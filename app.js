@@ -164,13 +164,10 @@ function handleDroppedFiles(files) {
 
   // If no tool is selected, suggest based on file type
   if (!state.currentTool) {
-    if (isPDF && files.length > 1) {
-      showTool('merge');
-      addMergeFiles(files);
-    } else if (isPDF) {
-      // Show tool selection hint or default to pages tool
-      showTool('pages');
-      loadPDFForTool(file, 'pages');
+    if (isPDF) {
+      // Default to Page Manager for all PDF operations
+      showTool('page-manager');
+      pmAddFiles(files);
     } else if (isImage && files.length > 1) {
       showTool('img-to-pdf');
       addImagesToPDF(files);
@@ -192,18 +189,6 @@ async function loadPDFForTool(file, tool) {
     
     // Initialize tool-specific views
     switch (tool) {
-      case 'split':
-        await renderSplitPages();
-        document.getElementById('split-btn').disabled = false;
-        break;
-      case 'rotate':
-        await renderRotatePages();
-        document.getElementById('rotate-btn').disabled = false;
-        break;
-      case 'pages':
-        await renderPagesGrid();
-        document.getElementById('pages-btn').disabled = false;
-        break;
       case 'pdf-to-img':
         await renderPdfImgPages();
         document.getElementById('pdf-img-btn').disabled = false;
