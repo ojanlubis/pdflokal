@@ -46,6 +46,13 @@ const state = {
   // Page Manager unified state
   pmPages: [], // Array of { pageNum, sourceFile, sourceName, rotation, selected, canvas }
   pmSourceFiles: [], // Array of { name, bytes }
+  // Enhanced PDF Editor state
+  editUndoStack: [],           // Stack of previous annotation states for undo
+  editRedoStack: [],           // Stack of undone states for redo
+  selectedAnnotation: null,    // Currently selected annotation { pageNum, index }
+  pendingTextPosition: null,   // Position where text will be placed { x, y }
+  editPageScales: {},          // Per-page scale factors for accurate coordinate mapping
+  editDevicePixelRatio: 1,     // Device pixel ratio for high-DPI displays
 };
 
 // ============================================================
@@ -2218,39 +2225,78 @@ async function applyCrop() {
 }
 
 // ============================================================
-// EDIT PDF (Whiteout, Text, Signature)
+// EDIT PDF (Whiteout, Text, Signature) - Enhanced Version
 // ============================================================
 
 async function initEditMode() {
   state.currentEditPage = 0;
   state.editAnnotations = {};
   state.currentEditTool = null;
-  
+  state.editUndoStack = [];
+  state.editRedoStack = [];
+  state.selectedAnnotation = null;
+  state.pendingTextPosition = null;
+  state.editPageScales = {};
+  state.editDevicePixelRatio = window.devicePixelRatio || 1;
+
   for (let i = 0; i < state.currentPDF.numPages; i++) {
     state.editAnnotations[i] = [];
   }
-  
+
+  // Setup keyboard shortcuts
+  setupEditKeyboardShortcuts();
+
   await renderEditPage();
   setupEditCanvas();
+  updateEditorStatus('Pilih alat untuk mulai mengedit');
 }
 
 async function renderEditPage() {
   const canvas = document.getElementById('edit-canvas');
   const ctx = canvas.getContext('2d');
+  const dpr = state.editDevicePixelRatio;
 
   const page = await state.currentPDF.getPage(state.currentEditPage + 1);
-  const scale = 1.5;
+
+  // Use adaptive scaling based on container width
+  const wrapper = document.querySelector('.editor-canvas-wrapper');
+  const maxWidth = wrapper ? wrapper.clientWidth - 40 : 800;
+  const naturalViewport = page.getViewport({ scale: 1 });
+
+  // Calculate scale to fit width while maintaining quality
+  let scale = Math.min(maxWidth / naturalViewport.width, 2);
+  scale = Math.max(scale, 1); // Minimum scale of 1
+
   const viewport = page.getViewport({ scale });
 
-  canvas.width = viewport.width;
-  canvas.height = viewport.height;
+  // Store scale info for this page for coordinate transformation
+  state.editPageScales[state.currentEditPage] = {
+    scale: scale,
+    pdfWidth: naturalViewport.width,
+    pdfHeight: naturalViewport.height,
+    canvasWidth: viewport.width,
+    canvasHeight: viewport.height
+  };
+
+  // Set canvas size accounting for device pixel ratio for crisp rendering
+  canvas.width = viewport.width * dpr;
+  canvas.height = viewport.height * dpr;
+  canvas.style.width = viewport.width + 'px';
+  canvas.style.height = viewport.height + 'px';
+
+  // Scale context for high-DPI displays
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
   await page.render({ canvasContext: ctx, viewport }).promise;
 
   // Draw annotations - await each one to ensure images are loaded
   const annotations = state.editAnnotations[state.currentEditPage] || [];
-  for (const anno of annotations) {
-    await drawAnnotation(ctx, anno);
+  for (let i = 0; i < annotations.length; i++) {
+    const anno = annotations[i];
+    const isSelected = state.selectedAnnotation &&
+                       state.selectedAnnotation.pageNum === state.currentEditPage &&
+                       state.selectedAnnotation.index === i;
+    await drawAnnotation(ctx, anno, isSelected);
   }
 
   document.getElementById('edit-page-info').textContent =
@@ -2260,31 +2306,48 @@ async function renderEditPage() {
   document.getElementById('edit-next').disabled = state.currentEditPage === state.currentPDF.numPages - 1;
 }
 
-function drawAnnotation(ctx, anno) {
+function drawAnnotation(ctx, anno, isSelected = false) {
   return new Promise((resolve) => {
     switch (anno.type) {
       case 'whiteout':
         ctx.fillStyle = 'white';
         ctx.fillRect(anno.x, anno.y, anno.width, anno.height);
+        if (isSelected) {
+          drawSelectionHandles(ctx, anno.x, anno.y, anno.width, anno.height);
+        }
         resolve();
         break;
       case 'text':
         ctx.font = `${anno.fontSize}px Arial`;
         ctx.fillStyle = anno.color;
-        ctx.fillText(anno.text, anno.x, anno.y);
+        // Handle multi-line text
+        const lines = anno.text.split('\n');
+        lines.forEach((line, i) => {
+          ctx.fillText(line, anno.x, anno.y + (i * anno.fontSize * 1.2));
+        });
+        if (isSelected) {
+          // Calculate text bounds for selection
+          const metrics = ctx.measureText(anno.text);
+          const textHeight = anno.fontSize * lines.length * 1.2;
+          drawSelectionHandles(ctx, anno.x - 2, anno.y - anno.fontSize, metrics.width + 4, textHeight + 4);
+        }
         resolve();
         break;
       case 'signature':
         if (anno.image && anno.cachedImg) {
-          // Use cached image if available
           ctx.drawImage(anno.cachedImg, anno.x, anno.y, anno.width, anno.height);
+          if (isSelected) {
+            drawSelectionHandles(ctx, anno.x, anno.y, anno.width, anno.height);
+          }
           resolve();
         } else if (anno.image) {
-          // Load image and cache it for future renders
           const img = new Image();
           img.onload = () => {
             anno.cachedImg = img;
             ctx.drawImage(img, anno.x, anno.y, anno.width, anno.height);
+            if (isSelected) {
+              drawSelectionHandles(ctx, anno.x, anno.y, anno.width, anno.height);
+            }
             resolve();
           };
           img.onerror = () => resolve();
@@ -2299,8 +2362,36 @@ function drawAnnotation(ctx, anno) {
   });
 }
 
+function drawSelectionHandles(ctx, x, y, width, height) {
+  // Draw selection border
+  ctx.strokeStyle = '#3B82F6';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([5, 3]);
+  ctx.strokeRect(x - 2, y - 2, width + 4, height + 4);
+  ctx.setLineDash([]);
+
+  // Draw corner handles
+  const handleSize = 8;
+  ctx.fillStyle = '#3B82F6';
+
+  // Top-left
+  ctx.fillRect(x - handleSize/2 - 2, y - handleSize/2 - 2, handleSize, handleSize);
+  // Top-right
+  ctx.fillRect(x + width - handleSize/2 + 2, y - handleSize/2 - 2, handleSize, handleSize);
+  // Bottom-left
+  ctx.fillRect(x - handleSize/2 - 2, y + height - handleSize/2 + 2, handleSize, handleSize);
+  // Bottom-right
+  ctx.fillRect(x + width - handleSize/2 + 2, y + height - handleSize/2 + 2, handleSize, handleSize);
+}
+
+function getCanvasCoordinates(e, canvas) {
+  const rect = canvas.getBoundingClientRect();
+  const x = (e.clientX - rect.left) * (canvas.width / canvas.clientWidth / state.editDevicePixelRatio);
+  const y = (e.clientY - rect.top) * (canvas.height / canvas.clientHeight / state.editDevicePixelRatio);
+  return { x, y };
+}
+
 function setupEditCanvas() {
-  // Prevent duplicate event listeners
   if (state.editCanvasSetup) {
     return;
   }
@@ -2311,114 +2402,226 @@ function setupEditCanvas() {
   state.editCanvasSetup = true;
 
   let isDrawing = false;
+  let isDragging = false;
+  let isResizing = false;
   let startX, startY;
+  let dragOffsetX, dragOffsetY;
 
-  canvas.addEventListener('mousedown', (e) => {
-    if (!state.currentEditTool) return;
+  // Mouse event handlers
+  canvas.addEventListener('mousedown', (e) => handlePointerDown(e, canvas));
+  canvas.addEventListener('mousemove', (e) => handlePointerMove(e, canvas));
+  canvas.addEventListener('mouseup', (e) => handlePointerUp(e, canvas));
+  canvas.addEventListener('mouseleave', () => { isDrawing = false; isDragging = false; });
 
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    startX = (e.clientX - rect.left) * scaleX;
-    startY = (e.clientY - rect.top) * scaleY;
+  // Touch event handlers for mobile support
+  canvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    const touch = e.touches[0];
+    handlePointerDown({ clientX: touch.clientX, clientY: touch.clientY }, canvas);
+  }, { passive: false });
+
+  canvas.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    const touch = e.touches[0];
+    handlePointerMove({ clientX: touch.clientX, clientY: touch.clientY }, canvas);
+  }, { passive: false });
+
+  canvas.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    const touch = e.changedTouches[0];
+    handlePointerUp({ clientX: touch.clientX, clientY: touch.clientY }, canvas);
+  }, { passive: false });
+
+  function handlePointerDown(e, canvas) {
+    const { x, y } = getCanvasCoordinates(e, canvas);
+    startX = x;
+    startY = y;
+
+    // Check if clicking on an existing annotation (select mode)
+    if (state.currentEditTool === 'select') {
+      const clickedAnno = findAnnotationAt(x, y);
+      if (clickedAnno) {
+        state.selectedAnnotation = clickedAnno;
+        isDragging = true;
+        const anno = state.editAnnotations[clickedAnno.pageNum][clickedAnno.index];
+        dragOffsetX = x - anno.x;
+        dragOffsetY = y - (anno.type === 'text' ? anno.y - anno.fontSize : anno.y);
+        renderEditPage();
+        return;
+      } else {
+        state.selectedAnnotation = null;
+        renderEditPage();
+      }
+    }
+
+    if (!state.currentEditTool || state.currentEditTool === 'select') return;
     isDrawing = true;
-  });
+  }
 
-  canvas.addEventListener('mousemove', (e) => {
+  function handlePointerMove(e, canvas) {
+    const { x, y } = getCanvasCoordinates(e, canvas);
+
+    // Handle dragging selected annotation
+    if (isDragging && state.selectedAnnotation) {
+      const anno = state.editAnnotations[state.selectedAnnotation.pageNum][state.selectedAnnotation.index];
+      if (anno.type === 'text') {
+        anno.x = x - dragOffsetX;
+        anno.y = y - dragOffsetY + anno.fontSize;
+      } else {
+        anno.x = x - dragOffsetX;
+        anno.y = y - dragOffsetY;
+      }
+      renderEditPage();
+      return;
+    }
+
     if (!isDrawing || state.currentEditTool !== 'whiteout') return;
 
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const currentX = (e.clientX - rect.left) * scaleX;
-    const currentY = (e.clientY - rect.top) * scaleY;
-
-    // Draw preview
+    // Draw preview for whiteout
     renderEditPage().then(() => {
       const ctx = canvas.getContext('2d');
+      ctx.setTransform(state.editDevicePixelRatio, 0, 0, state.editDevicePixelRatio, 0, 0);
       ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-      ctx.strokeStyle = '#ccc';
+      ctx.strokeStyle = '#3B82F6';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 3]);
       ctx.fillRect(
-        Math.min(startX, currentX),
-        Math.min(startY, currentY),
-        Math.abs(currentX - startX),
-        Math.abs(currentY - startY)
+        Math.min(startX, x),
+        Math.min(startY, y),
+        Math.abs(x - startX),
+        Math.abs(y - startY)
       );
       ctx.strokeRect(
-        Math.min(startX, currentX),
-        Math.min(startY, currentY),
-        Math.abs(currentX - startX),
-        Math.abs(currentY - startY)
+        Math.min(startX, x),
+        Math.min(startY, y),
+        Math.abs(x - startX),
+        Math.abs(y - startY)
       );
+      ctx.setLineDash([]);
     });
-  });
+  }
 
-  canvas.addEventListener('mouseup', (e) => {
+  function handlePointerUp(e, canvas) {
+    const { x, y } = getCanvasCoordinates(e, canvas);
+
+    // Handle end of drag
+    if (isDragging) {
+      isDragging = false;
+      saveUndoState();
+      return;
+    }
+
     if (!isDrawing) return;
     isDrawing = false;
 
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const endX = (e.clientX - rect.left) * scaleX;
-    const endY = (e.clientY - rect.top) * scaleY;
-
     if (state.currentEditTool === 'whiteout') {
-      state.editAnnotations[state.currentEditPage].push({
-        type: 'whiteout',
-        x: Math.min(startX, endX),
-        y: Math.min(startY, endY),
-        width: Math.abs(endX - startX),
-        height: Math.abs(endY - startY)
-      });
-      renderEditPage();
-    } else if (state.currentEditTool === 'text') {
-      const text = prompt('Masukkan teks:');
-      if (text) {
-        const fontSize = parseInt(document.getElementById('edit-font-size').value);
-        const color = document.getElementById('edit-text-color').value;
+      const width = Math.abs(x - startX);
+      const height = Math.abs(y - startY);
+      if (width > 5 && height > 5) { // Minimum size
+        saveUndoState();
         state.editAnnotations[state.currentEditPage].push({
-          type: 'text',
-          text,
-          x: startX,
-          y: startY,
-          fontSize,
-          color
+          type: 'whiteout',
+          x: Math.min(startX, x),
+          y: Math.min(startY, y),
+          width,
+          height
         });
         renderEditPage();
       }
+    } else if (state.currentEditTool === 'text') {
+      state.pendingTextPosition = { x: startX, y: startY };
+      openTextModal();
     } else if (state.currentEditTool === 'signature' && state.signatureImage) {
+      saveUndoState();
+      // Calculate signature size based on page scale (adaptive sizing)
+      const pageScale = state.editPageScales[state.currentEditPage];
+      const sigWidth = Math.min(200, pageScale.canvasWidth * 0.3);
+      const sigHeight = sigWidth / 2; // Maintain 2:1 aspect ratio
+
       state.editAnnotations[state.currentEditPage].push({
         type: 'signature',
         image: state.signatureImage,
         x: startX,
         y: startY,
-        width: 150,
-        height: 75
+        width: sigWidth,
+        height: sigHeight
       });
       renderEditPage();
+      updateEditorStatus('Tanda tangan ditambahkan');
     }
-  });
+  }
+}
 
-  // Handle mouse leaving the canvas
-  canvas.addEventListener('mouseleave', () => {
-    isDrawing = false;
-  });
+function findAnnotationAt(x, y) {
+  const annotations = state.editAnnotations[state.currentEditPage] || [];
+  // Check in reverse order (topmost first)
+  for (let i = annotations.length - 1; i >= 0; i--) {
+    const anno = annotations[i];
+    let bounds;
+
+    if (anno.type === 'whiteout' || anno.type === 'signature') {
+      bounds = { x: anno.x, y: anno.y, width: anno.width, height: anno.height };
+    } else if (anno.type === 'text') {
+      // Approximate text bounds
+      const canvas = document.getElementById('edit-canvas');
+      const ctx = canvas.getContext('2d');
+      ctx.font = `${anno.fontSize}px Arial`;
+      const metrics = ctx.measureText(anno.text);
+      const lines = anno.text.split('\n');
+      bounds = {
+        x: anno.x,
+        y: anno.y - anno.fontSize,
+        width: metrics.width,
+        height: anno.fontSize * lines.length * 1.2
+      };
+    }
+
+    if (bounds &&
+        x >= bounds.x && x <= bounds.x + bounds.width &&
+        y >= bounds.y && y <= bounds.y + bounds.height) {
+      return { pageNum: state.currentEditPage, index: i };
+    }
+  }
+  return null;
 }
 
 function setEditTool(tool) {
   state.currentEditTool = tool;
-  
+  state.selectedAnnotation = null;
+
   document.querySelectorAll('.editor-tool-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.editTool === tool);
   });
-  
-  document.getElementById('text-controls').style.display = 
-    tool === 'text' ? 'flex' : 'none';
+
+  // Update canvas cursor
+  const canvas = document.getElementById('edit-canvas');
+  canvas.className = 'editor-canvas';
+  if (tool) {
+    canvas.classList.add(`tool-${tool}`);
+  }
+
+  // Update status message
+  const messages = {
+    'select': 'Klik anotasi untuk memilih, seret untuk memindahkan',
+    'whiteout': 'Seret untuk menggambar area whiteout',
+    'text': 'Klik di mana Anda ingin menambahkan teks',
+    'signature': state.signatureImage ? 'Klik untuk menempatkan tanda tangan' : 'Buat tanda tangan terlebih dahulu'
+  };
+  updateEditorStatus(messages[tool] || 'Pilih alat untuk mulai mengedit');
+
+  renderEditPage();
+}
+
+function updateEditorStatus(message) {
+  const statusEl = document.querySelector('#editor-status .status-text');
+  if (statusEl) {
+    statusEl.textContent = message;
+  }
 }
 
 function editPrevPage() {
   if (state.currentEditPage > 0) {
+    state.selectedAnnotation = null;
     state.currentEditPage--;
     renderEditPage();
   }
@@ -2426,25 +2629,239 @@ function editPrevPage() {
 
 function editNextPage() {
   if (state.currentEditPage < state.currentPDF.numPages - 1) {
+    state.selectedAnnotation = null;
     state.currentEditPage++;
     renderEditPage();
   }
 }
 
-function undoEdit() {
-  const annotations = state.editAnnotations[state.currentEditPage];
-  if (annotations && annotations.length > 0) {
-    annotations.pop();
-    renderEditPage();
+// Undo/Redo System
+function saveUndoState() {
+  // Deep clone the current annotations
+  const currentState = JSON.parse(JSON.stringify(state.editAnnotations));
+  state.editUndoStack.push(currentState);
+  state.editRedoStack = []; // Clear redo stack when new action is performed
+
+  // Limit undo stack to 50 states
+  if (state.editUndoStack.length > 50) {
+    state.editUndoStack.shift();
   }
+}
+
+function undoEdit() {
+  if (state.editUndoStack.length === 0) {
+    showToast('Tidak ada yang bisa di-undo', 'info');
+    return;
+  }
+
+  // Save current state to redo stack
+  const currentState = JSON.parse(JSON.stringify(state.editAnnotations));
+  state.editRedoStack.push(currentState);
+
+  // Restore previous state
+  const previousState = state.editUndoStack.pop();
+
+  // Preserve cached images
+  for (const pageNum in previousState) {
+    for (const anno of previousState[pageNum]) {
+      if (anno.type === 'signature' && anno.image) {
+        // Find matching annotation in current state to copy cached image
+        const currentAnno = state.editAnnotations[pageNum]?.find(
+          a => a.type === 'signature' && a.image === anno.image
+        );
+        if (currentAnno?.cachedImg) {
+          anno.cachedImg = currentAnno.cachedImg;
+        }
+      }
+    }
+  }
+
+  state.editAnnotations = previousState;
+  state.selectedAnnotation = null;
+  renderEditPage();
+  showToast('Undo berhasil', 'success');
+}
+
+function redoEdit() {
+  if (state.editRedoStack.length === 0) {
+    showToast('Tidak ada yang bisa di-redo', 'info');
+    return;
+  }
+
+  // Save current state to undo stack
+  const currentState = JSON.parse(JSON.stringify(state.editAnnotations));
+  state.editUndoStack.push(currentState);
+
+  // Restore next state
+  const nextState = state.editRedoStack.pop();
+
+  // Preserve cached images
+  for (const pageNum in nextState) {
+    for (const anno of nextState[pageNum]) {
+      if (anno.type === 'signature' && anno.image) {
+        const currentAnno = state.editAnnotations[pageNum]?.find(
+          a => a.type === 'signature' && a.image === anno.image
+        );
+        if (currentAnno?.cachedImg) {
+          anno.cachedImg = currentAnno.cachedImg;
+        }
+      }
+    }
+  }
+
+  state.editAnnotations = nextState;
+  state.selectedAnnotation = null;
+  renderEditPage();
+  showToast('Redo berhasil', 'success');
+}
+
+function clearCurrentPageAnnotations() {
+  if (state.editAnnotations[state.currentEditPage]?.length === 0) {
+    showToast('Tidak ada anotasi di halaman ini', 'info');
+    return;
+  }
+
+  if (confirm('Hapus semua anotasi di halaman ini?')) {
+    saveUndoState();
+    state.editAnnotations[state.currentEditPage] = [];
+    state.selectedAnnotation = null;
+    renderEditPage();
+    showToast('Semua anotasi di halaman ini dihapus', 'success');
+  }
+}
+
+function deleteSelectedAnnotation() {
+  if (!state.selectedAnnotation) {
+    showToast('Pilih anotasi terlebih dahulu', 'info');
+    return;
+  }
+
+  saveUndoState();
+  const { pageNum, index } = state.selectedAnnotation;
+  state.editAnnotations[pageNum].splice(index, 1);
+  state.selectedAnnotation = null;
+  renderEditPage();
+  showToast('Anotasi dihapus', 'success');
+}
+
+// Keyboard shortcuts
+function setupEditKeyboardShortcuts() {
+  const handler = (e) => {
+    // Only handle when edit workspace is visible
+    const editWorkspace = document.getElementById('edit-pdf-workspace');
+    if (!editWorkspace || editWorkspace.style.display === 'none') return;
+
+    // Don't handle if typing in input
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+    // Ctrl/Cmd + Z for undo
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+      e.preventDefault();
+      undoEdit();
+    }
+    // Ctrl/Cmd + Y or Ctrl/Cmd + Shift + Z for redo
+    else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+      e.preventDefault();
+      redoEdit();
+    }
+    // Delete or Backspace to delete selected annotation
+    else if ((e.key === 'Delete' || e.key === 'Backspace') && state.selectedAnnotation) {
+      e.preventDefault();
+      deleteSelectedAnnotation();
+    }
+    // Tool shortcuts
+    else if (!e.ctrlKey && !e.metaKey) {
+      switch (e.key.toLowerCase()) {
+        case 'v': setEditTool('select'); break;
+        case 'w': setEditTool('whiteout'); break;
+        case 't': setEditTool('text'); break;
+        case 's': openSignatureModal(); break;
+        case 'escape':
+          state.selectedAnnotation = null;
+          state.currentEditTool = null;
+          document.querySelectorAll('.editor-tool-btn').forEach(btn => btn.classList.remove('active'));
+          renderEditPage();
+          break;
+      }
+    }
+  };
+
+  document.addEventListener('keydown', handler);
+  // Store reference to remove later if needed
+  state.editKeyboardHandler = handler;
+}
+
+// Text Input Modal
+function openTextModal() {
+  const modal = document.getElementById('text-input-modal');
+  modal.classList.add('active');
+
+  const textInput = document.getElementById('text-input-field');
+  textInput.value = '';
+  textInput.focus();
+
+  // Setup live preview
+  updateTextPreview();
+
+  textInput.addEventListener('input', updateTextPreview);
+  document.getElementById('modal-font-size').addEventListener('change', updateTextPreview);
+  document.getElementById('modal-text-color').addEventListener('input', updateTextPreview);
+}
+
+function closeTextModal() {
+  const modal = document.getElementById('text-input-modal');
+  modal.classList.remove('active');
+  state.pendingTextPosition = null;
+}
+
+function updateTextPreview() {
+  const text = document.getElementById('text-input-field').value || 'Preview teks';
+  const fontSize = document.getElementById('modal-font-size').value;
+  const color = document.getElementById('modal-text-color').value;
+
+  const preview = document.getElementById('text-preview');
+  preview.textContent = text;
+  preview.style.fontSize = fontSize + 'px';
+  preview.style.color = color;
+}
+
+function confirmTextInput() {
+  const text = document.getElementById('text-input-field').value.trim();
+
+  if (!text) {
+    showToast('Masukkan teks terlebih dahulu', 'error');
+    return;
+  }
+
+  if (!state.pendingTextPosition) {
+    showToast('Posisi teks tidak valid', 'error');
+    closeTextModal();
+    return;
+  }
+
+  const fontSize = parseInt(document.getElementById('modal-font-size').value);
+  const color = document.getElementById('modal-text-color').value;
+
+  saveUndoState();
+  state.editAnnotations[state.currentEditPage].push({
+    type: 'text',
+    text,
+    x: state.pendingTextPosition.x,
+    y: state.pendingTextPosition.y,
+    fontSize,
+    color
+  });
+
+  closeTextModal();
+  renderEditPage();
+  updateEditorStatus('Teks ditambahkan');
 }
 
 // Signature Modal
 function openSignatureModal() {
   document.getElementById('signature-modal').classList.add('active');
   setEditTool('signature');
-  
-  // Resize canvas after modal opens
+
   setTimeout(() => {
     const canvas = document.getElementById('signature-canvas');
     const ratio = Math.max(window.devicePixelRatio || 1, 1);
@@ -2470,6 +2887,7 @@ function useSignature() {
     state.signatureImage = state.signaturePad.toDataURL();
     closeSignatureModal();
     showToast('Klik pada PDF untuk menempatkan tanda tangan', 'success');
+    updateEditorStatus('Klik untuk menempatkan tanda tangan');
   } else {
     showToast('Buat tanda tangan terlebih dahulu', 'error');
   }
@@ -2479,65 +2897,107 @@ async function saveEditedPDF() {
   try {
     const srcDoc = await PDFLib.PDFDocument.load(state.currentPDFBytes);
     const pages = srcDoc.getPages();
-    
-    // Get scale factor
-    const canvas = document.getElementById('edit-canvas');
-    const firstPage = pages[0];
-    const { width: pageWidth, height: pageHeight } = firstPage.getSize();
-    
-    // We need to approximate - the canvas was rendered at 1.5x scale
-    const scale = 1.5;
-    
+
+    // Embed font once for all text annotations
+    const font = await srcDoc.embedFont(PDFLib.StandardFonts.Helvetica);
+
     for (let i = 0; i < pages.length; i++) {
       const page = pages[i];
       const annotations = state.editAnnotations[i] || [];
-      const { width, height } = page.getSize();
-      
+      const { width: pdfWidth, height: pdfHeight } = page.getSize();
+
+      // Get the scale info for this page
+      const pageScaleInfo = state.editPageScales[i];
+      if (!pageScaleInfo && annotations.length > 0) {
+        // If we don't have scale info (page wasn't viewed), we need to calculate it
+        const pdfPage = await state.currentPDF.getPage(i + 1);
+        const naturalViewport = pdfPage.getViewport({ scale: 1 });
+        const wrapper = document.querySelector('.editor-canvas-wrapper');
+        const maxWidth = wrapper ? wrapper.clientWidth - 40 : 800;
+        let scale = Math.min(maxWidth / naturalViewport.width, 2);
+        scale = Math.max(scale, 1);
+
+        state.editPageScales[i] = {
+          scale: scale,
+          pdfWidth: naturalViewport.width,
+          pdfHeight: naturalViewport.height,
+          canvasWidth: naturalViewport.width * scale,
+          canvasHeight: naturalViewport.height * scale
+        };
+      }
+
+      const scaleInfo = state.editPageScales[i];
+      if (!scaleInfo) continue;
+
+      // Correct scale factors: canvas coordinates to PDF coordinates
+      const scaleX = pdfWidth / scaleInfo.canvasWidth;
+      const scaleY = pdfHeight / scaleInfo.canvasHeight;
+
       for (const anno of annotations) {
-        const scaleX = width / (canvas.width / scale);
-        const scaleY = height / (canvas.height / scale);
-        
         if (anno.type === 'whiteout') {
+          // Convert canvas coordinates to PDF coordinates
+          const pdfX = anno.x * scaleX;
+          const pdfY = pdfHeight - (anno.y + anno.height) * scaleY; // Y is flipped in PDF
+          const pdfW = anno.width * scaleX;
+          const pdfH = anno.height * scaleY;
+
           page.drawRectangle({
-            x: anno.x * scaleX / scale,
-            y: height - (anno.y + anno.height) * scaleY / scale,
-            width: anno.width * scaleX / scale,
-            height: anno.height * scaleY / scale,
+            x: pdfX,
+            y: pdfY,
+            width: pdfW,
+            height: pdfH,
             color: PDFLib.rgb(1, 1, 1),
           });
         } else if (anno.type === 'text') {
-          const font = await srcDoc.embedFont(PDFLib.StandardFonts.Helvetica);
-          const hexColor = anno.color;
+          const hexColor = anno.color || '#000000';
           const r = parseInt(hexColor.slice(1, 3), 16) / 255;
           const g = parseInt(hexColor.slice(3, 5), 16) / 255;
           const b = parseInt(hexColor.slice(5, 7), 16) / 255;
-          
-          page.drawText(anno.text, {
-            x: anno.x * scaleX / scale,
-            y: height - anno.y * scaleY / scale,
-            size: anno.fontSize * scaleX / scale,
-            font,
-            color: PDFLib.rgb(r, g, b),
+
+          // Text position conversion
+          const pdfX = anno.x * scaleX;
+          const pdfY = pdfHeight - anno.y * scaleY;
+          const pdfFontSize = anno.fontSize * scaleX;
+
+          // Handle multi-line text
+          const lines = anno.text.split('\n');
+          lines.forEach((line, idx) => {
+            page.drawText(line, {
+              x: pdfX,
+              y: pdfY - (idx * pdfFontSize * 1.2),
+              size: pdfFontSize,
+              font,
+              color: PDFLib.rgb(r, g, b),
+            });
           });
         } else if (anno.type === 'signature' && anno.image) {
-          const pngImage = await srcDoc.embedPng(anno.image);
-          page.drawImage(pngImage, {
-            x: anno.x * scaleX / scale,
-            y: height - (anno.y + anno.height) * scaleY / scale,
-            width: anno.width * scaleX / scale,
-            height: anno.height * scaleY / scale,
-          });
+          try {
+            const pngImage = await srcDoc.embedPng(anno.image);
+            const pdfX = anno.x * scaleX;
+            const pdfY = pdfHeight - (anno.y + anno.height) * scaleY;
+            const pdfW = anno.width * scaleX;
+            const pdfH = anno.height * scaleY;
+
+            page.drawImage(pngImage, {
+              x: pdfX,
+              y: pdfY,
+              width: pdfW,
+              height: pdfH,
+            });
+          } catch (imgError) {
+            console.error('Error embedding signature:', imgError);
+          }
         }
       }
     }
-    
+
     const bytes = await srcDoc.save();
     downloadBlob(new Blob([bytes], { type: 'application/pdf' }), 'edited.pdf');
     showToast('PDF berhasil disimpan!', 'success');
-    
+
   } catch (error) {
     console.error('Error saving edited PDF:', error);
-    showToast('Gagal menyimpan PDF', 'error');
+    showToast('Gagal menyimpan PDF: ' + error.message, 'error');
   }
 }
 
