@@ -459,79 +459,94 @@ async function pmRenderPages() {
 
   for (let i = 0; i < state.pmPages.length; i++) {
     const pageData = state.pmPages[i];
-    const sourceFile = state.pmSourceFiles[pageData.sourceIndex];
 
-    try {
-      const pdf = await pdfjsLib.getDocument({ data: sourceFile.bytes.slice() }).promise;
-      const page = await pdf.getPage(pageData.pageNum);
+    // Use cached canvas if available, otherwise render
+    if (!pageData.canvas) {
+      const sourceFile = state.pmSourceFiles[pageData.sourceIndex];
+      try {
+        const pdf = await pdfjsLib.getDocument({ data: sourceFile.bytes.slice() }).promise;
+        const page = await pdf.getPage(pageData.pageNum);
 
-      const scale = 0.3;
-      const viewport = page.getViewport({ scale });
-      const canvas = document.createElement('canvas');
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-      const ctx = canvas.getContext('2d');
+        const scale = 0.3;
+        const viewport = page.getViewport({ scale });
+        const canvas = document.createElement('canvas');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        const ctx = canvas.getContext('2d');
 
-      await page.render({ canvasContext: ctx, viewport }).promise;
-
-      const div = document.createElement('div');
-      div.className = 'page-item' + (pageData.selected ? ' selected' : '');
-      div.dataset.index = i;
-      div.draggable = true;
-
-      // Apply rotation transform
-      if (pageData.rotation !== 0) {
-        canvas.style.transform = `rotate(${pageData.rotation}deg)`;
+        await page.render({ canvasContext: ctx, viewport }).promise;
+        pageData.canvas = canvas; // Cache the canvas
+      } catch (error) {
+        console.error('Error rendering page:', error);
+        continue;
       }
-
-      div.appendChild(canvas);
-
-      // Page number badge
-      const numBadge = document.createElement('span');
-      numBadge.className = 'page-item-number';
-      numBadge.textContent = i + 1;
-      div.appendChild(numBadge);
-
-      // Source file badge (truncated name)
-      const sourceBadge = document.createElement('span');
-      sourceBadge.className = 'page-source';
-      sourceBadge.textContent = pageData.sourceName.replace('.pdf', '').substring(0, 8);
-      sourceBadge.title = pageData.sourceName;
-      div.appendChild(sourceBadge);
-
-      // Rotation badge if rotated
-      if (pageData.rotation !== 0) {
-        const rotBadge = document.createElement('span');
-        rotBadge.className = 'page-rotation-badge';
-        rotBadge.textContent = pageData.rotation + '°';
-        div.appendChild(rotBadge);
-      }
-
-      // Delete button
-      const delBtn = document.createElement('button');
-      delBtn.className = 'delete-btn';
-      delBtn.textContent = '×';
-      delBtn.onclick = (e) => {
-        e.stopPropagation();
-        pmDeletePage(i);
-      };
-      div.appendChild(delBtn);
-
-      // Click to select
-      div.addEventListener('click', () => {
-        pageData.selected = !pageData.selected;
-        div.classList.toggle('selected', pageData.selected);
-        pmUpdateStatus();
-      });
-
-      container.appendChild(div);
-    } catch (error) {
-      console.error('Error rendering page:', error);
     }
+
+    const div = pmCreatePageElement(pageData, i);
+    container.appendChild(div);
   }
 
   // Enable drag-and-drop reordering
   pmEnableDragReorder();
+}
+
+function pmCreatePageElement(pageData, index) {
+  const div = document.createElement('div');
+  div.className = 'page-item' + (pageData.selected ? ' selected' : '');
+  div.dataset.index = index;
+  div.draggable = true;
+
+  // Clone the cached canvas
+  const canvas = pageData.canvas.cloneNode(true);
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(pageData.canvas, 0, 0);
+
+  // Apply rotation transform
+  if (pageData.rotation !== 0) {
+    canvas.style.transform = `rotate(${pageData.rotation}deg)`;
+  }
+
+  div.appendChild(canvas);
+
+  // Page number badge
+  const numBadge = document.createElement('span');
+  numBadge.className = 'page-item-number';
+  numBadge.textContent = index + 1;
+  div.appendChild(numBadge);
+
+  // Source file badge (truncated name)
+  const sourceBadge = document.createElement('span');
+  sourceBadge.className = 'page-source';
+  sourceBadge.textContent = pageData.sourceName.replace('.pdf', '').substring(0, 8);
+  sourceBadge.title = pageData.sourceName;
+  div.appendChild(sourceBadge);
+
+  // Rotation badge if rotated
+  if (pageData.rotation !== 0) {
+    const rotBadge = document.createElement('span');
+    rotBadge.className = 'page-rotation-badge';
+    rotBadge.textContent = pageData.rotation + '°';
+    div.appendChild(rotBadge);
+  }
+
+  // Delete button
+  const delBtn = document.createElement('button');
+  delBtn.className = 'delete-btn';
+  delBtn.textContent = '×';
+  delBtn.onclick = (e) => {
+    e.stopPropagation();
+    pmDeletePage(index);
+  };
+  div.appendChild(delBtn);
+
+  // Click to select
+  div.addEventListener('click', () => {
+    pageData.selected = !pageData.selected;
+    div.classList.toggle('selected', pageData.selected);
+    pmUpdateStatus();
+  });
+
+  return div;
 }
 
 function pmEnableDragReorder() {
@@ -568,9 +583,27 @@ function pmEnableDragReorder() {
         // Reorder in state
         const [movedPage] = state.pmPages.splice(draggedIndex, 1);
         state.pmPages.splice(targetIndex, 0, movedPage);
-        pmRenderPages();
+
+        // Move DOM element directly (no re-render)
+        if (draggedIndex < targetIndex) {
+          item.after(draggedItem);
+        } else {
+          item.before(draggedItem);
+        }
+
+        // Update all indices and page numbers
+        pmUpdateIndices();
       }
     });
+  });
+}
+
+function pmUpdateIndices() {
+  const container = document.getElementById('pm-pages');
+  container.querySelectorAll('.page-item').forEach((item, i) => {
+    item.dataset.index = i;
+    const numBadge = item.querySelector('.page-item-number');
+    if (numBadge) numBadge.textContent = i + 1;
   });
 }
 
@@ -598,13 +631,35 @@ function pmRotateSelected(degrees) {
     return;
   }
 
-  state.pmPages.forEach(p => {
+  const container = document.getElementById('pm-pages');
+  const items = container.querySelectorAll('.page-item');
+
+  state.pmPages.forEach((p, i) => {
     if (p.selected) {
       p.rotation = ((p.rotation + degrees) % 360 + 360) % 360;
+
+      // Update CSS transform on canvas (no re-render)
+      const item = items[i];
+      const canvas = item.querySelector('canvas');
+      if (canvas) {
+        canvas.style.transform = p.rotation !== 0 ? `rotate(${p.rotation}deg)` : '';
+      }
+
+      // Update or add/remove rotation badge
+      let rotBadge = item.querySelector('.page-rotation-badge');
+      if (p.rotation !== 0) {
+        if (!rotBadge) {
+          rotBadge = document.createElement('span');
+          rotBadge.className = 'page-rotation-badge';
+          item.appendChild(rotBadge);
+        }
+        rotBadge.textContent = p.rotation + '°';
+      } else if (rotBadge) {
+        rotBadge.remove();
+      }
     }
   });
 
-  pmRenderPages();
   showToast('Halaman diputar!', 'success');
 }
 
@@ -616,18 +671,47 @@ function pmDeleteSelected() {
     return;
   }
 
+  const container = document.getElementById('pm-pages');
+
+  // Remove selected DOM elements and filter state
+  state.pmPages.forEach((p, i) => {
+    if (p.selected) {
+      const item = container.querySelector(`[data-index="${i}"]`);
+      if (item) item.remove();
+    }
+  });
+
   state.pmPages = state.pmPages.filter(p => !p.selected);
-  pmRenderPages();
+
+  // Update indices after removal
+  pmUpdateIndices();
   pmUpdateStatus();
   pmUpdateDownloadButton();
+
+  // Show placeholder if empty
+  if (state.pmPages.length === 0) {
+    container.innerHTML = '<p style="color: var(--text-tertiary); width: 100%; text-align: center; padding: 2rem;">Seret file PDF ke sini atau klik "Tambah PDF"</p>';
+  }
+
   showToast('Halaman dihapus!', 'success');
 }
 
 function pmDeletePage(index) {
+  const container = document.getElementById('pm-pages');
+  const item = container.querySelector(`[data-index="${index}"]`);
+  if (item) item.remove();
+
   state.pmPages.splice(index, 1);
-  pmRenderPages();
+
+  // Update indices after removal
+  pmUpdateIndices();
   pmUpdateStatus();
   pmUpdateDownloadButton();
+
+  // Show placeholder if empty
+  if (state.pmPages.length === 0) {
+    container.innerHTML = '<p style="color: var(--text-tertiary); width: 100%; text-align: center; padding: 2rem;">Seret file PDF ke sini atau klik "Tambah PDF"</p>';
+  }
 }
 
 function pmUpdateStatus() {
