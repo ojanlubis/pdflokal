@@ -1211,6 +1211,23 @@ a:hover {
   cursor: grabbing;
 }
 
+/* Drop indicator for drag and drop */
+.drop-indicator {
+  width: 4px;
+  height: 140px;
+  background: var(--accent-primary);
+  border-radius: 2px;
+  margin: 0 -2px;
+  box-shadow: 0 0 8px var(--accent-primary);
+  animation: pulse-indicator 0.8s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+@keyframes pulse-indicator {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
 .page-item .delete-btn {
   position: absolute;
   bottom: 24px;

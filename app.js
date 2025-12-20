@@ -553,6 +553,22 @@ function pmEnableDragReorder() {
   const container = document.getElementById('pm-pages');
   let draggedItem = null;
   let draggedIndex = -1;
+  let dropIndicator = null;
+
+  // Create drop indicator element
+  function getDropIndicator() {
+    if (!dropIndicator) {
+      dropIndicator = document.createElement('div');
+      dropIndicator.className = 'drop-indicator';
+    }
+    return dropIndicator;
+  }
+
+  function removeDropIndicator() {
+    if (dropIndicator && dropIndicator.parentNode) {
+      dropIndicator.remove();
+    }
+  }
 
   container.querySelectorAll('.page-item').forEach((item) => {
     item.addEventListener('dragstart', (e) => {
@@ -567,34 +583,130 @@ function pmEnableDragReorder() {
         draggedItem.classList.remove('dragging');
         draggedItem = null;
       }
+      removeDropIndicator();
     });
 
     item.addEventListener('dragover', (e) => {
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
+      if (!draggedItem || item === draggedItem) return;
+
+      const rect = item.getBoundingClientRect();
+      const midpoint = rect.left + rect.width / 2;
+      const indicator = getDropIndicator();
+
+      // Show indicator on left or right side based on mouse position
+      if (e.clientX < midpoint) {
+        item.before(indicator);
+      } else {
+        item.after(indicator);
+      }
+    });
+
+    item.addEventListener('dragleave', () => {
+      // Don't remove immediately - let dragover on next item handle it
     });
 
     item.addEventListener('drop', (e) => {
       e.preventDefault();
+      e.stopPropagation();
       if (!draggedItem) return;
 
       const targetIndex = parseInt(item.dataset.index);
-      if (draggedIndex !== targetIndex) {
+      const rect = item.getBoundingClientRect();
+      const midpoint = rect.left + rect.width / 2;
+      const insertBefore = e.clientX < midpoint;
+
+      // Calculate final position
+      let newIndex = insertBefore ? targetIndex : targetIndex + 1;
+      if (draggedIndex < targetIndex) newIndex--;
+
+      if (draggedIndex !== newIndex && newIndex !== draggedIndex + 1 || insertBefore && draggedIndex !== targetIndex) {
         // Reorder in state
         const [movedPage] = state.pmPages.splice(draggedIndex, 1);
-        state.pmPages.splice(targetIndex, 0, movedPage);
+        const adjustedIndex = draggedIndex < (insertBefore ? targetIndex : targetIndex + 1)
+          ? (insertBefore ? targetIndex - 1 : targetIndex)
+          : (insertBefore ? targetIndex : targetIndex + 1);
+        state.pmPages.splice(adjustedIndex, 0, movedPage);
 
-        // Move DOM element directly (no re-render)
-        if (draggedIndex < targetIndex) {
-          item.after(draggedItem);
-        } else {
+        // Move DOM element directly
+        if (insertBefore) {
           item.before(draggedItem);
+        } else {
+          item.after(draggedItem);
         }
 
-        // Update all indices and page numbers
         pmUpdateIndices();
       }
+
+      removeDropIndicator();
     });
+  });
+
+  // Handle drops on the container itself (for first/last position)
+  container.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    if (!draggedItem) return;
+
+    const items = container.querySelectorAll('.page-item:not(.dragging)');
+    if (items.length === 0) return;
+
+    const indicator = getDropIndicator();
+    const containerRect = container.getBoundingClientRect();
+    const firstItem = items[0];
+    const lastItem = items[items.length - 1];
+    const firstRect = firstItem.getBoundingClientRect();
+    const lastRect = lastItem.getBoundingClientRect();
+
+    // Check if near left edge (before first item)
+    if (e.clientX < firstRect.left) {
+      firstItem.before(indicator);
+    }
+    // Check if near right edge (after last item)
+    else if (e.clientX > lastRect.right) {
+      lastItem.after(indicator);
+    }
+  });
+
+  container.addEventListener('drop', (e) => {
+    if (!draggedItem) return;
+    // Only handle if dropped on container, not on items
+    if (e.target === container || e.target.classList.contains('drop-indicator')) {
+      e.preventDefault();
+
+      const items = container.querySelectorAll('.page-item:not(.dragging)');
+      if (items.length === 0) return;
+
+      const firstItem = items[0];
+      const lastItem = items[items.length - 1];
+      const firstRect = firstItem.getBoundingClientRect();
+      const lastRect = lastItem.getBoundingClientRect();
+
+      let newIndex = -1;
+
+      // Dropped before first item
+      if (e.clientX < firstRect.left + firstRect.width / 2) {
+        newIndex = 0;
+        if (draggedIndex !== 0) {
+          const [movedPage] = state.pmPages.splice(draggedIndex, 1);
+          state.pmPages.unshift(movedPage);
+          container.insertBefore(draggedItem, firstItem);
+          pmUpdateIndices();
+        }
+      }
+      // Dropped after last item
+      else if (e.clientX > lastRect.left + lastRect.width / 2) {
+        newIndex = state.pmPages.length - 1;
+        if (draggedIndex !== state.pmPages.length - 1) {
+          const [movedPage] = state.pmPages.splice(draggedIndex, 1);
+          state.pmPages.push(movedPage);
+          container.appendChild(draggedItem);
+          pmUpdateIndices();
+        }
+      }
+
+      removeDropIndicator();
+    }
   });
 }
 
