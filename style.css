@@ -1261,6 +1261,264 @@ a:hover {
   }
 }
 
+/* Enhanced PDF Editor Styles */
+.editor-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+  padding-bottom: var(--space-lg);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.editor-tool-group {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.editor-tool-divider {
+  width: 1px;
+  height: 32px;
+  background: var(--border-light);
+}
+
+.editor-action-group {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.editor-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: all var(--transition-fast);
+}
+
+.editor-action-btn:hover {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  background: var(--accent-light);
+}
+
+.editor-action-btn.danger:hover {
+  border-color: #dc2626;
+  color: #dc2626;
+  background: rgba(220, 38, 38, 0.1);
+}
+
+.editor-status {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.editor-status .status-text {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+/* Text Input Modal */
+.edit-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.5);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.edit-modal.active {
+  display: flex;
+}
+
+.edit-modal-box {
+  background: var(--bg-secondary);
+  border-radius: var(--radius-lg);
+  padding: var(--space-xl);
+  max-width: 480px;
+  width: 90%;
+  box-shadow: var(--shadow-xl);
+}
+
+.edit-modal-box h3 {
+  margin-bottom: var(--space-lg);
+  font-size: 1.125rem;
+}
+
+.edit-modal-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.edit-text-input {
+  width: 100%;
+  padding: var(--space-md);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-md);
+  font-size: 1rem;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 80px;
+  transition: border-color var(--transition-fast);
+}
+
+.edit-text-input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+.edit-text-options {
+  display: flex;
+  gap: var(--space-lg);
+  flex-wrap: wrap;
+}
+
+.edit-option-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.edit-option-group label {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+.edit-option-group select,
+.edit-option-group input[type="color"] {
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.edit-option-group input[type="color"] {
+  width: 50px;
+  height: 36px;
+  padding: 2px;
+}
+
+.edit-text-preview {
+  padding: var(--space-md);
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+}
+
+#text-preview-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  display: block;
+  margin-bottom: var(--space-xs);
+}
+
+.text-preview-box {
+  min-height: 40px;
+  padding: var(--space-sm);
+  background: white;
+  border-radius: var(--radius-sm);
+  word-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+.edit-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-md);
+  margin-top: var(--space-lg);
+}
+
+/* Annotation Selection Handles */
+.annotation-selected {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* Canvas Cursors */
+.editor-canvas.tool-select { cursor: default; }
+.editor-canvas.tool-whiteout { cursor: crosshair; }
+.editor-canvas.tool-text { cursor: text; }
+.editor-canvas.tool-signature { cursor: copy; }
+.editor-canvas.dragging { cursor: grabbing; }
+.editor-canvas.resizing { cursor: nwse-resize; }
+
+/* Annotation Resize Handles (rendered via CSS overlay) */
+.resize-handle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: var(--accent-primary);
+  border: 2px solid white;
+  border-radius: 2px;
+  cursor: nwse-resize;
+}
+
+.resize-handle.nw { top: -5px; left: -5px; cursor: nwse-resize; }
+.resize-handle.ne { top: -5px; right: -5px; cursor: nesw-resize; }
+.resize-handle.sw { bottom: -5px; left: -5px; cursor: nesw-resize; }
+.resize-handle.se { bottom: -5px; right: -5px; cursor: nwse-resize; }
+
+/* Mobile Responsive for Editor */
+@media (max-width: 768px) {
+  .editor-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-sm);
+  }
+
+  .editor-tool-group {
+    justify-content: center;
+  }
+
+  .editor-tool-divider {
+    display: none;
+  }
+
+  .editor-action-group {
+    justify-content: center;
+  }
+
+  .editor-status {
+    justify-content: center;
+    margin-left: 0;
+    margin-top: var(--space-sm);
+  }
+
+  .editor-tool-btn {
+    padding: var(--space-sm);
+    font-size: 0.75rem;
+  }
+
+  .editor-tool-btn svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .edit-modal-box {
+    padding: var(--space-lg);
+  }
+
+  .edit-text-options {
+    flex-direction: column;
+    gap: var(--space-md);
+  }
+}
+
 /* Utility Classes */
 .hidden { display: none !important; }
 .text-center { text-align: center; }
