@@ -2251,6 +2251,9 @@ async function initEditMode() {
   updateEditorStatus('Pilih alat untuk mulai mengedit');
 }
 
+// Cached PDF page image for smooth dragging
+let editPageCache = null;
+
 async function renderEditPage() {
   const canvas = document.getElementById('edit-canvas');
   const ctx = canvas.getContext('2d');
@@ -2289,21 +2292,75 @@ async function renderEditPage() {
 
   await page.render({ canvasContext: ctx, viewport }).promise;
 
-  // Draw annotations - await each one to ensure images are loaded
-  const annotations = state.editAnnotations[state.currentEditPage] || [];
-  for (let i = 0; i < annotations.length; i++) {
-    const anno = annotations[i];
-    const isSelected = state.selectedAnnotation &&
-                       state.selectedAnnotation.pageNum === state.currentEditPage &&
-                       state.selectedAnnotation.index === i;
-    await drawAnnotation(ctx, anno, isSelected);
-  }
+  // Cache the rendered PDF page (without annotations) for smooth dragging
+  editPageCache = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+  // Draw annotations
+  redrawAnnotationsOnly();
 
   document.getElementById('edit-page-info').textContent =
     `Halaman ${state.currentEditPage + 1} dari ${state.currentPDF.numPages}`;
 
   document.getElementById('edit-prev').disabled = state.currentEditPage === 0;
   document.getElementById('edit-next').disabled = state.currentEditPage === state.currentPDF.numPages - 1;
+}
+
+// Synchronous function to redraw annotations from cache - used during drag
+function redrawAnnotationsOnly() {
+  const canvas = document.getElementById('edit-canvas');
+  const ctx = canvas.getContext('2d');
+
+  // Restore cached PDF page
+  if (editPageCache) {
+    ctx.putImageData(editPageCache, 0, 0);
+  }
+
+  // Reset transform after putImageData (which resets it)
+  ctx.setTransform(state.editDevicePixelRatio, 0, 0, state.editDevicePixelRatio, 0, 0);
+
+  // Draw annotations synchronously
+  const annotations = state.editAnnotations[state.currentEditPage] || [];
+  for (let i = 0; i < annotations.length; i++) {
+    const anno = annotations[i];
+    const isSelected = state.selectedAnnotation &&
+                       state.selectedAnnotation.pageNum === state.currentEditPage &&
+                       state.selectedAnnotation.index === i;
+    drawAnnotationSync(ctx, anno, isSelected);
+  }
+}
+
+// Synchronous version of drawAnnotation for drag operations
+function drawAnnotationSync(ctx, anno, isSelected = false) {
+  switch (anno.type) {
+    case 'whiteout':
+      ctx.fillStyle = 'white';
+      ctx.fillRect(anno.x, anno.y, anno.width, anno.height);
+      if (isSelected) {
+        drawSelectionHandles(ctx, anno.x, anno.y, anno.width, anno.height);
+      }
+      break;
+    case 'text':
+      ctx.font = `${anno.fontSize}px Arial`;
+      ctx.fillStyle = anno.color;
+      const lines = anno.text.split('\n');
+      lines.forEach((line, i) => {
+        ctx.fillText(line, anno.x, anno.y + (i * anno.fontSize * 1.2));
+      });
+      if (isSelected) {
+        const metrics = ctx.measureText(anno.text);
+        const textHeight = anno.fontSize * lines.length * 1.2;
+        drawSelectionHandles(ctx, anno.x - 2, anno.y - anno.fontSize, metrics.width + 4, textHeight + 4);
+      }
+      break;
+    case 'signature':
+      if (anno.image && anno.cachedImg) {
+        ctx.drawImage(anno.cachedImg, anno.x, anno.y, anno.width, anno.height);
+        if (isSelected) {
+          drawSelectionHandles(ctx, anno.x, anno.y, anno.width, anno.height);
+        }
+      }
+      break;
+  }
 }
 
 function drawAnnotation(ctx, anno, isSelected = false) {
@@ -2441,16 +2498,18 @@ function setupEditCanvas() {
     if (state.currentEditTool === 'select') {
       const clickedAnno = findAnnotationAt(x, y);
       if (clickedAnno) {
+        // Save undo state BEFORE we start dragging (so we can undo to original position)
+        saveUndoState();
         state.selectedAnnotation = clickedAnno;
         isDragging = true;
         const anno = state.editAnnotations[clickedAnno.pageNum][clickedAnno.index];
         dragOffsetX = x - anno.x;
         dragOffsetY = y - (anno.type === 'text' ? anno.y - anno.fontSize : anno.y);
-        renderEditPage();
+        redrawAnnotationsOnly();
         return;
       } else {
         state.selectedAnnotation = null;
-        renderEditPage();
+        redrawAnnotationsOnly();
       }
     }
 
@@ -2461,7 +2520,7 @@ function setupEditCanvas() {
   function handlePointerMove(e, canvas) {
     const { x, y } = getCanvasCoordinates(e, canvas);
 
-    // Handle dragging selected annotation
+    // Handle dragging selected annotation - use synchronous redraw for smooth movement
     if (isDragging && state.selectedAnnotation) {
       const anno = state.editAnnotations[state.selectedAnnotation.pageNum][state.selectedAnnotation.index];
       if (anno.type === 'text') {
@@ -2471,43 +2530,41 @@ function setupEditCanvas() {
         anno.x = x - dragOffsetX;
         anno.y = y - dragOffsetY;
       }
-      renderEditPage();
+      // Use synchronous redraw from cache - no async issues
+      redrawAnnotationsOnly();
       return;
     }
 
     if (!isDrawing || state.currentEditTool !== 'whiteout') return;
 
-    // Draw preview for whiteout
-    renderEditPage().then(() => {
-      const ctx = canvas.getContext('2d');
-      ctx.setTransform(state.editDevicePixelRatio, 0, 0, state.editDevicePixelRatio, 0, 0);
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-      ctx.strokeStyle = '#3B82F6';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([5, 3]);
-      ctx.fillRect(
-        Math.min(startX, x),
-        Math.min(startY, y),
-        Math.abs(x - startX),
-        Math.abs(y - startY)
-      );
-      ctx.strokeRect(
-        Math.min(startX, x),
-        Math.min(startY, y),
-        Math.abs(x - startX),
-        Math.abs(y - startY)
-      );
-      ctx.setLineDash([]);
-    });
+    // Draw preview for whiteout - use synchronous redraw
+    redrawAnnotationsOnly();
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+    ctx.strokeStyle = '#3B82F6';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 3]);
+    ctx.fillRect(
+      Math.min(startX, x),
+      Math.min(startY, y),
+      Math.abs(x - startX),
+      Math.abs(y - startY)
+    );
+    ctx.strokeRect(
+      Math.min(startX, x),
+      Math.min(startY, y),
+      Math.abs(x - startX),
+      Math.abs(y - startY)
+    );
+    ctx.setLineDash([]);
   }
 
   function handlePointerUp(e, canvas) {
     const { x, y } = getCanvasCoordinates(e, canvas);
 
-    // Handle end of drag
+    // Handle end of drag (undo state was already saved in handlePointerDown)
     if (isDragging) {
       isDragging = false;
-      saveUndoState();
       return;
     }
 
