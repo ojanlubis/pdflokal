@@ -88,26 +88,30 @@
         <div class="tools-category">
           <h2>PDF</h2>
           <div class="tools-grid">
-            <div class="tool-card" data-tool="merge">
+            <div class="tool-card" data-tool="page-manager">
               <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M16 16v6H8v-6"/>
-                <path d="M12 16V2"/>
-                <path d="M20 10H4"/>
-                <path d="M20 10l-4-4"/>
-                <path d="M20 10l-4 4"/>
-                <path d="M4 10l4-4"/>
-                <path d="M4 10l4 4"/>
+                <rect x="3" y="3" width="7" height="9"/>
+                <rect x="14" y="3" width="7" height="9"/>
+                <rect x="3" y="14" width="7" height="7"/>
+                <rect x="14" y="14" width="7" height="7"/>
               </svg>
-              <h3>Gabung PDF</h3>
+              <h3>Kelola Halaman</h3>
+              <p>Gabung, pisah, atur, putar</p>
             </div>
-            <div class="tool-card" data-tool="split">
+            <div class="tool-card" data-tool="edit">
               <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M16 3H8v6"/>
-                <path d="M8 21h8v-6"/>
-                <path d="M12 3v18"/>
-                <path d="M4 12h16"/>
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
               </svg>
-              <h3>Pisah PDF</h3>
+              <h3>Edit PDF</h3>
+            </div>
+            <div class="tool-card" data-tool="pdf-to-img">
+              <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                <circle cx="8.5" cy="8.5" r="1.5"/>
+                <polyline points="21 15 16 10 5 21"/>
+              </svg>
+              <h3>PDF ke Gambar</h3>
             </div>
             <div class="tool-card" data-tool="compress-pdf">
               <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -117,37 +121,6 @@
               </svg>
               <h3>Kompres PDF</h3>
               <p>Struktur saja</p>
-            </div>
-            <div class="tool-card" data-tool="rotate">
-              <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/>
-                <path d="M21 3v5h-5"/>
-              </svg>
-              <h3>Putar</h3>
-            </div>
-            <div class="tool-card" data-tool="edit">
-              <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-              </svg>
-              <h3>Edit PDF</h3>
-            </div>
-            <div class="tool-card" data-tool="pages">
-              <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="3" width="7" height="9"/>
-                <rect x="14" y="3" width="7" height="9"/>
-                <rect x="3" y="14" width="7" height="7"/>
-                <rect x="14" y="14" width="7" height="7"/>
-              </svg>
-              <h3>Atur Halaman</h3>
-            </div>
-            <div class="tool-card" data-tool="pdf-to-img">
-              <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                <circle cx="8.5" cy="8.5" r="1.5"/>
-                <polyline points="21 15 16 10 5 21"/>
-              </svg>
-              <h3>PDF ke Gambar</h3>
             </div>
             <div class="tool-card" data-tool="protect">
               <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -274,74 +247,62 @@
          WORKSPACE VIEWS - Each tool has its own workspace
          ================================================================ -->
 
-    <!-- Merge PDF Workspace -->
-    <div id="merge-workspace" class="workspace">
+    <!-- Unified Page Manager Workspace -->
+    <div id="page-manager-workspace" class="workspace">
       <div class="workspace-header">
         <h2>
           <button class="back-btn" onclick="showHome()">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
             Kembali
           </button>
-          Gabung PDF
+          Kelola Halaman
         </h2>
       </div>
-      <div class="file-list" id="merge-file-list">
-        <p style="color: var(--text-tertiary); width: 100%; text-align: center;">Seret file PDF ke sini atau gunakan tombol di bawah</p>
-      </div>
-      <div class="controls">
-        <button class="btn btn-secondary" onclick="document.getElementById('merge-input').click()">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-          Tambah File
+      <p class="mb-md" style="color: var(--text-secondary);">
+        Seret file PDF untuk menambah • Seret halaman untuk mengatur urutan • Klik halaman untuk memilih
+      </p>
+      <div class="page-manager-toolbar">
+        <button class="btn btn-secondary" onclick="document.getElementById('pm-file-input').click()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          Tambah PDF
         </button>
-        <input type="file" id="merge-input" multiple accept=".pdf" style="display:none">
-      </div>
-      <div class="action-bar">
-        <button class="btn btn-primary btn-lg" id="merge-btn" disabled onclick="mergePDFs()">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Gabung & Download
+        <input type="file" id="pm-file-input" multiple accept=".pdf" style="display:none">
+        <div class="toolbar-divider"></div>
+        <button class="btn btn-secondary" onclick="pmSelectAll()">Pilih Semua</button>
+        <button class="btn btn-secondary" onclick="pmDeselectAll()">Batal Pilih</button>
+        <div class="toolbar-divider"></div>
+        <button class="btn btn-secondary" onclick="pmRotateSelected(90)" title="Putar 90° searah jarum jam">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+          Putar
+        </button>
+        <button class="btn btn-secondary" onclick="pmDeleteSelected()" title="Hapus halaman terpilih">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          Hapus
         </button>
       </div>
-      <div class="progress-container hidden" id="merge-progress">
-        <div class="progress-bar"><div class="progress-fill" style="width: 0%"></div></div>
-        <p class="progress-text">Memproses...</p>
+      <div class="page-grid" id="pm-pages">
+        <p style="color: var(--text-tertiary); width: 100%; text-align: center; padding: 2rem;">
+          Seret file PDF ke sini atau klik "Tambah PDF"
+        </p>
       </div>
-    </div>
-
-    <!-- Split PDF Workspace -->
-    <div id="split-workspace" class="workspace">
-      <div class="workspace-header">
-        <h2>
-          <button class="back-btn" onclick="showHome()">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-            Kembali
-          </button>
-          Pisah PDF
-        </h2>
-      </div>
-      <div class="page-grid" id="split-pages"></div>
-      <div class="controls">
+      <div class="pm-status" id="pm-status"></div>
+      <div class="controls" style="flex-wrap: wrap;">
         <div class="control-group">
-          <label>Mode:</label>
-          <select id="split-mode">
+          <label>Aksi:</label>
+          <select id="pm-action">
+            <option value="save">Simpan semua halaman</option>
             <option value="extract">Ekstrak halaman terpilih</option>
-            <option value="range">Pisah berdasarkan range</option>
-            <option value="each">Setiap halaman jadi file</option>
+            <option value="split-each">Pisah: setiap halaman jadi file</option>
           </select>
         </div>
-        <div class="control-group" id="split-range-input" style="display:none">
-          <label>Range (misal: 1-3, 5, 7-10):</label>
-          <input type="text" id="split-range" placeholder="1-3, 5, 7-10">
-        </div>
-        <button class="btn btn-secondary" onclick="selectAllPages()">Pilih Semua</button>
-        <button class="btn btn-secondary" onclick="deselectAllPages()">Hapus Pilihan</button>
       </div>
       <div class="action-bar">
-        <button class="btn btn-primary btn-lg" id="split-btn" disabled onclick="splitPDF()">
+        <button class="btn btn-primary btn-lg" id="pm-download-btn" disabled onclick="pmDownload()">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Pisah & Download
+          Download
         </button>
       </div>
-      <div class="progress-container hidden" id="split-progress">
+      <div class="progress-container hidden" id="pm-progress">
         <div class="progress-bar"><div class="progress-fill" style="width: 0%"></div></div>
         <p class="progress-text">Memproses...</p>
       </div>
@@ -380,32 +341,6 @@
       <div class="progress-container hidden" id="compress-pdf-progress">
         <div class="progress-bar"><div class="progress-fill" style="width: 0%"></div></div>
         <p class="progress-text">Memproses...</p>
-      </div>
-    </div>
-
-    <!-- Rotate PDF Workspace -->
-    <div id="rotate-workspace" class="workspace">
-      <div class="workspace-header">
-        <h2>
-          <button class="back-btn" onclick="showHome()">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-            Kembali
-          </button>
-          Putar PDF
-        </h2>
-      </div>
-      <div class="page-grid" id="rotate-pages"></div>
-      <div class="controls">
-        <button class="btn btn-secondary" onclick="rotateSelected(90)">↻ Putar 90°</button>
-        <button class="btn btn-secondary" onclick="rotateSelected(180)">↻ Putar 180°</button>
-        <button class="btn btn-secondary" onclick="rotateSelected(270)">↻ Putar 270°</button>
-        <button class="btn btn-secondary" onclick="rotateAll(90)">Putar Semua 90°</button>
-      </div>
-      <div class="action-bar">
-        <button class="btn btn-primary btn-lg" id="rotate-btn" disabled onclick="saveRotatedPDF()">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Download
-        </button>
       </div>
     </div>
 
@@ -460,33 +395,6 @@
         <button class="btn btn-primary btn-lg" id="edit-btn" disabled onclick="saveEditedPDF()">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Download PDF
-        </button>
-      </div>
-    </div>
-
-    <!-- Pages (Reorder/Delete/Extract) Workspace -->
-    <div id="pages-workspace" class="workspace">
-      <div class="workspace-header">
-        <h2>
-          <button class="back-btn" onclick="showHome()">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-            Kembali
-          </button>
-          Atur Halaman
-        </h2>
-      </div>
-      <p class="mb-md" style="color: var(--text-secondary);">Seret untuk mengubah urutan • Klik untuk memilih • Klik tombol × untuk menghapus</p>
-      <div class="page-grid" id="pages-grid"></div>
-      <div class="controls">
-        <button class="btn btn-secondary" onclick="deleteSelectedPages()">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-          Hapus Terpilih
-        </button>
-      </div>
-      <div class="action-bar">
-        <button class="btn btn-primary btn-lg" id="pages-btn" disabled onclick="saveReorderedPDF()">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Download
         </button>
       </div>
     </div>
