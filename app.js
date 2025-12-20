@@ -29,6 +29,20 @@ const state = {
   signatureImage: null,
   originalImage: null,
   originalImageName: null,
+  // Additional state for proper cleanup
+  imgToPdfFiles: [],
+  pdfImgPages: [],
+  compressedBlob: null,
+  originalImageSize: 0,
+  originalWidth: 0,
+  originalHeight: 0,
+  // Track setup states to prevent duplicate event listeners
+  workspaceDropZonesSetup: new Set(),
+  cropCanvasSetup: false,
+  editCanvasSetup: false,
+  // Track blob URLs for cleanup
+  blobUrls: [],
+  compressPreviewUrl: null,
 };
 
 // ============================================================
@@ -258,10 +272,33 @@ async function loadImageForTool(file, tool) {
 function loadImage(file) {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = reject;
-    img.src = URL.createObjectURL(file);
+    const blobUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      // Store the blob URL on the image for later cleanup
+      img._blobUrl = blobUrl;
+      resolve(img);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(blobUrl);
+      reject(new Error('Failed to load image'));
+    };
+    img.src = blobUrl;
   });
+}
+
+// Helper function to escape HTML and prevent XSS
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// Helper function to revoke blob URL from an image
+function cleanupImage(img) {
+  if (img && img._blobUrl) {
+    URL.revokeObjectURL(img._blobUrl);
+    img._blobUrl = null;
+  }
 }
 
 // ============================================================
@@ -290,16 +327,24 @@ function showTool(tool) {
 }
 
 function setupWorkspaceDropZone(tool) {
+  // Prevent duplicate event listeners
+  if (state.workspaceDropZonesSetup.has(tool)) {
+    return;
+  }
+
   const workspace = document.getElementById(`${tool}-workspace`);
-  
+  if (!workspace) return;
+
+  state.workspaceDropZonesSetup.add(tool);
+
   workspace.addEventListener('dragover', (e) => {
     e.preventDefault();
   });
-  
+
   workspace.addEventListener('drop', (e) => {
     e.preventDefault();
     const files = e.dataTransfer.files;
-    
+
     if (tool === 'merge') {
       addMergeFiles(files);
     } else if (tool === 'img-to-pdf') {
@@ -325,7 +370,36 @@ function resetState() {
   state.pagesOrder = [];
   state.editAnnotations = {};
   state.currentEditPage = 0;
+
+  // Cleanup original image blob URL
+  cleanupImage(state.originalImage);
   state.originalImage = null;
+  state.originalImageName = null;
+  state.originalImageSize = 0;
+  state.originalWidth = 0;
+  state.originalHeight = 0;
+
+  // Cleanup images to PDF
+  state.imgToPdfFiles.forEach(item => cleanupImage(item.img));
+  state.imgToPdfFiles = [];
+
+  // Reset other state
+  state.pdfImgPages = [];
+  state.compressedBlob = null;
+  state.cropRect = null;
+  state.currentCropPage = 0;
+  state.currentEditTool = null;
+  state.signatureImage = null;
+
+  // Cleanup compress preview URL
+  if (state.compressPreviewUrl) {
+    URL.revokeObjectURL(state.compressPreviewUrl);
+    state.compressPreviewUrl = null;
+  }
+
+  // Reset canvas setup flags so they can be re-initialized
+  state.cropCanvasSetup = false;
+  state.editCanvasSetup = false;
 }
 
 // ============================================================
@@ -389,18 +463,25 @@ function createFileItem(name, size, thumbnail, index) {
   div.className = 'file-item';
   div.dataset.index = index;
   div.draggable = true;
-  
+
+  // Escape HTML to prevent XSS
+  const safeName = escapeHtml(name);
+  const safeSize = escapeHtml(size);
+
   div.innerHTML = `
     <div class="file-item-preview">
-      <img src="${thumbnail}" alt="${name}">
+      <img src="${thumbnail}" alt="preview">
     </div>
     <div class="file-item-info">
-      <div class="file-item-name" title="${name}">${name}</div>
-      <div class="file-item-size">${size}</div>
+      <div class="file-item-name" title="${safeName}">${safeName}</div>
+      <div class="file-item-size">${safeSize}</div>
     </div>
-    <button class="file-item-remove" onclick="removeMergeFile(${index})">×</button>
+    <button class="file-item-remove">×</button>
   `;
-  
+
+  // Add click handler safely (avoid inline onclick with index)
+  div.querySelector('.file-item-remove').addEventListener('click', () => removeMergeFile(index));
+
   return div;
 }
 
@@ -426,30 +507,32 @@ function removeMergeFile(index) {
   refreshMergeList();
 }
 
-function refreshMergeList() {
+async function refreshMergeList() {
   const fileList = document.getElementById('merge-file-list');
   fileList.innerHTML = '';
-  
+
   if (state.mergeFiles.length === 0) {
     fileList.innerHTML = '<p style="color: var(--text-tertiary); width: 100%; text-align: center;">Seret file PDF ke sini atau gunakan tombol di bawah</p>';
     document.getElementById('merge-btn').disabled = true;
     return;
   }
-  
-  state.mergeFiles.forEach(async (file, i) => {
+
+  // Use for...of to maintain order and await properly
+  for (let i = 0; i < state.mergeFiles.length; i++) {
+    const file = state.mergeFiles[i];
     try {
       const pdf = await pdfjsLib.getDocument({ data: file.bytes.slice() }).promise;
       const page = await pdf.getPage(1);
-      
+
       const scale = 0.3;
       const viewport = page.getViewport({ scale });
       const canvas = document.createElement('canvas');
       canvas.width = viewport.width;
       canvas.height = viewport.height;
       const ctx = canvas.getContext('2d');
-      
+
       await page.render({ canvasContext: ctx, viewport }).promise;
-      
+
       const fileItem = createFileItem(file.name, '', canvas.toDataURL(), i);
       const addBtn = fileList.querySelector('.add-file-btn');
       if (addBtn) {
@@ -460,8 +543,8 @@ function refreshMergeList() {
     } catch (error) {
       console.error('Error refreshing file:', error);
     }
-  });
-  
+  }
+
   updateMergeAddButton();
   document.getElementById('merge-btn').disabled = state.mergeFiles.length < 2;
   enableDragReorder('merge-file-list', state.mergeFiles);
@@ -586,84 +669,91 @@ async function splitPDF() {
   const progress = document.getElementById('split-progress');
   const progressFill = progress.querySelector('.progress-fill');
   const progressText = progress.querySelector('.progress-text');
-  
+  const splitBtn = document.getElementById('split-btn');
+
+  // Helper to hide progress and enable button
+  const cleanup = () => {
+    progress.classList.add('hidden');
+    splitBtn.disabled = false;
+  };
+
   progress.classList.remove('hidden');
-  document.getElementById('split-btn').disabled = true;
-  
+  splitBtn.disabled = true;
+
   try {
     const srcDoc = await PDFLib.PDFDocument.load(state.currentPDFBytes);
-    
+
     if (mode === 'each') {
       // Each page as separate file - create zip
-      const files = [];
       for (let i = 0; i < srcDoc.getPageCount(); i++) {
         progressText.textContent = `Memproses halaman ${i + 1}...`;
         progressFill.style.width = `${((i + 1) / srcDoc.getPageCount()) * 100}%`;
-        
+
         const newDoc = await PDFLib.PDFDocument.create();
         const [page] = await newDoc.copyPages(srcDoc, [i]);
         newDoc.addPage(page);
         const bytes = await newDoc.save();
-        
+
         downloadBlob(new Blob([bytes], { type: 'application/pdf' }), `halaman_${i + 1}.pdf`);
         await sleep(100); // Small delay between downloads
       }
-      
+
       showToast('Semua halaman berhasil dipisah!', 'success');
-      
+
     } else if (mode === 'range') {
       // Split by range
       const rangeStr = document.getElementById('split-range').value;
       const ranges = parsePageRanges(rangeStr, srcDoc.getPageCount());
-      
+
       if (ranges.length === 0) {
         showToast('Format range tidak valid', 'error');
+        cleanup();
         return;
       }
-      
+
       for (let r = 0; r < ranges.length; r++) {
         progressText.textContent = `Memproses range ${r + 1}...`;
         progressFill.style.width = `${((r + 1) / ranges.length) * 100}%`;
-        
+
         const newDoc = await PDFLib.PDFDocument.create();
         const pageIndices = ranges[r].map(p => p - 1);
         const pages = await newDoc.copyPages(srcDoc, pageIndices);
         pages.forEach(page => newDoc.addPage(page));
-        
+
         const bytes = await newDoc.save();
         downloadBlob(new Blob([bytes], { type: 'application/pdf' }), `split_${r + 1}.pdf`);
         await sleep(100);
       }
-      
+
       showToast('PDF berhasil dipisah!', 'success');
-      
+
     } else {
       // Extract selected pages
       const selectedPages = state.splitPages.filter(p => p.selected).map(p => p.page - 1);
-      
+
       if (selectedPages.length === 0) {
         showToast('Pilih minimal satu halaman', 'error');
+        cleanup();
         return;
       }
-      
+
       progressText.textContent = 'Mengekstrak halaman...';
-      
+
       const newDoc = await PDFLib.PDFDocument.create();
       const pages = await newDoc.copyPages(srcDoc, selectedPages);
       pages.forEach(page => newDoc.addPage(page));
-      
+
       const bytes = await newDoc.save();
       downloadBlob(new Blob([bytes], { type: 'application/pdf' }), 'extracted.pdf');
-      
+
       showToast('Halaman berhasil diekstrak!', 'success');
     }
-    
+
   } catch (error) {
     console.error('Error splitting PDF:', error);
     showToast('Gagal memisah PDF', 'error');
   } finally {
-    progress.classList.add('hidden');
-    document.getElementById('split-btn').disabled = false;
+    cleanup();
   }
 }
 
@@ -736,12 +826,13 @@ async function renderRotatePages() {
 function rotateSelected(degrees) {
   const container = document.getElementById('rotate-pages');
   const selected = container.querySelectorAll('.page-item.selected');
-  
+
   selected.forEach(item => {
     const pageNum = parseInt(item.dataset.page);
     const pageState = state.rotatePages.find(p => p.page === pageNum);
     if (pageState) {
-      pageState.rotation = (pageState.rotation + degrees) % 360;
+      // Fix negative rotation: ensure result is always positive
+      pageState.rotation = ((pageState.rotation + degrees) % 360 + 360) % 360;
       const canvas = item.querySelector('canvas');
       canvas.style.transform = `rotate(${pageState.rotation}deg)`;
     }
@@ -750,7 +841,8 @@ function rotateSelected(degrees) {
 
 function rotateAll(degrees) {
   state.rotatePages.forEach(pageState => {
-    pageState.rotation = (pageState.rotation + degrees) % 360;
+    // Fix negative rotation: ensure result is always positive
+    pageState.rotation = ((pageState.rotation + degrees) % 360 + 360) % 360;
   });
   
   const container = document.getElementById('rotate-pages');
@@ -952,8 +1044,6 @@ function updateStateOrder(container, stateArray, isPages) {
 // PDF TO IMAGE
 // ============================================================
 
-state.pdfImgPages = [];
-
 async function renderPdfImgPages() {
   const container = document.getElementById('pdf-img-pages');
   container.innerHTML = '<div class="spinner"></div>';
@@ -1005,45 +1095,51 @@ async function convertPDFtoImages() {
     showToast('Pilih minimal satu halaman', 'error');
     return;
   }
-  
+
   const format = document.getElementById('img-format').value;
   const scale = parseFloat(document.getElementById('img-scale').value);
-  
+
   const progress = document.getElementById('pdf-img-progress');
   const progressFill = progress.querySelector('.progress-fill');
   const progressText = progress.querySelector('.progress-text');
-  
+
   progress.classList.remove('hidden');
   document.getElementById('pdf-img-btn').disabled = true;
-  
+
   try {
     for (let i = 0; i < selectedPages.length; i++) {
       const pageNum = selectedPages[i].page;
       progressText.textContent = `Mengkonversi halaman ${pageNum}...`;
       progressFill.style.width = `${((i + 1) / selectedPages.length) * 100}%`;
-      
+
       const page = await state.currentPDF.getPage(pageNum);
       const viewport = page.getViewport({ scale });
-      
+
       const canvas = document.createElement('canvas');
       canvas.width = viewport.width;
       canvas.height = viewport.height;
       const ctx = canvas.getContext('2d');
-      
+
       await page.render({ canvasContext: ctx, viewport }).promise;
-      
+
       const mimeType = format === 'png' ? 'image/png' : 'image/jpeg';
       const quality = format === 'png' ? undefined : 0.92;
-      
-      canvas.toBlob((blob) => {
-        downloadBlob(blob, `halaman_${pageNum}.${format}`);
-      }, mimeType, quality);
-      
+
+      // Await blob creation to ensure proper ordering
+      await new Promise((resolve) => {
+        canvas.toBlob((blob) => {
+          if (blob) {
+            downloadBlob(blob, `halaman_${pageNum}.${format}`);
+          }
+          resolve();
+        }, mimeType, quality);
+      });
+
       await sleep(100);
     }
-    
+
     showToast('Semua halaman berhasil dikonversi!', 'success');
-    
+
   } catch (error) {
     console.error('Error converting PDF to images:', error);
     showToast('Gagal mengkonversi PDF', 'error');
@@ -1085,55 +1181,51 @@ async function showPDFPreview(containerId) {
 
 async function compressPDF() {
   const quality = parseInt(document.getElementById('pdf-quality').value) / 100;
-  
+
   const progress = document.getElementById('compress-pdf-progress');
   const progressFill = progress.querySelector('.progress-fill');
   const progressText = progress.querySelector('.progress-text');
-  
+
   progress.classList.remove('hidden');
   document.getElementById('compress-pdf-btn').disabled = true;
-  
+
   try {
     progressText.textContent = 'Menganalisis PDF...';
-    
+
     const srcDoc = await PDFLib.PDFDocument.load(state.currentPDFBytes, {
       ignoreEncryption: true
     });
-    
-    // This is a simplified compression - mainly reduces image quality
-    // True PDF compression would require more sophisticated processing
-    
+
     const pages = srcDoc.getPages();
-    let processedImages = 0;
-    
+
     for (let i = 0; i < pages.length; i++) {
       progressText.textContent = `Memproses halaman ${i + 1} dari ${pages.length}...`;
       progressFill.style.width = `${((i + 1) / pages.length) * 100}%`;
-      
-      // Note: pdf-lib doesn't directly expose image compression
-      // For real compression, we'd need to extract, compress, and re-embed images
-      // This is a limitation noted in the project plan
+      // Small delay to show progress
+      await sleep(50);
     }
-    
-    progressText.textContent = 'Menyimpan...';
-    
+
+    progressText.textContent = 'Mengoptimasi struktur PDF...';
+
+    // Use object streams for better compression of PDF structure
     const bytes = await srcDoc.save({
       useObjectStreams: true,
       addDefaultPage: false,
     });
-    
+
     const originalSize = state.currentPDFBytes.length;
     const newSize = bytes.length;
     const reduction = ((originalSize - newSize) / originalSize * 100).toFixed(1);
-    
+
     downloadBlob(new Blob([bytes], { type: 'application/pdf' }), 'compressed.pdf');
-    
+
     if (newSize < originalSize) {
       showToast(`PDF dikompres! Berkurang ${reduction}%`, 'success');
     } else {
-      showToast('PDF disimpan. Ukuran tidak banyak berubah (PDF ini mungkin sudah optimal).', 'success');
+      // More informative message about limitations
+      showToast('Ukuran tidak berubah. Fitur ini hanya mengoptimasi struktur PDF, bukan gambar di dalamnya.', 'info');
     }
-    
+
   } catch (error) {
     console.error('Error compressing PDF:', error);
     showToast('Gagal mengkompres PDF', 'error');
@@ -1410,35 +1502,53 @@ async function renderCropPage() {
 }
 
 function setupCropCanvas() {
+  // Prevent duplicate event listeners
+  if (state.cropCanvasSetup) {
+    return;
+  }
+
   const canvas = document.getElementById('crop-canvas');
+  if (!canvas) return;
+
+  state.cropCanvasSetup = true;
+
   let isDrawing = false;
   let startX, startY;
-  
+
   canvas.addEventListener('mousedown', (e) => {
     const rect = canvas.getBoundingClientRect();
-    startX = e.clientX - rect.left;
-    startY = e.clientY - rect.top;
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    startX = (e.clientX - rect.left) * scaleX;
+    startY = (e.clientY - rect.top) * scaleY;
     isDrawing = true;
   });
-  
+
   canvas.addEventListener('mousemove', (e) => {
     if (!isDrawing) return;
-    
+
     const rect = canvas.getBoundingClientRect();
-    const currentX = e.clientX - rect.left;
-    const currentY = e.clientY - rect.top;
-    
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const currentX = (e.clientX - rect.left) * scaleX;
+    const currentY = (e.clientY - rect.top) * scaleY;
+
     state.cropRect = {
       x: Math.min(startX, currentX),
       y: Math.min(startY, currentY),
       width: Math.abs(currentX - startX),
       height: Math.abs(currentY - startY)
     };
-    
+
     renderCropPage();
   });
-  
+
   canvas.addEventListener('mouseup', () => {
+    isDrawing = false;
+  });
+
+  // Also handle mouse leaving the canvas
+  canvas.addEventListener('mouseleave', () => {
     isDrawing = false;
   });
 }
@@ -1492,41 +1602,67 @@ async function applyCrop() {
     showToast('Tentukan area crop terlebih dahulu', 'error');
     return;
   }
-  
+
   try {
     const srcDoc = await PDFLib.PDFDocument.load(state.currentPDFBytes);
     const pages = srcDoc.getPages();
     const applyToAll = document.getElementById('crop-all-pages').checked;
-    
-    // Get the original page dimensions for the first page
+
+    // Get the canvas dimensions
     const canvas = document.getElementById('crop-canvas');
-    const firstPage = pages[0];
-    const { width: pageWidth, height: pageHeight } = firstPage.getSize();
-    
-    // Calculate crop box based on canvas/page ratio
-    const scaleX = pageWidth / canvas.width;
-    const scaleY = pageHeight / canvas.height;
-    
-    // PDF coordinates start from bottom-left
-    const cropBox = {
-      x: state.cropRect.x * scaleX,
-      y: pageHeight - (state.cropRect.y + state.cropRect.height) * scaleY,
-      width: state.cropRect.width * scaleX,
-      height: state.cropRect.height * scaleY
-    };
-    
+
+    // Get the current page being viewed for scale calculation
+    const currentPage = pages[state.currentCropPage];
+    const { width: currentPageWidth, height: currentPageHeight } = currentPage.getSize();
+
+    // Calculate scale based on current page
+    const scaleX = currentPageWidth / canvas.width;
+    const scaleY = currentPageHeight / canvas.height;
+
     if (applyToAll) {
+      // Apply to all pages - need to recalculate for each page size
       for (const page of pages) {
+        const { width: pageWidth, height: pageHeight } = page.getSize();
+
+        // Scale the crop rectangle relative to each page's dimensions
+        const pageScaleX = pageWidth / currentPageWidth;
+        const pageScaleY = pageHeight / currentPageHeight;
+
+        // PDF coordinates start from bottom-left
+        const cropBox = {
+          x: state.cropRect.x * scaleX * pageScaleX,
+          y: pageHeight - (state.cropRect.y + state.cropRect.height) * scaleY * pageScaleY,
+          width: state.cropRect.width * scaleX * pageScaleX,
+          height: state.cropRect.height * scaleY * pageScaleY
+        };
+
+        // Clamp crop box to page bounds
+        cropBox.x = Math.max(0, Math.min(cropBox.x, pageWidth));
+        cropBox.y = Math.max(0, Math.min(cropBox.y, pageHeight));
+        cropBox.width = Math.min(cropBox.width, pageWidth - cropBox.x);
+        cropBox.height = Math.min(cropBox.height, pageHeight - cropBox.y);
+
         page.setCropBox(cropBox.x, cropBox.y, cropBox.width, cropBox.height);
       }
     } else {
-      pages[state.currentCropPage].setCropBox(cropBox.x, cropBox.y, cropBox.width, cropBox.height);
+      // Apply to current page only
+      const { width: pageWidth, height: pageHeight } = currentPage.getSize();
+
+      // PDF coordinates start from bottom-left
+      const cropBox = {
+        x: state.cropRect.x * scaleX,
+        y: pageHeight - (state.cropRect.y + state.cropRect.height) * scaleY,
+        width: state.cropRect.width * scaleX,
+        height: state.cropRect.height * scaleY
+      };
+
+      currentPage.setCropBox(cropBox.x, cropBox.y, cropBox.width, cropBox.height);
     }
-    
+
     const bytes = await srcDoc.save();
     downloadBlob(new Blob([bytes], { type: 'application/pdf' }), 'cropped.pdf');
     showToast('PDF berhasil di-crop!', 'success');
-    
+
   } catch (error) {
     console.error('Error cropping PDF:', error);
     showToast('Gagal meng-crop PDF', 'error');
@@ -1553,71 +1689,102 @@ async function initEditMode() {
 async function renderEditPage() {
   const canvas = document.getElementById('edit-canvas');
   const ctx = canvas.getContext('2d');
-  
+
   const page = await state.currentPDF.getPage(state.currentEditPage + 1);
   const scale = 1.5;
   const viewport = page.getViewport({ scale });
-  
+
   canvas.width = viewport.width;
   canvas.height = viewport.height;
-  
+
   await page.render({ canvasContext: ctx, viewport }).promise;
-  
-  // Draw annotations
+
+  // Draw annotations - await each one to ensure images are loaded
   const annotations = state.editAnnotations[state.currentEditPage] || [];
   for (const anno of annotations) {
-    drawAnnotation(ctx, anno);
+    await drawAnnotation(ctx, anno);
   }
-  
-  document.getElementById('edit-page-info').textContent = 
+
+  document.getElementById('edit-page-info').textContent =
     `Halaman ${state.currentEditPage + 1} dari ${state.currentPDF.numPages}`;
-  
+
   document.getElementById('edit-prev').disabled = state.currentEditPage === 0;
   document.getElementById('edit-next').disabled = state.currentEditPage === state.currentPDF.numPages - 1;
 }
 
 function drawAnnotation(ctx, anno) {
-  switch (anno.type) {
-    case 'whiteout':
-      ctx.fillStyle = 'white';
-      ctx.fillRect(anno.x, anno.y, anno.width, anno.height);
-      break;
-    case 'text':
-      ctx.font = `${anno.fontSize}px Arial`;
-      ctx.fillStyle = anno.color;
-      ctx.fillText(anno.text, anno.x, anno.y);
-      break;
-    case 'signature':
-      if (anno.image) {
-        const img = new Image();
-        img.src = anno.image;
-        ctx.drawImage(img, anno.x, anno.y, anno.width, anno.height);
-      }
-      break;
-  }
+  return new Promise((resolve) => {
+    switch (anno.type) {
+      case 'whiteout':
+        ctx.fillStyle = 'white';
+        ctx.fillRect(anno.x, anno.y, anno.width, anno.height);
+        resolve();
+        break;
+      case 'text':
+        ctx.font = `${anno.fontSize}px Arial`;
+        ctx.fillStyle = anno.color;
+        ctx.fillText(anno.text, anno.x, anno.y);
+        resolve();
+        break;
+      case 'signature':
+        if (anno.image && anno.cachedImg) {
+          // Use cached image if available
+          ctx.drawImage(anno.cachedImg, anno.x, anno.y, anno.width, anno.height);
+          resolve();
+        } else if (anno.image) {
+          // Load image and cache it for future renders
+          const img = new Image();
+          img.onload = () => {
+            anno.cachedImg = img;
+            ctx.drawImage(img, anno.x, anno.y, anno.width, anno.height);
+            resolve();
+          };
+          img.onerror = () => resolve();
+          img.src = anno.image;
+        } else {
+          resolve();
+        }
+        break;
+      default:
+        resolve();
+    }
+  });
 }
 
 function setupEditCanvas() {
+  // Prevent duplicate event listeners
+  if (state.editCanvasSetup) {
+    return;
+  }
+
   const canvas = document.getElementById('edit-canvas');
+  if (!canvas) return;
+
+  state.editCanvasSetup = true;
+
   let isDrawing = false;
   let startX, startY;
-  
+
   canvas.addEventListener('mousedown', (e) => {
     if (!state.currentEditTool) return;
-    
+
     const rect = canvas.getBoundingClientRect();
-    startX = e.clientX - rect.left;
-    startY = e.clientY - rect.top;
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    startX = (e.clientX - rect.left) * scaleX;
+    startY = (e.clientY - rect.top) * scaleY;
     isDrawing = true;
   });
-  
+
   canvas.addEventListener('mousemove', (e) => {
     if (!isDrawing || state.currentEditTool !== 'whiteout') return;
-    
+
     const rect = canvas.getBoundingClientRect();
-    const currentX = e.clientX - rect.left;
-    const currentY = e.clientY - rect.top;
-    
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const currentX = (e.clientX - rect.left) * scaleX;
+    const currentY = (e.clientY - rect.top) * scaleY;
+
     // Draw preview
     renderEditPage().then(() => {
       const ctx = canvas.getContext('2d');
@@ -1637,15 +1804,17 @@ function setupEditCanvas() {
       );
     });
   });
-  
+
   canvas.addEventListener('mouseup', (e) => {
     if (!isDrawing) return;
     isDrawing = false;
-    
+
     const rect = canvas.getBoundingClientRect();
-    const endX = e.clientX - rect.left;
-    const endY = e.clientY - rect.top;
-    
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const endX = (e.clientX - rect.left) * scaleX;
+    const endY = (e.clientY - rect.top) * scaleY;
+
     if (state.currentEditTool === 'whiteout') {
       state.editAnnotations[state.currentEditPage].push({
         type: 'whiteout',
@@ -1681,6 +1850,11 @@ function setupEditCanvas() {
       });
       renderEditPage();
     }
+  });
+
+  // Handle mouse leaving the canvas
+  canvas.addEventListener('mouseleave', () => {
+    isDrawing = false;
   });
 }
 
@@ -1825,29 +1999,35 @@ async function saveEditedPDF() {
 
 async function updateCompressPreview() {
   if (!state.originalImage) return;
-  
+
   const quality = parseInt(document.getElementById('compress-quality').value) / 100;
   const format = document.getElementById('compress-format').value;
-  
+
   // Update slider display
-  document.querySelector('#compress-img-workspace .range-value').textContent = 
+  document.querySelector('#compress-img-workspace .range-value').textContent =
     document.getElementById('compress-quality').value + '%';
-  
+
   const canvas = document.createElement('canvas');
   canvas.width = state.originalImage.naturalWidth;
   canvas.height = state.originalImage.naturalHeight;
   const ctx = canvas.getContext('2d');
   ctx.drawImage(state.originalImage, 0, 0);
-  
+
   const mimeType = `image/${format}`;
-  
+
   canvas.toBlob((blob) => {
     if (blob) {
+      // Revoke previous blob URL to prevent memory leak
+      if (state.compressPreviewUrl) {
+        URL.revokeObjectURL(state.compressPreviewUrl);
+      }
+
       const url = URL.createObjectURL(blob);
+      state.compressPreviewUrl = url;
       document.getElementById('compress-preview').src = url;
       document.getElementById('compress-preview-size').textContent = `Hasil: ${formatFileSize(blob.size)}`;
       state.compressedBlob = blob;
-      
+
       // Calculate savings
       const savings = ((state.originalImageSize - blob.size) / state.originalImageSize * 100).toFixed(1);
       if (blob.size < state.originalImageSize) {
@@ -1987,8 +2167,6 @@ function convertImage() {
 // IMAGES TO PDF
 // ============================================================
 
-state.imgToPdfFiles = [];
-
 async function addImagesToPDF(files) {
   const fileList = document.getElementById('img-pdf-file-list');
   
@@ -2040,18 +2218,25 @@ function createImageFileItem(name, size, thumbnail, index) {
   div.className = 'file-item';
   div.dataset.index = index;
   div.draggable = true;
-  
+
+  // Escape HTML to prevent XSS
+  const safeName = escapeHtml(name);
+  const safeSize = escapeHtml(size);
+
   div.innerHTML = `
     <div class="file-item-preview">
-      <img src="${thumbnail}" alt="${name}">
+      <img src="${thumbnail}" alt="preview">
     </div>
     <div class="file-item-info">
-      <div class="file-item-name" title="${name}">${name}</div>
-      <div class="file-item-size">${size}</div>
+      <div class="file-item-name" title="${safeName}">${safeName}</div>
+      <div class="file-item-size">${safeSize}</div>
     </div>
-    <button class="file-item-remove" onclick="removeImgPdfFile(${index})">×</button>
+    <button class="file-item-remove">×</button>
   `;
-  
+
+  // Add click handler safely (avoid inline onclick with index)
+  div.querySelector('.file-item-remove').addEventListener('click', () => removeImgPdfFile(index));
+
   return div;
 }
 
@@ -2080,14 +2265,16 @@ function removeImgPdfFile(index) {
 function refreshImgPdfList() {
   const fileList = document.getElementById('img-pdf-file-list');
   fileList.innerHTML = '';
-  
+
   if (state.imgToPdfFiles.length === 0) {
     fileList.innerHTML = '<p style="color: var(--text-tertiary); width: 100%; text-align: center;">Seret gambar ke sini atau gunakan tombol di bawah</p>';
     document.getElementById('img-pdf-btn').disabled = true;
     return;
   }
-  
-  state.imgToPdfFiles.forEach((imgFile, i) => {
+
+  // Use for loop to maintain order (synchronous since we're just drawing to canvas)
+  for (let i = 0; i < state.imgToPdfFiles.length; i++) {
+    const imgFile = state.imgToPdfFiles[i];
     const canvas = document.createElement('canvas');
     const maxSize = 120;
     const ratio = Math.min(maxSize / imgFile.img.naturalWidth, maxSize / imgFile.img.naturalHeight);
@@ -2095,7 +2282,7 @@ function refreshImgPdfList() {
     canvas.height = imgFile.img.naturalHeight * ratio;
     const ctx = canvas.getContext('2d');
     ctx.drawImage(imgFile.img, 0, 0, canvas.width, canvas.height);
-    
+
     const fileItem = createImageFileItem(imgFile.name, '', canvas.toDataURL(), i);
     const addBtn = fileList.querySelector('.add-file-btn');
     if (addBtn) {
@@ -2103,8 +2290,8 @@ function refreshImgPdfList() {
     } else {
       fileList.appendChild(fileItem);
     }
-  });
-  
+  }
+
   updateImgPdfAddButton();
   document.getElementById('img-pdf-btn').disabled = state.imgToPdfFiles.length === 0;
   enableDragReorder('img-pdf-file-list', state.imgToPdfFiles);
