@@ -124,6 +124,114 @@ function initFileInputs() {
       e.target.value = '';
     });
   }
+
+  // Compress PDF input
+  const compressPdfInput = document.getElementById('compress-pdf-input');
+  if (compressPdfInput) {
+    compressPdfInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) {
+        loadPDFForTool(e.target.files[0], 'compress-pdf');
+      }
+      e.target.value = '';
+    });
+  }
+
+  // PDF to Image input
+  const pdfImgInput = document.getElementById('pdf-img-input');
+  if (pdfImgInput) {
+    pdfImgInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) {
+        loadPDFForTool(e.target.files[0], 'pdf-to-img');
+      }
+      e.target.value = '';
+    });
+  }
+
+  // Protect PDF input
+  const protectInput = document.getElementById('protect-input');
+  if (protectInput) {
+    protectInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) {
+        loadPDFForTool(e.target.files[0], 'protect');
+      }
+      e.target.value = '';
+    });
+  }
+
+  // Unlock PDF input
+  const unlockInput = document.getElementById('unlock-input');
+  if (unlockInput) {
+    unlockInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) {
+        loadPDFForTool(e.target.files[0], 'unlock');
+      }
+      e.target.value = '';
+    });
+  }
+
+  // Page Numbers input
+  const pageNumbersInput = document.getElementById('page-numbers-input');
+  if (pageNumbersInput) {
+    pageNumbersInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) {
+        loadPDFForTool(e.target.files[0], 'page-numbers');
+      }
+      e.target.value = '';
+    });
+  }
+
+  // Compress Image input
+  const compressImgInput = document.getElementById('compress-img-input');
+  if (compressImgInput) {
+    compressImgInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) {
+        loadImageForTool(e.target.files[0], 'compress-img');
+      }
+      e.target.value = '';
+    });
+  }
+
+  // Resize Image input
+  const resizeInput = document.getElementById('resize-input');
+  if (resizeInput) {
+    resizeInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) {
+        loadImageForTool(e.target.files[0], 'resize');
+      }
+      e.target.value = '';
+    });
+  }
+
+  // Convert Image input
+  const convertInput = document.getElementById('convert-input');
+  if (convertInput) {
+    convertInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) {
+        loadImageForTool(e.target.files[0], 'convert-img');
+      }
+      e.target.value = '';
+    });
+  }
+
+  // Initialize drop hint drag-over effects
+  initDropHints();
+}
+
+function initDropHints() {
+  document.querySelectorAll('.drop-hint').forEach(hint => {
+    hint.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      hint.classList.add('drag-over');
+    });
+    hint.addEventListener('dragleave', () => {
+      hint.classList.remove('drag-over');
+    });
+    hint.addEventListener('drop', (e) => {
+      e.preventDefault();
+      hint.classList.remove('drag-over');
+      // The workspace drop handler will handle the actual file processing
+    });
+  });
 }
 
 function initRangeSliders() {
@@ -243,9 +351,15 @@ async function loadImageForTool(file, tool) {
   try {
     state.originalImage = await loadImage(file);
     state.originalImageName = file.name;
-    
+
     switch (tool) {
       case 'compress-img':
+        // Hide drop hint, show comparison
+        const compressHint = document.getElementById('compress-img-hint');
+        const compressComparison = document.getElementById('compress-img-comparison');
+        if (compressHint) compressHint.classList.add('hidden');
+        if (compressComparison) compressComparison.classList.remove('hidden');
+
         document.getElementById('compress-original').src = state.originalImage.src;
         document.getElementById('compress-original-size').textContent = `Original: ${formatFileSize(file.size)}`;
         state.originalImageSize = file.size;
@@ -253,6 +367,12 @@ async function loadImageForTool(file, tool) {
         document.getElementById('compress-img-btn').disabled = false;
         break;
       case 'resize':
+        // Hide drop hint, show preview
+        const resizeHint = document.getElementById('resize-hint');
+        const resizePreviewBox = document.getElementById('resize-preview-box');
+        if (resizeHint) resizeHint.classList.add('hidden');
+        if (resizePreviewBox) resizePreviewBox.classList.remove('hidden');
+
         document.getElementById('resize-preview').src = state.originalImage.src;
         document.getElementById('resize-width').value = state.originalImage.naturalWidth;
         document.getElementById('resize-height').value = state.originalImage.naturalHeight;
@@ -262,6 +382,12 @@ async function loadImageForTool(file, tool) {
         document.getElementById('resize-btn').disabled = false;
         break;
       case 'convert-img':
+        // Hide drop hint, show preview
+        const convertHint = document.getElementById('convert-hint');
+        const convertPreviewBox = document.getElementById('convert-preview-box');
+        if (convertHint) convertHint.classList.add('hidden');
+        if (convertPreviewBox) convertPreviewBox.classList.remove('hidden');
+
         document.getElementById('convert-preview').src = state.originalImage.src;
         const ext = file.name.split('.').pop().toLowerCase();
         document.getElementById('convert-info').textContent = `Format saat ini: ${ext.toUpperCase()}`;
@@ -464,9 +590,17 @@ async function pmRenderPages() {
   container.innerHTML = '';
 
   if (state.pmPages.length === 0) {
-    container.innerHTML = '<p style="color: var(--text-tertiary); width: 100%; text-align: center; padding: 2rem;">Seret file PDF ke sini atau klik "Tambah PDF"</p>';
+    container.classList.add('empty');
+    container.innerHTML = `
+      <div class="drop-hint" onclick="document.getElementById('pm-file-input').click()">
+        <svg class="drop-hint-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <span class="drop-hint-text">Seret file PDF ke sini atau klik untuk upload</span>
+        <span class="drop-hint-subtext">PDF</span>
+      </div>`;
     return;
   }
+
+  container.classList.remove('empty');
 
   for (let i = 0; i < state.pmPages.length; i++) {
     const pageData = state.pmPages[i];
@@ -1685,10 +1819,11 @@ function updateStateOrder(container, stateArray, isPages) {
 async function renderPdfImgPages() {
   const container = document.getElementById('pdf-img-pages');
   container.innerHTML = '<div class="spinner"></div>';
-  
+  container.classList.remove('empty');
+
   state.pdfImgPages = [];
   const numPages = state.currentPDF.numPages;
-  
+
   container.innerHTML = '';
   
   for (let i = 1; i <= numPages; i++) {
@@ -2444,6 +2579,32 @@ function drawAnnotationSync(ctx, anno, isSelected = false) {
         }
       }
       break;
+    case 'watermark':
+      ctx.save();
+      ctx.translate(anno.x, anno.y);
+      ctx.rotate(anno.rotation * Math.PI / 180);
+      ctx.font = `${anno.fontSize}px Arial`;
+      ctx.fillStyle = anno.color;
+      ctx.globalAlpha = anno.opacity;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(anno.text, 0, 0);
+      ctx.restore();
+      break;
+    case 'pageNumber':
+      ctx.font = `${anno.fontSize}px Arial`;
+      ctx.fillStyle = anno.color;
+      // Adjust text alignment based on position
+      if (anno.position.includes('center')) {
+        ctx.textAlign = 'center';
+      } else if (anno.position.includes('right')) {
+        ctx.textAlign = 'right';
+      } else {
+        ctx.textAlign = 'left';
+      }
+      ctx.fillText(anno.text, anno.x, anno.y);
+      ctx.textAlign = 'left'; // Reset
+      break;
   }
 }
 
@@ -2496,6 +2657,33 @@ function drawAnnotation(ctx, anno, isSelected = false) {
         } else {
           resolve();
         }
+        break;
+      case 'watermark':
+        ctx.save();
+        ctx.translate(anno.x, anno.y);
+        ctx.rotate(anno.rotation * Math.PI / 180);
+        ctx.font = `${anno.fontSize}px Arial`;
+        ctx.fillStyle = anno.color;
+        ctx.globalAlpha = anno.opacity;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(anno.text, 0, 0);
+        ctx.restore();
+        resolve();
+        break;
+      case 'pageNumber':
+        ctx.font = `${anno.fontSize}px Arial`;
+        ctx.fillStyle = anno.color;
+        if (anno.position.includes('center')) {
+          ctx.textAlign = 'center';
+        } else if (anno.position.includes('right')) {
+          ctx.textAlign = 'right';
+        } else {
+          ctx.textAlign = 'left';
+        }
+        ctx.fillText(anno.text, anno.x, anno.y);
+        ctx.textAlign = 'left';
+        resolve();
         break;
       default:
         resolve();
@@ -3034,6 +3222,139 @@ function useSignature() {
   }
 }
 
+// Editor Watermark Functions
+function openEditorWatermarkModal() {
+  document.getElementById('editor-watermark-modal').classList.add('active');
+}
+
+function closeEditorWatermarkModal() {
+  document.getElementById('editor-watermark-modal').classList.remove('active');
+}
+
+function applyEditorWatermark() {
+  const text = document.getElementById('editor-wm-text').value || 'WATERMARK';
+  const fontSize = parseInt(document.getElementById('editor-wm-size').value);
+  const color = document.getElementById('editor-wm-color').value;
+  const opacity = parseInt(document.getElementById('editor-wm-opacity').value) / 100;
+  const rotation = parseInt(document.getElementById('editor-wm-rotation').value);
+  const applyTo = document.getElementById('editor-wm-pages').value;
+
+  saveUndoState();
+
+  const canvas = document.getElementById('edit-canvas');
+  const pageScale = state.editPageScales[state.currentEditPage];
+  const centerX = pageScale.canvasWidth / 2;
+  const centerY = pageScale.canvasHeight / 2;
+
+  const watermarkAnno = {
+    type: 'watermark',
+    text,
+    fontSize,
+    color,
+    opacity,
+    rotation,
+    x: centerX,
+    y: centerY
+  };
+
+  if (applyTo === 'all') {
+    // Apply to all pages
+    for (let i = 0; i < state.currentPDF.numPages; i++) {
+      state.editAnnotations[i].push({ ...watermarkAnno });
+    }
+    showToast('Watermark diterapkan ke semua halaman', 'success');
+  } else {
+    // Apply to current page only
+    state.editAnnotations[state.currentEditPage].push(watermarkAnno);
+    showToast('Watermark diterapkan', 'success');
+  }
+
+  closeEditorWatermarkModal();
+  renderEditPage();
+}
+
+// Editor Page Number Functions
+function openEditorPageNumModal() {
+  document.getElementById('editor-pagenum-modal').classList.add('active');
+}
+
+function closeEditorPageNumModal() {
+  document.getElementById('editor-pagenum-modal').classList.remove('active');
+}
+
+function applyEditorPageNumbers() {
+  const position = document.getElementById('editor-pn-position').value;
+  const format = document.getElementById('editor-pn-format').value;
+  const fontSize = parseInt(document.getElementById('editor-pn-size').value);
+  const startNum = parseInt(document.getElementById('editor-pn-start').value) || 1;
+  const totalPages = state.currentPDF.numPages;
+
+  saveUndoState();
+
+  for (let i = 0; i < totalPages; i++) {
+    const pageNum = startNum + i;
+    let text;
+
+    switch (format) {
+      case 'page-of':
+        text = `Halaman ${pageNum} dari ${totalPages + startNum - 1}`;
+        break;
+      case 'dash':
+        text = `- ${pageNum} -`;
+        break;
+      default:
+        text = `${pageNum}`;
+    }
+
+    // Calculate position based on page scale
+    const pageScale = state.editPageScales[i] || state.editPageScales[state.currentEditPage];
+    const canvasWidth = pageScale?.canvasWidth || 600;
+    const canvasHeight = pageScale?.canvasHeight || 800;
+    const margin = 30;
+
+    let x, y;
+    switch (position) {
+      case 'bottom-left':
+        x = margin;
+        y = canvasHeight - margin;
+        break;
+      case 'bottom-right':
+        x = canvasWidth - margin;
+        y = canvasHeight - margin;
+        break;
+      case 'top-center':
+        x = canvasWidth / 2;
+        y = margin + fontSize;
+        break;
+      case 'top-left':
+        x = margin;
+        y = margin + fontSize;
+        break;
+      case 'top-right':
+        x = canvasWidth - margin;
+        y = margin + fontSize;
+        break;
+      default: // bottom-center
+        x = canvasWidth / 2;
+        y = canvasHeight - margin;
+    }
+
+    state.editAnnotations[i].push({
+      type: 'pageNumber',
+      text,
+      fontSize,
+      color: '#000000',
+      x,
+      y,
+      position
+    });
+  }
+
+  closeEditorPageNumModal();
+  renderEditPage();
+  showToast('Nomor halaman ditambahkan ke semua halaman', 'success');
+}
+
 async function saveEditedPDF() {
   try {
     const srcDoc = await PDFLib.PDFDocument.load(state.currentPDFBytes);
@@ -3128,6 +3449,50 @@ async function saveEditedPDF() {
           } catch (imgError) {
             console.error('Error embedding signature:', imgError);
           }
+        } else if (anno.type === 'watermark') {
+          const hexColor = anno.color || '#888888';
+          const r = parseInt(hexColor.slice(1, 3), 16) / 255;
+          const g = parseInt(hexColor.slice(3, 5), 16) / 255;
+          const b = parseInt(hexColor.slice(5, 7), 16) / 255;
+
+          const pdfX = anno.x * scaleX;
+          const pdfY = pdfHeight - anno.y * scaleY;
+          const pdfFontSize = anno.fontSize * scaleX;
+
+          // Estimate text width for centering
+          const textWidth = anno.text.length * pdfFontSize * 0.5;
+
+          page.drawText(anno.text, {
+            x: pdfX - textWidth / 2,
+            y: pdfY,
+            size: pdfFontSize,
+            font,
+            color: PDFLib.rgb(r, g, b),
+            opacity: anno.opacity,
+            rotate: PDFLib.degrees(anno.rotation),
+          });
+        } else if (anno.type === 'pageNumber') {
+          const pdfX = anno.x * scaleX;
+          const pdfY = pdfHeight - anno.y * scaleY;
+          const pdfFontSize = anno.fontSize * scaleX;
+
+          // Adjust X position based on text alignment
+          let adjustedX = pdfX;
+          if (anno.position.includes('center')) {
+            const textWidth = font.widthOfTextAtSize(anno.text, pdfFontSize);
+            adjustedX = pdfX - textWidth / 2;
+          } else if (anno.position.includes('right')) {
+            const textWidth = font.widthOfTextAtSize(anno.text, pdfFontSize);
+            adjustedX = pdfX - textWidth;
+          }
+
+          page.drawText(anno.text, {
+            x: adjustedX,
+            y: pdfY,
+            size: pdfFontSize,
+            font,
+            color: PDFLib.rgb(0, 0, 0),
+          });
         }
       }
     }
@@ -3318,10 +3683,11 @@ function convertImage() {
 
 async function addImagesToPDF(files) {
   const fileList = document.getElementById('img-pdf-file-list');
-  
-  // Clear placeholder
+
+  // Clear placeholder and remove empty class
   if (state.imgToPdfFiles.length === 0) {
     fileList.innerHTML = '';
+    fileList.classList.remove('empty');
   }
   
   for (const file of files) {
