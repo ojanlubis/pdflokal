@@ -1519,6 +1519,92 @@ a:hover {
   }
 }
 
+/* Drop Hint Component - For file upload areas */
+.drop-hint {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-xl);
+  border: 2px dashed var(--border-medium);
+  border-radius: var(--radius-lg);
+  background: var(--bg-secondary);
+  color: var(--text-tertiary);
+  text-align: center;
+  min-height: 150px;
+  transition: all var(--transition-fast);
+  cursor: pointer;
+}
+
+.drop-hint:hover,
+.drop-hint.drag-over {
+  border-color: var(--accent-primary);
+  background: var(--accent-light);
+  color: var(--accent-primary);
+}
+
+.drop-hint-icon {
+  width: 48px;
+  height: 48px;
+  margin-bottom: var(--space-md);
+  color: inherit;
+}
+
+.drop-hint-text {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-xs);
+}
+
+.drop-hint-subtext {
+  font-size: 0.8125rem;
+  color: var(--text-tertiary);
+}
+
+.drop-hint input[type="file"] {
+  display: none;
+}
+
+/* Empty state for page-grid and file-list */
+.page-grid.empty,
+.file-list.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.page-grid.empty .drop-hint,
+.file-list.empty .drop-hint {
+  width: 100%;
+  max-width: 400px;
+  min-height: 200px;
+  border: none;
+  background: transparent;
+}
+
+.preview-area .drop-hint {
+  width: 100%;
+  max-width: 500px;
+}
+
+@media (max-width: 768px) {
+  .drop-hint {
+    padding: var(--space-lg);
+    min-height: 120px;
+  }
+
+  .drop-hint-icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .drop-hint-text {
+    font-size: 0.875rem;
+  }
+}
+
 /* Utility Classes */
 .hidden { display: none !important; }
 .text-center { text-align: center; }

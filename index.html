@@ -268,6 +268,13 @@
         </button>
         <input type="file" id="pm-file-input" multiple accept=".pdf" style="display:none">
         <div class="toolbar-divider"></div>
+        <button class="btn btn-secondary btn-icon" onclick="pmUndo()" title="Undo (Ctrl+Z)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+        </button>
+        <button class="btn btn-secondary btn-icon" onclick="pmRedo()" title="Redo (Ctrl+Y)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></svg>
+        </button>
+        <div class="toolbar-divider"></div>
         <button class="btn btn-secondary" onclick="pmSelectAll()">Pilih Semua</button>
         <button class="btn btn-secondary" onclick="pmDeselectAll()">Batal Pilih</button>
         <div class="toolbar-divider"></div>
@@ -280,10 +287,12 @@
           Hapus
         </button>
       </div>
-      <div class="page-grid" id="pm-pages">
-        <p style="color: var(--text-tertiary); width: 100%; text-align: center; padding: 2rem;">
-          Seret file PDF ke sini atau klik "Tambah PDF"
-        </p>
+      <div class="page-grid empty" id="pm-pages">
+        <div class="drop-hint" onclick="document.getElementById('pm-file-input').click()">
+          <svg class="drop-hint-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <span class="drop-hint-text">Seret file PDF ke sini atau klik untuk upload</span>
+          <span class="drop-hint-subtext">PDF</span>
+        </div>
       </div>
       <div class="pm-status" id="pm-status"></div>
       <div class="controls" style="flex-wrap: wrap;">
@@ -321,7 +330,12 @@
       </div>
       <p class="mb-lg" style="color: var(--text-secondary);">⚠️ Catatan: Fitur ini mengoptimasi struktur PDF. Kompresi gambar memerlukan server dan belum tersedia. Hasil bervariasi.</p>
       <div class="preview-area" id="compress-pdf-preview">
-        <p style="color: var(--text-tertiary)">Upload PDF untuk melihat preview</p>
+        <div class="drop-hint" onclick="document.getElementById('compress-pdf-input').click()">
+          <svg class="drop-hint-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <span class="drop-hint-text">Seret file PDF ke sini atau klik untuk upload</span>
+          <span class="drop-hint-subtext">PDF</span>
+          <input type="file" id="compress-pdf-input" accept=".pdf" style="display:none">
+        </div>
       </div>
       <div class="controls">
         <div class="control-group">
@@ -374,6 +388,14 @@
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 19.5v.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v1.5"/><path d="m16 19-3-3 8-8 3 3-8 8Z"/></svg>
               Tanda Tangan
             </button>
+            <button class="editor-tool-btn" onclick="openEditorWatermarkModal()" title="Tambah Watermark">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              Watermark
+            </button>
+            <button class="editor-tool-btn" onclick="openEditorPageNumModal()" title="Tambah Nomor Halaman">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h10"/><circle cx="18" cy="17" r="2"/></svg>
+              Nomor Halaman
+            </button>
           </div>
           <div class="editor-tool-divider"></div>
           <div class="editor-action-group">
@@ -419,7 +441,14 @@
           PDF ke Gambar
         </h2>
       </div>
-      <div class="page-grid" id="pdf-img-pages"></div>
+      <div class="page-grid empty" id="pdf-img-pages">
+        <div class="drop-hint" onclick="document.getElementById('pdf-img-input').click()">
+          <svg class="drop-hint-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <span class="drop-hint-text">Seret file PDF ke sini atau klik untuk upload</span>
+          <span class="drop-hint-subtext">PDF</span>
+          <input type="file" id="pdf-img-input" accept=".pdf" style="display:none">
+        </div>
+      </div>
       <div class="controls">
         <div class="control-group">
           <label>Format:</label>
@@ -462,7 +491,12 @@
         </h2>
       </div>
       <div class="preview-area" id="protect-preview">
-        <p style="color: var(--text-tertiary)">Upload PDF untuk melihat preview</p>
+        <div class="drop-hint" onclick="document.getElementById('protect-input').click()">
+          <svg class="drop-hint-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <span class="drop-hint-text">Seret file PDF ke sini atau klik untuk upload</span>
+          <span class="drop-hint-subtext">PDF</span>
+          <input type="file" id="protect-input" accept=".pdf" style="display:none">
+        </div>
       </div>
       <div class="controls">
         <div class="control-group">
@@ -495,7 +529,12 @@
       </div>
       <p class="mb-lg" style="color: var(--text-secondary);">⚠️ Catatan: Anda harus mengetahui password untuk membuka kunci PDF.</p>
       <div class="preview-area" id="unlock-preview">
-        <p style="color: var(--text-tertiary)">Upload PDF yang terkunci</p>
+        <div class="drop-hint" onclick="document.getElementById('unlock-input').click()">
+          <svg class="drop-hint-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <span class="drop-hint-text">Seret file PDF ke sini atau klik untuk upload</span>
+          <span class="drop-hint-subtext">PDF</span>
+          <input type="file" id="unlock-input" accept=".pdf" style="display:none">
+        </div>
       </div>
       <div class="controls">
         <div class="control-group">
@@ -579,7 +618,12 @@
         </h2>
       </div>
       <div class="preview-area" id="page-numbers-preview">
-        <p style="color: var(--text-tertiary)">Upload PDF untuk melihat preview</p>
+        <div class="drop-hint" onclick="document.getElementById('page-numbers-input').click()">
+          <svg class="drop-hint-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <span class="drop-hint-text">Seret file PDF ke sini atau klik untuk upload</span>
+          <span class="drop-hint-subtext">PDF</span>
+          <input type="file" id="page-numbers-input" accept=".pdf" style="display:none">
+        </div>
       </div>
       <div class="controls" style="flex-wrap: wrap;">
         <div class="control-group">
@@ -669,8 +713,14 @@
           Kompres Gambar
         </h2>
       </div>
-      <div class="preview-area">
-        <div class="preview-comparison" id="compress-img-comparison">
+      <div class="preview-area" id="compress-img-area">
+        <div class="drop-hint" id="compress-img-hint" onclick="document.getElementById('compress-img-input').click()">
+          <svg class="drop-hint-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <span class="drop-hint-text">Seret gambar ke sini atau klik untuk upload</span>
+          <span class="drop-hint-subtext">JPG • PNG • WebP</span>
+          <input type="file" id="compress-img-input" accept="image/*" style="display:none">
+        </div>
+        <div class="preview-comparison hidden" id="compress-img-comparison">
           <div class="preview-box">
             <img id="compress-original" src="" alt="Original">
             <p id="compress-original-size">Original: -</p>
@@ -718,8 +768,14 @@
           Ubah Ukuran Gambar
         </h2>
       </div>
-      <div class="preview-area">
-        <div class="preview-box">
+      <div class="preview-area" id="resize-area">
+        <div class="drop-hint" id="resize-hint" onclick="document.getElementById('resize-input').click()">
+          <svg class="drop-hint-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <span class="drop-hint-text">Seret gambar ke sini atau klik untuk upload</span>
+          <span class="drop-hint-subtext">JPG • PNG • WebP</span>
+          <input type="file" id="resize-input" accept="image/*" style="display:none">
+        </div>
+        <div class="preview-box hidden" id="resize-preview-box">
           <img id="resize-preview" src="" alt="Preview">
           <p id="resize-dimensions">Dimensi: -</p>
         </div>
@@ -771,8 +827,14 @@
           Convert Format Gambar
         </h2>
       </div>
-      <div class="preview-area">
-        <div class="preview-box">
+      <div class="preview-area" id="convert-area">
+        <div class="drop-hint" id="convert-hint" onclick="document.getElementById('convert-input').click()">
+          <svg class="drop-hint-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <span class="drop-hint-text">Seret gambar ke sini atau klik untuk upload</span>
+          <span class="drop-hint-subtext">JPG • PNG • WebP</span>
+          <input type="file" id="convert-input" accept="image/*" style="display:none">
+        </div>
+        <div class="preview-box hidden" id="convert-preview-box">
           <img id="convert-preview" src="" alt="Preview">
           <p id="convert-info">-</p>
         </div>
@@ -813,8 +875,12 @@
           Gambar ke PDF
         </h2>
       </div>
-      <div class="file-list" id="img-pdf-file-list">
-        <p style="color: var(--text-tertiary); width: 100%; text-align: center;">Seret gambar ke sini atau gunakan tombol di bawah</p>
+      <div class="file-list empty" id="img-pdf-file-list">
+        <div class="drop-hint" onclick="document.getElementById('img-pdf-input').click()">
+          <svg class="drop-hint-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <span class="drop-hint-text">Seret gambar ke sini atau klik untuk upload</span>
+          <span class="drop-hint-subtext">JPG • PNG • WebP</span>
+        </div>
       </div>
       <div class="controls">
         <button class="btn btn-secondary" onclick="document.getElementById('img-pdf-input').click()">
@@ -902,6 +968,107 @@
       <div class="edit-modal-actions">
         <button class="btn btn-ghost" onclick="closeTextModal()">Batal</button>
         <button class="btn btn-primary" onclick="confirmTextInput()">Tambah Teks</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Editor Watermark Modal -->
+  <div id="editor-watermark-modal" class="edit-modal">
+    <div class="edit-modal-box">
+      <h3>Tambah Watermark</h3>
+      <div class="edit-modal-content">
+        <div class="edit-option-group">
+          <label>Teks Watermark</label>
+          <input type="text" id="editor-wm-text" class="edit-text-input" value="CONFIDENTIAL" style="min-height: auto;">
+        </div>
+        <div class="edit-text-options">
+          <div class="edit-option-group">
+            <label>Ukuran Font</label>
+            <select id="editor-wm-size">
+              <option value="24">24pt</option>
+              <option value="36">36pt</option>
+              <option value="48" selected>48pt</option>
+              <option value="60">60pt</option>
+              <option value="72">72pt</option>
+            </select>
+          </div>
+          <div class="edit-option-group">
+            <label>Warna</label>
+            <input type="color" id="editor-wm-color" value="#888888">
+          </div>
+          <div class="edit-option-group">
+            <label>Opacity</label>
+            <input type="range" id="editor-wm-opacity" min="10" max="100" value="30">
+          </div>
+          <div class="edit-option-group">
+            <label>Rotasi</label>
+            <select id="editor-wm-rotation">
+              <option value="-45" selected>-45°</option>
+              <option value="-30">-30°</option>
+              <option value="0">0°</option>
+              <option value="30">30°</option>
+              <option value="45">45°</option>
+            </select>
+          </div>
+        </div>
+        <div class="edit-option-group">
+          <label>Terapkan ke</label>
+          <select id="editor-wm-pages">
+            <option value="all">Semua halaman</option>
+            <option value="current">Halaman ini saja</option>
+          </select>
+        </div>
+      </div>
+      <div class="edit-modal-actions">
+        <button class="btn btn-ghost" onclick="closeEditorWatermarkModal()">Batal</button>
+        <button class="btn btn-primary" onclick="applyEditorWatermark()">Terapkan Watermark</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Editor Page Number Modal -->
+  <div id="editor-pagenum-modal" class="edit-modal">
+    <div class="edit-modal-box">
+      <h3>Tambah Nomor Halaman</h3>
+      <div class="edit-modal-content">
+        <div class="edit-text-options">
+          <div class="edit-option-group">
+            <label>Posisi</label>
+            <select id="editor-pn-position">
+              <option value="bottom-center" selected>Bawah Tengah</option>
+              <option value="bottom-left">Bawah Kiri</option>
+              <option value="bottom-right">Bawah Kanan</option>
+              <option value="top-center">Atas Tengah</option>
+              <option value="top-left">Atas Kiri</option>
+              <option value="top-right">Atas Kanan</option>
+            </select>
+          </div>
+          <div class="edit-option-group">
+            <label>Format</label>
+            <select id="editor-pn-format">
+              <option value="number" selected>1, 2, 3...</option>
+              <option value="page-of">Halaman 1 dari N</option>
+              <option value="dash">- 1 -</option>
+            </select>
+          </div>
+          <div class="edit-option-group">
+            <label>Ukuran Font</label>
+            <select id="editor-pn-size">
+              <option value="10">10pt</option>
+              <option value="12" selected>12pt</option>
+              <option value="14">14pt</option>
+              <option value="16">16pt</option>
+            </select>
+          </div>
+          <div class="edit-option-group">
+            <label>Mulai dari</label>
+            <input type="number" id="editor-pn-start" value="1" min="1" style="width: 60px;">
+          </div>
+        </div>
+      </div>
+      <div class="edit-modal-actions">
+        <button class="btn btn-ghost" onclick="closeEditorPageNumModal()">Batal</button>
+        <button class="btn btn-primary" onclick="applyEditorPageNumbers()">Terapkan Nomor</button>
       </div>
     </div>
   </div>
