@@ -46,6 +46,10 @@ const state = {
   // Page Manager unified state
   pmPages: [], // Array of { pageNum, sourceFile, sourceName, rotation, selected, canvas }
   pmSourceFiles: [], // Array of { name, bytes }
+  pmUndoStack: [],   // Undo stack for page manager
+  pmRedoStack: [],   // Redo stack for page manager
+  // Original filename tracking
+  originalPDFName: null,  // Original PDF filename for output naming
   // Enhanced PDF Editor state
   editUndoStack: [],           // Stack of previous annotation states for undo
   editRedoStack: [],           // Stack of undone states for redo
@@ -579,6 +583,7 @@ function pmEnableDragReorder() {
 
   container.querySelectorAll('.page-item').forEach((item) => {
     item.addEventListener('dragstart', (e) => {
+      pmSaveUndoState(); // Save state before reordering
       draggedItem = item;
       draggedIndex = parseInt(item.dataset.index);
       item.classList.add('dragging');
@@ -742,6 +747,77 @@ function pmDeselectAll() {
   pmUpdateStatus();
 }
 
+// Page Manager Undo/Redo System
+function pmSaveUndoState() {
+  // Deep clone current pages state (without canvas which can't be cloned)
+  const snapshot = state.pmPages.map(p => ({
+    pageNum: p.pageNum,
+    sourceIndex: p.sourceIndex,
+    sourceName: p.sourceName,
+    rotation: p.rotation,
+    selected: p.selected
+  }));
+  state.pmUndoStack.push(snapshot);
+  state.pmRedoStack = []; // Clear redo on new action
+
+  // Limit stack size
+  if (state.pmUndoStack.length > 50) {
+    state.pmUndoStack.shift();
+  }
+}
+
+async function pmUndo() {
+  if (state.pmUndoStack.length === 0) {
+    showToast('Tidak ada yang bisa di-undo', 'info');
+    return;
+  }
+
+  // Save current state to redo
+  const currentSnapshot = state.pmPages.map(p => ({
+    pageNum: p.pageNum,
+    sourceIndex: p.sourceIndex,
+    sourceName: p.sourceName,
+    rotation: p.rotation,
+    selected: p.selected
+  }));
+  state.pmRedoStack.push(currentSnapshot);
+
+  // Restore previous state
+  const previousState = state.pmUndoStack.pop();
+  state.pmPages = previousState.map(p => ({ ...p, canvas: null }));
+
+  await pmRenderPages();
+  pmUpdateStatus();
+  pmUpdateDownloadButton();
+  showToast('Undo berhasil', 'success');
+}
+
+async function pmRedo() {
+  if (state.pmRedoStack.length === 0) {
+    showToast('Tidak ada yang bisa di-redo', 'info');
+    return;
+  }
+
+  // Save current state to undo
+  const currentSnapshot = state.pmPages.map(p => ({
+    pageNum: p.pageNum,
+    sourceIndex: p.sourceIndex,
+    sourceName: p.sourceName,
+    rotation: p.rotation,
+    selected: p.selected
+  }));
+  state.pmUndoStack.push(currentSnapshot);
+
+  // Restore next state
+  const nextState = state.pmRedoStack.pop();
+  state.pmPages = nextState.map(p => ({ ...p, canvas: null }));
+
+  await pmRenderPages();
+  pmUpdateStatus();
+  pmUpdateDownloadButton();
+  showToast('Redo berhasil', 'success');
+}
+
 function pmRotateSelected(degrees) {
   const hasSelection = state.pmPages.some(p => p.selected);
 
@@ -750,6 +826,7 @@ function pmRotateSelected(degrees) {
     return;
   }
 
+  pmSaveUndoState();
   const container = document.getElementById('pm-pages');
   const items = container.querySelectorAll('.page-item');
 
@@ -790,6 +867,7 @@ function pmDeleteSelected() {
     return;
   }
 
+  pmSaveUndoState();
   const container = document.getElementById('pm-pages');
 
   // Remove selected DOM elements and filter state
@@ -816,6 +894,7 @@ function pmDeleteSelected() {
 }
 
 function pmDeletePage(index) {
+  pmSaveUndoState();
   const container = document.getElementById('pm-pages');
   const item = container.querySelector(`[data-index="${index}"]`);
   if (item) item.remove();
@@ -885,7 +964,8 @@ async function pmDownload() {
 
         newDoc.addPage(page);
         const bytes = await newDoc.save();
-        downloadBlob(new Blob([bytes], { type: 'application/pdf' }), `halaman_${i + 1}.pdf`);
+        const baseName = state.pmSourceFiles[0]?.name?.replace(/\.pdf$/i, '') || 'halaman';
+        downloadBlob(new Blob([bytes], { type: 'application/pdf' }), `${baseName}_halaman${i + 1}.pdf`);
         await sleep(100);
       }
       showToast('Semua halaman berhasil dipisah!', 'success');
@@ -920,7 +1000,8 @@ async function pmDownload() {
       }
 
       const bytes = await newDoc.save();
-      downloadBlob(new Blob([bytes], { type: 'application/pdf' }), 'extracted.pdf');
+      const baseName = state.pmSourceFiles[0]?.name?.replace(/\.pdf$/i, '') || 'extracted';
+      downloadBlob(new Blob([bytes], { type: 'application/pdf' }), `${baseName}_extracted.pdf`);
       showToast('Halaman berhasil diekstrak!', 'success');
 
     } else {
@@ -944,7 +1025,9 @@ async function pmDownload() {
       }
 
       const bytes = await newDoc.save();
-      downloadBlob(new Blob([bytes], { type: 'application/pdf' }), 'output.pdf');
+      const baseName = state.pmSourceFiles[0]?.name?.replace(/\.pdf$/i, '') || 'output';
+      const suffix = state.pmSourceFiles.length > 1 ? 'merged' : 'edited';
+      downloadBlob(new Blob([bytes], { type: 'application/pdf' }), `${baseName}_${suffix}.pdf`);
       showToast('PDF berhasil disimpan!', 'success');
     }
 
@@ -1684,7 +1767,8 @@ async function convertPDFtoImages() {
       await new Promise((resolve) => {
         canvas.toBlob((blob) => {
           if (blob) {
-            downloadBlob(blob, `halaman_${pageNum}.${format}`);
+            const baseName = state.currentPDFName?.replace(/\.pdf$/i, '') || 'halaman';
+            downloadBlob(blob, `${baseName}_page${pageNum}.${format}`);
           }
           resolve();
         }, mimeType, quality);
@@ -1772,7 +1856,7 @@ async function compressPDF() {
     const newSize = bytes.length;
     const reduction = ((originalSize - newSize) / originalSize * 100).toFixed(1);
 
-    downloadBlob(new Blob([bytes], { type: 'application/pdf' }), 'compressed.pdf');
+    downloadBlob(new Blob([bytes], { type: 'application/pdf' }), getOutputFilename('compressed'));
 
     if (newSize < originalSize) {
       showToast(`PDF dikompres! Berkurang ${reduction}%`, 'success');
@@ -1816,7 +1900,7 @@ async function protectPDF() {
       ownerPassword: password,
     });
     
-    downloadBlob(new Blob([bytes], { type: 'application/pdf' }), 'protected.pdf');
+    downloadBlob(new Blob([bytes], { type: 'application/pdf' }), getOutputFilename('protected'));
     showToast('PDF berhasil diproteksi!', 'success');
     
   } catch (error) {
@@ -1844,7 +1928,7 @@ async function unlockPDF() {
     
     const bytes = await srcDoc.save();
     
-    downloadBlob(new Blob([bytes], { type: 'application/pdf' }), 'unlocked.pdf');
+    downloadBlob(new Blob([bytes], { type: 'application/pdf' }), getOutputFilename('unlocked'));
     showToast('PDF berhasil dibuka!', 'success');
     
   } catch (error) {
@@ -1933,7 +2017,7 @@ async function addWatermark() {
     }
     
     const bytes = await srcDoc.save();
-    downloadBlob(new Blob([bytes], { type: 'application/pdf' }), 'watermarked.pdf');
+    downloadBlob(new Blob([bytes], { type: 'application/pdf' }), getOutputFilename('watermark'));
     showToast('Watermark berhasil ditambahkan!', 'success');
     
   } catch (error) {
@@ -2014,7 +2098,7 @@ async function addPageNumbers() {
     }
     
     const bytes = await srcDoc.save();
-    downloadBlob(new Blob([bytes], { type: 'application/pdf' }), 'numbered.pdf');
+    downloadBlob(new Blob([bytes], { type: 'application/pdf' }), getOutputFilename('numbered'));
     showToast('Nomor halaman berhasil ditambahkan!', 'success');
     
   } catch (error) {
@@ -2215,7 +2299,7 @@ async function applyCrop() {
     }
 
     const bytes = await srcDoc.save();
-    downloadBlob(new Blob([bytes], { type: 'application/pdf' }), 'cropped.pdf');
+    downloadBlob(new Blob([bytes], { type: 'application/pdf' }), getOutputFilename('cropped'));
     showToast('PDF berhasil di-crop!', 'success');
 
   } catch (error) {
@@ -3049,7 +3133,7 @@ async function saveEditedPDF() {
     }
 
     const bytes = await srcDoc.save();
-    downloadBlob(new Blob([bytes], { type: 'application/pdf' }), 'edited.pdf');
+    downloadBlob(new Blob([bytes], { type: 'application/pdf' }), getOutputFilename('edited'));
     showToast('PDF berhasil disimpan!', 'success');
 
   } catch (error) {
@@ -3468,7 +3552,8 @@ async function imagesToPDF() {
     progressText.textContent = 'Menyimpan PDF...';
     const pdfBytes = await pdfDoc.save();
     
-    downloadBlob(new Blob([pdfBytes], { type: 'application/pdf' }), 'images.pdf');
+    const firstImgName = state.imgToPdfFiles[0]?.name?.replace(/\.[^/.]+$/, '') || 'images';
+    downloadBlob(new Blob([pdfBytes], { type: 'application/pdf' }), `${firstImgName}_converted.pdf`);
     showToast('PDF berhasil dibuat!', 'success');
     
   } catch (error) {
@@ -3490,6 +3575,14 @@ function formatFileSize(bytes) {
   const sizes = ['Bytes', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+// Generate output filename: [original]_[suffix].ext
+function getOutputFilename(suffix, ext = 'pdf', originalName = null) {
+  const baseName = originalName || state.currentPDFName || state.originalImageName || 'output';
+  // Remove extension from base name
+  const nameWithoutExt = baseName.replace(/\.[^/.]+$/, '');
+  return `${nameWithoutExt}_${suffix}.${ext}`;
 }
 
 function downloadBlob(blob, filename) {

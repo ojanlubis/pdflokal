@@ -268,6 +268,13 @@
         </button>
         <input type="file" id="pm-file-input" multiple accept=".pdf" style="display:none">
         <div class="toolbar-divider"></div>
+        <button class="btn btn-secondary btn-icon" onclick="pmUndo()" title="Undo (Ctrl+Z)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+        </button>
+        <button class="btn btn-secondary btn-icon" onclick="pmRedo()" title="Redo (Ctrl+Y)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></svg>
+        </button>
+        <div class="toolbar-divider"></div>
         <button class="btn btn-secondary" onclick="pmSelectAll()">Pilih Semua</button>
         <button class="btn btn-secondary" onclick="pmDeselectAll()">Batal Pilih</button>
         <div class="toolbar-divider"></div>
@@ -373,6 +380,14 @@
             <button class="editor-tool-btn" data-edit-tool="signature" onclick="openSignatureModal()" title="Tanda Tangan (S)">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 19.5v.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v1.5"/><path d="m16 19-3-3 8-8 3 3-8 8Z"/></svg>
               Tanda Tangan
+            </button>
+            <button class="editor-tool-btn" onclick="openEditorWatermarkModal()" title="Tambah Watermark">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              Watermark
+            </button>
+            <button class="editor-tool-btn" onclick="openEditorPageNumModal()" title="Tambah Nomor Halaman">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h10"/><circle cx="18" cy="17" r="2"/></svg>
+              Nomor Halaman
             </button>
           </div>
           <div class="editor-tool-divider"></div>
