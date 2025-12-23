@@ -32,7 +32,6 @@ PDFLokal adalah tool PDF gratis untuk pengguna Indonesia. Semua proses berjalan 
 
 - ✅ **100% Client-side** - Semua proses di browser
 - ✅ **Tidak ada upload** - File tidak pernah meninggalkan perangkat
-- ✅ **Tidak ada tracking** - Tidak ada analytics atau cookies
 - ✅ **Open source** - Kode bisa diperiksa siapa saja
 
 ## 🚀 Cara Pakai
