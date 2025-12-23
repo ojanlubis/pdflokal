@@ -2,11 +2,9 @@
 
 > **Urus dokumen langsung di browser.** Cepat, gratis, file tidak pernah diupload.
 
-PDFLokal adalah tool PDF & gambar gratis untuk pengguna Indonesia. Semua proses berjalan di browser - file tidak pernah meninggalkan perangkat Anda.
+PDFLokal adalah tool PDF gratis untuk pengguna Indonesia. Semua proses berjalan di browser - file tidak pernah meninggalkan perangkat Anda.
 
-🌐 **[Buka PDFLokal](https://pdflokal.github.io)** (ganti dengan URL deployment Anda)
-
-![PDFLokal Screenshot](images/og-image.png)
+🌐 **[Buka PDFLokal](https://pdflokal.vercel.app/)** (ganti dengan URL deployment Anda)
 
 ## ✨ Fitur
 
@@ -39,7 +37,7 @@ PDFLokal adalah tool PDF & gambar gratis untuk pengguna Indonesia. Semua proses 
 
 ## 🚀 Cara Pakai
 
-1. Buka [pdflokal.github.io](https://pdflokal.github.io)
+1. Buka [pdflokal.github.io](https://pdflokal.vercel.app/)
 2. Pilih tool yang dibutuhkan
 3. Drag & drop file atau klik untuk pilih
 4. Proses dan download hasilnya
@@ -55,7 +53,7 @@ Tidak perlu install, tidak perlu daftar, tidak perlu bayar.
 ### Run Locally
 ```bash
 # Clone repository
-git clone https://github.com/username/pdflokal.git
+git clone https://github.com/ojanlubis/pdflokal.git
 cd pdflokal
 
 # Buka dengan web server (opsional)
@@ -81,8 +79,6 @@ pdflokal/
 ├── style.css       # All styles
 ├── app.js          # Application logic
 ├── images/
-│   ├── qris.png    # QRIS donation code
-│   └── og-image.png # Social sharing image
 └── README.md
 ```
 
