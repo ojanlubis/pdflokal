@@ -37,7 +37,7 @@ PDFLokal adalah tool PDF gratis untuk pengguna Indonesia. Semua proses berjalan 
 
 ## 🚀 Cara Pakai
 
-1. Buka [pdflokal.github.io](https://pdflokal.vercel.app/)
+1. Buka [pdfokal.vercel.app](https://pdflokal.vercel.app/)
 2. Pilih tool yang dibutuhkan
 3. Drag & drop file atau klik untuk pilih
 4. Proses dan download hasilnya
