@@ -27,6 +27,8 @@ const state = {
   currentCropPage: 0,
   signaturePad: null,
   signatureImage: null,
+  signatureUploadImage: null,  // For uploaded signature image
+  signatureUploadCanvas: null, // Canvas for signature bg removal
   originalImage: null,
   originalImageName: null,
   // Additional state for proper cleanup
@@ -219,6 +221,17 @@ function initFileInputs() {
     removeBgInput.addEventListener('change', (e) => {
       if (e.target.files.length > 0) {
         loadImageForTool(e.target.files[0], 'remove-bg');
+      }
+      e.target.value = '';
+    });
+  }
+
+  // Signature Upload input
+  const sigUploadInput = document.getElementById('signature-upload-input');
+  if (sigUploadInput) {
+    sigUploadInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) {
+        loadSignatureImage(e.target.files[0]);
       }
       e.target.value = '';
     });
@@ -3213,6 +3226,9 @@ function openSignatureModal() {
   document.getElementById('signature-modal').classList.add('active');
   setEditTool('signature');
 
+  // Reset to draw tab
+  switchSignatureTab('draw');
+
   setTimeout(() => {
     const canvas = document.getElementById('signature-canvas');
     const ratio = Math.max(window.devicePixelRatio || 1, 1);
@@ -3242,6 +3258,125 @@ function useSignature() {
   } else {
     showToast('Buat tanda tangan terlebih dahulu', 'error');
   }
+}
+
+// Signature Tab Switching
+function switchSignatureTab(tab) {
+  // Update tab buttons
+  document.querySelectorAll('.signature-tab').forEach(btn => {
+    btn.classList.toggle('active', btn.textContent.toLowerCase().includes(tab === 'draw' ? 'gambar' : 'upload'));
+  });
+
+  // Update tab content
+  document.getElementById('signature-draw-tab').classList.toggle('active', tab === 'draw');
+  document.getElementById('signature-upload-tab').classList.toggle('active', tab === 'upload');
+
+  // Re-init signature pad if switching to draw tab
+  if (tab === 'draw') {
+    setTimeout(() => {
+      const canvas = document.getElementById('signature-canvas');
+      if (canvas && state.signaturePad) {
+        const ratio = Math.max(window.devicePixelRatio || 1, 1);
+        canvas.width = canvas.offsetWidth * ratio;
+        canvas.height = canvas.offsetHeight * ratio;
+        canvas.getContext('2d').scale(ratio, ratio);
+        state.signaturePad.clear();
+      }
+    }, 100);
+  }
+}
+
+// Load Signature Image for Background Removal
+async function loadSignatureImage(file) {
+  try {
+    const img = await loadImage(file);
+    state.signatureUploadImage = img;
+
+    // Close signature modal and open bg removal modal
+    closeSignatureModal();
+    openSignatureBgModal();
+  } catch (error) {
+    console.error('Error loading signature image:', error);
+    showToast('Gagal memuat gambar', 'error');
+  }
+}
+
+// Signature Background Removal Modal
+function openSignatureBgModal() {
+  document.getElementById('signature-bg-modal').classList.add('active');
+
+  // Show original image
+  document.getElementById('sig-bg-original').src = state.signatureUploadImage.src;
+
+  // Initialize preview
+  updateSignatureBgPreview();
+}
+
+function closeSignatureBgModal() {
+  document.getElementById('signature-bg-modal').classList.remove('active');
+
+  // Cleanup
+  if (state.signatureUploadImage && state.signatureUploadImage._blobUrl) {
+    URL.revokeObjectURL(state.signatureUploadImage._blobUrl);
+  }
+  state.signatureUploadImage = null;
+  state.signatureUploadCanvas = null;
+}
+
+function updateSignatureBgPreview() {
+  if (!state.signatureUploadImage) return;
+
+  const threshold = parseInt(document.getElementById('sig-bg-threshold').value);
+
+  // Update slider display
+  document.getElementById('sig-bg-threshold-value').textContent = threshold;
+
+  const canvas = document.getElementById('sig-bg-preview');
+  const ctx = canvas.getContext('2d');
+
+  // Set canvas size to match original image
+  canvas.width = state.signatureUploadImage.naturalWidth;
+  canvas.height = state.signatureUploadImage.naturalHeight;
+
+  // Draw original image
+  ctx.drawImage(state.signatureUploadImage, 0, 0);
+
+  // Get image data
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const data = imageData.data;
+
+  // Process each pixel - make white/near-white pixels transparent
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+
+    // Check if pixel is white/near-white based on threshold
+    if (r >= threshold && g >= threshold && b >= threshold) {
+      data[i + 3] = 0; // Set alpha to 0 (transparent)
+    }
+  }
+
+  // Put the modified image data back
+  ctx.putImageData(imageData, 0, 0);
+
+  // Store reference for use
+  state.signatureUploadCanvas = canvas;
+}
+
+function useSignatureFromUpload() {
+  if (!state.signatureUploadCanvas) {
+    showToast('Tidak ada gambar untuk digunakan', 'error');
+    return;
+  }
+
+  // Convert canvas to data URL and use as signature
+  state.signatureImage = state.signatureUploadCanvas.toDataURL('image/png');
+
+  closeSignatureBgModal();
+  setEditTool('signature');
+  showToast('Klik pada PDF untuk menempatkan tanda tangan', 'success');
+  updateEditorStatus('Klik untuk menempatkan tanda tangan');
 }
 
 // Editor Watermark Functions
