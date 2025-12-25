@@ -213,6 +213,17 @@ function initFileInputs() {
     });
   }
 
+  // Remove Background input
+  const removeBgInput = document.getElementById('remove-bg-input');
+  if (removeBgInput) {
+    removeBgInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) {
+        loadImageForTool(e.target.files[0], 'remove-bg');
+      }
+      e.target.value = '';
+    });
+  }
+
   // Initialize drop hint drag-over effects
   initDropHints();
 }
@@ -392,6 +403,17 @@ async function loadImageForTool(file, tool) {
         const ext = file.name.split('.').pop().toLowerCase();
         document.getElementById('convert-info').textContent = `Format saat ini: ${ext.toUpperCase()}`;
         document.getElementById('convert-btn').disabled = false;
+        break;
+      case 'remove-bg':
+        // Hide drop hint, show comparison
+        const removeBgHint = document.getElementById('remove-bg-hint');
+        const removeBgComparison = document.getElementById('remove-bg-comparison');
+        if (removeBgHint) removeBgHint.classList.add('hidden');
+        if (removeBgComparison) removeBgComparison.classList.remove('hidden');
+
+        document.getElementById('remove-bg-original').src = state.originalImage.src;
+        updateRemoveBgPreview();
+        document.getElementById('remove-bg-btn').disabled = false;
         break;
     }
   } catch (error) {
@@ -3556,11 +3578,72 @@ function downloadCompressedImage() {
     showToast('Tidak ada gambar untuk didownload', 'error');
     return;
   }
-  
+
   const format = document.getElementById('compress-format').value;
   const baseName = state.originalImageName.replace(/\.[^/.]+$/, '');
   downloadBlob(state.compressedBlob, `${baseName}_compressed.${format === 'jpeg' ? 'jpg' : format}`);
   showToast('Gambar berhasil dikompres!', 'success');
+}
+
+// ============================================================
+// REMOVE BACKGROUND
+// ============================================================
+
+function updateRemoveBgPreview() {
+  if (!state.originalImage) return;
+
+  const threshold = parseInt(document.getElementById('remove-bg-threshold').value);
+
+  // Update slider display
+  document.getElementById('remove-bg-threshold-value').textContent = threshold;
+
+  const canvas = document.getElementById('remove-bg-preview');
+  const ctx = canvas.getContext('2d');
+
+  // Set canvas size to match original image
+  canvas.width = state.originalImage.naturalWidth;
+  canvas.height = state.originalImage.naturalHeight;
+
+  // Draw original image
+  ctx.drawImage(state.originalImage, 0, 0);
+
+  // Get image data
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const data = imageData.data;
+
+  // Process each pixel - make white/near-white pixels transparent
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+
+    // Check if pixel is white/near-white based on threshold
+    // All RGB values must be >= threshold to be considered "white"
+    if (r >= threshold && g >= threshold && b >= threshold) {
+      data[i + 3] = 0; // Set alpha to 0 (transparent)
+    }
+  }
+
+  // Put the modified image data back
+  ctx.putImageData(imageData, 0, 0);
+
+  // Store the canvas for download
+  state.removeBgCanvas = canvas;
+}
+
+function downloadRemovedBgImage() {
+  if (!state.removeBgCanvas) {
+    showToast('Tidak ada gambar untuk didownload', 'error');
+    return;
+  }
+
+  state.removeBgCanvas.toBlob((blob) => {
+    if (blob) {
+      const baseName = state.originalImageName.replace(/\.[^/.]+$/, '');
+      downloadBlob(blob, `${baseName}_nobg.png`);
+      showToast('Latar belakang berhasil dihapus!', 'success');
+    }
+  }, 'image/png');
 }
 
 // ============================================================
@@ -4015,7 +4098,7 @@ document.addEventListener('paste', async (e) => {
       if (file) {
         if (state.currentTool === 'img-to-pdf') {
           addImagesToPDF([file]);
-        } else if (state.currentTool === 'compress-img' || state.currentTool === 'resize' || state.currentTool === 'convert-img') {
+        } else if (state.currentTool === 'compress-img' || state.currentTool === 'resize' || state.currentTool === 'convert-img' || state.currentTool === 'remove-bg') {
           loadImageForTool(file, state.currentTool);
         } else if (!state.currentTool) {
           showTool('compress-img');
