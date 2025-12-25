@@ -888,6 +888,124 @@ a:hover {
   margin-top: var(--space-lg);
 }
 
+/* Signature Tabs */
+.signature-tabs {
+  display: flex;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-lg);
+  border-bottom: 1px solid var(--border-light);
+  padding-bottom: var(--space-sm);
+}
+
+.signature-tab {
+  padding: var(--space-sm) var(--space-lg);
+  background: none;
+  border: none;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  transition: all var(--transition-fast);
+}
+
+.signature-tab:hover {
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+}
+
+.signature-tab.active {
+  color: var(--accent-primary);
+  border-bottom: 2px solid var(--accent-primary);
+  margin-bottom: -1px;
+}
+
+.signature-tab-content {
+  display: none;
+}
+
+.signature-tab-content.active {
+  display: block;
+}
+
+.signature-upload-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-xl);
+  border: 2px dashed var(--border-medium);
+  border-radius: var(--radius-lg);
+  background: var(--bg-tertiary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  min-height: 150px;
+  text-align: center;
+  color: var(--text-tertiary);
+}
+
+.signature-upload-area:hover {
+  border-color: var(--accent-primary);
+  background: var(--accent-light);
+  color: var(--accent-primary);
+}
+
+.signature-upload-area p {
+  margin-top: var(--space-md);
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.signature-upload-area span {
+  font-size: 0.8125rem;
+  color: var(--text-tertiary);
+  margin-top: var(--space-xs);
+}
+
+/* Signature Background Removal Preview */
+.signature-bg-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xl);
+  padding: var(--space-lg);
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-lg);
+}
+
+.signature-bg-preview .preview-box {
+  text-align: center;
+}
+
+.signature-bg-preview .preview-box img,
+.signature-bg-preview .preview-box canvas {
+  display: block;
+  margin: 0 auto;
+  border-radius: var(--radius-sm);
+}
+
+.signature-bg-preview .preview-box p {
+  margin-top: var(--space-sm);
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+.signature-bg-preview .preview-arrow {
+  font-size: 1.5rem;
+  color: var(--text-tertiary);
+}
+
+@media (max-width: 600px) {
+  .signature-bg-preview {
+    flex-direction: column;
+    gap: var(--space-md);
+  }
+
+  .signature-bg-preview .preview-arrow {
+    transform: rotate(90deg);
+  }
+}
+
 /* Progress Bar */
 .progress-container {
   margin-bottom: var(--space-xl);

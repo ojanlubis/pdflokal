@@ -1001,11 +1001,62 @@
   <div id="signature-modal" class="signature-modal">
     <div class="signature-box">
       <h3>Buat Tanda Tangan</h3>
-      <canvas id="signature-canvas" class="signature-canvas"></canvas>
-      <div class="signature-actions">
-        <button class="btn btn-secondary" onclick="clearSignature()">Hapus</button>
-        <button class="btn btn-ghost" onclick="closeSignatureModal()">Batal</button>
-        <button class="btn btn-primary" onclick="useSignature()">Gunakan</button>
+      <div class="signature-tabs">
+        <button class="signature-tab active" onclick="switchSignatureTab('draw')">Gambar</button>
+        <button class="signature-tab" onclick="switchSignatureTab('upload')">Upload Gambar</button>
+      </div>
+      <div id="signature-draw-tab" class="signature-tab-content active">
+        <canvas id="signature-canvas" class="signature-canvas"></canvas>
+        <div class="signature-actions">
+          <button class="btn btn-secondary" onclick="clearSignature()">Hapus</button>
+          <button class="btn btn-ghost" onclick="closeSignatureModal()">Batal</button>
+          <button class="btn btn-primary" onclick="useSignature()">Gunakan</button>
+        </div>
+      </div>
+      <div id="signature-upload-tab" class="signature-tab-content">
+        <div class="signature-upload-area" id="signature-upload-hint" onclick="document.getElementById('signature-upload-input').click()">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <p>Klik untuk upload gambar tanda tangan</p>
+          <span>JPG • PNG</span>
+          <input type="file" id="signature-upload-input" accept="image/jpeg,image/png" style="display:none">
+        </div>
+        <div class="signature-actions">
+          <button class="btn btn-ghost" onclick="closeSignatureModal()">Batal</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Signature Background Removal Modal -->
+  <div id="signature-bg-modal" class="edit-modal">
+    <div class="edit-modal-box" style="max-width: 700px;">
+      <h3>Hapus Latar Belakang Tanda Tangan</h3>
+      <div class="edit-modal-content">
+        <p class="mb-md" style="color: var(--text-secondary);">Atur threshold untuk mengubah warna putih/terang menjadi transparan.</p>
+        <div class="signature-bg-preview">
+          <div class="preview-box">
+            <img id="sig-bg-original" src="" alt="Original" style="max-width: 200px; max-height: 150px;">
+            <p>Original</p>
+          </div>
+          <div class="preview-arrow">→</div>
+          <div class="preview-box" style="background: repeating-conic-gradient(#ddd 0% 25%, #fff 0% 50%) 50% / 12px 12px; border-radius: var(--radius-md); padding: var(--space-sm);">
+            <canvas id="sig-bg-preview" style="max-width: 200px; max-height: 150px;"></canvas>
+            <p>Hasil</p>
+          </div>
+        </div>
+        <div class="controls" style="justify-content: center; margin-top: var(--space-lg);">
+          <div class="control-group">
+            <label>Threshold:</label>
+          </div>
+          <div class="range-slider" style="max-width: 250px;">
+            <input type="range" id="sig-bg-threshold" min="180" max="255" value="230" oninput="updateSignatureBgPreview()">
+            <span class="range-value" id="sig-bg-threshold-value">230</span>
+          </div>
+        </div>
+      </div>
+      <div class="edit-modal-actions">
+        <button class="btn btn-ghost" onclick="closeSignatureBgModal()">Batal</button>
+        <button class="btn btn-primary" onclick="useSignatureFromUpload()">Gunakan Tanda Tangan</button>
       </div>
     </div>
   </div>
