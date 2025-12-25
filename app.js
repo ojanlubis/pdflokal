@@ -2607,10 +2607,19 @@ function drawAnnotationSync(ctx, anno, isSelected = false) {
       }
       break;
     case 'signature':
-      if (anno.image && anno.cachedImg) {
-        ctx.drawImage(anno.cachedImg, anno.x, anno.y, anno.width, anno.height);
-        if (isSelected) {
-          drawSelectionHandles(ctx, anno.x, anno.y, anno.width, anno.height);
+      if (anno.image) {
+        // Create and cache image if not already cached
+        if (!anno.cachedImg) {
+          const img = new Image();
+          img.src = anno.image;
+          anno.cachedImg = img;
+        }
+        // Draw if image is loaded (data URLs load almost instantly)
+        if (anno.cachedImg.complete && anno.cachedImg.naturalWidth > 0) {
+          ctx.drawImage(anno.cachedImg, anno.x, anno.y, anno.width, anno.height);
+          if (isSelected) {
+            drawSelectionHandles(ctx, anno.x, anno.y, anno.width, anno.height);
+          }
         }
       }
       break;
@@ -2902,16 +2911,30 @@ function setupEditCanvas() {
       const sigWidth = Math.min(200, pageScale.canvasWidth * 0.3);
       const sigHeight = sigWidth / 2; // Maintain 2:1 aspect ratio
 
-      state.editAnnotations[state.currentEditPage].push({
+      const annotation = {
         type: 'signature',
         image: state.signatureImage,
         x: startX,
         y: startY,
         width: sigWidth,
         height: sigHeight
-      });
-      renderEditPage();
-      updateEditorStatus('Tanda tangan ditambahkan');
+      };
+
+      // Pre-cache the image for immediate visual rendering
+      const img = new Image();
+      img.onload = () => {
+        annotation.cachedImg = img;
+        renderEditPage();
+        updateEditorStatus('Tanda tangan ditambahkan');
+      };
+      img.onerror = () => {
+        // Still render even if image fails to load
+        renderEditPage();
+        updateEditorStatus('Tanda tangan ditambahkan');
+      };
+      img.src = state.signatureImage;
+
+      state.editAnnotations[state.currentEditPage].push(annotation);
     }
   }
 }
