@@ -3253,8 +3253,8 @@ function useSignature() {
   if (state.signaturePad && !state.signaturePad.isEmpty()) {
     state.signatureImage = state.signaturePad.toDataURL();
     closeSignatureModal();
+    setEditTool('signature');
     showToast('Klik pada PDF untuk menempatkan tanda tangan', 'success');
-    updateEditorStatus('Klik untuk menempatkan tanda tangan');
   } else {
     showToast('Buat tanda tangan terlebih dahulu', 'error');
   }
