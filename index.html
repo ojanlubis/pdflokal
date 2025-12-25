@@ -94,6 +94,17 @@
         <div class="tools-category">
           <h2>PDF</h2>
           <div class="tools-grid">
+            <div class="tool-card" data-tool="unified-editor" style="border: 2px solid var(--accent-primary);">
+              <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <path d="M16 13H8"/>
+                <path d="M16 17H8"/>
+                <path d="M10 9H8"/>
+              </svg>
+              <h3>Editor PDF</h3>
+              <p>edit, merge, kelola</p>
+            </div>
             <div class="tool-card" data-tool="page-manager">
               <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="3" y="3" width="7" height="9"/>
@@ -379,6 +390,112 @@
       <div class="progress-container hidden" id="compress-pdf-progress">
         <div class="progress-bar"><div class="progress-fill" style="width: 0%"></div></div>
         <p class="progress-text">Memproses...</p>
+      </div>
+    </div>
+
+    <!-- Unified Editor Workspace (combines Page Manager + Edit PDF) -->
+    <div id="unified-editor-workspace" class="workspace">
+      <div class="workspace-header">
+        <h2>
+          <button class="back-btn" onclick="showHome()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+            Kembali
+          </button>
+          Editor PDF
+        </h2>
+      </div>
+      <div class="unified-editor-layout">
+        <!-- Left Sidebar: Page Thumbnails -->
+        <div class="unified-sidebar">
+          <div class="unified-sidebar-header">
+            <span class="sidebar-title">Halaman</span>
+            <button class="btn btn-secondary btn-sm" onclick="document.getElementById('ue-file-input').click()" title="Tambah PDF">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+            <input type="file" id="ue-file-input" multiple accept=".pdf" style="display:none">
+          </div>
+          <div class="unified-thumbnails" id="ue-thumbnails">
+            <div class="drop-hint" onclick="document.getElementById('ue-file-input').click()">
+              <svg class="drop-hint-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width: 32px; height: 32px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              <span class="drop-hint-text" style="font-size: 0.8125rem;">Upload PDF</span>
+            </div>
+          </div>
+          <div class="unified-sidebar-footer">
+            <button class="btn btn-secondary btn-sm btn-icon" onclick="ueUndo()" title="Undo">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+            </button>
+            <button class="btn btn-secondary btn-sm btn-icon" onclick="ueRedo()" title="Redo">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></svg>
+            </button>
+            <span class="sidebar-page-count" id="ue-page-count">0 halaman</span>
+          </div>
+        </div>
+
+        <!-- Main Content: Canvas + Toolbar -->
+        <div class="unified-main">
+          <!-- Editor Toolbar -->
+          <div class="editor-toolbar">
+            <div class="editor-tool-group">
+              <button class="editor-tool-btn" data-edit-tool="select" onclick="ueSetTool('select')" title="Pilih & Edit (V)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="M13 13l6 6"/></svg>
+                Pilih
+              </button>
+              <button class="editor-tool-btn" data-edit-tool="whiteout" onclick="ueSetTool('whiteout')" title="Whiteout (W)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+                Whiteout
+              </button>
+              <button class="editor-tool-btn" data-edit-tool="text" onclick="ueSetTool('text')" title="Tambah Teks (T)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>
+                Teks
+              </button>
+              <button class="editor-tool-btn" data-edit-tool="signature" onclick="ueOpenSignatureModal()" title="Tanda Tangan (S)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 19.5v.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v1.5"/><path d="m16 19-3-3 8-8 3 3-8 8Z"/></svg>
+                Tanda Tangan
+              </button>
+              <button class="editor-tool-btn" onclick="ueOpenWatermarkModal()" title="Tambah Watermark">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                Watermark
+              </button>
+              <button class="editor-tool-btn" onclick="ueOpenPageNumModal()" title="Tambah Nomor Halaman">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h10"/><circle cx="18" cy="17" r="2"/></svg>
+                Nomor Halaman
+              </button>
+            </div>
+            <div class="editor-tool-divider"></div>
+            <div class="editor-action-group">
+              <button class="editor-action-btn" onclick="ueUndoAnnotation()" title="Undo Edit (Ctrl+Z)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+              </button>
+              <button class="editor-action-btn" onclick="ueRedoAnnotation()" title="Redo Edit (Ctrl+Y)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></svg>
+              </button>
+              <button class="editor-action-btn danger" onclick="ueClearPageAnnotations()" title="Hapus Semua Edit di Halaman Ini">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+              </button>
+            </div>
+            <div class="editor-status" id="ue-editor-status">
+              <span class="status-text">Pilih halaman untuk mulai mengedit</span>
+            </div>
+          </div>
+
+          <!-- Canvas Wrapper -->
+          <div class="unified-canvas-wrapper" id="ue-canvas-wrapper">
+            <div class="unified-empty-state" id="ue-empty-state">
+              <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color: var(--text-tertiary);">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+              </svg>
+              <p style="color: var(--text-secondary); margin-top: var(--space-md);">Upload PDF atau pilih halaman dari sidebar</p>
+            </div>
+            <canvas id="ue-canvas" class="editor-canvas" style="display: none;"></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="action-bar">
+        <button class="btn btn-primary btn-lg" id="ue-download-btn" disabled onclick="ueDownload()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download PDF
+        </button>
       </div>
     </div>
 

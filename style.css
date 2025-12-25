@@ -1723,6 +1723,229 @@ a:hover {
   }
 }
 
+/* ============================================================
+   Unified Editor Workspace Styles
+   ============================================================ */
+
+.unified-editor-layout {
+  display: flex;
+  gap: var(--space-lg);
+  height: calc(100vh - 280px);
+  min-height: 500px;
+}
+
+/* Sidebar */
+.unified-sidebar {
+  width: 200px;
+  min-width: 200px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.unified-sidebar-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  border-bottom: 1px solid var(--border-light);
+  background: var(--bg-tertiary);
+}
+
+.sidebar-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.unified-thumbnails {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.unified-thumbnails .drop-hint {
+  min-height: 100px;
+  padding: var(--space-md);
+  border: 1px dashed var(--border-medium);
+}
+
+.unified-sidebar-footer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border-top: 1px solid var(--border-light);
+  background: var(--bg-tertiary);
+}
+
+.sidebar-page-count {
+  flex: 1;
+  text-align: right;
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+}
+
+/* Thumbnail Items */
+.ue-thumbnail {
+  position: relative;
+  background: var(--bg-tertiary);
+  border: 2px solid var(--border-light);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.ue-thumbnail:hover {
+  border-color: var(--accent-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.ue-thumbnail.selected {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px var(--accent-light);
+}
+
+.ue-thumbnail canvas {
+  width: 100%;
+  display: block;
+}
+
+.ue-thumbnail-number {
+  position: absolute;
+  bottom: var(--space-xs);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  font-size: 0.625rem;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+}
+
+.ue-thumbnail-source {
+  position: absolute;
+  top: var(--space-xs);
+  right: var(--space-xs);
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  font-size: 0.5rem;
+  padding: 1px 4px;
+  border-radius: var(--radius-sm);
+  max-width: 50px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ue-thumbnail-delete {
+  position: absolute;
+  top: var(--space-xs);
+  left: var(--space-xs);
+  width: 18px;
+  height: 18px;
+  background: rgba(220, 38, 38, 0.9);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.ue-thumbnail:hover .ue-thumbnail-delete {
+  opacity: 1;
+}
+
+/* Main Content Area */
+.unified-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+}
+
+.unified-main .editor-toolbar {
+  margin-bottom: var(--space-md);
+}
+
+.unified-canvas-wrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #e5e5e5;
+  border-radius: var(--radius-md);
+  overflow: auto;
+  padding: var(--space-lg);
+  min-height: 400px;
+}
+
+.unified-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: var(--space-2xl);
+}
+
+/* Button size modifier */
+.btn-sm {
+  padding: var(--space-xs) var(--space-sm);
+  font-size: 0.8125rem;
+}
+
+.btn-icon {
+  padding: var(--space-xs);
+  width: 28px;
+  height: 28px;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .unified-editor-layout {
+    flex-direction: column;
+    height: auto;
+  }
+
+  .unified-sidebar {
+    width: 100%;
+    min-width: auto;
+    max-height: 200px;
+  }
+
+  .unified-thumbnails {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+  }
+
+  .ue-thumbnail {
+    width: 80px;
+    flex-shrink: 0;
+  }
+
+  .unified-canvas-wrapper {
+    min-height: 300px;
+  }
+}
+
 /* Utility Classes */
 .hidden { display: none !important; }
 .text-center { text-align: center; }

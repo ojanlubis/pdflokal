@@ -481,14 +481,19 @@ function showHome() {
 function showTool(tool) {
   document.getElementById('home-view').style.display = 'none';
   document.querySelectorAll('.workspace').forEach(ws => ws.classList.remove('active'));
-  
+
   const workspace = document.getElementById(`${tool}-workspace`);
   if (workspace) {
     workspace.classList.add('active');
     state.currentTool = tool;
-    
+
     // Setup drop zones for workspaces
     setupWorkspaceDropZone(tool);
+
+    // Initialize unified editor when opened
+    if (tool === 'unified-editor') {
+      initUnifiedEditor();
+    }
   }
 }
 
@@ -572,6 +577,11 @@ function resetState() {
   // Reset Page Manager state
   state.pmPages = [];
   state.pmSourceFiles = [];
+
+  // Reset Unified Editor state
+  if (typeof ueReset === 'function') {
+    ueReset();
+  }
 }
 
 // ============================================================
@@ -3213,6 +3223,12 @@ function updateTextPreview() {
 }
 
 function confirmTextInput() {
+  // Check if we're in unified editor mode
+  if (state.currentTool === 'unified-editor' && ueState.pendingTextPosition) {
+    ueConfirmText();
+    return;
+  }
+
   const text = document.getElementById('text-input-field').value.trim();
 
   if (!text) {
@@ -3276,7 +3292,12 @@ function useSignature() {
   if (state.signaturePad && !state.signaturePad.isEmpty()) {
     state.signatureImage = state.signaturePad.toDataURL();
     closeSignatureModal();
-    setEditTool('signature');
+    // Check if in unified editor mode
+    if (state.currentTool === 'unified-editor') {
+      ueSetTool('signature');
+    } else {
+      setEditTool('signature');
+    }
     showToast('Klik pada PDF untuk menempatkan tanda tangan', 'success');
   } else {
     showToast('Buat tanda tangan terlebih dahulu', 'error');
@@ -3397,9 +3418,15 @@ function useSignatureFromUpload() {
   state.signatureImage = state.signatureUploadCanvas.toDataURL('image/png');
 
   closeSignatureBgModal();
-  setEditTool('signature');
+  // Check if in unified editor mode
+  if (state.currentTool === 'unified-editor') {
+    ueSetTool('signature');
+    ueUpdateStatus('Klik untuk menempatkan tanda tangan');
+  } else {
+    setEditTool('signature');
+    updateEditorStatus('Klik untuk menempatkan tanda tangan');
+  }
   showToast('Klik pada PDF untuk menempatkan tanda tangan', 'success');
-  updateEditorStatus('Klik untuk menempatkan tanda tangan');
 }
 
 // Editor Watermark Functions
@@ -3418,6 +3445,40 @@ function applyEditorWatermark() {
   const opacity = parseInt(document.getElementById('editor-wm-opacity').value) / 100;
   const rotation = parseInt(document.getElementById('editor-wm-rotation').value);
   const applyTo = document.getElementById('editor-wm-pages').value;
+
+  // Check if in unified editor mode
+  if (state.currentTool === 'unified-editor') {
+    ueSaveEditUndoState();
+    const pageScale = ueState.pageScales[ueState.selectedPage] || { canvasWidth: 600, canvasHeight: 800 };
+    const centerX = pageScale.canvasWidth / 2;
+    const centerY = pageScale.canvasHeight / 2;
+
+    const watermarkAnno = {
+      type: 'watermark',
+      text,
+      fontSize,
+      color,
+      opacity,
+      rotation,
+      x: centerX,
+      y: centerY
+    };
+
+    if (applyTo === 'all') {
+      for (let i = 0; i < ueState.pages.length; i++) {
+        if (!ueState.annotations[i]) ueState.annotations[i] = [];
+        ueState.annotations[i].push({ ...watermarkAnno });
+      }
+      showToast('Watermark diterapkan ke semua halaman', 'success');
+    } else {
+      ueState.annotations[ueState.selectedPage].push(watermarkAnno);
+      showToast('Watermark diterapkan', 'success');
+    }
+
+    closeEditorWatermarkModal();
+    ueRedrawAnnotations();
+    return;
+  }
 
   saveUndoState();
 
@@ -3467,8 +3528,67 @@ function applyEditorPageNumbers() {
   const format = document.getElementById('editor-pn-format').value;
   const fontSize = parseInt(document.getElementById('editor-pn-size').value);
   const startNum = parseInt(document.getElementById('editor-pn-start').value) || 1;
-  const totalPages = state.currentPDF.numPages;
 
+  // Check if in unified editor mode
+  if (state.currentTool === 'unified-editor') {
+    const totalPages = ueState.pages.length;
+    ueSaveEditUndoState();
+
+    for (let i = 0; i < totalPages; i++) {
+      const pageNum = startNum + i;
+      let text;
+
+      switch (format) {
+        case 'page-of':
+          text = `Halaman ${pageNum} dari ${totalPages + startNum - 1}`;
+          break;
+        case 'dash':
+          text = `- ${pageNum} -`;
+          break;
+        default:
+          text = `${pageNum}`;
+      }
+
+      const pageScale = ueState.pageScales[i] || ueState.pageScales[ueState.selectedPage] || { canvasWidth: 600, canvasHeight: 800 };
+      const canvasWidth = pageScale.canvasWidth;
+      const canvasHeight = pageScale.canvasHeight;
+      const margin = 30;
+
+      let x, y;
+      switch (position) {
+        case 'bottom-left':
+          x = margin; y = canvasHeight - margin; break;
+        case 'bottom-right':
+          x = canvasWidth - margin; y = canvasHeight - margin; break;
+        case 'top-center':
+          x = canvasWidth / 2; y = margin + fontSize; break;
+        case 'top-left':
+          x = margin; y = margin + fontSize; break;
+        case 'top-right':
+          x = canvasWidth - margin; y = margin + fontSize; break;
+        default:
+          x = canvasWidth / 2; y = canvasHeight - margin;
+      }
+
+      if (!ueState.annotations[i]) ueState.annotations[i] = [];
+      ueState.annotations[i].push({
+        type: 'pageNumber',
+        text,
+        fontSize,
+        color: '#000000',
+        x,
+        y,
+        position
+      });
+    }
+
+    closeEditorPageNumModal();
+    ueRedrawAnnotations();
+    showToast('Nomor halaman ditambahkan ke semua halaman', 'success');
+    return;
+  }
+
+  const totalPages = state.currentPDF.numPages;
   saveUndoState();
 
   for (let i = 0; i < totalPages; i++) {
@@ -4226,6 +4346,895 @@ function showToast(message, type = 'info') {
 }
 
 // ============================================================
+// UNIFIED EDITOR WORKSPACE
+// ============================================================
+
+// State for unified editor
+const ueState = {
+  pages: [],            // Array of { pageNum, sourceIndex, sourceName, rotation, canvas }
+  sourceFiles: [],      // Array of { name, bytes }
+  selectedPage: -1,     // Currently selected page index
+  currentTool: null,    // Current edit tool
+  annotations: {},      // Per-page annotations: { pageIndex: [...] }
+  undoStack: [],        // Undo stack for page operations
+  redoStack: [],        // Redo stack for page operations
+  editUndoStack: [],    // Undo stack for annotations
+  editRedoStack: [],    // Redo stack for annotations
+  selectedAnnotation: null,
+  pendingTextPosition: null,
+  pageScales: {},
+  devicePixelRatio: 1,
+  canvasSetup: false,
+  pageCache: null,      // Cached rendered page for smooth dragging
+};
+
+// Initialize unified editor file input
+function initUnifiedEditorInput() {
+  const input = document.getElementById('ue-file-input');
+  if (input && !input._ueInitialized) {
+    input._ueInitialized = true;
+    input.addEventListener('change', (e) => {
+      ueAddFiles(e.target.files);
+      e.target.value = '';
+    });
+  }
+}
+
+// Add PDF files to unified editor
+async function ueAddFiles(files) {
+  if (!files || files.length === 0) return;
+
+  for (const file of files) {
+    if (file.type !== 'application/pdf') {
+      showToast('Hanya file PDF yang didukung', 'error');
+      continue;
+    }
+
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      const sourceIndex = ueState.sourceFiles.length;
+      const sourceName = file.name.replace('.pdf', '').substring(0, 15);
+
+      ueState.sourceFiles.push({ name: file.name, bytes });
+
+      // Load PDF with PDF.js
+      const pdf = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+
+      // Save undo state
+      ueSaveUndoState();
+
+      // Add all pages
+      for (let i = 0; i < pdf.numPages; i++) {
+        const page = await pdf.getPage(i + 1);
+        const viewport = page.getViewport({ scale: 0.3 }); // Thumbnail scale
+
+        const canvas = document.createElement('canvas');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        const ctx = canvas.getContext('2d');
+
+        await page.render({ canvasContext: ctx, viewport }).promise;
+
+        ueState.pages.push({
+          pageNum: i,
+          sourceIndex,
+          sourceName,
+          rotation: 0,
+          canvas
+        });
+
+        // Initialize annotations for this page
+        ueState.annotations[ueState.pages.length - 1] = [];
+      }
+
+      ueRenderThumbnails();
+      ueUpdatePageCount();
+      document.getElementById('ue-download-btn').disabled = false;
+
+      // Auto-select first page if none selected
+      if (ueState.selectedPage === -1 && ueState.pages.length > 0) {
+        ueSelectPage(0);
+      }
+
+    } catch (error) {
+      console.error('Error loading PDF:', error);
+      showToast('Gagal memuat PDF: ' + file.name, 'error');
+    }
+  }
+}
+
+// Render thumbnails in sidebar
+function ueRenderThumbnails() {
+  const container = document.getElementById('ue-thumbnails');
+  container.innerHTML = '';
+
+  if (ueState.pages.length === 0) {
+    container.innerHTML = `
+      <div class="drop-hint" onclick="document.getElementById('ue-file-input').click()">
+        <svg class="drop-hint-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width: 32px; height: 32px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <span class="drop-hint-text" style="font-size: 0.8125rem;">Upload PDF</span>
+      </div>
+    `;
+    return;
+  }
+
+  ueState.pages.forEach((page, index) => {
+    const item = document.createElement('div');
+    item.className = 'ue-thumbnail' + (index === ueState.selectedPage ? ' selected' : '');
+    item.onclick = () => ueSelectPage(index);
+
+    // Clone the thumbnail canvas
+    const thumbCanvas = document.createElement('canvas');
+    thumbCanvas.width = page.canvas.width;
+    thumbCanvas.height = page.canvas.height;
+    thumbCanvas.getContext('2d').drawImage(page.canvas, 0, 0);
+    item.appendChild(thumbCanvas);
+
+    // Page number badge
+    const numBadge = document.createElement('span');
+    numBadge.className = 'ue-thumbnail-number';
+    numBadge.textContent = index + 1;
+    item.appendChild(numBadge);
+
+    // Source file badge (if multiple sources)
+    if (ueState.sourceFiles.length > 1) {
+      const srcBadge = document.createElement('span');
+      srcBadge.className = 'ue-thumbnail-source';
+      srcBadge.textContent = page.sourceName;
+      item.appendChild(srcBadge);
+    }
+
+    // Delete button
+    const delBtn = document.createElement('button');
+    delBtn.className = 'ue-thumbnail-delete';
+    delBtn.innerHTML = '×';
+    delBtn.onclick = (e) => {
+      e.stopPropagation();
+      ueDeletePage(index);
+    };
+    item.appendChild(delBtn);
+
+    container.appendChild(item);
+  });
+}
+
+// Select a page
+function ueSelectPage(index) {
+  if (index < 0 || index >= ueState.pages.length) return;
+
+  ueState.selectedPage = index;
+  ueRenderThumbnails();
+  ueRenderSelectedPage();
+
+  // Show canvas, hide empty state
+  document.getElementById('ue-empty-state').style.display = 'none';
+  document.getElementById('ue-canvas').style.display = 'block';
+
+  ueUpdateStatus('Halaman ' + (index + 1) + ' dipilih. Gunakan alat di atas untuk mengedit.');
+}
+
+// Render selected page on main canvas
+async function ueRenderSelectedPage() {
+  if (ueState.selectedPage < 0) return;
+
+  const pageInfo = ueState.pages[ueState.selectedPage];
+  const sourceFile = ueState.sourceFiles[pageInfo.sourceIndex];
+
+  try {
+    const pdf = await pdfjsLib.getDocument({ data: sourceFile.bytes.slice() }).promise;
+    const page = await pdf.getPage(pageInfo.pageNum + 1);
+
+    const canvas = document.getElementById('ue-canvas');
+    const ctx = canvas.getContext('2d');
+    const dpr = ueState.devicePixelRatio = window.devicePixelRatio || 1;
+
+    // Calculate scale to fit wrapper
+    const wrapper = document.getElementById('ue-canvas-wrapper');
+    const maxWidth = wrapper.clientWidth - 40;
+    const maxHeight = wrapper.clientHeight - 40;
+    const naturalViewport = page.getViewport({ scale: 1, rotation: pageInfo.rotation });
+
+    let scale = Math.min(
+      maxWidth / naturalViewport.width,
+      maxHeight / naturalViewport.height,
+      2
+    );
+    scale = Math.max(scale, 0.5);
+
+    const viewport = page.getViewport({ scale, rotation: pageInfo.rotation });
+
+    // Store scale info
+    ueState.pageScales[ueState.selectedPage] = {
+      scale,
+      pdfWidth: naturalViewport.width,
+      pdfHeight: naturalViewport.height,
+      canvasWidth: viewport.width,
+      canvasHeight: viewport.height
+    };
+
+    // Set canvas size
+    canvas.width = viewport.width * dpr;
+    canvas.height = viewport.height * dpr;
+    canvas.style.width = viewport.width + 'px';
+    canvas.style.height = viewport.height + 'px';
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    await page.render({ canvasContext: ctx, viewport }).promise;
+
+    // Cache the page for smooth annotation drawing
+    ueState.pageCache = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+    // Draw annotations
+    ueRedrawAnnotations();
+
+    // Setup canvas events if not done
+    if (!ueState.canvasSetup) {
+      ueSetupCanvasEvents();
+    }
+
+  } catch (error) {
+    console.error('Error rendering page:', error);
+    showToast('Gagal merender halaman', 'error');
+  }
+}
+
+// Setup canvas events for editing
+function ueSetupCanvasEvents() {
+  if (ueState.canvasSetup) return;
+  ueState.canvasSetup = true;
+
+  const canvas = document.getElementById('ue-canvas');
+  let isDrawing = false;
+  let isDragging = false;
+  let startX, startY;
+  let dragOffsetX, dragOffsetY;
+
+  function getCoords(e) {
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left) * (canvas.width / canvas.clientWidth / ueState.devicePixelRatio);
+    const y = (e.clientY - rect.top) * (canvas.height / canvas.clientHeight / ueState.devicePixelRatio);
+    return { x, y };
+  }
+
+  canvas.addEventListener('mousedown', (e) => handleDown(getCoords(e)));
+  canvas.addEventListener('mousemove', (e) => handleMove(getCoords(e)));
+  canvas.addEventListener('mouseup', (e) => handleUp(getCoords(e)));
+  canvas.addEventListener('mouseleave', () => { isDrawing = false; isDragging = false; });
+
+  canvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    handleDown(getCoords(e.touches[0]));
+  }, { passive: false });
+  canvas.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    handleMove(getCoords(e.touches[0]));
+  }, { passive: false });
+  canvas.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    handleUp(getCoords(e.changedTouches[0]));
+  }, { passive: false });
+
+  function handleDown({ x, y }) {
+    startX = x;
+    startY = y;
+
+    // Check for annotation selection
+    if (ueState.currentTool === 'select') {
+      const clicked = ueFindAnnotationAt(x, y);
+      if (clicked) {
+        ueSaveEditUndoState();
+        ueState.selectedAnnotation = clicked;
+        isDragging = true;
+        const anno = ueState.annotations[clicked.pageIndex][clicked.index];
+        dragOffsetX = x - anno.x;
+        dragOffsetY = y - (anno.type === 'text' ? anno.y - anno.fontSize : anno.y);
+        ueRedrawAnnotations();
+        return;
+      } else {
+        ueState.selectedAnnotation = null;
+        ueRedrawAnnotations();
+      }
+    }
+
+    if (!ueState.currentTool || ueState.currentTool === 'select') return;
+    isDrawing = true;
+  }
+
+  function handleMove({ x, y }) {
+    // Handle dragging annotation
+    if (isDragging && ueState.selectedAnnotation) {
+      const anno = ueState.annotations[ueState.selectedAnnotation.pageIndex][ueState.selectedAnnotation.index];
+      if (anno.type === 'text') {
+        anno.x = x - dragOffsetX;
+        anno.y = y - dragOffsetY + anno.fontSize;
+      } else {
+        anno.x = x - dragOffsetX;
+        anno.y = y - dragOffsetY;
+      }
+      ueRedrawAnnotations();
+      return;
+    }
+
+    // Handle whiteout preview
+    if (!isDrawing || ueState.currentTool !== 'whiteout') return;
+
+    ueRedrawAnnotations();
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+    ctx.strokeStyle = '#3B82F6';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 3]);
+    ctx.fillRect(Math.min(startX, x), Math.min(startY, y), Math.abs(x - startX), Math.abs(y - startY));
+    ctx.strokeRect(Math.min(startX, x), Math.min(startY, y), Math.abs(x - startX), Math.abs(y - startY));
+    ctx.setLineDash([]);
+  }
+
+  function handleUp({ x, y }) {
+    if (isDragging) {
+      isDragging = false;
+      return;
+    }
+
+    if (!isDrawing) return;
+    isDrawing = false;
+
+    const pageIndex = ueState.selectedPage;
+
+    if (ueState.currentTool === 'whiteout') {
+      const width = Math.abs(x - startX);
+      const height = Math.abs(y - startY);
+      if (width > 5 && height > 5) {
+        ueSaveEditUndoState();
+        ueState.annotations[pageIndex].push({
+          type: 'whiteout',
+          x: Math.min(startX, x),
+          y: Math.min(startY, y),
+          width,
+          height
+        });
+        ueRedrawAnnotations();
+      }
+    } else if (ueState.currentTool === 'text') {
+      ueState.pendingTextPosition = { x: startX, y: startY };
+      ueOpenTextModal();
+    } else if (ueState.currentTool === 'signature' && state.signatureImage) {
+      ueSaveEditUndoState();
+      const img = new Image();
+      img.src = state.signatureImage;
+      img.onload = () => {
+        const aspectRatio = img.width / img.height;
+        const sigWidth = 150;
+        const sigHeight = sigWidth / aspectRatio;
+        ueState.annotations[pageIndex].push({
+          type: 'signature',
+          image: state.signatureImage,
+          x: startX,
+          y: startY,
+          width: sigWidth,
+          height: sigHeight,
+          cachedImg: img
+        });
+        ueRedrawAnnotations();
+        ueSetTool('select');
+      };
+    }
+  }
+}
+
+// Redraw annotations
+function ueRedrawAnnotations() {
+  const canvas = document.getElementById('ue-canvas');
+  const ctx = canvas.getContext('2d');
+
+  // Restore cached page
+  if (ueState.pageCache) {
+    ctx.putImageData(ueState.pageCache, 0, 0);
+  }
+  ctx.setTransform(ueState.devicePixelRatio, 0, 0, ueState.devicePixelRatio, 0, 0);
+
+  const annotations = ueState.annotations[ueState.selectedPage] || [];
+  annotations.forEach((anno, i) => {
+    const isSelected = ueState.selectedAnnotation &&
+      ueState.selectedAnnotation.pageIndex === ueState.selectedPage &&
+      ueState.selectedAnnotation.index === i;
+    ueDrawAnnotation(ctx, anno, isSelected);
+  });
+}
+
+// Draw a single annotation
+function ueDrawAnnotation(ctx, anno, isSelected) {
+  switch (anno.type) {
+    case 'whiteout':
+      ctx.fillStyle = 'white';
+      ctx.fillRect(anno.x, anno.y, anno.width, anno.height);
+      if (isSelected) ueDrawSelectionHandles(ctx, anno.x, anno.y, anno.width, anno.height);
+      break;
+    case 'text':
+      ctx.font = `${anno.fontSize}px Arial`;
+      ctx.fillStyle = anno.color;
+      const lines = anno.text.split('\n');
+      lines.forEach((line, i) => ctx.fillText(line, anno.x, anno.y + i * anno.fontSize * 1.2));
+      if (isSelected) {
+        const metrics = ctx.measureText(anno.text);
+        ueDrawSelectionHandles(ctx, anno.x - 2, anno.y - anno.fontSize, metrics.width + 4, anno.fontSize * lines.length * 1.2 + 4);
+      }
+      break;
+    case 'signature':
+      if (anno.cachedImg && anno.cachedImg.complete) {
+        ctx.drawImage(anno.cachedImg, anno.x, anno.y, anno.width, anno.height);
+        if (isSelected) ueDrawSelectionHandles(ctx, anno.x, anno.y, anno.width, anno.height);
+      } else if (anno.image) {
+        const img = new Image();
+        img.src = anno.image;
+        anno.cachedImg = img;
+      }
+      break;
+    case 'watermark':
+      ctx.save();
+      ctx.translate(anno.x, anno.y);
+      ctx.rotate(anno.rotation * Math.PI / 180);
+      ctx.font = `${anno.fontSize}px Arial`;
+      ctx.fillStyle = anno.color;
+      ctx.globalAlpha = anno.opacity;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(anno.text, 0, 0);
+      ctx.restore();
+      break;
+    case 'pageNumber':
+      ctx.font = `${anno.fontSize}px Arial`;
+      ctx.fillStyle = anno.color;
+      ctx.fillText(anno.text, anno.x, anno.y);
+      break;
+  }
+}
+
+// Draw selection handles
+function ueDrawSelectionHandles(ctx, x, y, width, height) {
+  ctx.strokeStyle = '#3B82F6';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([5, 3]);
+  ctx.strokeRect(x - 2, y - 2, width + 4, height + 4);
+  ctx.setLineDash([]);
+
+  const handleSize = 8;
+  ctx.fillStyle = '#3B82F6';
+  ctx.fillRect(x - handleSize/2 - 2, y - handleSize/2 - 2, handleSize, handleSize);
+  ctx.fillRect(x + width - handleSize/2 + 2, y - handleSize/2 - 2, handleSize, handleSize);
+  ctx.fillRect(x - handleSize/2 - 2, y + height - handleSize/2 + 2, handleSize, handleSize);
+  ctx.fillRect(x + width - handleSize/2 + 2, y + height - handleSize/2 + 2, handleSize, handleSize);
+}
+
+// Find annotation at position
+function ueFindAnnotationAt(x, y) {
+  const annotations = ueState.annotations[ueState.selectedPage] || [];
+  for (let i = annotations.length - 1; i >= 0; i--) {
+    const anno = annotations[i];
+    let bounds;
+    switch (anno.type) {
+      case 'whiteout':
+      case 'signature':
+        bounds = { x: anno.x, y: anno.y, w: anno.width, h: anno.height };
+        break;
+      case 'text':
+        const canvas = document.getElementById('ue-canvas');
+        const ctx = canvas.getContext('2d');
+        ctx.font = `${anno.fontSize}px Arial`;
+        const metrics = ctx.measureText(anno.text);
+        bounds = { x: anno.x, y: anno.y - anno.fontSize, w: metrics.width, h: anno.fontSize * 1.2 };
+        break;
+      default:
+        continue;
+    }
+    if (x >= bounds.x && x <= bounds.x + bounds.w && y >= bounds.y && y <= bounds.y + bounds.h) {
+      return { pageIndex: ueState.selectedPage, index: i };
+    }
+  }
+  return null;
+}
+
+// Delete a page
+function ueDeletePage(index) {
+  if (ueState.pages.length <= 1) {
+    showToast('Tidak bisa menghapus halaman terakhir', 'error');
+    return;
+  }
+
+  ueSaveUndoState();
+  ueState.pages.splice(index, 1);
+  delete ueState.annotations[index];
+
+  // Reindex annotations
+  const newAnnotations = {};
+  Object.keys(ueState.annotations).forEach((key, i) => {
+    const idx = parseInt(key);
+    if (idx > index) {
+      newAnnotations[idx - 1] = ueState.annotations[idx];
+    } else if (idx < index) {
+      newAnnotations[idx] = ueState.annotations[idx];
+    }
+  });
+  ueState.annotations = newAnnotations;
+
+  // Adjust selection
+  if (ueState.selectedPage >= ueState.pages.length) {
+    ueState.selectedPage = ueState.pages.length - 1;
+  }
+
+  ueRenderThumbnails();
+  ueUpdatePageCount();
+
+  if (ueState.selectedPage >= 0) {
+    ueSelectPage(ueState.selectedPage);
+  }
+}
+
+// Update page count
+function ueUpdatePageCount() {
+  document.getElementById('ue-page-count').textContent = ueState.pages.length + ' halaman';
+}
+
+// Update status
+function ueUpdateStatus(message) {
+  const status = document.getElementById('ue-editor-status');
+  if (status) status.querySelector('.status-text').textContent = message;
+}
+
+// Set current tool
+function ueSetTool(tool) {
+  ueState.currentTool = tool;
+
+  // Update toolbar UI
+  document.querySelectorAll('#unified-editor-workspace .editor-tool-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.editTool === tool);
+  });
+
+  const canvas = document.getElementById('ue-canvas');
+  if (canvas) {
+    canvas.className = 'editor-canvas tool-' + tool;
+  }
+
+  const toolNames = {
+    'select': 'Pilih & pindahkan anotasi',
+    'whiteout': 'Klik dan seret untuk menggambar area whiteout',
+    'text': 'Klik untuk menambah teks',
+    'signature': 'Klik untuk menempatkan tanda tangan'
+  };
+  ueUpdateStatus(toolNames[tool] || 'Pilih alat untuk mengedit');
+}
+
+// Open signature modal (reuse existing)
+function ueOpenSignatureModal() {
+  openSignatureModal();
+  // After signature is created, switch to signature placement mode
+}
+
+// Open text modal
+function ueOpenTextModal() {
+  const modal = document.getElementById('text-input-modal');
+  modal.classList.add('active');
+  document.getElementById('text-input-field').value = '';
+  document.getElementById('text-input-field').focus();
+
+  // Update preview
+  const previewEl = document.getElementById('text-preview');
+  const fontSizeEl = document.getElementById('modal-font-size');
+  const colorEl = document.getElementById('modal-text-color');
+
+  function updatePreview() {
+    previewEl.style.fontSize = fontSizeEl.value + 'px';
+    previewEl.style.color = colorEl.value;
+    previewEl.textContent = document.getElementById('text-input-field').value || 'Preview teks...';
+  }
+
+  document.getElementById('text-input-field').oninput = updatePreview;
+  fontSizeEl.onchange = updatePreview;
+  colorEl.onchange = updatePreview;
+  updatePreview();
+}
+
+// Confirm text input - modified to work with unified editor
+const originalConfirmTextInput = typeof confirmTextInput === 'function' ? confirmTextInput : null;
+
+function ueConfirmText() {
+  const text = document.getElementById('text-input-field').value.trim();
+  if (!text) {
+    showToast('Masukkan teks terlebih dahulu', 'error');
+    return;
+  }
+
+  const fontSize = parseInt(document.getElementById('modal-font-size').value);
+  const color = document.getElementById('modal-text-color').value;
+
+  ueSaveEditUndoState();
+  ueState.annotations[ueState.selectedPage].push({
+    type: 'text',
+    text,
+    x: ueState.pendingTextPosition.x,
+    y: ueState.pendingTextPosition.y,
+    fontSize,
+    color
+  });
+
+  document.getElementById('text-input-modal').classList.remove('active');
+  ueRedrawAnnotations();
+  ueState.pendingTextPosition = null;
+}
+
+// Watermark modal
+function ueOpenWatermarkModal() {
+  document.getElementById('editor-watermark-modal').classList.add('active');
+}
+
+// Page number modal
+function ueOpenPageNumModal() {
+  document.getElementById('editor-pagenum-modal').classList.add('active');
+}
+
+// Undo/Redo for page operations
+function ueSaveUndoState() {
+  ueState.undoStack.push(JSON.parse(JSON.stringify(ueState.pages.map(p => ({
+    pageNum: p.pageNum,
+    sourceIndex: p.sourceIndex,
+    sourceName: p.sourceName,
+    rotation: p.rotation
+  })))));
+  ueState.redoStack = [];
+  if (ueState.undoStack.length > 50) ueState.undoStack.shift();
+}
+
+function ueUndo() {
+  if (ueState.undoStack.length === 0) return;
+  // Save current state to redo
+  ueState.redoStack.push(JSON.parse(JSON.stringify(ueState.pages.map(p => ({
+    pageNum: p.pageNum,
+    sourceIndex: p.sourceIndex,
+    sourceName: p.sourceName,
+    rotation: p.rotation
+  })))));
+
+  const prevState = ueState.undoStack.pop();
+  // Restore pages - need to regenerate thumbnails
+  ueRestorePages(prevState);
+}
+
+function ueRedo() {
+  if (ueState.redoStack.length === 0) return;
+  // Save current to undo
+  ueState.undoStack.push(JSON.parse(JSON.stringify(ueState.pages.map(p => ({
+    pageNum: p.pageNum,
+    sourceIndex: p.sourceIndex,
+    sourceName: p.sourceName,
+    rotation: p.rotation
+  })))));
+
+  const nextState = ueState.redoStack.pop();
+  ueRestorePages(nextState);
+}
+
+async function ueRestorePages(pagesData) {
+  // Regenerate pages from pagesData
+  ueState.pages = [];
+  for (const pageData of pagesData) {
+    const source = ueState.sourceFiles[pageData.sourceIndex];
+    const pdf = await pdfjsLib.getDocument({ data: source.bytes.slice() }).promise;
+    const page = await pdf.getPage(pageData.pageNum + 1);
+    const viewport = page.getViewport({ scale: 0.3, rotation: pageData.rotation });
+
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+
+    ueState.pages.push({
+      ...pageData,
+      canvas
+    });
+  }
+  ueRenderThumbnails();
+  ueUpdatePageCount();
+  if (ueState.selectedPage >= ueState.pages.length) {
+    ueState.selectedPage = ueState.pages.length - 1;
+  }
+  if (ueState.selectedPage >= 0) {
+    ueSelectPage(ueState.selectedPage);
+  }
+}
+
+// Undo/Redo for annotations
+function ueSaveEditUndoState() {
+  ueState.editUndoStack.push(JSON.parse(JSON.stringify(ueState.annotations)));
+  ueState.editRedoStack = [];
+  if (ueState.editUndoStack.length > 50) ueState.editUndoStack.shift();
+}
+
+function ueUndoAnnotation() {
+  if (ueState.editUndoStack.length === 0) return;
+  ueState.editRedoStack.push(JSON.parse(JSON.stringify(ueState.annotations)));
+  ueState.annotations = ueState.editUndoStack.pop();
+  ueState.selectedAnnotation = null;
+  ueRedrawAnnotations();
+}
+
+function ueRedoAnnotation() {
+  if (ueState.editRedoStack.length === 0) return;
+  ueState.editUndoStack.push(JSON.parse(JSON.stringify(ueState.annotations)));
+  ueState.annotations = ueState.editRedoStack.pop();
+  ueState.selectedAnnotation = null;
+  ueRedrawAnnotations();
+}
+
+// Clear page annotations
+function ueClearPageAnnotations() {
+  if (ueState.selectedPage < 0) return;
+  if (ueState.annotations[ueState.selectedPage].length === 0) return;
+
+  ueSaveEditUndoState();
+  ueState.annotations[ueState.selectedPage] = [];
+  ueState.selectedAnnotation = null;
+  ueRedrawAnnotations();
+  showToast('Semua edit di halaman ini dihapus', 'success');
+}
+
+// Download PDF
+async function ueDownload() {
+  if (ueState.pages.length === 0) {
+    showToast('Tidak ada halaman untuk diunduh', 'error');
+    return;
+  }
+
+  try {
+    const newDoc = await PDFLib.PDFDocument.create();
+    let helveticaFont = null;
+
+    for (let i = 0; i < ueState.pages.length; i++) {
+      const pageInfo = ueState.pages[i];
+      const source = ueState.sourceFiles[pageInfo.sourceIndex];
+      const srcDoc = await PDFLib.PDFDocument.load(source.bytes);
+
+      const [copiedPage] = await newDoc.copyPages(srcDoc, [pageInfo.pageNum]);
+
+      // Apply rotation
+      if (pageInfo.rotation !== 0) {
+        copiedPage.setRotation(PDFLib.degrees(pageInfo.rotation));
+      }
+
+      newDoc.addPage(copiedPage);
+
+      // Apply annotations
+      const annotations = ueState.annotations[i] || [];
+      if (annotations.length > 0) {
+        const page = newDoc.getPages()[i];
+        const { width, height } = page.getSize();
+        const scaleInfo = ueState.pageScales[i] || { canvasWidth: width, canvasHeight: height };
+        const scaleX = width / scaleInfo.canvasWidth;
+        const scaleY = height / scaleInfo.canvasHeight;
+
+        for (const anno of annotations) {
+          switch (anno.type) {
+            case 'whiteout':
+              page.drawRectangle({
+                x: anno.x * scaleX,
+                y: height - (anno.y + anno.height) * scaleY,
+                width: anno.width * scaleX,
+                height: anno.height * scaleY,
+                color: PDFLib.rgb(1, 1, 1)
+              });
+              break;
+            case 'text':
+              if (!helveticaFont) {
+                helveticaFont = await newDoc.embedFont(PDFLib.StandardFonts.Helvetica);
+              }
+              const lines = anno.text.split('\n');
+              const hexColor = anno.color.replace('#', '');
+              const r = parseInt(hexColor.substr(0, 2), 16) / 255;
+              const g = parseInt(hexColor.substr(2, 2), 16) / 255;
+              const b = parseInt(hexColor.substr(4, 2), 16) / 255;
+              lines.forEach((line, lineIdx) => {
+                page.drawText(line, {
+                  x: anno.x * scaleX,
+                  y: height - (anno.y + lineIdx * anno.fontSize * 1.2) * scaleY,
+                  size: anno.fontSize * scaleY,
+                  font: helveticaFont,
+                  color: PDFLib.rgb(r, g, b)
+                });
+              });
+              break;
+            case 'signature':
+              const pngImage = await newDoc.embedPng(anno.image);
+              page.drawImage(pngImage, {
+                x: anno.x * scaleX,
+                y: height - (anno.y + anno.height) * scaleY,
+                width: anno.width * scaleX,
+                height: anno.height * scaleY
+              });
+              break;
+            case 'watermark':
+              if (!helveticaFont) {
+                helveticaFont = await newDoc.embedFont(PDFLib.StandardFonts.Helvetica);
+              }
+              const wmHex = anno.color.replace('#', '');
+              page.drawText(anno.text, {
+                x: anno.x * scaleX,
+                y: height - anno.y * scaleY,
+                size: anno.fontSize * scaleY,
+                font: helveticaFont,
+                color: PDFLib.rgb(
+                  parseInt(wmHex.substr(0, 2), 16) / 255,
+                  parseInt(wmHex.substr(2, 2), 16) / 255,
+                  parseInt(wmHex.substr(4, 2), 16) / 255
+                ),
+                opacity: anno.opacity,
+                rotate: PDFLib.degrees(anno.rotation)
+              });
+              break;
+          }
+        }
+      }
+    }
+
+    const pdfBytes = await newDoc.save();
+    const filename = ueState.sourceFiles.length === 1
+      ? ueState.sourceFiles[0].name.replace('.pdf', '-edited.pdf')
+      : 'edited-document.pdf';
+    downloadBlob(new Blob([pdfBytes], { type: 'application/pdf' }), filename);
+    showToast('PDF berhasil diunduh!', 'success');
+
+  } catch (error) {
+    console.error('Error saving PDF:', error);
+    showToast('Gagal menyimpan PDF', 'error');
+  }
+}
+
+// Reset unified editor state
+function ueReset() {
+  ueState.pages = [];
+  ueState.sourceFiles = [];
+  ueState.selectedPage = -1;
+  ueState.currentTool = null;
+  ueState.annotations = {};
+  ueState.undoStack = [];
+  ueState.redoStack = [];
+  ueState.editUndoStack = [];
+  ueState.editRedoStack = [];
+  ueState.selectedAnnotation = null;
+  ueState.pendingTextPosition = null;
+  ueState.pageScales = {};
+  ueState.pageCache = null;
+
+  document.getElementById('ue-empty-state').style.display = 'flex';
+  document.getElementById('ue-canvas').style.display = 'none';
+  document.getElementById('ue-download-btn').disabled = true;
+  ueRenderThumbnails();
+  ueUpdatePageCount();
+}
+
+// Initialize when showing unified editor
+function initUnifiedEditor() {
+  initUnifiedEditorInput();
+  ueState.devicePixelRatio = window.devicePixelRatio || 1;
+
+  // Setup drop zone for thumbnails area
+  const thumbnails = document.getElementById('ue-thumbnails');
+  if (thumbnails && !thumbnails._dropSetup) {
+    thumbnails._dropSetup = true;
+    thumbnails.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      thumbnails.classList.add('drag-over');
+    });
+    thumbnails.addEventListener('dragleave', () => {
+      thumbnails.classList.remove('drag-over');
+    });
+    thumbnails.addEventListener('drop', (e) => {
+      e.preventDefault();
+      thumbnails.classList.remove('drag-over');
+      ueAddFiles(e.dataTransfer.files);
+    });
+  }
+}
+
+// ============================================================
 // KEYBOARD SHORTCUTS
 // ============================================================
 
@@ -4234,11 +5243,38 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && state.currentTool) {
     showHome();
   }
-  
+
   // Ctrl+Z for undo in edit mode
   if (e.key === 'z' && (e.ctrlKey || e.metaKey) && state.currentTool === 'edit') {
     e.preventDefault();
     undoEdit();
+  }
+
+  // Ctrl+Z for undo in unified editor
+  if (e.key === 'z' && (e.ctrlKey || e.metaKey) && state.currentTool === 'unified-editor') {
+    e.preventDefault();
+    ueUndoAnnotation();
+  }
+
+  // Keyboard shortcuts for unified editor tools
+  if (state.currentTool === 'unified-editor' && ueState.selectedPage >= 0) {
+    if (e.key === 'v' && !e.ctrlKey && !e.metaKey) {
+      ueSetTool('select');
+    } else if (e.key === 'w' && !e.ctrlKey && !e.metaKey) {
+      ueSetTool('whiteout');
+    } else if (e.key === 't' && !e.ctrlKey && !e.metaKey) {
+      ueSetTool('text');
+    } else if (e.key === 's' && !e.ctrlKey && !e.metaKey) {
+      ueOpenSignatureModal();
+    } else if (e.key === 'Delete' || e.key === 'Backspace') {
+      if (ueState.selectedAnnotation) {
+        e.preventDefault();
+        ueSaveEditUndoState();
+        ueState.annotations[ueState.selectedAnnotation.pageIndex].splice(ueState.selectedAnnotation.index, 1);
+        ueState.selectedAnnotation = null;
+        ueRedrawAnnotations();
+      }
+    }
   }
 });
 
