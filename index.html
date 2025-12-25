@@ -208,6 +208,24 @@
           </div>
         </div>
 
+        <!-- Image Editing Tools -->
+        <div class="tools-category">
+          <h2>Alat Gambar</h2>
+          <div class="tools-grid">
+            <div class="tool-card" data-tool="remove-bg">
+              <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                <path d="M9 3v18"/>
+                <path d="M15 3v18"/>
+                <path d="M3 9h18"/>
+                <path d="M3 15h18"/>
+              </svg>
+              <h3>Hapus Latar Belakang</h3>
+              <p>putih → transparan</p>
+            </div>
+          </div>
+        </div>
+
         <!-- Coming Soon -->
         <div class="tools-category">
           <h2>Segera Hadir</h2>
@@ -920,6 +938,60 @@
       <div class="progress-container hidden" id="img-pdf-progress">
         <div class="progress-bar"><div class="progress-fill" style="width: 0%"></div></div>
         <p class="progress-text">Memproses...</p>
+      </div>
+    </div>
+
+    <!-- Remove Background Workspace -->
+    <div id="remove-bg-workspace" class="workspace">
+      <div class="workspace-header">
+        <h2>
+          <button class="back-btn" onclick="showHome()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+            Kembali
+          </button>
+          Hapus Latar Belakang
+        </h2>
+      </div>
+      <p class="mb-lg" style="color: var(--text-secondary);">Upload gambar dan atur threshold untuk mengubah warna putih/terang menjadi transparan.</p>
+      <div class="preview-area" id="remove-bg-area">
+        <div class="drop-hint" id="remove-bg-hint" onclick="document.getElementById('remove-bg-input').click()">
+          <svg class="drop-hint-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <span class="drop-hint-text">Seret gambar ke sini atau klik untuk upload</span>
+          <span class="drop-hint-subtext">JPG • PNG</span>
+          <input type="file" id="remove-bg-input" accept="image/jpeg,image/png" style="display:none">
+        </div>
+        <div class="preview-comparison hidden" id="remove-bg-comparison">
+          <div class="preview-box">
+            <img id="remove-bg-original" src="" alt="Original">
+            <p>Original</p>
+          </div>
+          <div class="preview-arrow">→</div>
+          <div class="preview-box" style="background: repeating-conic-gradient(#ddd 0% 25%, #fff 0% 50%) 50% / 16px 16px; border-radius: var(--radius-md);">
+            <canvas id="remove-bg-preview" style="max-width: 100%; max-height: 300px;"></canvas>
+            <p id="remove-bg-result-info">Hasil (transparan)</p>
+          </div>
+        </div>
+      </div>
+      <div class="controls">
+        <div class="control-group">
+          <label>Threshold Putih:</label>
+        </div>
+        <div class="range-slider">
+          <input type="range" id="remove-bg-threshold" min="200" max="255" value="240" oninput="updateRemoveBgPreview()">
+          <span class="range-value" id="remove-bg-threshold-value">240</span>
+        </div>
+        <div class="control-group">
+          <label title="Semakin tinggi, semakin banyak warna terang yang dihapus">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 4px;"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+            Tips: 255 = hanya putih murni, 200 = termasuk warna keabu-abuan
+          </label>
+        </div>
+      </div>
+      <div class="action-bar">
+        <button class="btn btn-primary btn-lg" id="remove-bg-btn" disabled onclick="downloadRemovedBgImage()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download PNG
+        </button>
       </div>
     </div>
 
