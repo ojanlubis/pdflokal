@@ -1983,7 +1983,7 @@ a:hover {
 }
 
 .unified-canvas-wrapper {
-  flex: 1;
+  flex: 1 1 auto;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1992,12 +1992,11 @@ a:hover {
   overflow: auto;
   padding: var(--space-sm);
   min-height: 0;
-  height: 100%;
 }
 
 #ue-canvas {
-  max-width: 100%;
-  max-height: 100%;
+  max-width: calc(100% - 16px);
+  max-height: calc(100% - 16px);
   background: white;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
 }
@@ -2021,6 +2020,21 @@ a:hover {
   padding: var(--space-xs);
   width: 28px;
   height: 28px;
+}
+
+/* Desktop - ensure proper canvas sizing */
+@media (min-width: 901px) {
+  .unified-editor-layout {
+    height: 100%;
+  }
+
+  .unified-main {
+    height: 100%;
+  }
+
+  .unified-canvas-wrapper {
+    min-height: calc(100vh - 280px);
+  }
 }
 
 /* Mobile Responsive */
