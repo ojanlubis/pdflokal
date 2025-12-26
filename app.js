@@ -4461,7 +4461,9 @@ function ueRenderThumbnails() {
 
   ueState.pages.forEach((page, index) => {
     const item = document.createElement('div');
-    item.className = 'ue-thumbnail' + (index === ueState.selectedPage ? ' selected' : '');
+    // Detect orientation based on canvas dimensions
+    const isLandscape = page.canvas.width > page.canvas.height;
+    item.className = 'ue-thumbnail' + (index === ueState.selectedPage ? ' selected' : '') + (isLandscape ? ' landscape' : ' portrait');
     item.onclick = () => ueSelectPage(index);
 
     // Clone the thumbnail canvas
@@ -4529,16 +4531,40 @@ async function ueRenderSelectedPage() {
     const ctx = canvas.getContext('2d');
     const dpr = ueState.devicePixelRatio = window.devicePixelRatio || 1;
 
-    // Calculate scale to fit wrapper
+    // Wait for layout to stabilize before measuring
+    await new Promise(resolve => requestAnimationFrame(resolve));
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    // Calculate scale to fit wrapper with minimal padding
     const wrapper = document.getElementById('ue-canvas-wrapper');
-    const maxWidth = wrapper.clientWidth - 40;
-    const maxHeight = wrapper.clientHeight - 40;
+    const wrapperStyle = getComputedStyle(wrapper);
+    const paddingX = parseFloat(wrapperStyle.paddingLeft) + parseFloat(wrapperStyle.paddingRight);
+    const paddingY = parseFloat(wrapperStyle.paddingTop) + parseFloat(wrapperStyle.paddingBottom);
+
+    // Use offsetWidth/offsetHeight for more reliable dimensions
+    let maxWidth = wrapper.offsetWidth - paddingX - 16;
+    let maxHeight = wrapper.offsetHeight - paddingY - 16;
+
+    // Fallback: if height seems too small, calculate based on viewport
+    const viewportHeight = window.innerHeight;
+    const minExpectedHeight = viewportHeight * 0.4;
+    if (maxHeight < minExpectedHeight) {
+      maxHeight = viewportHeight - 280; // Header, toolbar, action bar
+    }
+
     const naturalViewport = page.getViewport({ scale: 1, rotation: pageInfo.rotation });
+
+    // Ensure we have valid dimensions
+    if (maxWidth <= 100 || maxHeight <= 100) {
+      console.warn('Invalid wrapper dimensions, retrying...', { maxWidth, maxHeight });
+      setTimeout(() => ueRenderSelectedPage(), 150);
+      return;
+    }
 
     let scale = Math.min(
       maxWidth / naturalViewport.width,
       maxHeight / naturalViewport.height,
-      2
+      3  // Allow larger scale for better readability
     );
     scale = Math.max(scale, 0.5);
 
@@ -5232,6 +5258,39 @@ function initUnifiedEditor() {
       ueAddFiles(e.dataTransfer.files);
     });
   }
+
+  // Setup resize handler for responsive canvas
+  if (!window._ueResizeHandler) {
+    let resizeTimeout;
+    window._ueResizeHandler = () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        if (state.currentTool === 'unified-editor' && ueState.selectedPage >= 0) {
+          ueRenderSelectedPage();
+        }
+      }, 200);
+    };
+    window.addEventListener('resize', window._ueResizeHandler);
+  }
+}
+
+// Toggle sidebar visibility
+function ueToggleSidebar() {
+  const sidebar = document.getElementById('unified-sidebar');
+  const toggleBtn = sidebar.querySelector('.sidebar-toggle-btn');
+
+  sidebar.classList.toggle('collapsed');
+
+  // Update button title
+  const isCollapsed = sidebar.classList.contains('collapsed');
+  toggleBtn.title = isCollapsed ? 'Tampilkan sidebar' : 'Sembunyikan sidebar';
+
+  // Re-render the selected page to recalculate canvas size after transition
+  setTimeout(() => {
+    if (ueState.selectedPage >= 0) {
+      ueRenderSelectedPage();
+    }
+  }, 350); // Wait for CSS transition to complete
 }
 
 // ============================================================
