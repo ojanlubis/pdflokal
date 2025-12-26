@@ -1730,8 +1730,8 @@ a:hover {
 .unified-editor-layout {
   display: flex;
   gap: var(--space-lg);
-  height: calc(100vh - 280px);
-  min-height: 500px;
+  height: calc(100vh - 340px);
+  min-height: 400px;
 }
 
 /* Sidebar */
