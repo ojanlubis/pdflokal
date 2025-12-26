@@ -1753,7 +1753,7 @@ a:hover {
   gap: var(--space-sm);
   flex: 1;
   min-height: 0;
-  overflow: visible;
+  overflow: hidden;
 }
 
 /* Sidebar */
@@ -1982,7 +1982,7 @@ a:hover {
 }
 
 .unified-canvas-wrapper {
-  flex: 1 1 auto;
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1990,16 +1990,13 @@ a:hover {
   border-radius: var(--radius-md);
   overflow: auto;
   padding: var(--space-xs);
-  min-height: 400px;
-  height: auto;
+  min-height: 0;
 }
 
 #ue-canvas {
   background: white;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-  /* Size is controlled by JavaScript - allow natural scaling */
-  max-width: 100%;
-  height: auto;
+  /* Size is controlled by JavaScript */
 }
 
 .unified-empty-state {
@@ -2026,18 +2023,18 @@ a:hover {
 /* Desktop - ensure proper canvas sizing */
 @media (min-width: 901px) {
   .unified-editor-layout {
-    height: auto;
-    min-height: 100%;
+    height: 100%;
   }
 
   .unified-main {
-    height: auto;
-    min-height: 100%;
+    height: 100%;
+    overflow: hidden;
   }
 
   .unified-canvas-wrapper {
-    min-height: calc(100vh - 280px);
-    height: auto;
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
   }
 }
 
@@ -2099,7 +2096,6 @@ a:hover {
 
   .unified-canvas-wrapper {
     min-height: 40vh;
-    height: auto;
   }
 }
 
