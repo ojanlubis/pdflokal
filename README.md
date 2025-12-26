@@ -13,8 +13,8 @@ PDFLokal adalah tool PDF gratis untuk pengguna Indonesia. Semua proses berjalan 
 - **Pisah PDF** - Ekstrak halaman atau pisah berdasarkan range
 - **Kompres PDF** - Kurangi ukuran file (kompres gambar dalam PDF)
 - **Putar PDF** - Putar halaman 90°, 180°, atau 270°
-- **Edit PDF** - Whiteout, tambah teks, tambah tanda tangan
-- **Atur Halaman** - Reorder, hapus, ekstrak halaman
+- **Edit PDF** - Whiteout, tambah teks (dengan pilihan font, bold/italic, warna), tambah tanda tangan
+- **Atur Halaman** - Reorder (drag-drop), hapus, putar, ekstrak halaman via modal "Kelola"
 - **PDF ke Gambar** - Export halaman sebagai PNG/JPG
 - **Proteksi** - Tambahkan password ke PDF
 - **Buka Kunci** - Hapus password dari PDF (perlu tahu password)
