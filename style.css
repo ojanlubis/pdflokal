@@ -1727,25 +1727,30 @@ a:hover {
    Unified Editor Workspace Styles
    ============================================================ */
 
+#unified-editor-workspace.workspace {
+  padding: var(--space-md) 0;
+}
+
 #unified-editor-workspace.workspace.active {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 80px);
+  height: calc(100vh - 100px);
+  max-height: calc(100vh - 100px);
 }
 
 #unified-editor-workspace .workspace-header {
   flex-shrink: 0;
-  margin-bottom: var(--space-md);
+  margin-bottom: var(--space-sm);
 }
 
 #unified-editor-workspace .action-bar {
   flex-shrink: 0;
-  padding: var(--space-md) 0;
+  padding: var(--space-sm) 0;
 }
 
 .unified-editor-layout {
   display: flex;
-  gap: var(--space-lg);
+  gap: var(--space-md);
   flex: 1;
   min-height: 0;
   overflow: hidden;
@@ -1753,8 +1758,8 @@ a:hover {
 
 /* Sidebar */
 .unified-sidebar {
-  width: 260px;
-  min-width: 260px;
+  width: 280px;
+  min-width: 280px;
   background: var(--bg-secondary);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-lg);
@@ -1898,11 +1903,12 @@ a:hover {
   min-width: 0;
   background: var(--bg-tertiary);
   border-radius: var(--radius-lg);
-  padding: var(--space-lg);
+  padding: var(--space-md);
 }
 
 .unified-main .editor-toolbar {
-  margin-bottom: var(--space-md);
+  margin-bottom: var(--space-sm);
+  flex-shrink: 0;
 }
 
 .unified-canvas-wrapper {
@@ -1913,7 +1919,7 @@ a:hover {
   background: #e5e5e5;
   border-radius: var(--radius-md);
   overflow: auto;
-  padding: var(--space-lg);
+  padding: var(--space-md);
   min-height: 0;
 }
 
@@ -1939,9 +1945,10 @@ a:hover {
 }
 
 /* Mobile Responsive */
-@media (max-width: 768px) {
+@media (max-width: 900px) {
   #unified-editor-workspace.workspace.active {
     height: auto;
+    max-height: none;
   }
 
   .unified-editor-layout {
@@ -1952,24 +1959,24 @@ a:hover {
   .unified-sidebar {
     width: 100%;
     min-width: auto;
-    max-height: 180px;
+    max-height: 160px;
   }
 
   .unified-thumbnails {
     flex-direction: row;
     flex-wrap: nowrap;
     overflow-x: auto;
-    gap: var(--space-md);
+    gap: var(--space-sm);
     padding: var(--space-sm);
   }
 
   .ue-thumbnail {
-    width: 120px;
+    width: 100px;
     flex-shrink: 0;
   }
 
   .unified-canvas-wrapper {
-    min-height: 400px;
+    min-height: 50vh;
   }
 }
 
