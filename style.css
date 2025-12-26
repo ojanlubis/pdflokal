@@ -800,9 +800,8 @@ a:hover {
   background: #e5e5e5;
   border-radius: var(--radius-md);
   padding: var(--space-lg);
-  overflow: auto;
   min-height: 500px;
-  height: calc(100vh - 300px);
+  height: auto;
 }
 
 .editor-canvas {
@@ -1753,8 +1752,7 @@ a:hover {
 #unified-editor-workspace.workspace.active {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 100px);
-  max-height: calc(100vh - 100px);
+  height: auto;
 }
 
 #unified-editor-workspace .workspace-header {
@@ -1771,7 +1769,7 @@ a:hover {
   display: flex;
   gap: var(--space-sm);
   flex: 1;
-  min-height: 0;
+  min-height: 1200;
   overflow: hidden;
 }
 
@@ -1989,7 +1987,7 @@ a:hover {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  min-height: 0;
+  min-height: 200;
   background: var(--bg-tertiary);
   border-radius: var(--radius-lg);
   padding: var(--space-sm);
@@ -2001,15 +1999,14 @@ a:hover {
 }
 
 .unified-canvas-wrapper {
-  flex: 1;
   display: flex;
   align-items: flex-start;
   justify-content: center;
   background: #e5e5e5;
   border-radius: var(--radius-md);
-  overflow: auto;
   padding: var(--space-md);
   min-height: 500px;
+  height: auto;
 }
 
 #ue-canvas {
@@ -2042,18 +2039,17 @@ a:hover {
 /* Desktop - ensure proper canvas sizing */
 @media (min-width: 901px) {
   .unified-editor-layout {
-    height: 100%;
+    height: auto;
   }
 
   .unified-main {
-    height: 100%;
-    overflow: hidden;
+    height: auto;
+    overflow: visible;
   }
 
   .unified-canvas-wrapper {
-    flex: 1;
-    min-height: 100;
-    overflow: auto;
+    min-height: 500px;
+    height: auto;
   }
 }
 
@@ -2061,7 +2057,6 @@ a:hover {
 @media (max-width: 900px) {
   #unified-editor-workspace.workspace.active {
     height: auto;
-    max-height: none;
   }
 
   .unified-editor-layout {
@@ -2110,11 +2105,13 @@ a:hover {
   }
 
   .unified-main {
-    min-height: 70vh;
+    min-height: auto;
+    height: auto;
   }
 
   .unified-canvas-wrapper {
-    min-height: 60vh;
+    min-height: 500px;
+    height: auto;
   }
 }
 
