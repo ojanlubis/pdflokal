@@ -37,25 +37,76 @@ pdflokal/
 
 The entire application is in `index.html`. Features are organized as:
 - Separate sections/modals for each tool (merge, split, compress, etc.)
-- JavaScript in `app.js` handles all tool logic
+- JavaScript in `app.js` handles all tool logic (~5,700 lines, 190+ functions)
 - All styles in single `style.css` file
+
+### State Management
+
+The app uses several state objects for different tools:
+
+```javascript
+// Unified Editor state
+ueState = {
+  files: [],           // Loaded PDF files
+  pages: [],           // All pages from all files
+  annotations: {},     // Per-page annotations {pageId: [annotations]}
+  undoStack: [],       // Page operation history
+  redoStack: [],       // Page operation redo
+  annotationUndo: {},  // Per-page annotation undo
+  annotationRedo: {},  // Per-page annotation redo
+  zoom: 1.0            // Current zoom level
+}
+
+// Page Manager state
+state.mergeFiles = []  // Files for merge/page operations
+
+// Edit PDF state
+state.editAnnotations = {}  // Annotations for single-doc editor
+```
 
 ## Key Features
 
 ### PDF Tools
-- Merge, split, compress, rotate PDFs
-- Edit (whiteout, add text, signatures)
-- Page management (reorder, delete, extract)
-- PDF to image conversion
-- Protect/unlock with passwords
-- Add watermarks and page numbers
-- Crop pages
+
+#### Unified Editor (Primary Tool)
+The flagship multi-document PDF editor combining all editing capabilities:
+- **Multi-file support**: Load and merge multiple PDFs in one session
+- **Page operations**: Reorder (drag-drop), rotate, delete pages
+- **Annotations**: Whiteout, text, signatures, watermarks, page numbers
+- **Signature preview**: Position signatures before placing
+- **Zoom controls**: Scale view for precision editing
+- **Undo/Redo**: Separate stacks for page operations and annotations
+- **Thumbnail navigation**: Visual page overview
+
+#### Page Manager (Legacy)
+Unified interface for page-level operations:
+- Merge multiple PDFs
+- Split/extract pages
+- Reorder via drag-drop
+- Rotate (90°, 180°, 270°)
+- Delete pages
+- Undo/Redo support
+
+#### Edit PDF (Single Document)
+Legacy single-document editor:
+- Whiteout, text, signature annotations
+- Per-page editing
+
+#### Other PDF Tools
+- **PDF to Image**: Convert pages to PNG/JPG with batch export
+- **Compress PDF**: Compress embedded images within PDFs
+- **Protect PDF**: Add password protection
+- **Unlock PDF**: Remove password protection
+- **Watermark**: Add text watermarks with positioning
+- **Page Numbers**: Automatic numbering with position options
+- **Crop**: Crop specific regions from pages
 
 ### Image Tools
-- Compress images with quality control
-- Resize with aspect ratio lock
-- Format conversion (JPG ↔ PNG ↔ WebP)
-- Image to PDF conversion
+- **Compress Image**: Quality slider with live preview and savings percentage
+- **Resize Image**: Dimension input with aspect ratio lock, percentage-based
+- **Convert Format**: JPG ↔ PNG ↔ WebP conversion with quality control
+- **Image to PDF**: Convert images to PDF with drag-drop reordering
+- **Remove Background**: Remove white/near-white pixels (threshold-based) for transparent PNG output
 
 ## Development Guidelines
 
@@ -92,6 +143,16 @@ The entire application is in `index.html`. Features are organized as:
 
 ## Common Development Tasks
 
+### When to Use Each PDF Tool
+
+| Tool | Use Case |
+|------|----------|
+| **Unified Editor** | Multi-file operations, complex editing with annotations |
+| **Page Manager** | Quick page operations without annotations |
+| **Edit PDF** | Simple single-document annotation |
+
+For new PDF features, prefer extending the **Unified Editor** unless the feature is standalone.
+
 ### Adding a New PDF Tool
 
 1. Add UI section/modal in `index.html`
@@ -100,6 +161,15 @@ The entire application is in `index.html`. Features are organized as:
 4. Update README.md features list
 5. Test with various PDF types and sizes
 6. Ensure error handling is in place
+
+### Extending the Unified Editor
+
+1. Add new annotation type to `ueState.annotations` structure
+2. Add tool button in the editor toolbar UI
+3. Implement drawing/placement logic in `app.js`
+4. Add rendering in the PDF export function
+5. Ensure undo/redo works for the new annotation type
+6. Test across multiple pages and files
 
 ### Adding Image Processing Feature
 
@@ -137,19 +207,19 @@ Do not implement these without discussing server architecture first.
 
 ## Libraries and Dependencies
 
-### pdf-lib
-- Used for: PDF manipulation (merge, split, edit, add pages, etc.)
-- Loaded from CDN in production
-- Fully client-side
+All loaded from CDN (no npm/build dependencies):
 
-### PDF.js
-- Used for: Rendering PDFs, generating thumbnails
-- Mozilla's official PDF rendering library
-- Loaded from CDN
+| Library | Version | Purpose |
+|---------|---------|---------|
+| **pdf-lib** | 1.17.1 | PDF manipulation (merge, split, edit, add pages, etc.) |
+| **PDF.js** | 3.11.174 | PDF rendering and thumbnail generation |
+| **Signature Pad** | 4.1.7 | Digital signature capture (canvas-based) |
+| **Vercel Insights** | - | Analytics (optional) |
 
-### Signature Pad
-- Used for: Digital signature capture
-- Canvas-based signature drawing
+### Canvas API
+- Native browser API for all image processing
+- Used for: compression, resize, format conversion, background removal
+- No external library needed
 
 ## Testing Checklist
 
