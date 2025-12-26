@@ -1970,9 +1970,11 @@ a:hover {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
   background: var(--bg-tertiary);
   border-radius: var(--radius-lg);
   padding: var(--space-sm);
+  overflow: hidden;
 }
 
 .unified-main .editor-toolbar {
@@ -1989,7 +1991,15 @@ a:hover {
   border-radius: var(--radius-md);
   overflow: auto;
   padding: var(--space-sm);
-  min-height: 400px;
+  min-height: 0;
+  height: 100%;
+}
+
+#ue-canvas {
+  max-width: 100%;
+  max-height: 100%;
+  background: white;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
 }
 
 .unified-empty-state {
@@ -2065,8 +2075,13 @@ a:hover {
     max-height: 100px;
   }
 
-  .unified-canvas-wrapper {
+  .unified-main {
     min-height: 50vh;
+  }
+
+  .unified-canvas-wrapper {
+    min-height: 40vh;
+    height: auto;
   }
 }
 

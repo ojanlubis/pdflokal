@@ -4531,16 +4531,27 @@ async function ueRenderSelectedPage() {
     const ctx = canvas.getContext('2d');
     const dpr = ueState.devicePixelRatio = window.devicePixelRatio || 1;
 
+    // Wait for layout to stabilize before measuring
+    await new Promise(resolve => requestAnimationFrame(resolve));
+
     // Calculate scale to fit wrapper with minimal padding
     const wrapper = document.getElementById('ue-canvas-wrapper');
-    const maxWidth = wrapper.clientWidth - 20;
-    const maxHeight = wrapper.clientHeight - 20;
+    const wrapperRect = wrapper.getBoundingClientRect();
+    const maxWidth = wrapperRect.width - 32;
+    const maxHeight = wrapperRect.height - 32;
     const naturalViewport = page.getViewport({ scale: 1, rotation: pageInfo.rotation });
+
+    // Ensure we have valid dimensions
+    if (maxWidth <= 0 || maxHeight <= 0) {
+      console.warn('Invalid wrapper dimensions, retrying...');
+      setTimeout(() => ueRenderSelectedPage(), 100);
+      return;
+    }
 
     let scale = Math.min(
       maxWidth / naturalViewport.width,
       maxHeight / naturalViewport.height,
-      2.5  // Allow slightly larger scale for better readability
+      3  // Allow larger scale for better readability
     );
     scale = Math.max(scale, 0.5);
 
@@ -5233,6 +5244,20 @@ function initUnifiedEditor() {
       thumbnails.classList.remove('drag-over');
       ueAddFiles(e.dataTransfer.files);
     });
+  }
+
+  // Setup resize handler for responsive canvas
+  if (!window._ueResizeHandler) {
+    let resizeTimeout;
+    window._ueResizeHandler = () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        if (state.currentTool === 'unified-editor' && ueState.selectedPage >= 0) {
+          ueRenderSelectedPage();
+        }
+      }, 200);
+    };
+    window.addEventListener('resize', window._ueResizeHandler);
   }
 }
 
