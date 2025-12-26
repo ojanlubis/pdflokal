@@ -801,7 +801,8 @@ a:hover {
   border-radius: var(--radius-md);
   padding: var(--space-lg);
   overflow: auto;
-  max-height: 1200px;
+  min-height: 500px;
+  height: calc(100vh - 300px);
 }
 
 .editor-canvas {
@@ -2008,7 +2009,7 @@ a:hover {
   border-radius: var(--radius-md);
   overflow: auto;
   padding: var(--space-md);
-  min-height: 0;
+  min-height: 500px;
 }
 
 #ue-canvas {
@@ -2109,11 +2110,11 @@ a:hover {
   }
 
   .unified-main {
-    min-height: 50vh;
+    min-height: 70vh;
   }
 
   .unified-canvas-wrapper {
-    min-height: 40vh;
+    min-height: 60vh;
   }
 }
 
