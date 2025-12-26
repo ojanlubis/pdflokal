@@ -1690,6 +1690,115 @@ a:hover {
   white-space: pre-wrap;
 }
 
+/* Font Size Number Input */
+.font-size-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.font-size-input-wrap input[type="number"] {
+  width: 70px;
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.font-size-input-wrap input[type="number"]::-webkit-inner-spin-button,
+.font-size-input-wrap input[type="number"]::-webkit-outer-spin-button {
+  opacity: 1;
+}
+
+.font-size-unit {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+/* Bold/Italic Toggle Buttons */
+.text-style-toggles {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.text-style-btn {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9375rem;
+  color: var(--text-secondary);
+  transition: all 0.15s ease;
+}
+
+.text-style-btn:hover {
+  background: var(--bg-secondary);
+  border-color: var(--border-medium);
+}
+
+.text-style-btn.active {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: white;
+}
+
+/* Color Section */
+.edit-text-color-section {
+  margin-top: var(--space-sm);
+}
+
+.edit-text-color-section > label {
+  display: block;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-xs);
+}
+
+.color-options-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.color-presets {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.color-preset-btn {
+  width: 28px;
+  height: 28px;
+  border: 2px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.color-preset-btn:hover {
+  transform: scale(1.1);
+}
+
+.color-preset-btn.active {
+  border-color: var(--text-primary);
+  box-shadow: 0 0 0 2px var(--bg-primary);
+}
+
+.color-options-row input[type="color"] {
+  width: 36px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
 .edit-modal-actions {
   display: flex;
   justify-content: flex-end;
@@ -2144,8 +2253,20 @@ a:hover {
 }
 
 .unified-main .editor-toolbar {
-  margin-bottom: var(--space-sm);
+  margin-bottom: 0;
   flex-shrink: 0;
+}
+
+/* Status bar above canvas */
+.ue-status-bar {
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-light);
+  padding: var(--space-sm) var(--space-md);
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  text-align: center;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  margin-top: var(--space-sm);
 }
 
 .unified-canvas-wrapper {
@@ -2153,7 +2274,7 @@ a:hover {
   align-items: flex-start;
   justify-content: center;
   background: #e5e5e5;
-  border-radius: var(--radius-md);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
   padding: var(--space-md);
   min-height: 500px;
   height: auto;
@@ -2264,6 +2385,327 @@ a:hover {
   .unified-canvas-wrapper {
     min-height: 500px;
     height: auto;
+  }
+}
+
+/* ============================================================
+   Page Manager Modal for Unified Editor
+   ============================================================ */
+
+/* Kelola button in sidebar - slightly more prominent */
+.ue-manage-btn {
+  flex-shrink: 0;
+}
+
+/* Modal box - larger size for page management */
+.ue-pm-modal-box {
+  max-width: 900px;
+  width: 95vw;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header */
+.ue-pm-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-lg);
+}
+
+.ue-pm-header h3 {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.ue-pm-close-btn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: var(--space-xs);
+  line-height: 1;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.ue-pm-close-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+/* Toolbar */
+.ue-pm-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+  flex-wrap: wrap;
+}
+
+/* Make toolbar buttons more prominent */
+.ue-pm-toolbar > .btn-secondary {
+  background: var(--bg-secondary);
+  border-color: var(--border-medium);
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 0.9375rem;
+  padding: var(--space-sm) var(--space-lg);
+}
+
+.ue-pm-toolbar > .btn-secondary:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--accent-primary);
+}
+
+.ue-pm-extract-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-left: auto;
+}
+
+.ue-pm-selection-count {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  padding: 0 var(--space-sm);
+}
+
+/* Pages container - scrollable area */
+.ue-pm-pages-container {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  margin-bottom: var(--space-lg);
+  min-height: 250px;
+  max-height: 50vh;
+}
+
+/* Page grid */
+.ue-pm-pages {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: var(--space-md);
+  align-items: start;
+}
+
+/* Individual page item */
+.ue-pm-page-item {
+  position: relative;
+  background: white;
+  border: 3px solid var(--border-light);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm);
+  cursor: grab;
+  transition: all var(--transition-fast);
+  aspect-ratio: auto;
+}
+
+.ue-pm-page-item:hover {
+  border-color: var(--accent-primary);
+  box-shadow: var(--shadow-md);
+}
+
+.ue-pm-page-item.selected {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px var(--accent-light);
+}
+
+.ue-pm-page-item.dragging {
+  opacity: 0.4;
+  cursor: grabbing;
+}
+
+.ue-pm-page-item canvas {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: var(--radius-sm);
+}
+
+/* Page number badge */
+.ue-pm-page-number {
+  position: absolute;
+  bottom: var(--space-sm);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  font-size: 0.6875rem;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-weight: 500;
+}
+
+/* Source file badge */
+.ue-pm-source-badge {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(59, 130, 246, 0.9);
+  color: white;
+  font-size: 0.5625rem;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  max-width: 90%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Rotation badge */
+.ue-pm-rotation-badge {
+  position: absolute;
+  top: var(--space-sm);
+  left: var(--space-sm);
+  background: var(--accent-primary);
+  color: white;
+  font-size: 0.5625rem;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+}
+
+/* Action buttons overlay - always visible */
+.ue-pm-page-actions {
+  position: absolute;
+  top: var(--space-sm);
+  right: var(--space-sm);
+  display: flex;
+  gap: 3px;
+}
+
+.ue-pm-page-action-btn {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+  padding: 0;
+}
+
+.ue-pm-page-action-btn:hover {
+  background: rgba(0, 0, 0, 0.85);
+}
+
+.ue-pm-page-action-btn.delete:hover {
+  background: var(--accent-primary);
+}
+
+.ue-pm-page-action-btn svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* Extract mode checkbox */
+.ue-pm-page-checkbox {
+  position: absolute;
+  top: var(--space-sm);
+  left: var(--space-sm);
+  width: 22px;
+  height: 22px;
+  background: white;
+  border: 2px solid var(--border-medium);
+  border-radius: 4px;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.ue-pm-pages.extract-mode .ue-pm-page-checkbox {
+  display: flex;
+}
+
+.ue-pm-pages.extract-mode .ue-pm-page-actions {
+  display: none;
+}
+
+.ue-pm-pages.extract-mode .ue-pm-rotation-badge {
+  left: calc(var(--space-sm) + 26px);
+}
+
+.ue-pm-pages.extract-mode .ue-pm-page-item {
+  cursor: pointer;
+}
+
+.ue-pm-page-item.selected .ue-pm-page-checkbox {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: white;
+}
+
+/* Drop indicator for drag-drop */
+.ue-pm-drop-indicator {
+  width: 4px;
+  min-height: 100px;
+  background: var(--accent-primary);
+  border-radius: 2px;
+  animation: dropIndicatorPulse 0.8s ease-in-out infinite;
+  align-self: stretch;
+}
+
+@keyframes dropIndicatorPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Footer */
+.ue-pm-page-count {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  margin-right: auto;
+}
+
+/* Extract mode button active state */
+#ue-pm-extract-mode-btn.active {
+  background: var(--accent-primary);
+  color: white;
+  border-color: var(--accent-primary);
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .ue-pm-modal-box {
+    max-height: 90vh;
+    padding: var(--space-md);
+  }
+
+  .ue-pm-pages {
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+    gap: var(--space-sm);
+  }
+
+  .ue-pm-toolbar {
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+  }
+
+  .ue-pm-extract-actions {
+    width: 100%;
+    margin-left: 0;
+    margin-top: var(--space-sm);
+  }
+
+  .ue-pm-page-action-btn {
+    width: 22px;
+    height: 22px;
+  }
+
+  .ue-pm-page-action-btn svg {
+    width: 10px;
+    height: 10px;
   }
 }
 

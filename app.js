@@ -2604,7 +2604,17 @@ function drawAnnotationSync(ctx, anno, isSelected = false) {
       }
       break;
     case 'text':
-      ctx.font = `${anno.fontSize}px Arial`;
+      // Build font string with bold/italic and family
+      let textFontStyle = '';
+      if (anno.italic) textFontStyle += 'italic ';
+      if (anno.bold) textFontStyle += 'bold ';
+
+      // Map font family to CSS equivalent
+      let textCssFontFamily = 'Helvetica, Arial, sans-serif';
+      if (anno.fontFamily === 'Times-Roman') textCssFontFamily = 'Times New Roman, Times, serif';
+      else if (anno.fontFamily === 'Courier') textCssFontFamily = 'Courier New, Courier, monospace';
+
+      ctx.font = `${textFontStyle}${anno.fontSize}px ${textCssFontFamily}`;
       ctx.fillStyle = anno.color;
       const lines = anno.text.split('\n');
       lines.forEach((line, i) => {
@@ -3189,6 +3199,42 @@ function setupEditKeyboardShortcuts() {
 }
 
 // Text Input Modal
+function initTextModalControls() {
+  const boldBtn = document.getElementById('modal-text-bold');
+  const italicBtn = document.getElementById('modal-text-italic');
+  const colorPresets = document.querySelectorAll('.color-preset-btn');
+  const colorPicker = document.getElementById('modal-text-color');
+
+  // Bold toggle
+  boldBtn.onclick = () => {
+    boldBtn.classList.toggle('active');
+    updateTextPreview();
+  };
+
+  // Italic toggle
+  italicBtn.onclick = () => {
+    italicBtn.classList.toggle('active');
+    updateTextPreview();
+  };
+
+  // Color presets
+  colorPresets.forEach(btn => {
+    btn.onclick = () => {
+      const color = btn.dataset.color;
+      colorPicker.value = color;
+      colorPresets.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      updateTextPreview();
+    };
+  });
+
+  // Color picker change
+  colorPicker.oninput = () => {
+    colorPresets.forEach(b => b.classList.remove('active'));
+    updateTextPreview();
+  };
+}
+
 function openTextModal() {
   const modal = document.getElementById('text-input-modal');
   modal.classList.add('active');
@@ -3197,12 +3243,25 @@ function openTextModal() {
   textInput.value = '';
   textInput.focus();
 
+  // Reset to defaults
+  document.getElementById('modal-font-family').value = 'Helvetica';
+  document.getElementById('modal-font-size').value = '16';
+  document.getElementById('modal-text-bold').classList.remove('active');
+  document.getElementById('modal-text-italic').classList.remove('active');
+  document.getElementById('modal-text-color').value = '#000000';
+
+  // Set black as active preset
+  document.querySelectorAll('.color-preset-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.color === '#000000');
+  });
+
   // Setup live preview
+  initTextModalControls();
   updateTextPreview();
 
-  textInput.addEventListener('input', updateTextPreview);
-  document.getElementById('modal-font-size').addEventListener('change', updateTextPreview);
-  document.getElementById('modal-text-color').addEventListener('input', updateTextPreview);
+  textInput.oninput = updateTextPreview;
+  document.getElementById('modal-font-size').oninput = updateTextPreview;
+  document.getElementById('modal-font-family').onchange = updateTextPreview;
 }
 
 function closeTextModal() {
@@ -3215,11 +3274,33 @@ function updateTextPreview() {
   const text = document.getElementById('text-input-field').value || 'Preview teks';
   const fontSize = document.getElementById('modal-font-size').value;
   const color = document.getElementById('modal-text-color').value;
+  const fontFamily = document.getElementById('modal-font-family').value;
+  const isBold = document.getElementById('modal-text-bold').classList.contains('active');
+  const isItalic = document.getElementById('modal-text-italic').classList.contains('active');
 
   const preview = document.getElementById('text-preview');
   preview.textContent = text;
   preview.style.fontSize = fontSize + 'px';
   preview.style.color = color;
+  preview.style.fontWeight = isBold ? 'bold' : 'normal';
+  preview.style.fontStyle = isItalic ? 'italic' : 'normal';
+
+  // Map font family to CSS
+  let cssFontFamily = 'Helvetica, Arial, sans-serif';
+  if (fontFamily === 'Times-Roman') cssFontFamily = 'Times New Roman, Times, serif';
+  else if (fontFamily === 'Courier') cssFontFamily = 'Courier New, Courier, monospace';
+  preview.style.fontFamily = cssFontFamily;
+}
+
+function getTextModalSettings() {
+  return {
+    text: document.getElementById('text-input-field').value.trim(),
+    fontSize: parseInt(document.getElementById('modal-font-size').value) || 16,
+    color: document.getElementById('modal-text-color').value,
+    fontFamily: document.getElementById('modal-font-family').value,
+    bold: document.getElementById('modal-text-bold').classList.contains('active'),
+    italic: document.getElementById('modal-text-italic').classList.contains('active')
+  };
 }
 
 function confirmTextInput() {
@@ -3229,9 +3310,9 @@ function confirmTextInput() {
     return;
   }
 
-  const text = document.getElementById('text-input-field').value.trim();
+  const settings = getTextModalSettings();
 
-  if (!text) {
+  if (!settings.text) {
     showToast('Masukkan teks terlebih dahulu', 'error');
     return;
   }
@@ -3242,21 +3323,22 @@ function confirmTextInput() {
     return;
   }
 
-  const fontSize = parseInt(document.getElementById('modal-font-size').value);
-  const color = document.getElementById('modal-text-color').value;
-
   saveUndoState();
   state.editAnnotations[state.currentEditPage].push({
     type: 'text',
-    text,
+    text: settings.text,
     x: state.pendingTextPosition.x,
     y: state.pendingTextPosition.y,
-    fontSize,
-    color
+    fontSize: settings.fontSize,
+    color: settings.color,
+    fontFamily: settings.fontFamily,
+    bold: settings.bold,
+    italic: settings.italic
   });
 
   closeTextModal();
   renderEditPage();
+  setEditTool('select'); // Reset to select tool after adding text
   updateEditorStatus('Teks ditambahkan');
 }
 
@@ -3699,8 +3781,35 @@ async function saveEditedPDF() {
     const srcDoc = await PDFLib.PDFDocument.load(state.currentPDFBytes);
     const pages = srcDoc.getPages();
 
-    // Embed font once for all text annotations
-    const font = await srcDoc.embedFont(PDFLib.StandardFonts.Helvetica);
+    // Font cache for all text annotations
+    const fontCache = {};
+
+    // Helper to get the right font based on family, bold, italic
+    async function getTextFont(fontFamily, bold, italic) {
+      let fontName = fontFamily || 'Helvetica';
+
+      if (fontFamily === 'Helvetica') {
+        if (bold && italic) fontName = 'Helvetica-BoldOblique';
+        else if (bold) fontName = 'Helvetica-Bold';
+        else if (italic) fontName = 'Helvetica-Oblique';
+        else fontName = 'Helvetica';
+      } else if (fontFamily === 'Times-Roman') {
+        if (bold && italic) fontName = 'Times-BoldItalic';
+        else if (bold) fontName = 'Times-Bold';
+        else if (italic) fontName = 'Times-Italic';
+        else fontName = 'Times-Roman';
+      } else if (fontFamily === 'Courier') {
+        if (bold && italic) fontName = 'Courier-BoldOblique';
+        else if (bold) fontName = 'Courier-Bold';
+        else if (italic) fontName = 'Courier-Oblique';
+        else fontName = 'Courier';
+      }
+
+      if (!fontCache[fontName]) {
+        fontCache[fontName] = await srcDoc.embedFont(PDFLib.StandardFonts[fontName]);
+      }
+      return fontCache[fontName];
+    }
 
     for (let i = 0; i < pages.length; i++) {
       const page = pages[i];
@@ -3755,6 +3864,9 @@ async function saveEditedPDF() {
           const g = parseInt(hexColor.slice(3, 5), 16) / 255;
           const b = parseInt(hexColor.slice(5, 7), 16) / 255;
 
+          // Get the appropriate font based on family and style
+          const textFont = await getTextFont(anno.fontFamily, anno.bold, anno.italic);
+
           // Text position conversion
           const pdfX = anno.x * scaleX;
           const pdfY = pdfHeight - anno.y * scaleY;
@@ -3762,15 +3874,15 @@ async function saveEditedPDF() {
 
           // Handle multi-line text
           const lines = anno.text.split('\n');
-          lines.forEach((line, idx) => {
-            page.drawText(line, {
+          for (let idx = 0; idx < lines.length; idx++) {
+            page.drawText(lines[idx], {
               x: pdfX,
               y: pdfY - (idx * pdfFontSize * 1.2),
               size: pdfFontSize,
-              font,
+              font: textFont,
               color: PDFLib.rgb(r, g, b),
             });
-          });
+          }
         } else if (anno.type === 'signature' && anno.image) {
           try {
             const pngImage = await srcDoc.embedPng(anno.image);
@@ -5087,7 +5199,17 @@ function ueDrawAnnotation(ctx, anno, isSelected) {
       if (isSelected) ueDrawSelectionHandles(ctx, anno.x, anno.y, anno.width, anno.height);
       break;
     case 'text':
-      ctx.font = `${anno.fontSize}px Arial`;
+      // Build font string with bold/italic and family
+      let fontStyle = '';
+      if (anno.italic) fontStyle += 'italic ';
+      if (anno.bold) fontStyle += 'bold ';
+
+      // Map font family to CSS equivalent
+      let cssFontFamily = 'Helvetica, Arial, sans-serif';
+      if (anno.fontFamily === 'Times-Roman') cssFontFamily = 'Times New Roman, Times, serif';
+      else if (anno.fontFamily === 'Courier') cssFontFamily = 'Courier New, Courier, monospace';
+
+      ctx.font = `${fontStyle}${anno.fontSize}px ${cssFontFamily}`;
       ctx.fillStyle = anno.color;
       const lines = anno.text.split('\n');
       lines.forEach((line, i) => ctx.fillText(line, anno.x, anno.y + i * anno.fontSize * 1.2));
@@ -5223,7 +5345,7 @@ function ueUpdatePageCount() {
 // Update status
 function ueUpdateStatus(message) {
   const status = document.getElementById('ue-editor-status');
-  if (status) status.querySelector('.status-text').textContent = message;
+  if (status) status.textContent = message;
 }
 
 // Set current tool
@@ -5269,56 +5391,37 @@ function ueOpenSignatureModal() {
   // After signature is created, switch to signature placement mode
 }
 
-// Open text modal
+// Open text modal - uses shared openTextModal()
 function ueOpenTextModal() {
-  const modal = document.getElementById('text-input-modal');
-  modal.classList.add('active');
-  document.getElementById('text-input-field').value = '';
-  document.getElementById('text-input-field').focus();
-
-  // Update preview
-  const previewEl = document.getElementById('text-preview');
-  const fontSizeEl = document.getElementById('modal-font-size');
-  const colorEl = document.getElementById('modal-text-color');
-
-  function updatePreview() {
-    previewEl.style.fontSize = fontSizeEl.value + 'px';
-    previewEl.style.color = colorEl.value;
-    previewEl.textContent = document.getElementById('text-input-field').value || 'Preview teks...';
-  }
-
-  document.getElementById('text-input-field').oninput = updatePreview;
-  fontSizeEl.onchange = updatePreview;
-  colorEl.onchange = updatePreview;
-  updatePreview();
+  openTextModal();
 }
 
 // Confirm text input - modified to work with unified editor
-const originalConfirmTextInput = typeof confirmTextInput === 'function' ? confirmTextInput : null;
-
 function ueConfirmText() {
-  const text = document.getElementById('text-input-field').value.trim();
-  if (!text) {
+  const settings = getTextModalSettings();
+
+  if (!settings.text) {
     showToast('Masukkan teks terlebih dahulu', 'error');
     return;
   }
 
-  const fontSize = parseInt(document.getElementById('modal-font-size').value);
-  const color = document.getElementById('modal-text-color').value;
-
   ueSaveEditUndoState();
   ueState.annotations[ueState.selectedPage].push({
     type: 'text',
-    text,
+    text: settings.text,
     x: ueState.pendingTextPosition.x,
     y: ueState.pendingTextPosition.y,
-    fontSize,
-    color
+    fontSize: settings.fontSize,
+    color: settings.color,
+    fontFamily: settings.fontFamily,
+    bold: settings.bold,
+    italic: settings.italic
   });
 
   document.getElementById('text-input-modal').classList.remove('active');
   ueRedrawAnnotations();
   ueState.pendingTextPosition = null;
+  ueSetTool('select'); // Reset to select tool after adding text
 }
 
 // Watermark modal
@@ -5445,7 +5548,35 @@ async function ueDownload() {
 
   try {
     const newDoc = await PDFLib.PDFDocument.create();
-    let helveticaFont = null;
+    const fontCache = {};
+
+    // Helper to get the right font based on family, bold, italic
+    async function getFont(fontFamily, bold, italic) {
+      let fontName = fontFamily || 'Helvetica';
+
+      // Map font family + style to pdf-lib StandardFonts
+      if (fontFamily === 'Helvetica') {
+        if (bold && italic) fontName = 'Helvetica-BoldOblique';
+        else if (bold) fontName = 'Helvetica-Bold';
+        else if (italic) fontName = 'Helvetica-Oblique';
+        else fontName = 'Helvetica';
+      } else if (fontFamily === 'Times-Roman') {
+        if (bold && italic) fontName = 'Times-BoldItalic';
+        else if (bold) fontName = 'Times-Bold';
+        else if (italic) fontName = 'Times-Italic';
+        else fontName = 'Times-Roman';
+      } else if (fontFamily === 'Courier') {
+        if (bold && italic) fontName = 'Courier-BoldOblique';
+        else if (bold) fontName = 'Courier-Bold';
+        else if (italic) fontName = 'Courier-Oblique';
+        else fontName = 'Courier';
+      }
+
+      if (!fontCache[fontName]) {
+        fontCache[fontName] = await newDoc.embedFont(PDFLib.StandardFonts[fontName]);
+      }
+      return fontCache[fontName];
+    }
 
     for (let i = 0; i < ueState.pages.length; i++) {
       const pageInfo = ueState.pages[i];
@@ -5482,23 +5613,21 @@ async function ueDownload() {
               });
               break;
             case 'text':
-              if (!helveticaFont) {
-                helveticaFont = await newDoc.embedFont(PDFLib.StandardFonts.Helvetica);
-              }
+              const textFont = await getFont(anno.fontFamily, anno.bold, anno.italic);
               const lines = anno.text.split('\n');
               const hexColor = anno.color.replace('#', '');
               const r = parseInt(hexColor.substr(0, 2), 16) / 255;
               const g = parseInt(hexColor.substr(2, 2), 16) / 255;
               const b = parseInt(hexColor.substr(4, 2), 16) / 255;
-              lines.forEach((line, lineIdx) => {
-                page.drawText(line, {
+              for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+                page.drawText(lines[lineIdx], {
                   x: anno.x * scaleX,
                   y: height - (anno.y + lineIdx * anno.fontSize * 1.2) * scaleY,
                   size: anno.fontSize * scaleY,
-                  font: helveticaFont,
+                  font: textFont,
                   color: PDFLib.rgb(r, g, b)
                 });
-              });
+              }
               break;
             case 'signature':
               const pngImage = await newDoc.embedPng(anno.image);
@@ -5510,15 +5639,13 @@ async function ueDownload() {
               });
               break;
             case 'watermark':
-              if (!helveticaFont) {
-                helveticaFont = await newDoc.embedFont(PDFLib.StandardFonts.Helvetica);
-              }
+              const wmFont = await getFont('Helvetica', false, false);
               const wmHex = anno.color.replace('#', '');
               page.drawText(anno.text, {
                 x: anno.x * scaleX,
                 y: height - anno.y * scaleY,
                 size: anno.fontSize * scaleY,
-                font: helveticaFont,
+                font: wmFont,
                 color: PDFLib.rgb(
                   parseInt(wmHex.substr(0, 2), 16) / 255,
                   parseInt(wmHex.substr(2, 2), 16) / 255,
@@ -5661,6 +5788,626 @@ function ueToggleSidebar() {
 }
 
 // ============================================================
+// PAGE MANAGER MODAL FOR UNIFIED EDITOR
+// ============================================================
+
+const uePmState = {
+  isOpen: false,
+  extractMode: false,
+  selectedForExtract: [],
+  draggedIndex: -1,
+  dropIndicator: null
+};
+
+// Open the page manager modal
+function uePmOpenModal() {
+  if (ueState.pages.length === 0) {
+    showToast('Tambahkan halaman terlebih dahulu', 'error');
+    return;
+  }
+
+  uePmState.isOpen = true;
+  uePmState.extractMode = false;
+  uePmState.selectedForExtract = [];
+
+  uePmRenderPages();
+  uePmUpdateUI();
+
+  document.getElementById('ue-page-manager-modal').classList.add('active');
+
+  // Initialize file input handler
+  initUePmFileInput();
+}
+
+// Close the page manager modal
+function uePmCloseModal() {
+  uePmState.isOpen = false;
+  document.getElementById('ue-page-manager-modal').classList.remove('active');
+
+  // Clean up drop indicator
+  if (uePmState.dropIndicator && uePmState.dropIndicator.parentNode) {
+    uePmState.dropIndicator.remove();
+  }
+
+  // Reset extract mode UI
+  document.getElementById('ue-pm-extract-mode-btn').classList.remove('active');
+  document.getElementById('ue-pm-extract-actions').style.display = 'none';
+  document.getElementById('ue-pm-extract-btn').style.display = 'none';
+
+  // Sync thumbnails in main sidebar
+  ueRenderThumbnails();
+  ueUpdatePageCount();
+
+  // Re-render selected page if needed
+  if (ueState.selectedPage >= 0) {
+    ueRenderSelectedPage();
+  }
+}
+
+// Update modal UI elements
+function uePmUpdateUI() {
+  document.getElementById('ue-pm-page-count').textContent = ueState.pages.length + ' halaman';
+}
+
+// Render all pages in the modal grid
+function uePmRenderPages() {
+  const container = document.getElementById('ue-pm-pages');
+  container.innerHTML = '';
+
+  if (uePmState.extractMode) {
+    container.classList.add('extract-mode');
+  } else {
+    container.classList.remove('extract-mode');
+  }
+
+  ueState.pages.forEach((page, index) => {
+    const item = document.createElement('div');
+    item.className = 'ue-pm-page-item';
+    item.dataset.index = index;
+    item.draggable = !uePmState.extractMode;
+
+    // Check if selected for extract
+    if (uePmState.selectedForExtract.includes(index)) {
+      item.classList.add('selected');
+    }
+
+    // Canvas thumbnail
+    const canvas = document.createElement('canvas');
+    canvas.width = page.canvas.width;
+    canvas.height = page.canvas.height;
+    canvas.getContext('2d').drawImage(page.canvas, 0, 0);
+    if (page.rotation !== 0) {
+      canvas.style.transform = `rotate(${page.rotation}deg)`;
+    }
+    item.appendChild(canvas);
+
+    // Page number badge
+    const numBadge = document.createElement('span');
+    numBadge.className = 'ue-pm-page-number';
+    numBadge.textContent = index + 1;
+    item.appendChild(numBadge);
+
+    // Source badge (if multiple sources)
+    if (ueState.sourceFiles.length > 1) {
+      const srcBadge = document.createElement('span');
+      srcBadge.className = 'ue-pm-source-badge';
+      srcBadge.textContent = page.sourceName;
+      item.appendChild(srcBadge);
+    }
+
+    // Rotation badge (if rotated)
+    if (page.rotation !== 0) {
+      const rotBadge = document.createElement('span');
+      rotBadge.className = 'ue-pm-rotation-badge';
+      rotBadge.textContent = page.rotation + '°';
+      item.appendChild(rotBadge);
+    }
+
+    // Action buttons (rotate and delete) - always visible
+    const actions = document.createElement('div');
+    actions.className = 'ue-pm-page-actions';
+
+    // Rotate button
+    const rotateBtn = document.createElement('button');
+    rotateBtn.className = 'ue-pm-page-action-btn';
+    rotateBtn.title = 'Putar 90°';
+    rotateBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.85.83 6.72 2.24"/><path d="M21 3v6h-6"/></svg>';
+    rotateBtn.onclick = (e) => {
+      e.stopPropagation();
+      uePmRotatePage(index, 90);
+    };
+    actions.appendChild(rotateBtn);
+
+    // Delete button
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'ue-pm-page-action-btn delete';
+    deleteBtn.title = 'Hapus';
+    deleteBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
+    deleteBtn.onclick = (e) => {
+      e.stopPropagation();
+      uePmDeletePage(index);
+    };
+    actions.appendChild(deleteBtn);
+
+    item.appendChild(actions);
+
+    // Checkbox for extract mode
+    const checkbox = document.createElement('div');
+    checkbox.className = 'ue-pm-page-checkbox';
+    checkbox.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>';
+    item.appendChild(checkbox);
+
+    // Click handler for extract mode selection
+    item.onclick = () => {
+      if (uePmState.extractMode) {
+        uePmTogglePageSelection(index);
+      }
+    };
+
+    container.appendChild(item);
+  });
+
+  // Enable drag-drop if not in extract mode
+  if (!uePmState.extractMode) {
+    uePmEnableDragReorder();
+  }
+
+  uePmUpdateUI();
+}
+
+// Enable drag-drop reordering
+function uePmEnableDragReorder() {
+  const container = document.getElementById('ue-pm-pages');
+  let draggedItem = null;
+  let draggedIndex = -1;
+
+  function getDropIndicator() {
+    if (!uePmState.dropIndicator) {
+      uePmState.dropIndicator = document.createElement('div');
+      uePmState.dropIndicator.className = 'ue-pm-drop-indicator';
+    }
+    return uePmState.dropIndicator;
+  }
+
+  function removeDropIndicator() {
+    if (uePmState.dropIndicator && uePmState.dropIndicator.parentNode) {
+      uePmState.dropIndicator.remove();
+    }
+  }
+
+  container.querySelectorAll('.ue-pm-page-item').forEach((item) => {
+    item.addEventListener('dragstart', (e) => {
+      if (uePmState.extractMode) {
+        e.preventDefault();
+        return;
+      }
+      ueSaveUndoState();
+      draggedItem = item;
+      draggedIndex = parseInt(item.dataset.index);
+      uePmState.draggedIndex = draggedIndex;
+      item.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', draggedIndex);
+    });
+
+    item.addEventListener('dragend', () => {
+      if (draggedItem) {
+        draggedItem.classList.remove('dragging');
+        draggedItem = null;
+      }
+      uePmState.draggedIndex = -1;
+      removeDropIndicator();
+    });
+
+    item.addEventListener('dragover', (e) => {
+      if (uePmState.extractMode) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (!draggedItem || item === draggedItem) return;
+
+      const rect = item.getBoundingClientRect();
+      const midpoint = rect.left + rect.width / 2;
+      const indicator = getDropIndicator();
+
+      if (e.clientX < midpoint) {
+        item.before(indicator);
+      } else {
+        item.after(indicator);
+      }
+    });
+
+    item.addEventListener('dragleave', () => {
+      // Keep indicator visible during drag
+    });
+
+    item.addEventListener('drop', (e) => {
+      if (uePmState.extractMode) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (!draggedItem) return;
+
+      const targetIndex = parseInt(item.dataset.index);
+      const rect = item.getBoundingClientRect();
+      const midpoint = rect.left + rect.width / 2;
+      const insertBefore = e.clientX < midpoint;
+
+      // Track the page user is currently viewing
+      const viewedPage = ueState.pages[ueState.selectedPage];
+
+      // Calculate where to insert (before removing the dragged item)
+      let insertAt = insertBefore ? targetIndex : targetIndex + 1;
+
+      // Remove the page first
+      const [movedPage] = ueState.pages.splice(draggedIndex, 1);
+
+      // Adjust insertion point if we removed from before it
+      if (draggedIndex < insertAt) {
+        insertAt--;
+      }
+
+      // Insert at new position
+      ueState.pages.splice(insertAt, 0, movedPage);
+
+      // Reindex annotations
+      uePmReindexAnnotations(draggedIndex, insertAt);
+
+      // Update selectedPage to follow the viewed page
+      const newViewedIndex = ueState.pages.indexOf(viewedPage);
+      if (newViewedIndex !== -1) {
+        ueState.selectedPage = newViewedIndex;
+      }
+
+      // Re-render
+      uePmRenderPages();
+
+      removeDropIndicator();
+    });
+  });
+
+  // Handle container-level dragover (for edges and indicator)
+  container.addEventListener('dragover', (e) => {
+    if (uePmState.extractMode || !draggedItem) return;
+    e.preventDefault();
+
+    const items = container.querySelectorAll('.ue-pm-page-item:not(.dragging)');
+    if (items.length === 0) return;
+
+    const indicator = getDropIndicator();
+    const firstItem = items[0];
+    const lastItem = items[items.length - 1];
+    const firstRect = firstItem.getBoundingClientRect();
+    const lastRect = lastItem.getBoundingClientRect();
+
+    if (e.clientX < firstRect.left) {
+      firstItem.before(indicator);
+    } else if (e.clientX > lastRect.right) {
+      lastItem.after(indicator);
+    }
+  });
+
+  // Handle container-level drop (catches drops on indicator or container)
+  container.addEventListener('drop', (e) => {
+    if (uePmState.extractMode || !draggedItem) return;
+    e.preventDefault();
+
+    // Find where the indicator is positioned
+    const indicator = uePmState.dropIndicator;
+    if (!indicator || !indicator.parentNode) {
+      removeDropIndicator();
+      return;
+    }
+
+    // Find the insertion index based on indicator position
+    const items = Array.from(container.querySelectorAll('.ue-pm-page-item'));
+    let insertAt = 0;
+
+    // Find which item the indicator is before
+    const nextSibling = indicator.nextElementSibling;
+    if (nextSibling && nextSibling.classList.contains('ue-pm-page-item')) {
+      insertAt = parseInt(nextSibling.dataset.index);
+    } else {
+      // Indicator is at the end
+      insertAt = items.length;
+    }
+
+    // Track the page user is currently viewing
+    const viewedPage = ueState.pages[ueState.selectedPage];
+
+    // Remove the page first
+    const [movedPage] = ueState.pages.splice(draggedIndex, 1);
+
+    // Adjust insertion point if we removed from before it
+    if (draggedIndex < insertAt) {
+      insertAt--;
+    }
+
+    // Insert at new position
+    ueState.pages.splice(insertAt, 0, movedPage);
+
+    // Reindex annotations
+    uePmReindexAnnotations(draggedIndex, insertAt);
+
+    // Update selectedPage to follow the viewed page
+    const newViewedIndex = ueState.pages.indexOf(viewedPage);
+    if (newViewedIndex !== -1) {
+      ueState.selectedPage = newViewedIndex;
+    }
+
+    // Re-render
+    uePmRenderPages();
+
+    removeDropIndicator();
+  });
+}
+
+// Reindex annotations after page reorder
+function uePmReindexAnnotations(fromIndex, toIndex) {
+  const oldAnnotations = { ...ueState.annotations };
+  ueState.annotations = {};
+
+  // Create mapping of old index to new index
+  const indexMap = {};
+  for (let i = 0; i < ueState.pages.length; i++) {
+    indexMap[i] = i;
+  }
+
+  // Adjust indices based on the move
+  if (fromIndex < toIndex) {
+    for (let i = fromIndex; i < toIndex; i++) {
+      indexMap[i + 1] = i;
+    }
+    indexMap[fromIndex] = toIndex;
+  } else {
+    for (let i = toIndex + 1; i <= fromIndex; i++) {
+      indexMap[i - 1] = i;
+    }
+    indexMap[fromIndex] = toIndex;
+  }
+
+  // Remap annotations to new indices
+  Object.keys(oldAnnotations).forEach(key => {
+    const oldIdx = parseInt(key);
+    // Find which page this annotation belonged to
+    // The page at old position 'key' is now at a new position
+    let newIdx = oldIdx;
+    if (oldIdx === fromIndex) {
+      newIdx = toIndex;
+    } else if (fromIndex < toIndex && oldIdx > fromIndex && oldIdx <= toIndex) {
+      newIdx = oldIdx - 1;
+    } else if (fromIndex > toIndex && oldIdx >= toIndex && oldIdx < fromIndex) {
+      newIdx = oldIdx + 1;
+    }
+    ueState.annotations[newIdx] = oldAnnotations[key];
+  });
+}
+
+// Rotate a page
+function uePmRotatePage(index, degrees) {
+  ueSaveUndoState();
+
+  const page = ueState.pages[index];
+  page.rotation = ((page.rotation + degrees) % 360 + 360) % 360;
+
+  // Update thumbnail in modal
+  const item = document.querySelector(`.ue-pm-page-item[data-index="${index}"]`);
+  if (item) {
+    const canvas = item.querySelector('canvas');
+    if (canvas) {
+      canvas.style.transform = page.rotation !== 0 ? `rotate(${page.rotation}deg)` : '';
+    }
+
+    // Update rotation badge
+    let rotBadge = item.querySelector('.ue-pm-rotation-badge');
+    if (page.rotation !== 0) {
+      if (!rotBadge) {
+        rotBadge = document.createElement('span');
+        rotBadge.className = 'ue-pm-rotation-badge';
+        // Insert before actions div
+        const actions = item.querySelector('.ue-pm-page-actions');
+        if (actions) {
+          item.insertBefore(rotBadge, actions);
+        } else {
+          item.appendChild(rotBadge);
+        }
+      }
+      rotBadge.textContent = page.rotation + '°';
+    } else if (rotBadge) {
+      rotBadge.remove();
+    }
+  }
+
+  showToast('Halaman diputar', 'success');
+}
+
+// Delete a page
+function uePmDeletePage(index) {
+  if (ueState.pages.length <= 1) {
+    showToast('Tidak bisa menghapus halaman terakhir', 'error');
+    return;
+  }
+
+  if (!confirm('Hapus halaman ini?')) {
+    return;
+  }
+
+  ueSaveUndoState();
+
+  // Track if we're deleting the viewed page
+  const wasViewingDeletedPage = (ueState.selectedPage === index);
+  const viewedPage = ueState.pages[ueState.selectedPage];
+
+  // Remove page
+  ueState.pages.splice(index, 1);
+  delete ueState.annotations[index];
+
+  // Reindex annotations after deletion
+  const newAnnotations = {};
+  Object.keys(ueState.annotations).forEach(key => {
+    const idx = parseInt(key);
+    if (idx > index) {
+      newAnnotations[idx - 1] = ueState.annotations[idx];
+    } else {
+      newAnnotations[idx] = ueState.annotations[idx];
+    }
+  });
+  ueState.annotations = newAnnotations;
+
+  // Update viewed page index
+  if (wasViewingDeletedPage) {
+    ueState.selectedPage = Math.min(index, ueState.pages.length - 1);
+  } else {
+    const newViewedIndex = ueState.pages.indexOf(viewedPage);
+    if (newViewedIndex !== -1) {
+      ueState.selectedPage = newViewedIndex;
+    } else {
+      ueState.selectedPage = Math.max(0, ueState.selectedPage - 1);
+    }
+  }
+
+  // Update extract selections if needed
+  uePmState.selectedForExtract = uePmState.selectedForExtract
+    .filter(i => i !== index)
+    .map(i => i > index ? i - 1 : i);
+
+  // Re-render
+  uePmRenderPages();
+  uePmUpdateSelectionCount();
+
+  showToast('Halaman dihapus', 'success');
+}
+
+// Toggle extract mode
+function uePmToggleExtractMode() {
+  uePmState.extractMode = !uePmState.extractMode;
+  uePmState.selectedForExtract = [];
+
+  const btn = document.getElementById('ue-pm-extract-mode-btn');
+  const extractActions = document.getElementById('ue-pm-extract-actions');
+  const extractBtn = document.getElementById('ue-pm-extract-btn');
+
+  if (uePmState.extractMode) {
+    btn.classList.add('active');
+    btn.textContent = 'Batal Ekstrak';
+    extractActions.style.display = 'flex';
+    extractBtn.style.display = 'inline-flex';
+  } else {
+    btn.classList.remove('active');
+    btn.textContent = 'Ekstrak Halaman';
+    extractActions.style.display = 'none';
+    extractBtn.style.display = 'none';
+  }
+
+  uePmRenderPages();
+  uePmUpdateSelectionCount();
+}
+
+// Toggle page selection for extract
+function uePmTogglePageSelection(index) {
+  const idx = uePmState.selectedForExtract.indexOf(index);
+  if (idx === -1) {
+    uePmState.selectedForExtract.push(index);
+  } else {
+    uePmState.selectedForExtract.splice(idx, 1);
+  }
+
+  // Update UI
+  const item = document.querySelector(`.ue-pm-page-item[data-index="${index}"]`);
+  if (item) {
+    item.classList.toggle('selected', uePmState.selectedForExtract.includes(index));
+  }
+
+  uePmUpdateSelectionCount();
+}
+
+// Select all pages for extract
+function uePmSelectAll() {
+  uePmState.selectedForExtract = ueState.pages.map((_, i) => i);
+  document.querySelectorAll('.ue-pm-page-item').forEach(item => {
+    item.classList.add('selected');
+  });
+  uePmUpdateSelectionCount();
+}
+
+// Deselect all pages
+function uePmDeselectAll() {
+  uePmState.selectedForExtract = [];
+  document.querySelectorAll('.ue-pm-page-item').forEach(item => {
+    item.classList.remove('selected');
+  });
+  uePmUpdateSelectionCount();
+}
+
+// Update selection count display
+function uePmUpdateSelectionCount() {
+  const count = uePmState.selectedForExtract.length;
+  document.getElementById('ue-pm-selection-count').textContent = count + ' halaman dipilih';
+
+  const extractBtn = document.getElementById('ue-pm-extract-btn');
+  extractBtn.disabled = count === 0;
+  extractBtn.textContent = count > 0
+    ? `Ekstrak ${count} halaman sebagai PDF baru`
+    : 'Ekstrak sebagai PDF baru';
+}
+
+// Extract selected pages to new PDF
+async function uePmExtractSelected() {
+  if (uePmState.selectedForExtract.length === 0) {
+    showToast('Pilih halaman yang ingin diekstrak', 'error');
+    return;
+  }
+
+  try {
+    // Sort indices for consistent order
+    const sortedIndices = [...uePmState.selectedForExtract].sort((a, b) => a - b);
+
+    // Create new PDF
+    const newDoc = await PDFLib.PDFDocument.create();
+
+    for (const index of sortedIndices) {
+      const pageData = ueState.pages[index];
+      const sourceFile = ueState.sourceFiles[pageData.sourceIndex];
+      const srcDoc = await PDFLib.PDFDocument.load(sourceFile.bytes);
+      const [page] = await newDoc.copyPages(srcDoc, [pageData.pageNum]);
+
+      if (pageData.rotation !== 0) {
+        page.setRotation(PDFLib.degrees(pageData.rotation));
+      }
+
+      newDoc.addPage(page);
+    }
+
+    const bytes = await newDoc.save();
+    const baseName = ueState.sourceFiles[0]?.name?.replace(/\.pdf$/i, '') || 'extracted';
+    downloadBlob(new Blob([bytes], { type: 'application/pdf' }), `${baseName}_extracted.pdf`);
+
+    showToast(`${sortedIndices.length} halaman berhasil diekstrak!`, 'success');
+
+    // Exit extract mode after successful extraction
+    uePmToggleExtractMode();
+
+  } catch (error) {
+    console.error('Error extracting pages:', error);
+    showToast('Gagal mengekstrak halaman', 'error');
+  }
+}
+
+// Initialize file input for adding pages from modal
+function initUePmFileInput() {
+  const input = document.getElementById('ue-pm-file-input');
+  if (input && !input._uePmInitialized) {
+    input._uePmInitialized = true;
+    input.addEventListener('change', async (e) => {
+      await ueAddFiles(e.target.files);
+      e.target.value = '';
+      // Re-render modal content if open
+      if (uePmState.isOpen) {
+        uePmRenderPages();
+      }
+    });
+  }
+}
+
+// ============================================================
 // KEYBOARD SHORTCUTS
 // ============================================================
 
@@ -5683,7 +6430,11 @@ document.addEventListener('keydown', (e) => {
   }
 
   // Keyboard shortcuts for unified editor tools
-  if (state.currentTool === 'unified-editor' && ueState.selectedPage >= 0) {
+  // Skip if user is typing in an input field
+  const activeEl = document.activeElement;
+  const isTyping = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable);
+
+  if (state.currentTool === 'unified-editor' && ueState.selectedPage >= 0 && !isTyping) {
     if (e.key === 'v' && !e.ctrlKey && !e.metaKey) {
       ueSetTool('select');
     } else if (e.key === 'w' && !e.ctrlKey && !e.metaKey) {

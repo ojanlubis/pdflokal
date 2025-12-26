@@ -412,6 +412,10 @@
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
             </button>
             <span class="sidebar-title">Halaman</span>
+            <button class="btn btn-secondary btn-sm ue-manage-btn" onclick="uePmOpenModal()" title="Kelola Halaman">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+              Kelola
+            </button>
             <button class="btn btn-secondary btn-sm" onclick="document.getElementById('ue-file-input').click()" title="Tambah PDF">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
             </button>
@@ -499,14 +503,15 @@
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
               </button>
             </div>
-            <div class="editor-tool-divider"></div>
-            <div class="editor-status" id="ue-editor-status">
-              <span class="status-text">Pilih halaman untuk mulai mengedit</span>
-            </div>
             <button class="btn btn-primary btn--download-hero" id="ue-download-btn" disabled onclick="ueDownload()">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               Download PDF
             </button>
+          </div>
+
+          <!-- Status Bar -->
+          <div class="ue-status-bar" id="ue-status-bar">
+            <span id="ue-editor-status">Pilih halaman untuk mulai mengedit</span>
           </div>
 
           <!-- Canvas Wrapper -->
@@ -1211,28 +1216,57 @@
       <h3>Tambah Teks</h3>
       <div class="edit-modal-content">
         <textarea id="text-input-field" class="edit-text-input" placeholder="Masukkan teks..." rows="3"></textarea>
+
         <div class="edit-text-options">
+          <!-- Font Family -->
           <div class="edit-option-group">
-            <label>Ukuran Font</label>
-            <select id="modal-font-size">
-              <option value="10">10pt</option>
-              <option value="12">12pt</option>
-              <option value="14">14pt</option>
-              <option value="16" selected>16pt</option>
-              <option value="18">18pt</option>
-              <option value="20">20pt</option>
-              <option value="24">24pt</option>
-              <option value="28">28pt</option>
-              <option value="32">32pt</option>
-              <option value="36">36pt</option>
-              <option value="48">48pt</option>
+            <label>Font</label>
+            <select id="modal-font-family">
+              <option value="Helvetica" selected>Helvetica</option>
+              <option value="Times-Roman">Times Roman</option>
+              <option value="Courier">Courier</option>
             </select>
           </div>
+
+          <!-- Font Size - Number Input -->
           <div class="edit-option-group">
-            <label>Warna</label>
-            <input type="color" id="modal-text-color" value="#000000">
+            <label>Ukuran</label>
+            <div class="font-size-input-wrap">
+              <input type="number" id="modal-font-size" value="16" min="6" max="120" step="1">
+              <span class="font-size-unit">pt</span>
+            </div>
+          </div>
+
+          <!-- Bold/Italic -->
+          <div class="edit-option-group">
+            <label>Gaya</label>
+            <div class="text-style-toggles">
+              <button type="button" class="text-style-btn" id="modal-text-bold" title="Bold">
+                <strong>B</strong>
+              </button>
+              <button type="button" class="text-style-btn" id="modal-text-italic" title="Italic">
+                <em>I</em>
+              </button>
+            </div>
           </div>
         </div>
+
+        <!-- Color Options -->
+        <div class="edit-text-color-section">
+          <label>Warna</label>
+          <div class="color-options-row">
+            <div class="color-presets">
+              <button type="button" class="color-preset-btn" data-color="#000000" style="background:#000000" title="Hitam"></button>
+              <button type="button" class="color-preset-btn" data-color="#DC2626" style="background:#DC2626" title="Merah"></button>
+              <button type="button" class="color-preset-btn" data-color="#2563EB" style="background:#2563EB" title="Biru"></button>
+              <button type="button" class="color-preset-btn" data-color="#16A34A" style="background:#16A34A" title="Hijau"></button>
+              <button type="button" class="color-preset-btn" data-color="#9333EA" style="background:#9333EA" title="Ungu"></button>
+              <button type="button" class="color-preset-btn" data-color="#EA580C" style="background:#EA580C" title="Oranye"></button>
+            </div>
+            <input type="color" id="modal-text-color" value="#000000" title="Pilih warna lain">
+          </div>
+        </div>
+
         <div class="edit-text-preview">
           <span id="text-preview-label">Preview:</span>
           <div id="text-preview" class="text-preview-box"></div>
@@ -1342,6 +1376,46 @@
       <div class="edit-modal-actions">
         <button class="btn btn-ghost" onclick="closeEditorPageNumModal()">Batal</button>
         <button class="btn btn-primary" onclick="applyEditorPageNumbers()">Terapkan Nomor</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Page Manager Modal for Unified Editor -->
+  <div id="ue-page-manager-modal" class="edit-modal">
+    <div class="edit-modal-box ue-pm-modal-box">
+      <div class="ue-pm-header">
+        <h3>Kelola Halaman</h3>
+        <button class="ue-pm-close-btn" onclick="uePmCloseModal()">&times;</button>
+      </div>
+
+      <div class="ue-pm-toolbar">
+        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('ue-pm-file-input').click()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          Tambah Halaman
+        </button>
+        <input type="file" id="ue-pm-file-input" multiple accept=".pdf" style="display:none">
+
+        <button class="btn btn-secondary btn-sm" id="ue-pm-extract-mode-btn" onclick="uePmToggleExtractMode()">
+          Ekstrak Halaman
+        </button>
+
+        <div class="ue-pm-extract-actions" id="ue-pm-extract-actions" style="display:none;">
+          <button class="btn btn-secondary btn-sm" onclick="uePmSelectAll()">Pilih Semua</button>
+          <button class="btn btn-secondary btn-sm" onclick="uePmDeselectAll()">Batal Pilih</button>
+          <span class="ue-pm-selection-count" id="ue-pm-selection-count">0 halaman dipilih</span>
+        </div>
+      </div>
+
+      <div class="ue-pm-pages-container">
+        <div class="ue-pm-pages" id="ue-pm-pages"></div>
+      </div>
+
+      <div class="edit-modal-actions">
+        <span class="ue-pm-page-count" id="ue-pm-page-count">0 halaman</span>
+        <button class="btn btn-primary" id="ue-pm-extract-btn" onclick="uePmExtractSelected()" style="display:none;">
+          Ekstrak sebagai PDF baru
+        </button>
+        <button class="btn btn-ghost" onclick="uePmCloseModal()">Selesai</button>
       </div>
     </div>
   </div>
