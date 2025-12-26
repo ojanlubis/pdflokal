@@ -794,6 +794,126 @@ a:hover {
   color: var(--accent-primary);
 }
 
+/* Hero Signature Button */
+.editor-tool-group--primary {
+  position: relative;
+}
+
+.editor-tool-btn--primary {
+  background: var(--accent-primary);
+  color: white;
+  border-color: var(--accent-primary);
+  font-weight: 600;
+  padding: var(--space-sm) var(--space-lg);
+}
+
+.editor-tool-btn--primary:hover {
+  background: var(--accent-dark, #1d4ed8);
+  border-color: var(--accent-dark, #1d4ed8);
+  color: white;
+}
+
+.editor-tool-btn--primary.active {
+  background: var(--accent-dark, #1d4ed8);
+  border-color: var(--accent-dark, #1d4ed8);
+  color: white;
+}
+
+/* Secondary Tools - More subtle */
+.editor-tool-btn--secondary {
+  color: var(--text-tertiary);
+  background: transparent;
+}
+
+.editor-tool-btn--secondary:hover {
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+}
+
+.editor-tool-btn--secondary.active {
+  background: var(--accent-light);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+/* First-use Tooltip */
+.signature-hint-tooltip {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: var(--space-sm);
+  background: var(--text-primary);
+  color: white;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  white-space: nowrap;
+  z-index: 100;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+  box-shadow: var(--shadow-lg);
+}
+
+.signature-hint-tooltip.show {
+  opacity: 1;
+  visibility: visible;
+}
+
+.signature-hint-tooltip .tooltip-arrow {
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 6px solid var(--text-primary);
+}
+
+/* Signature Confirm Button */
+.signature-confirm-btn {
+  position: absolute;
+  background: var(--accent-primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 6px 14px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  z-index: 20;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  transition: all var(--transition-fast);
+}
+
+.signature-confirm-btn:hover {
+  background: var(--accent-dark, #1d4ed8);
+  transform: scale(1.05);
+}
+
+/* Hero Download Button */
+.btn--download-hero {
+  padding: var(--space-md) var(--space-xl);
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.btn--download-hero:not(:disabled).has-signatures {
+  animation: gentle-pulse 2s infinite;
+}
+
+@keyframes gentle-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(59, 130, 246, 0);
+  }
+}
+
 .editor-canvas-wrapper {
   display: flex;
   justify-content: center;
@@ -1653,6 +1773,30 @@ a:hover {
     flex-direction: column;
     gap: var(--space-md);
   }
+
+  /* Hero signature button on mobile */
+  .editor-tool-btn--primary {
+    padding: var(--space-sm) var(--space-md);
+    font-size: 0.875rem;
+  }
+
+  .editor-tool-btn--primary svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  /* Hide tooltip on mobile (touch interaction is different) */
+  .signature-hint-tooltip {
+    display: none !important;
+  }
+
+  /* Download button on mobile */
+  .btn--download-hero {
+    padding: var(--space-sm) var(--space-lg);
+    font-size: 0.875rem;
+    width: 100%;
+    justify-content: center;
+  }
 }
 
 /* Drop Hint Component - For file upload areas */
@@ -1767,6 +1911,7 @@ a:hover {
 
 .unified-editor-layout {
   display: flex;
+  align-items: flex-start;
   gap: var(--space-sm);
   flex: 1;
   min-height: 1200;
@@ -1777,6 +1922,9 @@ a:hover {
 .unified-sidebar {
   width: 280px;
   min-width: 280px;
+  max-height: 100vh;
+  position: sticky;
+  top: var(--space-md);
   background: var(--bg-secondary);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-lg);
@@ -2007,6 +2155,7 @@ a:hover {
   padding: var(--space-md);
   min-height: 500px;
   height: auto;
+  position: relative; /* For confirm button positioning */
 }
 
 #ue-canvas {

@@ -3295,6 +3295,9 @@ function useSignature() {
     // Check if in unified editor mode
     if (state.currentTool === 'unified-editor') {
       ueSetTool('signature');
+      // Enable signature preview attached to cursor
+      ueState.pendingSignature = true;
+      ueState.signaturePreviewPos = null;
     } else {
       setEditTool('signature');
     }
@@ -3421,6 +3424,9 @@ function useSignatureFromUpload() {
   // Check if in unified editor mode
   if (state.currentTool === 'unified-editor') {
     ueSetTool('signature');
+    // Enable signature preview attached to cursor
+    ueState.pendingSignature = true;
+    ueState.signaturePreviewPos = null;
     ueUpdateStatus('Klik untuk menempatkan tanda tangan');
   } else {
     setEditTool('signature');
@@ -4367,6 +4373,11 @@ const ueState = {
   canvasSetup: false,
   pageCache: null,      // Cached rendered page for smooth dragging
   zoomLevel: 1.0,       // Zoom level (1.0 = fit width)
+  // Signature enhancements
+  pendingSignature: false,      // Whether signature is attached to cursor
+  signaturePreviewPos: null,    // Current cursor position for preview { x, y }
+  resizeHandle: null,           // Current resize handle being dragged ('tl', 'tr', 'bl', 'br')
+  resizeStartInfo: null,        // Initial annotation state when resize started
 };
 
 // Initialize unified editor file input
@@ -4506,6 +4517,10 @@ function ueRenderThumbnails() {
 function ueSelectPage(index) {
   if (index < 0 || index >= ueState.pages.length) return;
 
+  // Clear selection and confirm button when switching pages
+  ueState.selectedAnnotation = null;
+  ueHideConfirmButton();
+
   ueState.selectedPage = index;
   ueRenderThumbnails();
   ueRenderSelectedPage();
@@ -4621,6 +4636,7 @@ function ueSetupCanvasEvents() {
   const canvas = document.getElementById('ue-canvas');
   let isDrawing = false;
   let isDragging = false;
+  let isResizing = false;
   let startX, startY;
   let dragOffsetX, dragOffsetY;
 
@@ -4631,10 +4647,37 @@ function ueSetupCanvasEvents() {
     return { x, y };
   }
 
+  // Check if clicking on a resize handle
+  function getResizeHandle(anno, x, y) {
+    if (anno.locked) return null;
+    const handleSize = 12;
+    const handles = [
+      { pos: 'tl', hx: anno.x, hy: anno.y },
+      { pos: 'tr', hx: anno.x + anno.width, hy: anno.y },
+      { pos: 'bl', hx: anno.x, hy: anno.y + anno.height },
+      { pos: 'br', hx: anno.x + anno.width, hy: anno.y + anno.height }
+    ];
+    for (const h of handles) {
+      if (Math.abs(x - h.hx) < handleSize && Math.abs(y - h.hy) < handleSize) {
+        return h.pos;
+      }
+    }
+    return null;
+  }
+
   canvas.addEventListener('mousedown', (e) => handleDown(getCoords(e)));
   canvas.addEventListener('mousemove', (e) => handleMove(getCoords(e)));
   canvas.addEventListener('mouseup', (e) => handleUp(getCoords(e)));
-  canvas.addEventListener('mouseleave', () => { isDrawing = false; isDragging = false; });
+  canvas.addEventListener('mouseleave', () => {
+    isDrawing = false;
+    isDragging = false;
+    isResizing = false;
+    // Clear signature preview when leaving canvas
+    if (ueState.pendingSignature) {
+      ueState.signaturePreviewPos = null;
+      ueRedrawAnnotations();
+    }
+  });
 
   canvas.addEventListener('touchstart', (e) => {
     e.preventDefault();
@@ -4653,20 +4696,55 @@ function ueSetupCanvasEvents() {
     startX = x;
     startY = y;
 
-    // Check for annotation selection
+    // If pending signature, place it immediately on click
+    if (ueState.pendingSignature && state.signatureImage) {
+      uePlaceSignature(x, y);
+      return;
+    }
+
+    // Check for annotation selection and resize
     if (ueState.currentTool === 'select') {
+      // First check if clicking on a resize handle of selected annotation
+      if (ueState.selectedAnnotation) {
+        const anno = ueState.annotations[ueState.selectedAnnotation.pageIndex][ueState.selectedAnnotation.index];
+        const handle = getResizeHandle(anno, x, y);
+        if (handle) {
+          ueSaveEditUndoState();
+          isResizing = true;
+          ueState.resizeHandle = handle;
+          ueState.resizeStartInfo = {
+            x: anno.x,
+            y: anno.y,
+            width: anno.width,
+            height: anno.height,
+            aspectRatio: anno.width / anno.height
+          };
+          return;
+        }
+      }
+
       const clicked = ueFindAnnotationAt(x, y);
       if (clicked) {
+        const anno = ueState.annotations[clicked.pageIndex][clicked.index];
+        // Check if this annotation is locked
+        if (anno.locked) {
+          // Can't drag locked annotations
+          ueState.selectedAnnotation = clicked;
+          ueRedrawAnnotations();
+          ueShowConfirmButton(anno, clicked);
+          return;
+        }
         ueSaveEditUndoState();
         ueState.selectedAnnotation = clicked;
         isDragging = true;
-        const anno = ueState.annotations[clicked.pageIndex][clicked.index];
         dragOffsetX = x - anno.x;
         dragOffsetY = y - (anno.type === 'text' ? anno.y - anno.fontSize : anno.y);
         ueRedrawAnnotations();
+        ueShowConfirmButton(anno, clicked);
         return;
       } else {
         ueState.selectedAnnotation = null;
+        ueHideConfirmButton();
         ueRedrawAnnotations();
       }
     }
@@ -4676,6 +4754,55 @@ function ueSetupCanvasEvents() {
   }
 
   function handleMove({ x, y }) {
+    // Handle signature preview following cursor
+    if (ueState.pendingSignature && state.signatureImage) {
+      ueState.signaturePreviewPos = { x, y };
+      ueRedrawAnnotations();
+      ueDrawSignaturePreview(x, y);
+      return;
+    }
+
+    // Handle resizing annotation
+    if (isResizing && ueState.selectedAnnotation && ueState.resizeStartInfo) {
+      const anno = ueState.annotations[ueState.selectedAnnotation.pageIndex][ueState.selectedAnnotation.index];
+      const info = ueState.resizeStartInfo;
+      const handle = ueState.resizeHandle;
+
+      let newWidth, newHeight, newX, newY;
+
+      // Calculate new dimensions based on which handle is being dragged
+      if (handle === 'br') {
+        newWidth = Math.max(50, x - info.x);
+        newHeight = newWidth / info.aspectRatio;
+        newX = info.x;
+        newY = info.y;
+      } else if (handle === 'bl') {
+        newWidth = Math.max(50, info.x + info.width - x);
+        newHeight = newWidth / info.aspectRatio;
+        newX = info.x + info.width - newWidth;
+        newY = info.y;
+      } else if (handle === 'tr') {
+        newWidth = Math.max(50, x - info.x);
+        newHeight = newWidth / info.aspectRatio;
+        newX = info.x;
+        newY = info.y + info.height - newHeight;
+      } else if (handle === 'tl') {
+        newWidth = Math.max(50, info.x + info.width - x);
+        newHeight = newWidth / info.aspectRatio;
+        newX = info.x + info.width - newWidth;
+        newY = info.y + info.height - newHeight;
+      }
+
+      anno.x = newX;
+      anno.y = newY;
+      anno.width = newWidth;
+      anno.height = newHeight;
+
+      ueRedrawAnnotations();
+      ueUpdateConfirmButtonPosition(anno);
+      return;
+    }
+
     // Handle dragging annotation
     if (isDragging && ueState.selectedAnnotation) {
       const anno = ueState.annotations[ueState.selectedAnnotation.pageIndex][ueState.selectedAnnotation.index];
@@ -4687,6 +4814,7 @@ function ueSetupCanvasEvents() {
         anno.y = y - dragOffsetY;
       }
       ueRedrawAnnotations();
+      ueUpdateConfirmButtonPosition(anno);
       return;
     }
 
@@ -4705,6 +4833,13 @@ function ueSetupCanvasEvents() {
   }
 
   function handleUp({ x, y }) {
+    if (isResizing) {
+      isResizing = false;
+      ueState.resizeHandle = null;
+      ueState.resizeStartInfo = null;
+      return;
+    }
+
     if (isDragging) {
       isDragging = false;
       return;
@@ -4733,27 +4868,158 @@ function ueSetupCanvasEvents() {
       ueState.pendingTextPosition = { x: startX, y: startY };
       ueOpenTextModal();
     } else if (ueState.currentTool === 'signature' && state.signatureImage) {
-      ueSaveEditUndoState();
-      const img = new Image();
-      img.src = state.signatureImage;
-      img.onload = () => {
-        const aspectRatio = img.width / img.height;
-        const sigWidth = 150;
-        const sigHeight = sigWidth / aspectRatio;
-        ueState.annotations[pageIndex].push({
-          type: 'signature',
-          image: state.signatureImage,
-          x: startX,
-          y: startY,
-          width: sigWidth,
-          height: sigHeight,
-          cachedImg: img
-        });
-        ueRedrawAnnotations();
-        ueSetTool('select');
-      };
+      // This case is now handled by pendingSignature flow
+      uePlaceSignature(startX, startY);
     }
   }
+}
+
+// Place signature at position
+function uePlaceSignature(x, y) {
+  const pageIndex = ueState.selectedPage;
+  if (pageIndex < 0 || !state.signatureImage) return;
+
+  ueSaveEditUndoState();
+  const img = new Image();
+  img.src = state.signatureImage;
+  img.onload = () => {
+    const aspectRatio = img.width / img.height;
+    const sigWidth = 150;
+    const sigHeight = sigWidth / aspectRatio;
+    const newAnno = {
+      type: 'signature',
+      image: state.signatureImage,
+      x: x - sigWidth / 2,  // Center signature on click
+      y: y - sigHeight / 2,
+      width: sigWidth,
+      height: sigHeight,
+      cachedImg: img,
+      locked: false
+    };
+    ueState.annotations[pageIndex].push(newAnno);
+
+    // Select the newly placed signature
+    const newIndex = ueState.annotations[pageIndex].length - 1;
+    ueState.selectedAnnotation = { pageIndex, index: newIndex };
+
+    // Clear pending state but stay in signature mode for multiple placements
+    ueState.pendingSignature = false;
+    ueState.signaturePreviewPos = null;
+
+    ueRedrawAnnotations();
+
+    // Show confirm button on the new signature
+    ueShowConfirmButton(newAnno, ueState.selectedAnnotation);
+
+    // Update download button to show pulse animation
+    ueUpdateDownloadButtonState();
+  };
+}
+
+// Draw signature preview at cursor
+function ueDrawSignaturePreview(x, y) {
+  if (!state.signatureImage) return;
+
+  const canvas = document.getElementById('ue-canvas');
+  const ctx = canvas.getContext('2d');
+
+  const img = new Image();
+  img.src = state.signatureImage;
+
+  if (img.complete) {
+    const aspectRatio = img.width / img.height;
+    const sigWidth = 150;
+    const sigHeight = sigWidth / aspectRatio;
+
+    // Draw semi-transparent preview centered on cursor
+    ctx.globalAlpha = 0.6;
+    ctx.drawImage(img, x - sigWidth / 2, y - sigHeight / 2, sigWidth, sigHeight);
+    ctx.globalAlpha = 1.0;
+
+    // Draw dashed border
+    ctx.strokeStyle = '#3B82F6';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 3]);
+    ctx.strokeRect(x - sigWidth / 2, y - sigHeight / 2, sigWidth, sigHeight);
+    ctx.setLineDash([]);
+  }
+}
+
+// Show confirm button for signature
+function ueShowConfirmButton(anno, annoRef) {
+  if (anno.type !== 'signature' || anno.locked) {
+    ueHideConfirmButton();
+    return;
+  }
+
+  const btn = document.getElementById('signature-confirm-btn');
+  if (!btn) return;
+
+  btn.style.display = 'block';
+  btn.onclick = () => ueConfirmSignature(annoRef);
+
+  ueUpdateConfirmButtonPosition(anno);
+}
+
+// Update confirm button position
+function ueUpdateConfirmButtonPosition(anno) {
+  const btn = document.getElementById('signature-confirm-btn');
+  if (!btn || btn.style.display === 'none') return;
+
+  const canvas = document.getElementById('ue-canvas');
+  const wrapper = document.getElementById('ue-canvas-wrapper');
+  if (!canvas || !wrapper) return;
+
+  const canvasRect = canvas.getBoundingClientRect();
+  const wrapperRect = wrapper.getBoundingClientRect();
+
+  // Convert annotation coords to screen coords
+  const scaleX = canvas.clientWidth / (canvas.width / ueState.devicePixelRatio);
+  const scaleY = canvas.clientHeight / (canvas.height / ueState.devicePixelRatio);
+
+  const screenX = (anno.x + anno.width / 2) * scaleX + canvasRect.left - wrapperRect.left;
+  const screenY = (anno.y + anno.height) * scaleY + canvasRect.top - wrapperRect.top + 8;
+
+  btn.style.left = screenX + 'px';
+  btn.style.top = screenY + 'px';
+  btn.style.transform = 'translateX(-50%)';
+}
+
+// Hide confirm button
+function ueHideConfirmButton() {
+  const btn = document.getElementById('signature-confirm-btn');
+  if (btn) {
+    btn.style.display = 'none';
+  }
+}
+
+// Confirm (lock) signature
+function ueConfirmSignature(annoRef) {
+  const anno = ueState.annotations[annoRef.pageIndex][annoRef.index];
+  if (anno) {
+    anno.locked = true;
+    ueHideConfirmButton();
+    ueState.selectedAnnotation = null;
+    ueRedrawAnnotations();
+    showToast('Tanda tangan dikonfirmasi', 'success');
+  }
+}
+
+// Update download button state (pulse animation when signatures exist)
+function ueUpdateDownloadButtonState() {
+  const btn = document.getElementById('ue-download-btn');
+  if (!btn) return;
+
+  // Check if any signatures exist
+  let hasSignatures = false;
+  for (const pageIndex in ueState.annotations) {
+    if (ueState.annotations[pageIndex].some(a => a.type === 'signature')) {
+      hasSignatures = true;
+      break;
+    }
+  }
+
+  btn.classList.toggle('has-signatures', hasSignatures);
 }
 
 // Redraw annotations
@@ -4797,7 +5063,16 @@ function ueDrawAnnotation(ctx, anno, isSelected) {
     case 'signature':
       if (anno.cachedImg && anno.cachedImg.complete) {
         ctx.drawImage(anno.cachedImg, anno.x, anno.y, anno.width, anno.height);
-        if (isSelected) ueDrawSelectionHandles(ctx, anno.x, anno.y, anno.width, anno.height);
+        // Show handles only if selected and not locked
+        if (isSelected && !anno.locked) {
+          ueDrawSelectionHandles(ctx, anno.x, anno.y, anno.width, anno.height);
+        } else if (isSelected && anno.locked) {
+          // Draw a subtle locked indicator (just border, no handles)
+          ctx.strokeStyle = '#10B981';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([]);
+          ctx.strokeRect(anno.x - 2, anno.y - 2, anno.width + 4, anno.height + 4);
+        }
       } else if (anno.image) {
         const img = new Image();
         img.src = anno.image;
@@ -4919,6 +5194,18 @@ function ueUpdateStatus(message) {
 function ueSetTool(tool) {
   ueState.currentTool = tool;
 
+  // Clear selection and hide confirm button when switching tools
+  if (tool !== 'select') {
+    ueState.selectedAnnotation = null;
+    ueHideConfirmButton();
+  }
+
+  // Clear pending signature when switching to a different tool
+  if (tool !== 'signature') {
+    ueState.pendingSignature = false;
+    ueState.signaturePreviewPos = null;
+  }
+
   // Update toolbar UI
   document.querySelectorAll('#unified-editor-workspace .editor-tool-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.editTool === tool);
@@ -4940,6 +5227,8 @@ function ueSetTool(tool) {
 
 // Open signature modal (reuse existing)
 function ueOpenSignatureModal() {
+  // Dismiss the first-use tooltip when clicked
+  ueDismissSignatureHint();
   openSignatureModal();
   // After signature is created, switch to signature placement mode
 }
@@ -5246,10 +5535,42 @@ function ueReset() {
   ueUpdatePageCount();
 }
 
+// Show first-use signature tooltip
+function ueShowSignatureHint() {
+  const HINT_KEY = 'pdflokal_signature_hint_shown';
+  if (localStorage.getItem(HINT_KEY)) return;
+
+  const tooltip = document.getElementById('signature-hint-tooltip');
+  if (!tooltip) return;
+
+  // Show tooltip after a short delay
+  setTimeout(() => {
+    tooltip.classList.add('show');
+  }, 500);
+
+  // Auto-dismiss after 5 seconds
+  setTimeout(() => {
+    ueDismissSignatureHint();
+  }, 5500);
+}
+
+// Dismiss signature hint tooltip
+function ueDismissSignatureHint() {
+  const HINT_KEY = 'pdflokal_signature_hint_shown';
+  const tooltip = document.getElementById('signature-hint-tooltip');
+  if (tooltip) {
+    tooltip.classList.remove('show');
+  }
+  localStorage.setItem(HINT_KEY, 'true');
+}
+
 // Initialize when showing unified editor
 function initUnifiedEditor() {
   initUnifiedEditorInput();
   ueState.devicePixelRatio = window.devicePixelRatio || 1;
+
+  // Show first-use signature tooltip
+  ueShowSignatureHint();
 
   // Setup drop zone for thumbnails area
   const thumbnails = document.getElementById('ue-thumbnails');
