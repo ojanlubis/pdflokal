@@ -4529,16 +4529,16 @@ async function ueRenderSelectedPage() {
     const ctx = canvas.getContext('2d');
     const dpr = ueState.devicePixelRatio = window.devicePixelRatio || 1;
 
-    // Calculate scale to fit wrapper
+    // Calculate scale to fit wrapper - maximize canvas size
     const wrapper = document.getElementById('ue-canvas-wrapper');
-    const maxWidth = wrapper.clientWidth - 40;
-    const maxHeight = wrapper.clientHeight - 40;
+    const maxWidth = wrapper.clientWidth - 16;  // Minimal padding
+    const maxHeight = wrapper.clientHeight - 16;
     const naturalViewport = page.getViewport({ scale: 1, rotation: pageInfo.rotation });
 
     let scale = Math.min(
       maxWidth / naturalViewport.width,
       maxHeight / naturalViewport.height,
-      2
+      4  // Allow larger scaling for better use of space
     );
     scale = Math.max(scale, 0.5);
 

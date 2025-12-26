@@ -1750,7 +1750,7 @@ a:hover {
 
 .unified-editor-layout {
   display: flex;
-  gap: var(--space-md);
+  gap: var(--space-sm);
   flex: 1;
   min-height: 0;
   overflow: hidden;
@@ -1903,7 +1903,7 @@ a:hover {
   min-width: 0;
   background: var(--bg-tertiary);
   border-radius: var(--radius-lg);
-  padding: var(--space-md);
+  padding: var(--space-sm);
 }
 
 .unified-main .editor-toolbar {
@@ -1919,7 +1919,7 @@ a:hover {
   background: #e5e5e5;
   border-radius: var(--radius-md);
   overflow: auto;
-  padding: var(--space-md);
+  padding: var(--space-xs);
   min-height: 0;
 }
 
