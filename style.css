@@ -2052,7 +2052,7 @@ a:hover {
 
   .unified-canvas-wrapper {
     flex: 1;
-    min-height: 0;
+    min-height: 100;
     overflow: auto;
   }
 }
