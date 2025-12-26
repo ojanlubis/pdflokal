@@ -1727,11 +1727,26 @@ a:hover {
    Unified Editor Workspace Styles
    ============================================================ */
 
+#unified-editor-workspace.workspace.active {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 120px);
+}
+
+#unified-editor-workspace .workspace-header {
+  flex-shrink: 0;
+}
+
+#unified-editor-workspace .action-bar {
+  flex-shrink: 0;
+}
+
 .unified-editor-layout {
   display: flex;
   gap: var(--space-lg);
-  height: calc(100vh - 340px);
-  min-height: 400px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* Sidebar */
@@ -1893,7 +1908,7 @@ a:hover {
   border-radius: var(--radius-md);
   overflow: auto;
   padding: var(--space-lg);
-  min-height: 400px;
+  min-height: 0;
 }
 
 .unified-empty-state {
@@ -1919,9 +1934,13 @@ a:hover {
 
 /* Mobile Responsive */
 @media (max-width: 768px) {
+  #unified-editor-workspace.workspace.active {
+    height: auto;
+  }
+
   .unified-editor-layout {
     flex-direction: column;
-    height: auto;
+    flex: none;
   }
 
   .unified-sidebar {
