@@ -1432,6 +1432,20 @@ a:hover {
   background: rgba(220, 38, 38, 0.1);
 }
 
+.editor-zoom-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.editor-zoom-group .zoom-level {
+  min-width: 48px;
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
 .editor-status {
   margin-left: auto;
   display: flex;
@@ -1609,6 +1623,10 @@ a:hover {
 
   .editor-action-group {
     justify-content: center;
+  }
+
+  .editor-zoom-group {
+    display: none;
   }
 
   .editor-status {
@@ -1982,21 +2000,21 @@ a:hover {
 }
 
 .unified-canvas-wrapper {
-  flex: 1 1 auto;
+  flex: 1;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   background: #e5e5e5;
   border-radius: var(--radius-md);
   overflow: auto;
-  padding: var(--space-xs);
+  padding: var(--space-md);
   min-height: 0;
 }
 
 #ue-canvas {
   background: white;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-  /* Size is controlled by JavaScript - no max constraints needed */
+  /* Size is controlled by JavaScript */
 }
 
 .unified-empty-state {
@@ -2028,10 +2046,13 @@ a:hover {
 
   .unified-main {
     height: 100%;
+    overflow: hidden;
   }
 
   .unified-canvas-wrapper {
-    min-height: calc(100vh - 280px);
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
   }
 }
 
@@ -2093,7 +2114,6 @@ a:hover {
 
   .unified-canvas-wrapper {
     min-height: 40vh;
-    height: auto;
   }
 }
 
