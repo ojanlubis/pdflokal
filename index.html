@@ -500,13 +500,13 @@
               </button>
             </div>
             <div class="editor-tool-divider"></div>
-            <button class="btn btn-primary btn--download-hero" id="ue-download-btn" disabled onclick="ueDownload()" style="margin-left: auto;">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              Download PDF
-            </button>
             <div class="editor-status" id="ue-editor-status">
               <span class="status-text">Pilih halaman untuk mulai mengedit</span>
             </div>
+            <button class="btn btn-primary btn--download-hero" id="ue-download-btn" disabled onclick="ueDownload()">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Download PDF
+            </button>
           </div>
 
           <!-- Canvas Wrapper -->
@@ -1146,16 +1146,8 @@
     <div class="signature-box">
       <h3>Buat Tanda Tangan</h3>
       <div class="signature-tabs">
-        <button class="signature-tab active" onclick="switchSignatureTab('draw')">Gambar</button>
         <button class="signature-tab" onclick="switchSignatureTab('upload')">Upload Gambar</button>
-      </div>
-      <div id="signature-draw-tab" class="signature-tab-content active">
-        <canvas id="signature-canvas" class="signature-canvas"></canvas>
-        <div class="signature-actions">
-          <button class="btn btn-secondary" onclick="clearSignature()">Hapus</button>
-          <button class="btn btn-ghost" onclick="closeSignatureModal()">Batal</button>
-          <button class="btn btn-primary" onclick="useSignature()">Gunakan</button>
-        </div>
+        <button class="signature-tab" onclick="switchSignatureTab('draw')">Gambar</button>
       </div>
       <div id="signature-upload-tab" class="signature-tab-content">
         <div class="signature-upload-area" id="signature-upload-hint" onclick="document.getElementById('signature-upload-input').click()">
@@ -1166,6 +1158,14 @@
         </div>
         <div class="signature-actions">
           <button class="btn btn-ghost" onclick="closeSignatureModal()">Batal</button>
+        </div>
+      </div>
+      <div id="signature-draw-tab" class="signature-tab-content">
+        <canvas id="signature-canvas" class="signature-canvas"></canvas>
+        <div class="signature-actions">
+          <button class="btn btn-secondary" onclick="clearSignature()">Hapus</button>
+          <button class="btn btn-ghost" onclick="closeSignatureModal()">Batal</button>
+          <button class="btn btn-primary" onclick="useSignature()">Gunakan</button>
         </div>
       </div>
     </div>
