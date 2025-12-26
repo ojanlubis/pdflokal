@@ -4366,6 +4366,7 @@ const ueState = {
   devicePixelRatio: 1,
   canvasSetup: false,
   pageCache: null,      // Cached rendered page for smooth dragging
+  zoomLevel: 1.0,       // Zoom level (1.0 = fit width)
 };
 
 // Initialize unified editor file input
@@ -4531,25 +4532,23 @@ async function ueRenderSelectedPage() {
     const ctx = canvas.getContext('2d');
     const dpr = ueState.devicePixelRatio = window.devicePixelRatio || 1;
 
-    // Calculate scale to fit wrapper - maximize canvas size
+    // Calculate scale based on width only - allow vertical scrolling
     const wrapper = document.getElementById('ue-canvas-wrapper');
-    const maxWidth = wrapper.clientWidth - 16;  // Minimal padding
-    const maxHeight = wrapper.clientHeight - 16;
+    const maxWidth = wrapper.clientWidth - 32;  // Padding for scrollbar
     const naturalViewport = page.getViewport({ scale: 1, rotation: pageInfo.rotation });
 
     // Ensure we have valid dimensions
-    if (maxWidth <= 100 || maxHeight <= 100) {
-      console.warn('Invalid wrapper dimensions, retrying...', { maxWidth, maxHeight });
+    if (maxWidth <= 100) {
+      console.warn('Invalid wrapper dimensions, retrying...', { maxWidth });
       setTimeout(() => ueRenderSelectedPage(), 150);
       return;
     }
 
-    let scale = Math.min(
-      maxWidth / naturalViewport.width,
-      maxHeight / naturalViewport.height,
-      4  // Allow larger scaling for better use of space
-    );
-    scale = Math.max(scale, 0.5);
+    // Scale to fit width, then apply zoom level
+    let baseScale = maxWidth / naturalViewport.width;
+    let scale = baseScale * ueState.zoomLevel;
+    scale = Math.max(scale, 0.25);  // Minimum scale
+    scale = Math.min(scale, 4);     // Maximum scale
 
     const viewport = page.getViewport({ scale, rotation: pageInfo.rotation });
 
@@ -4585,6 +4584,32 @@ async function ueRenderSelectedPage() {
   } catch (error) {
     console.error('Error rendering page:', error);
     showToast('Gagal merender halaman', 'error');
+  }
+}
+
+// Zoom controls
+function ueZoomIn() {
+  ueState.zoomLevel = Math.min(ueState.zoomLevel + 0.25, 3);
+  ueUpdateZoomDisplay();
+  ueRenderSelectedPage();
+}
+
+function ueZoomOut() {
+  ueState.zoomLevel = Math.max(ueState.zoomLevel - 0.25, 0.5);
+  ueUpdateZoomDisplay();
+  ueRenderSelectedPage();
+}
+
+function ueZoomReset() {
+  ueState.zoomLevel = 1.0;
+  ueUpdateZoomDisplay();
+  ueRenderSelectedPage();
+}
+
+function ueUpdateZoomDisplay() {
+  const display = document.getElementById('ue-zoom-level');
+  if (display) {
+    display.textContent = Math.round(ueState.zoomLevel * 100) + '%';
   }
 }
 
@@ -5211,6 +5236,8 @@ function ueReset() {
   ueState.pendingTextPosition = null;
   ueState.pageScales = {};
   ueState.pageCache = null;
+  ueState.zoomLevel = 1.0;
+  ueUpdateZoomDisplay();
 
   document.getElementById('ue-empty-state').style.display = 'flex';
   document.getElementById('ue-canvas').style.display = 'none';
