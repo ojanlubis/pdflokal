@@ -406,8 +406,11 @@
       </div>
       <div class="unified-editor-layout">
         <!-- Left Sidebar: Page Thumbnails -->
-        <div class="unified-sidebar">
+        <div class="unified-sidebar" id="unified-sidebar">
           <div class="unified-sidebar-header">
+            <button class="sidebar-toggle-btn" onclick="ueToggleSidebar()" title="Sembunyikan sidebar">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+            </button>
             <span class="sidebar-title">Halaman</span>
             <button class="btn btn-secondary btn-sm" onclick="document.getElementById('ue-file-input').click()" title="Tambah PDF">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>

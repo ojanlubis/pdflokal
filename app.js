@@ -4461,7 +4461,9 @@ function ueRenderThumbnails() {
 
   ueState.pages.forEach((page, index) => {
     const item = document.createElement('div');
-    item.className = 'ue-thumbnail' + (index === ueState.selectedPage ? ' selected' : '');
+    // Detect orientation based on canvas dimensions
+    const isLandscape = page.canvas.width > page.canvas.height;
+    item.className = 'ue-thumbnail' + (index === ueState.selectedPage ? ' selected' : '') + (isLandscape ? ' landscape' : ' portrait');
     item.onclick = () => ueSelectPage(index);
 
     // Clone the thumbnail canvas
@@ -4534,6 +4536,13 @@ async function ueRenderSelectedPage() {
     const maxWidth = wrapper.clientWidth - 16;  // Minimal padding
     const maxHeight = wrapper.clientHeight - 16;
     const naturalViewport = page.getViewport({ scale: 1, rotation: pageInfo.rotation });
+
+    // Ensure we have valid dimensions
+    if (maxWidth <= 100 || maxHeight <= 100) {
+      console.warn('Invalid wrapper dimensions, retrying...', { maxWidth, maxHeight });
+      setTimeout(() => ueRenderSelectedPage(), 150);
+      return;
+    }
 
     let scale = Math.min(
       maxWidth / naturalViewport.width,
@@ -5232,6 +5241,39 @@ function initUnifiedEditor() {
       ueAddFiles(e.dataTransfer.files);
     });
   }
+
+  // Setup resize handler for responsive canvas
+  if (!window._ueResizeHandler) {
+    let resizeTimeout;
+    window._ueResizeHandler = () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        if (state.currentTool === 'unified-editor' && ueState.selectedPage >= 0) {
+          ueRenderSelectedPage();
+        }
+      }, 200);
+    };
+    window.addEventListener('resize', window._ueResizeHandler);
+  }
+}
+
+// Toggle sidebar visibility
+function ueToggleSidebar() {
+  const sidebar = document.getElementById('unified-sidebar');
+  const toggleBtn = sidebar.querySelector('.sidebar-toggle-btn');
+
+  sidebar.classList.toggle('collapsed');
+
+  // Update button title
+  const isCollapsed = sidebar.classList.contains('collapsed');
+  toggleBtn.title = isCollapsed ? 'Tampilkan sidebar' : 'Sembunyikan sidebar';
+
+  // Re-render the selected page to recalculate canvas size after transition
+  setTimeout(() => {
+    if (ueState.selectedPage >= 0) {
+      ueRenderSelectedPage();
+    }
+  }, 350); // Wait for CSS transition to complete
 }
 
 // ============================================================

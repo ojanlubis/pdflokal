@@ -1766,6 +1766,57 @@ a:hover {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  transition: width 0.3s ease, min-width 0.3s ease;
+}
+
+/* Collapsed sidebar state */
+.unified-sidebar.collapsed {
+  width: 48px;
+  min-width: 48px;
+}
+
+.unified-sidebar.collapsed .sidebar-title,
+.unified-sidebar.collapsed .unified-sidebar-header .btn,
+.unified-sidebar.collapsed .unified-thumbnails,
+.unified-sidebar.collapsed .unified-sidebar-footer {
+  display: none;
+}
+
+.unified-sidebar.collapsed .unified-sidebar-header {
+  justify-content: center;
+  padding: var(--space-md) var(--space-sm);
+}
+
+.unified-sidebar.collapsed .sidebar-toggle-btn svg {
+  transform: rotate(180deg);
+}
+
+/* Sidebar toggle button */
+.sidebar-toggle-btn {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  padding: 0;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.sidebar-toggle-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border-color: var(--border-medium);
+}
+
+.sidebar-toggle-btn svg {
+  transition: transform 0.3s ease;
 }
 
 .unified-sidebar-header {
@@ -1826,6 +1877,20 @@ a:hover {
   cursor: pointer;
   transition: all var(--transition-fast);
   box-shadow: var(--shadow-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 80px;
+}
+
+/* Portrait PDF thumbnail */
+.ue-thumbnail.portrait {
+  aspect-ratio: auto;
+}
+
+/* Landscape PDF thumbnail - ensure minimum visibility */
+.ue-thumbnail.landscape {
+  min-height: 100px;
 }
 
 .ue-thumbnail:hover {
@@ -1840,8 +1905,12 @@ a:hover {
 }
 
 .ue-thumbnail canvas {
-  width: 100%;
+  max-width: 100%;
+  max-height: 180px;
+  width: auto;
+  height: auto;
   display: block;
+  object-fit: contain;
 }
 
 .ue-thumbnail-number {
@@ -1901,6 +1970,7 @@ a:hover {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
   background: var(--bg-tertiary);
   border-radius: var(--radius-lg);
   padding: var(--space-sm);
@@ -1912,7 +1982,7 @@ a:hover {
 }
 
 .unified-canvas-wrapper {
-  flex: 1;
+  flex: 1 1 auto;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1921,6 +1991,12 @@ a:hover {
   overflow: auto;
   padding: var(--space-xs);
   min-height: 0;
+}
+
+#ue-canvas {
+  background: white;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  /* Size is controlled by JavaScript - no max constraints needed */
 }
 
 .unified-empty-state {
@@ -1944,6 +2020,21 @@ a:hover {
   height: 28px;
 }
 
+/* Desktop - ensure proper canvas sizing */
+@media (min-width: 901px) {
+  .unified-editor-layout {
+    height: 100%;
+  }
+
+  .unified-main {
+    height: 100%;
+  }
+
+  .unified-canvas-wrapper {
+    min-height: calc(100vh - 280px);
+  }
+}
+
 /* Mobile Responsive */
 @media (max-width: 900px) {
   #unified-editor-workspace.workspace.active {
@@ -1959,7 +2050,18 @@ a:hover {
   .unified-sidebar {
     width: 100%;
     min-width: auto;
-    max-height: 160px;
+    max-height: 180px;
+    transition: max-height 0.3s ease;
+  }
+
+  .unified-sidebar.collapsed {
+    width: 100%;
+    min-width: auto;
+    max-height: 48px;
+  }
+
+  .unified-sidebar.collapsed .sidebar-toggle-btn svg {
+    transform: rotate(90deg);
   }
 
   .unified-thumbnails {
@@ -1972,11 +2074,26 @@ a:hover {
 
   .ue-thumbnail {
     width: 100px;
+    min-height: 60px;
     flex-shrink: 0;
   }
 
-  .unified-canvas-wrapper {
+  .ue-thumbnail.landscape {
+    width: 140px;
+    min-height: 70px;
+  }
+
+  .ue-thumbnail canvas {
+    max-height: 100px;
+  }
+
+  .unified-main {
     min-height: 50vh;
+  }
+
+  .unified-canvas-wrapper {
+    min-height: 40vh;
+    height: auto;
   }
 }
 
