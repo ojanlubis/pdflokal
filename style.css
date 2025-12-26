@@ -1995,10 +1995,9 @@ a:hover {
 }
 
 #ue-canvas {
-  max-width: calc(100% - 16px);
-  max-height: calc(100% - 16px);
   background: white;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  /* Size is controlled by JavaScript - no max constraints needed */
 }
 
 .unified-empty-state {
