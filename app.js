@@ -4407,7 +4407,7 @@ async function ueAddFiles(files) {
       // Add all pages
       for (let i = 0; i < pdf.numPages; i++) {
         const page = await pdf.getPage(i + 1);
-        const viewport = page.getViewport({ scale: 0.3 }); // Thumbnail scale
+        const viewport = page.getViewport({ scale: 0.5 }); // Thumbnail scale - larger for better visibility
 
         const canvas = document.createElement('canvas');
         canvas.width = viewport.width;
@@ -5020,7 +5020,7 @@ async function ueRestorePages(pagesData) {
     const source = ueState.sourceFiles[pageData.sourceIndex];
     const pdf = await pdfjsLib.getDocument({ data: source.bytes.slice() }).promise;
     const page = await pdf.getPage(pageData.pageNum + 1);
-    const viewport = page.getViewport({ scale: 0.3, rotation: pageData.rotation });
+    const viewport = page.getViewport({ scale: 0.5, rotation: pageData.rotation });
 
     const canvas = document.createElement('canvas');
     canvas.width = viewport.width;

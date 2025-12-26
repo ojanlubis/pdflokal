@@ -1730,15 +1730,17 @@ a:hover {
 #unified-editor-workspace.workspace.active {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 120px);
+  height: calc(100vh - 80px);
 }
 
 #unified-editor-workspace .workspace-header {
   flex-shrink: 0;
+  margin-bottom: var(--space-md);
 }
 
 #unified-editor-workspace .action-bar {
   flex-shrink: 0;
+  padding: var(--space-md) 0;
 }
 
 .unified-editor-layout {
@@ -1751,8 +1753,8 @@ a:hover {
 
 /* Sidebar */
 .unified-sidebar {
-  width: 200px;
-  min-width: 200px;
+  width: 260px;
+  min-width: 260px;
   background: var(--bg-secondary);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-lg);
@@ -1780,16 +1782,17 @@ a:hover {
 .unified-thumbnails {
   flex: 1;
   overflow-y: auto;
-  padding: var(--space-sm);
+  padding: var(--space-md);
   display: flex;
   flex-direction: column;
-  gap: var(--space-sm);
+  gap: var(--space-md);
 }
 
 .unified-thumbnails .drop-hint {
-  min-height: 100px;
-  padding: var(--space-md);
-  border: 1px dashed var(--border-medium);
+  min-height: 140px;
+  padding: var(--space-lg);
+  border: 2px dashed var(--border-medium);
+  border-radius: var(--radius-md);
 }
 
 .unified-sidebar-footer {
@@ -1811,22 +1814,24 @@ a:hover {
 /* Thumbnail Items */
 .ue-thumbnail {
   position: relative;
-  background: var(--bg-tertiary);
-  border: 2px solid var(--border-light);
+  background: white;
+  border: 3px solid var(--border-light);
   border-radius: var(--radius-md);
   overflow: hidden;
   cursor: pointer;
   transition: all var(--transition-fast);
+  box-shadow: var(--shadow-sm);
 }
 
 .ue-thumbnail:hover {
   border-color: var(--accent-primary);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
 }
 
 .ue-thumbnail.selected {
   border-color: var(--accent-primary);
-  box-shadow: 0 0 0 2px var(--accent-light);
+  box-shadow: 0 0 0 3px var(--accent-light), var(--shadow-md);
 }
 
 .ue-thumbnail canvas {
@@ -1836,13 +1841,14 @@ a:hover {
 
 .ue-thumbnail-number {
   position: absolute;
-  bottom: var(--space-xs);
+  bottom: var(--space-sm);
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.75);
   color: white;
-  font-size: 0.625rem;
-  padding: 2px 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 4px 10px;
   border-radius: var(--radius-sm);
 }
 
@@ -1946,22 +1952,24 @@ a:hover {
   .unified-sidebar {
     width: 100%;
     min-width: auto;
-    max-height: 200px;
+    max-height: 180px;
   }
 
   .unified-thumbnails {
     flex-direction: row;
-    flex-wrap: wrap;
-    gap: var(--space-sm);
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: var(--space-md);
+    padding: var(--space-sm);
   }
 
   .ue-thumbnail {
-    width: 80px;
+    width: 120px;
     flex-shrink: 0;
   }
 
   .unified-canvas-wrapper {
-    min-height: 300px;
+    min-height: 400px;
   }
 }
 
