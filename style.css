@@ -821,13 +821,15 @@ a:hover {
 
 /* Secondary Tools - More subtle */
 .editor-tool-btn--secondary {
-  color: var(--text-tertiary);
-  background: transparent;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  border-color: var(--border-light);
 }
 
 .editor-tool-btn--secondary:hover {
-  color: var(--text-primary);
-  background: var(--bg-secondary);
+  color: var(--accent-primary);
+  background: var(--accent-light);
+  border-color: var(--accent-primary);
 }
 
 .editor-tool-btn--secondary.active {
@@ -2156,6 +2158,7 @@ a:hover {
   min-height: 500px;
   height: auto;
   position: relative; /* For confirm button positioning */
+  overflow: auto; /* Allow scrolling when canvas is zoomed */
 }
 
 #ue-canvas {

@@ -3265,8 +3265,8 @@ function openSignatureModal() {
   document.getElementById('signature-modal').classList.add('active');
   setEditTool('signature');
 
-  // Reset to draw tab
-  switchSignatureTab('draw');
+  // Default to upload tab
+  switchSignatureTab('upload');
 
   setTimeout(() => {
     const canvas = document.getElementById('signature-canvas');
@@ -3290,7 +3290,37 @@ function clearSignature() {
 
 function useSignature() {
   if (state.signaturePad && !state.signaturePad.isEmpty()) {
-    state.signatureImage = state.signaturePad.toDataURL();
+    // Get the drawn signature
+    const signatureCanvas = document.getElementById('signature-canvas');
+
+    // Create a temporary canvas for background removal
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = signatureCanvas.width;
+    tempCanvas.height = signatureCanvas.height;
+    const ctx = tempCanvas.getContext('2d');
+
+    // Draw the signature
+    ctx.drawImage(signatureCanvas, 0, 0);
+
+    // Apply background removal (make white pixels transparent)
+    const imageData = ctx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+    const data = imageData.data;
+    const threshold = 240; // Threshold for white background
+
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+
+      // Make white/near-white pixels transparent
+      if (r >= threshold && g >= threshold && b >= threshold) {
+        data[i + 3] = 0; // Set alpha to 0 (transparent)
+      }
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+    state.signatureImage = tempCanvas.toDataURL('image/png');
+
     closeSignatureModal();
     // Check if in unified editor mode
     if (state.currentTool === 'unified-editor') {
@@ -3311,7 +3341,10 @@ function useSignature() {
 function switchSignatureTab(tab) {
   // Update tab buttons
   document.querySelectorAll('.signature-tab').forEach(btn => {
-    btn.classList.toggle('active', btn.textContent.toLowerCase().includes(tab === 'draw' ? 'gambar' : 'upload'));
+    const text = btn.textContent.toLowerCase().trim();
+    const shouldBeActive = (tab === 'upload' && text === 'upload gambar') ||
+                          (tab === 'draw' && text === 'gambar');
+    btn.classList.toggle('active', shouldBeActive);
   });
 
   // Update tab content
@@ -4902,7 +4935,7 @@ function uePlaceSignature(x, y) {
     const newIndex = ueState.annotations[pageIndex].length - 1;
     ueState.selectedAnnotation = { pageIndex, index: newIndex };
 
-    // Clear pending state but stay in signature mode for multiple placements
+    // Clear pending state and switch to select tool
     ueState.pendingSignature = false;
     ueState.signaturePreviewPos = null;
 
@@ -4910,6 +4943,9 @@ function uePlaceSignature(x, y) {
 
     // Show confirm button on the new signature
     ueShowConfirmButton(newAnno, ueState.selectedAnnotation);
+
+    // Switch to select tool so user can move/edit the signature
+    ueSetTool('select');
 
     // Update download button to show pulse animation
     ueUpdateDownloadButtonState();
