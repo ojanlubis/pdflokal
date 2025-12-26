@@ -4531,27 +4531,10 @@ async function ueRenderSelectedPage() {
     const ctx = canvas.getContext('2d');
     const dpr = ueState.devicePixelRatio = window.devicePixelRatio || 1;
 
-    // Wait for layout to stabilize before measuring
-    await new Promise(resolve => requestAnimationFrame(resolve));
-    await new Promise(resolve => setTimeout(resolve, 50));
-
-    // Calculate scale to fit wrapper with minimal padding
+    // Calculate scale to fit wrapper - maximize canvas size
     const wrapper = document.getElementById('ue-canvas-wrapper');
-    const wrapperStyle = getComputedStyle(wrapper);
-    const paddingX = parseFloat(wrapperStyle.paddingLeft) + parseFloat(wrapperStyle.paddingRight);
-    const paddingY = parseFloat(wrapperStyle.paddingTop) + parseFloat(wrapperStyle.paddingBottom);
-
-    // Use offsetWidth/offsetHeight for more reliable dimensions
-    let maxWidth = wrapper.offsetWidth - paddingX - 16;
-    let maxHeight = wrapper.offsetHeight - paddingY - 16;
-
-    // Fallback: if height seems too small, calculate based on viewport
-    const viewportHeight = window.innerHeight;
-    const minExpectedHeight = viewportHeight * 0.4;
-    if (maxHeight < minExpectedHeight) {
-      maxHeight = viewportHeight - 280; // Header, toolbar, action bar
-    }
-
+    const maxWidth = wrapper.clientWidth - 16;  // Minimal padding
+    const maxHeight = wrapper.clientHeight - 16;
     const naturalViewport = page.getViewport({ scale: 1, rotation: pageInfo.rotation });
 
     // Ensure we have valid dimensions
@@ -4564,7 +4547,7 @@ async function ueRenderSelectedPage() {
     let scale = Math.min(
       maxWidth / naturalViewport.width,
       maxHeight / naturalViewport.height,
-      3  // Allow larger scale for better readability
+      4  // Allow larger scaling for better use of space
     );
     scale = Math.max(scale, 0.5);
 
