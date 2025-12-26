@@ -801,7 +801,7 @@ a:hover {
   border-radius: var(--radius-md);
   padding: var(--space-lg);
   overflow: auto;
-  max-height: 600px;
+  max-height: 1200px;
 }
 
 .editor-canvas {
