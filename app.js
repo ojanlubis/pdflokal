@@ -4461,7 +4461,9 @@ function ueRenderThumbnails() {
 
   ueState.pages.forEach((page, index) => {
     const item = document.createElement('div');
-    item.className = 'ue-thumbnail' + (index === ueState.selectedPage ? ' selected' : '');
+    // Detect orientation based on canvas dimensions
+    const isLandscape = page.canvas.width > page.canvas.height;
+    item.className = 'ue-thumbnail' + (index === ueState.selectedPage ? ' selected' : '') + (isLandscape ? ' landscape' : ' portrait');
     item.onclick = () => ueSelectPage(index);
 
     // Clone the thumbnail canvas
@@ -4529,16 +4531,16 @@ async function ueRenderSelectedPage() {
     const ctx = canvas.getContext('2d');
     const dpr = ueState.devicePixelRatio = window.devicePixelRatio || 1;
 
-    // Calculate scale to fit wrapper
+    // Calculate scale to fit wrapper with minimal padding
     const wrapper = document.getElementById('ue-canvas-wrapper');
-    const maxWidth = wrapper.clientWidth - 40;
-    const maxHeight = wrapper.clientHeight - 40;
+    const maxWidth = wrapper.clientWidth - 20;
+    const maxHeight = wrapper.clientHeight - 20;
     const naturalViewport = page.getViewport({ scale: 1, rotation: pageInfo.rotation });
 
     let scale = Math.min(
       maxWidth / naturalViewport.width,
       maxHeight / naturalViewport.height,
-      2
+      2.5  // Allow slightly larger scale for better readability
     );
     scale = Math.max(scale, 0.5);
 
@@ -5232,6 +5234,25 @@ function initUnifiedEditor() {
       ueAddFiles(e.dataTransfer.files);
     });
   }
+}
+
+// Toggle sidebar visibility
+function ueToggleSidebar() {
+  const sidebar = document.getElementById('unified-sidebar');
+  const toggleBtn = sidebar.querySelector('.sidebar-toggle-btn');
+
+  sidebar.classList.toggle('collapsed');
+
+  // Update button title
+  const isCollapsed = sidebar.classList.contains('collapsed');
+  toggleBtn.title = isCollapsed ? 'Tampilkan sidebar' : 'Sembunyikan sidebar';
+
+  // Re-render the selected page to recalculate canvas size after transition
+  setTimeout(() => {
+    if (ueState.selectedPage >= 0) {
+      ueRenderSelectedPage();
+    }
+  }, 350); // Wait for CSS transition to complete
 }
 
 // ============================================================
