@@ -1166,6 +1166,14 @@ a:hover {
   margin-top: var(--space-xs);
 }
 
+.signature-upload-area .upload-hint-secondary {
+  display: block;
+  font-size: 0.8125rem;
+  color: var(--text-tertiary);
+  margin-top: var(--space-xs);
+  font-style: italic;
+}
+
 /* Signature Background Removal Preview */
 .signature-bg-preview {
   display: flex;
@@ -1184,8 +1192,15 @@ a:hover {
 .signature-bg-preview .preview-box img,
 .signature-bg-preview .preview-box canvas {
   display: block;
-  margin: 0 auto;
-  border-radius: var(--radius-sm);
+  max-width: 200px;
+  max-height: 150px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+}
+
+.signature-bg-preview .preview-box canvas.transparent-bg {
+  background: repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%) 50% / 10px 10px;
 }
 
 .signature-bg-preview .preview-box p {
@@ -1206,7 +1221,7 @@ a:hover {
   }
 
   .signature-bg-preview .preview-arrow {
-    transform: rotate(90deg);
+    transform: none;
   }
 }
 
@@ -1290,6 +1305,10 @@ a:hover {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+.btn-spinner {
+  animation: spin 1s linear infinite;
 }
 
 /* ============================================================
@@ -1504,32 +1523,6 @@ a:hover {
   }
 }
 
-/* Page Manager Toolbar */
-.page-manager-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-sm);
-  padding: var(--space-md);
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius-lg);
-  margin-bottom: var(--space-lg);
-  align-items: center;
-}
-
-.toolbar-divider {
-  width: 1px;
-  height: 24px;
-  background: var(--border-medium);
-  margin: 0 var(--space-sm);
-}
-
-.pm-status {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  padding: var(--space-sm) 0;
-  text-align: center;
-}
 
 .page-item .page-source {
   position: absolute;
@@ -1600,16 +1593,6 @@ a:hover {
 
 .page-item:hover .delete-btn {
   opacity: 1;
-}
-
-@media (max-width: 768px) {
-  .page-manager-toolbar {
-    justify-content: center;
-  }
-
-  .toolbar-divider {
-    display: none;
-  }
 }
 
 /* Enhanced PDF Editor Styles */
@@ -3287,14 +3270,13 @@ body.is-touch .btn:active {
     display: none !important;
   }
 
-  /* Simplify toolbar line 2 - only keep download */
+  /* Simplify toolbar line 2 - zoom left, download right */
   #unified-editor-workspace .editor-toolbar-line--actions {
-    justify-content: flex-end;
+    justify-content: space-between;
     padding: var(--space-sm) var(--space-md);
     border-top: none;
   }
 
-  #unified-editor-workspace .editor-zoom-group,
   #unified-editor-workspace .editor-action-group,
   #unified-editor-workspace .editor-tool-divider {
     display: none !important;
@@ -3302,6 +3284,17 @@ body.is-touch .btn:active {
 
   #unified-editor-workspace .editor-toolbar-spacer {
     display: none;
+  }
+
+  /* Show zoom controls on mobile */
+  #unified-editor-workspace .editor-zoom-group {
+    display: flex !important;
+    gap: var(--space-xs);
+  }
+
+  #unified-editor-workspace .editor-zoom-group .zoom-level {
+    min-width: 45px;
+    font-size: 0.75rem;
   }
 
   /* Keep download button visible */
@@ -3467,6 +3460,7 @@ body.is-touch .btn:active {
 
   .signature-bg-preview .preview-box img,
   .signature-bg-preview .preview-box canvas {
+    margin: 0 auto;
     max-width: 100%;
     max-height: 120px;
   }
@@ -3517,5 +3511,160 @@ body.is-touch .resize-handle.se { bottom: -10px; right: -10px; }
   .tool-card {
     min-height: 80px;
     padding: var(--space-md);
+  }
+}
+
+/* ============================================================
+   Keyboard Shortcuts Modal & Help Button
+   ============================================================ */
+
+.shortcuts-help-btn {
+  position: fixed;
+  bottom: calc(var(--space-lg) + var(--sab));
+  right: var(--space-lg);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  transition: all var(--transition-fast);
+}
+
+.shortcuts-help-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--accent-primary);
+  transform: scale(1.05);
+}
+
+.shortcuts-help-btn svg {
+  width: 22px;
+  height: 22px;
+}
+
+.shortcuts-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.shortcuts-modal.active {
+  display: flex;
+}
+
+.shortcuts-modal-backdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.shortcuts-modal-box {
+  position: relative;
+  background: var(--bg-primary);
+  border-radius: var(--radius-lg);
+  padding: var(--space-xl);
+  max-width: 500px;
+  width: calc(100% - var(--space-xl) * 2);
+  max-height: calc(100vh - var(--space-xl) * 2);
+  overflow-y: auto;
+  box-shadow: var(--shadow-xl);
+}
+
+.shortcuts-modal-box h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: var(--space-lg);
+  color: var(--text-primary);
+}
+
+.shortcuts-modal-content {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-lg);
+}
+
+.shortcut-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.shortcut-group h4 {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--space-xs);
+}
+
+.shortcut-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.shortcut-item span {
+  flex: 1;
+}
+
+kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  padding: 2px 6px;
+  font-size: 0.75rem;
+  font-family: inherit;
+  font-weight: 500;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+}
+
+.shortcuts-modal-actions {
+  margin-top: var(--space-xl);
+  display: flex;
+  justify-content: center;
+}
+
+@media (max-width: 767px) {
+  .shortcuts-help-btn {
+    bottom: calc(80px + var(--sab));
+    right: var(--space-md);
+    width: 40px;
+    height: 40px;
+  }
+
+  .shortcuts-help-btn svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .shortcuts-modal-box {
+    padding: var(--space-lg);
+  }
+
+  .shortcuts-modal-content {
+    grid-template-columns: 1fr;
+    gap: var(--space-md);
   }
 }

@@ -21,7 +21,7 @@
   <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Montserrat:ital,wght@0,400;0,700;1,400;1,700&family=Carlito:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
   
   <!-- Styles -->
   <link rel="stylesheet" href="style.css">
@@ -248,80 +248,6 @@
     <!-- ================================================================
          WORKSPACE VIEWS - Each tool has its own workspace
          ================================================================ -->
-
-    <!-- Unified Page Manager Workspace -->
-    <div id="page-manager-workspace" class="workspace">
-      <div class="workspace-header">
-        <h2>
-          <button class="back-btn" onclick="showHome()">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-            Kembali
-          </button>
-          Kelola Halaman
-        </h2>
-      </div>
-      <p class="mb-md" style="color: var(--text-secondary);">
-        Seret file PDF untuk menambah • Seret halaman untuk mengatur urutan • Klik halaman untuk memilih
-      </p>
-      <div class="page-manager-toolbar">
-        <button class="btn btn-secondary" onclick="document.getElementById('pm-file-input').click()">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-          Tambah PDF
-        </button>
-        <input type="file" id="pm-file-input" multiple accept=".pdf" style="display:none">
-        <div class="toolbar-divider"></div>
-        <button class="btn btn-secondary btn-icon" onclick="pmUndo()" title="Undo (Ctrl+Z)">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
-        </button>
-        <button class="btn btn-secondary btn-icon" onclick="pmRedo()" title="Redo (Ctrl+Y)">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></svg>
-        </button>
-        <div class="toolbar-divider"></div>
-        <button class="btn btn-secondary" onclick="pmSelectAll()">Pilih Semua</button>
-        <button class="btn btn-secondary" onclick="pmDeselectAll()">Batal Pilih</button>
-        <div class="toolbar-divider"></div>
-        <button class="btn btn-secondary" onclick="pmRotateSelected(90)" title="Putar 90° searah jarum jam">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
-          Putar
-        </button>
-        <button class="btn btn-secondary" onclick="pmDeleteSelected()" title="Hapus halaman terpilih">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-          Hapus
-        </button>
-      </div>
-      <div class="page-grid empty" id="pm-pages">
-        <div class="dropzone" onclick="document.getElementById('pm-file-input').click()">
-          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-            <polyline points="17 8 12 3 7 8"/>
-            <line x1="12" y1="3" x2="12" y2="15"/>
-          </svg>
-          <h3>Seret file ke sini atau klik untuk pilih</h3>
-          <p>PDF</p>
-        </div>
-      </div>
-      <div class="pm-status" id="pm-status"></div>
-      <div class="controls" style="flex-wrap: wrap;">
-        <div class="control-group">
-          <label>Aksi:</label>
-          <select id="pm-action">
-            <option value="save">Simpan semua halaman</option>
-            <option value="extract">Ekstrak halaman terpilih</option>
-            <option value="split-each">Pisah: setiap halaman jadi file</option>
-          </select>
-        </div>
-      </div>
-      <div class="action-bar">
-        <button class="btn btn-primary btn-lg" id="pm-download-btn" disabled onclick="pmDownload()">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Download
-        </button>
-      </div>
-      <div class="progress-container hidden" id="pm-progress">
-        <div class="progress-bar"><div class="progress-fill" style="width: 0%"></div></div>
-        <p class="progress-text">Memproses...</p>
-      </div>
-    </div>
 
     <!-- Compress PDF Workspace -->
     <div id="compress-pdf-workspace" class="workspace">
@@ -582,78 +508,15 @@
           <div class="mobile-page-picker-grid" id="ue-mobile-page-grid"></div>
         </div>
       </div>
-    </div>
 
-    <!-- Edit PDF Workspace -->
-    <div id="edit-workspace" class="workspace">
-      <div class="workspace-header">
-        <h2>
-          <button class="back-btn" onclick="showHome()">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-            Kembali
-          </button>
-          Edit PDF
-        </h2>
-      </div>
-      <div class="editor-container">
-        <div class="editor-toolbar">
-          <div class="editor-tool-group">
-            <button class="editor-tool-btn" data-edit-tool="select" onclick="setEditTool('select')" title="Pilih & Edit (V)">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="M13 13l6 6"/></svg>
-              Pilih
-            </button>
-            <button class="editor-tool-btn" data-edit-tool="whiteout" onclick="setEditTool('whiteout')" title="Whiteout (W)">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
-              Whiteout
-            </button>
-            <button class="editor-tool-btn" data-edit-tool="text" onclick="setEditTool('text')" title="Tambah Teks (T)">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>
-              Teks
-            </button>
-            <button class="editor-tool-btn" data-edit-tool="signature" onclick="openSignatureModal()" title="Tanda Tangan (S)">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 19.5v.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v1.5"/><path d="m16 19-3-3 8-8 3 3-8 8Z"/></svg>
-              Tanda Tangan
-            </button>
-            <button class="editor-tool-btn" onclick="openEditorWatermarkModal()" title="Tambah Watermark">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-              Watermark
-            </button>
-            <button class="editor-tool-btn" onclick="openEditorPageNumModal()" title="Tambah Nomor Halaman">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h10"/><circle cx="18" cy="17" r="2"/></svg>
-              Nomor Halaman
-            </button>
-          </div>
-          <div class="editor-tool-divider"></div>
-          <div class="editor-action-group">
-            <button class="editor-action-btn" onclick="undoEdit()" title="Undo (Ctrl+Z)">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
-            </button>
-            <button class="editor-action-btn" onclick="redoEdit()" title="Redo (Ctrl+Y)">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></svg>
-            </button>
-            <button class="editor-action-btn danger" onclick="clearCurrentPageAnnotations()" title="Hapus Semua di Halaman Ini">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
-            </button>
-          </div>
-          <div class="editor-status" id="editor-status">
-            <span class="status-text">Pilih alat untuk mulai mengedit</span>
-          </div>
-        </div>
-        <div class="editor-canvas-wrapper">
-          <canvas id="edit-canvas" class="editor-canvas"></canvas>
-        </div>
-        <div class="editor-page-nav">
-          <button id="edit-prev" onclick="editPrevPage()">← Sebelumnya</button>
-          <span id="edit-page-info">Halaman 1 dari 1</span>
-          <button id="edit-next" onclick="editNextPage()">Berikutnya →</button>
-        </div>
-      </div>
-      <div class="action-bar">
-        <button class="btn btn-primary btn-lg" id="edit-btn" disabled onclick="saveEditedPDF()">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Download PDF
-        </button>
-      </div>
+      <!-- Floating Keyboard Shortcuts Help Button -->
+      <button class="shortcuts-help-btn" id="shortcuts-help-btn" onclick="openShortcutsModal()" title="Pintasan Keyboard (?)">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+          <line x1="12" y1="17" x2="12.01" y2="17"/>
+        </svg>
+      </button>
     </div>
 
     <!-- PDF to Image Workspace -->
@@ -746,44 +609,6 @@
         <button class="btn btn-primary btn-lg" id="protect-btn" disabled onclick="protectPDF()">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Proteksi & Download
-        </button>
-      </div>
-    </div>
-
-    <!-- Unlock PDF Workspace -->
-    <div id="unlock-workspace" class="workspace">
-      <div class="workspace-header">
-        <h2>
-          <button class="back-btn" onclick="showHome()">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-            Kembali
-          </button>
-          Buka Kunci PDF
-        </h2>
-      </div>
-      <p class="mb-lg" style="color: var(--text-secondary);">⚠️ Catatan: Anda harus mengetahui password untuk membuka kunci PDF.</p>
-      <div class="preview-area" id="unlock-preview">
-        <div class="dropzone" onclick="document.getElementById('unlock-input').click()">
-          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-            <polyline points="17 8 12 3 7 8"/>
-            <line x1="12" y1="3" x2="12" y2="15"/>
-          </svg>
-          <h3>Seret file ke sini atau klik untuk pilih</h3>
-          <p>PDF</p>
-          <input type="file" id="unlock-input" accept=".pdf" style="display:none">
-        </div>
-      </div>
-      <div class="controls">
-        <div class="control-group">
-          <label>Password:</label>
-          <input type="password" id="unlock-password" placeholder="Masukkan password PDF">
-        </div>
-      </div>
-      <div class="action-bar">
-        <button class="btn btn-primary btn-lg" id="unlock-btn" disabled onclick="unlockPDF()">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Buka Kunci & Download
         </button>
       </div>
     </div>
@@ -1215,13 +1040,14 @@
     <div class="signature-box">
       <h3>Buat Tanda Tangan</h3>
       <div class="signature-tabs">
-        <button class="signature-tab" onclick="switchSignatureTab('upload')">Upload Gambar</button>
+        <button class="signature-tab active" onclick="switchSignatureTab('upload')">Upload Gambar</button>
         <button class="signature-tab" onclick="switchSignatureTab('draw')">Gambar</button>
       </div>
-      <div id="signature-upload-tab" class="signature-tab-content">
+      <div id="signature-upload-tab" class="signature-tab-content active">
         <div class="signature-upload-area" id="signature-upload-hint" onclick="document.getElementById('signature-upload-input').click()">
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
           <p>Klik untuk upload gambar tanda tangan</p>
+          <span class="upload-hint-secondary">Bisa juga digunakan untuk stempel</span>
           <span>JPG • PNG</span>
           <input type="file" id="signature-upload-input" accept="image/jpeg,image/png" style="display:none">
         </div>
@@ -1248,12 +1074,12 @@
         <p class="mb-md" style="color: var(--text-secondary);">Atur threshold untuk mengubah warna putih/terang menjadi transparan.</p>
         <div class="signature-bg-preview">
           <div class="preview-box">
-            <img id="sig-bg-original" src="" alt="Original" style="max-width: 200px; max-height: 150px;">
+            <img id="sig-bg-original" src="" alt="Original">
             <p>Original</p>
           </div>
-          <div class="preview-arrow">→</div>
-          <div class="preview-box" style="background: repeating-conic-gradient(#ddd 0% 25%, #fff 0% 50%) 50% / 12px 12px; border-radius: var(--radius-md); padding: var(--space-sm);">
-            <canvas id="sig-bg-preview" style="max-width: 200px; max-height: 150px;"></canvas>
+          <div class="preview-arrow">↓</div>
+          <div class="preview-box">
+            <canvas id="sig-bg-preview" class="transparent-bg"></canvas>
             <p>Hasil</p>
           </div>
         </div>
@@ -1289,6 +1115,8 @@
               <option value="Helvetica" selected>Helvetica</option>
               <option value="Times-Roman">Times Roman</option>
               <option value="Courier">Courier</option>
+              <option value="Montserrat">Montserrat</option>
+              <option value="Carlito">Carlito</option>
             </select>
           </div>
 
@@ -1502,6 +1330,45 @@
           Ekstrak sebagai PDF baru
         </button>
         <button class="btn btn-ghost" onclick="uePmCloseModal()">Selesai</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Keyboard Shortcuts Modal -->
+  <div class="shortcuts-modal" id="shortcuts-modal">
+    <div class="shortcuts-modal-backdrop" onclick="closeShortcutsModal()"></div>
+    <div class="shortcuts-modal-box">
+      <h3>Pintasan Keyboard</h3>
+      <div class="shortcuts-modal-content">
+        <div class="shortcut-group">
+          <h4>Tools</h4>
+          <div class="shortcut-item"><kbd>V</kbd> <span>Pilih & Edit</span></div>
+          <div class="shortcut-item"><kbd>W</kbd> <span>Whiteout</span></div>
+          <div class="shortcut-item"><kbd>T</kbd> <span>Tambah Teks</span></div>
+          <div class="shortcut-item"><kbd>S</kbd> <span>Tanda Tangan</span></div>
+        </div>
+        <div class="shortcut-group">
+          <h4>Navigasi</h4>
+          <div class="shortcut-item"><kbd>&larr;</kbd> <span>Halaman sebelumnya</span></div>
+          <div class="shortcut-item"><kbd>&rarr;</kbd> <span>Halaman berikutnya</span></div>
+          <div class="shortcut-item"><kbd>Esc</kbd> <span>Kembali ke beranda</span></div>
+        </div>
+        <div class="shortcut-group">
+          <h4>Zoom</h4>
+          <div class="shortcut-item"><kbd>-</kbd> <span>Perkecil</span></div>
+          <div class="shortcut-item"><kbd>+</kbd> <span>Perbesar</span></div>
+          <div class="shortcut-item"><kbd>0</kbd> <span>Reset zoom</span></div>
+        </div>
+        <div class="shortcut-group">
+          <h4>Aksi</h4>
+          <div class="shortcut-item"><kbd>Ctrl</kbd><kbd>S</kbd> <span>Download PDF</span></div>
+          <div class="shortcut-item"><kbd>Ctrl</kbd><kbd>Z</kbd> <span>Undo</span></div>
+          <div class="shortcut-item"><kbd>Ctrl</kbd><kbd>Y</kbd> <span>Redo</span></div>
+          <div class="shortcut-item"><kbd>Del</kbd> <span>Hapus anotasi</span></div>
+        </div>
+      </div>
+      <div class="shortcuts-modal-actions">
+        <button class="btn btn-primary" onclick="closeShortcutsModal()">Tutup</button>
       </div>
     </div>
   </div>

@@ -61,6 +61,51 @@ const state = {
 };
 
 // ============================================================
+// FILE SIZE LIMITS
+// ============================================================
+
+const MAX_FILE_SIZE_WARNING = 20 * 1024 * 1024; // 20MB - show warning
+const MAX_FILE_SIZE_LIMIT = 100 * 1024 * 1024;  // 100MB - hard limit
+
+function formatFileSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+function checkFileSize(file) {
+  if (file.size > MAX_FILE_SIZE_LIMIT) {
+    showToast(`File "${file.name}" terlalu besar (${formatFileSize(file.size)}). Maksimal 100MB.`, 'error');
+    return false;
+  }
+  if (file.size > MAX_FILE_SIZE_WARNING) {
+    showToast(`File "${file.name}" berukuran ${formatFileSize(file.size)}. File besar mungkin memerlukan waktu lebih lama untuk diproses.`, 'info');
+  }
+  return true;
+}
+
+// ============================================================
+// BROWSER COMPATIBILITY CHECK
+// ============================================================
+
+function checkBrowserCompatibility() {
+  const required = [
+    { feature: 'Promise', check: typeof Promise !== 'undefined' },
+    { feature: 'Blob', check: typeof Blob !== 'undefined' },
+    { feature: 'Canvas', check: !!document.createElement('canvas').getContext },
+    { feature: 'fetch', check: typeof fetch !== 'undefined' },
+    { feature: 'FileReader', check: typeof FileReader !== 'undefined' }
+  ];
+
+  const missing = required.filter(r => !r.check);
+  if (missing.length > 0) {
+    showToast(`Browser tidak mendukung fitur: ${missing.map(m => m.feature).join(', ')}. Silakan gunakan browser modern.`, 'error');
+    return false;
+  }
+  return true;
+}
+
+// ============================================================
 // MOBILE STATE & DETECTION
 // ============================================================
 
@@ -125,10 +170,116 @@ function debounce(fn, delay) {
 }
 
 // ============================================================
+// NAVIGATION HISTORY MANAGEMENT
+// ============================================================
+
+const navHistory = {
+  currentView: 'home',      // 'home', 'workspace', 'modal'
+  currentWorkspace: null,   // Current tool name when in workspace
+  currentModal: null        // Current modal id when modal is open
+};
+
+// Push state when entering workspace
+function pushWorkspaceState(tool) {
+  history.pushState({ view: 'workspace', tool }, '', `#${tool}`);
+  navHistory.currentView = 'workspace';
+  navHistory.currentWorkspace = tool;
+  navHistory.currentModal = null;
+}
+
+// Push state when opening modal
+function pushModalState(modalId) {
+  history.pushState({
+    view: 'modal',
+    modal: modalId,
+    tool: navHistory.currentWorkspace
+  }, '', null);
+  navHistory.currentView = 'modal';
+  navHistory.currentModal = modalId;
+}
+
+// Close all modals
+function closeAllModals() {
+  // Close signature modal
+  const sigModal = document.getElementById('signature-modal');
+  if (sigModal?.classList.contains('active')) {
+    sigModal.classList.remove('active');
+  }
+
+  // Close signature background modal
+  const sigBgModal = document.getElementById('signature-bg-modal');
+  if (sigBgModal?.classList.contains('active')) {
+    sigBgModal.classList.remove('active');
+  }
+
+  // Close text modal
+  const textModal = document.getElementById('text-input-modal');
+  if (textModal?.classList.contains('active')) {
+    textModal.classList.remove('active');
+  }
+
+  // Close page manager modal
+  const pmModal = document.getElementById('ue-page-manager-modal');
+  if (pmModal?.classList.contains('active')) {
+    if (typeof uePmCloseModal === 'function') {
+      uePmCloseModal(true); // true = skip history manipulation
+    }
+  }
+
+  // Close watermark modal
+  const wmModal = document.getElementById('editor-watermark-modal');
+  if (wmModal?.classList.contains('active')) {
+    wmModal.classList.remove('active');
+  }
+
+  // Close page number modal
+  const pnModal = document.getElementById('editor-pagenum-modal');
+  if (pnModal?.classList.contains('active')) {
+    pnModal.classList.remove('active');
+  }
+
+  // Close protect modal
+  const protectModal = document.getElementById('editor-protect-modal');
+  if (protectModal?.classList.contains('active')) {
+    protectModal.classList.remove('active');
+  }
+
+  navHistory.currentModal = null;
+}
+
+// Handle browser back button
+function initNavigationHistory() {
+  // Set initial state
+  history.replaceState({ view: 'home' }, '', window.location.pathname);
+
+  window.addEventListener('popstate', (event) => {
+    if (event.state) {
+      if (event.state.view === 'workspace') {
+        // Close any open modal, stay in workspace
+        closeAllModals();
+        navHistory.currentView = 'workspace';
+        navHistory.currentModal = null;
+      } else if (event.state.view === 'home') {
+        // Go back to home
+        closeAllModals();
+        showHome(true); // true = skip pushState
+      }
+    } else {
+      // No state = we're at home or initial load
+      closeAllModals();
+      showHome(true);
+    }
+  });
+}
+
+// ============================================================
 // INITIALIZATION
 // ============================================================
 
 document.addEventListener('DOMContentLoaded', () => {
+  // Check browser compatibility first
+  checkBrowserCompatibility();
+
   // Initialize mobile detection first
   detectMobile();
 
@@ -143,6 +294,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initFileInputs();
   initRangeSliders();
   initSignaturePad();
+  initNavigationHistory();
 });
 
 function initDropZone() {
@@ -181,15 +333,6 @@ function initToolCards() {
 }
 
 function initFileInputs() {
-  // Page Manager input
-  const pmInput = document.getElementById('pm-file-input');
-  if (pmInput) {
-    pmInput.addEventListener('change', (e) => {
-      pmAddFiles(e.target.files);
-      e.target.value = '';
-    });
-  }
-
   // Image to PDF input
   const imgPdfInput = document.getElementById('img-pdf-input');
   if (imgPdfInput) {
@@ -227,17 +370,6 @@ function initFileInputs() {
     protectInput.addEventListener('change', (e) => {
       if (e.target.files.length > 0) {
         loadPDFForTool(e.target.files[0], 'protect');
-      }
-      e.target.value = '';
-    });
-  }
-
-  // Unlock PDF input
-  const unlockInput = document.getElementById('unlock-input');
-  if (unlockInput) {
-    unlockInput.addEventListener('change', (e) => {
-      if (e.target.files.length > 0) {
-        loadPDFForTool(e.target.files[0], 'unlock');
       }
       e.target.value = '';
     });
@@ -385,6 +517,10 @@ function handleDroppedFiles(files) {
   if (!files || files.length === 0) return;
 
   const file = files[0];
+
+  // Check file size
+  if (!checkFileSize(file)) return;
+
   const isPDF = file.type === 'application/pdf';
   const isImage = file.type.startsWith('image/');
 
@@ -430,10 +566,6 @@ async function loadPDFForTool(file, tool) {
         await renderPdfImgPages();
         document.getElementById('pdf-img-btn').disabled = false;
         break;
-      case 'edit':
-        await initEditMode();
-        document.getElementById('edit-btn').disabled = false;
-        break;
       case 'compress-pdf':
         await showPDFPreview('compress-pdf-preview');
         document.getElementById('compress-pdf-btn').disabled = false;
@@ -441,10 +573,6 @@ async function loadPDFForTool(file, tool) {
       case 'protect':
         await showPDFPreview('protect-preview');
         document.getElementById('protect-btn').disabled = false;
-        break;
-      case 'unlock':
-        await showPDFPreview('unlock-preview');
-        document.getElementById('unlock-btn').disabled = false;
         break;
       case 'watermark':
         await initWatermarkMode();
@@ -457,7 +585,15 @@ async function loadPDFForTool(file, tool) {
     }
   } catch (error) {
     console.error('Error loading PDF:', error);
-    showToast('Gagal memuat PDF. File mungkin rusak atau terenkripsi.', 'error');
+    // Provide more specific error messages
+    const errorMsg = error.message || '';
+    if (errorMsg.includes('password') || errorMsg.includes('encrypted')) {
+      showToast('PDF ini dilindungi password. File tidak dapat dibuka tanpa password.', 'error');
+    } else if (errorMsg.includes('Invalid') || errorMsg.includes('corrupt')) {
+      showToast('File PDF rusak atau tidak valid. Coba file lain.', 'error');
+    } else {
+      showToast('Gagal memuat PDF. File mungkin rusak atau terenkripsi.', 'error');
+    }
   }
 }
 
@@ -561,14 +697,23 @@ function cleanupImage(img) {
 // NAVIGATION
 // ============================================================
 
-function showHome() {
+function showHome(skipPushState = false) {
   document.getElementById('home-view').style.display = 'block';
   document.querySelectorAll('.workspace').forEach(ws => ws.classList.remove('active'));
+  closeAllModals();
   state.currentTool = null;
   resetState();
+
+  // Update navigation history
+  if (!skipPushState) {
+    history.pushState({ view: 'home' }, '', '#');
+  }
+  navHistory.currentView = 'home';
+  navHistory.currentWorkspace = null;
+  navHistory.currentModal = null;
 }
 
-function showTool(tool) {
+function showTool(tool, skipPushState = false) {
   document.getElementById('home-view').style.display = 'none';
   document.querySelectorAll('.workspace').forEach(ws => ws.classList.remove('active'));
 
@@ -576,6 +721,11 @@ function showTool(tool) {
   if (workspace) {
     workspace.classList.add('active');
     state.currentTool = tool;
+
+    // Push browser history state
+    if (!skipPushState) {
+      pushWorkspaceState(tool);
+    }
 
     // Setup drop zones for workspaces
     setupWorkspaceDropZone(tool);
@@ -614,9 +764,7 @@ function setupWorkspaceDropZone(tool) {
     e.preventDefault();
     const files = e.dataTransfer.files;
 
-    if (tool === 'page-manager') {
-      pmAddFiles(files);
-    } else if (tool === 'merge') {
+    if (tool === 'merge') {
       addMergeFiles(files);
     } else if (tool === 'img-to-pdf') {
       addImagesToPDF(files);
@@ -682,642 +830,7 @@ function resetState() {
 }
 
 // ============================================================
-// PAGE MANAGER (Unified: Merge, Split, Reorder, Rotate, Delete)
-// ============================================================
-
-async function pmAddFiles(files) {
-  const container = document.getElementById('pm-pages');
-
-  // Clear placeholder if this is the first file
-  if (state.pmPages.length === 0) {
-    container.innerHTML = '<div class="spinner"></div>';
-  }
-
-  for (const file of files) {
-    if (file.type !== 'application/pdf') {
-      showToast(`${file.name} bukan file PDF`, 'error');
-      continue;
-    }
-
-    try {
-      const bytes = await file.arrayBuffer();
-      const sourceIndex = state.pmSourceFiles.length;
-      state.pmSourceFiles.push({ name: file.name, bytes: new Uint8Array(bytes) });
-
-      // Load with PDF.js to get page count and thumbnails
-      const pdf = await pdfjsLib.getDocument({ data: bytes.slice(0) }).promise;
-
-      for (let i = 1; i <= pdf.numPages; i++) {
-        state.pmPages.push({
-          pageNum: i,
-          sourceIndex: sourceIndex,
-          sourceName: file.name,
-          rotation: 0,
-          selected: false
-        });
-      }
-    } catch (error) {
-      console.error('Error loading PDF:', error);
-      showToast(`Gagal memuat ${file.name}`, 'error');
-    }
-  }
-
-  await pmRenderPages();
-  pmUpdateStatus();
-  pmUpdateDownloadButton();
-}
-
-async function pmRenderPages() {
-  const container = document.getElementById('pm-pages');
-  container.innerHTML = '';
-
-  if (state.pmPages.length === 0) {
-    container.classList.add('empty');
-    container.innerHTML = `
-      <div class="drop-hint" onclick="document.getElementById('pm-file-input').click()">
-        <svg class="drop-hint-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-        <span class="drop-hint-text">Seret file PDF ke sini atau klik untuk upload</span>
-        <span class="drop-hint-subtext">PDF</span>
-      </div>`;
-    return;
-  }
-
-  container.classList.remove('empty');
-
-  for (let i = 0; i < state.pmPages.length; i++) {
-    const pageData = state.pmPages[i];
-
-    // Use cached canvas if available, otherwise render
-    if (!pageData.canvas) {
-      const sourceFile = state.pmSourceFiles[pageData.sourceIndex];
-      try {
-        const pdf = await pdfjsLib.getDocument({ data: sourceFile.bytes.slice() }).promise;
-        const page = await pdf.getPage(pageData.pageNum);
-
-        const scale = 0.3;
-        const viewport = page.getViewport({ scale });
-        const canvas = document.createElement('canvas');
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        const ctx = canvas.getContext('2d');
-
-        await page.render({ canvasContext: ctx, viewport }).promise;
-        pageData.canvas = canvas; // Cache the canvas
-      } catch (error) {
-        console.error('Error rendering page:', error);
-        continue;
-      }
-    }
-
-    const div = pmCreatePageElement(pageData, i);
-    container.appendChild(div);
-  }
-
-  // Enable drag-and-drop reordering
-  pmEnableDragReorder();
-}
-
-function pmCreatePageElement(pageData, index) {
-  const div = document.createElement('div');
-  div.className = 'page-item' + (pageData.selected ? ' selected' : '');
-  div.dataset.index = index;
-  div.draggable = true;
-
-  // Clone the cached canvas
-  const canvas = pageData.canvas.cloneNode(true);
-  const ctx = canvas.getContext('2d');
-  ctx.drawImage(pageData.canvas, 0, 0);
-
-  // Apply rotation transform
-  if (pageData.rotation !== 0) {
-    canvas.style.transform = `rotate(${pageData.rotation}deg)`;
-  }
-
-  div.appendChild(canvas);
-
-  // Page number badge
-  const numBadge = document.createElement('span');
-  numBadge.className = 'page-item-number';
-  numBadge.textContent = index + 1;
-  div.appendChild(numBadge);
-
-  // Source file badge (truncated name)
-  const sourceBadge = document.createElement('span');
-  sourceBadge.className = 'page-source';
-  sourceBadge.textContent = pageData.sourceName.replace('.pdf', '').substring(0, 8);
-  sourceBadge.title = pageData.sourceName;
-  div.appendChild(sourceBadge);
-
-  // Rotation badge if rotated
-  if (pageData.rotation !== 0) {
-    const rotBadge = document.createElement('span');
-    rotBadge.className = 'page-rotation-badge';
-    rotBadge.textContent = pageData.rotation + '°';
-    div.appendChild(rotBadge);
-  }
-
-  // Delete button
-  const delBtn = document.createElement('button');
-  delBtn.className = 'delete-btn';
-  delBtn.textContent = '×';
-  delBtn.onclick = (e) => {
-    e.stopPropagation();
-    pmDeletePage(index);
-  };
-  div.appendChild(delBtn);
-
-  // Click to select
-  div.addEventListener('click', () => {
-    pageData.selected = !pageData.selected;
-    div.classList.toggle('selected', pageData.selected);
-    pmUpdateStatus();
-  });
-
-  return div;
-}
-
-function pmEnableDragReorder() {
-  const container = document.getElementById('pm-pages');
-  let draggedItem = null;
-  let draggedIndex = -1;
-  let dropIndicator = null;
-
-  // Create drop indicator element
-  function getDropIndicator() {
-    if (!dropIndicator) {
-      dropIndicator = document.createElement('div');
-      dropIndicator.className = 'drop-indicator';
-    }
-    return dropIndicator;
-  }
-
-  function removeDropIndicator() {
-    if (dropIndicator && dropIndicator.parentNode) {
-      dropIndicator.remove();
-    }
-  }
-
-  container.querySelectorAll('.page-item').forEach((item) => {
-    item.addEventListener('dragstart', (e) => {
-      pmSaveUndoState(); // Save state before reordering
-      draggedItem = item;
-      draggedIndex = parseInt(item.dataset.index);
-      item.classList.add('dragging');
-      e.dataTransfer.effectAllowed = 'move';
-    });
-
-    item.addEventListener('dragend', () => {
-      if (draggedItem) {
-        draggedItem.classList.remove('dragging');
-        draggedItem = null;
-      }
-      removeDropIndicator();
-    });
-
-    item.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-      if (!draggedItem || item === draggedItem) return;
-
-      const rect = item.getBoundingClientRect();
-      const midpoint = rect.left + rect.width / 2;
-      const indicator = getDropIndicator();
-
-      // Show indicator on left or right side based on mouse position
-      if (e.clientX < midpoint) {
-        item.before(indicator);
-      } else {
-        item.after(indicator);
-      }
-    });
-
-    item.addEventListener('dragleave', () => {
-      // Don't remove immediately - let dragover on next item handle it
-    });
-
-    item.addEventListener('drop', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (!draggedItem) return;
-
-      const targetIndex = parseInt(item.dataset.index);
-      const rect = item.getBoundingClientRect();
-      const midpoint = rect.left + rect.width / 2;
-      const insertBefore = e.clientX < midpoint;
-
-      // Calculate final position
-      let newIndex = insertBefore ? targetIndex : targetIndex + 1;
-      if (draggedIndex < targetIndex) newIndex--;
-
-      if (draggedIndex !== newIndex && newIndex !== draggedIndex + 1 || insertBefore && draggedIndex !== targetIndex) {
-        // Reorder in state
-        const [movedPage] = state.pmPages.splice(draggedIndex, 1);
-        const adjustedIndex = draggedIndex < (insertBefore ? targetIndex : targetIndex + 1)
-          ? (insertBefore ? targetIndex - 1 : targetIndex)
-          : (insertBefore ? targetIndex : targetIndex + 1);
-        state.pmPages.splice(adjustedIndex, 0, movedPage);
-
-        // Move DOM element directly
-        if (insertBefore) {
-          item.before(draggedItem);
-        } else {
-          item.after(draggedItem);
-        }
-
-        pmUpdateIndices();
-      }
-
-      removeDropIndicator();
-    });
-  });
-
-  // Handle drops on the container itself (for first/last position)
-  container.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    if (!draggedItem) return;
-
-    const items = container.querySelectorAll('.page-item:not(.dragging)');
-    if (items.length === 0) return;
-
-    const indicator = getDropIndicator();
-    const containerRect = container.getBoundingClientRect();
-    const firstItem = items[0];
-    const lastItem = items[items.length - 1];
-    const firstRect = firstItem.getBoundingClientRect();
-    const lastRect = lastItem.getBoundingClientRect();
-
-    // Check if near left edge (before first item)
-    if (e.clientX < firstRect.left) {
-      firstItem.before(indicator);
-    }
-    // Check if near right edge (after last item)
-    else if (e.clientX > lastRect.right) {
-      lastItem.after(indicator);
-    }
-  });
-
-  container.addEventListener('drop', (e) => {
-    if (!draggedItem) return;
-    // Only handle if dropped on container, not on items
-    if (e.target === container || e.target.classList.contains('drop-indicator')) {
-      e.preventDefault();
-
-      const items = container.querySelectorAll('.page-item:not(.dragging)');
-      if (items.length === 0) return;
-
-      const firstItem = items[0];
-      const lastItem = items[items.length - 1];
-      const firstRect = firstItem.getBoundingClientRect();
-      const lastRect = lastItem.getBoundingClientRect();
-
-      let newIndex = -1;
-
-      // Dropped before first item
-      if (e.clientX < firstRect.left + firstRect.width / 2) {
-        newIndex = 0;
-        if (draggedIndex !== 0) {
-          const [movedPage] = state.pmPages.splice(draggedIndex, 1);
-          state.pmPages.unshift(movedPage);
-          container.insertBefore(draggedItem, firstItem);
-          pmUpdateIndices();
-        }
-      }
-      // Dropped after last item
-      else if (e.clientX > lastRect.left + lastRect.width / 2) {
-        newIndex = state.pmPages.length - 1;
-        if (draggedIndex !== state.pmPages.length - 1) {
-          const [movedPage] = state.pmPages.splice(draggedIndex, 1);
-          state.pmPages.push(movedPage);
-          container.appendChild(draggedItem);
-          pmUpdateIndices();
-        }
-      }
-
-      removeDropIndicator();
-    }
-  });
-}
-
-function pmUpdateIndices() {
-  const container = document.getElementById('pm-pages');
-  container.querySelectorAll('.page-item').forEach((item, i) => {
-    item.dataset.index = i;
-    const numBadge = item.querySelector('.page-item-number');
-    if (numBadge) numBadge.textContent = i + 1;
-  });
-}
-
-function pmSelectAll() {
-  state.pmPages.forEach(p => p.selected = true);
-  document.querySelectorAll('#pm-pages .page-item').forEach(item => {
-    item.classList.add('selected');
-  });
-  pmUpdateStatus();
-}
-
-function pmDeselectAll() {
-  state.pmPages.forEach(p => p.selected = false);
-  document.querySelectorAll('#pm-pages .page-item').forEach(item => {
-    item.classList.remove('selected');
-  });
-  pmUpdateStatus();
-}
-
-// Page Manager Undo/Redo System
-function pmSaveUndoState() {
-  // Deep clone current pages state (without canvas which can't be cloned)
-  const snapshot = state.pmPages.map(p => ({
-    pageNum: p.pageNum,
-    sourceIndex: p.sourceIndex,
-    sourceName: p.sourceName,
-    rotation: p.rotation,
-    selected: p.selected
-  }));
-  state.pmUndoStack.push(snapshot);
-  state.pmRedoStack = []; // Clear redo on new action
-
-  // Limit stack size
-  if (state.pmUndoStack.length > 50) {
-    state.pmUndoStack.shift();
-  }
-}
-
-async function pmUndo() {
-  if (state.pmUndoStack.length === 0) {
-    showToast('Tidak ada yang bisa di-undo', 'info');
-    return;
-  }
-
-  // Save current state to redo
-  const currentSnapshot = state.pmPages.map(p => ({
-    pageNum: p.pageNum,
-    sourceIndex: p.sourceIndex,
-    sourceName: p.sourceName,
-    rotation: p.rotation,
-    selected: p.selected
-  }));
-  state.pmRedoStack.push(currentSnapshot);
-
-  // Restore previous state
-  const previousState = state.pmUndoStack.pop();
-  state.pmPages = previousState.map(p => ({ ...p, canvas: null }));
-
-  await pmRenderPages();
-  pmUpdateStatus();
-  pmUpdateDownloadButton();
-  showToast('Undo berhasil', 'success');
-}
-
-async function pmRedo() {
-  if (state.pmRedoStack.length === 0) {
-    showToast('Tidak ada yang bisa di-redo', 'info');
-    return;
-  }
-
-  // Save current state to undo
-  const currentSnapshot = state.pmPages.map(p => ({
-    pageNum: p.pageNum,
-    sourceIndex: p.sourceIndex,
-    sourceName: p.sourceName,
-    rotation: p.rotation,
-    selected: p.selected
-  }));
-  state.pmUndoStack.push(currentSnapshot);
-
-  // Restore next state
-  const nextState = state.pmRedoStack.pop();
-  state.pmPages = nextState.map(p => ({ ...p, canvas: null }));
-
-  await pmRenderPages();
-  pmUpdateStatus();
-  pmUpdateDownloadButton();
-  showToast('Redo berhasil', 'success');
-}
-
-function pmRotateSelected(degrees) {
-  const hasSelection = state.pmPages.some(p => p.selected);
-
-  if (!hasSelection) {
-    showToast('Pilih halaman yang ingin diputar', 'error');
-    return;
-  }
-
-  pmSaveUndoState();
-  const container = document.getElementById('pm-pages');
-  const items = container.querySelectorAll('.page-item');
-
-  state.pmPages.forEach((p, i) => {
-    if (p.selected) {
-      p.rotation = ((p.rotation + degrees) % 360 + 360) % 360;
-
-      // Update CSS transform on canvas (no re-render)
-      const item = items[i];
-      const canvas = item.querySelector('canvas');
-      if (canvas) {
-        canvas.style.transform = p.rotation !== 0 ? `rotate(${p.rotation}deg)` : '';
-      }
-
-      // Update or add/remove rotation badge
-      let rotBadge = item.querySelector('.page-rotation-badge');
-      if (p.rotation !== 0) {
-        if (!rotBadge) {
-          rotBadge = document.createElement('span');
-          rotBadge.className = 'page-rotation-badge';
-          item.appendChild(rotBadge);
-        }
-        rotBadge.textContent = p.rotation + '°';
-      } else if (rotBadge) {
-        rotBadge.remove();
-      }
-    }
-  });
-
-  showToast('Halaman diputar!', 'success');
-}
-
-function pmDeleteSelected() {
-  const hasSelection = state.pmPages.some(p => p.selected);
-
-  if (!hasSelection) {
-    showToast('Pilih halaman yang ingin dihapus', 'error');
-    return;
-  }
-
-  pmSaveUndoState();
-  const container = document.getElementById('pm-pages');
-
-  // Remove selected DOM elements and filter state
-  state.pmPages.forEach((p, i) => {
-    if (p.selected) {
-      const item = container.querySelector(`[data-index="${i}"]`);
-      if (item) item.remove();
-    }
-  });
-
-  state.pmPages = state.pmPages.filter(p => !p.selected);
-
-  // Update indices after removal
-  pmUpdateIndices();
-  pmUpdateStatus();
-  pmUpdateDownloadButton();
-
-  // Show placeholder if empty
-  if (state.pmPages.length === 0) {
-    container.innerHTML = '<p style="color: var(--text-tertiary); width: 100%; text-align: center; padding: 2rem;">Seret file PDF ke sini atau klik "Tambah PDF"</p>';
-  }
-
-  showToast('Halaman dihapus!', 'success');
-}
-
-function pmDeletePage(index) {
-  pmSaveUndoState();
-  const container = document.getElementById('pm-pages');
-  const item = container.querySelector(`[data-index="${index}"]`);
-  if (item) item.remove();
-
-  state.pmPages.splice(index, 1);
-
-  // Update indices after removal
-  pmUpdateIndices();
-  pmUpdateStatus();
-  pmUpdateDownloadButton();
-
-  // Show placeholder if empty
-  if (state.pmPages.length === 0) {
-    container.innerHTML = '<p style="color: var(--text-tertiary); width: 100%; text-align: center; padding: 2rem;">Seret file PDF ke sini atau klik "Tambah PDF"</p>';
-  }
-}
-
-function pmUpdateStatus() {
-  const total = state.pmPages.length;
-  const selected = state.pmPages.filter(p => p.selected).length;
-  const statusEl = document.getElementById('pm-status');
-
-  if (total === 0) {
-    statusEl.textContent = '';
-  } else if (selected > 0) {
-    statusEl.textContent = `${selected} dari ${total} halaman dipilih`;
-  } else {
-    statusEl.textContent = `${total} halaman total dari ${state.pmSourceFiles.length} file`;
-  }
-}
-
-function pmUpdateDownloadButton() {
-  const btn = document.getElementById('pm-download-btn');
-  btn.disabled = state.pmPages.length === 0;
-}
-
-async function pmDownload() {
-  if (state.pmPages.length === 0) return;
-
-  const action = document.getElementById('pm-action').value;
-  const progress = document.getElementById('pm-progress');
-  const progressFill = progress.querySelector('.progress-fill');
-  const progressText = progress.querySelector('.progress-text');
-  const btn = document.getElementById('pm-download-btn');
-
-  progress.classList.remove('hidden');
-  btn.disabled = true;
-
-  try {
-    if (action === 'split-each') {
-      // Each page as separate file
-      for (let i = 0; i < state.pmPages.length; i++) {
-        progressText.textContent = `Memproses halaman ${i + 1}...`;
-        progressFill.style.width = `${((i + 1) / state.pmPages.length) * 100}%`;
-
-        const pageData = state.pmPages[i];
-        const sourceFile = state.pmSourceFiles[pageData.sourceIndex];
-
-        const srcDoc = await PDFLib.PDFDocument.load(sourceFile.bytes);
-        const newDoc = await PDFLib.PDFDocument.create();
-        const [page] = await newDoc.copyPages(srcDoc, [pageData.pageNum - 1]);
-
-        // Apply rotation
-        if (pageData.rotation !== 0) {
-          page.setRotation(PDFLib.degrees(pageData.rotation));
-        }
-
-        newDoc.addPage(page);
-        const bytes = await newDoc.save();
-        const baseName = state.pmSourceFiles[0]?.name?.replace(/\.pdf$/i, '') || 'halaman';
-        downloadBlob(new Blob([bytes], { type: 'application/pdf' }), `${baseName}_halaman${i + 1}.pdf`);
-        await sleep(100);
-      }
-      showToast('Semua halaman berhasil dipisah!', 'success');
-
-    } else if (action === 'extract') {
-      // Extract selected pages
-      const selectedPages = state.pmPages.filter(p => p.selected);
-
-      if (selectedPages.length === 0) {
-        showToast('Pilih halaman yang ingin diekstrak', 'error');
-        progress.classList.add('hidden');
-        btn.disabled = false;
-        return;
-      }
-
-      progressText.textContent = 'Mengekstrak halaman terpilih...';
-
-      const newDoc = await PDFLib.PDFDocument.create();
-
-      for (let i = 0; i < selectedPages.length; i++) {
-        const pageData = selectedPages[i];
-        const sourceFile = state.pmSourceFiles[pageData.sourceIndex];
-        const srcDoc = await PDFLib.PDFDocument.load(sourceFile.bytes);
-        const [page] = await newDoc.copyPages(srcDoc, [pageData.pageNum - 1]);
-
-        if (pageData.rotation !== 0) {
-          page.setRotation(PDFLib.degrees(pageData.rotation));
-        }
-
-        newDoc.addPage(page);
-        progressFill.style.width = `${((i + 1) / selectedPages.length) * 100}%`;
-      }
-
-      const bytes = await newDoc.save();
-      const baseName = state.pmSourceFiles[0]?.name?.replace(/\.pdf$/i, '') || 'extracted';
-      downloadBlob(new Blob([bytes], { type: 'application/pdf' }), `${baseName}_extracted.pdf`);
-      showToast('Halaman berhasil diekstrak!', 'success');
-
-    } else {
-      // Save all pages (merged, reordered, rotated)
-      progressText.textContent = 'Menggabungkan halaman...';
-
-      const newDoc = await PDFLib.PDFDocument.create();
-
-      for (let i = 0; i < state.pmPages.length; i++) {
-        const pageData = state.pmPages[i];
-        const sourceFile = state.pmSourceFiles[pageData.sourceIndex];
-        const srcDoc = await PDFLib.PDFDocument.load(sourceFile.bytes);
-        const [page] = await newDoc.copyPages(srcDoc, [pageData.pageNum - 1]);
-
-        if (pageData.rotation !== 0) {
-          page.setRotation(PDFLib.degrees(pageData.rotation));
-        }
-
-        newDoc.addPage(page);
-        progressFill.style.width = `${((i + 1) / state.pmPages.length) * 100}%`;
-      }
-
-      const bytes = await newDoc.save();
-      const baseName = state.pmSourceFiles[0]?.name?.replace(/\.pdf$/i, '') || 'output';
-      const suffix = state.pmSourceFiles.length > 1 ? 'merged' : 'edited';
-      downloadBlob(new Blob([bytes], { type: 'application/pdf' }), `${baseName}_${suffix}.pdf`);
-      showToast('PDF berhasil disimpan!', 'success');
-    }
-
-  } catch (error) {
-    console.error('Error processing PDF:', error);
-    showToast('Gagal memproses PDF', 'error');
-  } finally {
-    progress.classList.add('hidden');
-    btn.disabled = false;
-  }
-}
-
-// ============================================================
-// LEGACY MERGE PDF (kept for compatibility, redirects to Page Manager)
+// LEGACY MERGE PDF (kept for future use)
 // ============================================================
 
 async function addMergeFiles(files) {
@@ -2158,59 +1671,47 @@ async function compressPDF() {
 async function protectPDF() {
   const password = document.getElementById('protect-password').value;
   const confirm = document.getElementById('protect-password-confirm').value;
-  
+
   if (!password) {
     showToast('Masukkan password', 'error');
     return;
   }
-  
+
   if (password !== confirm) {
     showToast('Password tidak cocok', 'error');
     return;
   }
-  
+
+  const protectBtn = document.getElementById('protect-btn');
+  const originalText = protectBtn.innerHTML;
+
+  // Show loading state
+  protectBtn.disabled = true;
+  protectBtn.innerHTML = `
+    <svg class="btn-spinner" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M12 2v4m0 12v4m-7.07-3.93l2.83-2.83m8.48-8.48l2.83-2.83M2 12h4m12 0h4m-3.93 7.07l-2.83-2.83M7.76 7.76L4.93 4.93"/>
+    </svg>
+    Memproses...
+  `;
+
   try {
     const srcDoc = await PDFLib.PDFDocument.load(state.currentPDFBytes);
-    
+
     const bytes = await srcDoc.save({
       userPassword: password,
       ownerPassword: password,
     });
-    
+
     downloadBlob(new Blob([bytes], { type: 'application/pdf' }), getOutputFilename('protected'));
     showToast('PDF berhasil diproteksi!', 'success');
-    
+
   } catch (error) {
     console.error('Error protecting PDF:', error);
     showToast('Gagal memproteksi PDF', 'error');
-  }
-}
-
-// ============================================================
-// UNLOCK PDF
-// ============================================================
-
-async function unlockPDF() {
-  const password = document.getElementById('unlock-password').value;
-  
-  if (!password) {
-    showToast('Masukkan password', 'error');
-    return;
-  }
-  
-  try {
-    const srcDoc = await PDFLib.PDFDocument.load(state.currentPDFBytes, {
-      password: password
-    });
-    
-    const bytes = await srcDoc.save();
-    
-    downloadBlob(new Blob([bytes], { type: 'application/pdf' }), getOutputFilename('unlocked'));
-    showToast('PDF berhasil dibuka!', 'success');
-    
-  } catch (error) {
-    console.error('Error unlocking PDF:', error);
-    showToast('Password salah atau PDF tidak bisa dibuka', 'error');
+  } finally {
+    // Restore button state
+    protectBtn.disabled = false;
+    protectBtn.innerHTML = originalText;
   }
 }
 
@@ -2522,6 +2023,8 @@ function drawAnnotationSync(ctx, anno, isSelected = false) {
       let textCssFontFamily = 'Helvetica, Arial, sans-serif';
       if (anno.fontFamily === 'Times-Roman') textCssFontFamily = 'Times New Roman, Times, serif';
       else if (anno.fontFamily === 'Courier') textCssFontFamily = 'Courier New, Courier, monospace';
+      else if (anno.fontFamily === 'Montserrat') textCssFontFamily = 'Montserrat, sans-serif';
+      else if (anno.fontFamily === 'Carlito') textCssFontFamily = 'Carlito, Calibri, sans-serif';
 
       ctx.font = `${textFontStyle}${anno.fontSize}px ${textCssFontFamily}`;
       ctx.fillStyle = anno.color;
@@ -3147,6 +2650,7 @@ function initTextModalControls() {
 function openTextModal() {
   const modal = document.getElementById('text-input-modal');
   modal.classList.add('active');
+  pushModalState('text-input-modal');
 
   const textInput = document.getElementById('text-input-field');
   textInput.value = '';
@@ -3173,10 +2677,14 @@ function openTextModal() {
   document.getElementById('modal-font-family').onchange = updateTextPreview;
 }
 
-function closeTextModal() {
+function closeTextModal(skipHistoryBack = false) {
   const modal = document.getElementById('text-input-modal');
   modal.classList.remove('active');
   state.pendingTextPosition = null;
+  navHistory.currentModal = null;
+  if (!skipHistoryBack && navHistory.currentView === 'modal') {
+    history.back();
+  }
 }
 
 function updateTextPreview() {
@@ -3198,6 +2706,8 @@ function updateTextPreview() {
   let cssFontFamily = 'Helvetica, Arial, sans-serif';
   if (fontFamily === 'Times-Roman') cssFontFamily = 'Times New Roman, Times, serif';
   else if (fontFamily === 'Courier') cssFontFamily = 'Courier New, Courier, monospace';
+  else if (fontFamily === 'Montserrat') cssFontFamily = 'Montserrat, sans-serif';
+  else if (fontFamily === 'Carlito') cssFontFamily = 'Carlito, Calibri, sans-serif';
   preview.style.fontFamily = cssFontFamily;
 }
 
@@ -3255,6 +2765,7 @@ function confirmTextInput() {
 function openSignatureModal() {
   document.getElementById('signature-modal').classList.add('active');
   setEditTool('signature');
+  pushModalState('signature-modal');
 
   // Default to upload tab
   switchSignatureTab('upload');
@@ -3269,8 +2780,12 @@ function openSignatureModal() {
   }, 100);
 }
 
-function closeSignatureModal() {
+function closeSignatureModal(skipHistoryBack = false) {
   document.getElementById('signature-modal').classList.remove('active');
+  navHistory.currentModal = null;
+  if (!skipHistoryBack && navHistory.currentView === 'modal') {
+    history.back();
+  }
 }
 
 function clearSignature() {
@@ -3375,6 +2890,7 @@ async function loadSignatureImage(file) {
 // Signature Background Removal Modal
 function openSignatureBgModal() {
   document.getElementById('signature-bg-modal').classList.add('active');
+  pushModalState('signature-bg-modal');
 
   // Show original image
   document.getElementById('sig-bg-original').src = state.signatureUploadImage.src;
@@ -3383,7 +2899,7 @@ function openSignatureBgModal() {
   updateSignatureBgPreview();
 }
 
-function closeSignatureBgModal() {
+function closeSignatureBgModal(skipHistoryBack = false) {
   document.getElementById('signature-bg-modal').classList.remove('active');
 
   // Cleanup
@@ -3392,6 +2908,11 @@ function closeSignatureBgModal() {
   }
   state.signatureUploadImage = null;
   state.signatureUploadCanvas = null;
+
+  navHistory.currentModal = null;
+  if (!skipHistoryBack && navHistory.currentView === 'modal') {
+    history.back();
+  }
 }
 
 function updateSignatureBgPreview() {
@@ -3462,10 +2983,15 @@ function useSignatureFromUpload() {
 // Editor Watermark Functions
 function openEditorWatermarkModal() {
   document.getElementById('editor-watermark-modal').classList.add('active');
+  pushModalState('editor-watermark-modal');
 }
 
-function closeEditorWatermarkModal() {
+function closeEditorWatermarkModal(skipHistoryBack = false) {
   document.getElementById('editor-watermark-modal').classList.remove('active');
+  navHistory.currentModal = null;
+  if (!skipHistoryBack && navHistory.currentView === 'modal') {
+    history.back();
+  }
 }
 
 function applyEditorWatermark() {
@@ -3547,10 +3073,15 @@ function applyEditorWatermark() {
 // Editor Page Number Functions
 function openEditorPageNumModal() {
   document.getElementById('editor-pagenum-modal').classList.add('active');
+  pushModalState('editor-pagenum-modal');
 }
 
-function closeEditorPageNumModal() {
+function closeEditorPageNumModal(skipHistoryBack = false) {
   document.getElementById('editor-pagenum-modal').classList.remove('active');
+  navHistory.currentModal = null;
+  if (!skipHistoryBack && navHistory.currentView === 'modal') {
+    history.back();
+  }
 }
 
 function applyEditorPageNumbers() {
@@ -4459,6 +3990,9 @@ async function ueAddFiles(files) {
       continue;
     }
 
+    // Check file size
+    if (!checkFileSize(file)) continue;
+
     try {
       const arrayBuffer = await file.arrayBuffer();
       const bytes = new Uint8Array(arrayBuffer);
@@ -4586,7 +4120,10 @@ function ueSelectPage(index) {
   document.getElementById('ue-empty-state').style.display = 'none';
   document.getElementById('ue-canvas').style.display = 'block';
 
-  ueUpdateStatus('Halaman ' + (index + 1) + ' dipilih. Gunakan alat di atas untuk mengedit.');
+  ueUpdateStatus(
+    'Halaman ' + (index + 1) + ' dipilih. Gunakan alat di atas untuk mengedit.',
+    'Halaman ' + (index + 1) + ' dipilih. Gunakan toolbar di bawah untuk pindah halaman.'
+  );
 
   // Update mobile UI
   if (typeof ueMobileUpdatePageIndicator === 'function') {
@@ -5280,10 +4817,16 @@ function ueUpdatePageCount() {
   document.getElementById('ue-page-count').textContent = ueState.pages.length + ' halaman';
 }
 
-// Update status
-function ueUpdateStatus(message) {
+// Update status (supports different message for mobile)
+function ueUpdateStatus(message, mobileMessage) {
   const status = document.getElementById('ue-editor-status');
-  if (status) status.textContent = message;
+  if (status) {
+    if (mobileMessage && mobileState.isMobile) {
+      status.textContent = mobileMessage;
+    } else {
+      status.textContent = message;
+    }
+  }
 }
 
 // Set current tool
@@ -5365,11 +4908,13 @@ function ueConfirmText() {
 // Watermark modal
 function ueOpenWatermarkModal() {
   document.getElementById('editor-watermark-modal').classList.add('active');
+  pushModalState('editor-watermark-modal');
 }
 
 // Page number modal
 function ueOpenPageNumModal() {
   document.getElementById('editor-pagenum-modal').classList.add('active');
+  pushModalState('editor-pagenum-modal');
 }
 
 // More Tools Dropdown
@@ -5406,10 +4951,15 @@ function ueOpenProtectModal() {
   document.getElementById('editor-protect-modal').classList.add('active');
   document.getElementById('editor-protect-password').value = '';
   document.getElementById('editor-protect-confirm').value = '';
+  pushModalState('editor-protect-modal');
 }
 
-function closeEditorProtectModal() {
+function closeEditorProtectModal(skipHistoryBack = false) {
   document.getElementById('editor-protect-modal').classList.remove('active');
+  navHistory.currentModal = null;
+  if (!skipHistoryBack && navHistory.currentView === 'modal') {
+    history.back();
+  }
 }
 
 async function applyEditorProtect() {
@@ -5559,15 +5109,40 @@ async function ueDownload() {
     return;
   }
 
+  const downloadBtn = document.getElementById('ue-download-btn');
+  const originalText = downloadBtn.innerHTML;
+
+  // Show loading state
+  downloadBtn.disabled = true;
+  downloadBtn.innerHTML = `
+    <svg class="btn-spinner" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M12 2v4m0 12v4m-7.07-3.93l2.83-2.83m8.48-8.48l2.83-2.83M2 12h4m12 0h4m-3.93 7.07l-2.83-2.83M7.76 7.76L4.93 4.93"/>
+    </svg>
+    Memproses...
+  `;
+
   try {
     const newDoc = await PDFLib.PDFDocument.create();
     const fontCache = {};
 
+    // Google Fonts URLs for custom fonts (woff2 format)
+    const customFontUrls = {
+      'Montserrat': 'https://fonts.gstatic.com/s/montserrat/v26/JTUHjIg1_i6t8kCHKm4532VJOt5-QNFgpCtr6Ew-.woff2',
+      'Montserrat-Bold': 'https://fonts.gstatic.com/s/montserrat/v26/JTUHjIg1_i6t8kCHKm4532VJOt5-QNFgpCuM70w-.woff2',
+      'Montserrat-Italic': 'https://fonts.gstatic.com/s/montserrat/v26/JTUFjIg1_i6t8kCHKm459Wx7xQYXK0vOoz6jq6R8WXV0poK5.woff2',
+      'Montserrat-BoldItalic': 'https://fonts.gstatic.com/s/montserrat/v26/JTUFjIg1_i6t8kCHKm459Wx7xQYXK0vOoz6jqxp5WXV0poK5.woff2',
+      'Carlito': 'https://fonts.gstatic.com/s/carlito/v3/3Jn9SDPw3m-pk039PDCLTXUETuE.woff2',
+      'Carlito-Bold': 'https://fonts.gstatic.com/s/carlito/v3/3Jn4SDPw3m-pk039BIykaX0vUuhCyOo.woff2',
+      'Carlito-Italic': 'https://fonts.gstatic.com/s/carlito/v3/3Jn_SDPw3m-pk039DDKBSVcBXuFb0Q.woff2',
+      'Carlito-BoldItalic': 'https://fonts.gstatic.com/s/carlito/v3/3Jn6SDPw3m-pk039DDK59XglVspH2OprMQ.woff2'
+    };
+
     // Helper to get the right font based on family, bold, italic
     async function getFont(fontFamily, bold, italic) {
       let fontName = fontFamily || 'Helvetica';
+      let isCustomFont = false;
 
-      // Map font family + style to pdf-lib StandardFonts
+      // Map font family + style to pdf-lib StandardFonts or custom font names
       if (fontFamily === 'Helvetica') {
         if (bold && italic) fontName = 'Helvetica-BoldOblique';
         else if (bold) fontName = 'Helvetica-Bold';
@@ -5583,10 +5158,40 @@ async function ueDownload() {
         else if (bold) fontName = 'Courier-Bold';
         else if (italic) fontName = 'Courier-Oblique';
         else fontName = 'Courier';
+      } else if (fontFamily === 'Montserrat') {
+        isCustomFont = true;
+        if (bold && italic) fontName = 'Montserrat-BoldItalic';
+        else if (bold) fontName = 'Montserrat-Bold';
+        else if (italic) fontName = 'Montserrat-Italic';
+        else fontName = 'Montserrat';
+      } else if (fontFamily === 'Carlito') {
+        isCustomFont = true;
+        if (bold && italic) fontName = 'Carlito-BoldItalic';
+        else if (bold) fontName = 'Carlito-Bold';
+        else if (italic) fontName = 'Carlito-Italic';
+        else fontName = 'Carlito';
       }
 
       if (!fontCache[fontName]) {
-        fontCache[fontName] = await newDoc.embedFont(PDFLib.StandardFonts[fontName]);
+        if (isCustomFont) {
+          // Fetch and embed custom font from Google Fonts
+          try {
+            const fontUrl = customFontUrls[fontName];
+            const fontResponse = await fetch(fontUrl);
+            const fontBytes = await fontResponse.arrayBuffer();
+            fontCache[fontName] = await newDoc.embedFont(fontBytes);
+          } catch (err) {
+            console.warn(`Failed to load custom font ${fontName}, falling back to Helvetica:`, err);
+            // Fallback to Helvetica
+            const fallbackName = bold ? 'Helvetica-Bold' : 'Helvetica';
+            if (!fontCache[fallbackName]) {
+              fontCache[fallbackName] = await newDoc.embedFont(PDFLib.StandardFonts[fallbackName]);
+            }
+            return fontCache[fallbackName];
+          }
+        } else {
+          fontCache[fontName] = await newDoc.embedFont(PDFLib.StandardFonts[fontName]);
+        }
       }
       return fontCache[fontName];
     }
@@ -5683,6 +5288,10 @@ async function ueDownload() {
   } catch (error) {
     console.error('Error saving PDF:', error);
     showToast('Gagal menyimpan PDF', 'error');
+  } finally {
+    // Restore button state
+    downloadBtn.disabled = false;
+    downloadBtn.innerHTML = originalText;
   }
 }
 
@@ -5827,13 +5436,14 @@ function uePmOpenModal() {
   uePmUpdateUI();
 
   document.getElementById('ue-page-manager-modal').classList.add('active');
+  pushModalState('ue-page-manager-modal');
 
   // Initialize file input handler
   initUePmFileInput();
 }
 
 // Close the page manager modal
-function uePmCloseModal() {
+function uePmCloseModal(skipHistoryBack = false) {
   uePmState.isOpen = false;
   document.getElementById('ue-page-manager-modal').classList.remove('active');
 
@@ -5854,6 +5464,11 @@ function uePmCloseModal() {
   // Re-render selected page if needed
   if (ueState.selectedPage >= 0) {
     ueRenderSelectedPage();
+  }
+
+  navHistory.currentModal = null;
+  if (!skipHistoryBack && navHistory.currentView === 'modal') {
+    history.back();
   }
 }
 
@@ -6425,48 +6040,114 @@ function initUePmFileInput() {
 // ============================================================
 
 document.addEventListener('keydown', (e) => {
-  // Escape to go back
-  if (e.key === 'Escape' && state.currentTool) {
-    showHome();
-  }
+  const key = e.key.toLowerCase();
 
-  // Ctrl+Z for undo in edit mode
-  if (e.key === 'z' && (e.ctrlKey || e.metaKey) && state.currentTool === 'edit') {
-    e.preventDefault();
-    undoEdit();
-  }
-
-  // Ctrl+Z for undo in unified editor
-  if (e.key === 'z' && (e.ctrlKey || e.metaKey) && state.currentTool === 'unified-editor') {
-    e.preventDefault();
-    ueUndoAnnotation();
-  }
-
-  // Keyboard shortcuts for unified editor tools
   // Skip if user is typing in an input field
   const activeEl = document.activeElement;
   const isTyping = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable);
 
-  if (state.currentTool === 'unified-editor' && ueState.selectedPage >= 0 && !isTyping) {
-    if (e.key === 'v' && !e.ctrlKey && !e.metaKey) {
-      ueSetTool('select');
-    } else if (e.key === 'w' && !e.ctrlKey && !e.metaKey) {
-      ueSetTool('whiteout');
-    } else if (e.key === 't' && !e.ctrlKey && !e.metaKey) {
-      ueSetTool('text');
-    } else if (e.key === 's' && !e.ctrlKey && !e.metaKey) {
-      ueOpenSignatureModal();
-    } else if (e.key === 'Delete' || e.key === 'Backspace') {
-      if (ueState.selectedAnnotation) {
-        e.preventDefault();
-        ueSaveEditUndoState();
-        ueState.annotations[ueState.selectedAnnotation.pageIndex].splice(ueState.selectedAnnotation.index, 1);
-        ueState.selectedAnnotation = null;
-        ueRedrawAnnotations();
+  // Escape - close modals or go back home
+  if (e.key === 'Escape') {
+    // Check if any modal is open first
+    const shortcutsModal = document.getElementById('shortcuts-modal');
+    if (shortcutsModal && shortcutsModal.classList.contains('active')) {
+      closeShortcutsModal();
+      return;
+    }
+    if (state.currentTool) {
+      showHome();
+    }
+  }
+
+  // Ctrl+S / Cmd+S - Download PDF in unified editor
+  if ((e.ctrlKey || e.metaKey) && key === 's') {
+    e.preventDefault();
+    if (state.currentTool === 'unified-editor' && ueState.pages.length > 0) {
+      ueDownload();
+    }
+  }
+
+  // Ctrl+Z for undo in unified editor
+  if (key === 'z' && (e.ctrlKey || e.metaKey) && state.currentTool === 'unified-editor') {
+    e.preventDefault();
+    ueUndoAnnotation();
+  }
+
+  // Ctrl+Y for redo in unified editor
+  if (key === 'y' && (e.ctrlKey || e.metaKey) && state.currentTool === 'unified-editor') {
+    e.preventDefault();
+    ueRedoAnnotation();
+  }
+
+  // Keyboard shortcuts for unified editor tools (only when not typing)
+  if (state.currentTool === 'unified-editor' && !isTyping) {
+    // Tool shortcuts (require a page to be selected)
+    if (ueState.selectedPage >= 0) {
+      if (key === 'v' && !e.ctrlKey && !e.metaKey) {
+        ueSetTool('select');
+      } else if (key === 'w' && !e.ctrlKey && !e.metaKey) {
+        ueSetTool('whiteout');
+      } else if (key === 't' && !e.ctrlKey && !e.metaKey) {
+        ueSetTool('text');
+      } else if (key === 's' && !e.ctrlKey && !e.metaKey) {
+        ueOpenSignatureModal();
+      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (ueState.selectedAnnotation) {
+          e.preventDefault();
+          ueSaveEditUndoState();
+          ueState.annotations[ueState.selectedAnnotation.pageIndex].splice(ueState.selectedAnnotation.index, 1);
+          ueState.selectedAnnotation = null;
+          ueRedrawAnnotations();
+        }
       }
+    }
+
+    // Arrow key navigation
+    if (e.key === 'ArrowLeft' && ueState.selectedPage > 0) {
+      e.preventDefault();
+      ueSelectPage(ueState.selectedPage - 1);
+    } else if (e.key === 'ArrowRight' && ueState.selectedPage < ueState.pages.length - 1) {
+      e.preventDefault();
+      ueSelectPage(ueState.selectedPage + 1);
+    }
+
+    // Zoom shortcuts
+    if (e.key === '-' || e.key === '_') {
+      e.preventDefault();
+      ueZoomOut();
+    } else if (e.key === '+' || e.key === '=') {
+      e.preventDefault();
+      ueZoomIn();
+    } else if (e.key === '0' && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      ueZoomReset();
+    }
+
+    // ? to show keyboard shortcuts help
+    if (e.key === '?' || (e.shiftKey && key === '/')) {
+      e.preventDefault();
+      openShortcutsModal();
     }
   }
 });
+
+// ============================================================
+// KEYBOARD SHORTCUTS MODAL
+// ============================================================
+
+function openShortcutsModal() {
+  const modal = document.getElementById('shortcuts-modal');
+  if (modal) {
+    modal.classList.add('active');
+  }
+}
+
+function closeShortcutsModal() {
+  const modal = document.getElementById('shortcuts-modal');
+  if (modal) {
+    modal.classList.remove('active');
+  }
+}
 
 // ============================================================
 // HANDLE PASTE
