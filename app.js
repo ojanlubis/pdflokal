@@ -83,6 +83,16 @@ function detectMobile() {
   document.body.classList.toggle('is-mobile', mobileState.isMobile);
   document.body.classList.toggle('is-touch', mobileState.isTouch);
   document.body.classList.toggle('is-landscape', mobileState.orientation === 'landscape');
+
+  // Update dropzone text for mobile/touch devices
+  const dropzoneText = document.querySelector('#main-dropzone h3');
+  if (dropzoneText) {
+    if (mobileState.isMobile || mobileState.isTouch) {
+      dropzoneText.textContent = 'Ketuk, lalu pilih Foto/Media untuk browse file PDF';
+    } else {
+      dropzoneText.textContent = 'Seret file ke sini atau klik untuk pilih';
+    }
+  }
 }
 
 // Debounce helper for resize events
