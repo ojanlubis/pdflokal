@@ -4594,9 +4594,15 @@ function ueSelectPage(index) {
   }
 }
 
+// Render lock to prevent concurrent renders
+let ueRenderLock = false;
+
 // Render selected page on main canvas
 async function ueRenderSelectedPage() {
   if (ueState.selectedPage < 0) return;
+  if (ueRenderLock) return; // Skip if already rendering
+
+  ueRenderLock = true;
 
   const pageInfo = ueState.pages[ueState.selectedPage];
   const sourceFile = ueState.sourceFiles[pageInfo.sourceIndex];
@@ -4617,6 +4623,7 @@ async function ueRenderSelectedPage() {
     // Ensure we have valid dimensions
     if (maxWidth <= 100) {
       console.warn('Invalid wrapper dimensions, retrying...', { maxWidth });
+      ueRenderLock = false;
       setTimeout(() => ueRenderSelectedPage(), 150);
       return;
     }
@@ -4661,6 +4668,8 @@ async function ueRenderSelectedPage() {
   } catch (error) {
     console.error('Error rendering page:', error);
     showToast('Gagal merender halaman', 'error');
+  } finally {
+    ueRenderLock = false;
   }
 }
 
@@ -4742,10 +4751,14 @@ function ueSetupCanvasEvents() {
   });
 
   canvas.addEventListener('touchstart', (e) => {
+    // Ignore multi-touch (pinch gestures handled separately)
+    if (e.touches.length > 1) return;
     e.preventDefault();
     handleDown(getCoords(e.touches[0]));
   }, { passive: false });
   canvas.addEventListener('touchmove', (e) => {
+    // Ignore multi-touch (pinch gestures handled separately)
+    if (e.touches.length > 1) return;
     e.preventDefault();
     handleMove(getCoords(e.touches[0]));
   }, { passive: false });
@@ -6727,6 +6740,7 @@ function initMobileEditorEnhancements() {
   // Track pinch-to-zoom state
   let initialPinchDistance = null;
   let initialZoom = 1;
+  let renderTimeout = null;
 
   function getPinchDistance(e) {
     if (e.touches.length < 2) return null;
@@ -6755,7 +6769,12 @@ function initMobileEditorEnhancements() {
         if (Math.abs(newZoom - ueState.zoomLevel) > 0.05) {
           ueState.zoomLevel = newZoom;
           ueUpdateZoomDisplay();
-          ueRenderSelectedPage();
+
+          // Debounce render to prevent multiple concurrent calls
+          clearTimeout(renderTimeout);
+          renderTimeout = setTimeout(() => {
+            ueRenderSelectedPage();
+          }, 100);
         }
       }
       e.preventDefault();
@@ -6765,6 +6784,9 @@ function initMobileEditorEnhancements() {
   canvas.addEventListener('touchend', function(e) {
     if (e.touches.length < 2) {
       initialPinchDistance = null;
+      // Final render when pinch ends
+      clearTimeout(renderTimeout);
+      ueRenderSelectedPage();
     }
   }, { passive: true });
 }
