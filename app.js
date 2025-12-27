@@ -4432,6 +4432,9 @@ const ueState = {
   signaturePreviewPos: null,    // Current cursor position for preview { x, y }
   resizeHandle: null,           // Current resize handle being dragged ('tl', 'tr', 'bl', 'br')
   resizeStartInfo: null,        // Initial annotation state when resize started
+  // Touch interaction state (shared with pinch-to-zoom handler)
+  isDragging: false,            // Whether annotation is being dragged
+  isResizing: false,            // Whether annotation is being resized
 };
 
 // Initialize unified editor file input
@@ -4706,8 +4709,7 @@ function ueSetupCanvasEvents() {
 
   const canvas = document.getElementById('ue-canvas');
   let isDrawing = false;
-  let isDragging = false;
-  let isResizing = false;
+  // isDragging and isResizing are now on ueState for sharing with pinch-to-zoom handler
   let startX, startY;
   let dragOffsetX, dragOffsetY;
 
@@ -4741,8 +4743,8 @@ function ueSetupCanvasEvents() {
   canvas.addEventListener('mouseup', (e) => handleUp(getCoords(e)));
   canvas.addEventListener('mouseleave', () => {
     isDrawing = false;
-    isDragging = false;
-    isResizing = false;
+    ueState.isDragging = false;
+    ueState.isResizing = false;
     // Clear signature preview when leaving canvas
     if (ueState.pendingSignature) {
       ueState.signaturePreviewPos = null;
@@ -4785,7 +4787,7 @@ function ueSetupCanvasEvents() {
         const handle = getResizeHandle(anno, x, y);
         if (handle) {
           ueSaveEditUndoState();
-          isResizing = true;
+          ueState.isResizing = true;
           ueState.resizeHandle = handle;
           ueState.resizeStartInfo = {
             x: anno.x,
@@ -4811,7 +4813,7 @@ function ueSetupCanvasEvents() {
         }
         ueSaveEditUndoState();
         ueState.selectedAnnotation = clicked;
-        isDragging = true;
+        ueState.isDragging = true;
         dragOffsetX = x - anno.x;
         dragOffsetY = y - (anno.type === 'text' ? anno.y - anno.fontSize : anno.y);
         ueRedrawAnnotations();
@@ -4838,7 +4840,7 @@ function ueSetupCanvasEvents() {
     }
 
     // Handle resizing annotation
-    if (isResizing && ueState.selectedAnnotation && ueState.resizeStartInfo) {
+    if (ueState.isResizing && ueState.selectedAnnotation && ueState.resizeStartInfo) {
       const anno = ueState.annotations[ueState.selectedAnnotation.pageIndex][ueState.selectedAnnotation.index];
       const info = ueState.resizeStartInfo;
       const handle = ueState.resizeHandle;
@@ -4879,7 +4881,7 @@ function ueSetupCanvasEvents() {
     }
 
     // Handle dragging annotation
-    if (isDragging && ueState.selectedAnnotation) {
+    if (ueState.isDragging && ueState.selectedAnnotation) {
       const anno = ueState.annotations[ueState.selectedAnnotation.pageIndex][ueState.selectedAnnotation.index];
       if (anno.type === 'text') {
         anno.x = x - dragOffsetX;
@@ -4908,15 +4910,15 @@ function ueSetupCanvasEvents() {
   }
 
   function handleUp({ x, y }) {
-    if (isResizing) {
-      isResizing = false;
+    if (ueState.isResizing) {
+      ueState.isResizing = false;
       ueState.resizeHandle = null;
       ueState.resizeStartInfo = null;
       return;
     }
 
-    if (isDragging) {
-      isDragging = false;
+    if (ueState.isDragging) {
+      ueState.isDragging = false;
       return;
     }
 
@@ -6752,6 +6754,9 @@ function initMobileEditorEnhancements() {
   // Add pinch-to-zoom handlers
   canvas.addEventListener('touchstart', function(e) {
     if (e.touches.length === 2) {
+      // Don't start pinch if user is dragging/resizing annotation
+      if (ueState.isDragging || ueState.isResizing) return;
+
       initialPinchDistance = getPinchDistance(e);
       initialZoom = ueState.zoomLevel;
       e.preventDefault();
@@ -6760,6 +6765,12 @@ function initMobileEditorEnhancements() {
 
   canvas.addEventListener('touchmove', function(e) {
     if (e.touches.length === 2 && initialPinchDistance) {
+      // Cancel pinch if drag/resize started after pinch init
+      if (ueState.isDragging || ueState.isResizing) {
+        initialPinchDistance = null;
+        return;
+      }
+
       const currentDistance = getPinchDistance(e);
       if (currentDistance) {
         const scale = currentDistance / initialPinchDistance;
