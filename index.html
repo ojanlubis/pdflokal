@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   
   <!-- SEO Meta Tags -->
   <title>PDFLokal - Gabung PDF, Kompres, Edit | Gratis & Cepat</title>
@@ -63,6 +63,7 @@
       <section class="hero">
         <h1>Urus dokumen langsung di browser</h1>
         <p>Cepat, gratis, secure</p>
+        <p class="hero-hint">Tambahkan tanda tangan, edit, merge — semua offline</p>
       </section>
 
       <!-- Drop Zone -->
@@ -74,7 +75,7 @@
             <line x1="12" y1="3" x2="12" y2="15"/>
           </svg>
           <h3>Seret file ke sini atau klik untuk pilih</h3>
-          <p>PDF • JPG • PNG • WebP</p>
+          <p>PDF or Image</p>
           <input type="file" id="file-input" multiple accept=".pdf,.jpg,.jpeg,.png,.webp">
         </div>
       </div>
@@ -90,149 +91,115 @@
 
       <!-- Tools Section -->
       <section class="tools-section">
-        <!-- PDF Tools -->
-        <div class="tools-category">
-          <h2>PDF</h2>
-          <div class="tools-grid">
-            <div class="tool-card" data-tool="unified-editor" style="border: 2px solid var(--accent-primary);">
-              <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                <polyline points="14 2 14 8 20 8"/>
-                <path d="M16 13H8"/>
-                <path d="M16 17H8"/>
-                <path d="M10 9H8"/>
-              </svg>
-              <h3>Editor PDF</h3>
-              <p>edit, merge, kelola</p>
-            </div>
-            <div class="tool-card" data-tool="page-manager">
-              <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="3" width="7" height="9"/>
-                <rect x="14" y="3" width="7" height="9"/>
-                <rect x="3" y="14" width="7" height="7"/>
-                <rect x="14" y="14" width="7" height="7"/>
-              </svg>
-              <h3>Kelola Halaman</h3>
-              <p>merge, split, manage</p>
-            </div>
-            <div class="tool-card" data-tool="edit">
-              <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-              </svg>
-              <h3>Edit PDF</h3>
-            </div>
-            <div class="tool-card" data-tool="pdf-to-img">
-              <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                <circle cx="8.5" cy="8.5" r="1.5"/>
-                <polyline points="21 15 16 10 5 21"/>
-              </svg>
-              <h3>PDF ke Gambar</h3>
-            </div>
-            <div class="tool-card" data-tool="compress-pdf">
-              <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 3v12"/>
-                <path d="m8 11 4 4 4-4"/>
-                <path d="M8 5H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-4"/>
-              </svg>
-              <h3>Kompres PDF</h3>
-              <p>Struktur saja</p>
-            </div>
-            <div class="tool-card" data-tool="protect">
-              <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-              </svg>
-              <h3>Proteksi</h3>
-            </div>
-            <div class="tool-card" data-tool="unlock">
-              <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                <path d="M7 11V7a5 5 0 0 1 9.9-1"/>
-              </svg>
-              <h3>Buka Kunci</h3>
-            </div>
-            <div class="tool-card" data-tool="watermark">
-              <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-              </svg>
-              <h3>Watermark</h3>
-            </div>
-            <div class="tool-card" data-tool="page-numbers">
-              <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M4 7V4h16v3"/>
-                <path d="M9 20h6"/>
-                <path d="M12 4v16"/>
-              </svg>
-              <h3>Nomor Halaman</h3>
-            </div>
-            <div class="tool-card" data-tool="crop">
-              <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M6.13 1L6 16a2 2 0 0 0 2 2h15"/>
-                <path d="M1 6.13L16 6a2 2 0 0 1 2 2v15"/>
-              </svg>
-              <h3>Crop</h3>
+        <!-- Main Tools Row: PDF and Image side by side -->
+        <div class="tools-row">
+          <!-- PDF Tools -->
+          <div class="tools-category">
+            <h2>PDF</h2>
+            <div class="tools-grid">
+              <div class="tool-card" data-tool="unified-editor" style="border: 2px solid var(--accent-primary);">
+                <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                  <path d="M16 13H8"/>
+                  <path d="M16 17H8"/>
+                  <path d="M10 9H8"/>
+                </svg>
+                <h3>Editor PDF</h3>
+                <p>edit, merge, kelola</p>
+              </div>
+              <div class="tool-card" data-tool="pdf-to-img">
+                <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                  <circle cx="8.5" cy="8.5" r="1.5"/>
+                  <polyline points="21 15 16 10 5 21"/>
+                </svg>
+                <h3>PDF ke Gambar</h3>
+              </div>
+              <div class="tool-card" data-tool="compress-pdf">
+                <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 3v12"/>
+                  <path d="m8 11 4 4 4-4"/>
+                  <path d="M8 5H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-4"/>
+                </svg>
+                <h3>Kompres PDF</h3>
+                <p>Struktur saja</p>
+              </div>
+              <div class="tool-card" data-tool="protect">
+                <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                </svg>
+                <h3>Proteksi</h3>
+              </div>
+              <div class="tool-card" data-tool="watermark">
+                <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+                <h3>Watermark</h3>
+              </div>
+              <div class="tool-card" data-tool="page-numbers">
+                <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="4" y1="9" x2="20" y2="9"/>
+                  <line x1="4" y1="15" x2="20" y2="15"/>
+                  <line x1="10" y1="3" x2="8" y2="21"/>
+                  <line x1="16" y1="3" x2="14" y2="21"/>
+                </svg>
+                <h3>Nomor Halaman</h3>
+              </div>
             </div>
           </div>
-        </div>
 
-        <!-- Image Tools -->
-        <div class="tools-category">
-          <h2>Gambar</h2>
-          <div class="tools-grid">
-            <div class="tool-card" data-tool="compress-img">
-              <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                <polyline points="7 10 12 15 17 10"/>
-                <line x1="12" y1="15" x2="12" y2="3"/>
-              </svg>
-              <h3>Kompres Gambar</h3>
-            </div>
-            <div class="tool-card" data-tool="resize">
-              <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="15 3 21 3 21 9"/>
-                <polyline points="9 21 3 21 3 15"/>
-                <line x1="21" y1="3" x2="14" y2="10"/>
-                <line x1="3" y1="21" x2="10" y2="14"/>
-              </svg>
-              <h3>Ubah Ukuran</h3>
-            </div>
-            <div class="tool-card" data-tool="convert-img">
-              <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="17 1 21 5 17 9"/>
-                <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
-                <polyline points="7 23 3 19 7 15"/>
-                <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
-              </svg>
-              <h3>Convert Format</h3>
-            </div>
-            <div class="tool-card" data-tool="img-to-pdf">
-              <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                <polyline points="14 2 14 8 20 8"/>
-                <path d="M12 18v-6"/>
-                <path d="m9 15 3-3 3 3"/>
-              </svg>
-              <h3>Gambar ke PDF</h3>
-            </div>
-          </div>
-        </div>
-
-        <!-- Image Editing Tools -->
-        <div class="tools-category">
-          <h2>Alat Gambar</h2>
-          <div class="tools-grid">
-            <div class="tool-card" data-tool="remove-bg">
-              <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                <path d="M9 3v18"/>
-                <path d="M15 3v18"/>
-                <path d="M3 9h18"/>
-                <path d="M3 15h18"/>
-              </svg>
-              <h3>Hapus Latar Belakang</h3>
-              <p>putih → transparan</p>
+          <!-- Image Tools -->
+          <div class="tools-category">
+            <h2>Gambar</h2>
+            <div class="tools-grid">
+              <div class="tool-card" data-tool="compress-img">
+                <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                <h3>Kompres Gambar</h3>
+              </div>
+              <div class="tool-card" data-tool="resize">
+                <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="15 3 21 3 21 9"/>
+                  <polyline points="9 21 3 21 3 15"/>
+                  <line x1="21" y1="3" x2="14" y2="10"/>
+                  <line x1="3" y1="21" x2="10" y2="14"/>
+                </svg>
+                <h3>Ubah Ukuran</h3>
+              </div>
+              <div class="tool-card" data-tool="convert-img">
+                <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="17 1 21 5 17 9"/>
+                  <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+                  <polyline points="7 23 3 19 7 15"/>
+                  <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+                </svg>
+                <h3>Convert Format</h3>
+              </div>
+              <div class="tool-card" data-tool="img-to-pdf">
+                <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                  <path d="M12 18v-6"/>
+                  <path d="m9 15 3-3 3 3"/>
+                </svg>
+                <h3>Gambar ke PDF</h3>
+              </div>
+              <div class="tool-card" data-tool="remove-bg">
+                <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                  <path d="M9 3v18"/>
+                  <path d="M15 3v18"/>
+                  <path d="M3 9h18"/>
+                  <path d="M3 15h18"/>
+                </svg>
+                <h3>Hapus Latar</h3>
+                <p>putih → transparan</p>
+              </div>
             </div>
           </div>
         </div>
@@ -442,71 +409,93 @@
         <div class="unified-main">
           <!-- Editor Toolbar -->
           <div class="editor-toolbar">
-            <!-- Hero Action: Signature -->
-            <div class="editor-tool-group editor-tool-group--primary">
-              <button class="editor-tool-btn editor-tool-btn--primary" id="ue-signature-btn" data-edit-tool="signature" onclick="ueOpenSignatureModal()" title="Tanda Tangan (S)">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 19.5v.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v1.5"/><path d="m16 19-3-3 8-8 3 3-8 8Z"/></svg>
-                Tanda Tangan
-              </button>
-              <!-- First-use tooltip -->
-              <div class="signature-hint-tooltip" id="signature-hint-tooltip">
-                Klik untuk menandatangani dokumen
-                <span class="tooltip-arrow"></span>
+            <!-- Line 1: Tools -->
+            <div class="editor-toolbar-line">
+              <!-- Signature Button -->
+              <div class="editor-tool-group editor-tool-group--primary">
+                <button class="editor-tool-btn editor-tool-btn--signature" id="ue-signature-btn" data-edit-tool="signature" onclick="ueOpenSignatureModal()" title="Tanda Tangan (S)">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 19.5v.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v1.5"/><path d="m16 19-3-3 8-8 3 3-8 8Z"/></svg>
+                  Tanda Tangan
+                </button>
+                <!-- First-use tooltip -->
+                <div class="signature-hint-tooltip" id="signature-hint-tooltip">
+                  Klik untuk menandatangani dokumen
+                  <span class="tooltip-arrow"></span>
+                </div>
+              </div>
+              <div class="editor-tool-divider"></div>
+              <!-- Secondary Tools -->
+              <div class="editor-tool-group editor-tool-group--secondary">
+                <button class="editor-tool-btn editor-tool-btn--secondary" data-edit-tool="select" onclick="ueSetTool('select')" title="Pilih & Edit (V)">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="M13 13l6 6"/></svg>
+                  Pilih
+                </button>
+                <button class="editor-tool-btn editor-tool-btn--secondary" data-edit-tool="whiteout" onclick="ueSetTool('whiteout')" title="Whiteout (W)">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+                  Whiteout
+                </button>
+                <button class="editor-tool-btn editor-tool-btn--secondary" data-edit-tool="text" onclick="ueSetTool('text')" title="Tambah Teks (T)">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>
+                  Teks
+                </button>
+              </div>
+              <!-- Spacer to push More Tools to the right -->
+              <div class="editor-toolbar-spacer"></div>
+              <!-- More Tools Dropdown -->
+              <div class="editor-more-tools">
+                <button class="editor-tool-btn editor-tool-btn--secondary" id="more-tools-btn" onclick="toggleMoreTools(event)" title="Alat Lainnya">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
+                  Lainnya
+                </button>
+                <div class="more-tools-dropdown" id="more-tools-dropdown">
+                  <button class="more-tools-item" onclick="ueOpenWatermarkModal(); closeMoreTools()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    Watermark
+                  </button>
+                  <button class="more-tools-item" onclick="ueOpenPageNumModal(); closeMoreTools()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h10"/><circle cx="18" cy="17" r="2"/></svg>
+                    Nomor Halaman
+                  </button>
+                  <button class="more-tools-item" onclick="ueOpenProtectModal(); closeMoreTools()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    Kunci PDF
+                  </button>
+                </div>
               </div>
             </div>
-            <div class="editor-tool-divider"></div>
-            <!-- Secondary Tools -->
-            <div class="editor-tool-group editor-tool-group--secondary">
-              <button class="editor-tool-btn editor-tool-btn--secondary" data-edit-tool="select" onclick="ueSetTool('select')" title="Pilih & Edit (V)">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="M13 13l6 6"/></svg>
-                Pilih
-              </button>
-              <button class="editor-tool-btn editor-tool-btn--secondary" data-edit-tool="whiteout" onclick="ueSetTool('whiteout')" title="Whiteout (W)">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
-                Whiteout
-              </button>
-              <button class="editor-tool-btn editor-tool-btn--secondary" data-edit-tool="text" onclick="ueSetTool('text')" title="Tambah Teks (T)">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>
-                Teks
-              </button>
-              <button class="editor-tool-btn editor-tool-btn--secondary" onclick="ueOpenWatermarkModal()" title="Tambah Watermark">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                Watermark
-              </button>
-              <button class="editor-tool-btn editor-tool-btn--secondary" onclick="ueOpenPageNumModal()" title="Tambah Nomor Halaman">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h10"/><circle cx="18" cy="17" r="2"/></svg>
-                Nomor Halaman
-              </button>
-            </div>
-            <div class="editor-tool-divider"></div>
-            <div class="editor-action-group">
-              <button class="editor-action-btn" onclick="ueUndoAnnotation()" title="Undo Edit (Ctrl+Z)">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
-              </button>
-              <button class="editor-action-btn" onclick="ueRedoAnnotation()" title="Redo Edit (Ctrl+Y)">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></svg>
-              </button>
-              <button class="editor-action-btn danger" onclick="ueClearPageAnnotations()" title="Hapus Semua Edit di Halaman Ini">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+            <!-- Line 2: Actions -->
+            <div class="editor-toolbar-line editor-toolbar-line--actions">
+              <div class="editor-zoom-group">
+                <button class="editor-action-btn" onclick="ueZoomOut()" title="Zoom Out (-)">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35M8 11h6"/></svg>
+                </button>
+                <span class="zoom-level" id="ue-zoom-level">100%</span>
+                <button class="editor-action-btn" onclick="ueZoomIn()" title="Zoom In (+)">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35M11 8v6M8 11h6"/></svg>
+                </button>
+                <button class="editor-action-btn" onclick="ueZoomReset()" title="Reset Zoom (0)">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                </button>
+              </div>
+              <div class="editor-tool-divider"></div>
+              <div class="editor-action-group">
+                <button class="editor-action-btn" onclick="ueUndoAnnotation()" title="Undo Edit (Ctrl+Z)">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+                </button>
+                <button class="editor-action-btn" onclick="ueRedoAnnotation()" title="Redo Edit (Ctrl+Y)">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></svg>
+                </button>
+                <button class="editor-action-btn danger" onclick="ueClearPageAnnotations()" title="Hapus Semua Edit di Halaman Ini">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+                </button>
+              </div>
+              <!-- Spacer to push Download to the right -->
+              <div class="editor-toolbar-spacer"></div>
+              <button class="btn btn-primary btn--download-hero" id="ue-download-btn" disabled onclick="ueDownload()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Download PDF
               </button>
             </div>
-            <div class="editor-tool-divider"></div>
-            <div class="editor-zoom-group">
-              <button class="editor-action-btn" onclick="ueZoomOut()" title="Zoom Out (-)">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35M8 11h6"/></svg>
-              </button>
-              <span class="zoom-level" id="ue-zoom-level">100%</span>
-              <button class="editor-action-btn" onclick="ueZoomIn()" title="Zoom In (+)">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35M11 8v6M8 11h6"/></svg>
-              </button>
-              <button class="editor-action-btn" onclick="ueZoomReset()" title="Reset Zoom (0)">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-              </button>
-            </div>
-            <button class="btn btn-primary btn--download-hero" id="ue-download-btn" disabled onclick="ueDownload()">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              Download PDF
-            </button>
           </div>
 
           <!-- Status Bar -->
@@ -527,6 +516,58 @@
             </div>
             <canvas id="ue-canvas" class="editor-canvas" style="display: none;"></canvas>
           </div>
+        </div>
+      </div>
+
+      <!-- Mobile Bottom Bar (visible only on mobile) -->
+      <div class="mobile-bottom-bar" id="ue-mobile-bottombar">
+        <div class="mobile-page-nav">
+          <button class="mobile-nav-btn" id="ue-mobile-prev" onclick="ueMobilePrevPage()" disabled title="Halaman sebelumnya">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
+          <span class="mobile-page-indicator" id="ue-mobile-page-indicator" onclick="ueMobileOpenPagePicker()">
+            Halaman <strong>1</strong> / 1
+          </span>
+          <button class="mobile-nav-btn" id="ue-mobile-next" onclick="ueMobileNextPage()" title="Halaman berikutnya">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+          </button>
+        </div>
+        <div class="mobile-tools-wrapper">
+          <button class="mobile-more-btn" id="ue-mobile-more-btn" onclick="toggleMobileTools()" title="Alat lainnya">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
+          </button>
+          <div class="mobile-tools-dropdown" id="mobile-tools-dropdown">
+            <button class="mobile-tool-item" onclick="ueSetTool('select'); closeMobileTools()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="M13 13l6 6"/></svg>
+              Pilih
+            </button>
+            <button class="mobile-tool-item" onclick="ueSetTool('whiteout'); closeMobileTools()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+              Whiteout
+            </button>
+            <button class="mobile-tool-item" onclick="ueSetTool('text'); closeMobileTools()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>
+              Teks
+            </button>
+          </div>
+        </div>
+        <button class="mobile-sign-btn" id="ue-mobile-sign-btn" onclick="ueOpenSignatureModal()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 19.5v.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v1.5"/><path d="m16 19-3-3 8-8 3 3-8 8Z"/></svg>
+          <span>Tanda Tangan</span>
+        </button>
+      </div>
+
+      <!-- Mobile Page Picker Modal -->
+      <div class="mobile-page-picker" id="ue-mobile-page-picker">
+        <div class="mobile-page-picker-backdrop" onclick="ueMobileClosePagePicker()"></div>
+        <div class="mobile-page-picker-content">
+          <div class="mobile-page-picker-header">
+            <span>Pilih Halaman</span>
+            <button class="mobile-page-picker-close" onclick="ueMobileClosePagePicker()">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+          </div>
+          <div class="mobile-page-picker-grid" id="ue-mobile-page-grid"></div>
         </div>
       </div>
     </div>
@@ -838,43 +879,6 @@
         </button>
       </div>
     </div>
-
-    <!-- Crop PDF Workspace -->
-    <div id="crop-workspace" class="workspace">
-      <div class="workspace-header">
-        <h2>
-          <button class="back-btn" onclick="showHome()">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-            Kembali
-          </button>
-          Crop PDF
-        </h2>
-      </div>
-      <p class="mb-md" style="color: var(--text-secondary);">Klik dan seret pada halaman untuk menentukan area crop</p>
-      <div class="editor-canvas-wrapper">
-        <canvas id="crop-canvas" class="editor-canvas"></canvas>
-      </div>
-      <div class="editor-page-nav">
-        <button id="crop-prev" onclick="cropPrevPage()">← Sebelumnya</button>
-        <span id="crop-page-info">Halaman 1 dari 1</span>
-        <button id="crop-next" onclick="cropNextPage()">Berikutnya →</button>
-      </div>
-      <div class="controls">
-        <div class="control-group">
-          <label>
-            <input type="checkbox" id="crop-all-pages" checked> Terapkan ke semua halaman
-          </label>
-        </div>
-        <button class="btn btn-secondary" onclick="resetCrop()">Reset Crop</button>
-      </div>
-      <div class="action-bar">
-        <button class="btn btn-primary btn-lg" id="crop-btn" disabled onclick="applyCrop()">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Crop & Download
-        </button>
-      </div>
-    </div>
-
     <!-- Compress Image Workspace -->
     <div id="compress-img-workspace" class="workspace">
       <div class="workspace-header">
@@ -1376,6 +1380,28 @@
       <div class="edit-modal-actions">
         <button class="btn btn-ghost" onclick="closeEditorPageNumModal()">Batal</button>
         <button class="btn btn-primary" onclick="applyEditorPageNumbers()">Terapkan Nomor</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Kunci PDF Modal for Unified Editor -->
+  <div id="editor-protect-modal" class="edit-modal">
+    <div class="edit-modal-box">
+      <h3>Kunci PDF</h3>
+      <div class="edit-modal-content">
+        <div class="edit-option-group" style="width: 100%;">
+          <label>Password</label>
+          <input type="password" id="editor-protect-password" class="edit-text-input" placeholder="Masukkan password">
+        </div>
+        <div class="edit-option-group" style="width: 100%;">
+          <label>Konfirmasi Password</label>
+          <input type="password" id="editor-protect-confirm" class="edit-text-input" placeholder="Konfirmasi password">
+        </div>
+        <p class="modal-note">PDF akan di-download dengan proteksi password</p>
+      </div>
+      <div class="edit-modal-actions">
+        <button class="btn btn-ghost" onclick="closeEditorProtectModal()">Batal</button>
+        <button class="btn btn-primary" onclick="applyEditorProtect()">Kunci & Download</button>
       </div>
     </div>
   </div>

@@ -40,7 +40,6 @@ const state = {
   originalHeight: 0,
   // Track setup states to prevent duplicate event listeners
   workspaceDropZonesSetup: new Set(),
-  cropCanvasSetup: false,
   editCanvasSetup: false,
   // Track blob URLs for cleanup
   blobUrls: [],
@@ -62,10 +61,53 @@ const state = {
 };
 
 // ============================================================
+// MOBILE STATE & DETECTION
+// ============================================================
+
+const mobileState = {
+  isMobile: false,
+  isTouch: false,
+  orientation: 'portrait',
+  viewportWidth: 0,
+  viewportHeight: 0
+};
+
+function detectMobile() {
+  mobileState.viewportWidth = window.innerWidth;
+  mobileState.viewportHeight = window.innerHeight;
+  mobileState.isMobile = window.innerWidth < 768;
+  mobileState.isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+  mobileState.orientation = window.innerHeight > window.innerWidth ? 'portrait' : 'landscape';
+
+  // Update body classes for CSS targeting
+  document.body.classList.toggle('is-mobile', mobileState.isMobile);
+  document.body.classList.toggle('is-touch', mobileState.isTouch);
+  document.body.classList.toggle('is-landscape', mobileState.orientation === 'landscape');
+}
+
+// Debounce helper for resize events
+function debounce(fn, delay) {
+  let timeoutId;
+  return function(...args) {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => fn.apply(this, args), delay);
+  };
+}
+
+// ============================================================
 // INITIALIZATION
 // ============================================================
 
 document.addEventListener('DOMContentLoaded', () => {
+  // Initialize mobile detection first
+  detectMobile();
+
+  // Listen for resize and orientation changes
+  window.addEventListener('resize', debounce(detectMobile, 150));
+  window.addEventListener('orientationchange', () => {
+    setTimeout(detectMobile, 100);
+  });
+
   initDropZone();
   initToolCards();
   initFileInputs();
@@ -308,9 +350,9 @@ function handleDroppedFiles(files) {
   // If no tool is selected, suggest based on file type
   if (!state.currentTool) {
     if (isPDF) {
-      // Default to Page Manager for all PDF operations
-      showTool('page-manager');
-      pmAddFiles(files);
+      // Default to Unified Editor for all PDF operations
+      showTool('unified-editor');
+      ueAddFiles(files);
     } else if (isImage && files.length > 1) {
       showTool('img-to-pdf');
       addImagesToPDF(files);
@@ -359,10 +401,6 @@ async function loadPDFForTool(file, tool) {
       case 'page-numbers':
         await showPDFPreview('page-numbers-preview');
         document.getElementById('page-numbers-btn').disabled = false;
-        break;
-      case 'crop':
-        await initCropMode();
-        document.getElementById('crop-btn').disabled = false;
         break;
     }
   } catch (error) {
@@ -493,6 +531,14 @@ function showTool(tool) {
     // Initialize unified editor when opened
     if (tool === 'unified-editor') {
       initUnifiedEditor();
+
+      // Initialize mobile enhancements
+      if (mobileState.isMobile || mobileState.isTouch) {
+        setTimeout(() => {
+          initMobileEditorEnhancements();
+          ueMobileUpdatePageIndicator();
+        }, 100);
+      }
     }
   }
 }
@@ -571,7 +617,6 @@ function resetState() {
   }
 
   // Reset canvas setup flags so they can be re-initialized
-  state.cropCanvasSetup = false;
   state.editCanvasSetup = false;
 
   // Reset Page Manager state
@@ -2284,207 +2329,6 @@ async function addPageNumbers() {
   } catch (error) {
     console.error('Error adding page numbers:', error);
     showToast('Gagal menambahkan nomor halaman', 'error');
-  }
-}
-
-// ============================================================
-// CROP PDF
-// ============================================================
-
-async function initCropMode() {
-  state.currentCropPage = 0;
-  state.cropRect = null;
-  await renderCropPage();
-  setupCropCanvas();
-}
-
-async function renderCropPage() {
-  const canvas = document.getElementById('crop-canvas');
-  const ctx = canvas.getContext('2d');
-  
-  const page = await state.currentPDF.getPage(state.currentCropPage + 1);
-  const scale = 1;
-  const viewport = page.getViewport({ scale });
-  
-  canvas.width = viewport.width;
-  canvas.height = viewport.height;
-  
-  await page.render({ canvasContext: ctx, viewport }).promise;
-  
-  document.getElementById('crop-page-info').textContent = 
-    `Halaman ${state.currentCropPage + 1} dari ${state.currentPDF.numPages}`;
-  
-  // Redraw crop rect if exists
-  if (state.cropRect) {
-    drawCropRect();
-  }
-}
-
-function setupCropCanvas() {
-  // Prevent duplicate event listeners
-  if (state.cropCanvasSetup) {
-    return;
-  }
-
-  const canvas = document.getElementById('crop-canvas');
-  if (!canvas) return;
-
-  state.cropCanvasSetup = true;
-
-  let isDrawing = false;
-  let startX, startY;
-
-  canvas.addEventListener('mousedown', (e) => {
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    startX = (e.clientX - rect.left) * scaleX;
-    startY = (e.clientY - rect.top) * scaleY;
-    isDrawing = true;
-  });
-
-  canvas.addEventListener('mousemove', (e) => {
-    if (!isDrawing) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const currentX = (e.clientX - rect.left) * scaleX;
-    const currentY = (e.clientY - rect.top) * scaleY;
-
-    state.cropRect = {
-      x: Math.min(startX, currentX),
-      y: Math.min(startY, currentY),
-      width: Math.abs(currentX - startX),
-      height: Math.abs(currentY - startY)
-    };
-
-    renderCropPage();
-  });
-
-  canvas.addEventListener('mouseup', () => {
-    isDrawing = false;
-  });
-
-  // Also handle mouse leaving the canvas
-  canvas.addEventListener('mouseleave', () => {
-    isDrawing = false;
-  });
-}
-
-function drawCropRect() {
-  if (!state.cropRect) return;
-  
-  const canvas = document.getElementById('crop-canvas');
-  const ctx = canvas.getContext('2d');
-  
-  // Draw semi-transparent overlay outside crop area
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-  
-  // Top
-  ctx.fillRect(0, 0, canvas.width, state.cropRect.y);
-  // Bottom
-  ctx.fillRect(0, state.cropRect.y + state.cropRect.height, canvas.width, canvas.height - state.cropRect.y - state.cropRect.height);
-  // Left
-  ctx.fillRect(0, state.cropRect.y, state.cropRect.x, state.cropRect.height);
-  // Right
-  ctx.fillRect(state.cropRect.x + state.cropRect.width, state.cropRect.y, canvas.width - state.cropRect.x - state.cropRect.width, state.cropRect.height);
-  
-  // Draw crop border
-  ctx.strokeStyle = '#dc2626';
-  ctx.lineWidth = 2;
-  ctx.setLineDash([5, 5]);
-  ctx.strokeRect(state.cropRect.x, state.cropRect.y, state.cropRect.width, state.cropRect.height);
-}
-
-function cropPrevPage() {
-  if (state.currentCropPage > 0) {
-    state.currentCropPage--;
-    renderCropPage();
-  }
-}
-
-function cropNextPage() {
-  if (state.currentCropPage < state.currentPDF.numPages - 1) {
-    state.currentCropPage++;
-    renderCropPage();
-  }
-}
-
-function resetCrop() {
-  state.cropRect = null;
-  renderCropPage();
-}
-
-async function applyCrop() {
-  if (!state.cropRect) {
-    showToast('Tentukan area crop terlebih dahulu', 'error');
-    return;
-  }
-
-  try {
-    const srcDoc = await PDFLib.PDFDocument.load(state.currentPDFBytes);
-    const pages = srcDoc.getPages();
-    const applyToAll = document.getElementById('crop-all-pages').checked;
-
-    // Get the canvas dimensions
-    const canvas = document.getElementById('crop-canvas');
-
-    // Get the current page being viewed for scale calculation
-    const currentPage = pages[state.currentCropPage];
-    const { width: currentPageWidth, height: currentPageHeight } = currentPage.getSize();
-
-    // Calculate scale based on current page
-    const scaleX = currentPageWidth / canvas.width;
-    const scaleY = currentPageHeight / canvas.height;
-
-    if (applyToAll) {
-      // Apply to all pages - need to recalculate for each page size
-      for (const page of pages) {
-        const { width: pageWidth, height: pageHeight } = page.getSize();
-
-        // Scale the crop rectangle relative to each page's dimensions
-        const pageScaleX = pageWidth / currentPageWidth;
-        const pageScaleY = pageHeight / currentPageHeight;
-
-        // PDF coordinates start from bottom-left
-        const cropBox = {
-          x: state.cropRect.x * scaleX * pageScaleX,
-          y: pageHeight - (state.cropRect.y + state.cropRect.height) * scaleY * pageScaleY,
-          width: state.cropRect.width * scaleX * pageScaleX,
-          height: state.cropRect.height * scaleY * pageScaleY
-        };
-
-        // Clamp crop box to page bounds
-        cropBox.x = Math.max(0, Math.min(cropBox.x, pageWidth));
-        cropBox.y = Math.max(0, Math.min(cropBox.y, pageHeight));
-        cropBox.width = Math.min(cropBox.width, pageWidth - cropBox.x);
-        cropBox.height = Math.min(cropBox.height, pageHeight - cropBox.y);
-
-        page.setCropBox(cropBox.x, cropBox.y, cropBox.width, cropBox.height);
-      }
-    } else {
-      // Apply to current page only
-      const { width: pageWidth, height: pageHeight } = currentPage.getSize();
-
-      // PDF coordinates start from bottom-left
-      const cropBox = {
-        x: state.cropRect.x * scaleX,
-        y: pageHeight - (state.cropRect.y + state.cropRect.height) * scaleY,
-        width: state.cropRect.width * scaleX,
-        height: state.cropRect.height * scaleY
-      };
-
-      currentPage.setCropBox(cropBox.x, cropBox.y, cropBox.width, cropBox.height);
-    }
-
-    const bytes = await srcDoc.save();
-    downloadBlob(new Blob([bytes], { type: 'application/pdf' }), getOutputFilename('cropped'));
-    showToast('PDF berhasil di-crop!', 'success');
-
-  } catch (error) {
-    console.error('Error cropping PDF:', error);
-    showToast('Gagal meng-crop PDF', 'error');
   }
 }
 
@@ -4675,6 +4519,14 @@ function ueSelectPage(index) {
   document.getElementById('ue-canvas').style.display = 'block';
 
   ueUpdateStatus('Halaman ' + (index + 1) + ' dipilih. Gunakan alat di atas untuk mengedit.');
+
+  // Update mobile UI
+  if (typeof ueMobileUpdatePageIndicator === 'function') {
+    ueMobileUpdatePageIndicator();
+  }
+  if (typeof ueMobileUpdateSignButton === 'function') {
+    ueMobileUpdateSignButton();
+  }
 }
 
 // Render selected page on main canvas
@@ -5061,6 +4913,16 @@ function uePlaceSignature(x, y) {
 
     // Update download button to show pulse animation
     ueUpdateDownloadButtonState();
+
+    // Haptic feedback for mobile
+    if (mobileState.isTouch && navigator.vibrate) {
+      navigator.vibrate(20);
+    }
+
+    // Update mobile sign button state
+    if (typeof ueMobileUpdateSignButton === 'function') {
+      ueMobileUpdateSignButton();
+    }
   };
 }
 
@@ -5432,6 +5294,81 @@ function ueOpenWatermarkModal() {
 // Page number modal
 function ueOpenPageNumModal() {
   document.getElementById('editor-pagenum-modal').classList.add('active');
+}
+
+// More Tools Dropdown
+function toggleMoreTools(e) {
+  e.stopPropagation();
+  const btn = document.getElementById('more-tools-btn');
+  const dropdown = document.getElementById('more-tools-dropdown');
+
+  if (dropdown.classList.contains('active')) {
+    dropdown.classList.remove('active');
+  } else {
+    // Position dropdown below the button
+    const rect = btn.getBoundingClientRect();
+    dropdown.style.top = (rect.bottom + 4) + 'px';
+    dropdown.style.left = rect.left + 'px';
+    dropdown.classList.add('active');
+  }
+}
+
+function closeMoreTools() {
+  document.getElementById('more-tools-dropdown').classList.remove('active');
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', (e) => {
+  const container = document.querySelector('.editor-more-tools');
+  if (container && !container.contains(e.target)) {
+    closeMoreTools();
+  }
+});
+
+// Kunci PDF modal
+function ueOpenProtectModal() {
+  document.getElementById('editor-protect-modal').classList.add('active');
+  document.getElementById('editor-protect-password').value = '';
+  document.getElementById('editor-protect-confirm').value = '';
+}
+
+function closeEditorProtectModal() {
+  document.getElementById('editor-protect-modal').classList.remove('active');
+}
+
+async function applyEditorProtect() {
+  const password = document.getElementById('editor-protect-password').value;
+  const confirm = document.getElementById('editor-protect-confirm').value;
+
+  if (!password) {
+    showToast('Masukkan password', 'error');
+    return;
+  }
+
+  if (password !== confirm) {
+    showToast('Password tidak cocok', 'error');
+    return;
+  }
+
+  try {
+    // Build PDF with current annotations first
+    const pdfBytes = await ueBuildFinalPDF();
+    const pdfDoc = await PDFLib.PDFDocument.load(pdfBytes);
+
+    const protectedBytes = await pdfDoc.save({
+      userPassword: password,
+      ownerPassword: password,
+    });
+
+    const baseName = ueState.sourceFiles[0]?.name?.replace('.pdf', '') || 'document';
+    downloadBlob(new Blob([protectedBytes], { type: 'application/pdf' }), `${baseName}-protected.pdf`);
+
+    closeEditorProtectModal();
+    showToast('PDF berhasil dikunci!', 'success');
+  } catch (error) {
+    console.error('Error protecting PDF:', error);
+    showToast('Gagal mengunci PDF', 'error');
+  }
 }
 
 // Undo/Redo for page operations
@@ -6545,3 +6482,230 @@ if ('serviceWorker' in navigator) {
  * 
  * When to implement: When MAU > 10K or donation revenue covers costs
  */
+
+// ============================================================
+// MOBILE NAVIGATION & UI FUNCTIONS
+// ============================================================
+
+/**
+ * Navigate to previous page on mobile
+ */
+function ueMobilePrevPage() {
+  if (ueState.selectedPage > 0) {
+    ueSelectPage(ueState.selectedPage - 1);
+    ueMobileUpdatePageIndicator();
+
+    // Haptic feedback
+    if (mobileState.isTouch && navigator.vibrate) {
+      navigator.vibrate(10);
+    }
+  }
+}
+
+/**
+ * Navigate to next page on mobile
+ */
+function ueMobileNextPage() {
+  if (ueState.selectedPage < ueState.pages.length - 1) {
+    ueSelectPage(ueState.selectedPage + 1);
+    ueMobileUpdatePageIndicator();
+
+    // Haptic feedback
+    if (mobileState.isTouch && navigator.vibrate) {
+      navigator.vibrate(10);
+    }
+  }
+}
+
+/**
+ * Update the mobile page indicator display
+ */
+function ueMobileUpdatePageIndicator() {
+  const indicator = document.getElementById('ue-mobile-page-indicator');
+  const prevBtn = document.getElementById('ue-mobile-prev');
+  const nextBtn = document.getElementById('ue-mobile-next');
+
+  if (!indicator) return;
+
+  const current = ueState.selectedPage + 1;
+  const total = ueState.pages.length;
+
+  indicator.innerHTML = `Halaman <strong>${current}</strong> / ${total}`;
+
+  if (prevBtn) prevBtn.disabled = ueState.selectedPage <= 0;
+  if (nextBtn) nextBtn.disabled = ueState.selectedPage >= ueState.pages.length - 1;
+}
+
+/**
+ * Open the mobile page picker modal
+ */
+function ueMobileOpenPagePicker() {
+  const picker = document.getElementById('ue-mobile-page-picker');
+  const grid = document.getElementById('ue-mobile-page-grid');
+
+  if (!picker || !grid || ueState.pages.length === 0) return;
+
+  // Build thumbnail grid
+  grid.innerHTML = '';
+  ueState.pages.forEach((page, index) => {
+    const thumb = document.createElement('div');
+    thumb.className = 'mobile-page-thumb' + (index === ueState.selectedPage ? ' selected' : '');
+    thumb.onclick = () => {
+      ueSelectPage(index);
+      ueMobileUpdatePageIndicator();
+      ueMobileClosePagePicker();
+
+      // Haptic feedback
+      if (mobileState.isTouch && navigator.vibrate) {
+        navigator.vibrate(10);
+      }
+    };
+
+    // Clone thumbnail canvas
+    if (page.canvas) {
+      const thumbCanvas = document.createElement('canvas');
+      const scale = 0.3; // Smaller scale for picker
+      thumbCanvas.width = page.canvas.width * scale;
+      thumbCanvas.height = page.canvas.height * scale;
+      const ctx = thumbCanvas.getContext('2d');
+      ctx.drawImage(page.canvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
+      thumb.appendChild(thumbCanvas);
+    }
+
+    // Page number badge
+    const num = document.createElement('span');
+    num.className = 'mobile-page-thumb-number';
+    num.textContent = index + 1;
+    thumb.appendChild(num);
+
+    grid.appendChild(thumb);
+  });
+
+  picker.classList.add('active');
+
+  // Prevent body scroll
+  document.body.style.overflow = 'hidden';
+}
+
+/**
+ * Close the mobile page picker modal
+ */
+function ueMobileClosePagePicker() {
+  const picker = document.getElementById('ue-mobile-page-picker');
+  if (picker) {
+    picker.classList.remove('active');
+  }
+
+  // Restore body scroll
+  document.body.style.overflow = '';
+}
+
+/**
+ * Toggle mobile tools dropdown
+ */
+function toggleMobileTools() {
+  const dropdown = document.getElementById('mobile-tools-dropdown');
+  if (dropdown) {
+    dropdown.classList.toggle('active');
+  }
+}
+
+/**
+ * Close mobile tools dropdown
+ */
+function closeMobileTools() {
+  const dropdown = document.getElementById('mobile-tools-dropdown');
+  if (dropdown) {
+    dropdown.classList.remove('active');
+  }
+}
+
+/**
+ * Update mobile sign button state (show checkmark when signature exists)
+ */
+function ueMobileUpdateSignButton() {
+  const signBtn = document.getElementById('ue-mobile-sign-btn');
+  if (!signBtn) return;
+
+  // Check if there are any signatures on the current page
+  const currentPageAnnotations = ueState.annotations[ueState.selectedPage] || [];
+  const hasSignature = currentPageAnnotations.some(a => a.type === 'signature');
+
+  signBtn.classList.toggle('has-signature', hasSignature);
+}
+
+// Close mobile tools when clicking outside
+document.addEventListener('click', function(e) {
+  const dropdown = document.getElementById('mobile-tools-dropdown');
+  const moreBtn = document.getElementById('ue-mobile-more-btn');
+
+  if (dropdown && dropdown.classList.contains('active')) {
+    if (!dropdown.contains(e.target) && e.target !== moreBtn && !moreBtn.contains(e.target)) {
+      closeMobileTools();
+    }
+  }
+});
+
+// ============================================================
+// ENHANCED TOUCH HANDLING FOR UNIFIED EDITOR
+// ============================================================
+
+/**
+ * Initialize mobile-specific enhancements when editor loads
+ */
+function initMobileEditorEnhancements() {
+  if (!mobileState.isMobile && !mobileState.isTouch) return;
+
+  const canvas = document.getElementById('ue-canvas');
+  if (!canvas) return;
+
+  // Track pinch-to-zoom state
+  let initialPinchDistance = null;
+  let initialZoom = 1;
+
+  function getPinchDistance(e) {
+    if (e.touches.length < 2) return null;
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  // Add pinch-to-zoom handlers
+  canvas.addEventListener('touchstart', function(e) {
+    if (e.touches.length === 2) {
+      initialPinchDistance = getPinchDistance(e);
+      initialZoom = ueState.zoomLevel;
+      e.preventDefault();
+    }
+  }, { passive: false });
+
+  canvas.addEventListener('touchmove', function(e) {
+    if (e.touches.length === 2 && initialPinchDistance) {
+      const currentDistance = getPinchDistance(e);
+      if (currentDistance) {
+        const scale = currentDistance / initialPinchDistance;
+        const newZoom = Math.max(0.5, Math.min(3, initialZoom * scale));
+
+        // Only update if change is significant
+        if (Math.abs(newZoom - ueState.zoomLevel) > 0.05) {
+          ueState.zoomLevel = newZoom;
+          ueUpdateZoomDisplay();
+          ueRenderSelectedPage();
+        }
+      }
+      e.preventDefault();
+    }
+  }, { passive: false });
+
+  canvas.addEventListener('touchend', function(e) {
+    if (e.touches.length < 2) {
+      initialPinchDistance = null;
+    }
+  }, { passive: true });
+}
+
+// Hook into existing ueRenderSelectedPage to update mobile UI
+const originalUeRenderSelectedPage = typeof ueRenderSelectedPage === 'function' ? ueRenderSelectedPage : null;
+
+// We need to hook into when pages change to update mobile UI
+// This is done by patching ueSelectPage after it's defined

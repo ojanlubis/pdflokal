@@ -36,8 +36,8 @@ pdflokal/
 ### Single-Page Architecture
 
 The entire application is in `index.html`. Features are organized as:
-- Separate sections/modals for each tool (merge, split, compress, etc.)
-- JavaScript in `app.js` handles all tool logic (~6,400 lines, 210+ functions)
+- Separate sections/modals for each tool
+- JavaScript in `app.js` handles all tool logic
 - All styles in single `style.css` file
 
 ### State Management
@@ -65,12 +65,6 @@ uePmState = {
   draggedIndex: -1,
   dropIndicator: null
 }
-
-// Page Manager state
-state.mergeFiles = []  // Files for merge/page operations
-
-// Edit PDF state
-state.editAnnotations = {}  // Annotations for single-doc editor
 ```
 
 ## Key Features
@@ -78,39 +72,35 @@ state.editAnnotations = {}  // Annotations for single-doc editor
 ### PDF Tools
 
 #### Unified Editor (Primary Tool)
-The flagship multi-document PDF editor combining all editing capabilities:
+The flagship multi-document PDF editor - **this is the main user flow**. When users drop a PDF on the homepage, it opens the Unified Editor.
+
+Features:
 - **Multi-file support**: Load and merge multiple PDFs in one session
 - **Page operations**: Reorder (drag-drop), rotate, delete pages
 - **Page Manager Modal**: "Kelola" button opens full-page management with drag-drop reorder, rotate, delete, add pages, and multi-select extract
-- **Annotations**: Whiteout, text, signatures, watermarks, page numbers
+- **Annotations**: Whiteout, text, signatures
 - **Text annotations**: Font family (Helvetica, Times, Courier), bold/italic styling, custom font size (6-120pt), quick color presets
 - **Signature preview**: Position signatures before placing
 - **Zoom controls**: Scale view for precision editing
 - **Undo/Redo**: Separate stacks for page operations and annotations
 - **Thumbnail navigation**: Visual page overview
 
-#### Page Manager (Legacy)
-Unified interface for page-level operations:
-- Merge multiple PDFs
-- Split/extract pages
-- Reorder via drag-drop
-- Rotate (90°, 180°, 270°)
-- Delete pages
-- Undo/Redo support
+**Toolbar Structure (Two Lines):**
+- Line 1: Signature button, secondary tools (Pilih, Whiteout, Teks), "Lainnya" dropdown (Watermark, Nomor Halaman, Kunci PDF)
+- Line 2: Zoom controls, action buttons (Undo/Redo/Clear), Download PDF button
 
-#### Edit PDF (Single Document)
-Legacy single-document editor:
-- Whiteout, text, signature annotations
-- Per-page editing
-
-#### Other PDF Tools
+#### Other PDF Tools (Standalone Workspaces)
 - **PDF to Image**: Convert pages to PNG/JPG with batch export
 - **Compress PDF**: Compress embedded images within PDFs
-- **Protect PDF**: Add password protection
-- **Unlock PDF**: Remove password protection
-- **Watermark**: Add text watermarks with positioning
-- **Page Numbers**: Automatic numbering with position options
-- **Crop**: Crop specific regions from pages
+- **Protect PDF**: Add password protection (also available in Unified Editor via "Kunci PDF")
+- **Watermark**: Add text watermarks with positioning (also in Unified Editor)
+- **Page Numbers**: Automatic numbering with position options (also in Unified Editor)
+
+**Removed Tools:**
+- Crop PDF (removed)
+- Unlock PDF / Buka Kunci (removed from homepage, kept workspace for direct access)
+- Legacy Edit PDF (merged into Unified Editor)
+- Legacy Kelola Halaman / Page Manager (merged into Unified Editor)
 
 ### Image Tools
 - **Compress Image**: Quality slider with live preview and savings percentage
@@ -118,6 +108,13 @@ Legacy single-document editor:
 - **Convert Format**: JPG ↔ PNG ↔ WebP conversion with quality control
 - **Image to PDF**: Convert images to PDF with drag-drop reordering
 - **Remove Background**: Remove white/near-white pixels (threshold-based) for transparent PNG output
+
+### Homepage Layout
+- Hero section with tagline and signature hint
+- Main dropzone (opens Unified Editor for PDFs)
+- PDF and Image tool cards displayed **side by side** on desktop (stacked on mobile)
+- Privacy badge below dropzone
+- "Coming Soon" section for server-dependent features
 
 ## Development Guidelines
 
@@ -154,33 +151,24 @@ Legacy single-document editor:
 
 ## Common Development Tasks
 
-### When to Use Each PDF Tool
-
-| Tool | Use Case |
-|------|----------|
-| **Unified Editor** | Multi-file operations, complex editing with annotations |
-| **Page Manager** | Quick page operations without annotations |
-| **Edit PDF** | Simple single-document annotation |
-
-For new PDF features, prefer extending the **Unified Editor** unless the feature is standalone.
-
-### Adding a New PDF Tool
-
-1. Add UI section/modal in `index.html`
-2. Add tool logic in `app.js`
-3. Style in `style.css`
-4. Update README.md features list
-5. Test with various PDF types and sizes
-6. Ensure error handling is in place
-
 ### Extending the Unified Editor
 
+The Unified Editor is the primary tool. New PDF features should be added here:
+
 1. Add new annotation type to `ueState.annotations` structure
-2. Add tool button in the editor toolbar UI
+2. Add tool button in the editor toolbar (Line 1 for tools, or in "Lainnya" dropdown for less common tools)
 3. Implement drawing/placement logic in `app.js`
-4. Add rendering in the PDF export function
+4. Add rendering in the PDF export function (`ueBuildFinalPDF`)
 5. Ensure undo/redo works for the new annotation type
 6. Test across multiple pages and files
+
+### Adding to "Lainnya" Dropdown
+
+For rarely-used tools, add them to the "Lainnya" (More Tools) dropdown:
+1. Add button in `#more-tools-dropdown` in index.html
+2. Create modal HTML following existing pattern (`editor-*-modal`)
+3. Add JS functions: `ueOpen[Tool]Modal()`, `closeEditor[Tool]Modal()`, `applyEditor[Tool]()`
+4. The dropdown uses `position: fixed` for proper overflow handling
 
 ### Adding Image Processing Feature
 
@@ -189,14 +177,6 @@ For new PDF features, prefer extending the **Unified Editor** unless the feature
 3. Support drag & drop and file selection
 4. Show previews where appropriate
 5. Test with different image formats
-
-### Modifying Existing Features
-
-1. Read the existing code carefully
-2. Test before and after changes
-3. Ensure no regressions in other features
-4. Maintain Indonesian UI text
-5. Update documentation if needed
 
 ## Important Notes
 
