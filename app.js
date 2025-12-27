@@ -4620,7 +4620,7 @@ async function ueRenderSelectedPage() {
 
     // Calculate scale based on width only - allow vertical scrolling
     const wrapper = document.getElementById('ue-canvas-wrapper');
-    const maxWidth = wrapper.clientWidth - 32;  // Padding for scrollbar
+    const maxWidth = wrapper.clientWidth - 16;  // Small margin for cleaner appearance
     const naturalViewport = page.getViewport({ scale: 1, rotation: pageInfo.rotation });
 
     // Ensure we have valid dimensions
@@ -4753,14 +4753,10 @@ function ueSetupCanvasEvents() {
   });
 
   canvas.addEventListener('touchstart', (e) => {
-    // Ignore multi-touch (pinch gestures handled separately)
-    if (e.touches.length > 1) return;
     e.preventDefault();
     handleDown(getCoords(e.touches[0]));
   }, { passive: false });
   canvas.addEventListener('touchmove', (e) => {
-    // Ignore multi-touch (pinch gestures handled separately)
-    if (e.touches.length > 1) return;
     e.preventDefault();
     handleMove(getCoords(e.touches[0]));
   }, { passive: false });
@@ -6732,74 +6728,12 @@ document.addEventListener('click', function(e) {
 
 /**
  * Initialize mobile-specific enhancements when editor loads
+ * Note: Pinch-to-zoom was removed due to conflicts with signature dragging.
+ * Users can use the zoom +/- buttons in the toolbar instead.
  */
 function initMobileEditorEnhancements() {
-  if (!mobileState.isMobile && !mobileState.isTouch) return;
-
-  const canvas = document.getElementById('ue-canvas');
-  if (!canvas) return;
-
-  // Track pinch-to-zoom state
-  let initialPinchDistance = null;
-  let initialZoom = 1;
-  let renderTimeout = null;
-
-  function getPinchDistance(e) {
-    if (e.touches.length < 2) return null;
-    const dx = e.touches[0].clientX - e.touches[1].clientX;
-    const dy = e.touches[0].clientY - e.touches[1].clientY;
-    return Math.sqrt(dx * dx + dy * dy);
-  }
-
-  // Add pinch-to-zoom handlers
-  canvas.addEventListener('touchstart', function(e) {
-    if (e.touches.length === 2) {
-      // Don't start pinch if user is dragging/resizing annotation
-      if (ueState.isDragging || ueState.isResizing) return;
-
-      initialPinchDistance = getPinchDistance(e);
-      initialZoom = ueState.zoomLevel;
-      e.preventDefault();
-    }
-  }, { passive: false });
-
-  canvas.addEventListener('touchmove', function(e) {
-    if (e.touches.length === 2 && initialPinchDistance) {
-      // Cancel pinch if drag/resize started after pinch init
-      if (ueState.isDragging || ueState.isResizing) {
-        initialPinchDistance = null;
-        return;
-      }
-
-      const currentDistance = getPinchDistance(e);
-      if (currentDistance) {
-        const scale = currentDistance / initialPinchDistance;
-        const newZoom = Math.max(0.5, Math.min(3, initialZoom * scale));
-
-        // Only update if change is significant
-        if (Math.abs(newZoom - ueState.zoomLevel) > 0.05) {
-          ueState.zoomLevel = newZoom;
-          ueUpdateZoomDisplay();
-
-          // Debounce render to prevent multiple concurrent calls
-          clearTimeout(renderTimeout);
-          renderTimeout = setTimeout(() => {
-            ueRenderSelectedPage();
-          }, 100);
-        }
-      }
-      e.preventDefault();
-    }
-  }, { passive: false });
-
-  canvas.addEventListener('touchend', function(e) {
-    if (e.touches.length < 2) {
-      initialPinchDistance = null;
-      // Final render when pinch ends
-      clearTimeout(renderTimeout);
-      ueRenderSelectedPage();
-    }
-  }, { passive: true });
+  // Placeholder for future mobile-specific enhancements
+  // Pinch-to-zoom removed - use toolbar zoom buttons instead
 }
 
 // Hook into existing ueRenderSelectedPage to update mobile UI

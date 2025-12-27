@@ -3320,7 +3320,7 @@ body.is-touch .btn:active {
   #unified-editor-workspace .unified-canvas-wrapper {
     min-height: auto;
     height: auto;
-    padding: var(--space-sm);
+    padding: var(--space-xs);
     overflow: auto;
     -webkit-overflow-scrolling: touch;
   }
@@ -3340,6 +3340,16 @@ body.is-touch .btn:active {
   /* Unified editor layout goes full width */
   #unified-editor-workspace .unified-editor-layout {
     flex-direction: column;
+  }
+
+  /* Reduce workspace padding on mobile */
+  #unified-editor-workspace.workspace {
+    padding: var(--space-sm) 0;
+  }
+
+  /* Reduce unified-main padding on mobile */
+  #unified-editor-workspace .unified-main {
+    padding: var(--space-xs);
   }
 
   /* Workspace header adjustments */
