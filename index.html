@@ -68,7 +68,7 @@
 
       <!-- Drop Zone -->
       <div class="dropzone-container">
-        <label for="file-input" class="dropzone" id="main-dropzone">
+        <div class="dropzone" id="main-dropzone">
           <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
             <polyline points="17 8 12 3 7 8"/>
@@ -76,8 +76,8 @@
           </svg>
           <h3>Seret file ke sini atau klik untuk pilih</h3>
           <p>PDF or Image</p>
-          <input type="file" id="file-input" multiple accept="*/*">
-        </label>
+          <input type="file" id="file-input" multiple accept=".pdf,image/*,application/pdf">
+        </div>
       </div>
 
       <!-- Privacy Badge -->
@@ -386,7 +386,7 @@
             <button class="btn btn-secondary btn-sm" onclick="document.getElementById('ue-file-input').click()" title="Tambah PDF">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
             </button>
-            <input type="file" id="ue-file-input" multiple accept="application/pdf,*/*" style="display:none">
+            <input type="file" id="ue-file-input" multiple accept=".pdf,application/pdf" style="display:none">
           </div>
           <div class="unified-thumbnails" id="ue-thumbnails">
             <div class="drop-hint" onclick="document.getElementById('ue-file-input').click()">
