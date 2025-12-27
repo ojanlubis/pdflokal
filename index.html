@@ -290,10 +290,14 @@
         </button>
       </div>
       <div class="page-grid empty" id="pm-pages">
-        <div class="drop-hint" onclick="document.getElementById('pm-file-input').click()">
-          <svg class="drop-hint-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          <span class="drop-hint-text">Seret file PDF ke sini atau klik untuk upload</span>
-          <span class="drop-hint-subtext">PDF</span>
+        <div class="dropzone" onclick="document.getElementById('pm-file-input').click()">
+          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          <h3>Seret file ke sini atau klik untuk pilih</h3>
+          <p>PDF</p>
         </div>
       </div>
       <div class="pm-status" id="pm-status"></div>
@@ -332,10 +336,14 @@
       </div>
       <p class="mb-lg" style="color: var(--text-secondary);">⚠️ Catatan: Fitur ini mengoptimasi struktur PDF. Kompresi gambar memerlukan server dan belum tersedia. Hasil bervariasi.</p>
       <div class="preview-area" id="compress-pdf-preview">
-        <div class="drop-hint" onclick="document.getElementById('compress-pdf-input').click()">
-          <svg class="drop-hint-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          <span class="drop-hint-text">Seret file PDF ke sini atau klik untuk upload</span>
-          <span class="drop-hint-subtext">PDF</span>
+        <div class="dropzone" onclick="document.getElementById('compress-pdf-input').click()">
+          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          <h3>Seret file ke sini atau klik untuk pilih</h3>
+          <p>PDF</p>
           <input type="file" id="compress-pdf-input" accept=".pdf" style="display:none">
         </div>
       </div>
@@ -508,11 +516,15 @@
             <!-- Signature confirm button (positioned dynamically) -->
             <button class="signature-confirm-btn" id="signature-confirm-btn" style="display: none;">Konfirmasi</button>
             <div class="unified-empty-state" id="ue-empty-state">
-              <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color: var(--text-tertiary);">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                <polyline points="14 2 14 8 20 8"/>
-              </svg>
-              <p style="color: var(--text-secondary); margin-top: var(--space-md);">Upload PDF atau pilih halaman dari sidebar</p>
+              <div class="dropzone" onclick="document.getElementById('ue-file-input').click()">
+                <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="17 8 12 3 7 8"/>
+                  <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+                <h3>Seret file ke sini atau klik untuk pilih</h3>
+                <p>PDF</p>
+              </div>
             </div>
             <canvas id="ue-canvas" class="editor-canvas" style="display: none;"></canvas>
           </div>
@@ -656,10 +668,14 @@
         </h2>
       </div>
       <div class="page-grid empty" id="pdf-img-pages">
-        <div class="drop-hint" onclick="document.getElementById('pdf-img-input').click()">
-          <svg class="drop-hint-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          <span class="drop-hint-text">Seret file PDF ke sini atau klik untuk upload</span>
-          <span class="drop-hint-subtext">PDF</span>
+        <div class="dropzone" onclick="document.getElementById('pdf-img-input').click()">
+          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          <h3>Seret file ke sini atau klik untuk pilih</h3>
+          <p>PDF</p>
           <input type="file" id="pdf-img-input" accept=".pdf" style="display:none">
         </div>
       </div>
@@ -705,10 +721,14 @@
         </h2>
       </div>
       <div class="preview-area" id="protect-preview">
-        <div class="drop-hint" onclick="document.getElementById('protect-input').click()">
-          <svg class="drop-hint-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          <span class="drop-hint-text">Seret file PDF ke sini atau klik untuk upload</span>
-          <span class="drop-hint-subtext">PDF</span>
+        <div class="dropzone" onclick="document.getElementById('protect-input').click()">
+          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          <h3>Seret file ke sini atau klik untuk pilih</h3>
+          <p>PDF</p>
           <input type="file" id="protect-input" accept=".pdf" style="display:none">
         </div>
       </div>
@@ -743,10 +763,14 @@
       </div>
       <p class="mb-lg" style="color: var(--text-secondary);">⚠️ Catatan: Anda harus mengetahui password untuk membuka kunci PDF.</p>
       <div class="preview-area" id="unlock-preview">
-        <div class="drop-hint" onclick="document.getElementById('unlock-input').click()">
-          <svg class="drop-hint-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          <span class="drop-hint-text">Seret file PDF ke sini atau klik untuk upload</span>
-          <span class="drop-hint-subtext">PDF</span>
+        <div class="dropzone" onclick="document.getElementById('unlock-input').click()">
+          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          <h3>Seret file ke sini atau klik untuk pilih</h3>
+          <p>PDF</p>
           <input type="file" id="unlock-input" accept=".pdf" style="display:none">
         </div>
       </div>
@@ -775,10 +799,22 @@
           Watermark PDF
         </h2>
       </div>
-      <div class="editor-canvas-wrapper" style="margin-bottom: var(--space-xl);">
-        <canvas id="watermark-preview-canvas" class="editor-canvas"></canvas>
+      <div class="preview-area" id="watermark-preview">
+        <div class="dropzone" onclick="document.getElementById('watermark-input').click()">
+          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          <h3>Seret file ke sini atau klik untuk pilih</h3>
+          <p>PDF</p>
+          <input type="file" id="watermark-input" accept=".pdf,application/pdf" style="display:none">
+        </div>
+        <div class="editor-canvas-wrapper hidden" id="watermark-canvas-wrapper" style="margin-bottom: var(--space-xl);">
+          <canvas id="watermark-preview-canvas" class="editor-canvas"></canvas>
+        </div>
       </div>
-      <div class="controls" style="flex-wrap: wrap;">
+      <div class="controls hidden" id="watermark-controls" style="flex-wrap: wrap;">
         <div class="control-group">
           <label>Teks Watermark:</label>
           <input type="text" id="watermark-text" placeholder="CONFIDENTIAL" value="CONFIDENTIAL" onchange="updateWatermarkPreview()">
@@ -812,8 +848,8 @@
           </select>
         </div>
       </div>
-      <div class="action-bar">
-        <button class="btn btn-primary btn-lg" id="watermark-btn" disabled onclick="addWatermark()">
+      <div class="action-bar hidden" id="watermark-action-bar">
+        <button class="btn btn-primary btn-lg" id="watermark-btn" onclick="addWatermark()">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Download
         </button>
@@ -832,10 +868,14 @@
         </h2>
       </div>
       <div class="preview-area" id="page-numbers-preview">
-        <div class="drop-hint" onclick="document.getElementById('page-numbers-input').click()">
-          <svg class="drop-hint-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          <span class="drop-hint-text">Seret file PDF ke sini atau klik untuk upload</span>
-          <span class="drop-hint-subtext">PDF</span>
+        <div class="dropzone" onclick="document.getElementById('page-numbers-input').click()">
+          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          <h3>Seret file ke sini atau klik untuk pilih</h3>
+          <p>PDF</p>
           <input type="file" id="page-numbers-input" accept=".pdf" style="display:none">
         </div>
       </div>
@@ -891,10 +931,14 @@
         </h2>
       </div>
       <div class="preview-area" id="compress-img-area">
-        <div class="drop-hint" id="compress-img-hint" onclick="document.getElementById('compress-img-input').click()">
-          <svg class="drop-hint-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          <span class="drop-hint-text">Seret gambar ke sini atau klik untuk upload</span>
-          <span class="drop-hint-subtext">JPG • PNG • WebP</span>
+        <div class="dropzone" id="compress-img-hint" onclick="document.getElementById('compress-img-input').click()">
+          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          <h3>Seret file ke sini atau klik untuk pilih</h3>
+          <p>JPG, PNG, WebP</p>
           <input type="file" id="compress-img-input" accept="image/*" style="display:none">
         </div>
         <div class="preview-comparison hidden" id="compress-img-comparison">
@@ -946,10 +990,14 @@
         </h2>
       </div>
       <div class="preview-area" id="resize-area">
-        <div class="drop-hint" id="resize-hint" onclick="document.getElementById('resize-input').click()">
-          <svg class="drop-hint-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          <span class="drop-hint-text">Seret gambar ke sini atau klik untuk upload</span>
-          <span class="drop-hint-subtext">JPG • PNG • WebP</span>
+        <div class="dropzone" id="resize-hint" onclick="document.getElementById('resize-input').click()">
+          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          <h3>Seret file ke sini atau klik untuk pilih</h3>
+          <p>JPG, PNG, WebP</p>
           <input type="file" id="resize-input" accept="image/*" style="display:none">
         </div>
         <div class="preview-box hidden" id="resize-preview-box">
@@ -1005,10 +1053,14 @@
         </h2>
       </div>
       <div class="preview-area" id="convert-area">
-        <div class="drop-hint" id="convert-hint" onclick="document.getElementById('convert-input').click()">
-          <svg class="drop-hint-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          <span class="drop-hint-text">Seret gambar ke sini atau klik untuk upload</span>
-          <span class="drop-hint-subtext">JPG • PNG • WebP</span>
+        <div class="dropzone" id="convert-hint" onclick="document.getElementById('convert-input').click()">
+          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          <h3>Seret file ke sini atau klik untuk pilih</h3>
+          <p>JPG, PNG, WebP</p>
           <input type="file" id="convert-input" accept="image/*" style="display:none">
         </div>
         <div class="preview-box hidden" id="convert-preview-box">
@@ -1053,10 +1105,14 @@
         </h2>
       </div>
       <div class="file-list empty" id="img-pdf-file-list">
-        <div class="drop-hint" onclick="document.getElementById('img-pdf-input').click()">
-          <svg class="drop-hint-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          <span class="drop-hint-text">Seret gambar ke sini atau klik untuk upload</span>
-          <span class="drop-hint-subtext">JPG • PNG • WebP</span>
+        <div class="dropzone" onclick="document.getElementById('img-pdf-input').click()">
+          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          <h3>Seret file ke sini atau klik untuk pilih</h3>
+          <p>JPG, PNG, WebP</p>
         </div>
       </div>
       <div class="controls">
@@ -1107,10 +1163,14 @@
       </div>
       <p class="mb-lg" style="color: var(--text-secondary);">Upload gambar dan atur threshold untuk mengubah warna putih/terang menjadi transparan.</p>
       <div class="preview-area" id="remove-bg-area">
-        <div class="drop-hint" id="remove-bg-hint" onclick="document.getElementById('remove-bg-input').click()">
-          <svg class="drop-hint-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          <span class="drop-hint-text">Seret gambar ke sini atau klik untuk upload</span>
-          <span class="drop-hint-subtext">JPG • PNG</span>
+        <div class="dropzone" id="remove-bg-hint" onclick="document.getElementById('remove-bg-input').click()">
+          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          <h3>Seret file ke sini atau klik untuk pilih</h3>
+          <p>JPG, PNG</p>
           <input type="file" id="remove-bg-input" accept="image/jpeg,image/png" style="display:none">
         </div>
         <div class="preview-comparison hidden" id="remove-bg-comparison">

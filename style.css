@@ -2189,6 +2189,33 @@ a:hover {
   }
 }
 
+/* Workspace dropzones - use homepage dropzone style with constraints */
+.preview-area .dropzone,
+.page-grid.empty .dropzone,
+.file-list.empty .dropzone,
+.unified-empty-state .dropzone {
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.page-grid.empty .dropzone,
+.file-list.empty .dropzone {
+  max-width: 400px;
+}
+
+/* Unified Editor empty state dropzone */
+.unified-empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: var(--space-xl);
+}
+
+.unified-empty-state .dropzone {
+  width: 100%;
+}
+
 /* ============================================================
    Unified Editor Workspace Styles
    ============================================================ */
@@ -3398,9 +3425,25 @@ body.is-touch .btn:active {
     height: 100%;
     max-height: 100%;
     border-radius: 0;
+    display: flex;
+    flex-direction: column;
     padding: var(--space-md);
     padding-top: calc(var(--space-md) + var(--sat));
     padding-bottom: calc(var(--space-md) + var(--sab));
+  }
+
+  #signature-bg-modal .edit-modal-content {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  #signature-bg-modal .edit-modal-actions {
+    margin-top: auto;
+    padding-top: var(--space-md);
+    flex-shrink: 0;
   }
 
   .signature-bg-preview {

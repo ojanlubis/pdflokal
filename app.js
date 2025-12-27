@@ -86,11 +86,31 @@ function detectMobile() {
 
   // Update dropzone text for mobile/touch devices
   const dropzoneText = document.querySelector('#main-dropzone h3');
+  const dropzoneSubtext = document.querySelector('#main-dropzone p');
+  const mainFileInput = document.getElementById('file-input');
+
   if (dropzoneText) {
     if (mobileState.isMobile || mobileState.isTouch) {
       dropzoneText.textContent = 'Ketuk, lalu pilih Foto/Media untuk browse file PDF';
     } else {
       dropzoneText.textContent = 'Seret file ke sini atau klik untuk pilih';
+    }
+  }
+
+  // Mobile: PDF only on main dropzone
+  if (mobileState.isMobile) {
+    if (mainFileInput) {
+      mainFileInput.accept = '.pdf,application/pdf';
+    }
+    if (dropzoneSubtext) {
+      dropzoneSubtext.textContent = 'PDF';
+    }
+  } else {
+    if (mainFileInput) {
+      mainFileInput.accept = '.pdf,image/*,application/pdf';
+    }
+    if (dropzoneSubtext) {
+      dropzoneSubtext.textContent = 'PDF or Image';
     }
   }
 }
@@ -234,6 +254,17 @@ function initFileInputs() {
     });
   }
 
+  // Watermark input
+  const watermarkInput = document.getElementById('watermark-input');
+  if (watermarkInput) {
+    watermarkInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) {
+        loadPDFForTool(e.target.files[0], 'watermark');
+      }
+      e.target.value = '';
+    });
+  }
+
   // Compress Image input
   const compressImgInput = document.getElementById('compress-img-input');
   if (compressImgInput) {
@@ -294,7 +325,12 @@ function initFileInputs() {
 }
 
 function initDropHints() {
-  document.querySelectorAll('.drop-hint').forEach(hint => {
+  // Handle both old .drop-hint class and new .dropzone class in workspaces
+  // Exclude main-dropzone which has its own handler in initDropZone()
+  document.querySelectorAll('.drop-hint, .workspace .dropzone, .preview-area .dropzone, .page-grid .dropzone, .file-list .dropzone').forEach(hint => {
+    // Skip the main homepage dropzone
+    if (hint.id === 'main-dropzone') return;
+
     hint.addEventListener('dragover', (e) => {
       e.preventDefault();
       hint.classList.add('drag-over');
@@ -354,6 +390,12 @@ function handleDroppedFiles(files) {
 
   if (!isPDF && !isImage) {
     showToast('File tidak didukung. Gunakan PDF, JPG, PNG, atau WebP.', 'error');
+    return;
+  }
+
+  // Mobile: reject images on main dropzone (only allow PDF)
+  if (mobileState.isMobile && isImage && !isPDF) {
+    showToast('Di perangkat mobile, gunakan tool khusus gambar untuk memproses gambar.', 'info');
     return;
   }
 
@@ -2178,6 +2220,19 @@ async function unlockPDF() {
 
 async function initWatermarkMode() {
   state.currentWatermarkPage = 0;
+
+  // Hide dropzone, show canvas wrapper and controls
+  const previewArea = document.getElementById('watermark-preview');
+  const dropzone = previewArea.querySelector('.dropzone');
+  const canvasWrapper = document.getElementById('watermark-canvas-wrapper');
+  const controls = document.getElementById('watermark-controls');
+  const actionBar = document.getElementById('watermark-action-bar');
+
+  if (dropzone) dropzone.classList.add('hidden');
+  if (canvasWrapper) canvasWrapper.classList.remove('hidden');
+  if (controls) controls.classList.remove('hidden');
+  if (actionBar) actionBar.classList.remove('hidden');
+
   await updateWatermarkPreview();
 }
 
