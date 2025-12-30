@@ -4252,6 +4252,8 @@ function ueSetupCanvasEvents() {
   // isDragging and isResizing are now on ueState for sharing with pinch-to-zoom handler
   let startX, startY;
   let dragOffsetX, dragOffsetY;
+  let hasMovedOrResized = false;  // Track if actual movement happened (for undo)
+  let preChangeState = null;  // Store annotations state before drag/resize
 
   function getCoords(e) {
     const rect = canvas.getBoundingClientRect();
@@ -4322,7 +4324,8 @@ function ueSetupCanvasEvents() {
         const anno = ueState.annotations[ueState.selectedAnnotation.pageIndex][ueState.selectedAnnotation.index];
         const handle = getResizeHandle(anno, x, y);
         if (handle) {
-          ueSaveEditUndoState();
+          hasMovedOrResized = false;  // Will be set true if actual resize happens
+          preChangeState = JSON.parse(JSON.stringify(ueState.annotations));  // Save state before change
           ueState.isResizing = true;
           ueState.resizeHandle = handle;
           ueState.resizeStartInfo = {
@@ -4347,7 +4350,8 @@ function ueSetupCanvasEvents() {
           ueShowConfirmButton(anno, clicked);
           return;
         }
-        ueSaveEditUndoState();
+        hasMovedOrResized = false;  // Will be set true if actual drag happens
+        preChangeState = JSON.parse(JSON.stringify(ueState.annotations));  // Save state before change
         ueState.selectedAnnotation = clicked;
         ueState.isDragging = true;
         dragOffsetX = x - anno.x;
@@ -4410,6 +4414,7 @@ function ueSetupCanvasEvents() {
       anno.y = newY;
       anno.width = newWidth;
       anno.height = newHeight;
+      hasMovedOrResized = true;  // Mark that actual resize happened
 
       ueRedrawAnnotations();
       ueUpdateConfirmButtonPosition(anno);
@@ -4426,6 +4431,7 @@ function ueSetupCanvasEvents() {
         anno.x = x - dragOffsetX;
         anno.y = y - dragOffsetY;
       }
+      hasMovedOrResized = true;  // Mark that actual drag happened
       ueRedrawAnnotations();
       ueUpdateConfirmButtonPosition(anno);
       return;
@@ -4447,14 +4453,30 @@ function ueSetupCanvasEvents() {
 
   function handleUp({ x, y }) {
     if (ueState.isResizing) {
+      // Save undo state only if actual resize happened
+      if (hasMovedOrResized && preChangeState) {
+        ueState.editUndoStack.push(preChangeState);
+        ueState.editRedoStack = [];
+        if (ueState.editUndoStack.length > 50) ueState.editUndoStack.shift();
+      }
       ueState.isResizing = false;
       ueState.resizeHandle = null;
       ueState.resizeStartInfo = null;
+      hasMovedOrResized = false;
+      preChangeState = null;
       return;
     }
 
     if (ueState.isDragging) {
+      // Save undo state only if actual drag happened
+      if (hasMovedOrResized && preChangeState) {
+        ueState.editUndoStack.push(preChangeState);
+        ueState.editRedoStack = [];
+        if (ueState.editUndoStack.length > 50) ueState.editUndoStack.shift();
+      }
       ueState.isDragging = false;
+      hasMovedOrResized = false;
+      preChangeState = null;
       return;
     }
 
@@ -6112,18 +6134,6 @@ document.addEventListener('keydown', (e) => {
     } else if (e.key === 'ArrowRight' && ueState.selectedPage < ueState.pages.length - 1) {
       e.preventDefault();
       ueSelectPage(ueState.selectedPage + 1);
-    }
-
-    // Zoom shortcuts
-    if (e.key === '-' || e.key === '_') {
-      e.preventDefault();
-      ueZoomOut();
-    } else if (e.key === '+' || e.key === '=') {
-      e.preventDefault();
-      ueZoomIn();
-    } else if (e.key === '0' && !e.ctrlKey && !e.metaKey) {
-      e.preventDefault();
-      ueZoomReset();
     }
 
     // ? to show keyboard shortcuts help
