@@ -722,6 +722,9 @@ function showTool(tool, skipPushState = false) {
     workspace.classList.add('active');
     state.currentTool = tool;
 
+    // Scroll to top when opening workspace
+    window.scrollTo(0, 0);
+
     // Push browser history state
     if (!skipPushState) {
       pushWorkspaceState(tool);
