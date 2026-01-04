@@ -9,7 +9,7 @@
 
 // ============================================================
 // GLOBAL STATE
-// hello world ojan here testing this out
+// hello world ojan here testing this out v2
 // ============================================================
 
 const state = {
