@@ -10,6 +10,7 @@
 // ============================================================
 // GLOBAL STATE
 // masa iya hello world ojan here testing this out v2
+// masa engga hello world ojan here testing this out v2
 // ============================================================
 
 const state = {
