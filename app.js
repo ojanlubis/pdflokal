@@ -9,7 +9,7 @@
 
 // ============================================================
 // GLOBAL STATE
-// testing wether or not gitignore worked
+// testing wether or not gitignore worked 
 // ============================================================
 
 const state = {
