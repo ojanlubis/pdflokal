@@ -57,11 +57,11 @@ ueState = {
   zoom: 1.0            // Current zoom level
 }
 
-// Page Manager Modal state (for "Kelola" feature)
+// Gabungkan Modal state (for "Merge" button feature)
 uePmState = {
   isOpen: false,
-  extractMode: false,
-  selectedForExtract: [],  // Array of page indices for extraction
+  extractMode: false,       // When true, enables "Split" mode
+  selectedForExtract: [],   // Array of page indices for split/extraction
   draggedIndex: -1,
   dropIndicator: null
 }
@@ -76,15 +76,18 @@ The flagship multi-document PDF editor - **this is the main user flow**. When us
 
 Features:
 - **Multi-file support**: Load and merge multiple PDFs in one session
-- **Page operations**: Reorder (drag-drop), rotate, delete pages
-- **Page Manager Modal**: "Kelola" button opens full-page management with drag-drop reorder, rotate, delete, add pages, and multi-select extract
+- **Page operations**: Reorder (drag-drop in sidebar AND modal), rotate, delete pages
+- **Sidebar thumbnails**: Drag-drop reordering, visual rotation display
+- **Gabungkan Modal**: "Merge" button (sidebar header) opens full-page management with drag-drop reorder, rotate, delete, add pages, and multi-select split
+- **Split mode**: Multi-select pages to extract as separate PDFs
 - **Annotations**: Whiteout, text, signatures
 - **Text annotations**: Font family (Helvetica, Times, Courier, Montserrat, Carlito), bold/italic styling, custom font size (6-120pt), quick color presets
 - **Signature upload**: Supports images for signatures AND stamps, with background removal option
 - **Signature preview**: Position signatures before placing
 - **Zoom controls**: Scale view for precision editing
+- **Rotate function**: Rotate current page 90° clockwise
 - **Undo/Redo**: Separate stacks for page operations and annotations
-- **Thumbnail navigation**: Visual page overview
+- **Thumbnail navigation**: Visual page overview with rotation preview
 - **Keyboard shortcuts**: Full keyboard support with floating "?" help button
 
 **Keyboard Shortcuts:**
@@ -94,6 +97,7 @@ Features:
 | W | Whiteout tool |
 | T | Text tool |
 | S | Signature tool |
+| R | Rotate current page 90° clockwise |
 | Delete/Backspace | Delete selected annotation |
 | Ctrl+Z | Undo |
 | Ctrl+Y | Redo |
@@ -104,21 +108,26 @@ Features:
 
 **Toolbar Structure (Two Lines):**
 - Line 1: Signature button, secondary tools (Pilih, Whiteout, Teks), "Lainnya" dropdown (Watermark, Nomor Halaman, Kunci PDF)
-- Line 2: Zoom controls, action buttons (Undo/Redo/Clear), Download PDF button
+- Line 2: Zoom controls, Rotate button, action buttons (Undo/Redo/Clear), Download PDF button
 - Floating "?" button: Opens keyboard shortcuts help modal
+
+**Sidebar Structure:**
+- Header: "Merge" button (opens Gabungkan modal), close button
+- Thumbnails: Drag-drop reorderable, visual rotation, click to navigate
+- Footer: Page indicator (e.g., "1 / 5")
 
 #### Other PDF Tools (Standalone Workspaces)
 - **PDF to Image**: Convert pages to PNG/JPG with batch export
 - **Compress PDF**: Compress embedded images within PDFs
 - **Protect PDF**: Add password protection (also available in Unified Editor via "Kunci PDF")
-- **Watermark**: Add text watermarks with positioning (also in Unified Editor)
-- **Page Numbers**: Automatic numbering with position options (also in Unified Editor)
 
 **Removed Tools:**
 - Crop PDF (removed)
 - Unlock PDF / Buka Kunci (removed completely)
 - Legacy Edit PDF (merged into Unified Editor)
 - Legacy Kelola Halaman / Page Manager (merged into Unified Editor)
+- Watermark standalone workspace (removed - now only in Unified Editor via "Lainnya")
+- Page Numbers standalone workspace (removed - now only in Unified Editor via "Lainnya")
 
 ### Image Tools
 - **Compress Image**: Quality slider with live preview and savings percentage
@@ -130,7 +139,11 @@ Features:
 ### Homepage Layout
 - Hero section with tagline and signature hint
 - Main dropzone (opens Unified Editor for PDFs)
+- PDF tool cards: **Editor PDF**, **Merge PDF**, **Split PDF**, PDF to Image, Compress PDF, Protect PDF
+- Image tool cards: Compress, Resize, Convert Format, Image to PDF, Remove Background
 - PDF and Image tool cards displayed **side by side** on desktop (stacked on mobile)
+- **Merge PDF card**: Opens file picker → Loads files → Opens Unified Editor with Gabungkan modal
+- **Split PDF card**: Opens file picker → Loads files → Opens Unified Editor with Gabungkan modal in Split mode
 - Privacy badge below dropzone
 - "Coming Soon" section for server-dependent features
 
@@ -139,6 +152,8 @@ Features:
 - **File size warnings**: Shows info toast for files >20MB, blocks files >100MB
 - **Browser compatibility check**: Validates required features on page load
 - **Loading states**: Spinner on buttons during processing (PDF download, protect, etc.)
+- **Fullscreen loading overlay**: Used for async operations (Merge/Split cards) - home-view stays visible during file picking, overlay shows during PDF loading
+- **File picker UX pattern**: Merge/Split cards use `handleMergePdfCard()` and `handleSplitPdfCard()` which bypass `showTool()` to keep home-view visible until files are loaded
 
 ## Development Guidelines
 
@@ -186,6 +201,18 @@ The Unified Editor is the primary tool. New PDF features should be added here:
 5. Ensure undo/redo works for the new annotation type
 6. Test across multiple pages and files
 
+### Adding Sidebar Drag-Drop Functionality
+
+To enable drag-drop reordering in the sidebar (or similar vertical lists):
+
+1. Add `draggable="true"` and `data-index` attributes to items in render function
+2. Create setup function mirroring `uePmEnableDragReorder()` but adapted for vertical layout:
+   - Use `clientY` instead of `clientX` for drop position calculation
+   - Use `rect.top + rect.height / 2` instead of `rect.left + rect.width / 2` for midpoint
+3. Add drop indicator state to relevant state object (e.g., `sidebarDropIndicator`)
+4. Add CSS for `.dragging` and drop indicator styles
+5. Call setup function after rendering items
+
 ### Adding to "Lainnya" Dropdown
 
 For rarely-used tools, add them to the "Lainnya" (More Tools) dropdown:
@@ -193,6 +220,48 @@ For rarely-used tools, add them to the "Lainnya" (More Tools) dropdown:
 2. Create modal HTML following existing pattern (`editor-*-modal`)
 3. Add JS functions: `ueOpen[Tool]Modal()`, `closeEditor[Tool]Modal()`, `applyEditor[Tool]()`
 4. The dropdown uses `position: fixed` for proper overflow handling
+
+### Creating File Picker Cards (Like Merge/Split PDF)
+
+To create tool cards that trigger file picker before opening workspace:
+
+1. **Don't call `showTool()` from `initToolCards()`** - `showTool()` immediately hides home-view
+2. Create dedicated handler function (e.g., `handleMergePdfCard()`) that:
+   - Creates hidden file input element (or reuses existing one)
+   - Attaches `change` event listener with async handler
+   - Calls `input.click()` to trigger file picker
+3. In the async `change` handler:
+   - Convert FileList to Array: `const filesArray = Array.from(e.target.files)`
+   - Reset input immediately: `input.value = ''` (so same files can be selected again)
+   - Show fullscreen loading overlay: `showFullscreenLoading('Memuat PDF...')`
+   - Load files and initialize workspace manually (don't use `showTool()`)
+   - Manually hide home-view and show workspace after files are loaded
+   - Hide loading overlay when ready
+4. This pattern keeps home-view visible during file picking, provides loading feedback, and prevents blank screen
+
+**Example:**
+```javascript
+function handleMergePdfCard() {
+  let input = document.getElementById('merge-pdf-input');
+  if (!input) {
+    input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = true;
+    input.accept = '.pdf';
+    input.addEventListener('change', async (e) => {
+      const filesArray = Array.from(e.target.files);
+      input.value = '';
+      showFullscreenLoading('Memuat PDF...');
+      await loadFiles(filesArray);
+      document.getElementById('home-view').style.display = 'none';
+      // ... show workspace ...
+      hideFullscreenLoading();
+    });
+    document.body.appendChild(input);
+  }
+  input.click();
+}
+```
 
 ### Adding Image Processing Feature
 
@@ -302,6 +371,41 @@ Before committing changes:
 4. Have I tested with large files?
 5. Is this consistent with existing code style?
 6. Does this introduce new dependencies unnecessarily?
+
+## Key Technical Patterns
+
+### FileList to Array Conversion
+When handling file inputs with async operations:
+```javascript
+const filesArray = Array.from(e.target.files);
+input.value = ''; // Reset AFTER converting to array
+await processFiles(filesArray); // FileList would be empty if reset before conversion
+```
+
+### Drag-Drop Reordering Patterns
+- **Horizontal lists** (like Page Manager): Use `clientX` and `rect.left + rect.width / 2`
+- **Vertical lists** (like sidebar): Use `clientY` and `rect.top + rect.height / 2`
+- Always use event delegation for dynamically created elements
+- Store drop indicator element in state for cleanup
+
+### Home-View Visibility Pattern
+- **Problem**: `showTool()` immediately hides home-view, causing blank screen during file picking
+- **Solution**: Bypass `showTool()` for file-picker-first flows, manually manage workspace visibility after files load
+- **Benefits**: Home-view stays visible, loading overlay provides feedback, better UX
+
+### Visual Rotation Display
+Apply CSS transforms to match page rotation state:
+```javascript
+if (page.rotation && page.rotation !== 0) {
+  canvas.style.transform = `rotate(${page.rotation}deg)`;
+}
+```
+
+### Fullscreen Loading Overlay
+Use for async operations where workspace isn't ready yet:
+- Shows spinner and message
+- Keeps previous view visible behind semi-transparent overlay
+- Better UX than blank screen or immediate transition
 
 ---
 

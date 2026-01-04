@@ -155,6 +155,32 @@
                 <h3>Editor PDF</h3>
                 <p>edit, merge, kelola</p>
               </div>
+              <div class="tool-card" data-tool="merge-pdf">
+                <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3"/>
+                  <path d="M16 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3"/>
+                  <path d="M12 3v18"/>
+                  <path d="M4 12h5"/>
+                  <path d="M7 9l3 3-3 3"/>
+                  <path d="M20 12h-5"/>
+                  <path d="M17 9l-3 3 3 3"/>
+                </svg>
+                <h3>Merge PDF</h3>
+                <p>Gabungkan PDF</p>
+              </div>
+              <div class="tool-card" data-tool="split-pdf">
+                <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3"/>
+                  <path d="M16 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3"/>
+                  <path d="M12 3v18"/>
+                  <path d="M9 12H4"/>
+                  <path d="M6 9l-3 3 3 3"/>
+                  <path d="M15 12h5"/>
+                  <path d="M18 9l3 3-3 3"/>
+                </svg>
+                <h3>Split PDF</h3>
+                <p>Pisahkan PDF</p>
+              </div>
               <div class="tool-card" data-tool="pdf-to-img">
                 <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
@@ -179,21 +205,6 @@
                 </svg>
                 <h3>Proteksi</h3>
               </div>
-              <div class="tool-card" data-tool="watermark">
-                <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                </svg>
-                <h3>Watermark</h3>
-              </div>
-              <div class="tool-card" data-tool="page-numbers">
-                <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <line x1="4" y1="9" x2="20" y2="9"/>
-                  <line x1="4" y1="15" x2="20" y2="15"/>
-                  <line x1="10" y1="3" x2="8" y2="21"/>
-                  <line x1="16" y1="3" x2="14" y2="21"/>
-                </svg>
-                <h3>Nomor Halaman</h3>
-              </div>
             </div>
           </div>
 
@@ -201,6 +212,17 @@
           <div class="tools-category">
             <h2>Gambar</h2>
             <div class="tools-grid">
+              <div class="tool-card" data-tool="remove-bg">
+                <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                  <path d="M9 3v18"/>
+                  <path d="M15 3v18"/>
+                  <path d="M3 9h18"/>
+                  <path d="M3 15h18"/>
+                </svg>
+                <h3>Hapus Latar</h3>
+                <p>putih → transparan</p>
+              </div>
               <div class="tool-card" data-tool="compress-img">
                 <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -235,17 +257,6 @@
                   <path d="m9 15 3-3 3 3"/>
                 </svg>
                 <h3>Gambar ke PDF</h3>
-              </div>
-              <div class="tool-card" data-tool="remove-bg">
-                <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                  <path d="M9 3v18"/>
-                  <path d="M15 3v18"/>
-                  <path d="M3 9h18"/>
-                  <path d="M3 15h18"/>
-                </svg>
-                <h3>Hapus Latar</h3>
-                <p>putih → transparan</p>
               </div>
             </div>
           </div>
@@ -360,12 +371,9 @@
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
             </button>
             <span class="sidebar-title">Halaman</span>
-            <button class="btn btn-secondary btn-sm ue-manage-btn" onclick="uePmOpenModal()" title="Kelola Halaman">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-              Kelola
-            </button>
-            <button class="btn btn-secondary btn-sm" onclick="document.getElementById('ue-file-input').click()" title="Tambah PDF">
+            <button class="btn btn-secondary btn-sm ue-manage-btn" onclick="uePmOpenModal()" title="Gabungkan & Split">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+              Merge
             </button>
             <input type="file" id="ue-file-input" multiple accept=".pdf,application/pdf" style="display:none">
           </div>
@@ -376,12 +384,6 @@
             </div>
           </div>
           <div class="unified-sidebar-footer">
-            <button class="btn btn-secondary btn-sm btn-icon" onclick="ueUndo()" title="Undo">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
-            </button>
-            <button class="btn btn-secondary btn-sm btn-icon" onclick="ueRedo()" title="Redo">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></svg>
-            </button>
             <span class="sidebar-page-count" id="ue-page-count">0 halaman</span>
           </div>
         </div>
@@ -454,10 +456,11 @@
                 <button class="editor-action-btn" onclick="ueZoomIn()" title="Zoom In (+)">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35M11 8v6M8 11h6"/></svg>
                 </button>
-                <button class="editor-action-btn" onclick="ueZoomReset()" title="Reset Zoom (0)">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-                </button>
               </div>
+              <div class="editor-tool-divider"></div>
+              <button class="editor-action-btn" onclick="ueRotateCurrentPage()" title="Putar Halaman (R)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.85.83 6.72 2.24"/><path d="M21 3v6h-6"/></svg>
+              </button>
               <div class="editor-tool-divider"></div>
               <div class="editor-action-group">
                 <button class="editor-action-btn" onclick="ueUndoAnnotation()" title="Undo Edit (Ctrl+Z)">
@@ -660,137 +663,6 @@
       </div>
     </div>
 
-    <!-- Watermark Workspace -->
-    <div id="watermark-workspace" class="workspace">
-      <div class="workspace-header">
-        <h2>
-          <button class="back-btn" onclick="showHome()">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-            Kembali
-          </button>
-          Watermark PDF
-        </h2>
-      </div>
-      <div class="preview-area" id="watermark-preview">
-        <div class="dropzone" onclick="document.getElementById('watermark-input').click()">
-          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-            <polyline points="17 8 12 3 7 8"/>
-            <line x1="12" y1="3" x2="12" y2="15"/>
-          </svg>
-          <h3>Seret file ke sini atau klik untuk pilih</h3>
-          <p>PDF</p>
-          <input type="file" id="watermark-input" accept=".pdf,application/pdf" style="display:none">
-        </div>
-        <div class="editor-canvas-wrapper hidden" id="watermark-canvas-wrapper" style="margin-bottom: var(--space-xl);">
-          <canvas id="watermark-preview-canvas" class="editor-canvas"></canvas>
-        </div>
-      </div>
-      <div class="controls hidden" id="watermark-controls" style="flex-wrap: wrap;">
-        <div class="control-group">
-          <label>Teks Watermark:</label>
-          <input type="text" id="watermark-text" placeholder="CONFIDENTIAL" value="CONFIDENTIAL" onchange="updateWatermarkPreview()">
-        </div>
-        <div class="control-group">
-          <label>Ukuran:</label>
-          <select id="watermark-size" onchange="updateWatermarkPreview()">
-            <option value="24">Kecil</option>
-            <option value="48" selected>Sedang</option>
-            <option value="72">Besar</option>
-          </select>
-        </div>
-        <div class="control-group">
-          <label>Warna:</label>
-          <input type="color" id="watermark-color" value="#dc2626" onchange="updateWatermarkPreview()">
-        </div>
-        <div class="control-group">
-          <label>Opacity:</label>
-        </div>
-        <div class="range-slider" style="max-width: 200px;">
-          <input type="range" id="watermark-opacity" min="10" max="100" value="30" onchange="updateWatermarkPreview()">
-          <span class="range-value">30%</span>
-        </div>
-        <div class="control-group">
-          <label>Rotasi:</label>
-          <select id="watermark-rotation" onchange="updateWatermarkPreview()">
-            <option value="0">0°</option>
-            <option value="-45" selected>-45°</option>
-            <option value="-30">-30°</option>
-            <option value="45">45°</option>
-          </select>
-        </div>
-      </div>
-      <div class="action-bar hidden" id="watermark-action-bar">
-        <button class="btn btn-primary btn-lg" id="watermark-btn" onclick="addWatermark()">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Download
-        </button>
-      </div>
-    </div>
-
-    <!-- Page Numbers Workspace -->
-    <div id="page-numbers-workspace" class="workspace">
-      <div class="workspace-header">
-        <h2>
-          <button class="back-btn" onclick="showHome()">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-            Kembali
-          </button>
-          Nomor Halaman
-        </h2>
-      </div>
-      <div class="preview-area" id="page-numbers-preview">
-        <div class="dropzone" onclick="document.getElementById('page-numbers-input').click()">
-          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-            <polyline points="17 8 12 3 7 8"/>
-            <line x1="12" y1="3" x2="12" y2="15"/>
-          </svg>
-          <h3>Seret file ke sini atau klik untuk pilih</h3>
-          <p>PDF</p>
-          <input type="file" id="page-numbers-input" accept=".pdf" style="display:none">
-        </div>
-      </div>
-      <div class="controls" style="flex-wrap: wrap;">
-        <div class="control-group">
-          <label>Posisi:</label>
-          <select id="page-num-position">
-            <option value="bottom-center" selected>Bawah Tengah</option>
-            <option value="bottom-left">Bawah Kiri</option>
-            <option value="bottom-right">Bawah Kanan</option>
-            <option value="top-center">Atas Tengah</option>
-            <option value="top-left">Atas Kiri</option>
-            <option value="top-right">Atas Kanan</option>
-          </select>
-        </div>
-        <div class="control-group">
-          <label>Format:</label>
-          <select id="page-num-format">
-            <option value="number">1, 2, 3...</option>
-            <option value="page-of">Halaman 1 dari X</option>
-            <option value="dash">- 1 -</option>
-          </select>
-        </div>
-        <div class="control-group">
-          <label>Mulai dari:</label>
-          <input type="number" id="page-num-start" value="1" min="1" style="width: 80px;">
-        </div>
-        <div class="control-group">
-          <label>Ukuran:</label>
-          <select id="page-num-size">
-            <option value="10">10pt</option>
-            <option value="12" selected>12pt</option>
-            <option value="14">14pt</option>
-          </select>
-        </div>
-      </div>
-      <div class="action-bar">
-        <button class="btn btn-primary btn-lg" id="page-numbers-btn" disabled onclick="addPageNumbers()">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Download
-        </button>
-      </div>
-    </div>
     <!-- Compress Image Workspace -->
     <div id="compress-img-workspace" class="workspace">
       <div class="workspace-header">
@@ -1341,23 +1213,24 @@
     </div>
   </div>
 
-  <!-- Page Manager Modal for Unified Editor -->
-  <div id="ue-page-manager-modal" class="edit-modal">
+  <!-- Gabungkan Halaman Modal for Unified Editor -->
+  <div id="ue-gabungkan-modal" class="edit-modal">
     <div class="edit-modal-box ue-pm-modal-box">
       <div class="ue-pm-header">
-        <h3>Kelola Halaman</h3>
+        <h3>Gabungkan Halaman</h3>
         <button class="ue-pm-close-btn" onclick="uePmCloseModal()">&times;</button>
       </div>
 
       <div class="ue-pm-toolbar">
         <button class="btn btn-secondary btn-sm" onclick="document.getElementById('ue-pm-file-input').click()">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-          Tambah Halaman
+          Tambah PDF
         </button>
         <input type="file" id="ue-pm-file-input" multiple accept=".pdf" style="display:none">
 
         <button class="btn btn-secondary btn-sm" id="ue-pm-extract-mode-btn" onclick="uePmToggleExtractMode()">
-          Ekstrak Halaman
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18"/><path d="M8 8H4a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h4"/><path d="M16 8h4a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-4"/><path d="M9 12H5"/><path d="M7 10l-2 2 2 2"/><path d="M15 12h4"/><path d="M17 10l2 2-2 2"/></svg>
+          Split PDF
         </button>
 
         <div class="ue-pm-extract-actions" id="ue-pm-extract-actions" style="display:none;">
@@ -1374,7 +1247,7 @@
       <div class="edit-modal-actions">
         <span class="ue-pm-page-count" id="ue-pm-page-count">0 halaman</span>
         <button class="btn btn-primary" id="ue-pm-extract-btn" onclick="uePmExtractSelected()" style="display:none;">
-          Ekstrak sebagai PDF baru
+          Split sebagai PDF baru
         </button>
         <button class="btn btn-ghost" onclick="uePmCloseModal()">Selesai</button>
       </div>
@@ -1393,6 +1266,7 @@
           <div class="shortcut-item"><kbd>W</kbd> <span>Whiteout</span></div>
           <div class="shortcut-item"><kbd>T</kbd> <span>Tambah Teks</span></div>
           <div class="shortcut-item"><kbd>S</kbd> <span>Tanda Tangan</span></div>
+          <div class="shortcut-item"><kbd>R</kbd> <span>Putar Halaman</span></div>
         </div>
         <div class="shortcut-group">
           <h4>Navigasi</h4>

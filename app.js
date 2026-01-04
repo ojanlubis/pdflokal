@@ -219,7 +219,7 @@ function closeAllModals() {
   }
 
   // Close page manager modal
-  const pmModal = document.getElementById('ue-page-manager-modal');
+  const pmModal = document.getElementById('ue-gabungkan-modal');
   if (pmModal?.classList.contains('active')) {
     if (typeof uePmCloseModal === 'function') {
       uePmCloseModal(true); // true = skip history manipulation
@@ -327,9 +327,152 @@ function initToolCards() {
   document.querySelectorAll('.tool-card:not(.disabled)').forEach(card => {
     card.addEventListener('click', () => {
       const tool = card.dataset.tool;
+
+      // Handle merge-pdf and split-pdf separately (don't call showTool)
+      if (tool === 'merge-pdf') {
+        handleMergePdfCard();
+        return;
+      }
+      if (tool === 'split-pdf') {
+        handleSplitPdfCard();
+        return;
+      }
+
       showTool(tool);
     });
   });
+}
+
+function handleMergePdfCard() {
+  // Create or get hidden file input for merge
+  let mergeInput = document.getElementById('merge-pdf-input');
+  if (!mergeInput) {
+    mergeInput = document.createElement('input');
+    mergeInput.type = 'file';
+    mergeInput.id = 'merge-pdf-input';
+    mergeInput.multiple = true;
+    mergeInput.accept = '.pdf,application/pdf';
+    mergeInput.style.display = 'none';
+    document.body.appendChild(mergeInput);
+
+    mergeInput.addEventListener('change', async (e) => {
+      if (e.target.files.length > 0) {
+        // Convert FileList to Array before resetting input
+        const filesArray = Array.from(e.target.files);
+        // Reset input immediately so same files can be selected again
+        mergeInput.value = '';
+
+        // Show loading overlay (home-view stays visible behind it)
+        showFullscreenLoading('Memuat PDF...');
+
+        try {
+          // Initialize unified editor in background
+          const workspace = document.getElementById('unified-editor-workspace');
+          if (workspace) {
+            initUnifiedEditor();
+
+            // Load the files into unified editor
+            await ueAddFiles(filesArray);
+
+            // Now hide home-view and show editor
+            document.getElementById('home-view').style.display = 'none';
+            workspace.classList.add('active');
+            state.currentTool = 'unified-editor';
+            window.scrollTo(0, 0);
+            pushWorkspaceState('unified-editor');
+
+            // Initialize mobile enhancements
+            if (mobileState.isMobile || mobileState.isTouch) {
+              initMobileEditorEnhancements();
+              ueMobileUpdatePageIndicator();
+            }
+
+            // Open the Gabungkan modal
+            uePmOpenModal();
+
+            // Hide loading overlay after modal is ready
+            setTimeout(() => {
+              hideFullscreenLoading();
+            }, 100);
+          }
+        } catch (error) {
+          console.error('Error loading PDFs:', error);
+          hideFullscreenLoading();
+          showToast('Gagal memuat PDF', 'error');
+        }
+      }
+    });
+  }
+  // Trigger file selection
+  mergeInput.click();
+}
+
+function handleSplitPdfCard() {
+  // Create or get hidden file input for split
+  let splitInput = document.getElementById('split-pdf-input');
+  if (!splitInput) {
+    splitInput = document.createElement('input');
+    splitInput.type = 'file';
+    splitInput.id = 'split-pdf-input';
+    splitInput.multiple = true;
+    splitInput.accept = '.pdf,application/pdf';
+    splitInput.style.display = 'none';
+    document.body.appendChild(splitInput);
+
+    splitInput.addEventListener('change', async (e) => {
+      if (e.target.files.length > 0) {
+        // Convert FileList to Array before resetting input
+        const filesArray = Array.from(e.target.files);
+        // Reset input immediately so same files can be selected again
+        splitInput.value = '';
+
+        // Show loading overlay (home-view stays visible behind it)
+        showFullscreenLoading('Memuat PDF...');
+
+        try {
+          // Initialize unified editor in background
+          const workspace = document.getElementById('unified-editor-workspace');
+          if (workspace) {
+            initUnifiedEditor();
+
+            // Load the files into unified editor
+            await ueAddFiles(filesArray);
+
+            // Now hide home-view and show editor
+            document.getElementById('home-view').style.display = 'none';
+            workspace.classList.add('active');
+            state.currentTool = 'unified-editor';
+            window.scrollTo(0, 0);
+            pushWorkspaceState('unified-editor');
+
+            // Initialize mobile enhancements
+            if (mobileState.isMobile || mobileState.isTouch) {
+              initMobileEditorEnhancements();
+              ueMobileUpdatePageIndicator();
+            }
+
+            // Open the Gabungkan modal
+            uePmOpenModal();
+
+            // Enable split mode
+            setTimeout(() => {
+              if (!uePmState.extractMode) {
+                uePmToggleExtractMode();
+              }
+              // Hide loading overlay after split mode is ready
+              hideFullscreenLoading();
+            }, 100);
+          }
+        } catch (error) {
+          console.error('Error loading PDFs:', error);
+          hideFullscreenLoading();
+          showToast('Gagal memuat PDF', 'error');
+        }
+      }
+    });
+  }
+  // Trigger file selection
+  splitInput.click();
 }
 
 function initFileInputs() {
@@ -370,28 +513,6 @@ function initFileInputs() {
     protectInput.addEventListener('change', (e) => {
       if (e.target.files.length > 0) {
         loadPDFForTool(e.target.files[0], 'protect');
-      }
-      e.target.value = '';
-    });
-  }
-
-  // Page Numbers input
-  const pageNumbersInput = document.getElementById('page-numbers-input');
-  if (pageNumbersInput) {
-    pageNumbersInput.addEventListener('change', (e) => {
-      if (e.target.files.length > 0) {
-        loadPDFForTool(e.target.files[0], 'page-numbers');
-      }
-      e.target.value = '';
-    });
-  }
-
-  // Watermark input
-  const watermarkInput = document.getElementById('watermark-input');
-  if (watermarkInput) {
-    watermarkInput.addEventListener('change', (e) => {
-      if (e.target.files.length > 0) {
-        loadPDFForTool(e.target.files[0], 'watermark');
       }
       e.target.value = '';
     });
@@ -573,14 +694,6 @@ async function loadPDFForTool(file, tool) {
       case 'protect':
         await showPDFPreview('protect-preview');
         document.getElementById('protect-btn').disabled = false;
-        break;
-      case 'watermark':
-        await initWatermarkMode();
-        document.getElementById('watermark-btn').disabled = false;
-        break;
-      case 'page-numbers':
-        await showPDFPreview('page-numbers-preview');
-        document.getElementById('page-numbers-btn').disabled = false;
         break;
     }
   } catch (error) {
@@ -1715,189 +1828,6 @@ async function protectPDF() {
     // Restore button state
     protectBtn.disabled = false;
     protectBtn.innerHTML = originalText;
-  }
-}
-
-// ============================================================
-// WATERMARK PDF
-// ============================================================
-
-async function initWatermarkMode() {
-  state.currentWatermarkPage = 0;
-
-  // Hide dropzone, show canvas wrapper and controls
-  const previewArea = document.getElementById('watermark-preview');
-  const dropzone = previewArea.querySelector('.dropzone');
-  const canvasWrapper = document.getElementById('watermark-canvas-wrapper');
-  const controls = document.getElementById('watermark-controls');
-  const actionBar = document.getElementById('watermark-action-bar');
-
-  if (dropzone) dropzone.classList.add('hidden');
-  if (canvasWrapper) canvasWrapper.classList.remove('hidden');
-  if (controls) controls.classList.remove('hidden');
-  if (actionBar) actionBar.classList.remove('hidden');
-
-  await updateWatermarkPreview();
-}
-
-async function updateWatermarkPreview() {
-  if (!state.currentPDF) return;
-  
-  const canvas = document.getElementById('watermark-preview-canvas');
-  const ctx = canvas.getContext('2d');
-  
-  const page = await state.currentPDF.getPage(1);
-  const scale = 1;
-  const viewport = page.getViewport({ scale });
-  
-  canvas.width = viewport.width;
-  canvas.height = viewport.height;
-  
-  await page.render({ canvasContext: ctx, viewport }).promise;
-  
-  // Draw watermark preview
-  const text = document.getElementById('watermark-text').value || 'WATERMARK';
-  const size = parseInt(document.getElementById('watermark-size').value);
-  const color = document.getElementById('watermark-color').value;
-  const opacity = parseInt(document.getElementById('watermark-opacity').value) / 100;
-  const rotation = parseInt(document.getElementById('watermark-rotation').value);
-  
-  // Update opacity display
-  document.querySelector('#watermark-workspace .range-value').textContent = 
-    document.getElementById('watermark-opacity').value + '%';
-  
-  ctx.save();
-  ctx.translate(canvas.width / 2, canvas.height / 2);
-  ctx.rotate(rotation * Math.PI / 180);
-  ctx.font = `${size}px Arial`;
-  ctx.fillStyle = color;
-  ctx.globalAlpha = opacity;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(text, 0, 0);
-  ctx.restore();
-}
-
-async function addWatermark() {
-  const text = document.getElementById('watermark-text').value || 'WATERMARK';
-  const size = parseInt(document.getElementById('watermark-size').value);
-  const color = document.getElementById('watermark-color').value;
-  const opacity = parseInt(document.getElementById('watermark-opacity').value) / 100;
-  const rotation = parseInt(document.getElementById('watermark-rotation').value);
-  
-  try {
-    const srcDoc = await PDFLib.PDFDocument.load(state.currentPDFBytes);
-    const pages = srcDoc.getPages();
-    
-    // Convert hex color to RGB
-    const r = parseInt(color.slice(1, 3), 16) / 255;
-    const g = parseInt(color.slice(3, 5), 16) / 255;
-    const b = parseInt(color.slice(5, 7), 16) / 255;
-    
-    const font = await srcDoc.embedFont(PDFLib.StandardFonts.Helvetica);
-    
-    for (const page of pages) {
-      const { width, height } = page.getSize();
-      
-      page.drawText(text, {
-        x: width / 2 - (text.length * size * 0.3),
-        y: height / 2,
-        size: size,
-        font: font,
-        color: PDFLib.rgb(r, g, b),
-        opacity: opacity,
-        rotate: PDFLib.degrees(rotation),
-      });
-    }
-    
-    const bytes = await srcDoc.save();
-    downloadBlob(new Blob([bytes], { type: 'application/pdf' }), getOutputFilename('watermark'));
-    showToast('Watermark berhasil ditambahkan!', 'success');
-    
-  } catch (error) {
-    console.error('Error adding watermark:', error);
-    showToast('Gagal menambahkan watermark', 'error');
-  }
-}
-
-// ============================================================
-// PAGE NUMBERS
-// ============================================================
-
-async function addPageNumbers() {
-  const position = document.getElementById('page-num-position').value;
-  const format = document.getElementById('page-num-format').value;
-  const startNum = parseInt(document.getElementById('page-num-start').value) || 1;
-  const fontSize = parseInt(document.getElementById('page-num-size').value);
-  
-  try {
-    const srcDoc = await PDFLib.PDFDocument.load(state.currentPDFBytes);
-    const pages = srcDoc.getPages();
-    const font = await srcDoc.embedFont(PDFLib.StandardFonts.Helvetica);
-    const totalPages = pages.length;
-    
-    for (let i = 0; i < pages.length; i++) {
-      const page = pages[i];
-      const { width, height } = page.getSize();
-      const pageNum = startNum + i;
-      
-      let text;
-      switch (format) {
-        case 'page-of':
-          text = `Halaman ${pageNum} dari ${totalPages + startNum - 1}`;
-          break;
-        case 'dash':
-          text = `- ${pageNum} -`;
-          break;
-        default:
-          text = `${pageNum}`;
-      }
-      
-      const textWidth = font.widthOfTextAtSize(text, fontSize);
-      let x, y;
-      
-      switch (position) {
-        case 'bottom-left':
-          x = 40;
-          y = 30;
-          break;
-        case 'bottom-right':
-          x = width - textWidth - 40;
-          y = 30;
-          break;
-        case 'top-center':
-          x = (width - textWidth) / 2;
-          y = height - 30;
-          break;
-        case 'top-left':
-          x = 40;
-          y = height - 30;
-          break;
-        case 'top-right':
-          x = width - textWidth - 40;
-          y = height - 30;
-          break;
-        default: // bottom-center
-          x = (width - textWidth) / 2;
-          y = 30;
-      }
-      
-      page.drawText(text, {
-        x,
-        y,
-        size: fontSize,
-        font,
-        color: PDFLib.rgb(0, 0, 0),
-      });
-    }
-    
-    const bytes = await srcDoc.save();
-    downloadBlob(new Blob([bytes], { type: 'application/pdf' }), getOutputFilename('numbered'));
-    showToast('Nomor halaman berhasil ditambahkan!', 'success');
-    
-  } catch (error) {
-    console.error('Error adding page numbers:', error);
-    showToast('Gagal menambahkan nomor halaman', 'error');
   }
 }
 
@@ -3923,20 +3853,46 @@ function sleep(ms) {
 
 function showToast(message, type = 'info') {
   const container = document.getElementById('toast-container');
-  
+
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
   toast.innerHTML = `
     ${type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ'}
     <span>${message}</span>
   `;
-  
+
   container.appendChild(toast);
-  
+
   setTimeout(() => {
     toast.style.animation = 'slideIn 0.3s ease reverse';
     setTimeout(() => toast.remove(), 300);
   }, 3000);
+}
+
+// Full-screen loading overlay for merge/split operations
+function showFullscreenLoading(message = 'Memuat PDF...') {
+  let overlay = document.getElementById('fullscreen-loading-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'fullscreen-loading-overlay';
+    overlay.innerHTML = `
+      <div class="fullscreen-loading-content">
+        <div class="fullscreen-loading-spinner"></div>
+        <p class="fullscreen-loading-text">${message}</p>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+  } else {
+    overlay.querySelector('.fullscreen-loading-text').textContent = message;
+    overlay.style.display = 'flex';
+  }
+}
+
+function hideFullscreenLoading() {
+  const overlay = document.getElementById('fullscreen-loading-overlay');
+  if (overlay) {
+    overlay.style.display = 'none';
+  }
 }
 
 // ============================================================
@@ -3969,6 +3925,8 @@ const ueState = {
   // Touch interaction state (shared with pinch-to-zoom handler)
   isDragging: false,            // Whether annotation is being dragged
   isResizing: false,            // Whether annotation is being resized
+  // Sidebar drag-drop state
+  sidebarDropIndicator: null,
 };
 
 // Initialize unified editor file input
@@ -4070,6 +4028,8 @@ function ueRenderThumbnails() {
     // Detect orientation based on canvas dimensions
     const isLandscape = page.canvas.width > page.canvas.height;
     item.className = 'ue-thumbnail' + (index === ueState.selectedPage ? ' selected' : '') + (isLandscape ? ' landscape' : ' portrait');
+    item.draggable = true;
+    item.dataset.index = index;
     item.onclick = () => ueSelectPage(index);
 
     // Clone the thumbnail canvas
@@ -4077,6 +4037,10 @@ function ueRenderThumbnails() {
     thumbCanvas.width = page.canvas.width;
     thumbCanvas.height = page.canvas.height;
     thumbCanvas.getContext('2d').drawImage(page.canvas, 0, 0);
+    // Apply rotation transform if page is rotated
+    if (page.rotation && page.rotation !== 0) {
+      thumbCanvas.style.transform = `rotate(${page.rotation}deg)`;
+    }
     item.appendChild(thumbCanvas);
 
     // Page number badge
@@ -4104,6 +4068,146 @@ function ueRenderThumbnails() {
     item.appendChild(delBtn);
 
     container.appendChild(item);
+  });
+
+  // Setup drag-drop reordering
+  ueSetupSidebarDragDrop();
+}
+
+// Setup sidebar drag-drop reordering (mirrors uePmEnableDragReorder for vertical layout)
+function ueSetupSidebarDragDrop() {
+  const container = document.getElementById('ue-thumbnails');
+  if (!container || container._sidebarDragSetup) return;
+  container._sidebarDragSetup = true;
+
+  let draggedItem = null;
+  let draggedIndex = -1;
+
+  function getDropIndicator() {
+    if (!ueState.sidebarDropIndicator) {
+      ueState.sidebarDropIndicator = document.createElement('div');
+      ueState.sidebarDropIndicator.className = 'ue-sidebar-drop-indicator';
+    }
+    return ueState.sidebarDropIndicator;
+  }
+
+  function removeDropIndicator() {
+    if (ueState.sidebarDropIndicator && ueState.sidebarDropIndicator.parentNode) {
+      ueState.sidebarDropIndicator.remove();
+    }
+  }
+
+  // Use event delegation on container
+  container.addEventListener('dragstart', (e) => {
+    const item = e.target.closest('.ue-thumbnail');
+    if (!item) return;
+
+    ueSaveUndoState();
+    draggedItem = item;
+    draggedIndex = parseInt(item.dataset.index);
+    item.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', draggedIndex);
+  });
+
+  container.addEventListener('dragend', (e) => {
+    const item = e.target.closest('.ue-thumbnail');
+    if (item) {
+      item.classList.remove('dragging');
+    }
+    draggedItem = null;
+    draggedIndex = -1;
+    removeDropIndicator();
+  });
+
+  container.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (!draggedItem) return;
+
+    const item = e.target.closest('.ue-thumbnail');
+    if (!item || item === draggedItem) {
+      // Handle container edges
+      const items = container.querySelectorAll('.ue-thumbnail:not(.dragging)');
+      if (items.length === 0) return;
+
+      const indicator = getDropIndicator();
+      const firstItem = items[0];
+      const lastItem = items[items.length - 1];
+      const firstRect = firstItem.getBoundingClientRect();
+      const lastRect = lastItem.getBoundingClientRect();
+
+      if (e.clientY < firstRect.top) {
+        firstItem.before(indicator);
+      } else if (e.clientY > lastRect.bottom) {
+        lastItem.after(indicator);
+      }
+      return;
+    }
+
+    const rect = item.getBoundingClientRect();
+    const midpoint = rect.top + rect.height / 2;
+    const indicator = getDropIndicator();
+
+    if (e.clientY < midpoint) {
+      item.before(indicator);
+    } else {
+      item.after(indicator);
+    }
+  });
+
+  container.addEventListener('drop', (e) => {
+    e.preventDefault();
+    if (!draggedItem) return;
+
+    // Find where the indicator is positioned
+    const indicator = ueState.sidebarDropIndicator;
+    if (!indicator || !indicator.parentNode) {
+      removeDropIndicator();
+      return;
+    }
+
+    // Find the insertion index based on indicator position
+    const items = Array.from(container.querySelectorAll('.ue-thumbnail'));
+    let insertAt = 0;
+
+    // Find which item the indicator is before
+    const nextSibling = indicator.nextElementSibling;
+    if (nextSibling && nextSibling.classList.contains('ue-thumbnail')) {
+      insertAt = parseInt(nextSibling.dataset.index);
+    } else {
+      // Indicator is at the end
+      insertAt = items.length;
+    }
+
+    // Track the page user is currently viewing
+    const viewedPage = ueState.pages[ueState.selectedPage];
+
+    // Remove the page first
+    const [movedPage] = ueState.pages.splice(draggedIndex, 1);
+
+    // Adjust insertion point if we removed from before it
+    if (draggedIndex < insertAt) {
+      insertAt--;
+    }
+
+    // Insert at new position
+    ueState.pages.splice(insertAt, 0, movedPage);
+
+    // Reindex annotations
+    uePmReindexAnnotations(draggedIndex, insertAt);
+
+    // Update selectedPage to follow the viewed page
+    const newViewedIndex = ueState.pages.indexOf(viewedPage);
+    if (newViewedIndex !== -1) {
+      ueState.selectedPage = newViewedIndex;
+    }
+
+    // Re-render (this will reset _sidebarDragSetup via innerHTML clear)
+    container._sidebarDragSetup = false;
+    ueRenderThumbnails();
+
+    removeDropIndicator();
   });
 }
 
@@ -4233,6 +4337,24 @@ function ueZoomReset() {
   ueState.zoomLevel = 1.0;
   ueUpdateZoomDisplay();
   ueRenderSelectedPage();
+}
+
+// Rotate current page 90 degrees clockwise
+function ueRotateCurrentPage() {
+  if (ueState.pages.length === 0 || ueState.selectedPage < 0) return;
+
+  ueSaveUndoState();
+
+  const page = ueState.pages[ueState.selectedPage];
+  page.rotation = ((page.rotation || 0) + 90) % 360;
+
+  // Re-render the page with new rotation
+  ueRenderSelectedPage();
+
+  // Update thumbnails to reflect rotation
+  ueRenderThumbnails();
+
+  showToast('Halaman diputar', 'success');
 }
 
 function ueUpdateZoomDisplay() {
@@ -5460,8 +5582,8 @@ function uePmOpenModal() {
   uePmRenderPages();
   uePmUpdateUI();
 
-  document.getElementById('ue-page-manager-modal').classList.add('active');
-  pushModalState('ue-page-manager-modal');
+  document.getElementById('ue-gabungkan-modal').classList.add('active');
+  pushModalState('ue-gabungkan-modal');
 
   // Initialize file input handler
   initUePmFileInput();
@@ -5470,7 +5592,7 @@ function uePmOpenModal() {
 // Close the page manager modal
 function uePmCloseModal(skipHistoryBack = false) {
   uePmState.isOpen = false;
-  document.getElementById('ue-page-manager-modal').classList.remove('active');
+  document.getElementById('ue-gabungkan-modal').classList.remove('active');
 
   // Clean up drop indicator
   if (uePmState.dropIndicator && uePmState.dropIndicator.parentNode) {
@@ -5940,12 +6062,12 @@ function uePmToggleExtractMode() {
 
   if (uePmState.extractMode) {
     btn.classList.add('active');
-    btn.textContent = 'Batal Ekstrak';
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg> Batal Split';
     extractActions.style.display = 'flex';
     extractBtn.style.display = 'inline-flex';
   } else {
     btn.classList.remove('active');
-    btn.textContent = 'Ekstrak Halaman';
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18"/><path d="M8 8H4a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h4"/><path d="M16 8h4a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-4"/><path d="M9 12H5"/><path d="M7 10l-2 2 2 2"/><path d="M15 12h4"/><path d="M17 10l2 2-2 2"/></svg> Split PDF';
     extractActions.style.display = 'none';
     extractBtn.style.display = 'none';
   }
@@ -5998,14 +6120,14 @@ function uePmUpdateSelectionCount() {
   const extractBtn = document.getElementById('ue-pm-extract-btn');
   extractBtn.disabled = count === 0;
   extractBtn.textContent = count > 0
-    ? `Ekstrak ${count} halaman sebagai PDF baru`
-    : 'Ekstrak sebagai PDF baru';
+    ? `Split ${count} halaman sebagai PDF baru`
+    : 'Split sebagai PDF baru';
 }
 
 // Extract selected pages to new PDF
 async function uePmExtractSelected() {
   if (uePmState.selectedForExtract.length === 0) {
-    showToast('Pilih halaman yang ingin diekstrak', 'error');
+    showToast('Pilih halaman yang ingin di-split', 'error');
     return;
   }
 
@@ -6030,17 +6152,17 @@ async function uePmExtractSelected() {
     }
 
     const bytes = await newDoc.save();
-    const baseName = ueState.sourceFiles[0]?.name?.replace(/\.pdf$/i, '') || 'extracted';
-    downloadBlob(new Blob([bytes], { type: 'application/pdf' }), `${baseName}_extracted.pdf`);
+    const baseName = ueState.sourceFiles[0]?.name?.replace(/\.pdf$/i, '') || 'split';
+    downloadBlob(new Blob([bytes], { type: 'application/pdf' }), `${baseName}_split.pdf`);
 
-    showToast(`${sortedIndices.length} halaman berhasil diekstrak!`, 'success');
+    showToast(`${sortedIndices.length} halaman berhasil di-split!`, 'success');
 
     // Exit extract mode after successful extraction
     uePmToggleExtractMode();
 
   } catch (error) {
-    console.error('Error extracting pages:', error);
-    showToast('Gagal mengekstrak halaman', 'error');
+    console.error('Error splitting pages:', error);
+    showToast('Gagal split halaman', 'error');
   }
 }
 
@@ -6116,6 +6238,8 @@ document.addEventListener('keydown', (e) => {
         ueSetTool('text');
       } else if (key === 's' && !e.ctrlKey && !e.metaKey) {
         ueOpenSignatureModal();
+      } else if (key === 'r' && !e.ctrlKey && !e.metaKey) {
+        ueRotateCurrentPage();
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         if (ueState.selectedAnnotation) {
           e.preventDefault();
