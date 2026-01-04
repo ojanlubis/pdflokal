@@ -9,8 +9,7 @@
 
 // ============================================================
 // GLOBAL STATE
-// masa iya hello world ojan here testing this out v2
-// masa engga hello world ojan here testing this out v2
+// testing wether or not gitignore worked
 // ============================================================
 
 const state = {
