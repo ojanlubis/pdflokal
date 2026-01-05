@@ -166,7 +166,7 @@
                   <path d="M17 9l-3 3 3 3"/>
                 </svg>
                 <h3>Merge PDF</h3>
-                <p>Gabungkan PDF</p>
+                <p>Gabungkan PDF dan gambar</p>
               </div>
               <div class="tool-card" data-tool="split-pdf">
                 <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -179,7 +179,7 @@
                   <path d="M18 9l3 3-3 3"/>
                 </svg>
                 <h3>Split PDF</h3>
-                <p>Pisahkan PDF</p>
+                <p>Pisahkan PDF dan gambar</p>
               </div>
               <div class="tool-card" data-tool="pdf-to-img">
                 <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -375,12 +375,12 @@
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
               Merge
             </button>
-            <input type="file" id="ue-file-input" multiple accept=".pdf,application/pdf" style="display:none">
+            <input type="file" id="ue-file-input" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/*" style="display:none">
           </div>
           <div class="unified-thumbnails" id="ue-thumbnails">
             <div class="drop-hint" onclick="document.getElementById('ue-file-input').click()">
               <svg class="drop-hint-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width: 32px; height: 32px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-              <span class="drop-hint-text" style="font-size: 0.8125rem;">Upload PDF</span>
+              <span class="drop-hint-text" style="font-size: 0.8125rem;">Upload PDF atau Gambar</span>
             </div>
           </div>
           <div class="unified-sidebar-footer">
@@ -1226,7 +1226,13 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
           Tambah PDF
         </button>
-        <input type="file" id="ue-pm-file-input" multiple accept=".pdf" style="display:none">
+        <input type="file" id="ue-pm-file-input" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/*" style="display:none">
+
+        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('ue-pm-image-input').click()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18v-6"/><path d="m9 15 3-3 3 3"/></svg>
+          Tambah Gambar
+        </button>
+        <input type="file" id="ue-pm-image-input" multiple accept=".png,.jpg,.jpeg,.webp,image/*" style="display:none">
 
         <button class="btn btn-secondary btn-sm" id="ue-pm-extract-mode-btn" onclick="uePmToggleExtractMode()">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18"/><path d="M8 8H4a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h4"/><path d="M16 8h4a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-4"/><path d="M9 12H5"/><path d="M7 10l-2 2 2 2"/><path d="M15 12h4"/><path d="M17 10l2 2-2 2"/></svg>

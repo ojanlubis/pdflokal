@@ -319,8 +319,9 @@ function initDropZone() {
     handleDroppedFiles(e.dataTransfer.files);
   });
 
-  fileInput.addEventListener('change', (e) => {
-    handleDroppedFiles(e.target.files);
+  fileInput.addEventListener('change', async (e) => {
+    await handleDroppedFiles(e.target.files);
+    e.target.value = '';
   });
 }
 
@@ -352,7 +353,7 @@ function handleMergePdfCard() {
     mergeInput.type = 'file';
     mergeInput.id = 'merge-pdf-input';
     mergeInput.multiple = true;
-    mergeInput.accept = '.pdf,application/pdf';
+    mergeInput.accept = '.pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/*';
     mergeInput.style.display = 'none';
     document.body.appendChild(mergeInput);
 
@@ -416,7 +417,7 @@ function handleSplitPdfCard() {
     splitInput.type = 'file';
     splitInput.id = 'split-pdf-input';
     splitInput.multiple = true;
-    splitInput.accept = '.pdf,application/pdf';
+    splitInput.accept = '.pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/*';
     splitInput.style.display = 'none';
     document.body.appendChild(splitInput);
 
@@ -480,97 +481,171 @@ function initFileInputs() {
   // Image to PDF input
   const imgPdfInput = document.getElementById('img-pdf-input');
   if (imgPdfInput) {
-    imgPdfInput.addEventListener('change', (e) => {
-      addImagesToPDF(e.target.files);
-      e.target.value = '';
+    imgPdfInput.addEventListener('change', async (e) => {
+      if (e.target.files.length > 0) {
+        showFullscreenLoading('Memuat gambar...');
+        try {
+          await addImagesToPDF(e.target.files);
+        } catch (error) {
+          console.error('Error loading images:', error);
+          showToast('Gagal memuat gambar', 'error');
+        } finally {
+          hideFullscreenLoading();
+          e.target.value = '';
+        }
+      }
     });
   }
 
   // Compress PDF input
   const compressPdfInput = document.getElementById('compress-pdf-input');
   if (compressPdfInput) {
-    compressPdfInput.addEventListener('change', (e) => {
+    compressPdfInput.addEventListener('change', async (e) => {
       if (e.target.files.length > 0) {
-        loadPDFForTool(e.target.files[0], 'compress-pdf');
+        showFullscreenLoading('Memuat PDF...');
+        try {
+          await loadPDFForTool(e.target.files[0], 'compress-pdf');
+        } catch (error) {
+          console.error('Error loading PDF:', error);
+          showToast('Gagal memuat PDF', 'error');
+        } finally {
+          hideFullscreenLoading();
+          e.target.value = '';
+        }
       }
-      e.target.value = '';
     });
   }
 
   // PDF to Image input
   const pdfImgInput = document.getElementById('pdf-img-input');
   if (pdfImgInput) {
-    pdfImgInput.addEventListener('change', (e) => {
+    pdfImgInput.addEventListener('change', async (e) => {
       if (e.target.files.length > 0) {
-        loadPDFForTool(e.target.files[0], 'pdf-to-img');
+        showFullscreenLoading('Memuat PDF...');
+        try {
+          await loadPDFForTool(e.target.files[0], 'pdf-to-img');
+        } catch (error) {
+          console.error('Error loading PDF:', error);
+          showToast('Gagal memuat PDF', 'error');
+        } finally {
+          hideFullscreenLoading();
+          e.target.value = '';
+        }
       }
-      e.target.value = '';
     });
   }
 
   // Protect PDF input
   const protectInput = document.getElementById('protect-input');
   if (protectInput) {
-    protectInput.addEventListener('change', (e) => {
+    protectInput.addEventListener('change', async (e) => {
       if (e.target.files.length > 0) {
-        loadPDFForTool(e.target.files[0], 'protect');
+        showFullscreenLoading('Memuat PDF...');
+        try {
+          await loadPDFForTool(e.target.files[0], 'protect');
+        } catch (error) {
+          console.error('Error loading PDF:', error);
+          showToast('Gagal memuat PDF', 'error');
+        } finally {
+          hideFullscreenLoading();
+          e.target.value = '';
+        }
       }
-      e.target.value = '';
     });
   }
 
   // Compress Image input
   const compressImgInput = document.getElementById('compress-img-input');
   if (compressImgInput) {
-    compressImgInput.addEventListener('change', (e) => {
+    compressImgInput.addEventListener('change', async (e) => {
       if (e.target.files.length > 0) {
-        loadImageForTool(e.target.files[0], 'compress-img');
+        showFullscreenLoading('Memuat gambar...');
+        try {
+          await loadImageForTool(e.target.files[0], 'compress-img');
+        } catch (error) {
+          console.error('Error loading image:', error);
+          showToast('Gagal memuat gambar', 'error');
+        } finally {
+          hideFullscreenLoading();
+          e.target.value = '';
+        }
       }
-      e.target.value = '';
     });
   }
 
   // Resize Image input
   const resizeInput = document.getElementById('resize-input');
   if (resizeInput) {
-    resizeInput.addEventListener('change', (e) => {
+    resizeInput.addEventListener('change', async (e) => {
       if (e.target.files.length > 0) {
-        loadImageForTool(e.target.files[0], 'resize');
+        showFullscreenLoading('Memuat gambar...');
+        try {
+          await loadImageForTool(e.target.files[0], 'resize');
+        } catch (error) {
+          console.error('Error loading image:', error);
+          showToast('Gagal memuat gambar', 'error');
+        } finally {
+          hideFullscreenLoading();
+          e.target.value = '';
+        }
       }
-      e.target.value = '';
     });
   }
 
   // Convert Image input
   const convertInput = document.getElementById('convert-input');
   if (convertInput) {
-    convertInput.addEventListener('change', (e) => {
+    convertInput.addEventListener('change', async (e) => {
       if (e.target.files.length > 0) {
-        loadImageForTool(e.target.files[0], 'convert-img');
+        showFullscreenLoading('Memuat gambar...');
+        try {
+          await loadImageForTool(e.target.files[0], 'convert-img');
+        } catch (error) {
+          console.error('Error loading image:', error);
+          showToast('Gagal memuat gambar', 'error');
+        } finally {
+          hideFullscreenLoading();
+          e.target.value = '';
+        }
       }
-      e.target.value = '';
     });
   }
 
   // Remove Background input
   const removeBgInput = document.getElementById('remove-bg-input');
   if (removeBgInput) {
-    removeBgInput.addEventListener('change', (e) => {
+    removeBgInput.addEventListener('change', async (e) => {
       if (e.target.files.length > 0) {
-        loadImageForTool(e.target.files[0], 'remove-bg');
+        showFullscreenLoading('Memuat gambar...');
+        try {
+          await loadImageForTool(e.target.files[0], 'remove-bg');
+        } catch (error) {
+          console.error('Error loading image:', error);
+          showToast('Gagal memuat gambar', 'error');
+        } finally {
+          hideFullscreenLoading();
+          e.target.value = '';
+        }
       }
-      e.target.value = '';
     });
   }
 
   // Signature Upload input
   const sigUploadInput = document.getElementById('signature-upload-input');
   if (sigUploadInput) {
-    sigUploadInput.addEventListener('change', (e) => {
+    sigUploadInput.addEventListener('change', async (e) => {
       if (e.target.files.length > 0) {
-        loadSignatureImage(e.target.files[0]);
+        showFullscreenLoading('Memuat tanda tangan...');
+        try {
+          await loadSignatureImage(e.target.files[0]);
+        } catch (error) {
+          console.error('Error loading signature:', error);
+          showToast('Gagal memuat tanda tangan', 'error');
+        } finally {
+          hideFullscreenLoading();
+          e.target.value = '';
+        }
       }
-      e.target.value = '';
     });
   }
 
@@ -635,7 +710,7 @@ function initSignaturePad() {
 // FILE HANDLING
 // ============================================================
 
-function handleDroppedFiles(files) {
+async function handleDroppedFiles(files) {
   if (!files || files.length === 0) return;
 
   const file = files[0];
@@ -657,19 +732,29 @@ function handleDroppedFiles(files) {
     return;
   }
 
-  // If no tool is selected, suggest based on file type
-  if (!state.currentTool) {
-    if (isPDF) {
-      // Default to Unified Editor for all PDF operations
-      showTool('unified-editor');
-      ueAddFiles(files);
-    } else if (isImage && files.length > 1) {
-      showTool('img-to-pdf');
-      addImagesToPDF(files);
-    } else if (isImage) {
-      showTool('compress-img');
-      loadImageForTool(file, 'compress-img');
+  // Show loading state
+  showFullscreenLoading(isPDF ? 'Memuat PDF...' : 'Memuat gambar...');
+
+  try {
+    // If no tool is selected, suggest based on file type
+    if (!state.currentTool) {
+      if (isPDF) {
+        // Default to Unified Editor for all PDF operations
+        showTool('unified-editor');
+        await ueAddFiles(files);
+      } else if (isImage && files.length > 1) {
+        showTool('img-to-pdf');
+        await addImagesToPDF(files);
+      } else if (isImage) {
+        showTool('compress-img');
+        await loadImageForTool(file, 'compress-img');
+      }
     }
+  } catch (error) {
+    console.error('Error loading file:', error);
+    showToast('Gagal memuat file', 'error');
+  } finally {
+    hideFullscreenLoading();
   }
 }
 
@@ -792,6 +877,69 @@ function loadImage(file) {
   });
 }
 
+/**
+ * Convert image file to single-page PDF
+ * @param {File} imageFile - Image file to convert
+ * @returns {Promise<Uint8Array>} PDF bytes
+ */
+async function convertImageToPdf(imageFile) {
+  try {
+    // Load image to get dimensions
+    const img = await loadImage(imageFile);
+
+    // Create new PDF document
+    const pdfDoc = await PDFLib.PDFDocument.create();
+
+    // Read image bytes
+    const arrayBuffer = await imageFile.arrayBuffer();
+    const imgBytes = new Uint8Array(arrayBuffer);
+
+    // Embed image based on MIME type
+    let embeddedImage;
+    const mimeType = imageFile.type.toLowerCase();
+
+    if (mimeType === 'image/png') {
+      embeddedImage = await pdfDoc.embedPng(imgBytes);
+    } else if (mimeType === 'image/jpeg' || mimeType === 'image/jpg') {
+      embeddedImage = await pdfDoc.embedJpg(imgBytes);
+    } else {
+      // Convert other formats (WebP, GIF, etc.) to PNG via Canvas
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+
+      const pngBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+      const pngBytes = new Uint8Array(await pngBlob.arrayBuffer());
+      embeddedImage = await pdfDoc.embedPng(pngBytes);
+    }
+
+    // Create page matching image dimensions exactly
+    const page = pdfDoc.addPage([embeddedImage.width, embeddedImage.height]);
+
+    // Draw image to fill entire page
+    page.drawImage(embeddedImage, {
+      x: 0,
+      y: 0,
+      width: embeddedImage.width,
+      height: embeddedImage.height
+    });
+
+    // Clean up blob URL
+    if (img._blobUrl) {
+      URL.revokeObjectURL(img._blobUrl);
+    }
+
+    // Return PDF bytes
+    return await pdfDoc.save();
+
+  } catch (error) {
+    console.error('Image conversion failed:', error);
+    throw new Error(`Gagal mengonversi ${imageFile.name}. Format tidak didukung.`);
+  }
+}
+
 // Helper function to escape HTML and prevent XSS
 function escapeHtml(text) {
   const div = document.createElement('div');
@@ -877,21 +1025,35 @@ function setupWorkspaceDropZone(tool) {
     e.preventDefault();
   });
 
-  workspace.addEventListener('drop', (e) => {
+  workspace.addEventListener('drop', async (e) => {
     e.preventDefault();
     const files = e.dataTransfer.files;
 
-    if (tool === 'merge') {
-      addMergeFiles(files);
-    } else if (tool === 'img-to-pdf') {
-      addImagesToPDF(files);
-    } else if (files.length === 1) {
-      const file = files[0];
-      if (file.type === 'application/pdf') {
-        loadPDFForTool(file, tool);
-      } else if (file.type.startsWith('image/')) {
-        loadImageForTool(file, tool);
+    if (files.length === 0) return;
+
+    // Determine loading message based on file type
+    const isPDF = files[0].type === 'application/pdf';
+    const loadingMessage = isPDF ? 'Memuat PDF...' : 'Memuat gambar...';
+
+    showFullscreenLoading(loadingMessage);
+    try {
+      if (tool === 'merge') {
+        await addMergeFiles(files);
+      } else if (tool === 'img-to-pdf') {
+        await addImagesToPDF(files);
+      } else if (files.length === 1) {
+        const file = files[0];
+        if (file.type === 'application/pdf') {
+          await loadPDFForTool(file, tool);
+        } else if (file.type.startsWith('image/')) {
+          await loadImageForTool(file, tool);
+        }
       }
+    } catch (error) {
+      console.error('Error handling dropped files:', error);
+      showToast('Gagal memuat file', 'error');
+    } finally {
+      hideFullscreenLoading();
     }
   });
 }
@@ -1118,7 +1280,7 @@ async function mergePDFs() {
     
     progressText.textContent = 'Menyimpan...';
     const mergedBytes = await mergedPdf.save();
-    downloadBlob(new Blob([mergedBytes], { type: 'application/pdf' }), 'merged.pdf');
+    downloadBlob(new Blob([mergedBytes], { type: 'application/pdf' }), getDownloadFilename({originalName: state.mergeFiles[0]?.name, extension: 'pdf'}));
     
     showToast('PDF berhasil digabung!', 'success');
     
@@ -1238,7 +1400,7 @@ async function splitPDF() {
         newDoc.addPage(page);
         const bytes = await newDoc.save();
 
-        downloadBlob(new Blob([bytes], { type: 'application/pdf' }), `halaman_${i + 1}.pdf`);
+        downloadBlob(new Blob([bytes], { type: 'application/pdf' }), getDownloadFilename({originalName: state.currentPDFName, suffix: `page${i + 1}`, extension: 'pdf'}));
         await sleep(100); // Small delay between downloads
       }
 
@@ -1265,7 +1427,7 @@ async function splitPDF() {
         pages.forEach(page => newDoc.addPage(page));
 
         const bytes = await newDoc.save();
-        downloadBlob(new Blob([bytes], { type: 'application/pdf' }), `split_${r + 1}.pdf`);
+        downloadBlob(new Blob([bytes], { type: 'application/pdf' }), getDownloadFilename({originalName: state.currentPDFName, suffix: `page${r + 1}`, extension: 'pdf'}));
         await sleep(100);
       }
 
@@ -1288,7 +1450,7 @@ async function splitPDF() {
       pages.forEach(page => newDoc.addPage(page));
 
       const bytes = await newDoc.save();
-      downloadBlob(new Blob([bytes], { type: 'application/pdf' }), 'extracted.pdf');
+      downloadBlob(new Blob([bytes], { type: 'application/pdf' }), getDownloadFilename({originalName: state.currentPDFName, extension: 'pdf'}));
 
       showToast('Halaman berhasil diekstrak!', 'success');
     }
@@ -1408,7 +1570,7 @@ async function saveRotatedPDF() {
     });
     
     const bytes = await srcDoc.save();
-    downloadBlob(new Blob([bytes], { type: 'application/pdf' }), 'rotated.pdf');
+    downloadBlob(new Blob([bytes], { type: 'application/pdf' }), getDownloadFilename({originalName: state.currentPDFName, extension: 'pdf'}));
     showToast('PDF berhasil diputar!', 'success');
     
   } catch (error) {
@@ -1512,7 +1674,7 @@ async function saveReorderedPDF() {
     pages.forEach(page => newDoc.addPage(page));
     
     const bytes = await newDoc.save();
-    downloadBlob(new Blob([bytes], { type: 'application/pdf' }), 'reordered.pdf');
+    downloadBlob(new Blob([bytes], { type: 'application/pdf' }), getDownloadFilename({originalName: state.currentPDFName, extension: 'pdf'}));
     showToast('PDF berhasil disimpan!', 'success');
     
   } catch (error) {
@@ -1674,8 +1836,7 @@ async function convertPDFtoImages() {
       await new Promise((resolve) => {
         canvas.toBlob((blob) => {
           if (blob) {
-            const baseName = state.currentPDFName?.replace(/\.pdf$/i, '') || 'halaman';
-            downloadBlob(blob, `${baseName}_page${pageNum}.${format}`);
+            downloadBlob(blob, getDownloadFilename({originalName: state.currentPDFName, suffix: `page${pageNum}`, extension: format}));
           }
           resolve();
         }, mimeType, quality);
@@ -1763,7 +1924,7 @@ async function compressPDF() {
     const newSize = bytes.length;
     const reduction = ((originalSize - newSize) / originalSize * 100).toFixed(1);
 
-    downloadBlob(new Blob([bytes], { type: 'application/pdf' }), getOutputFilename('compressed'));
+    downloadBlob(new Blob([bytes], { type: 'application/pdf' }), getDownloadFilename({originalName: state.currentPDFName, extension: 'pdf'}));
 
     if (newSize < originalSize) {
       showToast(`PDF dikompres! Berkurang ${reduction}%`, 'success');
@@ -1819,7 +1980,7 @@ async function protectPDF() {
       ownerPassword: password,
     });
 
-    downloadBlob(new Blob([bytes], { type: 'application/pdf' }), getOutputFilename('protected'));
+    downloadBlob(new Blob([bytes], { type: 'application/pdf' }), getDownloadFilename({originalName: state.currentPDFName, extension: 'pdf'}));
     showToast('PDF berhasil diproteksi!', 'success');
 
   } catch (error) {
@@ -3331,7 +3492,7 @@ async function saveEditedPDF() {
     }
 
     const bytes = await srcDoc.save();
-    downloadBlob(new Blob([bytes], { type: 'application/pdf' }), getOutputFilename('edited'));
+    downloadBlob(new Blob([bytes], { type: 'application/pdf' }), getDownloadFilename({originalName: state.currentPDFName, extension: 'pdf'}));
     showToast('PDF berhasil disimpan!', 'success');
 
   } catch (error) {
@@ -3391,8 +3552,8 @@ function downloadCompressedImage() {
   }
 
   const format = document.getElementById('compress-format').value;
-  const baseName = state.originalImageName.replace(/\.[^/.]+$/, '');
-  downloadBlob(state.compressedBlob, `${baseName}_compressed.${format === 'jpeg' ? 'jpg' : format}`);
+  const extension = format === 'jpeg' ? 'jpg' : format;
+  downloadBlob(state.compressedBlob, getDownloadFilename({originalName: state.originalImageName, extension: extension}));
   showToast('Gambar berhasil dikompres!', 'success');
 }
 
@@ -3450,8 +3611,7 @@ function downloadRemovedBgImage() {
 
   state.removeBgCanvas.toBlob((blob) => {
     if (blob) {
-      const baseName = state.originalImageName.replace(/\.[^/.]+$/, '');
-      downloadBlob(blob, `${baseName}_nobg.png`);
+      downloadBlob(blob, getDownloadFilename({originalName: state.originalImageName, extension: 'png'}));
       showToast('Latar belakang berhasil dihapus!', 'success');
     }
   }, 'image/png');
@@ -3529,8 +3689,7 @@ function downloadResizedImage() {
   }
   
   canvas.toBlob((blob) => {
-    const baseName = state.originalImageName.replace(/\.[^/.]+$/, '');
-    downloadBlob(blob, `${baseName}_${newWidth}x${newHeight}.${extension}`);
+    downloadBlob(blob, getDownloadFilename({originalName: state.originalImageName, extension: extension}));
     showToast('Gambar berhasil diubah ukurannya!', 'success');
   }, mimeType, 0.92);
 }
@@ -3565,8 +3724,7 @@ function convertImage() {
   const extension = format === 'jpeg' ? 'jpg' : format;
   
   canvas.toBlob((blob) => {
-    const baseName = state.originalImageName.replace(/\.[^/.]+$/, '');
-    downloadBlob(blob, `${baseName}.${extension}`);
+    downloadBlob(blob, getDownloadFilename({originalName: state.originalImageName, extension: extension}));
     showToast('Gambar berhasil dikonversi!', 'success');
   }, mimeType, quality);
 }
@@ -3811,9 +3969,8 @@ async function imagesToPDF() {
     
     progressText.textContent = 'Menyimpan PDF...';
     const pdfBytes = await pdfDoc.save();
-    
-    const firstImgName = state.imgToPdfFiles[0]?.name?.replace(/\.[^/.]+$/, '') || 'images';
-    downloadBlob(new Blob([pdfBytes], { type: 'application/pdf' }), `${firstImgName}_converted.pdf`);
+
+    downloadBlob(new Blob([pdfBytes], { type: 'application/pdf' }), getDownloadFilename({originalName: state.imgToPdfFiles[0]?.name, extension: 'pdf'}));
     showToast('PDF berhasil dibuat!', 'success');
     
   } catch (error) {
@@ -3843,6 +4000,36 @@ function getOutputFilename(suffix, ext = 'pdf', originalName = null) {
   // Remove extension from base name
   const nameWithoutExt = baseName.replace(/\.[^/.]+$/, '');
   return `${nameWithoutExt}_${suffix}.${ext}`;
+}
+
+/**
+ * Constructs download filename with _pdflokal.id suffix
+ * @param {Object} options - Configuration object
+ * @param {string} options.originalName - Original uploaded filename (with or without extension)
+ * @param {string} [options.suffix] - Optional descriptive suffix (e.g., 'page1', 'page2')
+ * @param {string} options.extension - Output file extension (pdf, png, jpg, etc.)
+ * @returns {string} Formatted filename: {basename}[_suffix]_pdflokal.id.{extension}
+ */
+function getDownloadFilename(options) {
+  const { originalName, suffix = '', extension } = options;
+
+  // Handle missing original name (fallback to 'output')
+  if (!originalName) {
+    const filename = suffix
+      ? `output_${suffix}_pdflokal.id.${extension}`
+      : `output_pdflokal.id.${extension}`;
+    return filename;
+  }
+
+  // Remove extension from original name
+  const baseName = originalName.replace(/\.[^/.]+$/, '');
+
+  // Build: {basename}[_suffix]_pdflokal.id.{extension}
+  const filename = suffix
+    ? `${baseName}_${suffix}_pdflokal.id.${extension}`
+    : `${baseName}_pdflokal.id.${extension}`;
+
+  return filename;
 }
 
 function downloadBlob(blob, filename) {
@@ -3943,20 +4130,34 @@ function initUnifiedEditorInput() {
   const input = document.getElementById('ue-file-input');
   if (input && !input._ueInitialized) {
     input._ueInitialized = true;
-    input.addEventListener('change', (e) => {
-      ueAddFiles(e.target.files);
-      e.target.value = '';
+    input.addEventListener('change', async (e) => {
+      if (e.target.files.length > 0) {
+        showFullscreenLoading('Memuat PDF...');
+        try {
+          await ueAddFiles(e.target.files);
+        } catch (error) {
+          console.error('Error loading PDF:', error);
+          showToast('Gagal memuat PDF', 'error');
+        } finally {
+          hideFullscreenLoading();
+          e.target.value = '';
+        }
+      }
     });
   }
 }
 
-// Add PDF files to unified editor
+// Add PDF and image files to unified editor
 async function ueAddFiles(files) {
   if (!files || files.length === 0) return;
 
   for (const file of files) {
-    if (file.type !== 'application/pdf') {
-      showToast('Hanya file PDF yang didukung', 'error');
+    // Validate file type
+    const isPdf = file.type === 'application/pdf';
+    const isImage = file.type.startsWith('image/');
+
+    if (!isPdf && !isImage) {
+      showToast(`File ${file.name} bukan PDF atau gambar. Diabaikan.`, 'warning');
       continue;
     }
 
@@ -3964,57 +4165,114 @@ async function ueAddFiles(files) {
     if (!checkFileSize(file)) continue;
 
     try {
-      const arrayBuffer = await file.arrayBuffer();
-      const bytes = new Uint8Array(arrayBuffer);
-      const sourceIndex = ueState.sourceFiles.length;
-      const sourceName = file.name.replace('.pdf', '').substring(0, 15);
-
-      ueState.sourceFiles.push({ name: file.name, bytes });
-
-      // Load PDF with PDF.js
-      const pdf = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
-
-      // Save undo state
-      ueSaveUndoState();
-
-      // Add all pages
-      for (let i = 0; i < pdf.numPages; i++) {
-        const page = await pdf.getPage(i + 1);
-        const viewport = page.getViewport({ scale: 0.5 }); // Thumbnail scale - larger for better visibility
-
-        const canvas = document.createElement('canvas');
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        const ctx = canvas.getContext('2d');
-
-        await page.render({ canvasContext: ctx, viewport }).promise;
-
-        ueState.pages.push({
-          pageNum: i,
-          sourceIndex,
-          sourceName,
-          rotation: 0,
-          canvas
-        });
-
-        // Initialize annotations for this page
-        ueState.annotations[ueState.pages.length - 1] = [];
+      if (isPdf) {
+        await handlePdfFile(file);
+      } else {
+        await handleImageFile(file);
       }
-
-      ueRenderThumbnails();
-      ueUpdatePageCount();
-      document.getElementById('ue-download-btn').disabled = false;
-
-      // Auto-select first page if none selected
-      if (ueState.selectedPage === -1 && ueState.pages.length > 0) {
-        ueSelectPage(0);
-      }
-
     } catch (error) {
-      console.error('Error loading PDF:', error);
-      showToast('Gagal memuat PDF: ' + file.name, 'error');
+      console.error('Error loading file:', error);
+      showToast(error.message || `Gagal memuat ${file.name}`, 'error');
     }
   }
+
+  ueRenderThumbnails();
+  ueUpdatePageCount();
+  document.getElementById('ue-download-btn').disabled = false;
+
+  // Auto-select first page if none selected
+  if (ueState.selectedPage === -1 && ueState.pages.length > 0) {
+    ueSelectPage(0);
+  }
+}
+
+// Handle PDF file loading
+async function handlePdfFile(file) {
+  const arrayBuffer = await file.arrayBuffer();
+  const bytes = new Uint8Array(arrayBuffer);
+  const sourceIndex = ueState.sourceFiles.length;
+  const sourceName = file.name.replace('.pdf', '').substring(0, 15);
+
+  ueState.sourceFiles.push({ name: file.name, bytes });
+
+  // Load PDF with PDF.js
+  const pdf = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+
+  // Save undo state
+  ueSaveUndoState();
+
+  // Add all pages
+  for (let i = 0; i < pdf.numPages; i++) {
+    const page = await pdf.getPage(i + 1);
+    const viewport = page.getViewport({ scale: 0.5 }); // Thumbnail scale
+
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const ctx = canvas.getContext('2d');
+
+    await page.render({ canvasContext: ctx, viewport }).promise;
+
+    ueState.pages.push({
+      pageNum: i,
+      sourceIndex,
+      sourceName,
+      rotation: 0,
+      canvas,
+      isFromImage: false  // NEW FIELD
+    });
+
+    // Initialize annotations for this page
+    ueState.annotations[ueState.pages.length - 1] = [];
+  }
+}
+
+// Handle image file loading (converts to PDF)
+async function handleImageFile(file) {
+  // Convert image to PDF
+  const pdfBytes = await convertImageToPdf(file);
+
+  // Store converted PDF in sourceFiles
+  const sourceIndex = ueState.sourceFiles.length;
+  const sourceName = file.name.replace(/\.(png|jpg|jpeg|webp|gif)$/i, '').substring(0, 15);
+
+  // Create a TRUE copy of the bytes to prevent ArrayBuffer detachment issues
+  // new Uint8Array(pdfBytes) shares the same buffer, so we use slice() for a deep copy
+  const bytesCopy = pdfBytes.slice();
+
+  ueState.sourceFiles.push({
+    name: file.name,
+    bytes: bytesCopy  // Store as PDF bytes, not image bytes
+  });
+
+  // Render thumbnail using PDF.js (use the original for rendering)
+  const pdf = await pdfjsLib.getDocument({ data: pdfBytes }).promise;
+  const page = await pdf.getPage(1);  // Always page 1 for images
+
+  const viewport = page.getViewport({ scale: 0.5 });
+
+  const canvas = document.createElement('canvas');
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+  const ctx = canvas.getContext('2d');
+
+  await page.render({ canvasContext: ctx, viewport }).promise;
+
+  // Save undo state
+  ueSaveUndoState();
+
+  // Add to pages array
+  ueState.pages.push({
+    pageNum: 0,  // Always 0 for single-page image PDFs
+    sourceIndex,
+    sourceName,
+    rotation: 0,
+    canvas,
+    isFromImage: true  // NEW FIELD - marks as image-sourced
+  });
+
+  // Initialize annotations for this page
+  ueState.annotations[ueState.pages.length - 1] = [];
 }
 
 // Render thumbnails in sidebar
@@ -5413,8 +5671,7 @@ async function applyEditorProtect() {
       ownerPassword: password,
     });
 
-    const baseName = ueState.sourceFiles[0]?.name?.replace('.pdf', '') || 'document';
-    downloadBlob(new Blob([protectedBytes], { type: 'application/pdf' }), `${baseName}-protected.pdf`);
+    downloadBlob(new Blob([protectedBytes], { type: 'application/pdf' }), getDownloadFilename({originalName: ueState.sourceFiles[0]?.name, extension: 'pdf'}));
 
     closeEditorProtectModal();
     showToast('PDF berhasil dikunci!', 'success');
@@ -5706,10 +5963,7 @@ async function ueDownload() {
     }
 
     const pdfBytes = await newDoc.save();
-    const filename = ueState.sourceFiles.length === 1
-      ? ueState.sourceFiles[0].name.replace('.pdf', '-edited.pdf')
-      : 'edited-document.pdf';
-    downloadBlob(new Blob([pdfBytes], { type: 'application/pdf' }), filename);
+    downloadBlob(new Blob([pdfBytes], { type: 'application/pdf' }), getDownloadFilename({originalName: ueState.sourceFiles[0]?.name, extension: 'pdf'}));
     showToast('PDF berhasil diunduh!', 'success');
 
   } catch (error) {
@@ -5795,10 +6049,20 @@ function initUnifiedEditor() {
     thumbnails.addEventListener('dragleave', () => {
       thumbnails.classList.remove('drag-over');
     });
-    thumbnails.addEventListener('drop', (e) => {
+    thumbnails.addEventListener('drop', async (e) => {
       e.preventDefault();
       thumbnails.classList.remove('drag-over');
-      ueAddFiles(e.dataTransfer.files);
+      if (e.dataTransfer.files.length > 0) {
+        showFullscreenLoading('Menambahkan PDF...');
+        try {
+          await ueAddFiles(e.dataTransfer.files);
+        } catch (error) {
+          console.error('Error adding PDF:', error);
+          showToast('Gagal menambahkan PDF', 'error');
+        } finally {
+          hideFullscreenLoading();
+        }
+      }
     });
   }
 
@@ -5865,8 +6129,9 @@ function uePmOpenModal() {
   document.getElementById('ue-gabungkan-modal').classList.add('active');
   pushModalState('ue-gabungkan-modal');
 
-  // Initialize file input handler
+  // Initialize file input handlers
   initUePmFileInput();
+  initUePmImageInput();
 }
 
 // Close the page manager modal
@@ -6432,8 +6697,7 @@ async function uePmExtractSelected() {
     }
 
     const bytes = await newDoc.save();
-    const baseName = ueState.sourceFiles[0]?.name?.replace(/\.pdf$/i, '') || 'split';
-    downloadBlob(new Blob([bytes], { type: 'application/pdf' }), `${baseName}_split.pdf`);
+    downloadBlob(new Blob([bytes], { type: 'application/pdf' }), getDownloadFilename({originalName: ueState.sourceFiles[0]?.name, extension: 'pdf'}));
 
     showToast(`${sortedIndices.length} halaman berhasil di-split!`, 'success');
 
@@ -6452,11 +6716,46 @@ function initUePmFileInput() {
   if (input && !input._uePmInitialized) {
     input._uePmInitialized = true;
     input.addEventListener('change', async (e) => {
-      await ueAddFiles(e.target.files);
-      e.target.value = '';
-      // Re-render modal content if open
-      if (uePmState.isOpen) {
-        uePmRenderPages();
+      if (e.target.files.length > 0) {
+        showFullscreenLoading('Menambahkan PDF...');
+        try {
+          await ueAddFiles(e.target.files);
+          // Re-render modal content if open
+          if (uePmState.isOpen) {
+            uePmRenderPages();
+          }
+        } catch (error) {
+          console.error('Error adding PDF:', error);
+          showToast('Gagal menambahkan PDF', 'error');
+        } finally {
+          hideFullscreenLoading();
+          e.target.value = '';
+        }
+      }
+    });
+  }
+}
+
+function initUePmImageInput() {
+  const input = document.getElementById('ue-pm-image-input');
+  if (input && !input._uePmInitialized) {
+    input._uePmInitialized = true;
+    input.addEventListener('change', async (e) => {
+      if (e.target.files.length > 0) {
+        showFullscreenLoading('Menambahkan gambar...');
+        try {
+          await ueAddFiles(e.target.files);
+          // Re-render modal content if open
+          if (uePmState.isOpen) {
+            uePmRenderPages();
+          }
+        } catch (error) {
+          console.error('Error adding images:', error);
+          showToast('Gagal menambahkan gambar', 'error');
+        } finally {
+          hideFullscreenLoading();
+          e.target.value = '';
+        }
       }
     });
   }
