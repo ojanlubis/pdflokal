@@ -1973,14 +1973,18 @@ async function protectPDF() {
   `;
 
   try {
+    // Load the PDF with pdf-lib to ensure it's valid
     const srcDoc = await PDFLib.PDFDocument.load(state.currentPDFBytes);
+    const pdfBytes = await srcDoc.save();
 
-    const bytes = await srcDoc.save({
-      userPassword: password,
-      ownerPassword: password,
-    });
+    // Encrypt with @pdfsmaller/pdf-encrypt-lite
+    const encryptedBytes = await window.encryptPDF(
+      new Uint8Array(pdfBytes),
+      password,
+      password // Use same password for both user and owner
+    );
 
-    downloadBlob(new Blob([bytes], { type: 'application/pdf' }), getDownloadFilename({originalName: state.currentPDFName, extension: 'pdf'}));
+    downloadBlob(new Blob([encryptedBytes], { type: 'application/pdf' }), getDownloadFilename({originalName: state.currentPDFName, extension: 'pdf'}));
     showToast('PDF berhasil diproteksi!', 'success');
 
   } catch (error) {

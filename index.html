@@ -959,13 +959,13 @@
     <div class="signature-box">
       <h3>Buat Tanda Tangan</h3>
       <div class="signature-tabs">
-        <button class="signature-tab active" onclick="switchSignatureTab('upload')">Upload Gambar</button>
+        <button class="signature-tab active" onclick="switchSignatureTab('upload')">Upload Foto</button>
         <button class="signature-tab" onclick="switchSignatureTab('draw')">Gambar</button>
       </div>
       <div id="signature-upload-tab" class="signature-tab-content active">
         <div class="signature-upload-area" id="signature-upload-hint" onclick="document.getElementById('signature-upload-input').click()">
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          <p>Klik untuk upload gambar tanda tangan</p>
+          <p>Klik untuk upload foto tanda tangan</p>
           <span class="upload-hint-secondary">Bisa juga digunakan untuk stempel</span>
           <span>JPG • PNG</span>
           <input type="file" id="signature-upload-input" accept="image/jpeg,image/png" style="display:none">
@@ -1312,7 +1312,14 @@
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   </script>
   <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.7/dist/signature_pad.umd.min.js"></script>
-  
+
+  <!-- PDF Encryption Library (ES Module) -->
+  <script type="module">
+    import { encryptPDF } from 'https://esm.sh/@pdfsmaller/pdf-encrypt-lite@1.0.1';
+    // Make it globally available for the main app
+    window.encryptPDF = encryptPDF;
+  </script>
+
   <!-- Main App -->
   <script src="app.js"></script>
 </body>
