@@ -4,46 +4,40 @@
 
 PDFLokal adalah tool PDF gratis untuk pengguna Indonesia. Semua proses berjalan di browser - file tidak pernah meninggalkan perangkat Anda.
 
-🌐 **[Buka PDFLokal](https://pdflokal.vercel.app/)**
+**[Buka PDFLokal](https://pdflokal.vercel.app/)**
 
-## ✨ Fitur
+## Fitur
 
 ### PDF Tools
-- **Gabung PDF** - Gabungkan beberapa PDF menjadi satu
-- **Pisah PDF** - Ekstrak halaman atau pisah berdasarkan range
+- **Editor PDF** - Editor lengkap dengan whiteout, teks (pilihan font, bold/italic, warna), tanda tangan, watermark, nomor halaman, dan proteksi password
+- **Gabung PDF** - Gabungkan beberapa PDF menjadi satu dengan drag-drop reordering
+- **Pisah PDF** - Ekstrak halaman tertentu sebagai PDF terpisah
 - **Kompres PDF** - Kurangi ukuran file (kompres gambar dalam PDF)
-- **Putar PDF** - Putar halaman 90°, 180°, atau 270°
-- **Edit PDF** - Whiteout, tambah teks (dengan pilihan font, bold/italic, warna), tambah tanda tangan
-- **Atur Halaman** - Reorder (drag-drop), hapus, putar, ekstrak halaman via modal "Kelola"
 - **PDF ke Gambar** - Export halaman sebagai PNG/JPG
-- **Proteksi** - Tambahkan password ke PDF
-- **Buka Kunci** - Hapus password dari PDF (perlu tahu password)
-- **Watermark** - Tambahkan watermark teks
-- **Nomor Halaman** - Tambahkan nomor halaman otomatis
-- **Crop** - Potong halaman PDF
+- **Proteksi PDF** - Tambahkan password ke PDF
 
 ### Image Tools
 - **Kompres Gambar** - Kurangi ukuran file dengan kontrol kualitas
 - **Ubah Ukuran** - Resize dengan lock aspect ratio
-- **Convert Format** - JPG ↔ PNG ↔ WebP
+- **Convert Format** - JPG, PNG, WebP
 - **Gambar ke PDF** - Gabungkan gambar menjadi PDF
+- **Hapus Background** - Hapus latar belakang putih untuk PNG transparan
 
-## 🔒 Privasi
+## Privasi
 
-- ✅ **100% Client-side** - Semua proses di browser
-- ✅ **Tidak ada upload** - File tidak pernah meninggalkan perangkat
-- ✅ **Open source** - Kode bisa diperiksa siapa saja
+- **100% Client-side** - Semua proses di browser
+- **Tidak ada upload** - File tidak pernah meninggalkan perangkat
+- **Open source** - Kode bisa diperiksa siapa saja
 
-## 🚀 Cara Pakai
+## Cara Pakai
 
-1. Buka [pdfokal.vercel.app](https://pdflokal.vercel.app/)
-2. Pilih tool yang dibutuhkan
-3. Drag & drop file atau klik untuk pilih
-4. Proses dan download hasilnya
+1. Buka [pdflokal.vercel.app](https://pdflokal.vercel.app/)
+2. Pilih tool yang dibutuhkan atau drag & drop file PDF
+3. Proses dan download hasilnya
 
 Tidak perlu install, tidak perlu daftar, tidak perlu bayar.
 
-## 💻 Development
+## Development
 
 ### Prerequisites
 - Browser modern (Chrome, Firefox, Safari, Edge)
@@ -52,7 +46,7 @@ Tidak perlu install, tidak perlu daftar, tidak perlu bayar.
 ### Run Locally
 ```bash
 # Clone repository
-git clone https://github.com/ojanlubis/pdflokal.git
+git clone https://github.com/nicholasohjj/pdflokal.git
 cd pdflokal
 
 # Buka dengan web server (opsional)
@@ -68,6 +62,7 @@ python -m http.server 8000
 - **[pdf-lib](https://pdf-lib.js.org/)** - PDF manipulation
 - **[PDF.js](https://mozilla.github.io/pdf.js/)** - PDF rendering & thumbnails
 - **[Signature Pad](https://github.com/szimek/signature_pad)** - Tanda tangan digital
+- **[pdf-encrypt-lite](https://github.com/nicholasohjj/pdf-encrypt-lite)** - PDF password encryption
 - **Canvas API** - Image processing
 
 ### Project Structure
@@ -81,7 +76,7 @@ pdflokal/
 └── README.md
 ```
 
-## 🤝 Kontribusi
+## Kontribusi
 
 Kontribusi selalu disambut! Beberapa cara untuk berkontribusi:
 
@@ -98,7 +93,7 @@ Kontribusi selalu disambut! Beberapa cara untuk berkontribusi:
 - Copy dalam Bahasa Indonesia
 - Test di berbagai browser sebelum PR
 
-## ⚠️ Limitasi
+## Limitasi
 
 Beberapa hal yang perlu diketahui:
 
@@ -108,18 +103,34 @@ Beberapa hal yang perlu diketahui:
 4. **Browser lama** - Butuh browser modern dengan support ES6+
 
 ### Fitur yang Butuh Server (Coming Soon)
-- PDF → Word conversion
-- PDF → Excel conversion  
-- Word/Excel → PDF conversion
+- PDF ke Word
+- PDF ke Excel
+- Word/Excel ke PDF
 - OCR (text recognition)
 
 Fitur ini akan ditambahkan ketika ada resources untuk server-side processing.
 
-## 📄 License
+## ⚠️ Lisensi & Commercial Use
 
-MIT License - bebas digunakan untuk keperluan apapun.
+PDFLokal adalah open source dengan lisensi AGPL-3.0 untuk kepentingan:
+- ✅ Pembelajaran dan edukasi
+- ✅ Self-hosting untuk penggunaan internal/pribadi
+- ✅ Kontribusi dan improvement
 
-## 🙏 Credits
+**Untuk commercial derivatives atau rebranding:**
+- Wajib memberikan atribusi jelas ke PDFLokal
+- Link ke repo original: github.com/ojanlubis/pdflokal
+- Tidak boleh claim sebagai karya original
+- Source code modifikasi wajib tetap open source dan dibagikan
+
+**Khusus untuk web service:**
+Jika menjalankan versi modifikasi sebagai layanan web publik, wajib menyediakan akses ke source code lengkap sesuai ketentuan AGPL-3.0.
+
+Jika ingin diskusi commercial use, hubungi via GitHub Issues.
+
+Lihat file [LICENSE](LICENSE) untuk detail lengkap.
+
+## Credits
 
 - [pdf-lib](https://pdf-lib.js.org/) by Andrew Dillon
 - [PDF.js](https://mozilla.github.io/pdf.js/) by Mozilla
@@ -128,6 +139,6 @@ MIT License - bebas digunakan untuk keperluan apapun.
 
 ---
 
-**Made with ❤️ in Indonesia**
+**Made with love in Indonesia**
 
 Punya pertanyaan? Buka issue atau hubungi via GitHub.
