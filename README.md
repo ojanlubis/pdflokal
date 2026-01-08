@@ -110,12 +110,12 @@ Beberapa hal yang perlu diketahui:
 
 Fitur ini akan ditambahkan ketika ada resources untuk server-side processing.
 
-## ⚠️ Lisensi & Commercial Use
+## Lisensi & Commercial Use
 
 PDFLokal adalah open source dengan lisensi AGPL-3.0 untuk kepentingan:
-- ✅ Pembelajaran dan edukasi
-- ✅ Self-hosting untuk penggunaan internal/pribadi
-- ✅ Kontribusi dan improvement
+- Pembelajaran dan edukasi
+- Self-hosting untuk penggunaan internal/pribadi
+- Kontribusi dan improvement
 
 **Untuk commercial derivatives atau rebranding:**
 - Wajib memberikan atribusi jelas ke PDFLokal
