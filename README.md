@@ -4,7 +4,7 @@
 
 PDFLokal adalah tool PDF gratis untuk pengguna Indonesia. Semua proses berjalan di browser - file tidak pernah meninggalkan perangkat Anda.
 
-**[Buka PDFLokal](https://pdflokal.vercel.app/)**
+**[Buka PDFLokal](https://www.pdflokal.id/)**
 
 ## Fitur
 
@@ -31,7 +31,7 @@ PDFLokal adalah tool PDF gratis untuk pengguna Indonesia. Semua proses berjalan 
 
 ## Cara Pakai
 
-1. Buka [pdflokal.vercel.app](https://pdflokal.vercel.app/)
+1. Buka [https://www.pdflokal.id/](https://www.pdflokal.id/)
 2. Pilih tool yang dibutuhkan atau drag & drop file PDF
 3. Proses dan download hasilnya
 
@@ -46,7 +46,7 @@ Tidak perlu install, tidak perlu daftar, tidak perlu bayar.
 ### Run Locally
 ```bash
 # Clone repository
-git clone https://github.com/nicholasohjj/pdflokal.git
+git clone https://github.com/ojanlubis/pdflokal
 cd pdflokal
 
 # Buka dengan web server (opsional)
@@ -84,7 +84,7 @@ Kontribusi selalu disambut! Beberapa cara untuk berkontribusi:
 2. **Request Fitur** - Sarankan fitur baru via issue
 3. **Pull Request** - Perbaiki bug atau tambah fitur
 4. **Share** - Ceritakan tentang PDFLokal ke orang lain
-5. **Donasi** - Bantu biaya development via [halaman donasi](dukung.html)
+5. **Donasi** - Bantu biaya development via [halaman donasi](https://www.pdflokal.id/dukung.html)
 
 ### Development Guidelines
 - Gunakan vanilla JS, hindari dependencies baru kecuali benar-benar perlu
