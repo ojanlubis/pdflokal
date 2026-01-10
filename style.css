@@ -960,6 +960,7 @@ a:hover {
 /* Signature Confirm Button */
 .signature-btn-wrapper {
   position: absolute;
+  gap: 5px;
 }
 
 .signature-confirm-btn {
@@ -979,6 +980,26 @@ a:hover {
 
 .signature-confirm-btn:hover {
   background: var(--accent-dark, #1d4ed8);
+  transform: scale(1.05);
+}
+
+.signature-delete-btn {
+  position: relative;
+  background: #404040;
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 6px 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  z-index: 20;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  transition: all var(--transition-fast);
+}
+
+.signature-delete-btn:hover {
+  background: #2a2a2a;
   transform: scale(1.05);
 }
 

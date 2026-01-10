@@ -5242,6 +5242,9 @@ function ueShowConfirmButton(anno, annoRef) {
   const confirmBtn = document.getElementById('signature-confirm-btn');
   confirmBtn.onclick = () => ueConfirmSignature(annoRef);
 
+  const deleteBtn = document.getElementById('signature-delete-btn');
+  deleteBtn.onclick = () => ueDeleteSignature(annoRef);
+
   ueUpdateConfirmButtonPosition(anno);
 }
 
@@ -5286,6 +5289,19 @@ function ueConfirmSignature(annoRef) {
     ueState.selectedAnnotation = null;
     ueRedrawAnnotations();
     showToast('Tanda tangan dikonfirmasi', 'success');
+  }
+}
+
+// Delete signature
+function ueDeleteSignature(annoRef) {
+  const anno = ueState.annotations[annoRef.pageIndex][annoRef.index];
+  if (anno) {
+    ueSaveEditUndoState();
+    ueState.annotations[annoRef.pageIndex].splice(annoRef.index, 1);
+    ueHideConfirmButton();
+    ueState.selectedAnnotation = null;
+    ueRedrawAnnotations();
+    showToast('Tanda tangan dihapus', 'success');
   }
 }
 
