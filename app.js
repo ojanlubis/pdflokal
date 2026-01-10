@@ -4767,9 +4767,11 @@ function ueSetupCanvasEvents() {
         // Check if this annotation is locked
         if (anno.locked) {
           // Can't drag locked annotations
+          if (anno.type === 'signature') {
+            showToast('Tanda tangan terkunci. Klik dua kali untuk membuka kunci.', 'info');
+          }
           ueState.selectedAnnotation = clicked;
           ueRedrawAnnotations();
-          ueShowConfirmButton(anno, clicked);
           return;
         }
         hasMovedOrResized = false;  // Will be set true if actual drag happens
@@ -5016,6 +5018,14 @@ function ueSetupCanvasEvents() {
 
     // Get actual annotation
     const anno = ueState.annotations[result.pageIndex][result.index];
+
+    // Unlock signature
+    if (anno.type === 'signature' && anno.locked) {
+      anno.locked = false;
+      ueRedrawAnnotations();
+      ueShowConfirmButton(anno, result);
+      return;
+    }
 
     // Only handle text annotations
     if (!anno || anno.type !== 'text' || anno.locked) return;
