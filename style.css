@@ -3330,7 +3330,6 @@ body.is-touch .btn:active {
     border-top: none;
   }
 
-  #unified-editor-workspace .editor-action-group,
   #unified-editor-workspace .editor-tool-divider {
     display: none !important;
   }
