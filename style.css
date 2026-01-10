@@ -958,8 +958,12 @@ a:hover {
 }
 
 /* Signature Confirm Button */
-.signature-confirm-btn {
+.signature-btn-wrapper {
   position: absolute;
+}
+
+.signature-confirm-btn {
+  position: relative;
   background: var(--accent-primary);
   color: white;
   border: none;

@@ -5235,18 +5235,19 @@ function ueShowConfirmButton(anno, annoRef) {
     return;
   }
 
-  const btn = document.getElementById('signature-confirm-btn');
+  const btn = document.getElementById('signature-btn-wrapper');
   if (!btn) return;
+  btn.style.display = 'inline-flex';
 
-  btn.style.display = 'block';
-  btn.onclick = () => ueConfirmSignature(annoRef);
+  const confirmBtn = document.getElementById('signature-confirm-btn');
+  confirmBtn.onclick = () => ueConfirmSignature(annoRef);
 
   ueUpdateConfirmButtonPosition(anno);
 }
 
 // Update confirm button position
 function ueUpdateConfirmButtonPosition(anno) {
-  const btn = document.getElementById('signature-confirm-btn');
+  const btn = document.getElementById('signature-btn-wrapper');
   if (!btn || btn.style.display === 'none') return;
 
   const canvas = document.getElementById('ue-canvas');
@@ -5270,7 +5271,7 @@ function ueUpdateConfirmButtonPosition(anno) {
 
 // Hide confirm button
 function ueHideConfirmButton() {
-  const btn = document.getElementById('signature-confirm-btn');
+  const btn = document.getElementById('signature-btn-wrapper');
   if (btn) {
     btn.style.display = 'none';
   }
