@@ -60,7 +60,9 @@
   window.changelogAPI = {
     open: openChangelog,
     minimize: minimizeChangelog,
-    close: closeChangelog
+    close: closeChangelog,
+    hide: hideChangelog,
+    restore: restoreChangelog
   };
 
   /**
@@ -148,6 +150,32 @@
 
     // Mark as seen in localStorage
     localStorage.setItem('pdflokal_changelog_seen', 'true');
+  }
+
+  /**
+   * Temporarily hide changelog (without changing localStorage)
+   * Used when leaving home-view
+   */
+  function hideChangelog() {
+    const notification = document.getElementById('changelog-notification');
+    if (!notification) return;
+
+    notification.classList.remove('active');
+    // Don't change currentState, so we can restore it later
+  }
+
+  /**
+   * Restore changelog to previous state based on localStorage
+   * Used when returning to home-view
+   */
+  function restoreChangelog() {
+    const hasSeen = localStorage.getItem('pdflokal_changelog_seen') === 'true';
+
+    // If user has closed it permanently, don't restore
+    if (hasSeen) return;
+
+    // Otherwise, restore to collapsed badge state
+    showCollapsed();
   }
 
   /**

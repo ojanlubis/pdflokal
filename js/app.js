@@ -971,6 +971,11 @@ function showHome(skipPushState = false) {
   state.currentTool = null;
   resetState();
 
+  // Restore changelog badge when returning to home
+  if (window.changelogAPI) {
+    window.changelogAPI.restore();
+  }
+
   // Update navigation history
   if (!skipPushState) {
     history.pushState({ view: 'home' }, '', '#');
@@ -981,9 +986,9 @@ function showHome(skipPushState = false) {
 }
 
 function showTool(tool, skipPushState = false) {
-  // Minimize changelog when opening any workspace
+  // Hide changelog when leaving home-view
   if (window.changelogAPI) {
-    window.changelogAPI.minimize();
+    window.changelogAPI.hide();
   }
 
   document.getElementById('home-view').style.display = 'none';
