@@ -3338,19 +3338,19 @@ async function saveEditedPDF() {
       let fontName = fontFamily || 'Helvetica';
 
       if (fontFamily === 'Helvetica') {
-        if (bold && italic) fontName = 'Helvetica-BoldOblique';
-        else if (bold) fontName = 'Helvetica-Bold';
-        else if (italic) fontName = 'Helvetica-Oblique';
+        if (bold && italic) fontName = 'HelveticaBoldOblique';
+        else if (bold) fontName = 'HelveticaBold';
+        else if (italic) fontName = 'HelveticaOblique';
         else fontName = 'Helvetica';
       } else if (fontFamily === 'Times-Roman') {
-        if (bold && italic) fontName = 'Times-BoldItalic';
-        else if (bold) fontName = 'Times-Bold';
-        else if (italic) fontName = 'Times-Italic';
-        else fontName = 'Times-Roman';
+        if (bold && italic) fontName = 'TimesRomanBoldItalic';
+        else if (bold) fontName = 'TimesRomanBold';
+        else if (italic) fontName = 'TimesRomanItalic';
+        else fontName = 'TimesRoman';
       } else if (fontFamily === 'Courier') {
-        if (bold && italic) fontName = 'Courier-BoldOblique';
-        else if (bold) fontName = 'Courier-Bold';
-        else if (italic) fontName = 'Courier-Oblique';
+        if (bold && italic) fontName = 'CourierBoldOblique';
+        else if (bold) fontName = 'CourierBold';
+        else if (italic) fontName = 'CourierOblique';
         else fontName = 'Courier';
       }
 
@@ -5838,19 +5838,19 @@ async function ueDownload() {
 
       // Map font family + style to pdf-lib StandardFonts or custom font names
       if (fontFamily === 'Helvetica') {
-        if (bold && italic) fontName = 'Helvetica-BoldOblique';
-        else if (bold) fontName = 'Helvetica-Bold';
-        else if (italic) fontName = 'Helvetica-Oblique';
+        if (bold && italic) fontName = 'HelveticaBoldOblique';
+        else if (bold) fontName = 'HelveticaBold';
+        else if (italic) fontName = 'HelveticaOblique';
         else fontName = 'Helvetica';
       } else if (fontFamily === 'Times-Roman') {
-        if (bold && italic) fontName = 'Times-BoldItalic';
-        else if (bold) fontName = 'Times-Bold';
-        else if (italic) fontName = 'Times-Italic';
-        else fontName = 'Times-Roman';
+        if (bold && italic) fontName = 'TimesRomanBoldItalic';
+        else if (bold) fontName = 'TimesRomanBold';
+        else if (italic) fontName = 'TimesRomanItalic';
+        else fontName = 'TimesRoman';
       } else if (fontFamily === 'Courier') {
-        if (bold && italic) fontName = 'Courier-BoldOblique';
-        else if (bold) fontName = 'Courier-Bold';
-        else if (italic) fontName = 'Courier-Oblique';
+        if (bold && italic) fontName = 'CourierBoldOblique';
+        else if (bold) fontName = 'CourierBold';
+        else if (italic) fontName = 'CourierOblique';
         else fontName = 'Courier';
       } else if (fontFamily === 'Montserrat') {
         isCustomFont = true;
@@ -5867,9 +5867,9 @@ async function ueDownload() {
       } else {
         // Unknown font family - fall back to Helvetica
         console.warn('[PDF Export] Unknown font family:', fontFamily, '- falling back to Helvetica');
-        if (bold && italic) fontName = 'Helvetica-BoldOblique';
-        else if (bold) fontName = 'Helvetica-Bold';
-        else if (italic) fontName = 'Helvetica-Oblique';
+        if (bold && italic) fontName = 'HelveticaBoldOblique';
+        else if (bold) fontName = 'HelveticaBold';
+        else if (italic) fontName = 'HelveticaOblique';
         else fontName = 'Helvetica';
       }
 
