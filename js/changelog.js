@@ -9,44 +9,44 @@
   // Changelog data - Add new updates at the beginning of the array
   const changelogData = [
     {
-      title: "kuntulsesttt bisa diakses di jaringan terbatas",
-      description: "Update penggunaan font agar bisa diakses di restricted network (self hosting font)",
+      title: "File PDF Kamu Jadi Lebih Kecil",
+      description: "PDF dengan tanda tangan sekarang 80% lebih kecil! Download lebih cepat, hemat ruang penyimpanan. File yang tidak diedit tetap ukuran aslinya.",
+      date: "12 Januari 2026"
+    },
+    {
+      title: "Tanda Tangan Lebih Mudah Diatur",
+      description: "Tanda tangan otomatis terkunci setelah ditempatkan (anti geser tidak sengaja). Klik 2x untuk unlock. Bisa dihapus jika salah. Terima kasih @hamdi1611! 🙏",
       date: "11 Januari 2026"
     },
     {
-      title: "Perbaikan Editor PDF",
-      description: "Memperbaiki bug pada fitur tanda tangan digital dan whiteout",
-      date: "8 Januari 2026"
+      title: "Notifikasi Update di Pojok Layar",
+      description: "Sekarang kamu bisa lihat update terbaru lewat badge merah di pojok kanan. Kami terus bekerja untuk aplikasi yang kamu pakai gratis ini! 💪",
+      date: "11 Januari 2026"
     },
     {
-      title: "Peningkatan Performa",
-      description: "Optimasi kecepatan pemrosesan PDF dan gambar hingga 2x lebih cepat",
+      title: "Tetap Berfungsi di Jaringan Terbatas",
+      description: "PDFLokal sekarang bisa diakses di kantor/sekolah yang blokir internet eksternal. Semua font sudah tersedia offline. Privasi kamu lebih terjaga.",
+      date: "11 Januari 2026"
+    },
+    {
+      title: "Editor PDF Lebih Stabil",
+      description: "Tidak ada lagi error saat export PDF atau pindah halaman. Kami perbaiki bug yang bikin aplikasi crash. Sekarang lebih lancar!",
+      date: "11 Januari 2026"
+    },
+    {
+      title: "Kunci PDF dengan Password Diperbaiki",
+      description: "Fitur proteksi PDF dengan password sekarang bekerja dengan sempurna. File kamu lebih aman!",
       date: "5 Januari 2026"
     },
     {
-      title: "Fitur Baru: Watermark",
-      description: "Tambahkan watermark teks atau gambar ke dokumen PDF Anda",
-      date: "3 Januari 2026"
+      title: "Loading yang Lebih Jelas & Nama File Otomatis",
+      description: "Sekarang ada indikator loading saat proses file besar, jadi kamu tahu aplikasi sedang bekerja. Nama file hasil download otomatis mengikuti file asli.",
+      date: "5 Januari 2026"
     },
     {
-      title: "UI/UX Improvements",
-      description: "Tampilan baru yang lebih modern dan responsif untuk mobile",
-      date: "1 Januari 2026"
-    },
-    {
-      title: "Kompres Gambar",
-      description: "Fitur kompres gambar dengan preview real-time kini tersedia",
-      date: "28 Desember 2025"
-    },
-    {
-      title: "Dark Mode Support",
-      description: "Dukungan dark mode otomatis mengikuti preferensi sistem",
-      date: "25 Desember 2025"
-    },
-    {
-      title: "Peluncuran Awal",
-      description: "PDFLokal diluncurkan dengan fitur merge, split, dan edit PDF",
-      date: "20 Desember 2025"
+      title: "Edit Teks Langsung di Canvas",
+      description: "Sekarang kamu bisa resize kotak teks (tarik pojok), edit langsung (klik 2x), dan tekan Enter untuk langsung submit. Lebih cepat!",
+      date: "4 Januari 2026"
     }
   ];
 
