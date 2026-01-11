@@ -3910,9 +3910,9 @@ kbd {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  background: var(--accent-primary);
+  width: 16px;
+  height: 16px;
+  background: #ef4444;
   border-radius: var(--radius-md);
   color: white;
   flex-shrink: 0;
@@ -3923,7 +3923,7 @@ kbd {
 }
 
 .changelog-badge-title {
-  font-size: 0.875rem;
+  font-size: 0.775rem;
   font-weight: 600;
   color: var(--text-primary);
 }
