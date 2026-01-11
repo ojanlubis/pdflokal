@@ -5810,18 +5810,19 @@ async function ueDownload() {
 
   try {
     const newDoc = await PDFLib.PDFDocument.create();
+    newDoc.registerFontkit(fontkit); // Register fontkit for custom font embedding
     const fontCache = {};
 
-    // Google Fonts URLs for custom fonts (woff2 format)
+    // Self-hosted fonts for offline support and privacy
     const customFontUrls = {
-      'Montserrat': 'https://fonts.gstatic.com/s/montserrat/v26/JTUHjIg1_i6t8kCHKm4532VJOt5-QNFgpCtr6Ew-.woff2',
-      'Montserrat-Bold': 'https://fonts.gstatic.com/s/montserrat/v26/JTUHjIg1_i6t8kCHKm4532VJOt5-QNFgpCuM70w-.woff2',
-      'Montserrat-Italic': 'https://fonts.gstatic.com/s/montserrat/v26/JTUFjIg1_i6t8kCHKm459Wx7xQYXK0vOoz6jq6R8WXV0poK5.woff2',
-      'Montserrat-BoldItalic': 'https://fonts.gstatic.com/s/montserrat/v26/JTUFjIg1_i6t8kCHKm459Wx7xQYXK0vOoz6jqxp5WXV0poK5.woff2',
-      'Carlito': 'https://fonts.gstatic.com/s/carlito/v3/3Jn9SDPw3m-pk039PDCLTXUETuE.woff2',
-      'Carlito-Bold': 'https://fonts.gstatic.com/s/carlito/v3/3Jn4SDPw3m-pk039BIykaX0vUuhCyOo.woff2',
-      'Carlito-Italic': 'https://fonts.gstatic.com/s/carlito/v3/3Jn_SDPw3m-pk039DDKBSVcBXuFb0Q.woff2',
-      'Carlito-BoldItalic': 'https://fonts.gstatic.com/s/carlito/v3/3Jn6SDPw3m-pk039DDK59XglVspH2OprMQ.woff2'
+      'Montserrat': 'fonts/montserrat-regular.woff2',
+      'Montserrat-Bold': 'fonts/montserrat-bold.woff2',
+      'Montserrat-Italic': 'fonts/montserrat-italic.woff2',
+      'Montserrat-BoldItalic': 'fonts/montserrat-bolditalic.woff2',
+      'Carlito': 'fonts/carlito-regular.woff2',
+      'Carlito-Bold': 'fonts/carlito-bold.woff2',
+      'Carlito-Italic': 'fonts/carlito-italic.woff2',
+      'Carlito-BoldItalic': 'fonts/carlito-bolditalic.woff2'
     };
 
     // Helper to get the right font based on family, bold, italic
