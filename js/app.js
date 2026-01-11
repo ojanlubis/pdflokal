@@ -277,7 +277,6 @@ function initNavigationHistory() {
 // ============================================================
 
 function initApp() {
-  console.log('[DEBUG initApp] Starting app initialization...');
   // Check browser compatibility first
   checkBrowserCompatibility();
 
@@ -639,19 +638,13 @@ function initFileInputs() {
 
   // Signature Upload input
   const sigUploadInput = document.getElementById('signature-upload-input');
-  console.log('[DEBUG initFileInputs] signature-upload-input element:', sigUploadInput);
   if (sigUploadInput) {
     sigUploadInput.addEventListener('change', async (e) => {
-      console.log('[DEBUG signature upload] change event fired, files:', e.target.files);
       if (e.target.files.length > 0) {
-        console.log('[DEBUG signature upload] Loading signature image...');
         showFullscreenLoading('Memuat tanda tangan...');
         try {
-          console.log('[DEBUG signature upload] Calling loadSignatureImage...');
           await loadSignatureImage(e.target.files[0]);
-          console.log('[DEBUG signature upload] loadSignatureImage completed successfully');
         } catch (error) {
-          console.error('[DEBUG signature upload] Error:', error);
           showToast('Gagal memuat tanda tangan', 'error');
         } finally {
           hideFullscreenLoading();
@@ -659,9 +652,6 @@ function initFileInputs() {
         }
       }
     });
-    console.log('[DEBUG initFileInputs] Event listener attached to signature-upload-input');
-  } else {
-    console.warn('[DEBUG initFileInputs] signature-upload-input element NOT FOUND!');
   }
 
   // Initialize drop hint drag-over effects

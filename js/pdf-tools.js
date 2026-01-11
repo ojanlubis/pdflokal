@@ -1792,15 +1792,11 @@ function openSignatureModal() {
 }
 
 function closeSignatureModal(skipHistoryBack = false) {
-  console.log('[DEBUG closeSignatureModal] Called with skipHistoryBack:', skipHistoryBack);
   const modal = document.getElementById('signature-modal');
   modal.classList.remove('active');
   navHistory.currentModal = null;
   if (!skipHistoryBack && navHistory.currentView === 'modal') {
-    console.log('[DEBUG closeSignatureModal] Calling history.back()');
     history.back();
-  } else {
-    console.log('[DEBUG closeSignatureModal] Skipping history.back()');
   }
 }
 
@@ -1890,22 +1886,15 @@ function switchSignatureTab(tab) {
 
 // Load Signature Image for Background Removal
 async function loadSignatureImage(file) {
-  console.log('[DEBUG loadSignatureImage] Called with file:', file);
   try {
-    console.log('[DEBUG loadSignatureImage] Loading image...');
     const img = await loadImage(file);
-    console.log('[DEBUG loadSignatureImage] Image loaded:', img);
     state.signatureUploadImage = img;
 
     // Close signature modal and open bg removal modal
-    // Pass true to skip history.back() since we're immediately opening another modal
-    console.log('[DEBUG loadSignatureImage] Closing signature modal...');
+    // Pass true to skip history.back() since we're immediately replacing with bg modal state
     closeSignatureModal(true);
-    console.log('[DEBUG loadSignatureImage] Opening signature bg modal...');
     openSignatureBgModal();
-    console.log('[DEBUG loadSignatureImage] Success!');
   } catch (error) {
-    console.error('[DEBUG loadSignatureImage] Error:', error);
     showToast('Gagal memuat gambar', 'error');
     throw error; // Re-throw so app.js can catch it
   }
@@ -1913,39 +1902,31 @@ async function loadSignatureImage(file) {
 
 // Signature Background Removal Modal
 function openSignatureBgModal() {
-  console.log('[DEBUG openSignatureBgModal] Starting...');
-
   // Minimize changelog when opening modal
   if (window.changelogAPI) {
     window.changelogAPI.minimize();
   }
 
   const modal = document.getElementById('signature-bg-modal');
-  console.log('[DEBUG openSignatureBgModal] Modal element:', modal);
-  console.log('[DEBUG openSignatureBgModal] Modal classes before:', modal.className);
-
   modal.classList.add('active');
 
-  console.log('[DEBUG openSignatureBgModal] Modal classes after:', modal.className);
-  console.log('[DEBUG openSignatureBgModal] Modal computed display:', window.getComputedStyle(modal).display);
-  console.log('[DEBUG openSignatureBgModal] Modal computed visibility:', window.getComputedStyle(modal).visibility);
-  console.log('[DEBUG openSignatureBgModal] Modal computed opacity:', window.getComputedStyle(modal).opacity);
-
-  pushModalState('signature-bg-modal');
+  // IMPORTANT: Use replaceState instead of pushState to replace the signature-modal
+  // history state (which we just closed). This prevents orphaned history states.
+  // If we pushed here, the history would be: [workspace, signature-modal (closed), bg-modal]
+  // With replace, it's clean: [workspace, bg-modal]
+  history.replaceState({
+    view: 'modal',
+    modal: 'signature-bg-modal',
+    tool: navHistory.currentWorkspace
+  }, '', null);
+  navHistory.currentView = 'modal';
+  navHistory.currentModal = 'signature-bg-modal';
 
   // Show original image
   document.getElementById('sig-bg-original').src = state.signatureUploadImage.src;
 
   // Initialize preview
   updateSignatureBgPreview();
-
-  console.log('[DEBUG openSignatureBgModal] Completed');
-
-  // Check again after a short delay to see if something is removing the active class
-  setTimeout(() => {
-    console.log('[DEBUG openSignatureBgModal] After 100ms - Modal classes:', modal.className);
-    console.log('[DEBUG openSignatureBgModal] After 100ms - Computed visibility:', window.getComputedStyle(modal).visibility);
-  }, 100);
 }
 
 function closeSignatureBgModal(skipHistoryBack = false) {
