@@ -1898,8 +1898,9 @@ async function loadSignatureImage(file) {
     state.signatureUploadImage = img;
 
     // Close signature modal and open bg removal modal
+    // Pass true to skip history.back() since we're immediately opening another modal
     console.log('[DEBUG loadSignatureImage] Closing signature modal...');
-    closeSignatureModal();
+    closeSignatureModal(true);
     console.log('[DEBUG loadSignatureImage] Opening signature bg modal...');
     openSignatureBgModal();
     console.log('[DEBUG loadSignatureImage] Success!');
