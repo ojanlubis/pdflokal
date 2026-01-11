@@ -15,7 +15,7 @@
     },
     {
       title: "Tanda Tangan Lebih Mudah Diatur",
-      description: "Tanda tangan otomatis terkunci setelah ditempatkan (anti geser tidak sengaja). Klik 2x untuk unlock. Bisa dihapus jika salah. Terima kasih @hamdi1611! 🙏",
+      description: "Tanda tangan otomatis terkunci setelah ditempatkan (anti geser tidak sengaja). Klik 2x untuk unlock. Bisa dihapus jika salah. Terima kasih <a href=\"https://github.com/hamdi1611\" target=\"_blank\">@hamdi1611</a>! 🙏",
       date: "11 Januari 2026"
     },
     {
