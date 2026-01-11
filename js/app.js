@@ -631,18 +631,13 @@ function initFileInputs() {
 
   // Signature Upload input
   const sigUploadInput = document.getElementById('signature-upload-input');
-  console.log('[DEBUG] Signature upload input:', sigUploadInput);
   if (sigUploadInput) {
     sigUploadInput.addEventListener('change', async (e) => {
-      console.log('[DEBUG] Change event fired, files:', e.target.files);
       if (e.target.files.length > 0) {
         showFullscreenLoading('Memuat tanda tangan...');
         try {
-          console.log('[DEBUG] About to call loadSignatureImage, function exists:', typeof loadSignatureImage);
           await loadSignatureImage(e.target.files[0]);
-          console.log('[DEBUG] loadSignatureImage completed successfully');
         } catch (error) {
-          console.error('[DEBUG] Error in app.js catch block:', error);
           showToast('Gagal memuat tanda tangan', 'error');
         } finally {
           hideFullscreenLoading();
@@ -650,8 +645,6 @@ function initFileInputs() {
         }
       }
     });
-  } else {
-    console.error('[DEBUG] Signature upload input NOT found!');
   }
 
   // Initialize drop hint drag-over effects
@@ -981,6 +974,11 @@ function showHome(skipPushState = false) {
 }
 
 function showTool(tool, skipPushState = false) {
+  // Minimize changelog when opening any workspace
+  if (window.changelogAPI) {
+    window.changelogAPI.minimize();
+  }
+
   document.getElementById('home-view').style.display = 'none';
   document.querySelectorAll('.workspace').forEach(ws => ws.classList.remove('active'));
 

@@ -71,7 +71,7 @@
   <!-- Fonts (self-hosted in style.css via @font-face) -->
 
   <!-- Styles -->
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=5">
 
   <!-- Favicon -->
   <link rel="icon" type="image/svg+xml"
@@ -1529,217 +1529,60 @@
     window.encryptPDF = encryptPDF;
   </script>
 
-  <!-- Changelog Popup Notification -->
-  <div class="changelog-popup" id="changelog-popup">
-    <div class="changelog-popup-header">
-      <h3>📣 Update Terbaru</h3>
-      <button class="changelog-close-btn" onclick="closeChangelog()">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M18 6L6 18M6 6l12 12" />
+  <!-- Changelog Notification System -->
+  <div class="changelog-notification" id="changelog-notification">
+    <!-- Collapsed Badge View -->
+    <div class="changelog-badge" onclick="changelogAPI.open()">
+      <div class="changelog-badge-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
         </svg>
-      </button>
+      </div>
+      <div class="changelog-badge-text">
+        <span class="changelog-badge-title">Update Terbaru!</span>
+      </div>
     </div>
-    <div class="changelog-content" id="changelog-content">
-      <!-- Changelog items will be inserted here by JavaScript -->
-    </div>
-    <div class="changelog-pagination" id="changelog-pagination">
-      <button class="changelog-page-btn" id="changelog-prev-btn" onclick="changelogPrevPage()" disabled>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M15 18l-6-6 6-6" />
-        </svg>
-        Sebelumnya
-      </button>
-      <span class="changelog-page-info" id="changelog-page-info">1 / 1</span>
-      <button class="changelog-page-btn" id="changelog-next-btn" onclick="changelogNextPage()">
-        Selanjutnya
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M9 18l6-6-6-6" />
-        </svg>
-      </button>
-    </div>
-  </div>
 
-  <!-- Floating Update Button -->
-  <div class="floating-update-btn" id="floating-update-btn" onclick="openChangelog()">
-    <div class="floating-update-icon">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-        <polyline points="7 10 12 15 17 10" />
-        <line x1="12" y1="15" x2="12" y2="3" />
-      </svg>
-    </div>
-    <div class="floating-update-text">
-      <div class="floating-update-title">Update:</div>
-      <div class="floating-update-description" id="floating-update-description">
-        <!-- Latest update will be inserted here -->
+    <!-- Expanded Content View -->
+    <div class="changelog-content-wrapper">
+      <div class="changelog-header">
+        <h3>📣 Update Terbaru</h3>
+        <div class="changelog-header-actions">
+          <button class="changelog-action-btn" onclick="changelogAPI.minimize()" title="Minimize">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+          </button>
+          <button class="changelog-action-btn" onclick="changelogAPI.close()" title="Close">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div class="changelog-items" id="changelog-content">
+        <!-- Items inserted by JS -->
+      </div>
+      <div class="changelog-pagination" id="changelog-pagination">
+        <button class="changelog-page-btn" id="changelog-prev-btn" onclick="changelogPrevPage()" disabled>
+          Sebelumnya
+        </button>
+        <span class="changelog-page-info" id="changelog-page-info">1 / 1</span>
+        <button class="changelog-page-btn" id="changelog-next-btn" onclick="changelogNextPage()">
+          Selanjutnya
+        </button>
       </div>
     </div>
   </div>
 
   <!-- Main App -->
+  <script src="js/changelog.js"></script>
   <script src="js/app.js"></script>
   <script src="js/pdf-tools.js"></script>
   <script src="js/unified-editor.js"></script>
   <script src="js/image-tools.js"></script>
 
-  <!-- Changelog System -->
-  <script>
-    // Changelog data - Add new updates at the beginning of the array
-    const changelogData = [
-      {
-        title: "Font bisa diakses di jaringan terbatas",
-        description: "Update penggunaan font agar bisa diakses di restricted network (self hosting font)",
-        date: "11 Januari 2026"
-      },
-      {
-        title: "Perbaikan Editor PDF",
-        description: "Memperbaiki bug pada fitur tanda tangan digital dan whiteout",
-        date: "8 Januari 2026"
-      },
-      {
-        title: "Peningkatan Performa",
-        description: "Optimasi kecepatan pemrosesan PDF dan gambar hingga 2x lebih cepat",
-        date: "5 Januari 2026"
-      },
-      {
-        title: "Fitur Baru: Watermark",
-        description: "Tambahkan watermark teks atau gambar ke dokumen PDF Anda",
-        date: "3 Januari 2026"
-      },
-      {
-        title: "UI/UX Improvements",
-        description: "Tampilan baru yang lebih modern dan responsif untuk mobile",
-        date: "1 Januari 2026"
-      },
-      {
-        title: "Kompres Gambar",
-        description: "Fitur kompres gambar dengan preview real-time kini tersedia",
-        date: "28 Desember 2025"
-      },
-      {
-        title: "Dark Mode Support",
-        description: "Dukungan dark mode otomatis mengikuti preferensi sistem",
-        date: "25 Desember 2025"
-      },
-      {
-        title: "Peluncuran Awal",
-        description: "PDFLokal diluncurkan dengan fitur merge, split, dan edit PDF",
-        date: "20 Desember 2025"
-      }
-    ];
-
-    // Changelog state
-    let currentPage = 1;
-    const itemsPerPage = 4;
-    const totalPages = Math.ceil(changelogData.length / itemsPerPage);
-
-    // Check if user has seen the changelog
-    function hasSeenChangelog() {
-      return localStorage.getItem('pdflokal_changelog_seen') === 'true';
-    }
-
-    // Mark changelog as seen
-    function markChangelogSeen() {
-      localStorage.setItem('pdflokal_changelog_seen', 'true');
-    }
-
-    // Render changelog items for current page
-    function renderChangelog() {
-      const content = document.getElementById('changelog-content');
-      const startIdx = (currentPage - 1) * itemsPerPage;
-      const endIdx = Math.min(startIdx + itemsPerPage, changelogData.length);
-
-      content.innerHTML = changelogData.slice(startIdx, endIdx).map(item => `
-        <div class="changelog-item">
-          <div class="changelog-item-header">
-            <h4>${item.title}</h4>
-            <span class="changelog-date">${item.date}</span>
-          </div>
-          <p class="changelog-description">${item.description}</p>
-        </div>
-      `).join('');
-
-      // Update pagination
-      document.getElementById('changelog-page-info').textContent = `${currentPage} / ${totalPages}`;
-      document.getElementById('changelog-prev-btn').disabled = currentPage === 1;
-      document.getElementById('changelog-next-btn').disabled = currentPage === totalPages;
-    }
-
-    // Change page functions
-    function changelogNextPage() {
-      if (currentPage < totalPages) {
-        currentPage++;
-        renderChangelog();
-      }
-    }
-
-    function changelogPrevPage() {
-      if (currentPage > 1) {
-        currentPage--;
-        renderChangelog();
-      }
-    }
-
-    // Open changelog popup
-    function openChangelog() {
-      const popup = document.getElementById('changelog-popup');
-      const floatingBtn = document.getElementById('floating-update-btn');
-
-      popup.classList.add('active');
-      floatingBtn.classList.remove('active');
-
-      // Reset to first page
-      currentPage = 1;
-      renderChangelog();
-    }
-
-    // Close changelog popup
-    function closeChangelog() {
-      const popup = document.getElementById('changelog-popup');
-      const floatingBtn = document.getElementById('floating-update-btn');
-
-      popup.classList.remove('active');
-      floatingBtn.classList.add('active');
-
-      markChangelogSeen();
-    }
-
-    // Initialize changelog on page load
-    function initChangelog() {
-      // Update floating button with latest update
-      const latestUpdate = changelogData[0];
-      document.getElementById('floating-update-description').innerHTML = `
-        - ${latestUpdate.title}
-      `;
-
-      const hasSeenBefore = hasSeenChangelog();
-      console.log('Has seen changelog before:', hasSeenBefore);
-
-      // Show popup if first visit
-      if (!hasSeenBefore) {
-        console.log('First visit - showing popup immediately');
-        // Show popup immediately
-        openChangelog();
-
-        // Auto-minimize after 4 seconds
-        setTimeout(() => {
-          console.log('Auto-minimizing popup after 4 seconds');
-          closeChangelog();
-        }, 4000);
-      } else {
-        console.log('Returning visitor - showing floating button');
-        // Show floating button immediately if user has seen changelog
-        document.getElementById('floating-update-btn').classList.add('active');
-      }
-    }
-
-    // Run on page load
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', initChangelog);
-    } else {
-      initChangelog();
-    }
-  </script>
 </body>
 
 </html>

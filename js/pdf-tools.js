@@ -1640,6 +1640,11 @@ function initTextModalControls() {
 }
 
 function openTextModal() {
+  // Minimize changelog when opening modal
+  if (window.changelogAPI) {
+    window.changelogAPI.minimize();
+  }
+
   const modal = document.getElementById('text-input-modal');
   modal.classList.add('active');
   pushModalState('text-input-modal');
@@ -1763,7 +1768,13 @@ function confirmTextInput() {
 
 // Signature Modal
 function openSignatureModal() {
-  document.getElementById('signature-modal').classList.add('active');
+  // Minimize changelog when opening modal
+  if (window.changelogAPI) {
+    window.changelogAPI.minimize();
+  }
+
+  const modal = document.getElementById('signature-modal');
+  modal.classList.add('active');
   setEditTool('signature');
   pushModalState('signature-modal');
 
@@ -1781,7 +1792,8 @@ function openSignatureModal() {
 }
 
 function closeSignatureModal(skipHistoryBack = false) {
-  document.getElementById('signature-modal').classList.remove('active');
+  const modal = document.getElementById('signature-modal');
+  modal.classList.remove('active');
   navHistory.currentModal = null;
   if (!skipHistoryBack && navHistory.currentView === 'modal') {
     history.back();
@@ -1874,23 +1886,14 @@ function switchSignatureTab(tab) {
 
 // Load Signature Image for Background Removal
 async function loadSignatureImage(file) {
-  console.log('[DEBUG pdf-tools] loadSignatureImage called with file:', file);
   try {
-    console.log('[DEBUG pdf-tools] Calling loadImage...');
     const img = await loadImage(file);
-    console.log('[DEBUG pdf-tools] Image loaded successfully:', img);
     state.signatureUploadImage = img;
-    console.log('[DEBUG pdf-tools] Stored in state.signatureUploadImage');
 
     // Close signature modal and open bg removal modal
-    console.log('[DEBUG pdf-tools] Closing signature modal...');
     closeSignatureModal();
-    console.log('[DEBUG pdf-tools] Opening bg removal modal...');
     openSignatureBgModal();
-    console.log('[DEBUG pdf-tools] Bg modal opened successfully');
   } catch (error) {
-    console.error('[DEBUG pdf-tools] Error in loadSignatureImage:', error);
-    console.error('[DEBUG pdf-tools] Error stack:', error.stack);
     showToast('Gagal memuat gambar', 'error');
     throw error; // Re-throw so app.js can catch it
   }
@@ -1898,7 +1901,13 @@ async function loadSignatureImage(file) {
 
 // Signature Background Removal Modal
 function openSignatureBgModal() {
-  document.getElementById('signature-bg-modal').classList.add('active');
+  // Minimize changelog when opening modal
+  if (window.changelogAPI) {
+    window.changelogAPI.minimize();
+  }
+
+  const modal = document.getElementById('signature-bg-modal');
+  modal.classList.add('active');
   pushModalState('signature-bg-modal');
 
   // Show original image
@@ -1909,7 +1918,8 @@ function openSignatureBgModal() {
 }
 
 function closeSignatureBgModal(skipHistoryBack = false) {
-  document.getElementById('signature-bg-modal').classList.remove('active');
+  const modal = document.getElementById('signature-bg-modal');
+  modal.classList.remove('active');
 
   // Cleanup
   if (state.signatureUploadImage && state.signatureUploadImage._blobUrl) {
