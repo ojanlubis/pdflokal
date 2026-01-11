@@ -69,8 +69,11 @@
    * Initialize changelog on page load
    */
   function initChangelog() {
-    const hasSeen = localStorage.getItem('pdflokal_changelog_seen') === 'true';
-    const isMinimized = localStorage.getItem('pdflokal_changelog_minimized') === 'true';
+    // Get latest changelog entry title (unique identifier)
+    const latestChangelogTitle = changelogData[0].title;
+
+    // Get the title of the latest changelog user has closed
+    const lastClosedTitle = localStorage.getItem('pdflokal_changelog_last_closed');
 
     // Update badge text with latest update
     const badgeTitle = document.querySelector('.changelog-badge-title');
@@ -79,11 +82,11 @@
     }
 
     // Determine initial state
-    if (!hasSeen && !isMinimized) {
-      // First-time visitor: Show expanded
+    if (lastClosedTitle && lastClosedTitle !== latestChangelogTitle) {
+      // Returning visitor + NEW content available → Show expanded
       showExpanded();
     } else {
-      // Returning visitor: Show collapsed badge
+      // First-time visitor OR already closed this version → Show collapsed badge
       showCollapsed();
     }
   }
@@ -134,8 +137,9 @@
     notification.classList.add('collapsed');
     currentState = 'collapsed';
 
-    // Mark as minimized in localStorage
-    localStorage.setItem('pdflokal_changelog_minimized', 'true');
+    // Mark latest changelog as closed (user has viewed it)
+    const latestChangelogTitle = changelogData[0].title;
+    localStorage.setItem('pdflokal_changelog_last_closed', latestChangelogTitle);
   }
 
   /**
@@ -148,8 +152,9 @@
     notification.classList.remove('active', 'expanded', 'collapsed');
     currentState = 'hidden';
 
-    // Mark as seen in localStorage
-    localStorage.setItem('pdflokal_changelog_seen', 'true');
+    // Mark latest changelog as closed (user has closed it)
+    const latestChangelogTitle = changelogData[0].title;
+    localStorage.setItem('pdflokal_changelog_last_closed', latestChangelogTitle);
   }
 
   /**
@@ -169,13 +174,17 @@
    * Used when returning to home-view
    */
   function restoreChangelog() {
-    const hasSeen = localStorage.getItem('pdflokal_changelog_seen') === 'true';
+    const latestChangelogTitle = changelogData[0].title;
+    const lastClosedTitle = localStorage.getItem('pdflokal_changelog_last_closed');
 
-    // If user has closed it permanently, don't restore
-    if (hasSeen) return;
-
-    // Otherwise, restore to collapsed badge state
-    showCollapsed();
+    // If user has NEW content (or first visit), show expanded
+    if (lastClosedTitle && lastClosedTitle !== latestChangelogTitle) {
+      showExpanded();
+    } else if (!lastClosedTitle) {
+      // First visit, show badge
+      showCollapsed();
+    }
+    // If already closed this version, don't show anything (stays hidden)
   }
 
   /**
