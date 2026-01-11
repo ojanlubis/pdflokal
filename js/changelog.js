@@ -9,7 +9,7 @@
   // Changelog data - Add new updates at the beginning of the array
   const changelogData = [
     {
-      title: "Font bisa diakses di jaringan terbatas",
+      title: "kuntulsesttt bisa diakses di jaringan terbatas",
       description: "Update penggunaan font agar bisa diakses di restricted network (self hosting font)",
       date: "11 Januari 2026"
     },
@@ -86,8 +86,8 @@
       // First-time visitor → Show collapsed badge
       showCollapsed();
     } else if (lastClosedTitle !== latestChangelogTitle) {
-      // Returning visitor + NEW content available → Show expanded
-      showExpanded();
+      // Returning visitor + NEW content available → Show collapsed badge
+      showCollapsed();
     }
     // else: User already closed this version → Don't show anything (stays hidden)
   }
@@ -178,9 +178,9 @@
     const latestChangelogTitle = changelogData[0].title;
     const lastClosedTitle = localStorage.getItem('pdflokal_changelog_last_closed');
 
-    // If user has NEW content (or first visit), show expanded
+    // If user has NEW content (or first visit), show badge
     if (lastClosedTitle && lastClosedTitle !== latestChangelogTitle) {
-      showExpanded();
+      showCollapsed();
     } else if (!lastClosedTitle) {
       // First visit, show badge
       showCollapsed();
