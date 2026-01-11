@@ -2028,6 +2028,7 @@ let editPageCache = null;
 
 async function renderEditPage() {
   const canvas = document.getElementById('edit-canvas');
+  if (!canvas) return; // Skip if in Unified Editor or canvas not found
   const ctx = canvas.getContext('2d');
   const dpr = state.editDevicePixelRatio;
 
