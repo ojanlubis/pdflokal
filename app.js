@@ -2028,6 +2028,7 @@ let editPageCache = null;
 
 async function renderEditPage() {
   const canvas = document.getElementById('edit-canvas');
+  if (!canvas) return; // Skip if in Unified Editor or canvas not found
   const ctx = canvas.getContext('2d');
   const dpr = state.editDevicePixelRatio;
 
@@ -2510,11 +2511,13 @@ function setEditTool(tool) {
     btn.classList.toggle('active', btn.dataset.editTool === tool);
   });
 
-  // Update canvas cursor
+  // Update canvas cursor (only for legacy editor)
   const canvas = document.getElementById('edit-canvas');
-  canvas.className = 'editor-canvas';
-  if (tool) {
-    canvas.classList.add(`tool-${tool}`);
+  if (canvas) {
+    canvas.className = 'editor-canvas';
+    if (tool) {
+      canvas.classList.add(`tool-${tool}`);
+    }
   }
 
   // Update status message
@@ -5336,6 +5339,8 @@ function ueDrawAnnotation(ctx, anno, isSelected) {
       let cssFontFamily = 'Helvetica, Arial, sans-serif';
       if (anno.fontFamily === 'Times-Roman') cssFontFamily = 'Times New Roman, Times, serif';
       else if (anno.fontFamily === 'Courier') cssFontFamily = 'Courier New, Courier, monospace';
+      else if (anno.fontFamily === 'Montserrat') cssFontFamily = 'Montserrat, sans-serif';
+      else if (anno.fontFamily === 'Carlito') cssFontFamily = 'Carlito, sans-serif';
 
       ctx.font = `${fontStyle}${anno.fontSize}px ${cssFontFamily}`;
       ctx.fillStyle = anno.color;
@@ -5810,18 +5815,19 @@ async function ueDownload() {
 
   try {
     const newDoc = await PDFLib.PDFDocument.create();
+    newDoc.registerFontkit(fontkit); // Register fontkit for custom font embedding
     const fontCache = {};
 
-    // Google Fonts URLs for custom fonts (woff2 format)
+    // Self-hosted fonts for offline support and privacy
     const customFontUrls = {
-      'Montserrat': 'https://fonts.gstatic.com/s/montserrat/v26/JTUHjIg1_i6t8kCHKm4532VJOt5-QNFgpCtr6Ew-.woff2',
-      'Montserrat-Bold': 'https://fonts.gstatic.com/s/montserrat/v26/JTUHjIg1_i6t8kCHKm4532VJOt5-QNFgpCuM70w-.woff2',
-      'Montserrat-Italic': 'https://fonts.gstatic.com/s/montserrat/v26/JTUFjIg1_i6t8kCHKm459Wx7xQYXK0vOoz6jq6R8WXV0poK5.woff2',
-      'Montserrat-BoldItalic': 'https://fonts.gstatic.com/s/montserrat/v26/JTUFjIg1_i6t8kCHKm459Wx7xQYXK0vOoz6jqxp5WXV0poK5.woff2',
-      'Carlito': 'https://fonts.gstatic.com/s/carlito/v3/3Jn9SDPw3m-pk039PDCLTXUETuE.woff2',
-      'Carlito-Bold': 'https://fonts.gstatic.com/s/carlito/v3/3Jn4SDPw3m-pk039BIykaX0vUuhCyOo.woff2',
-      'Carlito-Italic': 'https://fonts.gstatic.com/s/carlito/v3/3Jn_SDPw3m-pk039DDKBSVcBXuFb0Q.woff2',
-      'Carlito-BoldItalic': 'https://fonts.gstatic.com/s/carlito/v3/3Jn6SDPw3m-pk039DDK59XglVspH2OprMQ.woff2'
+      'Montserrat': 'fonts/montserrat-regular.woff2',
+      'Montserrat-Bold': 'fonts/montserrat-bold.woff2',
+      'Montserrat-Italic': 'fonts/montserrat-italic.woff2',
+      'Montserrat-BoldItalic': 'fonts/montserrat-bolditalic.woff2',
+      'Carlito': 'fonts/carlito-regular.woff2',
+      'Carlito-Bold': 'fonts/carlito-bold.woff2',
+      'Carlito-Italic': 'fonts/carlito-italic.woff2',
+      'Carlito-BoldItalic': 'fonts/carlito-bolditalic.woff2'
     };
 
     // Helper to get the right font based on family, bold, italic
@@ -5861,14 +5867,15 @@ async function ueDownload() {
 
       if (!fontCache[fontName]) {
         if (isCustomFont) {
-          // Fetch and embed custom font from Google Fonts
+          // Fetch and embed custom font from local files
           try {
             const fontUrl = customFontUrls[fontName];
             const fontResponse = await fetch(fontUrl);
             const fontBytes = await fontResponse.arrayBuffer();
             fontCache[fontName] = await newDoc.embedFont(fontBytes);
+            console.log('[PDF Export] ✓ Embedded font:', fontName, `(${(fontBytes.byteLength / 1024).toFixed(1)}KB)`);
           } catch (err) {
-            console.warn(`Failed to load custom font ${fontName}, falling back to Helvetica:`, err);
+            console.error('[PDF Export] ✗ Failed to load font:', fontName, err);
             // Fallback to Helvetica
             const fallbackName = bold ? 'Helvetica-Bold' : 'Helvetica';
             if (!fontCache[fallbackName]) {
