@@ -276,7 +276,7 @@ function initNavigationHistory() {
 // INITIALIZATION
 // ============================================================
 
-document.addEventListener('DOMContentLoaded', () => {
+function initApp() {
   // Check browser compatibility first
   checkBrowserCompatibility();
 
@@ -295,7 +295,14 @@ document.addEventListener('DOMContentLoaded', () => {
   initRangeSliders();
   initSignaturePad();
   initNavigationHistory();
-});
+}
+
+// Initialize when DOM is ready (same pattern as changelog.js)
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initApp);
+} else {
+  initApp();
+}
 
 function initDropZone() {
   const dropzone = document.getElementById('main-dropzone');
