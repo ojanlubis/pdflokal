@@ -5336,7 +5336,10 @@ function ueDrawAnnotation(ctx, anno, isSelected) {
       let cssFontFamily = 'Helvetica, Arial, sans-serif';
       if (anno.fontFamily === 'Times-Roman') cssFontFamily = 'Times New Roman, Times, serif';
       else if (anno.fontFamily === 'Courier') cssFontFamily = 'Courier New, Courier, monospace';
+      else if (anno.fontFamily === 'Montserrat') cssFontFamily = 'Montserrat, sans-serif';
+      else if (anno.fontFamily === 'Carlito') cssFontFamily = 'Carlito, sans-serif';
 
+      console.log('[UE] Rendering text:', { fontFamily: anno.fontFamily, cssFontFamily, bold: anno.bold, italic: anno.italic, fontSize: anno.fontSize });
       ctx.font = `${fontStyle}${anno.fontSize}px ${cssFontFamily}`;
       ctx.fillStyle = anno.color;
       const lines = anno.text.split('\n');
@@ -5862,14 +5865,17 @@ async function ueDownload() {
 
       if (!fontCache[fontName]) {
         if (isCustomFont) {
-          // Fetch and embed custom font from Google Fonts
+          // Fetch and embed custom font from local files
           try {
             const fontUrl = customFontUrls[fontName];
+            console.log('[PDF Export] Fetching font:', { fontName, fontUrl, isCustomFont });
             const fontResponse = await fetch(fontUrl);
             const fontBytes = await fontResponse.arrayBuffer();
+            console.log('[PDF Export] Font loaded successfully:', { fontName, byteLength: fontBytes.byteLength });
             fontCache[fontName] = await newDoc.embedFont(fontBytes);
+            console.log('[PDF Export] Font embedded successfully:', fontName);
           } catch (err) {
-            console.warn(`Failed to load custom font ${fontName}, falling back to Helvetica:`, err);
+            console.error('[PDF Export] Failed to load custom font, falling back to Helvetica:', { fontName, error: err });
             // Fallback to Helvetica
             const fallbackName = bold ? 'Helvetica-Bold' : 'Helvetica';
             if (!fontCache[fallbackName]) {
@@ -5919,7 +5925,9 @@ async function ueDownload() {
               });
               break;
             case 'text':
+              console.log('[PDF Export] Processing text annotation:', { fontFamily: anno.fontFamily, bold: anno.bold, italic: anno.italic, text: anno.text });
               const textFont = await getFont(anno.fontFamily, anno.bold, anno.italic);
+              console.log('[PDF Export] Text font retrieved:', textFont);
               const lines = anno.text.split('\n');
               const hexColor = anno.color.replace('#', '');
               const r = parseInt(hexColor.substr(0, 2), 16) / 255;
