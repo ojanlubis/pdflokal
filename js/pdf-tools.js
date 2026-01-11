@@ -1874,16 +1874,25 @@ function switchSignatureTab(tab) {
 
 // Load Signature Image for Background Removal
 async function loadSignatureImage(file) {
+  console.log('[DEBUG pdf-tools] loadSignatureImage called with file:', file);
   try {
+    console.log('[DEBUG pdf-tools] Calling loadImage...');
     const img = await loadImage(file);
+    console.log('[DEBUG pdf-tools] Image loaded successfully:', img);
     state.signatureUploadImage = img;
+    console.log('[DEBUG pdf-tools] Stored in state.signatureUploadImage');
 
     // Close signature modal and open bg removal modal
+    console.log('[DEBUG pdf-tools] Closing signature modal...');
     closeSignatureModal();
+    console.log('[DEBUG pdf-tools] Opening bg removal modal...');
     openSignatureBgModal();
+    console.log('[DEBUG pdf-tools] Bg modal opened successfully');
   } catch (error) {
-    console.error('Error loading signature image:', error);
+    console.error('[DEBUG pdf-tools] Error in loadSignatureImage:', error);
+    console.error('[DEBUG pdf-tools] Error stack:', error.stack);
     showToast('Gagal memuat gambar', 'error');
+    throw error; // Re-throw so app.js can catch it
   }
 }
 
