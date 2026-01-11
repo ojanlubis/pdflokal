@@ -2510,11 +2510,13 @@ function setEditTool(tool) {
     btn.classList.toggle('active', btn.dataset.editTool === tool);
   });
 
-  // Update canvas cursor
+  // Update canvas cursor (only for legacy editor)
   const canvas = document.getElementById('edit-canvas');
-  canvas.className = 'editor-canvas';
-  if (tool) {
-    canvas.classList.add(`tool-${tool}`);
+  if (canvas) {
+    canvas.className = 'editor-canvas';
+    if (tool) {
+      canvas.classList.add(`tool-${tool}`);
+    }
   }
 
   // Update status message
@@ -5339,7 +5341,6 @@ function ueDrawAnnotation(ctx, anno, isSelected) {
       else if (anno.fontFamily === 'Montserrat') cssFontFamily = 'Montserrat, sans-serif';
       else if (anno.fontFamily === 'Carlito') cssFontFamily = 'Carlito, sans-serif';
 
-      console.log('[UE] Rendering text:', { fontFamily: anno.fontFamily, cssFontFamily, bold: anno.bold, italic: anno.italic, fontSize: anno.fontSize });
       ctx.font = `${fontStyle}${anno.fontSize}px ${cssFontFamily}`;
       ctx.fillStyle = anno.color;
       const lines = anno.text.split('\n');
@@ -5868,14 +5869,12 @@ async function ueDownload() {
           // Fetch and embed custom font from local files
           try {
             const fontUrl = customFontUrls[fontName];
-            console.log('[PDF Export] Fetching font:', { fontName, fontUrl, isCustomFont });
             const fontResponse = await fetch(fontUrl);
             const fontBytes = await fontResponse.arrayBuffer();
-            console.log('[PDF Export] Font loaded successfully:', { fontName, byteLength: fontBytes.byteLength });
             fontCache[fontName] = await newDoc.embedFont(fontBytes);
-            console.log('[PDF Export] Font embedded successfully:', fontName);
+            console.log('[PDF Export] ✓ Embedded font:', fontName, `(${(fontBytes.byteLength / 1024).toFixed(1)}KB)`);
           } catch (err) {
-            console.error('[PDF Export] Failed to load custom font, falling back to Helvetica:', { fontName, error: err });
+            console.error('[PDF Export] ✗ Failed to load font:', fontName, err);
             // Fallback to Helvetica
             const fallbackName = bold ? 'Helvetica-Bold' : 'Helvetica';
             if (!fontCache[fallbackName]) {
@@ -5925,9 +5924,7 @@ async function ueDownload() {
               });
               break;
             case 'text':
-              console.log('[PDF Export] Processing text annotation:', { fontFamily: anno.fontFamily, bold: anno.bold, italic: anno.italic, text: anno.text });
               const textFont = await getFont(anno.fontFamily, anno.bold, anno.italic);
-              console.log('[PDF Export] Text font retrieved:', textFont);
               const lines = anno.text.split('\n');
               const hexColor = anno.color.replace('#', '');
               const r = parseInt(hexColor.substr(0, 2), 16) / 255;
