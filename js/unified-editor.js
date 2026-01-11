@@ -671,9 +671,11 @@ function ueSetupCanvasEvents() {
         // Check if this annotation is locked
         if (anno.locked) {
           // Can't drag locked annotations
+          if (anno.type === 'signature') {
+            showToast('Tanda tangan terkunci. Klik dua kali untuk membuka kunci.', 'info');
+          }
           ueState.selectedAnnotation = clicked;
           ueRedrawAnnotations();
-          ueShowConfirmButton(anno, clicked);
           return;
         }
         hasMovedOrResized = false;  // Will be set true if actual drag happens
@@ -921,6 +923,14 @@ function ueSetupCanvasEvents() {
     // Get actual annotation
     const anno = ueState.annotations[result.pageIndex][result.index];
 
+    // Unlock signature
+    if (anno && anno.type === 'signature' && anno.locked) {
+      anno.locked = false;
+      ueRedrawAnnotations();
+      ueShowConfirmButton(anno, result);
+      return;
+    }
+
     // Only handle text annotations
     if (!anno || anno.type !== 'text' || anno.locked) return;
 
@@ -1129,18 +1139,22 @@ function ueShowConfirmButton(anno, annoRef) {
     return;
   }
 
-  const btn = document.getElementById('signature-confirm-btn');
+  const btn = document.getElementById('signature-btn-wrapper');
   if (!btn) return;
+  btn.style.display = 'inline-flex';
 
-  btn.style.display = 'block';
-  btn.onclick = () => ueConfirmSignature(annoRef);
+  const confirmBtn = document.getElementById('signature-confirm-btn');
+  confirmBtn.onclick = () => ueConfirmSignature(annoRef);
+
+  const deleteBtn = document.getElementById('signature-delete-btn');
+  deleteBtn.onclick = () => ueDeleteSignature(annoRef);
 
   ueUpdateConfirmButtonPosition(anno);
 }
 
 // Update confirm button position
 function ueUpdateConfirmButtonPosition(anno) {
-  const btn = document.getElementById('signature-confirm-btn');
+  const btn = document.getElementById('signature-btn-wrapper');
   if (!btn || btn.style.display === 'none') return;
 
   const canvas = document.getElementById('ue-canvas');
@@ -1164,7 +1178,7 @@ function ueUpdateConfirmButtonPosition(anno) {
 
 // Hide confirm button
 function ueHideConfirmButton() {
-  const btn = document.getElementById('signature-confirm-btn');
+  const btn = document.getElementById('signature-btn-wrapper');
   if (btn) {
     btn.style.display = 'none';
   }
@@ -1179,6 +1193,19 @@ function ueConfirmSignature(annoRef) {
     ueState.selectedAnnotation = null;
     ueRedrawAnnotations();
     showToast('Tanda tangan dikonfirmasi', 'success');
+  }
+}
+
+// Delete signature
+function ueDeleteSignature(annoRef) {
+  const anno = ueState.annotations[annoRef.pageIndex][annoRef.index];
+  if (anno) {
+    ueSaveEditUndoState();
+    ueState.annotations[annoRef.pageIndex].splice(annoRef.index, 1);
+    ueHideConfirmButton();
+    ueState.selectedAnnotation = null;
+    ueRedrawAnnotations();
+    showToast('Tanda tangan dihapus', 'success');
   }
 }
 

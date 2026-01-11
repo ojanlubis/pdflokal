@@ -1054,9 +1054,15 @@ a:hover {
   border-bottom: 6px solid var(--text-primary);
 }
 
-/* Signature Confirm Button */
-.signature-confirm-btn {
+/* Signature Button Wrapper */
+.signature-btn-wrapper {
   position: absolute;
+  display: inline-flex;
+  gap: 5px;
+}
+
+.signature-confirm-btn {
+  position: relative;
   background: var(--accent-primary);
   color: white;
   border: none;
@@ -1072,6 +1078,26 @@ a:hover {
 
 .signature-confirm-btn:hover {
   background: var(--accent-dark, #1d4ed8);
+  transform: scale(1.05);
+}
+
+.signature-delete-btn {
+  position: relative;
+  background: #404040;
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 6px 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  z-index: 20;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  transition: all var(--transition-fast);
+}
+
+.signature-delete-btn:hover {
+  background: #2a2a2a;
   transform: scale(1.05);
 }
 
@@ -3433,7 +3459,6 @@ body.is-touch .btn:active {
     border-top: none;
   }
 
-  #unified-editor-workspace .editor-action-group,
   #unified-editor-workspace .editor-tool-divider {
     display: none !important;
   }

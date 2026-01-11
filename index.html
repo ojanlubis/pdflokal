@@ -582,8 +582,11 @@
 
           <!-- Canvas Wrapper -->
           <div class="unified-canvas-wrapper" id="ue-canvas-wrapper">
-            <!-- Signature confirm button (positioned dynamically) -->
-            <button class="signature-confirm-btn" id="signature-confirm-btn" style="display: none;">Konfirmasi</button>
+            <div class="signature-btn-wrapper" id="signature-btn-wrapper" style="display: none;">
+              <!-- Signature confirm button (positioned dynamically) -->
+              <button class="signature-confirm-btn" id="signature-confirm-btn">Konfirmasi</button>
+              <button class="signature-delete-btn" id="signature-delete-btn">✕</button>
+            </div>
             <div class="unified-empty-state" id="ue-empty-state">
               <div class="dropzone" onclick="document.getElementById('ue-file-input').click()">
                 <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
