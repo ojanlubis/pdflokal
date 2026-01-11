@@ -1887,8 +1887,12 @@ async function ueDownload() {
               }
               break;
             case 'signature':
-              const pngImage = await newDoc.embedPng(anno.image);
-              page.drawImage(pngImage, {
+              // Detect image format from data URL and use appropriate embed function
+              const isJpeg = anno.image.startsWith('data:image/jpeg');
+              const signatureImage = isJpeg
+                ? await newDoc.embedJpg(anno.image)
+                : await newDoc.embedPng(anno.image);
+              page.drawImage(signatureImage, {
                 x: anno.x * scaleX,
                 y: height - (anno.y + anno.height) * scaleY,
                 width: anno.width * scaleX,
@@ -1917,7 +1921,11 @@ async function ueDownload() {
       }
     }
 
-    const pdfBytes = await newDoc.save();
+    // Save with compression to reduce file size
+    const pdfBytes = await newDoc.save({
+      useObjectStreams: true,  // Enable object streams for better compression
+      addDefaultPage: false     // Don't add blank page if empty
+    });
     downloadBlob(new Blob([pdfBytes], { type: 'application/pdf' }), getDownloadFilename({originalName: ueState.sourceFiles[0]?.name, extension: 'pdf'}));
     showToast('PDF berhasil diunduh!', 'success');
 

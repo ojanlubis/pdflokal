@@ -1837,7 +1837,8 @@ function useSignature() {
     }
 
     ctx.putImageData(imageData, 0, 0);
-    state.signatureImage = tempCanvas.toDataURL('image/png');
+    // Optimize drawn signature (resize if too large, compress appropriately)
+    state.signatureImage = optimizeSignatureImage(tempCanvas);
 
     closeSignatureModal();
     // Check if in unified editor mode
@@ -1987,14 +1988,52 @@ function updateSignatureBgPreview() {
   state.signatureUploadCanvas = canvas;
 }
 
+// Optimize signature image: resize if too large, compress as JPEG if no transparency
+function optimizeSignatureImage(sourceCanvas) {
+  const MAX_SIZE = 1500; // Max width or height in pixels
+  let canvas = sourceCanvas;
+
+  // Resize if image is too large
+  if (sourceCanvas.width > MAX_SIZE || sourceCanvas.height > MAX_SIZE) {
+    const scale = Math.min(MAX_SIZE / sourceCanvas.width, MAX_SIZE / sourceCanvas.height);
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = Math.floor(sourceCanvas.width * scale);
+    tempCanvas.height = Math.floor(sourceCanvas.height * scale);
+    const ctx = tempCanvas.getContext('2d');
+    ctx.drawImage(sourceCanvas, 0, 0, tempCanvas.width, tempCanvas.height);
+    canvas = tempCanvas;
+  }
+
+  // Check if image has transparency
+  const ctx = canvas.getContext('2d');
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const data = imageData.data;
+  let hasTransparency = false;
+
+  for (let i = 3; i < data.length; i += 4) {
+    if (data[i] < 255) {
+      hasTransparency = true;
+      break;
+    }
+  }
+
+  // Use JPEG for better compression if no transparency, otherwise PNG
+  if (hasTransparency) {
+    return canvas.toDataURL('image/png');
+  } else {
+    // JPEG with 85% quality - much smaller than PNG for photos
+    return canvas.toDataURL('image/jpeg', 0.85);
+  }
+}
+
 function useSignatureFromUpload() {
   if (!state.signatureUploadCanvas) {
     showToast('Tidak ada gambar untuk digunakan', 'error');
     return;
   }
 
-  // Convert canvas to data URL and use as signature
-  state.signatureImage = state.signatureUploadCanvas.toDataURL('image/png');
+  // Optimize and compress signature image before storing
+  state.signatureImage = optimizeSignatureImage(state.signatureUploadCanvas);
 
   closeSignatureBgModal();
   // Check if in unified editor mode
@@ -2356,13 +2395,17 @@ async function saveEditedPDF() {
           }
         } else if (anno.type === 'signature' && anno.image) {
           try {
-            const pngImage = await srcDoc.embedPng(anno.image);
+            // Detect image format and use appropriate embed function
+            const isJpeg = anno.image.startsWith('data:image/jpeg');
+            const signatureImage = isJpeg
+              ? await srcDoc.embedJpg(anno.image)
+              : await srcDoc.embedPng(anno.image);
             const pdfX = anno.x * scaleX;
             const pdfY = pdfHeight - (anno.y + anno.height) * scaleY;
             const pdfW = anno.width * scaleX;
             const pdfH = anno.height * scaleY;
 
-            page.drawImage(pngImage, {
+            page.drawImage(signatureImage, {
               x: pdfX,
               y: pdfY,
               width: pdfW,
