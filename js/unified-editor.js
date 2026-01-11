@@ -1732,6 +1732,40 @@ async function ueDownload() {
   const downloadBtn = document.getElementById('ue-download-btn');
   const originalText = downloadBtn.innerHTML;
 
+  // Optimization: If PDF is unmodified, download original bytes to avoid pdf-lib re-encoding bloat
+  // Check if: single file + no reordering + no rotations + no annotations
+  if (ueState.sourceFiles.length === 1) {
+    let isUnmodified = true;
+    const sourceFile = ueState.sourceFiles[0];
+
+    // Check if pages are in original order and unrotated
+    for (let i = 0; i < ueState.pages.length; i++) {
+      const page = ueState.pages[i];
+      if (page.sourceIndex !== 0 || page.pageNum !== i || page.rotation !== 0) {
+        isUnmodified = false;
+        break;
+      }
+
+      // Check if page has annotations
+      const annotations = ueState.annotations[i] || [];
+      if (annotations.length > 0) {
+        isUnmodified = false;
+        break;
+      }
+    }
+
+    // If unmodified, download original bytes without re-encoding
+    if (isUnmodified) {
+      console.log('[PDF Download] Unmodified PDF detected, downloading original bytes');
+      downloadBlob(
+        new Blob([sourceFile.bytes], { type: 'application/pdf' }),
+        getDownloadFilename({originalName: sourceFile.name, extension: 'pdf'})
+      );
+      showToast('PDF berhasil diunduh!', 'success');
+      return;
+    }
+  }
+
   // Show loading state
   downloadBtn.disabled = true;
   downloadBtn.innerHTML = `
