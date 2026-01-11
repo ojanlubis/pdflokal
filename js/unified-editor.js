@@ -30,6 +30,8 @@ const ueState = {
   isResizing: false,            // Whether annotation is being resized
   // Sidebar drag-drop state
   sidebarDropIndicator: null,
+  // Track last annotation that showed "locked" toast (to avoid spam)
+  lastLockedToastAnnotation: null,
 };
 
 // Initialize unified editor file input
@@ -672,7 +674,12 @@ function ueSetupCanvasEvents() {
         if (anno.locked) {
           // Can't drag locked annotations
           if (anno.type === 'signature') {
-            showToast('Tanda tangan terkunci. Klik dua kali untuk membuka kunci.', 'info');
+            // Only show toast once per annotation (avoid spam)
+            const annoId = `${clicked.pageIndex}-${clicked.index}`;
+            if (ueState.lastLockedToastAnnotation !== annoId) {
+              showToast('Tanda tangan terkunci. Klik dua kali untuk membuka kunci.', 'info');
+              ueState.lastLockedToastAnnotation = annoId;
+            }
           }
           ueState.selectedAnnotation = clicked;
           ueRedrawAnnotations();
@@ -681,6 +688,7 @@ function ueSetupCanvasEvents() {
         hasMovedOrResized = false;  // Will be set true if actual drag happens
         preChangeState = JSON.parse(JSON.stringify(ueState.annotations));  // Save state before change
         ueState.selectedAnnotation = clicked;
+        ueState.lastLockedToastAnnotation = null;  // Reset when selecting different annotation
         ueState.isDragging = true;
         dragOffsetX = x - anno.x;
         dragOffsetY = y - (anno.type === 'text' ? anno.y - anno.fontSize : anno.y);
@@ -689,6 +697,7 @@ function ueSetupCanvasEvents() {
         return;
       } else {
         ueState.selectedAnnotation = null;
+        ueState.lastLockedToastAnnotation = null;  // Reset when deselecting
         ueHideConfirmButton();
         ueRedrawAnnotations();
       }
@@ -926,6 +935,7 @@ function ueSetupCanvasEvents() {
     // Unlock signature
     if (anno && anno.type === 'signature' && anno.locked) {
       anno.locked = false;
+      ueState.lastLockedToastAnnotation = null;  // Reset toast tracking after unlock
       ueRedrawAnnotations();
       ueShowConfirmButton(anno, result);
       return;
