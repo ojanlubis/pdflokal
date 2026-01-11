@@ -6,10 +6,20 @@ PDFLokal adalah tool PDF gratis untuk pengguna Indonesia. Semua proses berjalan 
 
 **[Buka PDFLokal](https://www.pdflokal.id/)**
 
+## Update Terbaru
+
+**Januari 2026:**
+- ✨ Tanda tangan bisa di-unlock dengan double-click untuk diedit
+- 🗑️ Tombol hapus signature dengan sekali klik
+- 🎨 Changelog notification system yang smooth dan non-intrusive
+- 🏗️ Refactoring ke modular JavaScript architecture untuk maintainability
+- 🌐 Self-hosted fonts untuk akses di restricted networks
+- 📱 Mobile UX improvements (action buttons kini muncul di mobile)
+
 ## Fitur
 
 ### PDF Tools
-- **Editor PDF** - Editor lengkap dengan whiteout, teks (pilihan font, bold/italic, warna), tanda tangan, watermark, nomor halaman, dan proteksi password
+- **Editor PDF** - Editor lengkap dengan whiteout, teks (5 font choices, bold/italic, warna), tanda tangan (upload gambar dengan background removal, unlock untuk edit, hapus dengan sekali klik), watermark, nomor halaman, dan proteksi password
 - **Gabung PDF** - Gabungkan beberapa PDF menjadi satu dengan drag-drop reordering
 - **Pisah PDF** - Ekstrak halaman tertentu sebagai PDF terpisah
 - **Kompres PDF** - Kurangi ukuran file (kompres gambar dalam PDF)
@@ -58,12 +68,13 @@ python -m http.server 8000
 ```
 
 ### Tech Stack
-- **Vanilla HTML/CSS/JS** - No build step, no framework
+- **Vanilla HTML/CSS/JS** - No build step, no framework, modular IIFE pattern
 - **[pdf-lib](https://pdf-lib.js.org/)** - PDF manipulation
 - **[PDF.js](https://mozilla.github.io/pdf.js/)** - PDF rendering & thumbnails
 - **[Signature Pad](https://github.com/szimek/signature_pad)** - Tanda tangan digital
 - **[pdf-encrypt-lite](https://github.com/nicholasohjj/pdf-encrypt-lite)** - PDF password encryption
 - **Canvas API** - Image processing
+- **Self-hosted fonts** - Montserrat, Carlito, Plus Jakarta Sans (no external CDN, works offline & in restricted networks)
 
 ### Project Structure
 ```
@@ -71,8 +82,17 @@ pdflokal/
 ├── index.html      # Main application
 ├── dukung.html     # Donation page
 ├── style.css       # All styles
-├── app.js          # Application logic
-├── images/
+├── js/             # Modularized JavaScript
+│   ├── changelog.js      # Changelog notification system
+│   ├── app.js            # Core app logic & state management
+│   ├── pdf-tools.js      # PDF tools (text, signature, whiteout modals)
+│   ├── unified-editor.js # Unified PDF editor workspace
+│   └── image-tools.js    # Image processing tools
+├── fonts/          # Self-hosted fonts (268KB total)
+│   ├── montserrat-*.woff2
+│   ├── carlito-*.woff2
+│   └── plusjakartasans-*.woff2
+├── images/         # UI assets
 └── README.md
 ```
 
@@ -87,11 +107,18 @@ Kontribusi selalu disambut! Beberapa cara untuk berkontribusi:
 5. **Donasi** - Bantu biaya development via [halaman donasi](https://www.pdflokal.id/dukung.html)
 
 ### Development Guidelines
-- Gunakan vanilla JS, hindari dependencies baru kecuali benar-benar perlu
-- Semua fitur harus client-side (tidak boleh butuh server)
-- UI harus responsive dan mudah digunakan
-- Copy dalam Bahasa Indonesia
-- Test di berbagai browser sebelum PR
+- **Gunakan vanilla JS** - Hindari dependencies baru kecuali benar-benar perlu
+- **Semua fitur harus client-side** - Tidak boleh butuh server
+- **Modular architecture** - Kode diorganisir dalam `js/` folder dengan IIFE pattern:
+  - `js/app.js` - Core logic & state management
+  - `js/unified-editor.js` - Unified editor workspace
+  - `js/pdf-tools.js` - PDF tool modals
+  - `js/image-tools.js` - Image processing
+  - `js/changelog.js` - Changelog system
+- **UI harus responsive** - Test di desktop dan mobile
+- **Copy dalam Bahasa Indonesia** - Semua UI text harus bahasa Indonesia
+- **Test di berbagai browser** - Chrome, Firefox, Safari, Edge sebelum PR
+- **Lihat CLAUDE.md** - Untuk detail teknis arsitektur dan patterns
 
 ## Limitasi
 
@@ -129,6 +156,14 @@ Jika menjalankan versi modifikasi sebagai layanan web publik, wajib menyediakan 
 Jika ingin diskusi commercial use, hubungi via GitHub Issues.
 
 Lihat file [LICENSE](LICENSE) untuk detail lengkap.
+
+## Contributors
+
+Terima kasih kepada semua yang telah berkontribusi:
+
+- [@hamdi1611](https://github.com/hamdi1611) - Signature UX improvements (unlock, delete, mobile layout)
+
+Ingin berkontribusi? Lihat [panduan kontribusi](#kontribusi) di atas.
 
 ## Credits
 
