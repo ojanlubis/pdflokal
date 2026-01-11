@@ -5832,6 +5832,7 @@ async function ueDownload() {
 
     // Helper to get the right font based on family, bold, italic
     async function getFont(fontFamily, bold, italic) {
+      console.log('[PDF Export] getFont called:', { fontFamily, bold, italic });
       let fontName = fontFamily || 'Helvetica';
       let isCustomFont = false;
 
@@ -5863,6 +5864,13 @@ async function ueDownload() {
         else if (bold) fontName = 'Carlito-Bold';
         else if (italic) fontName = 'Carlito-Italic';
         else fontName = 'Carlito';
+      } else {
+        // Unknown font family - fall back to Helvetica
+        console.warn('[PDF Export] Unknown font family:', fontFamily, '- falling back to Helvetica');
+        if (bold && italic) fontName = 'Helvetica-BoldOblique';
+        else if (bold) fontName = 'Helvetica-Bold';
+        else if (italic) fontName = 'Helvetica-Oblique';
+        else fontName = 'Helvetica';
       }
 
       if (!fontCache[fontName]) {
@@ -5884,7 +5892,16 @@ async function ueDownload() {
             return fontCache[fallbackName];
           }
         } else {
-          fontCache[fontName] = await newDoc.embedFont(PDFLib.StandardFonts[fontName]);
+          // Embed standard PDF font
+          const standardFont = PDFLib.StandardFonts[fontName];
+          if (!standardFont) {
+            console.error('[PDF Export] Invalid standard font name:', fontName, '- available fonts:', Object.keys(PDFLib.StandardFonts));
+            // Fall back to Helvetica
+            const fallback = bold ? PDFLib.StandardFonts.HelveticaBold : PDFLib.StandardFonts.Helvetica;
+            fontCache[fontName] = await newDoc.embedFont(fallback);
+          } else {
+            fontCache[fontName] = await newDoc.embedFont(standardFont);
+          }
         }
       }
       return fontCache[fontName];
