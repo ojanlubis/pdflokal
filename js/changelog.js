@@ -82,13 +82,14 @@
     }
 
     // Determine initial state
-    if (lastClosedTitle && lastClosedTitle !== latestChangelogTitle) {
+    if (!lastClosedTitle) {
+      // First-time visitor → Show collapsed badge
+      showCollapsed();
+    } else if (lastClosedTitle !== latestChangelogTitle) {
       // Returning visitor + NEW content available → Show expanded
       showExpanded();
-    } else {
-      // First-time visitor OR already closed this version → Show collapsed badge
-      showCollapsed();
     }
+    // else: User already closed this version → Don't show anything (stays hidden)
   }
 
   /**
