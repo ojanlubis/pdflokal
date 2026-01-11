@@ -1792,11 +1792,15 @@ function openSignatureModal() {
 }
 
 function closeSignatureModal(skipHistoryBack = false) {
+  console.log('[DEBUG closeSignatureModal] Called with skipHistoryBack:', skipHistoryBack);
   const modal = document.getElementById('signature-modal');
   modal.classList.remove('active');
   navHistory.currentModal = null;
   if (!skipHistoryBack && navHistory.currentView === 'modal') {
+    console.log('[DEBUG closeSignatureModal] Calling history.back()');
     history.back();
+  } else {
+    console.log('[DEBUG closeSignatureModal] Skipping history.back()');
   }
 }
 
@@ -1908,13 +1912,24 @@ async function loadSignatureImage(file) {
 
 // Signature Background Removal Modal
 function openSignatureBgModal() {
+  console.log('[DEBUG openSignatureBgModal] Starting...');
+
   // Minimize changelog when opening modal
   if (window.changelogAPI) {
     window.changelogAPI.minimize();
   }
 
   const modal = document.getElementById('signature-bg-modal');
+  console.log('[DEBUG openSignatureBgModal] Modal element:', modal);
+  console.log('[DEBUG openSignatureBgModal] Modal classes before:', modal.className);
+
   modal.classList.add('active');
+
+  console.log('[DEBUG openSignatureBgModal] Modal classes after:', modal.className);
+  console.log('[DEBUG openSignatureBgModal] Modal computed display:', window.getComputedStyle(modal).display);
+  console.log('[DEBUG openSignatureBgModal] Modal computed visibility:', window.getComputedStyle(modal).visibility);
+  console.log('[DEBUG openSignatureBgModal] Modal computed opacity:', window.getComputedStyle(modal).opacity);
+
   pushModalState('signature-bg-modal');
 
   // Show original image
@@ -1922,6 +1937,14 @@ function openSignatureBgModal() {
 
   // Initialize preview
   updateSignatureBgPreview();
+
+  console.log('[DEBUG openSignatureBgModal] Completed');
+
+  // Check again after a short delay to see if something is removing the active class
+  setTimeout(() => {
+    console.log('[DEBUG openSignatureBgModal] After 100ms - Modal classes:', modal.className);
+    console.log('[DEBUG openSignatureBgModal] After 100ms - Computed visibility:', window.getComputedStyle(modal).visibility);
+  }, 100);
 }
 
 function closeSignatureBgModal(skipHistoryBack = false) {
