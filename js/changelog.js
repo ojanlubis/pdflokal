@@ -9,23 +9,28 @@
   // Changelog data - Add new updates at the beginning of the array
   const changelogData = [
     {
-      title: "File PDF Kamu Jadi Lebih Kecil",
-      description: "PDF dengan tanda tangan sekarang 80% lebih kecil! Download lebih cepat, hemat ruang penyimpanan. File yang tidak diedit tetap ukuran aslinya.",
+      title: "Penambahan mode gelap (Dark Mode)",
+      description: "Sekarang PDFLokal punya mode gelap, lebih nyaman di mata buat kalian-kalian yang suka bekerja dalam kegelapan! 🦇🦇🦇 wkwk.",
+      date: "12 Januari 2026"
+    },    
+    {
+      title: "File PDF Kamu Jadi Lebih enteng!",
+      description: "Sebelumnya ukuran PDF setelah ditambah tanda tangan sangat besar. Kami implementasi auto-compression biar tetap enteng. Download lebih cepat, hemat ruang penyimpanan.",
       date: "12 Januari 2026"
     },
     {
       title: "Tanda Tangan Lebih Mudah Diatur",
-      description: "Tanda tangan otomatis terkunci setelah ditempatkan (anti geser tidak sengaja). Klik 2x untuk unlock. Bisa dihapus jika salah. Terima kasih <a href=\"https://github.com/hamdi1611\" target=\"_blank\">@hamdi1611</a>! 🙏",
+      description: "Tanda tangan yang terkunci bisa diunlock dan dipindahkan dengan klik dua kali. Bisa dihapus juga. Terima kasih <a href=\"https://github.com/hamdi1611\" target=\"_blank\">@hamdi1611</a>! 🙏",
       date: "11 Januari 2026"
     },
     {
       title: "Notifikasi Update di Pojok Layar",
-      description: "Sekarang kamu bisa lihat update terbaru lewat badge merah di pojok kanan. Kami terus bekerja untuk aplikasi yang kamu pakai gratis ini! 💪",
+      description: "Sekarang kamu bisa lihat update terbaru lewat badge merah di pojok kanan!",
       date: "11 Januari 2026"
     },
     {
-      title: "Tetap Berfungsi di Jaringan Terbatas",
-      description: "PDFLokal sekarang bisa diakses di kantor/sekolah yang blokir internet eksternal. Semua font sudah tersedia offline. Privasi kamu lebih terjaga.",
+      title: "Tetap Berfungsi di Restricted Networks",
+      description: "PDFLokal sekarang bisa diakses di kantor/sekolah yang besar firewallnya! Semua font sudah tersedia offline. Privasi kamu lebih terjaga.",
       date: "11 Januari 2026"
     },
     {
@@ -45,7 +50,7 @@
     },
     {
       title: "Edit Teks Langsung di Canvas",
-      description: "Sekarang kamu bisa resize kotak teks (tarik pojok), edit langsung (klik 2x), dan tekan Enter untuk langsung submit. Lebih cepat!",
+      description: "Sekarang kamu bisa resize teks, edit langsung (klik 2x), dan tekan Enter untuk langsung submit. Lebih cepat!",
       date: "4 Januari 2026"
     }
   ];

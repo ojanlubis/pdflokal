@@ -289,6 +289,11 @@ function initApp() {
     setTimeout(detectMobile, 100);
   });
 
+  // Initialize theme system
+  if (window.themeAPI) {
+    window.themeAPI.init();
+  }
+
   initDropZone();
   initToolCards();
   initFileInputs();
