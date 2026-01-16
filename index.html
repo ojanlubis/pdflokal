@@ -20,11 +20,25 @@
   <meta name="keywords"
     content="gabung pdf, merge pdf, kompres pdf, edit pdf, kompres gambar, convert pdf, gratis, indonesia, tanpa upload">
 
+  <!-- Canonical URL -->
+  <link rel="canonical" href="https://www.pdflokal.id/">
+
   <!-- Open Graph -->
   <meta property="og:title" content="PDFLokal - PDF Tools Gratis & Cepat">
   <meta property="og:description" content="Urus dokumen langsung di browser. Gratis, cepat, aman.">
-  <meta property="og:image" content="images/og-image.png">
+  <meta property="og:image" content="https://www.pdflokal.id/images/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:url" content="https://www.pdflokal.id/">
   <meta property="og:type" content="website">
+  <meta property="og:locale" content="id_ID">
+  <meta property="og:site_name" content="PDFLokal">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="PDFLokal - PDF Tools Gratis & Cepat">
+  <meta name="twitter:description" content="Urus dokumen langsung di browser. Gratis, cepat, aman.">
+  <meta name="twitter:image" content="https://www.pdflokal.id/images/og-image.png">
 
   <!-- Schema Markup -->
   <script type="application/ld+json">
@@ -33,7 +47,13 @@
   "@type": "WebApplication",
   "name": "PDFLokal",
   "url": "https://www.pdflokal.id/",
-  "logo": "https://www.pdflokal.id/logo.png", 
+  "logo": {
+    "@type": "ImageObject",
+    "url": "https://www.pdflokal.id/images/logo.png",
+    "width": 512,
+    "height": 512,
+    "caption": "PDFLokal Logo"
+  }, 
   "description": "Aplikasi PDF gratis buatan Indonesia. Kompres, edit, gabung, dan tanda tangan PDF langsung di browser. Aman, file tidak di-upload ke server (offline processing).",
   "applicationCategory": "UtilitiesApplication",
   "operatingSystem": "All modern web browsers (Chrome, Firefox, Safari, Edge)",
@@ -67,7 +87,7 @@
     "name": "PDFLokal Indonesia",
     "url": "https://www.pdflokal.id/"
   },
-  "screenshot": "https://www.pdflokal.id/screenshot-preview.jpg"
+  "screenshot": "https://www.pdflokal.id/images/screenshot-preview.jpg"
 }
 </script>
 
@@ -82,8 +102,8 @@
   <link rel="stylesheet" href="style.css?v=5">
 
   <!-- Favicon -->
-  <link rel="icon" type="image/svg+xml"
-    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23dc2626'/><text x='50' y='68' font-size='50' text-anchor='middle' fill='white' font-family='system-ui' font-weight='bold'>P</text></svg>">
+  <link rel="icon" href="/images/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/images/apple-touch-icon.png">
 
   <!-- Vercel Web Analytics -->
   <script>
