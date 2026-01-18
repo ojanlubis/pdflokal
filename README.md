@@ -9,6 +9,8 @@ PDFLokal adalah tool PDF gratis untuk pengguna Indonesia. Semua proses berjalan 
 ## Update Terbaru
 
 **Januari 2026:**
+- 📴 **Offline mode!** PDFLokal sekarang bisa dipakai tanpa internet (kecuali fitur Proteksi PDF)
+- 🔒 Self-hosted libraries - semua library utama tersimpan lokal, tidak perlu CDN
 - ✨ Tanda tangan bisa di-unlock dengan double-click untuk diedit
 - 🗑️ Tombol hapus signature dengan sekali klik
 - 🎨 Changelog notification system yang smooth dan non-intrusive
@@ -69,12 +71,14 @@ python -m http.server 8000
 
 ### Tech Stack
 - **Vanilla HTML/CSS/JS** - No build step, no framework, modular IIFE pattern
-- **[pdf-lib](https://pdf-lib.js.org/)** - PDF manipulation
-- **[PDF.js](https://mozilla.github.io/pdf.js/)** - PDF rendering & thumbnails
-- **[Signature Pad](https://github.com/szimek/signature_pad)** - Tanda tangan digital
-- **[pdf-encrypt-lite](https://github.com/nicholasohjj/pdf-encrypt-lite)** - PDF password encryption
+- **[pdf-lib](https://pdf-lib.js.org/)** - PDF manipulation (self-hosted)
+- **[PDF.js](https://mozilla.github.io/pdf.js/)** - PDF rendering & thumbnails (self-hosted)
+- **[Signature Pad](https://github.com/szimek/signature_pad)** - Tanda tangan digital (self-hosted)
+- **[fontkit](https://github.com/foliojs/fontkit)** - Custom font embedding (self-hosted)
+- **[pdf-encrypt-lite](https://github.com/nicholasohjj/pdf-encrypt-lite)** - PDF password encryption (CDN - requires internet)
 - **Canvas API** - Image processing
-- **Self-hosted fonts** - Montserrat, Carlito, Plus Jakarta Sans (no external CDN, works offline & in restricted networks)
+- **Self-hosted fonts** - Montserrat, Carlito, Plus Jakarta Sans
+- **Self-hosted libraries** - 5/6 core libraries stored locally (2.6 MB) for offline support
 
 ### Project Structure
 ```
@@ -87,7 +91,13 @@ pdflokal/
 │   ├── app.js            # Core app logic & state management
 │   ├── pdf-tools.js      # PDF tools (text, signature, whiteout modals)
 │   ├── unified-editor.js # Unified PDF editor workspace
-│   └── image-tools.js    # Image processing tools
+│   ├── image-tools.js    # Image processing tools
+│   └── vendor/           # Self-hosted libraries (2.6 MB)
+│       ├── pdf-lib.min.js
+│       ├── fontkit.umd.min.js
+│       ├── pdf.min.js
+│       ├── pdf.worker.min.js
+│       └── signature_pad.umd.min.js
 ├── fonts/          # Self-hosted fonts (268KB total)
 │   ├── montserrat-*.woff2
 │   ├── carlito-*.woff2

@@ -9,6 +9,11 @@
   // Changelog data - Add new updates at the beginning of the array
   const changelogData = [
     {
+      title: "Bisa Dipakai Tanpa Internet! 📴",
+      description: "PDFLokal sekarang bisa dipakai offline! Edit PDF, gabung, pisah, tanda tangan - semua bisa tanpa koneksi internet. Cocok buat kamu yang sering di tempat dengan sinyal lemah atau Wi-Fi kantor yang suka putus-putus. Catatan: fitur Proteksi PDF masih butuh internet.",
+      date: "18 Januari 2026"
+    },
+    {
       title: "Penambahan mode gelap (Dark Mode)",
       description: "Sekarang PDFLokal punya mode gelap, lebih nyaman di mata buat kalian-kalian yang suka bekerja dalam kegelapan! 🦇🦇🦇 wkwk.",
       date: "12 Januari 2026"
