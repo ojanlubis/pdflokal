@@ -1562,10 +1562,13 @@
   <!-- Libraries (Self-hosted for offline support and firewall compatibility) -->
   <script src="js/vendor/pdf-lib.min.js"></script>
   <script src="js/vendor/fontkit.umd.min.js"></script>
+  <!-- PDF.js worker loaded FIRST so it's available in memory for offline fake worker fallback -->
+  <script src="js/vendor/pdf.worker.min.js"></script>
   <script src="js/vendor/pdf.min.js"></script>
   <script>
-    // PDF.js worker - self-hosted for guaranteed offline functionality
-    pdfjsLib.GlobalWorkerOptions.workerSrc = './js/vendor/pdf.worker.min.js';
+    // Disable Web Worker - use fake worker mode (worker code already loaded above)
+    // This ensures offline functionality without needing to fetch the worker dynamically
+    pdfjsLib.GlobalWorkerOptions.workerSrc = '';
   </script>
   <script src="js/vendor/signature_pad.umd.min.js"></script>
 
