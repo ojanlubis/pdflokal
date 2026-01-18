@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- CRITICAL: Prevent flash of wrong theme -->
+  <script>
+    (function() {
+      const theme = localStorage.getItem('pdflokal_theme') || 'light';
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
+
+  <title>Kebijakan Privasi - PDFLokal</title>
+  <meta name="description" content="Kebijakan privasi PDFLokal. Semua file diproses 100% di browser kamu, tidak ada yang diupload ke server.">
+
+  <!-- Fonts (self-hosted in style.css via @font-face) -->
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="style.css">
+
+  <!-- Favicon -->
+  <link rel="icon" href="/images/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/images/apple-touch-icon.png">
+
+  <!-- Vercel Web Analytics -->
+  <script>
+    window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+  </script>
+  <script defer src="/_vercel/insights/script.js"></script>
+
+  <style>
+    .privacy-page {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .privacy-intro {
+      font-size: 1.0625rem;
+      line-height: 1.7;
+      color: var(--text-secondary);
+      margin-bottom: var(--space-2xl);
+    }
+
+    .privacy-section {
+      background: var(--bg-secondary);
+      padding: var(--space-xl);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-md);
+      margin-bottom: var(--space-xl);
+    }
+
+    .privacy-section h2 {
+      margin-bottom: var(--space-lg);
+      font-size: 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+
+    .privacy-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .privacy-list li {
+      padding: var(--space-sm) 0;
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-sm);
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    .privacy-list li::before {
+      content: "✓";
+      color: var(--accent-success, #22c55e);
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+
+    .privacy-highlight {
+      background: var(--bg-tertiary);
+      padding: var(--space-lg);
+      border-radius: var(--radius-lg);
+      border-left: 4px solid var(--accent-primary);
+      margin: var(--space-lg) 0;
+    }
+
+    .privacy-highlight p {
+      margin: 0;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    .storage-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: var(--space-md);
+    }
+
+    .storage-table th,
+    .storage-table td {
+      padding: var(--space-sm) var(--space-md);
+      text-align: left;
+      border-bottom: 1px solid var(--border-light);
+    }
+
+    .storage-table th {
+      font-weight: 600;
+      color: var(--text-primary);
+      font-size: 0.875rem;
+    }
+
+    .storage-table td {
+      color: var(--text-secondary);
+      font-size: 0.875rem;
+    }
+
+    .storage-table code {
+      background: var(--bg-tertiary);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.8125rem;
+    }
+
+    @media (max-width: 480px) {
+      .privacy-section {
+        padding: var(--space-lg);
+      }
+
+      .storage-table th,
+      .storage-table td {
+        padding: var(--space-xs) var(--space-sm);
+        font-size: 0.8125rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <header class="header">
+    <div class="container header-inner">
+      <a href="index.html" class="logo">
+        <div class="logo-icon">P</div>
+        <span>PDFLokal</span>
+      </a>
+      <div class="header-actions">
+        <label class="theme-toggle" for="theme-toggle-checkbox" aria-label="Ganti tema" title="Ganti tema">
+          <input type="checkbox" id="theme-toggle-checkbox" class="theme-toggle-checkbox" />
+          <div class="theme-toggle-slider">
+            <svg class="theme-toggle-icon theme-toggle-icon-sun" width="14" height="14" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="5" />
+              <line x1="12" y1="1" x2="12" y2="3" />
+              <line x1="12" y1="21" x2="12" y2="23" />
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+              <line x1="1" y1="12" x2="3" y2="12" />
+              <line x1="21" y1="12" x2="23" y2="12" />
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+            </svg>
+            <svg class="theme-toggle-icon theme-toggle-icon-moon" width="14" height="14" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+            </svg>
+            <div class="theme-toggle-thumb"></div>
+          </div>
+        </label>
+        <a href="https://github.com/ojanlubis/pdflokal" target="_blank" class="btn btn-ghost">
+          <svg width="30" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path
+              d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22" />
+          </svg>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="container">
+    <div class="privacy-page">
+      <h1>Kebijakan Privasi</h1>
+
+      <p class="privacy-intro">
+        PDFLokal dibangun dengan satu prinsip utama: <strong>privasi kamu adalah prioritas</strong>.
+        Semua proses edit PDF dan gambar berjalan 100% di browser kamu. Tidak ada file yang diupload ke server manapun.
+      </p>
+
+      <!-- Prinsip Utama -->
+      <div class="privacy-section">
+        <h2>Prinsip Utama Kami</h2>
+        <ul class="privacy-list">
+          <li><strong>100% Client-Side Processing</strong> — Semua proses berjalan di browser kamu, bukan di server kami</li>
+          <li><strong>Tidak Ada Upload</strong> — File PDF dan gambar kamu tidak pernah dikirim ke server manapun</li>
+          <li><strong>Tidak Ada Penyimpanan</strong> — Kami tidak menyimpan file kamu di manapun, setelah tab ditutup file hilang</li>
+          <li><strong>Open Source</strong> — Kode sumber terbuka, siapa saja bisa verifikasi klaim privasi kami</li>
+        </ul>
+
+        <div class="privacy-highlight">
+          <p>
+            <strong>Cara mudah membuktikan:</strong> Coba matikan koneksi internet kamu, lalu gunakan PDFLokal.
+            Semua fitur tetap berjalan normal karena tidak ada data yang dikirim ke server.
+          </p>
+        </div>
+      </div>
+
+      <!-- Data yang Tidak Dikumpulkan -->
+      <div class="privacy-section">
+        <h2>Data yang TIDAK Kami Kumpulkan</h2>
+        <ul class="privacy-list">
+          <li>File PDF atau gambar yang kamu proses</li>
+          <li>Isi dokumen, teks, atau tanda tangan</li>
+          <li>Informasi pribadi (nama, email, dll)</li>
+          <li>Data lokasi atau GPS</li>
+          <li>Riwayat penggunaan atau aktivitas</li>
+        </ul>
+      </div>
+
+      <!-- Analytics -->
+      <div class="privacy-section">
+        <h2>Tentang Analytics</h2>
+        <p style="color: var(--text-secondary); line-height: 1.6; margin-bottom: var(--space-md);">
+          Kami menggunakan Vercel Web Analytics untuk memahami berapa banyak orang yang menggunakan PDFLokal.
+          Analytics ini bersifat:
+        </p>
+        <ul class="privacy-list">
+          <li><strong>Anonim</strong> — Tidak ada data pribadi yang dikumpulkan</li>
+          <li><strong>Agregat</strong> — Hanya statistik umum seperti jumlah kunjungan</li>
+          <li><strong>Tanpa Cookie Tracking</strong> — Tidak menggunakan cookie untuk melacak kamu</li>
+          <li><strong>Privacy-Focused</strong> — Tidak dijual ke pihak ketiga</li>
+        </ul>
+      </div>
+
+      <!-- Local Storage -->
+      <div class="privacy-section">
+        <h2>Penyimpanan Lokal (Local Storage)</h2>
+        <p style="color: var(--text-secondary); line-height: 1.6; margin-bottom: var(--space-md);">
+          PDFLokal menyimpan beberapa preferensi di browser kamu menggunakan Local Storage.
+          Data ini <strong>hanya tersimpan di perangkat kamu</strong> dan tidak pernah dikirim ke server.
+        </p>
+        <table class="storage-table">
+          <thead>
+            <tr>
+              <th>Key</th>
+              <th>Fungsi</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>pdflokal_theme</code></td>
+              <td>Menyimpan preferensi tema (light/dark)</td>
+            </tr>
+            <tr>
+              <td><code>pdflokal_changelog_last_closed</code></td>
+              <td>Mengingat changelog terakhir yang sudah dibaca</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Keamanan -->
+      <div class="privacy-section">
+        <h2>Keamanan</h2>
+        <ul class="privacy-list">
+          <li><strong>HTTPS</strong> — Koneksi terenkripsi untuk semua halaman</li>
+          <li><strong>Security Headers</strong> — CSP, X-Frame-Options, dan perlindungan lainnya</li>
+          <li><strong>No External Data Transmission</strong> — File kamu tidak pernah meninggalkan browser</li>
+          <li><strong>Regular Updates</strong> — Library dan dependensi selalu diupdate</li>
+        </ul>
+      </div>
+
+      <!-- Kontak -->
+      <div class="privacy-section">
+        <h2>Pertanyaan?</h2>
+        <p style="color: var(--text-secondary); line-height: 1.6;">
+          Kalau kamu punya pertanyaan tentang privasi atau keamanan PDFLokal, silakan buka issue di
+          <a href="https://github.com/ojanlubis/pdflokal/issues" target="_blank">GitHub repository</a> kami.
+          <br><br>
+          Kamu juga bisa langsung cek source code untuk memverifikasi semua klaim privasi di atas.
+        </p>
+      </div>
+
+      <!-- Back Button -->
+      <div style="text-align: center; padding: var(--space-2xl) 0;">
+        <p style="font-size: 1rem; color: var(--text-tertiary); margin-bottom: var(--space-md);">
+          Terakhir diupdate: 18 Januari 2026
+        </p>
+        <a href="index.html" class="btn btn-primary btn-lg">
+          Balik ke Tools
+        </a>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container">
+      <p>100% gratis • Open source • Made with ❤️ in Indonesia</p>
+      <p class="mt-sm"><a href="https://github.com/ojanlubis/pdflokal" target="_blank">GitHub</a> • <a
+          href="privasi.html">Privasi</a> • <a href="dukung.html">Dukung Kami</a></p>
+    </div>
+  </footer>
+
+  <!-- Theme management -->
+  <script src="js/theme.js"></script>
+
+</body>
+</html>

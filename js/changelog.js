@@ -9,6 +9,11 @@
   // Changelog data - Add new updates at the beginning of the array
   const changelogData = [
     {
+      title: "Keamanan Ditingkatkan! 🔒",
+      description: "PDFLokal sekarang pakai security headers untuk perlindungan ekstra. Plus, ada halaman <a href=\"privasi.html\">Kebijakan Privasi</a> baru biar kamu lebih yakin data kamu aman. Intinya: file kamu tetap 100% di perangkat kamu, nggak kemana-mana!",
+      date: "18 Januari 2026"
+    },
+    {
       title: "Bisa Dipakai Tanpa Internet! 📴",
       description: "PDFLokal sekarang bisa dipakai offline! Edit PDF, gabung, pisah, tanda tangan - semua bisa tanpa koneksi internet. Cocok buat kamu yang sering di tempat dengan sinyal lemah atau Wi-Fi kantor yang suka putus-putus. Catatan: fitur Proteksi PDF masih butuh internet.",
       date: "18 Januari 2026"

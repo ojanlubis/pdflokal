@@ -1,5 +1,10 @@
 # PDFLokal
 
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL%203.0-blue.svg)](LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/ojanlubis/pdflokal)](https://github.com/ojanlubis/pdflokal/stargazers)
+[![Client-Side Only](https://img.shields.io/badge/Privacy-100%25%20Client--Side-brightgreen.svg)](https://www.pdflokal.id/privasi.html)
+[![Security Headers](https://img.shields.io/badge/Security-Headers%20Enabled-green.svg)](https://www.pdflokal.id/.well-known/security.txt)
+
 > **Urus dokumen langsung di browser.** Cepat, gratis, file tidak pernah diupload.
 
 PDFLokal adalah tool PDF gratis untuk pengguna Indonesia. Semua proses berjalan di browser - file tidak pernah meninggalkan perangkat Anda.
@@ -9,6 +14,8 @@ PDFLokal adalah tool PDF gratis untuk pengguna Indonesia. Semua proses berjalan 
 ## Update Terbaru
 
 **Januari 2026:**
+- 🔒 **Security headers** - CSP, X-Frame-Options, dan perlindungan keamanan lainnya
+- 📜 **Halaman privasi** - Kebijakan privasi lengkap dalam Bahasa Indonesia
 - 📴 **Offline mode!** PDFLokal sekarang bisa dipakai tanpa internet (kecuali fitur Proteksi PDF)
 - 🔒 Self-hosted libraries - semua library utama tersimpan lokal, tidak perlu CDN
 - ✨ Tanda tangan bisa di-unlock dengan double-click untuk diedit

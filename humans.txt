@@ -1,0 +1,20 @@
+/* TEAM */
+Creator: PDFLokal Indonesia
+GitHub: github.com/ojanlubis/pdflokal
+Location: Indonesia
+
+/* CONTRIBUTORS */
+@hamdi1611 - Signature UX improvements
+
+/* THANKS */
+pdf-lib by Andrew Dillon
+PDF.js by Mozilla
+Signature Pad by Szymon Nowak
+fontkit by Foliojs
+
+/* SITE */
+Last update: 2026-01-18
+Language: Indonesian (Bahasa Indonesia)
+Standards: HTML5, CSS3, ES6+
+Components: pdf-lib, PDF.js, Signature Pad, fontkit
+Software: Vanilla JavaScript (no framework, no build step)

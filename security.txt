@@ -1,0 +1,13 @@
+# PDFLokal Security Contact
+# https://securitytxt.org/
+
+Contact: https://github.com/ojanlubis/pdflokal/security/advisories/new
+Expires: 2027-01-18T00:00:00.000Z
+Preferred-Languages: id, en
+Canonical: https://www.pdflokal.id/.well-known/security.txt
+Policy: https://github.com/ojanlubis/pdflokal/security/policy
+
+# About PDFLokal Security
+# - All file processing happens 100% client-side
+# - No files are ever uploaded to our servers
+# - Source code is open source: https://github.com/ojanlubis/pdflokal
