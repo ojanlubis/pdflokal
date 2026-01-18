@@ -1559,16 +1559,17 @@
     </div>
   </footer>
 
-  <!-- Libraries -->
-  <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
-  <script src="https://unpkg.com/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <!-- Libraries (Self-hosted for offline support and firewall compatibility) -->
+  <script src="js/vendor/pdf-lib.min.js"></script>
+  <script src="js/vendor/fontkit.umd.min.js"></script>
+  <script src="js/vendor/pdf.min.js"></script>
   <script>
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    // PDF.js worker - self-hosted for guaranteed offline functionality
+    pdfjsLib.GlobalWorkerOptions.workerSrc = './js/vendor/pdf.worker.min.js';
   </script>
-  <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.7/dist/signature_pad.umd.min.js"></script>
+  <script src="js/vendor/signature_pad.umd.min.js"></script>
 
-  <!-- PDF Encryption Library (ES Module) -->
+  <!-- PDF Encryption Library (ES Module - kept on CDN due to module dependency complexity) -->
   <script type="module">
     import { encryptPDF } from 'https://esm.sh/@pdfsmaller/pdf-encrypt-lite@1.0.1';
     // Make it globally available for the main app
