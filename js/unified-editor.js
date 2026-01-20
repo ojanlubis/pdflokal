@@ -553,6 +553,12 @@ function ueSetupCanvasEvents() {
   let hasMovedOrResized = false;  // Track if actual movement happened (for undo)
   let preChangeState = null;  // Store annotations state before drag/resize
 
+  // Double-tap detection state
+  let touchLastTap = 0;
+  let touchLastCoords = null;
+  const DOUBLE_TAP_DELAY = 300; // ms
+  const DOUBLE_TAP_DISTANCE = 30; // pixels
+
   function getCoords(e) {
     const rect = canvas.getBoundingClientRect();
     const x = (e.clientX - rect.left) * (canvas.width / canvas.clientWidth / ueState.devicePixelRatio);
@@ -612,7 +618,29 @@ function ueSetupCanvasEvents() {
 
   canvas.addEventListener('touchstart', (e) => {
     e.preventDefault();
-    handleDown(getCoords(e.touches[0]));
+    const coords = getCoords(e.touches[0]);
+
+    // Double-tap detection
+    const now = Date.now();
+    const timeDiff = now - touchLastTap;
+
+    if (timeDiff < DOUBLE_TAP_DELAY && touchLastCoords) {
+      const distance = Math.sqrt(
+        Math.pow(coords.x - touchLastCoords.x, 2) +
+        Math.pow(coords.y - touchLastCoords.y, 2)
+      );
+
+      if (distance < DOUBLE_TAP_DISTANCE) {
+        // Double-tap detected - handle as double-click
+        handleDoubleClick(coords);
+        return;
+      }
+    }
+
+    touchLastTap = now;
+    touchLastCoords = coords;
+
+    handleDown(coords);
   }, { passive: false });
   canvas.addEventListener('touchmove', (e) => {
     e.preventDefault();
@@ -1338,10 +1366,10 @@ function ueDrawSelectionHandles(ctx, x, y, width, height) {
 
   const handleSize = 8;
   ctx.fillStyle = '#3B82F6';
-  ctx.fillRect(x - handleSize/2 - 2, y - handleSize/2 - 2, handleSize, handleSize);
-  ctx.fillRect(x + width - handleSize/2 + 2, y - handleSize/2 - 2, handleSize, handleSize);
-  ctx.fillRect(x - handleSize/2 - 2, y + height - handleSize/2 + 2, handleSize, handleSize);
-  ctx.fillRect(x + width - handleSize/2 + 2, y + height - handleSize/2 + 2, handleSize, handleSize);
+  ctx.fillRect(x - handleSize / 2 - 2, y - handleSize / 2 - 2, handleSize, handleSize);
+  ctx.fillRect(x + width - handleSize / 2 + 2, y - handleSize / 2 - 2, handleSize, handleSize);
+  ctx.fillRect(x - handleSize / 2 - 2, y + height - handleSize / 2 + 2, handleSize, handleSize);
+  ctx.fillRect(x + width - handleSize / 2 + 2, y + height - handleSize / 2 + 2, handleSize, handleSize);
 }
 
 // Calculate accurate bounds for text annotation (handles multi-line)
@@ -1617,7 +1645,7 @@ async function applyEditorProtect() {
       ownerPassword: password,
     });
 
-    downloadBlob(new Blob([protectedBytes], { type: 'application/pdf' }), getDownloadFilename({originalName: ueState.sourceFiles[0]?.name, extension: 'pdf'}));
+    downloadBlob(new Blob([protectedBytes], { type: 'application/pdf' }), getDownloadFilename({ originalName: ueState.sourceFiles[0]?.name, extension: 'pdf' }));
 
     closeEditorProtectModal();
     showToast('PDF berhasil dikunci!', 'success');
@@ -1769,7 +1797,7 @@ async function ueDownload() {
       console.log('[PDF Download] Unmodified PDF detected, downloading original bytes');
       downloadBlob(
         new Blob([sourceFile.bytes], { type: 'application/pdf' }),
-        getDownloadFilename({originalName: sourceFile.name, extension: 'pdf'})
+        getDownloadFilename({ originalName: sourceFile.name, extension: 'pdf' })
       );
       showToast('PDF berhasil diunduh!', 'success');
       return;
@@ -1970,7 +1998,7 @@ async function ueDownload() {
       useObjectStreams: true,  // Enable object streams for better compression
       addDefaultPage: false     // Don't add blank page if empty
     });
-    downloadBlob(new Blob([pdfBytes], { type: 'application/pdf' }), getDownloadFilename({originalName: ueState.sourceFiles[0]?.name, extension: 'pdf'}));
+    downloadBlob(new Blob([pdfBytes], { type: 'application/pdf' }), getDownloadFilename({ originalName: ueState.sourceFiles[0]?.name, extension: 'pdf' }));
     showToast('PDF berhasil diunduh!', 'success');
 
   } catch (error) {
@@ -2704,7 +2732,7 @@ async function uePmExtractSelected() {
     }
 
     const bytes = await newDoc.save();
-    downloadBlob(new Blob([bytes], { type: 'application/pdf' }), getDownloadFilename({originalName: ueState.sourceFiles[0]?.name, extension: 'pdf'}));
+    downloadBlob(new Blob([bytes], { type: 'application/pdf' }), getDownloadFilename({ originalName: ueState.sourceFiles[0]?.name, extension: 'pdf' }));
 
     showToast(`${sortedIndices.length} halaman berhasil di-split!`, 'success');
 
