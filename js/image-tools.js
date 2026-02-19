@@ -13,8 +13,10 @@
  *   - showToast, formatFileSize, downloadBlob, getDownloadFilename,
  *     loadImage, escapeHtml from lib/utils.js
  *
+ * IMPORTS (from other modules):
+ *   - enableDragReorder from pdf-tools/drag-reorder.js
+ *
  * EXTERNAL GLOBALS (from non-module scripts):
- *   - enableDragReorder() from pdf-tools.js (via window)
  *   - PDFLib from vendor/pdf-lib.min.js (via window)
  *
  * ============================================================
@@ -29,6 +31,7 @@ import {
   loadImage,
   escapeHtml
 } from './lib/utils.js';
+import { enableDragReorder } from './pdf-tools/drag-reorder.js';
 
 // ============================================================
 // COMPRESS IMAGE
@@ -305,8 +308,7 @@ async function addImagesToPDF(files) {
 
   updateImgPdfAddButton();
   document.getElementById('img-pdf-btn').disabled = state.imgToPdfFiles.length === 0;
-  // enableDragReorder is from pdf-tools.js (still a global script)
-  window.enableDragReorder('img-pdf-file-list', state.imgToPdfFiles);
+  enableDragReorder('img-pdf-file-list', state.imgToPdfFiles);
 }
 
 function createImageFileItem(name, size, thumbnail, index) {
@@ -389,7 +391,7 @@ function refreshImgPdfList() {
 
   updateImgPdfAddButton();
   document.getElementById('img-pdf-btn').disabled = state.imgToPdfFiles.length === 0;
-  window.enableDragReorder('img-pdf-file-list', state.imgToPdfFiles);
+  enableDragReorder('img-pdf-file-list', state.imgToPdfFiles);
 }
 
 async function imagesToPDF() {

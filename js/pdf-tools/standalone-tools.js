@@ -1,98 +1,72 @@
 /*
- * ============================================================
- * PDFLokal - pdf-tools.js
- * PDF Tool Modals & Standalone PDF Operations
- * ============================================================
+ * PDFLokal - pdf-tools/standalone-tools.js (ES Module)
+ * Standalone PDF workspace tools + legacy editor
  *
- * PURPOSE:
- *   Shared modal logic (text input, signature capture/upload, watermark,
- *   page numbers) used by the unified editor. Also contains standalone
- *   PDF tools (merge list, split, rotate, compress, protect, PDF-to-image)
- *   and the drag-reorder utility.
- *
- * GLOBAL STATE USED:
- *   - state {}   (from app.js) — reads/writes state.editAnnotations,
- *     state.signaturePad, state.signatureImage, state.currentEditPage, etc.
- *   - ueState {} (from unified-editor.js) — reads/writes ueState.pendingSignature,
- *     ueState.annotations, ueState.pages, ueState.pageScales, etc.
- *
- * FUNCTIONS EXPORTED (called by other files):
- *   openSignatureModal(), openTextModal(), getTextModalSettings(),
- *   closeTextModal(), closeSignatureModal(), loadSignatureImage(),
- *   optimizeSignatureImage(), enableDragReorder(),
- *   openEditorWatermarkModal(), closeEditorWatermarkModal(),
- *   applyEditorWatermark(), openEditorPageNumModal(),
- *   closeEditorPageNumModal(), applyEditorPageNumbers()
- *
- * FUNCTIONS IMPORTED (defined in other files):
- *   From app.js:
- *     showToast(), formatFileSize(), downloadBlob(), getDownloadFilename(),
- *     escapeHtml(), loadImage(), pushModalState(), navHistory, state,
- *     mobileState, sleep()
- *   From unified-editor.js:
- *     ueSetTool(), ueUpdateStatus(), ueSaveEditUndoState(),
- *     ueRedrawAnnotations(), ueState, ueConfirmText()
- *
- * LOAD ORDER: Must load AFTER app.js, BEFORE unified-editor.js
- * ============================================================
+ * Contains: Merge, Split, Rotate, Pages/Reorder, PDF-to-Image,
+ *           Compress, Protect, Legacy Editor (initEditMode through saveEditedPDF)
  */
+
+import { state } from '../lib/state.js';
+import {
+  showToast,
+  formatFileSize,
+  downloadBlob,
+  getDownloadFilename,
+  escapeHtml,
+  sleep
+} from '../lib/utils.js';
+import { enableDragReorder } from './drag-reorder.js';
+import { openTextModal } from './text-modal.js';
+import { openSignatureModal } from './signature-modal.js';
 
 // ============================================================
 // STANDALONE MERGE PDF
 // ============================================================
-// Used by the merge-pdf workspace (standalone list-based merge).
-// The homepage Merge/Split cards bypass this and use the Unified
-// Editor's Gabungkan modal instead (see app.js handleEditorCardWithFilePicker).
 
-async function addMergeFiles(files) {
+export async function addMergeFiles(files) {
   const fileList = document.getElementById('merge-file-list');
-  
-  // Clear placeholder
+
   if (state.mergeFiles.length === 0) {
     fileList.innerHTML = '';
   }
-  
+
   for (const file of files) {
     if (file.type !== 'application/pdf') {
       showToast(`${file.name} bukan file PDF`, 'error');
       continue;
     }
-    
+
     try {
       const arrayBuffer = await file.arrayBuffer();
       const bytes = new Uint8Array(arrayBuffer);
       const pdf = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
       const page = await pdf.getPage(1);
-      
-      // Render thumbnail
+
       const scale = 0.3;
       const viewport = page.getViewport({ scale });
       const canvas = document.createElement('canvas');
       canvas.width = viewport.width;
       canvas.height = viewport.height;
       const ctx = canvas.getContext('2d');
-      
+
       await page.render({ canvasContext: ctx, viewport }).promise;
-      
+
       const fileItem = createFileItem(file.name, formatFileSize(file.size), canvas.toDataURL(), state.mergeFiles.length);
       fileList.appendChild(fileItem);
-      
+
       state.mergeFiles.push({
         name: file.name,
         bytes: bytes
       });
-      
+
     } catch (error) {
       console.error('Error processing file:', error);
       showToast(`Gagal memproses ${file.name}`, 'error');
     }
   }
-  
-  // Add the "add file" button
+
   updateMergeAddButton();
   document.getElementById('merge-btn').disabled = state.mergeFiles.length < 2;
-  
-  // Enable drag to reorder
   enableDragReorder('merge-file-list', state.mergeFiles);
 }
 
@@ -102,7 +76,6 @@ function createFileItem(name, size, thumbnail, index) {
   div.dataset.index = index;
   div.draggable = true;
 
-  // Escape HTML to prevent XSS
   const safeName = escapeHtml(name);
   const safeSize = escapeHtml(size);
 
@@ -114,10 +87,9 @@ function createFileItem(name, size, thumbnail, index) {
       <div class="file-item-name" title="${safeName}">${safeName}</div>
       <div class="file-item-size">${safeSize}</div>
     </div>
-    <button class="file-item-remove">×</button>
+    <button class="file-item-remove">\u00d7</button>
   `;
 
-  // Add click handler safely (avoid inline onclick with index)
   div.querySelector('.file-item-remove').addEventListener('click', () => removeMergeFile(index));
 
   return div;
@@ -127,7 +99,7 @@ function updateMergeAddButton() {
   const fileList = document.getElementById('merge-file-list');
   const existing = fileList.querySelector('.add-file-btn');
   if (existing) existing.remove();
-  
+
   const addBtn = document.createElement('button');
   addBtn.className = 'add-file-btn';
   addBtn.innerHTML = `
@@ -145,7 +117,7 @@ function removeMergeFile(index) {
   refreshMergeList();
 }
 
-async function refreshMergeList() {
+export async function refreshMergeList() {
   const fileList = document.getElementById('merge-file-list');
   fileList.innerHTML = '';
 
@@ -155,7 +127,6 @@ async function refreshMergeList() {
     return;
   }
 
-  // Use for...of to maintain order and await properly
   for (let i = 0; i < state.mergeFiles.length; i++) {
     const file = state.mergeFiles[i];
     try {
@@ -172,9 +143,9 @@ async function refreshMergeList() {
       await page.render({ canvasContext: ctx, viewport }).promise;
 
       const fileItem = createFileItem(file.name, '', canvas.toDataURL(), i);
-      const addBtn = fileList.querySelector('.add-file-btn');
-      if (addBtn) {
-        fileList.insertBefore(fileItem, addBtn);
+      const addBtnEl = fileList.querySelector('.add-file-btn');
+      if (addBtnEl) {
+        fileList.insertBefore(fileItem, addBtnEl);
       } else {
         fileList.appendChild(fileItem);
       }
@@ -188,34 +159,34 @@ async function refreshMergeList() {
   enableDragReorder('merge-file-list', state.mergeFiles);
 }
 
-async function mergePDFs() {
+export async function mergePDFs() {
   if (state.mergeFiles.length < 2) return;
-  
+
   const progress = document.getElementById('merge-progress');
   const progressFill = progress.querySelector('.progress-fill');
   const progressText = progress.querySelector('.progress-text');
-  
+
   progress.classList.remove('hidden');
   document.getElementById('merge-btn').disabled = true;
-  
+
   try {
     const mergedPdf = await PDFLib.PDFDocument.create();
-    
+
     for (let i = 0; i < state.mergeFiles.length; i++) {
       progressText.textContent = `Memproses file ${i + 1} dari ${state.mergeFiles.length}...`;
       progressFill.style.width = `${((i + 1) / state.mergeFiles.length) * 100}%`;
-      
+
       const pdf = await PDFLib.PDFDocument.load(state.mergeFiles[i].bytes);
       const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
       pages.forEach(page => mergedPdf.addPage(page));
     }
-    
+
     progressText.textContent = 'Menyimpan...';
     const mergedBytes = await mergedPdf.save();
     downloadBlob(new Blob([mergedBytes], { type: 'application/pdf' }), getDownloadFilename({originalName: state.mergeFiles[0]?.name, extension: 'pdf'}));
-    
+
     showToast('PDF berhasil digabung!', 'success');
-    
+
   } catch (error) {
     console.error('Error merging PDFs:', error);
     showToast('Gagal menggabung PDF', 'error');
@@ -229,54 +200,53 @@ async function mergePDFs() {
 // SPLIT PDF
 // ============================================================
 
-async function renderSplitPages() {
+export async function renderSplitPages() {
   const container = document.getElementById('split-pages');
   container.innerHTML = '<div class="spinner"></div>';
-  
+
   state.splitPages = [];
   const numPages = state.currentPDF.numPages;
-  
+
   container.innerHTML = '';
-  
+
   for (let i = 1; i <= numPages; i++) {
     const page = await state.currentPDF.getPage(i);
     const scale = 0.5;
     const viewport = page.getViewport({ scale });
-    
+
     const canvas = document.createElement('canvas');
     canvas.width = viewport.width;
     canvas.height = viewport.height;
     const ctx = canvas.getContext('2d');
-    
+
     await page.render({ canvasContext: ctx, viewport }).promise;
-    
+
     const pageItem = document.createElement('div');
     pageItem.className = 'page-item';
     pageItem.dataset.page = i;
     pageItem.onclick = () => togglePageSelection(pageItem, i, 'split');
-    
+
     pageItem.innerHTML = `
       <canvas></canvas>
       <div class="page-item-number">${i}</div>
-      <div class="page-item-checkbox">✓</div>
+      <div class="page-item-checkbox">\u2713</div>
     `;
-    
+
     pageItem.querySelector('canvas').replaceWith(canvas);
     container.appendChild(pageItem);
-    
+
     state.splitPages.push({ page: i, selected: false });
   }
-  
-  // Setup split mode change
+
   document.getElementById('split-mode').onchange = (e) => {
     const rangeInput = document.getElementById('split-range-input');
     rangeInput.style.display = e.target.value === 'range' ? 'flex' : 'none';
   };
 }
 
-function togglePageSelection(element, pageNum, tool) {
+export function togglePageSelection(element, pageNum, tool) {
   element.classList.toggle('selected');
-  
+
   if (tool === 'split') {
     const page = state.splitPages.find(p => p.page === pageNum);
     if (page) page.selected = !page.selected;
@@ -286,7 +256,7 @@ function togglePageSelection(element, pageNum, tool) {
   }
 }
 
-function selectAllPages() {
+export function selectAllPages() {
   const container = document.getElementById('split-pages');
   container.querySelectorAll('.page-item').forEach(item => {
     item.classList.add('selected');
@@ -294,7 +264,7 @@ function selectAllPages() {
   state.splitPages.forEach(p => p.selected = true);
 }
 
-function deselectAllPages() {
+export function deselectAllPages() {
   const container = document.getElementById('split-pages');
   container.querySelectorAll('.page-item').forEach(item => {
     item.classList.remove('selected');
@@ -302,14 +272,13 @@ function deselectAllPages() {
   state.splitPages.forEach(p => p.selected = false);
 }
 
-async function splitPDF() {
+export async function splitPDF() {
   const mode = document.getElementById('split-mode').value;
   const progress = document.getElementById('split-progress');
   const progressFill = progress.querySelector('.progress-fill');
   const progressText = progress.querySelector('.progress-text');
   const splitBtn = document.getElementById('split-btn');
 
-  // Helper to hide progress and enable button
   const cleanup = () => {
     progress.classList.add('hidden');
     splitBtn.disabled = false;
@@ -322,7 +291,6 @@ async function splitPDF() {
     const srcDoc = await PDFLib.PDFDocument.load(state.currentPDFBytes);
 
     if (mode === 'each') {
-      // Each page as separate file - create zip
       for (let i = 0; i < srcDoc.getPageCount(); i++) {
         progressText.textContent = `Memproses halaman ${i + 1}...`;
         progressFill.style.width = `${((i + 1) / srcDoc.getPageCount()) * 100}%`;
@@ -333,13 +301,12 @@ async function splitPDF() {
         const bytes = await newDoc.save();
 
         downloadBlob(new Blob([bytes], { type: 'application/pdf' }), getDownloadFilename({originalName: state.currentPDFName, suffix: `page${i + 1}`, extension: 'pdf'}));
-        await sleep(100); // Small delay between downloads
+        await sleep(100);
       }
 
       showToast('Semua halaman berhasil dipisah!', 'success');
 
     } else if (mode === 'range') {
-      // Split by range
       const rangeStr = document.getElementById('split-range').value;
       const ranges = parsePageRanges(rangeStr, srcDoc.getPageCount());
 
@@ -366,7 +333,6 @@ async function splitPDF() {
       showToast('PDF berhasil dipisah!', 'success');
 
     } else {
-      // Extract selected pages
       const selectedPages = state.splitPages.filter(p => p.selected).map(p => p.page - 1);
 
       if (selectedPages.length === 0) {
@@ -398,7 +364,7 @@ async function splitPDF() {
 function parsePageRanges(str, maxPages) {
   const ranges = [];
   const parts = str.split(',').map(s => s.trim()).filter(s => s);
-  
+
   for (const part of parts) {
     if (part.includes('-')) {
       const [start, end] = part.split('-').map(s => parseInt(s.trim()));
@@ -414,7 +380,7 @@ function parsePageRanges(str, maxPages) {
       }
     }
   }
-  
+
   return ranges;
 }
 
@@ -422,46 +388,46 @@ function parsePageRanges(str, maxPages) {
 // ROTATE PDF
 // ============================================================
 
-async function renderRotatePages() {
+export async function renderRotatePages() {
   const container = document.getElementById('rotate-pages');
   container.innerHTML = '<div class="spinner"></div>';
-  
+
   state.rotatePages = [];
   const numPages = state.currentPDF.numPages;
-  
+
   container.innerHTML = '';
-  
+
   for (let i = 1; i <= numPages; i++) {
     const page = await state.currentPDF.getPage(i);
     const scale = 0.5;
     const viewport = page.getViewport({ scale });
-    
+
     const canvas = document.createElement('canvas');
     canvas.width = viewport.width;
     canvas.height = viewport.height;
     const ctx = canvas.getContext('2d');
-    
+
     await page.render({ canvasContext: ctx, viewport }).promise;
-    
+
     const pageItem = document.createElement('div');
     pageItem.className = 'page-item';
     pageItem.dataset.page = i;
     pageItem.onclick = () => pageItem.classList.toggle('selected');
-    
+
     pageItem.innerHTML = `
       <canvas></canvas>
       <div class="page-item-number">${i}</div>
-      <div class="page-item-checkbox">✓</div>
+      <div class="page-item-checkbox">\u2713</div>
     `;
-    
+
     pageItem.querySelector('canvas').replaceWith(canvas);
     container.appendChild(pageItem);
-    
+
     state.rotatePages.push({ page: i, rotation: 0, canvas });
   }
 }
 
-function rotateSelected(degrees) {
+export function rotateSelected(degrees) {
   const container = document.getElementById('rotate-pages');
   const selected = container.querySelectorAll('.page-item.selected');
 
@@ -469,7 +435,6 @@ function rotateSelected(degrees) {
     const pageNum = parseInt(item.dataset.page);
     const pageState = state.rotatePages.find(p => p.page === pageNum);
     if (pageState) {
-      // Fix negative rotation: ensure result is always positive
       pageState.rotation = ((pageState.rotation + degrees) % 360 + 360) % 360;
       const canvas = item.querySelector('canvas');
       canvas.style.transform = `rotate(${pageState.rotation}deg)`;
@@ -477,22 +442,21 @@ function rotateSelected(degrees) {
   });
 }
 
-function rotateAll(degrees) {
+export function rotateAll(degrees) {
   state.rotatePages.forEach(pageState => {
-    // Fix negative rotation: ensure result is always positive
     pageState.rotation = ((pageState.rotation + degrees) % 360 + 360) % 360;
   });
-  
+
   const container = document.getElementById('rotate-pages');
   container.querySelectorAll('.page-item canvas').forEach((canvas, i) => {
     canvas.style.transform = `rotate(${state.rotatePages[i].rotation}deg)`;
   });
 }
 
-async function saveRotatedPDF() {
+export async function saveRotatedPDF() {
   try {
     const srcDoc = await PDFLib.PDFDocument.load(state.currentPDFBytes);
-    
+
     state.rotatePages.forEach(pageState => {
       if (pageState.rotation !== 0) {
         const page = srcDoc.getPage(pageState.page - 1);
@@ -500,11 +464,11 @@ async function saveRotatedPDF() {
         page.setRotation(PDFLib.degrees(currentRotation + pageState.rotation));
       }
     });
-    
+
     const bytes = await srcDoc.save();
     downloadBlob(new Blob([bytes], { type: 'application/pdf' }), getDownloadFilename({originalName: state.currentPDFName, extension: 'pdf'}));
     showToast('PDF berhasil diputar!', 'success');
-    
+
   } catch (error) {
     console.error('Error rotating PDF:', error);
     showToast('Gagal memutar PDF', 'error');
@@ -515,27 +479,27 @@ async function saveRotatedPDF() {
 // PAGES (REORDER/DELETE)
 // ============================================================
 
-async function renderPagesGrid() {
+export async function renderPagesGrid() {
   const container = document.getElementById('pages-grid');
   container.innerHTML = '<div class="spinner"></div>';
-  
+
   state.pagesOrder = [];
   const numPages = state.currentPDF.numPages;
-  
+
   container.innerHTML = '';
-  
+
   for (let i = 1; i <= numPages; i++) {
     const page = await state.currentPDF.getPage(i);
     const scale = 0.5;
     const viewport = page.getViewport({ scale });
-    
+
     const canvas = document.createElement('canvas');
     canvas.width = viewport.width;
     canvas.height = viewport.height;
     const ctx = canvas.getContext('2d');
-    
+
     await page.render({ canvasContext: ctx, viewport }).promise;
-    
+
     const pageItem = document.createElement('div');
     pageItem.className = 'page-item';
     pageItem.dataset.page = i;
@@ -545,70 +509,69 @@ async function renderPagesGrid() {
         pageItem.classList.toggle('selected');
       }
     };
-    
+
     pageItem.innerHTML = `
       <canvas></canvas>
       <div class="page-item-number">${i}</div>
-      <div class="page-item-checkbox">✓</div>
-      <button class="file-item-remove" onclick="event.stopPropagation(); deletePageFromGrid(${i})">×</button>
+      <div class="page-item-checkbox">\u2713</div>
+      <button class="file-item-remove" onclick="event.stopPropagation(); deletePageFromGrid(${i})">\u00d7</button>
     `;
-    
+
     pageItem.querySelector('canvas').replaceWith(canvas);
     container.appendChild(pageItem);
-    
+
     state.pagesOrder.push(i);
   }
-  
+
   enableDragReorder('pages-grid', state.pagesOrder, true);
 }
 
-function deletePageFromGrid(pageNum) {
+export function deletePageFromGrid(pageNum) {
   const index = state.pagesOrder.indexOf(pageNum);
   if (index > -1) {
     state.pagesOrder.splice(index, 1);
     const container = document.getElementById('pages-grid');
     const item = container.querySelector(`[data-page="${pageNum}"]`);
     if (item) item.remove();
-    
-    // Renumber visible pages
+
     container.querySelectorAll('.page-item').forEach((item, i) => {
       item.querySelector('.page-item-number').textContent = i + 1;
     });
   }
-  
+
   if (state.pagesOrder.length === 0) {
     document.getElementById('pages-btn').disabled = true;
   }
 }
 
-function deleteSelectedPages() {
+export function deleteSelectedPages() {
   const container = document.getElementById('pages-grid');
   const selected = container.querySelectorAll('.page-item.selected');
-  
+
   selected.forEach(item => {
     const pageNum = parseInt(item.dataset.page);
     deletePageFromGrid(pageNum);
   });
 }
 
-async function saveReorderedPDF() {
+export async function saveReorderedPDF() {
   if (state.pagesOrder.length === 0) {
     showToast('Tidak ada halaman tersisa', 'error');
     return;
   }
-  
+
   try {
     const srcDoc = await PDFLib.PDFDocument.load(state.currentPDFBytes);
     const newDoc = await PDFLib.PDFDocument.create();
-    
+
     const pageIndices = state.pagesOrder.map(p => p - 1);
     const pages = await newDoc.copyPages(srcDoc, pageIndices);
     pages.forEach(page => newDoc.addPage(page));
-    
+
     const bytes = await newDoc.save();
     downloadBlob(new Blob([bytes], { type: 'application/pdf' }), getDownloadFilename({originalName: state.currentPDFName, extension: 'pdf'}));
     showToast('PDF berhasil disimpan!', 'success');
-    
+
   } catch (error) {
     console.error('Error saving PDF:', error);
     showToast('Gagal menyimpan PDF', 'error');
@@ -616,75 +579,10 @@ async function saveReorderedPDF() {
 }
 
 // ============================================================
-// DRAG REORDER
-// ============================================================
-
-// Generic drag-reorder for any list. Used by: merge list, image-to-pdf list, page manager.
-// containerId: DOM id of the container. stateArray: the backing array to reorder.
-function enableDragReorder(containerId, stateArray, isPages = false) {
-  const container = document.getElementById(containerId);
-  let draggedItem = null;
-  
-  container.querySelectorAll(isPages ? '.page-item' : '.file-item').forEach(item => {
-    item.addEventListener('dragstart', (e) => {
-      draggedItem = item;
-      item.classList.add('dragging');
-      e.dataTransfer.effectAllowed = 'move';
-    });
-    
-    item.addEventListener('dragend', () => {
-      item.classList.remove('dragging');
-      draggedItem = null;
-    });
-    
-    item.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      if (item === draggedItem) return;
-      
-      const rect = item.getBoundingClientRect();
-      const midX = rect.left + rect.width / 2;
-      
-      if (e.clientX < midX) {
-        container.insertBefore(draggedItem, item);
-      } else {
-        container.insertBefore(draggedItem, item.nextSibling);
-      }
-      
-      // Update state array
-      updateStateOrder(container, stateArray, isPages);
-    });
-  });
-}
-
-function updateStateOrder(container, stateArray, isPages) {
-  const items = container.querySelectorAll(isPages ? '.page-item' : '.file-item');
-  const newOrder = [];
-  
-  items.forEach(item => {
-    if (isPages) {
-      const pageNum = parseInt(item.dataset.page);
-      if (!isNaN(pageNum)) newOrder.push(pageNum);
-    } else {
-      const index = parseInt(item.dataset.index);
-      if (!isNaN(index) && stateArray[index]) {
-        newOrder.push(stateArray[index]);
-      }
-    }
-  });
-  
-  if (isPages) {
-    state.pagesOrder = newOrder;
-  } else {
-    stateArray.length = 0;
-    newOrder.forEach(item => stateArray.push(item));
-  }
-}
-
-// ============================================================
 // PDF TO IMAGE
 // ============================================================
 
-async function renderPdfImgPages() {
+export async function renderPdfImgPages() {
   const container = document.getElementById('pdf-img-pages');
   container.innerHTML = '<div class="spinner"></div>';
   container.classList.remove('empty');
@@ -693,44 +591,44 @@ async function renderPdfImgPages() {
   const numPages = state.currentPDF.numPages;
 
   container.innerHTML = '';
-  
+
   for (let i = 1; i <= numPages; i++) {
     const page = await state.currentPDF.getPage(i);
     const scale = 0.5;
     const viewport = page.getViewport({ scale });
-    
+
     const canvas = document.createElement('canvas');
     canvas.width = viewport.width;
     canvas.height = viewport.height;
     const ctx = canvas.getContext('2d');
-    
+
     await page.render({ canvasContext: ctx, viewport }).promise;
-    
+
     const pageItem = document.createElement('div');
     pageItem.className = 'page-item selected';
     pageItem.dataset.page = i;
     pageItem.onclick = () => togglePageSelection(pageItem, i, 'pdf-img');
-    
+
     pageItem.innerHTML = `
       <canvas></canvas>
       <div class="page-item-number">${i}</div>
-      <div class="page-item-checkbox">✓</div>
+      <div class="page-item-checkbox">\u2713</div>
     `;
-    
+
     pageItem.querySelector('canvas').replaceWith(canvas);
     container.appendChild(pageItem);
-    
+
     state.pdfImgPages.push({ page: i, selected: true });
   }
 }
 
-function selectAllPdfImgPages() {
+export function selectAllPdfImgPages() {
   const container = document.getElementById('pdf-img-pages');
   container.querySelectorAll('.page-item').forEach(item => item.classList.add('selected'));
   state.pdfImgPages.forEach(p => p.selected = true);
 }
 
-async function convertPDFtoImages() {
+export async function convertPDFtoImages() {
   const selectedPages = state.pdfImgPages.filter(p => p.selected);
   if (selectedPages.length === 0) {
     showToast('Pilih minimal satu halaman', 'error');
@@ -766,7 +664,6 @@ async function convertPDFtoImages() {
       const mimeType = format === 'png' ? 'image/png' : 'image/jpeg';
       const quality = format === 'png' ? undefined : 0.92;
 
-      // Await blob creation to ensure proper ordering
       await new Promise((resolve) => {
         canvas.toBlob((blob) => {
           if (blob) {
@@ -794,33 +691,33 @@ async function convertPDFtoImages() {
 // COMPRESS PDF
 // ============================================================
 
-async function showPDFPreview(containerId) {
+export async function showPDFPreview(containerId) {
   const container = document.getElementById(containerId);
-  
+
   try {
     const page = await state.currentPDF.getPage(1);
     const scale = 0.5;
     const viewport = page.getViewport({ scale });
-    
+
     const canvas = document.createElement('canvas');
     canvas.width = viewport.width;
     canvas.height = viewport.height;
     const ctx = canvas.getContext('2d');
-    
+
     await page.render({ canvasContext: ctx, viewport }).promise;
-    
+
     container.innerHTML = '';
     container.appendChild(canvas);
     canvas.style.maxWidth = '300px';
     canvas.style.borderRadius = 'var(--radius-md)';
     canvas.style.boxShadow = 'var(--shadow-paper)';
-    
+
   } catch (error) {
     container.innerHTML = '<p style="color: var(--text-tertiary)">Gagal memuat preview</p>';
   }
 }
 
-async function compressPDF() {
+export async function compressPDF() {
   const quality = parseInt(document.getElementById('pdf-quality').value) / 100;
 
   const progress = document.getElementById('compress-pdf-progress');
@@ -842,13 +739,11 @@ async function compressPDF() {
     for (let i = 0; i < pages.length; i++) {
       progressText.textContent = `Memproses halaman ${i + 1} dari ${pages.length}...`;
       progressFill.style.width = `${((i + 1) / pages.length) * 100}%`;
-      // Small delay to show progress
       await sleep(50);
     }
 
     progressText.textContent = 'Mengoptimasi struktur PDF...';
 
-    // Use object streams for better compression of PDF structure
     const bytes = await srcDoc.save({
       useObjectStreams: true,
       addDefaultPage: false,
@@ -863,7 +758,6 @@ async function compressPDF() {
     if (newSize < originalSize) {
       showToast(`PDF dikompres! Berkurang ${reduction}%`, 'success');
     } else {
-      // More informative message about limitations
       showToast('Ukuran tidak berubah. Fitur ini hanya mengoptimasi struktur PDF, bukan gambar di dalamnya.', 'info');
     }
 
@@ -880,7 +774,7 @@ async function compressPDF() {
 // PROTECT PDF
 // ============================================================
 
-async function protectPDF() {
+export async function protectPDF() {
   const password = document.getElementById('protect-password').value;
   const confirm = document.getElementById('protect-password-confirm').value;
 
@@ -897,7 +791,6 @@ async function protectPDF() {
   const protectBtn = document.getElementById('protect-btn');
   const originalText = protectBtn.innerHTML;
 
-  // Show loading state
   protectBtn.disabled = true;
   protectBtn.innerHTML = `
     <svg class="btn-spinner" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -907,15 +800,13 @@ async function protectPDF() {
   `;
 
   try {
-    // Load the PDF with pdf-lib to ensure it's valid
     const srcDoc = await PDFLib.PDFDocument.load(state.currentPDFBytes);
     const pdfBytes = await srcDoc.save();
 
-    // Encrypt with @pdfsmaller/pdf-encrypt-lite
     const encryptedBytes = await window.encryptPDF(
       new Uint8Array(pdfBytes),
       password,
-      password // Use same password for both user and owner
+      password
     );
 
     downloadBlob(new Blob([encryptedBytes], { type: 'application/pdf' }), getDownloadFilename({originalName: state.currentPDFName, extension: 'pdf'}));
@@ -925,19 +816,19 @@ async function protectPDF() {
     console.error('Error protecting PDF:', error);
     showToast('Gagal memproteksi PDF', 'error');
   } finally {
-    // Restore button state
     protectBtn.disabled = false;
     protectBtn.innerHTML = originalText;
   }
 }
 
 // ============================================================
-// SHARED ANNOTATION TOOLS (used by Unified Editor)
+// LEGACY EDITOR (shared annotation tools)
 // ============================================================
-// Modal logic for text input, signature capture/upload, and annotation
-// drawing. These functions are called from unified-editor.js.
 
-async function initEditMode() {
+// Cached PDF page image for smooth dragging
+let editPageCache = null;
+
+export async function initEditMode() {
   state.currentEditPage = 0;
   state.editAnnotations = {};
   state.currentEditTool = null;
@@ -952,37 +843,29 @@ async function initEditMode() {
     state.editAnnotations[i] = [];
   }
 
-  // Setup keyboard shortcuts
   setupEditKeyboardShortcuts();
-
   await renderEditPage();
   setupEditCanvas();
   updateEditorStatus('Pilih alat untuk mulai mengedit');
 }
 
-// Cached PDF page image for smooth dragging
-let editPageCache = null;
-
-async function renderEditPage() {
+export async function renderEditPage() {
   const canvas = document.getElementById('edit-canvas');
-  if (!canvas) return; // Skip if in Unified Editor or canvas not found
+  if (!canvas) return;
   const ctx = canvas.getContext('2d');
   const dpr = state.editDevicePixelRatio;
 
   const page = await state.currentPDF.getPage(state.currentEditPage + 1);
 
-  // Use adaptive scaling based on container width
   const wrapper = document.querySelector('.editor-canvas-wrapper');
   const maxWidth = wrapper ? wrapper.clientWidth - 40 : 800;
   const naturalViewport = page.getViewport({ scale: 1 });
 
-  // Calculate scale to fit width while maintaining quality
   let scale = Math.min(maxWidth / naturalViewport.width, 2);
-  scale = Math.max(scale, 1); // Minimum scale of 1
+  scale = Math.max(scale, 1);
 
   const viewport = page.getViewport({ scale });
 
-  // Store scale info for this page for coordinate transformation
   state.editPageScales[state.currentEditPage] = {
     scale: scale,
     pdfWidth: naturalViewport.width,
@@ -991,21 +874,16 @@ async function renderEditPage() {
     canvasHeight: viewport.height
   };
 
-  // Set canvas size accounting for device pixel ratio for crisp rendering
   canvas.width = viewport.width * dpr;
   canvas.height = viewport.height * dpr;
   canvas.style.width = viewport.width + 'px';
   canvas.style.height = viewport.height + 'px';
 
-  // Scale context for high-DPI displays
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
   await page.render({ canvasContext: ctx, viewport }).promise;
 
-  // Cache the rendered PDF page (without annotations) for smooth dragging
   editPageCache = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-  // Draw annotations
   redrawAnnotationsOnly();
 
   document.getElementById('edit-page-info').textContent =
@@ -1015,20 +893,16 @@ async function renderEditPage() {
   document.getElementById('edit-next').disabled = state.currentEditPage === state.currentPDF.numPages - 1;
 }
 
-// Synchronous function to redraw annotations from cache - used during drag
 function redrawAnnotationsOnly() {
   const canvas = document.getElementById('edit-canvas');
   const ctx = canvas.getContext('2d');
 
-  // Restore cached PDF page
   if (editPageCache) {
     ctx.putImageData(editPageCache, 0, 0);
   }
 
-  // Reset transform after putImageData (which resets it)
   ctx.setTransform(state.editDevicePixelRatio, 0, 0, state.editDevicePixelRatio, 0, 0);
 
-  // Draw annotations synchronously
   const annotations = state.editAnnotations[state.currentEditPage] || [];
   for (let i = 0; i < annotations.length; i++) {
     const anno = annotations[i];
@@ -1039,8 +913,7 @@ function redrawAnnotationsOnly() {
   }
 }
 
-// Synchronous version of drawAnnotation for drag operations
-function drawAnnotationSync(ctx, anno, isSelected = false) {
+export function drawAnnotationSync(ctx, anno, isSelected = false) {
   switch (anno.type) {
     case 'whiteout':
       ctx.fillStyle = 'white';
@@ -1049,13 +922,11 @@ function drawAnnotationSync(ctx, anno, isSelected = false) {
         drawSelectionHandles(ctx, anno.x, anno.y, anno.width, anno.height);
       }
       break;
-    case 'text':
-      // Build font string with bold/italic and family
+    case 'text': {
       let textFontStyle = '';
       if (anno.italic) textFontStyle += 'italic ';
       if (anno.bold) textFontStyle += 'bold ';
 
-      // Map font family to CSS equivalent
       let textCssFontFamily = 'Helvetica, Arial, sans-serif';
       if (anno.fontFamily === 'Times-Roman') textCssFontFamily = 'Times New Roman, Times, serif';
       else if (anno.fontFamily === 'Courier') textCssFontFamily = 'Courier New, Courier, monospace';
@@ -1074,15 +945,14 @@ function drawAnnotationSync(ctx, anno, isSelected = false) {
         drawSelectionHandles(ctx, anno.x - 2, anno.y - anno.fontSize, metrics.width + 4, textHeight + 4);
       }
       break;
+    }
     case 'signature':
       if (anno.image) {
-        // Create and cache image if not already cached
         if (!anno.cachedImg) {
           const img = new Image();
           img.src = anno.image;
           anno.cachedImg = img;
         }
-        // Draw if image is loaded (data URLs load almost instantly)
         if (anno.cachedImg.complete && anno.cachedImg.naturalWidth > 0) {
           ctx.drawImage(anno.cachedImg, anno.x, anno.y, anno.width, anno.height);
           if (isSelected) {
@@ -1106,7 +976,6 @@ function drawAnnotationSync(ctx, anno, isSelected = false) {
     case 'pageNumber':
       ctx.font = `${anno.fontSize}px Arial`;
       ctx.fillStyle = anno.color;
-      // Adjust text alignment based on position
       if (anno.position.includes('center')) {
         ctx.textAlign = 'center';
       } else if (anno.position.includes('right')) {
@@ -1115,12 +984,12 @@ function drawAnnotationSync(ctx, anno, isSelected = false) {
         ctx.textAlign = 'left';
       }
       ctx.fillText(anno.text, anno.x, anno.y);
-      ctx.textAlign = 'left'; // Reset
+      ctx.textAlign = 'left';
       break;
   }
 }
 
-function drawAnnotation(ctx, anno, isSelected = false) {
+export function drawAnnotation(ctx, anno, isSelected = false) {
   return new Promise((resolve) => {
     switch (anno.type) {
       case 'whiteout':
@@ -1131,22 +1000,21 @@ function drawAnnotation(ctx, anno, isSelected = false) {
         }
         resolve();
         break;
-      case 'text':
+      case 'text': {
         ctx.font = `${anno.fontSize}px Arial`;
         ctx.fillStyle = anno.color;
-        // Handle multi-line text
         const lines = anno.text.split('\n');
         lines.forEach((line, i) => {
           ctx.fillText(line, anno.x, anno.y + (i * anno.fontSize * 1.2));
         });
         if (isSelected) {
-          // Calculate text bounds for selection
           const metrics = ctx.measureText(anno.text);
           const textHeight = anno.fontSize * lines.length * 1.2;
           drawSelectionHandles(ctx, anno.x - 2, anno.y - anno.fontSize, metrics.width + 4, textHeight + 4);
         }
         resolve();
         break;
+      }
       case 'signature':
         if (anno.image && anno.cachedImg) {
           ctx.drawImage(anno.cachedImg, anno.x, anno.y, anno.width, anno.height);
@@ -1203,25 +1071,19 @@ function drawAnnotation(ctx, anno, isSelected = false) {
   });
 }
 
-function drawSelectionHandles(ctx, x, y, width, height) {
-  // Draw selection border
+export function drawSelectionHandles(ctx, x, y, width, height) {
   ctx.strokeStyle = '#3B82F6';
   ctx.lineWidth = 2;
   ctx.setLineDash([5, 3]);
   ctx.strokeRect(x - 2, y - 2, width + 4, height + 4);
   ctx.setLineDash([]);
 
-  // Draw corner handles
   const handleSize = 8;
   ctx.fillStyle = '#3B82F6';
 
-  // Top-left
   ctx.fillRect(x - handleSize/2 - 2, y - handleSize/2 - 2, handleSize, handleSize);
-  // Top-right
   ctx.fillRect(x + width - handleSize/2 + 2, y - handleSize/2 - 2, handleSize, handleSize);
-  // Bottom-left
   ctx.fillRect(x - handleSize/2 - 2, y + height - handleSize/2 + 2, handleSize, handleSize);
-  // Bottom-right
   ctx.fillRect(x + width - handleSize/2 + 2, y + height - handleSize/2 + 2, handleSize, handleSize);
 }
 
@@ -1233,9 +1095,7 @@ function getCanvasCoordinates(e, canvas) {
 }
 
 function setupEditCanvas() {
-  if (state.editCanvasSetup) {
-    return;
-  }
+  if (state.editCanvasSetup) return;
 
   const canvas = document.getElementById('edit-canvas');
   if (!canvas) return;
@@ -1248,13 +1108,11 @@ function setupEditCanvas() {
   let startX, startY;
   let dragOffsetX, dragOffsetY;
 
-  // Mouse event handlers
   canvas.addEventListener('mousedown', (e) => handlePointerDown(e, canvas));
   canvas.addEventListener('mousemove', (e) => handlePointerMove(e, canvas));
   canvas.addEventListener('mouseup', (e) => handlePointerUp(e, canvas));
   canvas.addEventListener('mouseleave', () => { isDrawing = false; isDragging = false; });
 
-  // Touch event handlers for mobile support
   canvas.addEventListener('touchstart', (e) => {
     e.preventDefault();
     const touch = e.touches[0];
@@ -1278,11 +1136,9 @@ function setupEditCanvas() {
     startX = x;
     startY = y;
 
-    // Check if clicking on an existing annotation (select mode)
     if (state.currentEditTool === 'select') {
       const clickedAnno = findAnnotationAt(x, y);
       if (clickedAnno) {
-        // Save undo state BEFORE we start dragging (so we can undo to original position)
         saveUndoState();
         state.selectedAnnotation = clickedAnno;
         isDragging = true;
@@ -1304,7 +1160,6 @@ function setupEditCanvas() {
   function handlePointerMove(e, canvas) {
     const { x, y } = getCanvasCoordinates(e, canvas);
 
-    // Handle dragging selected annotation - use synchronous redraw for smooth movement
     if (isDragging && state.selectedAnnotation) {
       const anno = state.editAnnotations[state.selectedAnnotation.pageNum][state.selectedAnnotation.index];
       if (anno.type === 'text') {
@@ -1314,14 +1169,12 @@ function setupEditCanvas() {
         anno.x = x - dragOffsetX;
         anno.y = y - dragOffsetY;
       }
-      // Use synchronous redraw from cache - no async issues
       redrawAnnotationsOnly();
       return;
     }
 
     if (!isDrawing || state.currentEditTool !== 'whiteout') return;
 
-    // Draw preview for whiteout - use synchronous redraw
     redrawAnnotationsOnly();
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
@@ -1346,7 +1199,6 @@ function setupEditCanvas() {
   function handlePointerUp(e, canvas) {
     const { x, y } = getCanvasCoordinates(e, canvas);
 
-    // Handle end of drag (undo state was already saved in handlePointerDown)
     if (isDragging) {
       isDragging = false;
       return;
@@ -1358,7 +1210,7 @@ function setupEditCanvas() {
     if (state.currentEditTool === 'whiteout') {
       const width = Math.abs(x - startX);
       const height = Math.abs(y - startY);
-      if (width > 5 && height > 5) { // Minimum size
+      if (width > 5 && height > 5) {
         saveUndoState();
         state.editAnnotations[state.currentEditPage].push({
           type: 'whiteout',
@@ -1374,10 +1226,9 @@ function setupEditCanvas() {
       openTextModal();
     } else if (state.currentEditTool === 'signature' && state.signatureImage) {
       saveUndoState();
-      // Calculate signature size based on page scale (adaptive sizing)
       const pageScale = state.editPageScales[state.currentEditPage];
       const sigWidth = Math.min(200, pageScale.canvasWidth * 0.3);
-      const sigHeight = sigWidth / 2; // Maintain 2:1 aspect ratio
+      const sigHeight = sigWidth / 2;
 
       const annotation = {
         type: 'signature',
@@ -1388,7 +1239,6 @@ function setupEditCanvas() {
         height: sigHeight
       };
 
-      // Pre-cache the image for immediate visual rendering
       const img = new Image();
       img.onload = () => {
         annotation.cachedImg = img;
@@ -1396,7 +1246,6 @@ function setupEditCanvas() {
         updateEditorStatus('Tanda tangan ditambahkan');
       };
       img.onerror = () => {
-        // Still render even if image fails to load
         renderEditPage();
         updateEditorStatus('Tanda tangan ditambahkan');
       };
@@ -1409,7 +1258,6 @@ function setupEditCanvas() {
 
 function findAnnotationAt(x, y) {
   const annotations = state.editAnnotations[state.currentEditPage] || [];
-  // Check in reverse order (topmost first)
   for (let i = annotations.length - 1; i >= 0; i--) {
     const anno = annotations[i];
     let bounds;
@@ -1417,7 +1265,6 @@ function findAnnotationAt(x, y) {
     if (anno.type === 'whiteout' || anno.type === 'signature') {
       bounds = { x: anno.x, y: anno.y, width: anno.width, height: anno.height };
     } else if (anno.type === 'text') {
-      // Approximate text bounds
       const canvas = document.getElementById('edit-canvas');
       const ctx = canvas.getContext('2d');
       ctx.font = `${anno.fontSize}px Arial`;
@@ -1440,7 +1287,7 @@ function findAnnotationAt(x, y) {
   return null;
 }
 
-function setEditTool(tool) {
+export function setEditTool(tool) {
   state.currentEditTool = tool;
   state.selectedAnnotation = null;
 
@@ -1448,7 +1295,6 @@ function setEditTool(tool) {
     btn.classList.toggle('active', btn.dataset.editTool === tool);
   });
 
-  // Update canvas cursor (only for legacy editor)
   const canvas = document.getElementById('edit-canvas');
   if (canvas) {
     canvas.className = 'editor-canvas';
@@ -1457,7 +1303,6 @@ function setEditTool(tool) {
     }
   }
 
-  // Update status message
   const messages = {
     'select': 'Klik anotasi untuk memilih, seret untuk memindahkan',
     'whiteout': 'Seret untuk menggambar area whiteout',
@@ -1469,14 +1314,14 @@ function setEditTool(tool) {
   renderEditPage();
 }
 
-function updateEditorStatus(message) {
+export function updateEditorStatus(message) {
   const statusEl = document.querySelector('#editor-status .status-text');
   if (statusEl) {
     statusEl.textContent = message;
   }
 }
 
-function editPrevPage() {
+export function editPrevPage() {
   if (state.currentEditPage > 0) {
     state.selectedAnnotation = null;
     state.currentEditPage--;
@@ -1484,7 +1329,7 @@ function editPrevPage() {
   }
 }
 
-function editNextPage() {
+export function editNextPage() {
   if (state.currentEditPage < state.currentPDF.numPages - 1) {
     state.selectedAnnotation = null;
     state.currentEditPage++;
@@ -1492,37 +1337,30 @@ function editNextPage() {
   }
 }
 
-// Undo/Redo System
-function saveUndoState() {
-  // Deep clone the current annotations
+export function saveUndoState() {
   const currentState = JSON.parse(JSON.stringify(state.editAnnotations));
   state.editUndoStack.push(currentState);
-  state.editRedoStack = []; // Clear redo stack when new action is performed
+  state.editRedoStack = [];
 
-  // Limit undo stack to 50 states
   if (state.editUndoStack.length > 50) {
     state.editUndoStack.shift();
   }
 }
 
-function undoEdit() {
+export function undoEdit() {
   if (state.editUndoStack.length === 0) {
     showToast('Tidak ada yang bisa di-undo', 'info');
     return;
   }
 
-  // Save current state to redo stack
   const currentState = JSON.parse(JSON.stringify(state.editAnnotations));
   state.editRedoStack.push(currentState);
 
-  // Restore previous state
   const previousState = state.editUndoStack.pop();
 
-  // Preserve cached images
   for (const pageNum in previousState) {
     for (const anno of previousState[pageNum]) {
       if (anno.type === 'signature' && anno.image) {
-        // Find matching annotation in current state to copy cached image
         const currentAnno = state.editAnnotations[pageNum]?.find(
           a => a.type === 'signature' && a.image === anno.image
         );
@@ -1539,20 +1377,17 @@ function undoEdit() {
   showToast('Undo berhasil', 'success');
 }
 
-function redoEdit() {
+export function redoEdit() {
   if (state.editRedoStack.length === 0) {
     showToast('Tidak ada yang bisa di-redo', 'info');
     return;
   }
 
-  // Save current state to undo stack
   const currentState = JSON.parse(JSON.stringify(state.editAnnotations));
   state.editUndoStack.push(currentState);
 
-  // Restore next state
   const nextState = state.editRedoStack.pop();
 
-  // Preserve cached images
   for (const pageNum in nextState) {
     for (const anno of nextState[pageNum]) {
       if (anno.type === 'signature' && anno.image) {
@@ -1572,7 +1407,7 @@ function redoEdit() {
   showToast('Redo berhasil', 'success');
 }
 
-function clearCurrentPageAnnotations() {
+export function clearCurrentPageAnnotations() {
   if (state.editAnnotations[state.currentEditPage]?.length === 0) {
     showToast('Tidak ada anotasi di halaman ini', 'info');
     return;
@@ -1587,7 +1422,7 @@ function clearCurrentPageAnnotations() {
   }
 }
 
-function deleteSelectedAnnotation() {
+export function deleteSelectedAnnotation() {
   if (!state.selectedAnnotation) {
     showToast('Pilih anotasi terlebih dahulu', 'info');
     return;
@@ -1601,32 +1436,25 @@ function deleteSelectedAnnotation() {
   showToast('Anotasi dihapus', 'success');
 }
 
-// Keyboard shortcuts
 function setupEditKeyboardShortcuts() {
   const handler = (e) => {
-    // Only handle when edit workspace is visible
     const editWorkspace = document.getElementById('edit-pdf-workspace');
     if (!editWorkspace || editWorkspace.style.display === 'none') return;
 
-    // Don't handle if typing in input
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
-    // Ctrl/Cmd + Z for undo
     if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
       e.preventDefault();
       undoEdit();
     }
-    // Ctrl/Cmd + Y or Ctrl/Cmd + Shift + Z for redo
     else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
       e.preventDefault();
       redoEdit();
     }
-    // Delete or Backspace to delete selected annotation
     else if ((e.key === 'Delete' || e.key === 'Backspace') && state.selectedAnnotation) {
       e.preventDefault();
       deleteSelectedAnnotation();
     }
-    // Tool shortcuts
     else if (!e.ctrlKey && !e.metaKey) {
       switch (e.key.toLowerCase()) {
         case 'v': setEditTool('select'); break;
@@ -1644,708 +1472,16 @@ function setupEditKeyboardShortcuts() {
   };
 
   document.addEventListener('keydown', handler);
-  // Store reference to remove later if needed
   state.editKeyboardHandler = handler;
 }
 
-// Text Input Modal
-function initTextModalControls() {
-  const boldBtn = document.getElementById('modal-text-bold');
-  const italicBtn = document.getElementById('modal-text-italic');
-  const colorPresets = document.querySelectorAll('.color-preset-btn');
-  const colorPicker = document.getElementById('modal-text-color');
-
-  // Bold toggle
-  boldBtn.onclick = () => {
-    boldBtn.classList.toggle('active');
-    updateTextPreview();
-  };
-
-  // Italic toggle
-  italicBtn.onclick = () => {
-    italicBtn.classList.toggle('active');
-    updateTextPreview();
-  };
-
-  // Color presets
-  colorPresets.forEach(btn => {
-    btn.onclick = () => {
-      const color = btn.dataset.color;
-      colorPicker.value = color;
-      colorPresets.forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      updateTextPreview();
-    };
-  });
-
-  // Color picker change
-  colorPicker.oninput = () => {
-    colorPresets.forEach(b => b.classList.remove('active'));
-    updateTextPreview();
-  };
-}
-
-// Open text annotation modal. Resets all fields (font, size, color, bold/italic) to defaults.
-// Called from: unified-editor.js (ueOpenTextModal) and legacy editor.
-function openTextModal() {
-  // Minimize changelog when opening modal
-  if (window.changelogAPI) {
-    window.changelogAPI.minimize();
-  }
-
-  const modal = document.getElementById('text-input-modal');
-  modal.classList.add('active');
-  pushModalState('text-input-modal');
-
-  const textInput = document.getElementById('text-input-field');
-  textInput.value = '';
-  textInput.focus();
-
-  // Reset to defaults
-  document.getElementById('modal-font-family').value = 'Helvetica';
-  document.getElementById('modal-font-size').value = '16';
-  document.getElementById('modal-text-bold').classList.remove('active');
-  document.getElementById('modal-text-italic').classList.remove('active');
-  document.getElementById('modal-text-color').value = '#000000';
-
-  // Set black as active preset
-  document.querySelectorAll('.color-preset-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.color === '#000000');
-  });
-
-  // Setup live preview
-  initTextModalControls();
-  updateTextPreview();
-
-  textInput.oninput = updateTextPreview;
-  document.getElementById('modal-font-size').oninput = updateTextPreview;
-  document.getElementById('modal-font-family').onchange = updateTextPreview;
-
-  // Enter key to submit (Shift+Enter for new line)
-  textInput.onkeydown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      confirmTextInput();
-    }
-  };
-}
-
-function closeTextModal(skipHistoryBack = false) {
-  const modal = document.getElementById('text-input-modal');
-  modal.classList.remove('active');
-  state.pendingTextPosition = null;
-  navHistory.currentModal = null;
-  if (!skipHistoryBack && navHistory.currentView === 'modal') {
-    history.back();
-  }
-}
-
-function updateTextPreview() {
-  const text = document.getElementById('text-input-field').value || 'Preview teks';
-  const fontSize = document.getElementById('modal-font-size').value;
-  const color = document.getElementById('modal-text-color').value;
-  const fontFamily = document.getElementById('modal-font-family').value;
-  const isBold = document.getElementById('modal-text-bold').classList.contains('active');
-  const isItalic = document.getElementById('modal-text-italic').classList.contains('active');
-
-  const preview = document.getElementById('text-preview');
-  preview.textContent = text;
-  preview.style.fontSize = fontSize + 'px';
-  preview.style.color = color;
-  preview.style.fontWeight = isBold ? 'bold' : 'normal';
-  preview.style.fontStyle = isItalic ? 'italic' : 'normal';
-
-  // Map font family to CSS
-  let cssFontFamily = 'Helvetica, Arial, sans-serif';
-  if (fontFamily === 'Times-Roman') cssFontFamily = 'Times New Roman, Times, serif';
-  else if (fontFamily === 'Courier') cssFontFamily = 'Courier New, Courier, monospace';
-  else if (fontFamily === 'Montserrat') cssFontFamily = 'Montserrat, sans-serif';
-  else if (fontFamily === 'Carlito') cssFontFamily = 'Carlito, Calibri, sans-serif';
-  preview.style.fontFamily = cssFontFamily;
-}
-
-// Read current text modal form values. Returns { text, fontSize, color, fontFamily, bold, italic }.
-// Called from: unified-editor.js (ueConfirmText) to create text annotation.
-function getTextModalSettings() {
-  return {
-    text: document.getElementById('text-input-field').value.trim(),
-    fontSize: parseInt(document.getElementById('modal-font-size').value) || 16,
-    color: document.getElementById('modal-text-color').value,
-    fontFamily: document.getElementById('modal-font-family').value,
-    bold: document.getElementById('modal-text-bold').classList.contains('active'),
-    italic: document.getElementById('modal-text-italic').classList.contains('active')
-  };
-}
-
-function confirmTextInput() {
-  // Check if we're in unified editor mode
-  if (state.currentTool === 'unified-editor' && ueState.pendingTextPosition) {
-    ueConfirmText(); // → unified-editor.js
-    return;
-  }
-
-  const settings = getTextModalSettings();
-
-  if (!settings.text) {
-    showToast('Masukkan teks terlebih dahulu', 'error');
-    return;
-  }
-
-  if (!state.pendingTextPosition) {
-    showToast('Posisi teks tidak valid', 'error');
-    closeTextModal();
-    return;
-  }
-
-  saveUndoState();
-  state.editAnnotations[state.currentEditPage].push({
-    type: 'text',
-    text: settings.text,
-    x: state.pendingTextPosition.x,
-    y: state.pendingTextPosition.y,
-    fontSize: settings.fontSize,
-    color: settings.color,
-    fontFamily: settings.fontFamily,
-    bold: settings.bold,
-    italic: settings.italic
-  });
-
-  closeTextModal();
-  renderEditPage();
-  setEditTool('select'); // Reset to select tool after adding text
-  updateEditorStatus('Teks ditambahkan');
-}
-
-// Open signature modal (draw or upload tab). Initializes SignaturePad canvas.
-// After signature is created, calls ueSetTool('signature') to start placement mode.
-function openSignatureModal() {
-  // Minimize changelog when opening modal
-  if (window.changelogAPI) {
-    window.changelogAPI.minimize();
-  }
-
-  const modal = document.getElementById('signature-modal');
-  modal.classList.add('active');
-  setEditTool('signature');
-  pushModalState('signature-modal');
-
-  // Default to upload tab
-  switchSignatureTab('upload');
-
-  setTimeout(() => {
-    const canvas = document.getElementById('signature-canvas');
-    const ratio = Math.max(window.devicePixelRatio || 1, 1);
-    canvas.width = canvas.offsetWidth * ratio;
-    canvas.height = canvas.offsetHeight * ratio;
-    canvas.getContext('2d').scale(ratio, ratio);
-    if (state.signaturePad) state.signaturePad.clear();
-  }, 100);
-}
-
-function closeSignatureModal(skipHistoryBack = false) {
-  const modal = document.getElementById('signature-modal');
-  modal.classList.remove('active');
-  navHistory.currentModal = null;
-  if (!skipHistoryBack && navHistory.currentView === 'modal') {
-    history.back();
-  }
-}
-
-function clearSignature() {
-  if (state.signaturePad) {
-    state.signaturePad.clear();
-  }
-}
-
-function useSignature() {
-  if (state.signaturePad && !state.signaturePad.isEmpty()) {
-    // Get the drawn signature
-    const signatureCanvas = document.getElementById('signature-canvas');
-
-    // Create a temporary canvas for background removal
-    const tempCanvas = document.createElement('canvas');
-    tempCanvas.width = signatureCanvas.width;
-    tempCanvas.height = signatureCanvas.height;
-    const ctx = tempCanvas.getContext('2d');
-
-    // Draw the signature
-    ctx.drawImage(signatureCanvas, 0, 0);
-
-    // Apply background removal (make white pixels transparent)
-    const imageData = ctx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
-    const data = imageData.data;
-    const threshold = 240; // Threshold for white background
-
-    for (let i = 0; i < data.length; i += 4) {
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
-
-      // Make white/near-white pixels transparent
-      if (r >= threshold && g >= threshold && b >= threshold) {
-        data[i + 3] = 0; // Set alpha to 0 (transparent)
-      }
-    }
-
-    ctx.putImageData(imageData, 0, 0);
-    // Optimize drawn signature (resize if too large, compress appropriately)
-    state.signatureImage = optimizeSignatureImage(tempCanvas);
-
-    closeSignatureModal();
-    // Check if in unified editor mode
-    if (state.currentTool === 'unified-editor') {
-      ueSetTool('signature'); // → unified-editor.js
-      // Enable signature preview attached to cursor
-      ueState.pendingSignature = true;
-      ueState.signaturePreviewPos = null;
-    } else {
-      setEditTool('signature');
-    }
-    showToast('Klik pada PDF untuk menempatkan tanda tangan', 'success');
-  } else {
-    showToast('Buat tanda tangan terlebih dahulu', 'error');
-  }
-}
-
-// Signature Tab Switching
-function switchSignatureTab(tab) {
-  // Update tab buttons
-  document.querySelectorAll('.signature-tab').forEach(btn => {
-    const text = btn.textContent.toLowerCase().trim();
-    const shouldBeActive = (tab === 'upload' && text === 'upload gambar') ||
-                          (tab === 'draw' && text === 'gambar');
-    btn.classList.toggle('active', shouldBeActive);
-  });
-
-  // Update tab content
-  document.getElementById('signature-draw-tab').classList.toggle('active', tab === 'draw');
-  document.getElementById('signature-upload-tab').classList.toggle('active', tab === 'upload');
-
-  // Re-init signature pad if switching to draw tab
-  if (tab === 'draw') {
-    setTimeout(() => {
-      const canvas = document.getElementById('signature-canvas');
-      if (canvas && state.signaturePad) {
-        const ratio = Math.max(window.devicePixelRatio || 1, 1);
-        canvas.width = canvas.offsetWidth * ratio;
-        canvas.height = canvas.offsetHeight * ratio;
-        canvas.getContext('2d').scale(ratio, ratio);
-        state.signaturePad.clear();
-      }
-    }, 100);
-  }
-}
-
-// Load Signature Image for Background Removal
-async function loadSignatureImage(file) {
-  try {
-    const img = await loadImage(file);
-    state.signatureUploadImage = img;
-
-    // Close signature modal and open bg removal modal
-    // Pass true to skip history.back() since we're immediately replacing with bg modal state
-    closeSignatureModal(true);
-    openSignatureBgModal();
-  } catch (error) {
-    showToast('Gagal memuat gambar', 'error');
-    throw error; // Re-throw so app.js can catch it
-  }
-}
-
-// Signature Background Removal Modal
-function openSignatureBgModal() {
-  // Minimize changelog when opening modal
-  if (window.changelogAPI) {
-    window.changelogAPI.minimize();
-  }
-
-  const modal = document.getElementById('signature-bg-modal');
-  modal.classList.add('active');
-
-  // IMPORTANT: Use replaceState instead of pushState to replace the signature-modal
-  // history state (which we just closed). This prevents orphaned history states.
-  // If we pushed here, the history would be: [workspace, signature-modal (closed), bg-modal]
-  // With replace, it's clean: [workspace, bg-modal]
-  history.replaceState({
-    view: 'modal',
-    modal: 'signature-bg-modal',
-    tool: navHistory.currentWorkspace
-  }, '', null);
-  navHistory.currentView = 'modal';
-  navHistory.currentModal = 'signature-bg-modal';
-
-  // Show original image
-  document.getElementById('sig-bg-original').src = state.signatureUploadImage.src;
-
-  // Initialize preview
-  updateSignatureBgPreview();
-}
-
-function closeSignatureBgModal(skipHistoryBack = false) {
-  const modal = document.getElementById('signature-bg-modal');
-  modal.classList.remove('active');
-
-  // Cleanup
-  if (state.signatureUploadImage && state.signatureUploadImage._blobUrl) {
-    URL.revokeObjectURL(state.signatureUploadImage._blobUrl);
-  }
-  state.signatureUploadImage = null;
-  state.signatureUploadCanvas = null;
-
-  navHistory.currentModal = null;
-  if (!skipHistoryBack && navHistory.currentView === 'modal') {
-    history.back();
-  }
-}
-
-function updateSignatureBgPreview() {
-  if (!state.signatureUploadImage) return;
-
-  const threshold = parseInt(document.getElementById('sig-bg-threshold').value);
-
-  // Update slider display
-  document.getElementById('sig-bg-threshold-value').textContent = threshold;
-
-  const canvas = document.getElementById('sig-bg-preview');
-  const ctx = canvas.getContext('2d');
-
-  // Set canvas size to match original image
-  canvas.width = state.signatureUploadImage.naturalWidth;
-  canvas.height = state.signatureUploadImage.naturalHeight;
-
-  // Draw original image
-  ctx.drawImage(state.signatureUploadImage, 0, 0);
-
-  // Get image data
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const data = imageData.data;
-
-  // Process each pixel - make white/near-white pixels transparent
-  for (let i = 0; i < data.length; i += 4) {
-    const r = data[i];
-    const g = data[i + 1];
-    const b = data[i + 2];
-
-    // Check if pixel is white/near-white based on threshold
-    if (r >= threshold && g >= threshold && b >= threshold) {
-      data[i + 3] = 0; // Set alpha to 0 (transparent)
-    }
-  }
-
-  // Put the modified image data back
-  ctx.putImageData(imageData, 0, 0);
-
-  // Store reference for use
-  state.signatureUploadCanvas = canvas;
-}
-
-// Optimize signature image: resize if too large, compress as JPEG if no transparency
-function optimizeSignatureImage(sourceCanvas) {
-  const MAX_SIZE = 1500; // Max width or height in pixels
-  let canvas = sourceCanvas;
-
-  // Resize if image is too large
-  if (sourceCanvas.width > MAX_SIZE || sourceCanvas.height > MAX_SIZE) {
-    const scale = Math.min(MAX_SIZE / sourceCanvas.width, MAX_SIZE / sourceCanvas.height);
-    const tempCanvas = document.createElement('canvas');
-    tempCanvas.width = Math.floor(sourceCanvas.width * scale);
-    tempCanvas.height = Math.floor(sourceCanvas.height * scale);
-    const ctx = tempCanvas.getContext('2d');
-    ctx.drawImage(sourceCanvas, 0, 0, tempCanvas.width, tempCanvas.height);
-    canvas = tempCanvas;
-  }
-
-  // Check if image has transparency
-  const ctx = canvas.getContext('2d');
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const data = imageData.data;
-  let hasTransparency = false;
-
-  for (let i = 3; i < data.length; i += 4) {
-    if (data[i] < 255) {
-      hasTransparency = true;
-      break;
-    }
-  }
-
-  // Use JPEG for better compression if no transparency, otherwise PNG
-  if (hasTransparency) {
-    return canvas.toDataURL('image/png');
-  } else {
-    // JPEG with 85% quality - much smaller than PNG for photos
-    return canvas.toDataURL('image/jpeg', 0.85);
-  }
-}
-
-function useSignatureFromUpload() {
-  if (!state.signatureUploadCanvas) {
-    showToast('Tidak ada gambar untuk digunakan', 'error');
-    return;
-  }
-
-  // Optimize and compress signature image before storing
-  state.signatureImage = optimizeSignatureImage(state.signatureUploadCanvas);
-
-  closeSignatureBgModal();
-  // Check if in unified editor mode
-  if (state.currentTool === 'unified-editor') {
-    ueSetTool('signature'); // → unified-editor.js
-    // Enable signature preview attached to cursor
-    ueState.pendingSignature = true;
-    ueState.signaturePreviewPos = null;
-    ueUpdateStatus('Klik untuk menempatkan tanda tangan'); // → unified-editor.js
-  } else {
-    setEditTool('signature');
-    updateEditorStatus('Klik untuk menempatkan tanda tangan');
-  }
-  showToast('Klik pada PDF untuk menempatkan tanda tangan', 'success');
-}
-
-// Editor Watermark Functions
-function openEditorWatermarkModal() {
-  document.getElementById('editor-watermark-modal').classList.add('active');
-  pushModalState('editor-watermark-modal');
-}
-
-function closeEditorWatermarkModal(skipHistoryBack = false) {
-  document.getElementById('editor-watermark-modal').classList.remove('active');
-  navHistory.currentModal = null;
-  if (!skipHistoryBack && navHistory.currentView === 'modal') {
-    history.back();
-  }
-}
-
-function applyEditorWatermark() {
-  const text = document.getElementById('editor-wm-text').value || 'WATERMARK';
-  const fontSize = parseInt(document.getElementById('editor-wm-size').value);
-  const color = document.getElementById('editor-wm-color').value;
-  const opacity = parseInt(document.getElementById('editor-wm-opacity').value) / 100;
-  const rotation = parseInt(document.getElementById('editor-wm-rotation').value);
-  const applyTo = document.getElementById('editor-wm-pages').value;
-
-  // Check if in unified editor mode
-  if (state.currentTool === 'unified-editor') {
-    ueSaveEditUndoState(); // → unified-editor.js
-    const pageScale = ueState.pageScales[ueState.selectedPage] || { canvasWidth: 600, canvasHeight: 800 };
-    const centerX = pageScale.canvasWidth / 2;
-    const centerY = pageScale.canvasHeight / 2;
-
-    const watermarkAnno = {
-      type: 'watermark',
-      text,
-      fontSize,
-      color,
-      opacity,
-      rotation,
-      x: centerX,
-      y: centerY
-    };
-
-    if (applyTo === 'all') {
-      for (let i = 0; i < ueState.pages.length; i++) {
-        if (!ueState.annotations[i]) ueState.annotations[i] = [];
-        ueState.annotations[i].push({ ...watermarkAnno });
-      }
-      showToast('Watermark diterapkan ke semua halaman', 'success');
-    } else {
-      ueState.annotations[ueState.selectedPage].push(watermarkAnno);
-      showToast('Watermark diterapkan', 'success');
-    }
-
-    closeEditorWatermarkModal();
-    ueRedrawAnnotations(); // → unified-editor.js
-    return;
-  }
-
-  saveUndoState();
-
-  const canvas = document.getElementById('edit-canvas');
-  const pageScale = state.editPageScales[state.currentEditPage];
-  const centerX = pageScale.canvasWidth / 2;
-  const centerY = pageScale.canvasHeight / 2;
-
-  const watermarkAnno = {
-    type: 'watermark',
-    text,
-    fontSize,
-    color,
-    opacity,
-    rotation,
-    x: centerX,
-    y: centerY
-  };
-
-  if (applyTo === 'all') {
-    // Apply to all pages
-    for (let i = 0; i < state.currentPDF.numPages; i++) {
-      state.editAnnotations[i].push({ ...watermarkAnno });
-    }
-    showToast('Watermark diterapkan ke semua halaman', 'success');
-  } else {
-    // Apply to current page only
-    state.editAnnotations[state.currentEditPage].push(watermarkAnno);
-    showToast('Watermark diterapkan', 'success');
-  }
-
-  closeEditorWatermarkModal();
-  renderEditPage();
-}
-
-// Editor Page Number Functions
-function openEditorPageNumModal() {
-  document.getElementById('editor-pagenum-modal').classList.add('active');
-  pushModalState('editor-pagenum-modal');
-}
-
-function closeEditorPageNumModal(skipHistoryBack = false) {
-  document.getElementById('editor-pagenum-modal').classList.remove('active');
-  navHistory.currentModal = null;
-  if (!skipHistoryBack && navHistory.currentView === 'modal') {
-    history.back();
-  }
-}
-
-function applyEditorPageNumbers() {
-  const position = document.getElementById('editor-pn-position').value;
-  const format = document.getElementById('editor-pn-format').value;
-  const fontSize = parseInt(document.getElementById('editor-pn-size').value);
-  const startNum = parseInt(document.getElementById('editor-pn-start').value) || 1;
-
-  // Check if in unified editor mode
-  if (state.currentTool === 'unified-editor') {
-    const totalPages = ueState.pages.length;
-    ueSaveEditUndoState(); // → unified-editor.js
-
-    for (let i = 0; i < totalPages; i++) {
-      const pageNum = startNum + i;
-      let text;
-
-      switch (format) {
-        case 'page-of':
-          text = `Halaman ${pageNum} dari ${totalPages + startNum - 1}`;
-          break;
-        case 'dash':
-          text = `- ${pageNum} -`;
-          break;
-        default:
-          text = `${pageNum}`;
-      }
-
-      const pageScale = ueState.pageScales[i] || ueState.pageScales[ueState.selectedPage] || { canvasWidth: 600, canvasHeight: 800 };
-      const canvasWidth = pageScale.canvasWidth;
-      const canvasHeight = pageScale.canvasHeight;
-      const margin = 30;
-
-      let x, y;
-      switch (position) {
-        case 'bottom-left':
-          x = margin; y = canvasHeight - margin; break;
-        case 'bottom-right':
-          x = canvasWidth - margin; y = canvasHeight - margin; break;
-        case 'top-center':
-          x = canvasWidth / 2; y = margin + fontSize; break;
-        case 'top-left':
-          x = margin; y = margin + fontSize; break;
-        case 'top-right':
-          x = canvasWidth - margin; y = margin + fontSize; break;
-        default:
-          x = canvasWidth / 2; y = canvasHeight - margin;
-      }
-
-      if (!ueState.annotations[i]) ueState.annotations[i] = [];
-      ueState.annotations[i].push({
-        type: 'pageNumber',
-        text,
-        fontSize,
-        color: '#000000',
-        x,
-        y,
-        position
-      });
-    }
-
-    closeEditorPageNumModal();
-    ueRedrawAnnotations(); // → unified-editor.js
-    showToast('Nomor halaman ditambahkan ke semua halaman', 'success');
-    return;
-  }
-
-  const totalPages = state.currentPDF.numPages;
-  saveUndoState();
-
-  for (let i = 0; i < totalPages; i++) {
-    const pageNum = startNum + i;
-    let text;
-
-    switch (format) {
-      case 'page-of':
-        text = `Halaman ${pageNum} dari ${totalPages + startNum - 1}`;
-        break;
-      case 'dash':
-        text = `- ${pageNum} -`;
-        break;
-      default:
-        text = `${pageNum}`;
-    }
-
-    // Calculate position based on page scale
-    const pageScale = state.editPageScales[i] || state.editPageScales[state.currentEditPage];
-    const canvasWidth = pageScale?.canvasWidth || 600;
-    const canvasHeight = pageScale?.canvasHeight || 800;
-    const margin = 30;
-
-    let x, y;
-    switch (position) {
-      case 'bottom-left':
-        x = margin;
-        y = canvasHeight - margin;
-        break;
-      case 'bottom-right':
-        x = canvasWidth - margin;
-        y = canvasHeight - margin;
-        break;
-      case 'top-center':
-        x = canvasWidth / 2;
-        y = margin + fontSize;
-        break;
-      case 'top-left':
-        x = margin;
-        y = margin + fontSize;
-        break;
-      case 'top-right':
-        x = canvasWidth - margin;
-        y = margin + fontSize;
-        break;
-      default: // bottom-center
-        x = canvasWidth / 2;
-        y = canvasHeight - margin;
-    }
-
-    state.editAnnotations[i].push({
-      type: 'pageNumber',
-      text,
-      fontSize,
-      color: '#000000',
-      x,
-      y,
-      position
-    });
-  }
-
-  closeEditorPageNumModal();
-  renderEditPage();
-  showToast('Nomor halaman ditambahkan ke semua halaman', 'success');
-}
-
-async function saveEditedPDF() {
+export async function saveEditedPDF() {
   try {
     const srcDoc = await PDFLib.PDFDocument.load(state.currentPDFBytes);
     const pages = srcDoc.getPages();
 
-    // Font cache for all text annotations
     const fontCache = {};
 
-    // Helper to get the right font based on family, bold, italic
     async function getTextFont(fontFamily, bold, italic) {
       let fontName = fontFamily || 'Helvetica';
 
@@ -2377,10 +1513,8 @@ async function saveEditedPDF() {
       const annotations = state.editAnnotations[i] || [];
       const { width: pdfWidth, height: pdfHeight } = page.getSize();
 
-      // Get the scale info for this page
       const pageScaleInfo = state.editPageScales[i];
       if (!pageScaleInfo && annotations.length > 0) {
-        // If we don't have scale info (page wasn't viewed), we need to calculate it
         const pdfPage = await state.currentPDF.getPage(i + 1);
         const naturalViewport = pdfPage.getViewport({ scale: 1 });
         const wrapper = document.querySelector('.editor-canvas-wrapper');
@@ -2400,15 +1534,13 @@ async function saveEditedPDF() {
       const scaleInfo = state.editPageScales[i];
       if (!scaleInfo) continue;
 
-      // Correct scale factors: canvas coordinates to PDF coordinates
       const scaleX = pdfWidth / scaleInfo.canvasWidth;
       const scaleY = pdfHeight / scaleInfo.canvasHeight;
 
       for (const anno of annotations) {
         if (anno.type === 'whiteout') {
-          // Convert canvas coordinates to PDF coordinates
           const pdfX = anno.x * scaleX;
-          const pdfY = pdfHeight - (anno.y + anno.height) * scaleY; // Y is flipped in PDF
+          const pdfY = pdfHeight - (anno.y + anno.height) * scaleY;
           const pdfW = anno.width * scaleX;
           const pdfH = anno.height * scaleY;
 
@@ -2425,15 +1557,12 @@ async function saveEditedPDF() {
           const g = parseInt(hexColor.slice(3, 5), 16) / 255;
           const b = parseInt(hexColor.slice(5, 7), 16) / 255;
 
-          // Get the appropriate font based on family and style
           const textFont = await getTextFont(anno.fontFamily, anno.bold, anno.italic);
 
-          // Text position conversion
           const pdfX = anno.x * scaleX;
           const pdfY = pdfHeight - anno.y * scaleY;
           const pdfFontSize = anno.fontSize * scaleX;
 
-          // Handle multi-line text
           const lines = anno.text.split('\n');
           for (let idx = 0; idx < lines.length; idx++) {
             page.drawText(lines[idx], {
@@ -2446,7 +1575,6 @@ async function saveEditedPDF() {
           }
         } else if (anno.type === 'signature' && anno.image) {
           try {
-            // Detect image format and use appropriate embed function
             const isJpeg = anno.image.startsWith('data:image/jpeg');
             const signatureImage = isJpeg
               ? await srcDoc.embedJpg(anno.image)
@@ -2475,8 +1603,8 @@ async function saveEditedPDF() {
           const pdfY = pdfHeight - anno.y * scaleY;
           const pdfFontSize = anno.fontSize * scaleX;
 
-          // Estimate text width for centering
           const textWidth = anno.text.length * pdfFontSize * 0.5;
+          const font = await srcDoc.embedFont(PDFLib.StandardFonts.Helvetica);
 
           page.drawText(anno.text, {
             x: pdfX - textWidth / 2,
@@ -2491,8 +1619,8 @@ async function saveEditedPDF() {
           const pdfX = anno.x * scaleX;
           const pdfY = pdfHeight - anno.y * scaleY;
           const pdfFontSize = anno.fontSize * scaleX;
+          const font = await srcDoc.embedFont(PDFLib.StandardFonts.Helvetica);
 
-          // Adjust X position based on text alignment
           let adjustedX = pdfX;
           if (anno.position.includes('center')) {
             const textWidth = font.widthOfTextAtSize(anno.text, pdfFontSize);
@@ -2522,4 +1650,3 @@ async function saveEditedPDF() {
     showToast('Gagal menyimpan PDF: ' + error.message, 'error');
   }
 }
-
