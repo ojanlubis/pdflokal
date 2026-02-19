@@ -218,6 +218,8 @@ async function ueAddFiles(files) {
   // Auto-select first page if none selected
   if (ueState.selectedPage === -1 && ueState.pages.length > 0) {
     ueSelectPage(0);
+    // Scroll body to top so user sees toolbar and first page, not middle of page
+    window.scrollTo(0, 0);
   }
 }
 
