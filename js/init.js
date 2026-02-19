@@ -1,27 +1,43 @@
 /*
- * ============================================================
- * PDFLokal - app.js
- * Application Bootstrap & Remaining Logic
- * ============================================================
+ * PDFLokal - init.js (ES Module)
+ * Main entry point: app bootstrap, dropzone, tool cards, file handling
  *
- * PURPOSE:
- *   Bootstrap file. Handles initialization, file handling,
- *   keyboard shortcuts, and mobile UI for the unified editor.
- *
- * STATE & UTILITIES: Moved to js/lib/state.js, js/lib/utils.js,
- *   and js/lib/navigation.js (loaded as ES modules before this file).
- *
- * GLOBALS AVAILABLE VIA WINDOW BRIDGE:
- *   state, mobileState, navHistory, ueState, uePmState,
- *   showToast, showFullscreenLoading, hideFullscreenLoading,
- *   formatFileSize, downloadBlob, getDownloadFilename, checkFileSize,
- *   loadImage, convertImageToPdf, cleanupImage, escapeHtml, sleep, debounce,
- *   showHome, showTool, pushWorkspaceState, pushModalState, closeAllModals,
- *   setupWorkspaceDropZone, resetState, initNavigationHistory
- *
- * LOAD ORDER: Must load AFTER js/lib/*.js modules, BEFORE pdf-tools.js
- * ============================================================
+ * This is the single <script type="module"> entry point.
+ * All other modules are loaded via import.
  */
+
+// Shared foundations
+import { state, mobileState, ueState, uePmState } from './lib/state.js';
+import {
+  showToast, showFullscreenLoading, hideFullscreenLoading,
+  formatFileSize, checkFileSize, loadImage, debounce
+} from './lib/utils.js';
+import {
+  showTool, showHome, pushWorkspaceState, initNavigationHistory
+} from './lib/navigation.js';
+
+// Feature modules (side-effect imports — set up window bridges on load)
+import './theme.js';
+import './changelog.js';
+import './pdf-tools/index.js';
+import './editor/index.js';
+import './image-tools.js';
+
+// Editor functions used directly
+import {
+  initUnifiedEditor, ueAddFiles,
+  uePmOpenModal, uePmToggleExtractMode
+} from './editor/index.js';
+
+// PDF tools functions used directly
+import { renderPdfImgPages, showPDFPreview, loadSignatureImage } from './pdf-tools/index.js';
+
+// Image tools functions used directly
+import { addImagesToPDF, updateCompressPreview, updateRemoveBgPreview } from './image-tools.js';
+
+// New modules
+import { setupKeyboardShortcuts } from './keyboard.js';
+import { initMobileEditorEnhancements, ueMobileUpdatePageIndicator } from './mobile-ui.js';
 
 // ============================================================
 // BROWSER COMPATIBILITY CHECK
@@ -96,10 +112,7 @@ function detectMobile() {
 // ============================================================
 
 function initApp() {
-  // Check browser compatibility first
   checkBrowserCompatibility();
-
-  // Initialize mobile detection first
   detectMobile();
 
   // Listen for resize and orientation changes
@@ -118,10 +131,11 @@ function initApp() {
   initFileInputs();
   initRangeSliders();
   initSignaturePad();
+  setupKeyboardShortcuts();
   initNavigationHistory();
 }
 
-// Initialize when DOM is ready (same pattern as changelog.js)
+// Modules execute after DOM parsing — readyState is 'interactive' or later
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initApp);
 } else {
@@ -404,7 +418,7 @@ function initFileInputs() {
       if (e.target.files.length > 0) {
         showFullscreenLoading('Memuat tanda tangan...');
         try {
-          await loadSignatureImage(e.target.files[0]); // → pdf-tools.js
+          await loadSignatureImage(e.target.files[0]);
         } catch (error) {
           showToast('Gagal memuat tanda tangan', 'error');
         } finally {
@@ -610,105 +624,6 @@ async function loadImageForTool(file, tool) {
 }
 
 // ============================================================
-// KEYBOARD SHORTCUTS
-// ============================================================
-
-document.addEventListener('keydown', (e) => {
-  const key = e.key.toLowerCase();
-
-  const activeEl = document.activeElement;
-  const isTyping = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable);
-
-  // Escape - close modals or go back home
-  if (e.key === 'Escape') {
-    const shortcutsModal = document.getElementById('shortcuts-modal');
-    if (shortcutsModal && shortcutsModal.classList.contains('active')) {
-      closeShortcutsModal();
-      return;
-    }
-    if (state.currentTool) {
-      showHome();
-    }
-  }
-
-  // Ctrl+S / Cmd+S - Download PDF in unified editor
-  if ((e.ctrlKey || e.metaKey) && key === 's') {
-    e.preventDefault();
-    if (state.currentTool === 'unified-editor' && ueState.pages.length > 0) {
-      ueDownload();
-    }
-  }
-
-  // Ctrl+Z for undo in unified editor
-  if (key === 'z' && (e.ctrlKey || e.metaKey) && state.currentTool === 'unified-editor') {
-    e.preventDefault();
-    ueUndoAnnotation();
-  }
-
-  // Ctrl+Y for redo in unified editor
-  if (key === 'y' && (e.ctrlKey || e.metaKey) && state.currentTool === 'unified-editor') {
-    e.preventDefault();
-    ueRedoAnnotation();
-  }
-
-  // Keyboard shortcuts for unified editor tools (only when not typing)
-  if (state.currentTool === 'unified-editor' && !isTyping) {
-    if (ueState.selectedPage >= 0) {
-      if (key === 'v' && !e.ctrlKey && !e.metaKey) {
-        ueSetTool('select');
-      } else if (key === 'w' && !e.ctrlKey && !e.metaKey) {
-        ueSetTool('whiteout');
-      } else if (key === 't' && !e.ctrlKey && !e.metaKey) {
-        ueSetTool('text');
-      } else if (key === 's' && !e.ctrlKey && !e.metaKey) {
-        ueOpenSignatureModal();
-      } else if (key === 'r' && !e.ctrlKey && !e.metaKey) {
-        ueRotateCurrentPage();
-      } else if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (ueState.selectedAnnotation) {
-          e.preventDefault();
-          ueSaveEditUndoState();
-          ueState.annotations[ueState.selectedAnnotation.pageIndex].splice(ueState.selectedAnnotation.index, 1);
-          ueState.selectedAnnotation = null;
-          ueRedrawAnnotations();
-        }
-      }
-    }
-
-    if (e.key === 'ArrowLeft' && ueState.selectedPage > 0) {
-      e.preventDefault();
-      ueSelectPage(ueState.selectedPage - 1);
-    } else if (e.key === 'ArrowRight' && ueState.selectedPage < ueState.pages.length - 1) {
-      e.preventDefault();
-      ueSelectPage(ueState.selectedPage + 1);
-    }
-
-    if (e.key === '?' || (e.shiftKey && key === '/')) {
-      e.preventDefault();
-      openShortcutsModal();
-    }
-  }
-});
-
-// ============================================================
-// KEYBOARD SHORTCUTS MODAL
-// ============================================================
-
-function openShortcutsModal() {
-  const modal = document.getElementById('shortcuts-modal');
-  if (modal) {
-    modal.classList.add('active');
-  }
-}
-
-function closeShortcutsModal() {
-  const modal = document.getElementById('shortcuts-modal');
-  if (modal) {
-    modal.classList.remove('active');
-  }
-}
-
-// ============================================================
 // HANDLE PASTE
 // ============================================================
 
@@ -734,133 +649,10 @@ document.addEventListener('paste', async (e) => {
 });
 
 // ============================================================
-// MOBILE NAVIGATION & UI FUNCTIONS
+// Window bridges (for functions called from other modules via window.*)
 // ============================================================
 
-function ueMobilePrevPage() {
-  if (ueState.selectedPage > 0) {
-    ueSelectPage(ueState.selectedPage - 1);
-    ueMobileUpdatePageIndicator();
-
-    if (mobileState.isTouch && navigator.vibrate) {
-      navigator.vibrate(10);
-    }
-  }
-}
-
-function ueMobileNextPage() {
-  if (ueState.selectedPage < ueState.pages.length - 1) {
-    ueSelectPage(ueState.selectedPage + 1);
-    ueMobileUpdatePageIndicator();
-
-    if (mobileState.isTouch && navigator.vibrate) {
-      navigator.vibrate(10);
-    }
-  }
-}
-
-function ueMobileUpdatePageIndicator() {
-  const indicator = document.getElementById('ue-mobile-page-indicator');
-  const prevBtn = document.getElementById('ue-mobile-prev');
-  const nextBtn = document.getElementById('ue-mobile-next');
-
-  if (!indicator) return;
-
-  const current = ueState.selectedPage + 1;
-  const total = ueState.pages.length;
-
-  indicator.innerHTML = `Halaman <strong>${current}</strong> / ${total}`;
-
-  if (prevBtn) prevBtn.disabled = ueState.selectedPage <= 0;
-  if (nextBtn) nextBtn.disabled = ueState.selectedPage >= ueState.pages.length - 1;
-}
-
-function ueMobileOpenPagePicker() {
-  const picker = document.getElementById('ue-mobile-page-picker');
-  const grid = document.getElementById('ue-mobile-page-grid');
-
-  if (!picker || !grid || ueState.pages.length === 0) return;
-
-  grid.innerHTML = '';
-  ueState.pages.forEach((page, index) => {
-    const thumb = document.createElement('div');
-    thumb.className = 'mobile-page-thumb' + (index === ueState.selectedPage ? ' selected' : '');
-    thumb.onclick = () => {
-      ueSelectPage(index);
-      ueMobileUpdatePageIndicator();
-      ueMobileClosePagePicker();
-
-      if (mobileState.isTouch && navigator.vibrate) {
-        navigator.vibrate(10);
-      }
-    };
-
-    if (page.canvas) {
-      const thumbCanvas = document.createElement('canvas');
-      const scale = 0.3;
-      thumbCanvas.width = page.canvas.width * scale;
-      thumbCanvas.height = page.canvas.height * scale;
-      const ctx = thumbCanvas.getContext('2d');
-      ctx.drawImage(page.canvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
-      thumb.appendChild(thumbCanvas);
-    }
-
-    const num = document.createElement('span');
-    num.className = 'mobile-page-thumb-number';
-    num.textContent = index + 1;
-    thumb.appendChild(num);
-
-    grid.appendChild(thumb);
-  });
-
-  picker.classList.add('active');
-  document.body.style.overflow = 'hidden';
-}
-
-function ueMobileClosePagePicker() {
-  const picker = document.getElementById('ue-mobile-page-picker');
-  if (picker) {
-    picker.classList.remove('active');
-  }
-  document.body.style.overflow = '';
-}
-
-function toggleMobileTools() {
-  const dropdown = document.getElementById('mobile-tools-dropdown');
-  if (dropdown) {
-    dropdown.classList.toggle('active');
-  }
-}
-
-function closeMobileTools() {
-  const dropdown = document.getElementById('mobile-tools-dropdown');
-  if (dropdown) {
-    dropdown.classList.remove('active');
-  }
-}
-
-function ueMobileUpdateSignButton() {
-  const signBtn = document.getElementById('ue-mobile-sign-btn');
-  if (!signBtn) return;
-
-  const currentPageAnnotations = ueState.annotations[ueState.selectedPage] || [];
-  const hasSignature = currentPageAnnotations.some(a => a.type === 'signature');
-
-  signBtn.classList.toggle('has-signature', hasSignature);
-}
-
-// Close mobile tools when clicking outside
-document.addEventListener('click', function(e) {
-  const dropdown = document.getElementById('mobile-tools-dropdown');
-  const moreBtn = document.getElementById('ue-mobile-more-btn');
-
-  if (dropdown && dropdown.classList.contains('active')) {
-    if (!dropdown.contains(e.target) && e.target !== moreBtn && !moreBtn.contains(e.target)) {
-      closeMobileTools();
-    }
-  }
-});
-
-function initMobileEditorEnhancements() {
-  // Placeholder for future mobile-specific enhancements
-}
+window.handleDroppedFiles = handleDroppedFiles;
+window.loadPDFForTool = loadPDFForTool;
+window.loadImageForTool = loadImageForTool;
+window.detectMobile = detectMobile;
