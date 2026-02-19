@@ -41,43 +41,13 @@ export {
 } from './pagenum-modal.js';
 
 export {
-  addMergeFiles,
-  refreshMergeList,
-  mergePDFs,
-  renderSplitPages,
   togglePageSelection,
-  selectAllPages,
-  deselectAllPages,
-  splitPDF,
-  renderRotatePages,
-  rotateSelected,
-  rotateAll,
-  saveRotatedPDF,
-  renderPagesGrid,
-  deletePageFromGrid,
-  deleteSelectedPages,
-  saveReorderedPDF,
   renderPdfImgPages,
   selectAllPdfImgPages,
   convertPDFtoImages,
   showPDFPreview,
   compressPDF,
-  protectPDF,
-  initEditMode,
-  renderEditPage,
-  drawAnnotationSync,
-  drawAnnotation,
-  drawSelectionHandles,
-  setEditTool,
-  updateEditorStatus,
-  editPrevPage,
-  editNextPage,
-  saveUndoState,
-  undoEdit,
-  redoEdit,
-  clearCurrentPageAnnotations,
-  deleteSelectedAnnotation,
-  saveEditedPDF
+  protectPDF
 } from './standalone-tools.js';
 
 // ============================================================
@@ -126,49 +96,14 @@ window.openEditorPageNumModal = openEditorPageNumModal;
 window.closeEditorPageNumModal = closeEditorPageNumModal;
 window.applyEditorPageNumbers = applyEditorPageNumbers;
 
-// Standalone tools
+// Standalone tools (PDF-to-Image, Compress, Protect)
 import {
-  addMergeFiles, refreshMergeList, mergePDFs,
-  renderSplitPages, togglePageSelection, selectAllPages, deselectAllPages, splitPDF,
-  renderRotatePages, rotateSelected, rotateAll, saveRotatedPDF,
-  renderPagesGrid, deletePageFromGrid, deleteSelectedPages, saveReorderedPDF,
   renderPdfImgPages, selectAllPdfImgPages, convertPDFtoImages,
-  showPDFPreview, compressPDF, protectPDF,
-  initEditMode, renderEditPage, setEditTool, updateEditorStatus,
-  editPrevPage, editNextPage, saveUndoState, undoEdit, redoEdit,
-  clearCurrentPageAnnotations, deleteSelectedAnnotation, saveEditedPDF
+  showPDFPreview, compressPDF, protectPDF
 } from './standalone-tools.js';
-window.addMergeFiles = addMergeFiles;
-window.refreshMergeList = refreshMergeList;
-window.mergePDFs = mergePDFs;
-window.renderSplitPages = renderSplitPages;
-window.togglePageSelection = togglePageSelection;
-window.selectAllPages = selectAllPages;
-window.deselectAllPages = deselectAllPages;
-window.splitPDF = splitPDF;
-window.renderRotatePages = renderRotatePages;
-window.rotateSelected = rotateSelected;
-window.rotateAll = rotateAll;
-window.saveRotatedPDF = saveRotatedPDF;
-window.renderPagesGrid = renderPagesGrid;
-window.deletePageFromGrid = deletePageFromGrid;
-window.deleteSelectedPages = deleteSelectedPages;
-window.saveReorderedPDF = saveReorderedPDF;
 window.renderPdfImgPages = renderPdfImgPages;
 window.selectAllPdfImgPages = selectAllPdfImgPages;
 window.convertPDFtoImages = convertPDFtoImages;
 window.showPDFPreview = showPDFPreview;
 window.compressPDF = compressPDF;
 window.protectPDF = protectPDF;
-window.initEditMode = initEditMode;
-window.renderEditPage = renderEditPage;
-window.setEditTool = setEditTool;
-window.updateEditorStatus = updateEditorStatus;
-window.editPrevPage = editPrevPage;
-window.editNextPage = editNextPage;
-window.saveUndoState = saveUndoState;
-window.undoEdit = undoEdit;
-window.redoEdit = redoEdit;
-window.clearCurrentPageAnnotations = clearCurrentPageAnnotations;
-window.deleteSelectedAnnotation = deleteSelectedAnnotation;
-window.saveEditedPDF = saveEditedPDF;

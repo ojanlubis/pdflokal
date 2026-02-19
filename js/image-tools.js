@@ -29,7 +29,8 @@ import {
   downloadBlob,
   getDownloadFilename,
   loadImage,
-  escapeHtml
+  escapeHtml,
+  makeWhiteTransparent
 } from './lib/utils.js';
 import { enableDragReorder } from './pdf-tools/drag-reorder.js';
 
@@ -111,24 +112,8 @@ function updateRemoveBgPreview() {
   // Draw original image
   ctx.drawImage(state.originalImage, 0, 0);
 
-  // Get image data
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const data = imageData.data;
-
-  // Process each pixel - make white/near-white pixels transparent
-  for (let i = 0; i < data.length; i += 4) {
-    const r = data[i];
-    const g = data[i + 1];
-    const b = data[i + 2];
-
-    // Check if pixel is white/near-white based on threshold
-    if (r >= threshold && g >= threshold && b >= threshold) {
-      data[i + 3] = 0; // Set alpha to 0 (transparent)
-    }
-  }
-
-  // Put the modified image data back
-  ctx.putImageData(imageData, 0, 0);
+  // Make white/near-white pixels transparent
+  makeWhiteTransparent(canvas, threshold);
 
   // Store the canvas for download
   state.removeBgCanvas = canvas;

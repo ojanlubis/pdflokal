@@ -84,6 +84,13 @@ export const state = {
 export const MAX_FILE_SIZE_WARNING = 20 * 1024 * 1024; // 20MB - show warning
 export const MAX_FILE_SIZE_LIMIT = 100 * 1024 * 1024;  // 100MB - hard limit
 
+// Editor constants
+export const UNDO_STACK_LIMIT = 50;             // Max undo/redo history entries
+export const SIGNATURE_DEFAULT_WIDTH = 150;     // Default signature placement width (px)
+export const OBSERVER_ROOT_MARGIN = '200px 0px'; // IntersectionObserver lazy-load buffer
+export const DOUBLE_TAP_DELAY = 300;            // ms threshold for double-tap detection
+export const DOUBLE_TAP_DISTANCE = 30;          // px threshold for double-tap proximity
+
 // ============================================================
 // MOBILE STATE (device detection results)
 // ============================================================

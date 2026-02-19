@@ -10,7 +10,7 @@
 import { state, mobileState, ueState, uePmState } from './lib/state.js';
 import {
   showToast, showFullscreenLoading, hideFullscreenLoading,
-  formatFileSize, checkFileSize, loadImage, debounce
+  formatFileSize, checkFileSize, loadImage, debounce, setupCanvasDPR
 } from './lib/utils.js';
 import {
   showTool, showHome, pushWorkspaceState, initNavigationHistory
@@ -286,176 +286,75 @@ function handleEditorCardWithFilePicker(mode) {
 // FILE INPUTS
 // ============================================================
 
+/**
+ * Wire up a file input with loading overlay, error handling, and cleanup.
+ * @param {string} inputId - DOM id of the <input type="file">
+ * @param {object} opts
+ * @param {string}   opts.loadingMsg  - Message for fullscreen loading overlay
+ * @param {string}   opts.errorMsg    - Toast message on failure
+ * @param {Function} opts.handler     - async (files) => void  — receives FileList or single File
+ * @param {boolean}  [opts.allFiles]  - Pass entire FileList instead of first file (default false)
+ */
+function setupFileInput(inputId, { loadingMsg, errorMsg, handler, allFiles = false }) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  input.addEventListener('change', async (e) => {
+    if (e.target.files.length === 0) return;
+    showFullscreenLoading(loadingMsg);
+    try {
+      await handler(allFiles ? e.target.files : e.target.files[0]);
+    } catch (error) {
+      console.error(`Error: ${errorMsg}`, error);
+      showToast(errorMsg, 'error');
+    } finally {
+      hideFullscreenLoading();
+      e.target.value = '';
+    }
+  });
+}
+
 function initFileInputs() {
-  // Image to PDF input
-  const imgPdfInput = document.getElementById('img-pdf-input');
-  if (imgPdfInput) {
-    imgPdfInput.addEventListener('change', async (e) => {
-      if (e.target.files.length > 0) {
-        showFullscreenLoading('Memuat gambar...');
-        try {
-          await addImagesToPDF(e.target.files);
-        } catch (error) {
-          console.error('Error loading images:', error);
-          showToast('Gagal memuat gambar', 'error');
-        } finally {
-          hideFullscreenLoading();
-          e.target.value = '';
-        }
-      }
-    });
-  }
+  // PDF tools
+  setupFileInput('compress-pdf-input', {
+    loadingMsg: 'Memuat PDF...', errorMsg: 'Gagal memuat PDF',
+    handler: (file) => loadPDFForTool(file, 'compress-pdf')
+  });
+  setupFileInput('pdf-img-input', {
+    loadingMsg: 'Memuat PDF...', errorMsg: 'Gagal memuat PDF',
+    handler: (file) => loadPDFForTool(file, 'pdf-to-img')
+  });
+  setupFileInput('protect-input', {
+    loadingMsg: 'Memuat PDF...', errorMsg: 'Gagal memuat PDF',
+    handler: (file) => loadPDFForTool(file, 'protect')
+  });
 
-  // Compress PDF input
-  const compressPdfInput = document.getElementById('compress-pdf-input');
-  if (compressPdfInput) {
-    compressPdfInput.addEventListener('change', async (e) => {
-      if (e.target.files.length > 0) {
-        showFullscreenLoading('Memuat PDF...');
-        try {
-          await loadPDFForTool(e.target.files[0], 'compress-pdf');
-        } catch (error) {
-          console.error('Error loading PDF:', error);
-          showToast('Gagal memuat PDF', 'error');
-        } finally {
-          hideFullscreenLoading();
-          e.target.value = '';
-        }
-      }
-    });
-  }
+  // Image tools
+  setupFileInput('img-pdf-input', {
+    loadingMsg: 'Memuat gambar...', errorMsg: 'Gagal memuat gambar',
+    handler: (files) => addImagesToPDF(files), allFiles: true
+  });
+  setupFileInput('compress-img-input', {
+    loadingMsg: 'Memuat gambar...', errorMsg: 'Gagal memuat gambar',
+    handler: (file) => loadImageForTool(file, 'compress-img')
+  });
+  setupFileInput('resize-input', {
+    loadingMsg: 'Memuat gambar...', errorMsg: 'Gagal memuat gambar',
+    handler: (file) => loadImageForTool(file, 'resize')
+  });
+  setupFileInput('convert-input', {
+    loadingMsg: 'Memuat gambar...', errorMsg: 'Gagal memuat gambar',
+    handler: (file) => loadImageForTool(file, 'convert-img')
+  });
+  setupFileInput('remove-bg-input', {
+    loadingMsg: 'Memuat gambar...', errorMsg: 'Gagal memuat gambar',
+    handler: (file) => loadImageForTool(file, 'remove-bg')
+  });
 
-  // PDF to Image input
-  const pdfImgInput = document.getElementById('pdf-img-input');
-  if (pdfImgInput) {
-    pdfImgInput.addEventListener('change', async (e) => {
-      if (e.target.files.length > 0) {
-        showFullscreenLoading('Memuat PDF...');
-        try {
-          await loadPDFForTool(e.target.files[0], 'pdf-to-img');
-        } catch (error) {
-          console.error('Error loading PDF:', error);
-          showToast('Gagal memuat PDF', 'error');
-        } finally {
-          hideFullscreenLoading();
-          e.target.value = '';
-        }
-      }
-    });
-  }
-
-  // Protect PDF input
-  const protectInput = document.getElementById('protect-input');
-  if (protectInput) {
-    protectInput.addEventListener('change', async (e) => {
-      if (e.target.files.length > 0) {
-        showFullscreenLoading('Memuat PDF...');
-        try {
-          await loadPDFForTool(e.target.files[0], 'protect');
-        } catch (error) {
-          console.error('Error loading PDF:', error);
-          showToast('Gagal memuat PDF', 'error');
-        } finally {
-          hideFullscreenLoading();
-          e.target.value = '';
-        }
-      }
-    });
-  }
-
-  // Compress Image input
-  const compressImgInput = document.getElementById('compress-img-input');
-  if (compressImgInput) {
-    compressImgInput.addEventListener('change', async (e) => {
-      if (e.target.files.length > 0) {
-        showFullscreenLoading('Memuat gambar...');
-        try {
-          await loadImageForTool(e.target.files[0], 'compress-img');
-        } catch (error) {
-          console.error('Error loading image:', error);
-          showToast('Gagal memuat gambar', 'error');
-        } finally {
-          hideFullscreenLoading();
-          e.target.value = '';
-        }
-      }
-    });
-  }
-
-  // Resize Image input
-  const resizeInput = document.getElementById('resize-input');
-  if (resizeInput) {
-    resizeInput.addEventListener('change', async (e) => {
-      if (e.target.files.length > 0) {
-        showFullscreenLoading('Memuat gambar...');
-        try {
-          await loadImageForTool(e.target.files[0], 'resize');
-        } catch (error) {
-          console.error('Error loading image:', error);
-          showToast('Gagal memuat gambar', 'error');
-        } finally {
-          hideFullscreenLoading();
-          e.target.value = '';
-        }
-      }
-    });
-  }
-
-  // Convert Image input
-  const convertInput = document.getElementById('convert-input');
-  if (convertInput) {
-    convertInput.addEventListener('change', async (e) => {
-      if (e.target.files.length > 0) {
-        showFullscreenLoading('Memuat gambar...');
-        try {
-          await loadImageForTool(e.target.files[0], 'convert-img');
-        } catch (error) {
-          console.error('Error loading image:', error);
-          showToast('Gagal memuat gambar', 'error');
-        } finally {
-          hideFullscreenLoading();
-          e.target.value = '';
-        }
-      }
-    });
-  }
-
-  // Remove Background input
-  const removeBgInput = document.getElementById('remove-bg-input');
-  if (removeBgInput) {
-    removeBgInput.addEventListener('change', async (e) => {
-      if (e.target.files.length > 0) {
-        showFullscreenLoading('Memuat gambar...');
-        try {
-          await loadImageForTool(e.target.files[0], 'remove-bg');
-        } catch (error) {
-          console.error('Error loading image:', error);
-          showToast('Gagal memuat gambar', 'error');
-        } finally {
-          hideFullscreenLoading();
-          e.target.value = '';
-        }
-      }
-    });
-  }
-
-  // Signature Upload input
-  const sigUploadInput = document.getElementById('signature-upload-input');
-  if (sigUploadInput) {
-    sigUploadInput.addEventListener('change', async (e) => {
-      if (e.target.files.length > 0) {
-        showFullscreenLoading('Memuat tanda tangan...');
-        try {
-          await loadSignatureImage(e.target.files[0]);
-        } catch (error) {
-          showToast('Gagal memuat tanda tangan', 'error');
-        } finally {
-          hideFullscreenLoading();
-          e.target.value = '';
-        }
-      }
-    });
-  }
+  // Signature upload
+  setupFileInput('signature-upload-input', {
+    loadingMsg: 'Memuat tanda tangan...', errorMsg: 'Gagal memuat tanda tangan',
+    handler: (file) => loadSignatureImage(file)
+  });
 
   // Initialize drop hint drag-over effects
   initDropHints();
@@ -497,10 +396,7 @@ function initSignaturePad() {
     });
 
     function resizeCanvas() {
-      const ratio = Math.max(window.devicePixelRatio || 1, 1);
-      canvas.width = canvas.offsetWidth * ratio;
-      canvas.height = canvas.offsetHeight * ratio;
-      canvas.getContext('2d').scale(ratio, ratio);
+      setupCanvasDPR(canvas);
       state.signaturePad.clear();
     }
 

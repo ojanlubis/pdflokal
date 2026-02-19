@@ -4,7 +4,7 @@
  */
 
 // Re-export everything
-export { ueGetCurrentCanvas, ueGetCoords, ueGetResizeHandle, getTextBounds } from './canvas-utils.js';
+export { ueGetCurrentCanvas, ueGetCoords, ueGetResizeHandle } from './canvas-utils.js';
 
 export {
   ueRedrawAnnotations, ueRedrawPageAnnotations,
@@ -44,7 +44,6 @@ export { ueSetupCanvasEvents } from './canvas-events.js';
 export {
   ueSetTool, ueOpenSignatureModal, ueOpenTextModal, ueConfirmText,
   ueOpenWatermarkModal, ueOpenPageNumModal,
-  toggleMoreTools, closeMoreTools,
   toggleFloatingMore, closeFloatingMore,
   ueOpenProtectModal, closeEditorProtectModal, applyEditorProtect,
   editorGoHome
@@ -54,7 +53,7 @@ export { ueBuildFinalPDF, ueDownload } from './pdf-export.js';
 
 export {
   uePmOpenModal, uePmCloseModal, uePmRenderPages,
-  rebuildAnnotationMapping, uePmReindexAnnotations,
+  rebuildAnnotationMapping,
   uePmToggleExtractMode, uePmTogglePageSelection,
   uePmSelectAll, uePmDeselectAll, uePmExtractSelected
 } from './page-manager.js';
@@ -73,11 +72,10 @@ export {
 // to break circular import chains (see comments in individual modules).
 
 // Canvas utils
-import { ueGetCurrentCanvas, ueGetCoords, ueGetResizeHandle, getTextBounds } from './canvas-utils.js';
+import { ueGetCurrentCanvas, ueGetCoords, ueGetResizeHandle } from './canvas-utils.js';
 window.ueGetCurrentCanvas = ueGetCurrentCanvas;
 window.ueGetCoords = ueGetCoords;
 window.ueGetResizeHandle = ueGetResizeHandle;
-window.getTextBounds = getTextBounds;
 
 // Annotations
 import { ueRedrawAnnotations, ueRedrawPageAnnotations, ueDrawAnnotation, ueDrawSelectionHandles, ueFindAnnotationAt } from './annotations.js';
@@ -148,15 +146,13 @@ import { ueSetupCanvasEvents } from './canvas-events.js';
 window.ueSetupCanvasEvents = ueSetupCanvasEvents;
 
 // Tools
-import { ueSetTool, ueOpenSignatureModal, ueOpenTextModal, ueConfirmText, ueOpenWatermarkModal, ueOpenPageNumModal, toggleMoreTools, closeMoreTools, toggleFloatingMore, closeFloatingMore, ueOpenProtectModal, closeEditorProtectModal, applyEditorProtect, editorGoHome } from './tools.js';
+import { ueSetTool, ueOpenSignatureModal, ueOpenTextModal, ueConfirmText, ueOpenWatermarkModal, ueOpenPageNumModal, toggleFloatingMore, closeFloatingMore, ueOpenProtectModal, closeEditorProtectModal, applyEditorProtect, editorGoHome } from './tools.js';
 window.ueSetTool = ueSetTool;
 window.ueOpenSignatureModal = ueOpenSignatureModal;
 window.ueOpenTextModal = ueOpenTextModal;
 window.ueConfirmText = ueConfirmText;
 window.ueOpenWatermarkModal = ueOpenWatermarkModal;
 window.ueOpenPageNumModal = ueOpenPageNumModal;
-window.toggleMoreTools = toggleMoreTools;
-window.closeMoreTools = closeMoreTools;
 window.toggleFloatingMore = toggleFloatingMore;
 window.closeFloatingMore = closeFloatingMore;
 window.ueOpenProtectModal = ueOpenProtectModal;
@@ -170,12 +166,11 @@ window.ueBuildFinalPDF = ueBuildFinalPDF;
 window.ueDownload = ueDownload;
 
 // Page manager
-import { uePmOpenModal, uePmCloseModal, uePmRenderPages, rebuildAnnotationMapping, uePmReindexAnnotations, uePmToggleExtractMode, uePmTogglePageSelection, uePmSelectAll, uePmDeselectAll, uePmExtractSelected } from './page-manager.js';
+import { uePmOpenModal, uePmCloseModal, uePmRenderPages, rebuildAnnotationMapping, uePmToggleExtractMode, uePmTogglePageSelection, uePmSelectAll, uePmDeselectAll, uePmExtractSelected } from './page-manager.js';
 window.uePmOpenModal = uePmOpenModal;
 window.uePmCloseModal = uePmCloseModal;
 window.uePmRenderPages = uePmRenderPages;
 window.rebuildAnnotationMapping = rebuildAnnotationMapping;
-window.uePmReindexAnnotations = uePmReindexAnnotations;
 window.uePmToggleExtractMode = uePmToggleExtractMode;
 window.uePmTogglePageSelection = uePmTogglePageSelection;
 window.uePmSelectAll = uePmSelectAll;

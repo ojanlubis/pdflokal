@@ -4,7 +4,7 @@
  */
 
 import { state, navHistory, ueState } from '../lib/state.js';
-import { showToast, loadImage } from '../lib/utils.js';
+import { showToast, loadImage, makeWhiteTransparent, setupCanvasDPR } from '../lib/utils.js';
 import { pushModalState } from '../lib/navigation.js';
 
 export function openSignatureModal() {
@@ -14,7 +14,6 @@ export function openSignatureModal() {
 
   const modal = document.getElementById('signature-modal');
   modal.classList.add('active');
-  window.setEditTool('signature');
   pushModalState('signature-modal');
 
   // Default to upload tab
@@ -22,10 +21,7 @@ export function openSignatureModal() {
 
   setTimeout(() => {
     const canvas = document.getElementById('signature-canvas');
-    const ratio = Math.max(window.devicePixelRatio || 1, 1);
-    canvas.width = canvas.offsetWidth * ratio;
-    canvas.height = canvas.offsetHeight * ratio;
-    canvas.getContext('2d').scale(ratio, ratio);
+    setupCanvasDPR(canvas);
     if (state.signaturePad) state.signaturePad.clear();
   }, 100);
 }
@@ -58,31 +54,13 @@ export function useSignature() {
     ctx.drawImage(signatureCanvas, 0, 0);
 
     // Apply background removal (make white pixels transparent)
-    const imageData = ctx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
-    const data = imageData.data;
-    const threshold = 240;
-
-    for (let i = 0; i < data.length; i += 4) {
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
-
-      if (r >= threshold && g >= threshold && b >= threshold) {
-        data[i + 3] = 0;
-      }
-    }
-
-    ctx.putImageData(imageData, 0, 0);
+    makeWhiteTransparent(tempCanvas, 240);
     state.signatureImage = optimizeSignatureImage(tempCanvas);
 
     closeSignatureModal();
-    if (state.currentTool === 'unified-editor') {
-      window.ueSetTool('signature'); // -> unified-editor.js
-      ueState.pendingSignature = true;
-      ueState.signaturePreviewPos = null;
-    } else {
-      window.setEditTool('signature');
-    }
+    window.ueSetTool('signature');
+    ueState.pendingSignature = true;
+    ueState.signaturePreviewPos = null;
     showToast('Klik pada PDF untuk menempatkan tanda tangan', 'success');
   } else {
     showToast('Buat tanda tangan terlebih dahulu', 'error');
@@ -104,10 +82,7 @@ export function switchSignatureTab(tab) {
     setTimeout(() => {
       const canvas = document.getElementById('signature-canvas');
       if (canvas && state.signaturePad) {
-        const ratio = Math.max(window.devicePixelRatio || 1, 1);
-        canvas.width = canvas.offsetWidth * ratio;
-        canvas.height = canvas.offsetHeight * ratio;
-        canvas.getContext('2d').scale(ratio, ratio);
+        setupCanvasDPR(canvas);
         state.signaturePad.clear();
       }
     }, 100);
@@ -177,20 +152,7 @@ export function updateSignatureBgPreview() {
 
   ctx.drawImage(state.signatureUploadImage, 0, 0);
 
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const data = imageData.data;
-
-  for (let i = 0; i < data.length; i += 4) {
-    const r = data[i];
-    const g = data[i + 1];
-    const b = data[i + 2];
-
-    if (r >= threshold && g >= threshold && b >= threshold) {
-      data[i + 3] = 0;
-    }
-  }
-
-  ctx.putImageData(imageData, 0, 0);
+  makeWhiteTransparent(canvas, threshold);
   state.signatureUploadCanvas = canvas;
 }
 
@@ -236,14 +198,9 @@ export function useSignatureFromUpload() {
   state.signatureImage = optimizeSignatureImage(state.signatureUploadCanvas);
 
   closeSignatureBgModal();
-  if (state.currentTool === 'unified-editor') {
-    window.ueSetTool('signature'); // -> unified-editor.js
-    ueState.pendingSignature = true;
-    ueState.signaturePreviewPos = null;
-    window.ueUpdateStatus('Klik untuk menempatkan tanda tangan'); // -> unified-editor.js
-  } else {
-    window.setEditTool('signature');
-    window.updateEditorStatus('Klik untuk menempatkan tanda tangan');
-  }
+  window.ueSetTool('signature');
+  ueState.pendingSignature = true;
+  ueState.signaturePreviewPos = null;
+  window.ueUpdateStatus('Klik untuk menempatkan tanda tangan');
   showToast('Klik pada PDF untuk menempatkan tanda tangan', 'success');
 }

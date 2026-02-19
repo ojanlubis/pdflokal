@@ -4,7 +4,7 @@
  * and inline text editing
  */
 
-import { ueState, state, CSS_FONT_MAP } from '../lib/state.js';
+import { ueState, state, CSS_FONT_MAP, UNDO_STACK_LIMIT, DOUBLE_TAP_DELAY, DOUBLE_TAP_DISTANCE } from '../lib/state.js';
 import { showToast } from '../lib/utils.js';
 import { ueGetCoords, ueGetResizeHandle, ueGetCurrentCanvas, getTextBounds } from './canvas-utils.js';
 import { ueRedrawAnnotations, ueFindAnnotationAt } from './annotations.js';
@@ -32,8 +32,6 @@ export function ueSetupCanvasEvents() {
   // Double-tap detection state
   let touchLastTap = 0;
   let touchLastCoords = null;
-  const DOUBLE_TAP_DELAY = 300;
-  const DOUBLE_TAP_DISTANCE = 30;
 
   function getCanvasAndIndex(target) {
     const canvas = target.closest ? target.closest('.ue-page-slot canvas') : null;
@@ -335,7 +333,7 @@ export function ueSetupCanvasEvents() {
       if (hasMovedOrResized && preChangeState) {
         ueState.editUndoStack.push(preChangeState);
         ueState.editRedoStack = [];
-        if (ueState.editUndoStack.length > 50) ueState.editUndoStack.shift();
+        if (ueState.editUndoStack.length > UNDO_STACK_LIMIT) ueState.editUndoStack.shift();
       }
       ueState.isResizing = false;
       ueState.resizeHandle = null;
@@ -350,7 +348,7 @@ export function ueSetupCanvasEvents() {
       if (hasMovedOrResized && preChangeState) {
         ueState.editUndoStack.push(preChangeState);
         ueState.editRedoStack = [];
-        if (ueState.editUndoStack.length > 50) ueState.editUndoStack.shift();
+        if (ueState.editUndoStack.length > UNDO_STACK_LIMIT) ueState.editUndoStack.shift();
       }
       ueState.isDragging = false;
       hasMovedOrResized = false;
@@ -475,7 +473,7 @@ function ueCreateInlineTextEditor(anno, pageIndex, index) {
       const undoState = JSON.parse(JSON.stringify(ueState.annotations));
       ueState.editUndoStack.push(undoState);
       ueState.editRedoStack = [];
-      if (ueState.editUndoStack.length > 50) ueState.editUndoStack.shift();
+      if (ueState.editUndoStack.length > UNDO_STACK_LIMIT) ueState.editUndoStack.shift();
       anno.text = newText;
     }
 

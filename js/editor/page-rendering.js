@@ -4,7 +4,7 @@
  * page selection, page deletion, status updates
  */
 
-import { ueState, state, mobileState } from '../lib/state.js';
+import { ueState, state, mobileState, OBSERVER_ROOT_MARGIN } from '../lib/state.js';
 import { showToast } from '../lib/utils.js';
 import { ueRedrawPageAnnotations } from './annotations.js';
 import { ueRenderThumbnails } from './sidebar.js';
@@ -305,7 +305,7 @@ export function ueSetupIntersectionObserver() {
     });
   }, {
     root: null,
-    rootMargin: '200px 0px'
+    rootMargin: OBSERVER_ROOT_MARGIN
   });
 
   ueState.pageCanvases.forEach(pc => {

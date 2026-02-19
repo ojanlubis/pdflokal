@@ -3,7 +3,7 @@
  * Signature placement, preview, confirm, delete
  */
 
-import { ueState, state, mobileState } from '../lib/state.js';
+import { ueState, state, mobileState, SIGNATURE_DEFAULT_WIDTH } from '../lib/state.js';
 import { showToast } from '../lib/utils.js';
 import { ueGetCurrentCanvas } from './canvas-utils.js';
 import { ueRedrawAnnotations } from './annotations.js';
@@ -30,7 +30,7 @@ export async function uePlaceSignature(x, y) {
   if (!ueState.annotations[pageIndex]) ueState.annotations[pageIndex] = [];
 
   const aspectRatio = img.width / img.height;
-  const sigWidth = 150;
+  const sigWidth = SIGNATURE_DEFAULT_WIDTH;
   const sigHeight = sigWidth / aspectRatio;
   const newAnno = {
     type: 'signature',
@@ -77,7 +77,7 @@ export function ueDrawSignaturePreview(x, y) {
 
   if (img.complete) {
     const aspectRatio = img.width / img.height;
-    const sigWidth = 150;
+    const sigWidth = SIGNATURE_DEFAULT_WIDTH;
     const sigHeight = sigWidth / aspectRatio;
 
     // Draw semi-transparent preview centered on cursor

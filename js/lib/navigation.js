@@ -203,9 +203,7 @@ export function setupWorkspaceDropZone(tool) {
 
     showFullscreenLoading(loadingMessage);
     try {
-      if (tool === 'merge') {
-        await window.addMergeFiles(files);
-      } else if (tool === 'img-to-pdf') {
+      if (tool === 'img-to-pdf') {
         await window.addImagesToPDF(files);
       } else if (files.length === 1) {
         const file = files[0];

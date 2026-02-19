@@ -3,7 +3,7 @@
  * Text annotation modal logic
  */
 
-import { state, navHistory } from '../lib/state.js';
+import { state, navHistory, CSS_FONT_MAP } from '../lib/state.js';
 import { showToast } from '../lib/utils.js';
 import { pushModalState } from '../lib/navigation.js';
 
@@ -40,7 +40,6 @@ function initTextModalControls() {
 }
 
 // Open text annotation modal. Resets all fields to defaults.
-// Called from: unified-editor.js (ueOpenTextModal) and legacy editor.
 export function openTextModal() {
   if (window.changelogAPI) {
     window.changelogAPI.minimize();
@@ -105,12 +104,7 @@ export function updateTextPreview() {
   preview.style.fontWeight = isBold ? 'bold' : 'normal';
   preview.style.fontStyle = isItalic ? 'italic' : 'normal';
 
-  let cssFontFamily = 'Helvetica, Arial, sans-serif';
-  if (fontFamily === 'Times-Roman') cssFontFamily = 'Times New Roman, Times, serif';
-  else if (fontFamily === 'Courier') cssFontFamily = 'Courier New, Courier, monospace';
-  else if (fontFamily === 'Montserrat') cssFontFamily = 'Montserrat, sans-serif';
-  else if (fontFamily === 'Carlito') cssFontFamily = 'Carlito, Calibri, sans-serif';
-  preview.style.fontFamily = cssFontFamily;
+  preview.style.fontFamily = CSS_FONT_MAP[fontFamily] || CSS_FONT_MAP['Helvetica'];
 }
 
 // Read current text modal form values.
@@ -127,40 +121,11 @@ export function getTextModalSettings() {
 }
 
 export function confirmTextInput() {
-  // Check if we're in unified editor mode
-  if (state.currentTool === 'unified-editor' && window.ueState && window.ueState.pendingTextPosition) {
-    window.ueConfirmText(); // -> unified-editor.js
+  if (window.ueState && window.ueState.pendingTextPosition) {
+    window.ueConfirmText();
     return;
   }
 
-  const settings = getTextModalSettings();
-
-  if (!settings.text) {
-    showToast('Masukkan teks terlebih dahulu', 'error');
-    return;
-  }
-
-  if (!state.pendingTextPosition) {
-    showToast('Posisi teks tidak valid', 'error');
-    closeTextModal();
-    return;
-  }
-
-  window.saveUndoState(); // -> standalone-tools.js (legacy editor)
-  state.editAnnotations[state.currentEditPage].push({
-    type: 'text',
-    text: settings.text,
-    x: state.pendingTextPosition.x,
-    y: state.pendingTextPosition.y,
-    fontSize: settings.fontSize,
-    color: settings.color,
-    fontFamily: settings.fontFamily,
-    bold: settings.bold,
-    italic: settings.italic
-  });
-
+  showToast('Posisi teks tidak valid', 'error');
   closeTextModal();
-  window.renderEditPage(); // -> standalone-tools.js (legacy editor)
-  window.setEditTool('select');
-  window.updateEditorStatus('Teks ditambahkan');
 }

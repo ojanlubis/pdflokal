@@ -269,6 +269,38 @@ export function safeLocalSet(key, val) {
 }
 
 // ============================================================
+// CANVAS HELPERS
+// ============================================================
+
+/**
+ * Make white/near-white pixels transparent on a canvas.
+ * Used by: Remove Background tool, Signature background removal, Signature upload preview.
+ */
+export function makeWhiteTransparent(canvas, threshold = 240) {
+  const ctx = canvas.getContext('2d');
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const data = imageData.data;
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i] >= threshold && data[i + 1] >= threshold && data[i + 2] >= threshold) {
+      data[i + 3] = 0;
+    }
+  }
+  ctx.putImageData(imageData, 0, 0);
+}
+
+/**
+ * Set up a canvas for high-DPI rendering.
+ * Scales canvas buffer by devicePixelRatio and applies ctx.scale().
+ */
+export function setupCanvasDPR(canvas) {
+  const ratio = Math.max(window.devicePixelRatio || 1, 1);
+  canvas.width = canvas.offsetWidth * ratio;
+  canvas.height = canvas.offsetHeight * ratio;
+  canvas.getContext('2d').scale(ratio, ratio);
+  return ratio;
+}
+
+// ============================================================
 // WINDOW BRIDGE (for non-module scripts and onclick handlers)
 // ============================================================
 

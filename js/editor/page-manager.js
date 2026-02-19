@@ -344,12 +344,6 @@ export function rebuildAnnotationMapping(oldPages) {
   ueState.pageCaches = newCaches;
 }
 
-// Legacy wrapper (kept for window bridge compatibility)
-export function uePmReindexAnnotations(fromIndex, toIndex) {
-  // No-op — callers should use rebuildAnnotationMapping(oldPages) instead.
-  // This exists only so old window.uePmReindexAnnotations calls don't crash.
-}
-
 // Rotate a page in the modal
 function uePmRotatePage(index, degrees) {
   ueSaveUndoState();

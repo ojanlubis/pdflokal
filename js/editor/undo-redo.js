@@ -3,7 +3,7 @@
  * Undo/redo for both page operations and annotation operations
  */
 
-import { ueState } from '../lib/state.js';
+import { ueState, UNDO_STACK_LIMIT } from '../lib/state.js';
 import { showToast } from '../lib/utils.js';
 import { ueRedrawAnnotations } from './annotations.js';
 
@@ -17,7 +17,7 @@ export function ueSaveUndoState() {
     rotation: p.rotation
   })))));
   ueState.redoStack = [];
-  if (ueState.undoStack.length > 50) ueState.undoStack.shift();
+  if (ueState.undoStack.length > UNDO_STACK_LIMIT) ueState.undoStack.shift();
 }
 
 export function ueUndo() {
@@ -94,7 +94,7 @@ async function ueRestorePages(pagesData) {
 export function ueSaveEditUndoState() {
   ueState.editUndoStack.push(JSON.parse(JSON.stringify(ueState.annotations)));
   ueState.editRedoStack = [];
-  if (ueState.editUndoStack.length > 50) ueState.editUndoStack.shift();
+  if (ueState.editUndoStack.length > UNDO_STACK_LIMIT) ueState.editUndoStack.shift();
 }
 
 export function ueUndoAnnotation() {
