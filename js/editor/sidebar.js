@@ -230,22 +230,20 @@ function ueSetupSidebarDragDrop() {
       insertAt = items.length;
     }
 
-    // Track the page user is currently viewing
+    // Snapshot pages BEFORE splice for reference-based reindex
+    const oldPages = [...ueState.pages];
     const viewedPage = ueState.pages[ueState.selectedPage];
 
-    // Remove the page first
     const [movedPage] = ueState.pages.splice(draggedIndex, 1);
 
-    // Adjust insertion point if we removed from before it
     if (draggedIndex < insertAt) {
       insertAt--;
     }
 
-    // Insert at new position
     ueState.pages.splice(insertAt, 0, movedPage);
 
-    // Reindex annotations (use window.* to avoid circular import with page-manager)
-    window.uePmReindexAnnotations(draggedIndex, insertAt);
+    // Rebuild annotations + caches using reference equality
+    window.rebuildAnnotationMapping(oldPages);
 
     // Update selectedPage to follow the viewed page
     const newViewedIndex = ueState.pages.indexOf(viewedPage);
@@ -253,8 +251,9 @@ function ueSetupSidebarDragDrop() {
       ueState.selectedPage = newViewedIndex;
     }
 
-    // Re-render (this will reset _sidebarDragSetup via innerHTML clear)
+    // Rebuild page slots (fixes observer stale indices) + re-render sidebar
     container._sidebarDragSetup = false;
+    window.ueCreatePageSlots();
     ueRenderThumbnails();
 
     removeDropIndicator();

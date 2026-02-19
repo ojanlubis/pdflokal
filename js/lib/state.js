@@ -151,6 +151,9 @@ export const ueState = {
 
   // --- UX ---
   lastLockedToastAnnotation: null, // Tracks last signature that showed "locked" toast (prevents spam)
+
+  // --- Guards ---
+  isRestoring: false,             // true during undo/redo page restoration (blocks scroll sync, new undo/redo)
 };
 
 // ============================================================

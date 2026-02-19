@@ -13,7 +13,7 @@ export function ueGetCurrentCanvas() {
 
 // Convert mouse/touch event coords to canvas-pixel coords
 export function ueGetCoords(e, canvas) {
-  const dpr = ueState.devicePixelRatio || window.devicePixelRatio || 1;
+  const dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 4));
   const rect = canvas.getBoundingClientRect();
   const x = (e.clientX - rect.left) * (canvas.width / canvas.clientWidth / dpr);
   const y = (e.clientY - rect.top) * (canvas.height / canvas.clientHeight / dpr);

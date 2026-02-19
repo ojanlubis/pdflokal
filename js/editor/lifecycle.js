@@ -4,10 +4,10 @@
  */
 
 import { ueState, state } from '../lib/state.js';
-import { showToast, showFullscreenLoading, hideFullscreenLoading } from '../lib/utils.js';
+import { showToast, showFullscreenLoading, hideFullscreenLoading, safeLocalGet, safeLocalSet } from '../lib/utils.js';
 import { initUnifiedEditorInput, ueAddFiles } from './file-loading.js';
 import { ueRenderThumbnails } from './sidebar.js';
-import { ueCreatePageSlots, ueSetupScrollSync, ueSetWrapperHeight, ueUpdatePageCount, ueRenderVisiblePages } from './page-rendering.js';
+import { ueCreatePageSlots, ueSetupScrollSync, ueSetWrapperHeight, ueUpdatePageCount, ueRenderVisiblePages, ueRemoveScrollSync, clearPdfDocCache } from './page-rendering.js';
 import { ueUpdateZoomDisplay } from './zoom-rotate.js';
 
 // Reset unified editor state
@@ -28,7 +28,13 @@ export function ueReset() {
   ueState.pageCanvases = [];
   if (ueState.pageObserver) { ueState.pageObserver.disconnect(); ueState.pageObserver = null; }
   ueState.scrollSyncEnabled = true;
-  window._ueScrollSyncSetup = false;
+  ueState.isRestoring = false;
+  ueRemoveScrollSync();
+  clearPdfDocCache();
+  if (window._ueResizeHandler) {
+    window.removeEventListener('resize', window._ueResizeHandler);
+    delete window._ueResizeHandler;
+  }
   ueState.zoomLevel = 1.0;
   ueUpdateZoomDisplay();
 
@@ -46,7 +52,7 @@ export function ueReset() {
 // First-use signature tooltip
 export function ueShowSignatureHint() {
   const HINT_KEY = 'pdflokal_signature_hint_shown';
-  if (localStorage.getItem(HINT_KEY)) return;
+  if (safeLocalGet(HINT_KEY)) return;
 
   const tooltip = document.getElementById('signature-hint-tooltip');
   if (!tooltip) return;
@@ -66,7 +72,7 @@ export function ueDismissSignatureHint() {
   if (tooltip) {
     tooltip.classList.remove('show');
   }
-  localStorage.setItem(HINT_KEY, 'true');
+  safeLocalSet(HINT_KEY, 'true');
 }
 
 // Initialize when showing unified editor

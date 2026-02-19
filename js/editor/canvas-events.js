@@ -463,8 +463,11 @@ function ueCreateInlineTextEditor(anno, pageIndex, index) {
   `;
 
   const originalText = anno.text;
+  let saved = false;
 
   const saveEdit = () => {
+    if (saved) return;
+    saved = true;
     const newText = editor.innerText.trim();
     delete anno._editing;
 

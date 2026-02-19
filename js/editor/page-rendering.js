@@ -15,6 +15,15 @@ const ueRenderingPages = new Set();
 // rAF debounce ID for ueRenderVisiblePages
 let ueRenderVisibleRafId = null;
 
+// Scroll sync timeout ID (cleared on rapid page selection to prevent deadlock)
+let scrollSyncTimeoutId = null;
+
+// Scroll handler reference (for cleanup in ueRemoveScrollSync)
+let scrollHandler = null;
+
+// PDF.js document cache — reuse across renders, destroyed on reset
+const pdfDocCache = new Map();
+
 // ============================================================
 // PAGE SLOTS & MULTI-CANVAS DOM
 // ============================================================
@@ -129,9 +138,10 @@ export function ueSelectPage(index) {
   // Scroll the selected page into view (suppress scroll-sync feedback loop)
   const entry = ueState.pageCanvases[index];
   if (entry) {
+    clearTimeout(scrollSyncTimeoutId);
     ueState.scrollSyncEnabled = false;
     entry.slot.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    setTimeout(() => { ueState.scrollSyncEnabled = true; }, 500);
+    scrollSyncTimeoutId = setTimeout(() => { ueState.scrollSyncEnabled = true; }, 500);
   }
 
   // Ensure the page is rendered
@@ -170,7 +180,12 @@ export async function ueRenderPageCanvas(index) {
   if (!entry) { ueRenderingPages.delete(index); return; }
 
   try {
-    const pdf = await pdfjsLib.getDocument({ data: sourceFile.bytes.slice() }).promise;
+    const pdf = await pdfDocCache.get(pageInfo.sourceIndex)
+      || await (async () => {
+        const doc = await pdfjsLib.getDocument({ data: sourceFile.bytes.slice() }).promise;
+        pdfDocCache.set(pageInfo.sourceIndex, doc);
+        return doc;
+      })();
     const page = await pdf.getPage(pageInfo.pageNum + 1);
 
     const canvas = entry.canvas;
@@ -210,6 +225,11 @@ export async function ueRenderPageCanvas(index) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     await page.render({ canvasContext: ctx, viewport }).promise;
 
+    // Guard: page may have been deleted/reordered during async render
+    if (index >= ueState.pages.length || ueState.pages[index] !== pageInfo) {
+      return;
+    }
+
     ueState.pageCaches[index] = ctx.getImageData(0, 0, canvas.width, canvas.height);
     entry.rendered = true;
 
@@ -242,7 +262,7 @@ export function ueRenderVisiblePages() {
 
 // Compatibility wrapper — renders the selected page
 export function ueRenderSelectedPage() {
-  if (ueState.selectedPage >= 0) {
+  if (ueState.selectedPage >= 0 && ueState.selectedPage < ueState.pageCanvases.length) {
     const entry = ueState.pageCanvases[ueState.selectedPage];
     if (entry) entry.rendered = false;
     ueRenderPageCanvas(ueState.selectedPage);
@@ -298,10 +318,11 @@ export function ueSetupScrollSync() {
   window._ueScrollSyncSetup = true;
 
   let scrollTimeout;
-  window.addEventListener('scroll', () => {
+  scrollHandler = () => {
     // Only sync when unified editor is active
     if (state.currentTool !== 'unified-editor') return;
     if (ueState.scrollSyncEnabled === false) return;
+    if (ueState.isRestoring) return;
 
     clearTimeout(scrollTimeout);
     scrollTimeout = setTimeout(() => {
@@ -329,7 +350,23 @@ export function ueSetupScrollSync() {
         }
       }
     }, 100);
-  });
+  };
+  window.addEventListener('scroll', scrollHandler);
+}
+
+// Remove scroll sync listener (called from ueReset)
+export function ueRemoveScrollSync() {
+  if (scrollHandler) {
+    window.removeEventListener('scroll', scrollHandler);
+    scrollHandler = null;
+  }
+  window._ueScrollSyncSetup = false;
+}
+
+// Clear PDF document cache (called from ueReset)
+export function clearPdfDocCache() {
+  pdfDocCache.forEach(doc => { try { doc.destroy(); } catch (e) { /* ignore */ } });
+  pdfDocCache.clear();
 }
 
 // ============================================================
@@ -342,35 +379,23 @@ export function ueDeletePage(index) {
     return;
   }
 
+  // Clear selected annotation if it's on the deleted page
+  if (ueState.selectedAnnotation && ueState.selectedAnnotation.pageIndex === index) {
+    ueState.selectedAnnotation = null;
+    window.ueHideConfirmButton();
+  }
+
   // Use window.* to avoid circular import with undo-redo
   window.ueSaveUndoState();
+  const oldPages = [...ueState.pages];
   ueState.pages.splice(index, 1);
-  delete ueState.annotations[index];
 
-  // Reindex annotations
-  const newAnnotations = {};
-  Object.keys(ueState.annotations).forEach((key) => {
-    const idx = parseInt(key);
-    if (idx > index) {
-      newAnnotations[idx - 1] = ueState.annotations[idx];
-    } else if (idx < index) {
-      newAnnotations[idx] = ueState.annotations[idx];
-    }
-  });
-  ueState.annotations = newAnnotations;
+  // Rebuild annotations + caches using reference equality
+  window.rebuildAnnotationMapping(oldPages);
 
-  // Remove slot from DOM and rebuild pageCanvases / pageCaches
+  // Remove slot from DOM and rebuild pageCanvases
   const removed = ueState.pageCanvases.splice(index, 1);
   if (removed[0]) removed[0].slot.remove();
-  delete ueState.pageCaches[index];
-
-  // Re-index pageCaches and slot data attributes
-  const newCaches = {};
-  Object.keys(ueState.pageCaches).forEach((key) => {
-    const idx = parseInt(key);
-    newCaches[idx > index ? idx - 1 : idx] = ueState.pageCaches[idx];
-  });
-  ueState.pageCaches = newCaches;
   ueState.pageCanvases.forEach((pc, i) => {
     pc.slot.dataset.pageIndex = i;
   });

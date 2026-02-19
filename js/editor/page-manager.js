@@ -7,7 +7,7 @@ import { ueState, uePmState, navHistory } from '../lib/state.js';
 import { showToast, showFullscreenLoading, hideFullscreenLoading, downloadBlob, getDownloadFilename } from '../lib/utils.js';
 import { pushModalState } from '../lib/navigation.js';
 import { ueRenderThumbnails } from './sidebar.js';
-import { ueUpdatePageCount, ueRenderSelectedPage } from './page-rendering.js';
+import { ueUpdatePageCount, ueRenderSelectedPage, ueSetupIntersectionObserver } from './page-rendering.js';
 import { ueAddFiles } from './file-loading.js';
 import { ueSaveUndoState } from './undo-redo.js';
 
@@ -21,6 +21,9 @@ export function uePmOpenModal() {
   uePmState.isOpen = true;
   uePmState.extractMode = false;
   uePmState.selectedForExtract = [];
+
+  // Disconnect lazy-render observer while modal is open (prevents stale renders)
+  if (ueState.pageObserver) ueState.pageObserver.disconnect();
 
   uePmRenderPages();
   uePmUpdateUI();
@@ -54,6 +57,8 @@ export function uePmCloseModal(skipHistoryBack = false) {
   requestAnimationFrame(() => {
     ueRenderThumbnails();
     ueUpdatePageCount();
+    // Reconnect lazy-render observer (disconnected in uePmOpenModal)
+    ueSetupIntersectionObserver();
     if (ueState.selectedPage >= 0) {
       ueRenderSelectedPage();
     }
@@ -235,6 +240,7 @@ function uePmEnableDragReorder() {
       const midpoint = rect.left + rect.width / 2;
       const insertBefore = e.clientX < midpoint;
 
+      const oldPages = [...ueState.pages];
       const viewedPage = ueState.pages[ueState.selectedPage];
       let insertAt = insertBefore ? targetIndex : targetIndex + 1;
 
@@ -245,7 +251,7 @@ function uePmEnableDragReorder() {
       }
 
       ueState.pages.splice(insertAt, 0, movedPage);
-      uePmReindexAnnotations(draggedIndex, insertAt);
+      rebuildAnnotationMapping(oldPages);
 
       const newViewedIndex = ueState.pages.indexOf(viewedPage);
       if (newViewedIndex !== -1) {
@@ -299,6 +305,7 @@ function uePmEnableDragReorder() {
       insertAt = items.length;
     }
 
+    const oldPages = [...ueState.pages];
     const viewedPage = ueState.pages[ueState.selectedPage];
 
     const [movedPage] = ueState.pages.splice(draggedIndex, 1);
@@ -308,7 +315,7 @@ function uePmEnableDragReorder() {
     }
 
     ueState.pages.splice(insertAt, 0, movedPage);
-    uePmReindexAnnotations(draggedIndex, insertAt);
+    rebuildAnnotationMapping(oldPages);
 
     const newViewedIndex = ueState.pages.indexOf(viewedPage);
     if (newViewedIndex !== -1) {
@@ -320,40 +327,27 @@ function uePmEnableDragReorder() {
   });
 }
 
-// Reindex annotations after page reorder
-export function uePmReindexAnnotations(fromIndex, toIndex) {
+// Rebuild annotation and cache mapping after page reorder/delete.
+// Takes a snapshot of the pages array BEFORE the splice.
+// Uses reference equality to map old positions to new positions.
+export function rebuildAnnotationMapping(oldPages) {
   const oldAnnotations = { ...ueState.annotations };
-  ueState.annotations = {};
-
-  const indexMap = {};
-  for (let i = 0; i < ueState.pages.length; i++) {
-    indexMap[i] = i;
-  }
-
-  if (fromIndex < toIndex) {
-    for (let i = fromIndex; i < toIndex; i++) {
-      indexMap[i + 1] = i;
-    }
-    indexMap[fromIndex] = toIndex;
-  } else {
-    for (let i = toIndex + 1; i <= fromIndex; i++) {
-      indexMap[i - 1] = i;
-    }
-    indexMap[fromIndex] = toIndex;
-  }
-
-  Object.keys(oldAnnotations).forEach(key => {
-    const oldIdx = parseInt(key);
-    let newIdx = oldIdx;
-    if (oldIdx === fromIndex) {
-      newIdx = toIndex;
-    } else if (fromIndex < toIndex && oldIdx > fromIndex && oldIdx <= toIndex) {
-      newIdx = oldIdx - 1;
-    } else if (fromIndex > toIndex && oldIdx >= toIndex && oldIdx < fromIndex) {
-      newIdx = oldIdx + 1;
-    }
-    ueState.annotations[newIdx] = oldAnnotations[key];
+  const oldCaches = { ...ueState.pageCaches };
+  const newAnnotations = {};
+  const newCaches = {};
+  ueState.pages.forEach((page, newIdx) => {
+    const oldIdx = oldPages.indexOf(page);
+    newAnnotations[newIdx] = (oldIdx >= 0 ? oldAnnotations[oldIdx] : null) || [];
+    if (oldIdx >= 0 && oldCaches[oldIdx]) newCaches[newIdx] = oldCaches[oldIdx];
   });
+  ueState.annotations = newAnnotations;
+  ueState.pageCaches = newCaches;
+}
+
+// Legacy wrapper (kept for window bridge compatibility)
+export function uePmReindexAnnotations(fromIndex, toIndex) {
+  // No-op — callers should use rebuildAnnotationMapping(oldPages) instead.
+  // This exists only so old window.uePmReindexAnnotations calls don't crash.
 }
 
 // Rotate a page in the modal
@@ -406,20 +400,10 @@ function uePmDeletePage(index) {
 
   const wasViewingDeletedPage = (ueState.selectedPage === index);
   const viewedPage = ueState.pages[ueState.selectedPage];
+  const oldPages = [...ueState.pages];
 
   ueState.pages.splice(index, 1);
-  delete ueState.annotations[index];
-
-  const newAnnotations = {};
-  Object.keys(ueState.annotations).forEach(key => {
-    const idx = parseInt(key);
-    if (idx > index) {
-      newAnnotations[idx - 1] = ueState.annotations[idx];
-    } else {
-      newAnnotations[idx] = ueState.annotations[idx];
-    }
-  });
-  ueState.annotations = newAnnotations;
+  rebuildAnnotationMapping(oldPages);
 
   if (wasViewingDeletedPage) {
     ueState.selectedPage = Math.min(index, ueState.pages.length - 1);

@@ -259,6 +259,15 @@ export function debounce(fn, delay) {
   };
 }
 
+// Safe localStorage wrappers (prevents crash in private browsing / quota exceeded)
+export function safeLocalGet(key) {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+
+export function safeLocalSet(key, val) {
+  try { localStorage.setItem(key, val); } catch { /* ignore */ }
+}
+
 // ============================================================
 // WINDOW BRIDGE (for non-module scripts and onclick handlers)
 // ============================================================
@@ -277,3 +286,5 @@ window.convertImageToPdf = convertImageToPdf;
 window.escapeHtml = escapeHtml;
 window.sleep = sleep;
 window.debounce = debounce;
+window.safeLocalGet = safeLocalGet;
+window.safeLocalSet = safeLocalSet;

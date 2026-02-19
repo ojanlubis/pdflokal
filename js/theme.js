@@ -3,6 +3,8 @@
  * Handles dark mode toggle and persistence
  */
 
+import { safeLocalGet, safeLocalSet } from './lib/utils.js';
+
 // Constants
 const THEME_KEY = 'pdflokal_theme'; // Values: 'light' or 'dark'
 const THEME_ATTR = 'data-theme';
@@ -14,7 +16,7 @@ let currentTheme = 'light';
  * Initialize theme system
  */
 function initTheme() {
-  const savedTheme = localStorage.getItem(THEME_KEY) || 'light';
+  const savedTheme = safeLocalGet(THEME_KEY) || 'light';
   applyTheme(savedTheme);
   initToggleButton();
 }
@@ -29,7 +31,7 @@ function setTheme(theme) {
     console.warn('Invalid theme:', theme);
     return;
   }
-  localStorage.setItem(THEME_KEY, theme);
+  safeLocalSet(THEME_KEY, theme);
   applyTheme(theme);
 }
 

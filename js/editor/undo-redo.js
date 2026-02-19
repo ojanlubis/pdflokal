@@ -21,7 +21,7 @@ export function ueSaveUndoState() {
 }
 
 export function ueUndo() {
-  if (ueState.undoStack.length === 0) return;
+  if (ueState.undoStack.length === 0 || ueState.isRestoring) return;
   // Save current state to redo
   ueState.redoStack.push(JSON.parse(JSON.stringify(ueState.pages.map(p => ({
     pageNum: p.pageNum,
@@ -35,7 +35,7 @@ export function ueUndo() {
 }
 
 export function ueRedo() {
-  if (ueState.redoStack.length === 0) return;
+  if (ueState.redoStack.length === 0 || ueState.isRestoring) return;
   // Save current to undo
   ueState.undoStack.push(JSON.parse(JSON.stringify(ueState.pages.map(p => ({
     pageNum: p.pageNum,
@@ -49,6 +49,8 @@ export function ueRedo() {
 }
 
 async function ueRestorePages(pagesData) {
+  ueState.isRestoring = true;
+  try {
   // Regenerate pages from pagesData
   ueState.pages = [];
   for (const pageData of pagesData) {
@@ -78,6 +80,12 @@ async function ueRestorePages(pagesData) {
   }
   if (ueState.selectedPage >= 0) {
     window.ueSelectPage(ueState.selectedPage);
+  }
+  } catch (err) {
+    console.error('Undo restore failed:', err);
+    showToast('Gagal mengembalikan perubahan', 'error');
+  } finally {
+    ueState.isRestoring = false;
   }
 }
 

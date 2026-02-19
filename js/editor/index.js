@@ -54,7 +54,7 @@ export { ueBuildFinalPDF, ueDownload } from './pdf-export.js';
 
 export {
   uePmOpenModal, uePmCloseModal, uePmRenderPages,
-  uePmReindexAnnotations,
+  rebuildAnnotationMapping, uePmReindexAnnotations,
   uePmToggleExtractMode, uePmTogglePageSelection,
   uePmSelectAll, uePmDeselectAll, uePmExtractSelected
 } from './page-manager.js';
@@ -170,10 +170,11 @@ window.ueBuildFinalPDF = ueBuildFinalPDF;
 window.ueDownload = ueDownload;
 
 // Page manager
-import { uePmOpenModal, uePmCloseModal, uePmRenderPages, uePmReindexAnnotations, uePmToggleExtractMode, uePmTogglePageSelection, uePmSelectAll, uePmDeselectAll, uePmExtractSelected } from './page-manager.js';
+import { uePmOpenModal, uePmCloseModal, uePmRenderPages, rebuildAnnotationMapping, uePmReindexAnnotations, uePmToggleExtractMode, uePmTogglePageSelection, uePmSelectAll, uePmDeselectAll, uePmExtractSelected } from './page-manager.js';
 window.uePmOpenModal = uePmOpenModal;
 window.uePmCloseModal = uePmCloseModal;
 window.uePmRenderPages = uePmRenderPages;
+window.rebuildAnnotationMapping = rebuildAnnotationMapping;
 window.uePmReindexAnnotations = uePmReindexAnnotations;
 window.uePmToggleExtractMode = uePmToggleExtractMode;
 window.uePmTogglePageSelection = uePmTogglePageSelection;

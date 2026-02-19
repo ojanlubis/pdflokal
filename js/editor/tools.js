@@ -55,6 +55,8 @@ export function ueOpenTextModal() {
 }
 
 export function ueConfirmText() {
+  if (ueState.selectedPage < 0 || ueState.selectedPage >= ueState.pages.length) return;
+
   const settings = window.getTextModalSettings();
 
   if (!settings.text) {
@@ -63,6 +65,7 @@ export function ueConfirmText() {
   }
 
   ueSaveEditUndoState();
+  if (!ueState.annotations[ueState.selectedPage]) ueState.annotations[ueState.selectedPage] = [];
   ueState.annotations[ueState.selectedPage].push({
     type: 'text',
     text: settings.text,

@@ -10,59 +10,59 @@ import { ueRedrawAnnotations } from './annotations.js';
 import { ueSaveEditUndoState } from './undo-redo.js';
 
 // Place signature on canvas at (x, y)
-export function uePlaceSignature(x, y) {
+export async function uePlaceSignature(x, y) {
   const pageIndex = ueState.selectedPage;
   if (pageIndex < 0 || !state.signatureImage) return;
 
-  ueSaveEditUndoState();
   const img = new Image();
   img.src = state.signatureImage;
-  img.onload = () => {
-    const aspectRatio = img.width / img.height;
-    const sigWidth = 150;
-    const sigHeight = sigWidth / aspectRatio;
-    const newAnno = {
-      type: 'signature',
-      image: state.signatureImage,
-      x: x - sigWidth / 2,  // Center signature on click
-      y: y - sigHeight / 2,
-      width: sigWidth,
-      height: sigHeight,
-      cachedImg: img,
-      locked: false
-    };
-    ueState.annotations[pageIndex].push(newAnno);
 
-    // Select the newly placed signature
-    const newIndex = ueState.annotations[pageIndex].length - 1;
-    ueState.selectedAnnotation = { pageIndex, index: newIndex };
+  try {
+    await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; });
+  } catch {
+    showToast('Gagal memuat tanda tangan', 'error');
+    return;
+  }
 
-    // Clear pending state and switch to select tool
-    ueState.pendingSignature = false;
-    ueState.signaturePreviewPos = null;
+  // Save undo AFTER image loads (prevents race with undo during load)
+  ueSaveEditUndoState();
 
-    ueRedrawAnnotations();
+  if (!ueState.annotations[pageIndex]) ueState.annotations[pageIndex] = [];
 
-    // Show confirm button on the new signature
-    ueShowConfirmButton(newAnno, ueState.selectedAnnotation);
-
-    // Switch to select tool (use window.* to avoid circular import with tools.js)
-    window.ueSetTool('select');
-
-    // Update download button to show pulse animation
-    ueUpdateDownloadButtonState();
-
-    // Haptic feedback for mobile
-    if (mobileState.isTouch && navigator.vibrate) {
-      navigator.vibrate(20);
-    }
-
-    // mobile-ui.js registers this as a window global. The bare `typeof` check
-    // works because window properties are accessible as bare names from ES modules.
-    if (typeof ueMobileUpdateSignButton === 'function') {
-      ueMobileUpdateSignButton();
-    }
+  const aspectRatio = img.width / img.height;
+  const sigWidth = 150;
+  const sigHeight = sigWidth / aspectRatio;
+  const newAnno = {
+    type: 'signature',
+    image: state.signatureImage,
+    x: x - sigWidth / 2,
+    y: y - sigHeight / 2,
+    width: sigWidth,
+    height: sigHeight,
+    cachedImg: img,
+    locked: false
   };
+  ueState.annotations[pageIndex].push(newAnno);
+
+  const newIndex = ueState.annotations[pageIndex].length - 1;
+  ueState.selectedAnnotation = { pageIndex, index: newIndex };
+
+  ueState.pendingSignature = false;
+  ueState.signaturePreviewPos = null;
+
+  ueRedrawAnnotations();
+  ueShowConfirmButton(newAnno, ueState.selectedAnnotation);
+
+  window.ueSetTool('select');
+  ueUpdateDownloadButtonState();
+
+  if (mobileState.isTouch && navigator.vibrate) {
+    navigator.vibrate(20);
+  }
+
+  if (typeof ueMobileUpdateSignButton === 'function') {
+    ueMobileUpdateSignButton();
+  }
 }
 
 // Draw signature preview at cursor

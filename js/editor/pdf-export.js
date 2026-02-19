@@ -184,8 +184,11 @@ export async function ueBuildFinalPDF() {
   });
 }
 
+let isDownloading = false;
+
 // Download PDF
 export async function ueDownload() {
+  if (isDownloading) return;
   if (ueState.pages.length === 0) {
     showToast('Tidak ada halaman untuk diunduh', 'error');
     return;
@@ -225,6 +228,7 @@ export async function ueDownload() {
   }
 
   // Show loading state
+  isDownloading = true;
   downloadBtn.disabled = true;
   downloadBtn.innerHTML = `
     <svg class="btn-spinner" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -242,6 +246,7 @@ export async function ueDownload() {
     console.error('Error saving PDF:', error);
     showToast('Gagal menyimpan PDF', 'error');
   } finally {
+    isDownloading = false;
     downloadBtn.disabled = false;
     downloadBtn.innerHTML = originalText;
   }

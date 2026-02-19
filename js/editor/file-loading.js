@@ -9,6 +9,8 @@ import { ueCreatePageSlots, ueSelectPage, ueUpdatePageCount } from './page-rende
 import { ueRenderThumbnails } from './sidebar.js';
 import { ueSaveUndoState } from './undo-redo.js';
 
+let isLoadingFiles = false;
+
 export function initUnifiedEditorInput() {
   const input = document.getElementById('ue-file-input');
   if (input && !input._ueInitialized) {
@@ -33,7 +35,15 @@ export function initUnifiedEditorInput() {
 // Load files into unified editor
 export async function ueAddFiles(files) {
   if (!files || files.length === 0) return;
+  if (isLoadingFiles) {
+    showToast('File sedang dimuat...', 'info');
+    return;
+  }
 
+  isLoadingFiles = true;
+  ueSaveUndoState();
+
+  try {
   for (const file of files) {
     const isPdf = file.type === 'application/pdf';
     const isImage = file.type.startsWith('image/');
@@ -72,6 +82,9 @@ export async function ueAddFiles(files) {
     ueSelectPage(0);
     window.scrollTo(0, 0);
   }
+  } finally {
+    isLoadingFiles = false;
+  }
 }
 
 // Handle PDF file loading
@@ -84,8 +97,6 @@ async function handlePdfFile(file) {
   ueState.sourceFiles.push({ name: file.name, bytes });
 
   const pdf = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
-
-  ueSaveUndoState();
 
   for (let i = 0; i < pdf.numPages; i++) {
     const page = await pdf.getPage(i + 1);
@@ -136,8 +147,6 @@ async function handleImageFile(file) {
   const ctx = canvas.getContext('2d');
 
   await page.render({ canvasContext: ctx, viewport }).promise;
-
-  ueSaveUndoState();
 
   ueState.pages.push({
     pageNum: 0,
