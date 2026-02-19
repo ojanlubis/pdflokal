@@ -146,6 +146,9 @@ ueState = {
   scrollSyncEnabled: true,         // false during programmatic scrollIntoView
   zoomLevel: 1.0,                  // Current zoom multiplier (1.0 = fit width)
 
+  // Guards (hardening)
+  isRestoring: false,              // true during undo/redo page restoration (blocks scroll sync + nested undo)
+
   // Signature placement
   pendingSignature: false,         // true when signature is "attached to cursor"
   signaturePreviewPos: null,       // Cursor position for ghost preview: { x, y }
@@ -919,6 +922,9 @@ The unified editor uses one `<canvas>` per page inside `#ue-pages-container`:
 - `ueGetCurrentCanvas()` — Returns selected page's canvas element
 - `ueGetCoords(e, canvas, dpr)` — Mouse/touch → canvas coordinates
 - `ueGetResizeHandle(anno, x, y)` — Hit test for annotation resize handles
+- `rebuildAnnotationMapping(oldPages)` — Reference-based annotation/cache reindex after page reorder/delete
+- `clearPdfDocCache()` — Destroys cached PDF.js documents (called from ueReset)
+- `ueRemoveScrollSync()` — Cleans up window scroll listener (called from ueReset)
 
 **Layout reflow guard:**
 `ueAddFiles()` uses `await new Promise(resolve => requestAnimationFrame(resolve))` before `ueCreatePageSlots()` to ensure the browser has laid out the workspace (so `clientWidth` returns a real value, not 0).
@@ -987,6 +993,32 @@ All modals automatically close when clicking the backdrop. This is handled by a 
 modal.style.display = 'flex';  // Workaround for old CSS pattern
 modal.style.display = '';      // Cleanup
 ```
+
+### Reliability & Hardening Patterns
+
+**Race condition guards:**
+- `isLoadingFiles` flag in `file-loading.js` prevents concurrent `ueAddFiles()` calls
+- `isDownloading` flag in `pdf-export.js` prevents double-click downloads
+- `isRestoring` flag in `ueState` blocks scroll sync and nested undo/redo during restore
+- `ueRenderingPages` Set in `page-rendering.js` prevents concurrent renders of same page
+- `saved` closure flag in inline text editor prevents blur+Enter double-save
+
+**Page reorder/delete pattern (reference-based):**
+```javascript
+const oldPages = [...ueState.pages];        // snapshot BEFORE splice
+ueState.pages.splice(draggedIndex, 1);      // mutate
+ueState.pages.splice(insertAt, 0, movedPage);
+rebuildAnnotationMapping(oldPages);          // uses indexOf() reference equality
+```
+
+**Resource lifecycle:**
+- `pdfDocCache` (Map in page-rendering.js) caches PDF.js documents, `.destroy()` on reset
+- `ueRemoveScrollSync()` cleans up window scroll listener on reset
+- `clearPdfDocCache()` destroys all cached PDF documents on reset
+- IntersectionObserver disconnected during Gabungkan modal, reconnected on close
+
+**Safe localStorage:**
+- Use `safeLocalGet(key)` / `safeLocalSet(key, val)` from `utils.js` — wraps in try/catch for private browsing
 
 ---
 
