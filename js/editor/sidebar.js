@@ -4,7 +4,7 @@
  */
 
 import { ueState } from '../lib/state.js';
-import { showToast } from '../lib/utils.js';
+import { showToast, showFullscreenLoading, hideFullscreenLoading } from '../lib/utils.js';
 
 // ============================================================
 // SIDEBAR FILE DROPDOWN
@@ -30,17 +30,20 @@ export function ueReplaceFiles() {
   // One-shot handler so it doesn't stack
   const handler = async (e) => {
     input.removeEventListener('change', handler);
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-    input.value = '';
+    const filesArray = Array.from(e.target.files);
+    if (filesArray.length === 0) return;
+    input.value = ''; // Reset AFTER converting to array (FileList is a live collection)
 
     // Reset editor then load new files
     window.ueReset();
+    showFullscreenLoading('Memuat file...');
     try {
-      await window.ueAddFiles(files);
+      await window.ueAddFiles(filesArray);
     } catch (err) {
       console.error('Error replacing files:', err);
       showToast('Gagal memuat file', 'error');
+    } finally {
+      hideFullscreenLoading();
     }
   };
   input.addEventListener('change', handler);
