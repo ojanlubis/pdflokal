@@ -76,11 +76,23 @@ export function ueCreatePageSlots() {
   ueSetWrapperHeight();
 }
 
-// Clear any legacy inline height — flex layout sizes the wrapper now.
-// Workspace is 100dvh; toolbar is flex-shrink:0; wrapper fills the rest via flex:1.
+// Set canvas wrapper height to show ~1 full page on desktop.
 export function ueSetWrapperHeight() {
   const wrapper = document.getElementById('ue-canvas-wrapper');
-  if (wrapper) wrapper.style.height = '';
+  if (!wrapper || ueState.pages.length === 0) return;
+
+  // Only apply on desktop (>900px)
+  if (window.innerWidth <= 900) {
+    wrapper.style.height = '';
+    return;
+  }
+
+  const firstPC = ueState.pageCanvases[0];
+  if (!firstPC) return;
+
+  const canvasH = firstPC.canvas.offsetHeight || parseInt(firstPC.canvas.style.height) || 600;
+  const wrapperH = canvasH + 80;
+  wrapper.style.height = wrapperH + 'px';
 }
 
 // Lightweight sidebar highlight
