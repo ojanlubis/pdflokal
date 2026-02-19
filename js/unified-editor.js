@@ -37,6 +37,70 @@
  */
 
 // ============================================================
+// CONSTANTS
+// ============================================================
+
+// CSS font-family mapping (used in annotation drawing, inline editor, and text bounds)
+const CSS_FONT_MAP = {
+  'Helvetica': 'Helvetica, Arial, sans-serif',
+  'Times-Roman': 'Times New Roman, Times, serif',
+  'Courier': 'Courier New, Courier, monospace',
+  'Montserrat': 'Montserrat, sans-serif',
+  'Carlito': 'Carlito, Calibri, sans-serif'
+};
+
+// ============================================================
+// CANVAS UTILITIES (extracted from ueSetupCanvasEvents closure)
+// ============================================================
+
+// Get the currently active canvas element (single-canvas for now, multi-canvas in Phase 2)
+function ueGetCurrentCanvas() {
+  return document.getElementById('ue-canvas');
+}
+
+// Convert mouse/touch event coords to canvas-pixel coords
+function ueGetCoords(e, canvas) {
+  const dpr = ueState.devicePixelRatio || window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  const x = (e.clientX - rect.left) * (canvas.width / canvas.clientWidth / dpr);
+  const y = (e.clientY - rect.top) * (canvas.height / canvas.clientHeight / dpr);
+  return { x, y };
+}
+
+// Check if (x, y) is on a resize handle of the given annotation
+function ueGetResizeHandle(anno, x, y) {
+  if (anno.locked) return null;
+  const handleSize = 12;
+
+  let corners;
+  if (anno.type === 'text') {
+    const bounds = getTextBounds(anno);
+    corners = [
+      { pos: 'tl', hx: bounds.x, hy: bounds.y },
+      { pos: 'tr', hx: bounds.x + bounds.width, hy: bounds.y },
+      { pos: 'bl', hx: bounds.x, hy: bounds.y + bounds.height },
+      { pos: 'br', hx: bounds.x + bounds.width, hy: bounds.y + bounds.height }
+    ];
+  } else if (anno.type === 'signature') {
+    corners = [
+      { pos: 'tl', hx: anno.x, hy: anno.y },
+      { pos: 'tr', hx: anno.x + anno.width, hy: anno.y },
+      { pos: 'bl', hx: anno.x, hy: anno.y + anno.height },
+      { pos: 'br', hx: anno.x + anno.width, hy: anno.y + anno.height }
+    ];
+  } else {
+    return null;
+  }
+
+  for (const h of corners) {
+    if (Math.abs(x - h.hx) < handleSize && Math.abs(y - h.hy) < handleSize) {
+      return h.pos;
+    }
+  }
+  return null;
+}
+
+// ============================================================
 // UNIFIED EDITOR STATE
 // ============================================================
 
@@ -465,7 +529,7 @@ function ueSelectPage(index) {
 
   // Show canvas, hide empty state
   document.getElementById('ue-empty-state').style.display = 'none';
-  document.getElementById('ue-canvas').style.display = 'block';
+  ueGetCurrentCanvas().style.display = 'block';
 
   ueUpdateStatus(
     'Halaman ' + (index + 1) + ' dipilih. Gunakan alat di atas untuk mengedit.',
@@ -498,7 +562,7 @@ async function ueRenderSelectedPage() {
     const pdf = await pdfjsLib.getDocument({ data: sourceFile.bytes.slice() }).promise;
     const page = await pdf.getPage(pageInfo.pageNum + 1);
 
-    const canvas = document.getElementById('ue-canvas');
+    const canvas = ueGetCurrentCanvas();
     const ctx = canvas.getContext('2d');
     const dpr = ueState.devicePixelRatio = window.devicePixelRatio || 1;
 
@@ -617,71 +681,43 @@ function ueSetupCanvasEvents() {
   if (ueState.canvasSetup) return;
   ueState.canvasSetup = true;
 
-  const canvas = document.getElementById('ue-canvas');
+  const canvas = ueGetCurrentCanvas();
+
+  // Closure state for drag/draw operations
+  // Note: isDragging/isResizing live on ueState (not here) for sharing with pinch-to-zoom handler
   let isDrawing = false;
-  // isDragging and isResizing are now on ueState for sharing with pinch-to-zoom handler
   let startX, startY;
   let dragOffsetX, dragOffsetY;
-  let hasMovedOrResized = false;  // Track if actual movement happened (for undo)
-  let preChangeState = null;  // Store annotations state before drag/resize
+  let hasMovedOrResized = false;
+  let preChangeState = null;
 
   // Double-tap detection state
   let touchLastTap = 0;
   let touchLastCoords = null;
-  const DOUBLE_TAP_DELAY = 300; // ms
-  const DOUBLE_TAP_DISTANCE = 30; // pixels
+  const DOUBLE_TAP_DELAY = 300;
+  const DOUBLE_TAP_DISTANCE = 30;
 
-  function getCoords(e) {
-    const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left) * (canvas.width / canvas.clientWidth / ueState.devicePixelRatio);
-    const y = (e.clientY - rect.top) * (canvas.height / canvas.clientHeight / ueState.devicePixelRatio);
-    return { x, y };
+  // Helper: build info object from mouse event
+  function infoFromMouse(e) {
+    const coords = ueGetCoords(e, canvas);
+    return { canvas, pageIndex: ueState.selectedPage, x: coords.x, y: coords.y };
   }
 
-  // Check if clicking on a resize handle
-  function getResizeHandle(anno, x, y) {
-    if (anno.locked) return null;
-    const handleSize = 12;
-
-    let bounds;
-    if (anno.type === 'text') {
-      bounds = getTextBounds(anno);
-      const handles = [
-        { pos: 'tl', hx: bounds.x, hy: bounds.y },
-        { pos: 'tr', hx: bounds.x + bounds.width, hy: bounds.y },
-        { pos: 'bl', hx: bounds.x, hy: bounds.y + bounds.height },
-        { pos: 'br', hx: bounds.x + bounds.width, hy: bounds.y + bounds.height }
-      ];
-      for (const h of handles) {
-        if (Math.abs(x - h.hx) < handleSize && Math.abs(y - h.hy) < handleSize) {
-          return h.pos;
-        }
-      }
-    } else if (anno.type === 'signature') {
-      const handles = [
-        { pos: 'tl', hx: anno.x, hy: anno.y },
-        { pos: 'tr', hx: anno.x + anno.width, hy: anno.y },
-        { pos: 'bl', hx: anno.x, hy: anno.y + anno.height },
-        { pos: 'br', hx: anno.x + anno.width, hy: anno.y + anno.height }
-      ];
-      for (const h of handles) {
-        if (Math.abs(x - h.hx) < handleSize && Math.abs(y - h.hy) < handleSize) {
-          return h.pos;
-        }
-      }
-    }
-    return null;
+  // Helper: build info object from touch event (works for touchstart, touchmove, AND touchend)
+  function infoFromTouch(e) {
+    const touch = (e.touches && e.touches.length) ? e.touches[0] : e.changedTouches[0];
+    const coords = ueGetCoords(touch, canvas);
+    return { canvas, pageIndex: ueState.selectedPage, x: coords.x, y: coords.y };
   }
 
-  canvas.addEventListener('mousedown', (e) => handleDown(getCoords(e)));
-  canvas.addEventListener('mousemove', (e) => handleMove(getCoords(e)));
-  canvas.addEventListener('mouseup', (e) => handleUp(getCoords(e)));
-  canvas.addEventListener('dblclick', (e) => handleDoubleClick(getCoords(e)));
+  canvas.addEventListener('mousedown', (e) => handleDown(infoFromMouse(e)));
+  canvas.addEventListener('mousemove', (e) => handleMove(infoFromMouse(e)));
+  canvas.addEventListener('mouseup', (e) => handleUp(infoFromMouse(e)));
+  canvas.addEventListener('dblclick', (e) => handleDoubleClick(infoFromMouse(e)));
   canvas.addEventListener('mouseleave', () => {
     isDrawing = false;
     ueState.isDragging = false;
     ueState.isResizing = false;
-    // Clear signature preview when leaving canvas
     if (ueState.pendingSignature) {
       ueState.signaturePreviewPos = null;
       ueRedrawAnnotations();
@@ -690,40 +726,38 @@ function ueSetupCanvasEvents() {
 
   canvas.addEventListener('touchstart', (e) => {
     e.preventDefault();
-    const coords = getCoords(e.touches[0]);
+    const info = infoFromTouch(e);
 
     // Double-tap detection
     const now = Date.now();
-    const timeDiff = now - touchLastTap;
-
-    if (timeDiff < DOUBLE_TAP_DELAY && touchLastCoords) {
+    if (now - touchLastTap < DOUBLE_TAP_DELAY && touchLastCoords) {
       const distance = Math.sqrt(
-        Math.pow(coords.x - touchLastCoords.x, 2) +
-        Math.pow(coords.y - touchLastCoords.y, 2)
+        Math.pow(info.x - touchLastCoords.x, 2) +
+        Math.pow(info.y - touchLastCoords.y, 2)
       );
-
       if (distance < DOUBLE_TAP_DISTANCE) {
-        // Double-tap detected - handle as double-click
-        handleDoubleClick(coords);
+        handleDoubleClick(info);
         return;
       }
     }
-
     touchLastTap = now;
-    touchLastCoords = coords;
-
-    handleDown(coords);
+    touchLastCoords = { x: info.x, y: info.y };
+    handleDown(info);
   }, { passive: false });
+
   canvas.addEventListener('touchmove', (e) => {
     e.preventDefault();
-    handleMove(getCoords(e.touches[0]));
-  }, { passive: false });
-  canvas.addEventListener('touchend', (e) => {
-    e.preventDefault();
-    handleUp(getCoords(e.changedTouches[0]));
+    handleMove(infoFromTouch(e));
   }, { passive: false });
 
-  function handleDown({ x, y }) {
+  canvas.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    handleUp(infoFromTouch(e));
+  }, { passive: false });
+
+  // --- Event handlers (accept { canvas, pageIndex, x, y }) ---
+
+  function handleDown({ canvas, pageIndex, x, y }) {
     startX = x;
     startY = y;
 
@@ -738,28 +772,23 @@ function ueSetupCanvasEvents() {
       // First check if clicking on a resize handle of selected annotation
       if (ueState.selectedAnnotation) {
         const anno = ueState.annotations[ueState.selectedAnnotation.pageIndex][ueState.selectedAnnotation.index];
-        const handle = getResizeHandle(anno, x, y);
+        const handle = ueGetResizeHandle(anno, x, y);
         if (handle) {
-          hasMovedOrResized = false;  // Will be set true if actual resize happens
-          preChangeState = JSON.parse(JSON.stringify(ueState.annotations));  // Save state before change
+          hasMovedOrResized = false;
+          preChangeState = JSON.parse(JSON.stringify(ueState.annotations));
           ueState.isResizing = true;
           ueState.resizeHandle = handle;
 
           if (anno.type === 'text') {
             const bounds = getTextBounds(anno);
             ueState.resizeStartInfo = {
-              x: anno.x,
-              y: anno.y,
-              fontSize: anno.fontSize,
-              width: bounds.width,
-              height: bounds.height
+              x: anno.x, y: anno.y, fontSize: anno.fontSize,
+              width: bounds.width, height: bounds.height
             };
           } else {
             ueState.resizeStartInfo = {
-              x: anno.x,
-              y: anno.y,
-              width: anno.width,
-              height: anno.height,
+              x: anno.x, y: anno.y,
+              width: anno.width, height: anno.height,
               aspectRatio: anno.width / anno.height
             };
           }
@@ -770,11 +799,8 @@ function ueSetupCanvasEvents() {
       const clicked = ueFindAnnotationAt(x, y);
       if (clicked) {
         const anno = ueState.annotations[clicked.pageIndex][clicked.index];
-        // Check if this annotation is locked
         if (anno.locked) {
-          // Can't drag locked annotations
           if (anno.type === 'signature') {
-            // Only show toast once per annotation (avoid spam)
             const annoId = `${clicked.pageIndex}-${clicked.index}`;
             if (ueState.lastLockedToastAnnotation !== annoId) {
               showToast('Tanda tangan terkunci. Klik dua kali untuk membuka kunci.', 'info');
@@ -785,10 +811,10 @@ function ueSetupCanvasEvents() {
           ueRedrawAnnotations();
           return;
         }
-        hasMovedOrResized = false;  // Will be set true if actual drag happens
-        preChangeState = JSON.parse(JSON.stringify(ueState.annotations));  // Save state before change
+        hasMovedOrResized = false;
+        preChangeState = JSON.parse(JSON.stringify(ueState.annotations));
         ueState.selectedAnnotation = clicked;
-        ueState.lastLockedToastAnnotation = null;  // Reset when selecting different annotation
+        ueState.lastLockedToastAnnotation = null;
         ueState.isDragging = true;
         dragOffsetX = x - anno.x;
         dragOffsetY = y - (anno.type === 'text' ? anno.y - anno.fontSize : anno.y);
@@ -797,7 +823,7 @@ function ueSetupCanvasEvents() {
         return;
       } else {
         ueState.selectedAnnotation = null;
-        ueState.lastLockedToastAnnotation = null;  // Reset when deselecting
+        ueState.lastLockedToastAnnotation = null;
         ueHideConfirmButton();
         ueRedrawAnnotations();
       }
@@ -807,20 +833,13 @@ function ueSetupCanvasEvents() {
     isDrawing = true;
   }
 
-  function handleMove({ x, y }) {
-    const canvas = document.getElementById('ue-canvas');
-
+  function handleMove({ canvas, pageIndex, x, y }) {
     // Update cursor for resize handles when hovering
     if (ueState.currentTool === 'select' && ueState.selectedAnnotation && !ueState.isResizing && !ueState.isDragging) {
       const anno = ueState.annotations[ueState.selectedAnnotation.pageIndex][ueState.selectedAnnotation.index];
-      const handle = getResizeHandle(anno, x, y);
+      const handle = ueGetResizeHandle(anno, x, y);
       if (handle) {
-        const cursors = {
-          'tl': 'nwse-resize',
-          'tr': 'nesw-resize',
-          'bl': 'nesw-resize',
-          'br': 'nwse-resize'
-        };
+        const cursors = { 'tl': 'nwse-resize', 'tr': 'nesw-resize', 'bl': 'nesw-resize', 'br': 'nwse-resize' };
         canvas.style.cursor = cursors[handle];
       } else {
         canvas.style.cursor = 'default';
@@ -842,46 +861,28 @@ function ueSetupCanvasEvents() {
       const handle = ueState.resizeHandle;
 
       if (anno.type === 'text') {
-        // TEXT RESIZE LOGIC
         const ctx = canvas.getContext('2d');
-
-        // Calculate new width based on which handle is being dragged
         let newWidth;
         if (handle === 'br' || handle === 'tr') {
-          // Right handles: width increases as x increases
           newWidth = Math.max(20, x - info.x);
         } else {
-          // Left handles: width increases as x decreases
           newWidth = Math.max(20, info.x + info.width - x);
         }
-
-        // Calculate scale factor based on width change
         const scale = newWidth / info.width;
-
-        // Apply to fontSize with 6-120pt constraints
         const newFontSize = Math.max(6, Math.min(120, info.fontSize * scale));
         anno.fontSize = newFontSize;
-
-        // Recalculate bounds with new fontSize
         const newBounds = getTextBounds(anno, ctx);
 
-        // Adjust position to keep opposite corner fixed
-        // Key: anno.y is the baseline (not top), so when fontSize changes, baseline must adjust
-        // to keep the visual top/bottom of bounds in the correct position
         if (handle === 'br') {
-          // Bottom-right: keep top-left of bounds fixed at (info.x, info.y - info.fontSize)
           anno.x = info.x;
           anno.y = info.y + (anno.fontSize - info.fontSize);
         } else if (handle === 'bl') {
-          // Bottom-left: keep top-right of bounds fixed
           anno.x = info.x + info.width - newBounds.width;
           anno.y = info.y + (anno.fontSize - info.fontSize);
         } else if (handle === 'tr') {
-          // Top-right: keep bottom-left of bounds fixed
           anno.x = info.x;
           anno.y = info.y + info.height - newBounds.height + (anno.fontSize - info.fontSize);
         } else if (handle === 'tl') {
-          // Top-left: keep bottom-right of bounds fixed
           anno.x = info.x + info.width - newBounds.width;
           anno.y = info.y + info.height - newBounds.height + (anno.fontSize - info.fontSize);
         }
@@ -892,38 +893,27 @@ function ueSetupCanvasEvents() {
         return;
 
       } else if (anno.type === 'signature') {
-        // SIGNATURE RESIZE LOGIC
         let newWidth, newHeight, newX, newY;
-
-        // Calculate new dimensions based on which handle is being dragged
         if (handle === 'br') {
           newWidth = Math.max(50, x - info.x);
           newHeight = newWidth / info.aspectRatio;
-          newX = info.x;
-          newY = info.y;
+          newX = info.x; newY = info.y;
         } else if (handle === 'bl') {
           newWidth = Math.max(50, info.x + info.width - x);
           newHeight = newWidth / info.aspectRatio;
-          newX = info.x + info.width - newWidth;
-          newY = info.y;
+          newX = info.x + info.width - newWidth; newY = info.y;
         } else if (handle === 'tr') {
           newWidth = Math.max(50, x - info.x);
           newHeight = newWidth / info.aspectRatio;
-          newX = info.x;
-          newY = info.y + info.height - newHeight;
+          newX = info.x; newY = info.y + info.height - newHeight;
         } else if (handle === 'tl') {
           newWidth = Math.max(50, info.x + info.width - x);
           newHeight = newWidth / info.aspectRatio;
-          newX = info.x + info.width - newWidth;
-          newY = info.y + info.height - newHeight;
+          newX = info.x + info.width - newWidth; newY = info.y + info.height - newHeight;
         }
-
-        anno.x = newX;
-        anno.y = newY;
-        anno.width = newWidth;
-        anno.height = newHeight;
-        hasMovedOrResized = true;  // Mark that actual resize happened
-
+        anno.x = newX; anno.y = newY;
+        anno.width = newWidth; anno.height = newHeight;
+        hasMovedOrResized = true;
         ueRedrawAnnotations();
         ueUpdateConfirmButtonPosition(anno);
         return;
@@ -940,7 +930,7 @@ function ueSetupCanvasEvents() {
         anno.x = x - dragOffsetX;
         anno.y = y - dragOffsetY;
       }
-      hasMovedOrResized = true;  // Mark that actual drag happened
+      hasMovedOrResized = true;
       ueRedrawAnnotations();
       ueUpdateConfirmButtonPosition(anno);
       return;
@@ -948,7 +938,6 @@ function ueSetupCanvasEvents() {
 
     // Handle whiteout preview
     if (!isDrawing || ueState.currentTool !== 'whiteout') return;
-
     ueRedrawAnnotations();
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
@@ -960,11 +949,8 @@ function ueSetupCanvasEvents() {
     ctx.setLineDash([]);
   }
 
-  function handleUp({ x, y }) {
-    const canvas = document.getElementById('ue-canvas');
-
+  function handleUp({ canvas, pageIndex, x, y }) {
     if (ueState.isResizing) {
-      // Save undo state only if actual resize happened
       if (hasMovedOrResized && preChangeState) {
         ueState.editUndoStack.push(preChangeState);
         ueState.editRedoStack = [];
@@ -980,7 +966,6 @@ function ueSetupCanvasEvents() {
     }
 
     if (ueState.isDragging) {
-      // Save undo state only if actual drag happened
       if (hasMovedOrResized && preChangeState) {
         ueState.editUndoStack.push(preChangeState);
         ueState.editRedoStack = [];
@@ -995,8 +980,6 @@ function ueSetupCanvasEvents() {
 
     if (!isDrawing) return;
     isDrawing = false;
-
-    const pageIndex = ueState.selectedPage;
 
     if (ueState.currentTool === 'whiteout') {
       const width = Math.abs(x - startX);
@@ -1016,35 +999,29 @@ function ueSetupCanvasEvents() {
       ueState.pendingTextPosition = { x: startX, y: startY };
       ueOpenTextModal();
     } else if (ueState.currentTool === 'signature' && state.signatureImage) {
-      // This case is now handled by pendingSignature flow
       uePlaceSignature(startX, startY);
     }
   }
 
-  function handleDoubleClick({ x, y }) {
-    // Only allow double-click edit when in select mode
+  function handleDoubleClick({ canvas, pageIndex, x, y }) {
     if (ueState.currentTool !== 'select') return;
 
-    // Find annotation at click position
     const result = ueFindAnnotationAt(x, y);
     if (!result) return;
 
-    // Get actual annotation
     const anno = ueState.annotations[result.pageIndex][result.index];
 
     // Unlock signature
     if (anno && anno.type === 'signature' && anno.locked) {
       anno.locked = false;
-      ueState.lastLockedToastAnnotation = null;  // Reset toast tracking after unlock
+      ueState.lastLockedToastAnnotation = null;
       ueRedrawAnnotations();
       ueShowConfirmButton(anno, result);
       return;
     }
 
-    // Only handle text annotations
+    // Edit text annotation
     if (!anno || anno.type !== 'text' || anno.locked) return;
-
-    // Create inline editor
     ueCreateInlineTextEditor(anno, result.pageIndex, result.index);
   }
 }
@@ -1059,7 +1036,7 @@ function ueCreateInlineTextEditor(anno, pageIndex, index) {
   const existing = document.getElementById('inline-text-editor');
   if (existing) existing.remove();
 
-  const canvas = document.getElementById('ue-canvas');
+  const canvas = ueGetCurrentCanvas();
   const wrapper = document.getElementById('ue-canvas-wrapper');
   if (!canvas || !wrapper) return;
 
@@ -1082,11 +1059,7 @@ function ueCreateInlineTextEditor(anno, pageIndex, index) {
   if (anno.italic) fontStyle += 'italic ';
   if (anno.bold) fontStyle += 'bold ';
 
-  let cssFontFamily = 'Helvetica, Arial, sans-serif';
-  if (anno.fontFamily === 'Times-Roman') cssFontFamily = 'Times New Roman, Times, serif';
-  else if (anno.fontFamily === 'Courier') cssFontFamily = 'Courier New, Courier, monospace';
-  else if (anno.fontFamily === 'Montserrat') cssFontFamily = 'Montserrat, sans-serif';
-  else if (anno.fontFamily === 'Carlito') cssFontFamily = 'Carlito, Calibri, sans-serif';
+  const cssFontFamily = CSS_FONT_MAP[anno.fontFamily] || CSS_FONT_MAP['Helvetica'];
 
   // Hide original text
   anno._editing = true;
@@ -1237,7 +1210,7 @@ function uePlaceSignature(x, y) {
 function ueDrawSignaturePreview(x, y) {
   if (!state.signatureImage) return;
 
-  const canvas = document.getElementById('ue-canvas');
+  const canvas = ueGetCurrentCanvas();
   const ctx = canvas.getContext('2d');
 
   const img = new Image();
@@ -1287,7 +1260,7 @@ function ueUpdateConfirmButtonPosition(anno) {
   const btn = document.getElementById('signature-btn-wrapper');
   if (!btn || btn.style.display === 'none') return;
 
-  const canvas = document.getElementById('ue-canvas');
+  const canvas = ueGetCurrentCanvas();
   const wrapper = document.getElementById('ue-canvas-wrapper');
   if (!canvas || !wrapper) return;
 
@@ -1363,7 +1336,7 @@ function ueUpdateDownloadButtonState() {
 // ============================================================
 
 function ueRedrawAnnotations() {
-  const canvas = document.getElementById('ue-canvas');
+  const canvas = ueGetCurrentCanvas();
   const ctx = canvas.getContext('2d');
 
   // Restore cached page
@@ -1398,12 +1371,7 @@ function ueDrawAnnotation(ctx, anno, isSelected) {
       if (anno.italic) fontStyle += 'italic ';
       if (anno.bold) fontStyle += 'bold ';
 
-      // Map font family to CSS equivalent
-      let cssFontFamily = 'Helvetica, Arial, sans-serif';
-      if (anno.fontFamily === 'Times-Roman') cssFontFamily = 'Times New Roman, Times, serif';
-      else if (anno.fontFamily === 'Courier') cssFontFamily = 'Courier New, Courier, monospace';
-      else if (anno.fontFamily === 'Montserrat') cssFontFamily = 'Montserrat, sans-serif';
-      else if (anno.fontFamily === 'Carlito') cssFontFamily = 'Carlito, sans-serif';
+      const cssFontFamily = CSS_FONT_MAP[anno.fontFamily] || CSS_FONT_MAP['Helvetica'];
 
       ctx.font = `${fontStyle}${anno.fontSize}px ${cssFontFamily}`;
       ctx.fillStyle = anno.color;
@@ -1472,7 +1440,7 @@ function ueDrawSelectionHandles(ctx, x, y, width, height) {
 // Calculate accurate bounds for text annotation (handles multi-line)
 function getTextBounds(anno, ctx) {
   if (!ctx) {
-    const canvas = document.getElementById('ue-canvas');
+    const canvas = ueGetCurrentCanvas();
     ctx = canvas.getContext('2d');
   }
 
@@ -1481,12 +1449,7 @@ function getTextBounds(anno, ctx) {
   if (anno.italic) fontStyle += 'italic ';
   if (anno.bold) fontStyle += 'bold ';
 
-  let cssFontFamily = 'Helvetica, Arial, sans-serif';
-  if (anno.fontFamily === 'Times-Roman')
-    cssFontFamily = 'Times New Roman, Times, serif';
-  else if (anno.fontFamily === 'Courier')
-    cssFontFamily = 'Courier New, Courier, monospace';
-
+  const cssFontFamily = CSS_FONT_MAP[anno.fontFamily] || CSS_FONT_MAP['Helvetica'];
   ctx.font = `${fontStyle}${anno.fontSize}px ${cssFontFamily}`;
 
   // Calculate max width across all lines
@@ -1617,7 +1580,7 @@ function ueSetTool(tool) {
     btn.classList.toggle('active', btn.dataset.editTool === tool);
   });
 
-  const canvas = document.getElementById('ue-canvas');
+  const canvas = ueGetCurrentCanvas();
   if (canvas) {
     canvas.className = 'editor-canvas tool-' + tool;
   }
@@ -2163,7 +2126,7 @@ function ueReset() {
   ueUpdateZoomDisplay();
 
   document.getElementById('ue-empty-state').style.display = 'flex';
-  document.getElementById('ue-canvas').style.display = 'none';
+  ueGetCurrentCanvas().style.display = 'none';
   document.getElementById('ue-download-btn').disabled = true;
   ueRenderThumbnails();
   ueUpdatePageCount();
