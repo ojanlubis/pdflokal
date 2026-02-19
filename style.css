@@ -2559,13 +2559,27 @@ a:hover {
    Unified Editor Workspace Styles
    ============================================================ */
 
+/* Prevent body scroll when editor is active */
+html:has(#unified-editor-workspace.workspace.active) {
+  overflow: hidden;
+}
+
 #unified-editor-workspace.workspace {
   padding: var(--space-md) 0;
 }
 
+/* Full-viewport editor — toolbar stays at top, only canvas scrolls */
 #unified-editor-workspace.workspace.active {
   display: flex;
   flex-direction: column;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 100;
+  padding: 0;
+  background: var(--bg-primary);
 }
 
 #unified-editor-workspace .workspace-header {
@@ -2862,7 +2876,8 @@ a:hover {
   position: relative; /* For confirm button positioning */
   overflow-y: auto; /* Vertical scroll for stacked pages */
   overflow-x: auto; /* Horizontal scroll when zoomed */
-  /* Height is set by JS based on first page dimensions via ueSetWrapperHeight() */
+  flex: 1;
+  min-height: 0; /* Allow flex child to shrink — needed for internal scroll */
 }
 
 /* Pages container — vertical stack of all pages, scrollable within wrapper */
@@ -2920,11 +2935,6 @@ a:hover {
 
 /* Mobile Responsive */
 @media (max-width: 900px) {
-  #unified-editor-workspace.workspace.active {
-    height: 100vh;
-    max-height: 100vh;
-  }
-
   .unified-editor-layout {
     flex-direction: column;
     flex: 1;
