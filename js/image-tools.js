@@ -1,3 +1,32 @@
+/*
+ * ============================================================
+ * PDFLokal - image-tools.js
+ * Client-Side Image Processing Tools
+ * ============================================================
+ *
+ * PURPOSE:
+ *   All image manipulation tools: compress, resize, convert format,
+ *   images-to-PDF, and background removal. Uses Canvas API exclusively.
+ *
+ * GLOBAL STATE USED:
+ *   - state {} (from app.js) — reads/writes state.originalImage,
+ *     state.originalImageName, state.originalImageSize, state.originalWidth,
+ *     state.originalHeight, state.compressedBlob, state.compressPreviewUrl,
+ *     state.imgToPdfFiles, state.removeBgCanvas
+ *
+ * FUNCTIONS EXPORTED (called by other files): None — all called from HTML onclick
+ *
+ * FUNCTIONS IMPORTED (defined in other files):
+ *   From app.js:
+ *     state, showToast(), formatFileSize(), downloadBlob(),
+ *     getDownloadFilename(), loadImage(), escapeHtml()
+ *   From pdf-tools.js:
+ *     enableDragReorder()
+ *
+ * LOAD ORDER: Must load AFTER app.js AND pdf-tools.js
+ * ============================================================
+ */
+
 // ============================================================
 // COMPRESS IMAGE
 // ============================================================

@@ -1,6 +1,24 @@
-/**
- * PDFLokal Changelog Notification System
- * Manages changelog display with badge and expanded views
+/*
+ * ============================================================
+ * PDFLokal - changelog.js
+ * Changelog Notification System
+ * ============================================================
+ *
+ * PURPOSE:
+ *   Smart, non-intrusive notification badge for app updates.
+ *   Self-contained IIFE — no external dependencies.
+ *
+ * GLOBAL API DEFINED HERE:
+ *   - window.changelogAPI — Public: open(), minimize(), close(), hide(), restore()
+ *   - window.changelogNextPage, window.changelogPrevPage — Pagination (HTML onclick)
+ *   - localStorage key: 'pdflokal_changelog_last_closed'
+ *
+ * CONSUMED BY:
+ *   - app.js calls changelogAPI.hide() / changelogAPI.restore() during navigation
+ *   - pdf-tools.js calls changelogAPI.minimize() when opening modals
+ *
+ * LOAD ORDER: Must load BEFORE app.js (exposes window.changelogAPI)
+ * ============================================================
  */
 
 (function() {

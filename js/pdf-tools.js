@@ -1,6 +1,48 @@
+/*
+ * ============================================================
+ * PDFLokal - pdf-tools.js
+ * PDF Tool Modals & Standalone PDF Operations
+ * ============================================================
+ *
+ * PURPOSE:
+ *   Shared modal logic (text input, signature capture/upload, watermark,
+ *   page numbers) used by the unified editor. Also contains standalone
+ *   PDF tools (merge list, split, rotate, compress, protect, PDF-to-image)
+ *   and the drag-reorder utility.
+ *
+ * GLOBAL STATE USED:
+ *   - state {}   (from app.js) — reads/writes state.editAnnotations,
+ *     state.signaturePad, state.signatureImage, state.currentEditPage, etc.
+ *   - ueState {} (from unified-editor.js) — reads/writes ueState.pendingSignature,
+ *     ueState.annotations, ueState.pages, ueState.pageScales, etc.
+ *
+ * FUNCTIONS EXPORTED (called by other files):
+ *   openSignatureModal(), openTextModal(), getTextModalSettings(),
+ *   closeTextModal(), closeSignatureModal(), loadSignatureImage(),
+ *   optimizeSignatureImage(), enableDragReorder(),
+ *   openEditorWatermarkModal(), closeEditorWatermarkModal(),
+ *   applyEditorWatermark(), openEditorPageNumModal(),
+ *   closeEditorPageNumModal(), applyEditorPageNumbers()
+ *
+ * FUNCTIONS IMPORTED (defined in other files):
+ *   From app.js:
+ *     showToast(), formatFileSize(), downloadBlob(), getDownloadFilename(),
+ *     escapeHtml(), loadImage(), pushModalState(), navHistory, state,
+ *     mobileState, sleep()
+ *   From unified-editor.js:
+ *     ueSetTool(), ueUpdateStatus(), ueSaveEditUndoState(),
+ *     ueRedrawAnnotations(), ueState, ueConfirmText()
+ *
+ * LOAD ORDER: Must load AFTER app.js, BEFORE unified-editor.js
+ * ============================================================
+ */
+
 // ============================================================
-// LEGACY MERGE PDF (kept for future use)
+// STANDALONE MERGE PDF
 // ============================================================
+// Used by the merge-pdf workspace (standalone list-based merge).
+// The homepage Merge/Split cards bypass this and use the Unified
+// Editor's Gabungkan modal instead (see app.js handleEditorCardWithFilePicker).
 
 async function addMergeFiles(files) {
   const fileList = document.getElementById('merge-file-list');
@@ -577,6 +619,8 @@ async function saveReorderedPDF() {
 // DRAG REORDER
 // ============================================================
 
+// Generic drag-reorder for any list. Used by: merge list, image-to-pdf list, page manager.
+// containerId: DOM id of the container. stateArray: the backing array to reorder.
 function enableDragReorder(containerId, stateArray, isPages = false) {
   const container = document.getElementById(containerId);
   let draggedItem = null;
@@ -888,8 +932,10 @@ async function protectPDF() {
 }
 
 // ============================================================
-// EDIT PDF (Whiteout, Text, Signature) - Enhanced Version
+// SHARED ANNOTATION TOOLS (used by Unified Editor)
 // ============================================================
+// Modal logic for text input, signature capture/upload, and annotation
+// drawing. These functions are called from unified-editor.js.
 
 async function initEditMode() {
   state.currentEditPage = 0;
@@ -1639,6 +1685,8 @@ function initTextModalControls() {
   };
 }
 
+// Open text annotation modal. Resets all fields (font, size, color, bold/italic) to defaults.
+// Called from: unified-editor.js (ueOpenTextModal) and legacy editor.
 function openTextModal() {
   // Minimize changelog when opening modal
   if (window.changelogAPI) {
@@ -1716,6 +1764,8 @@ function updateTextPreview() {
   preview.style.fontFamily = cssFontFamily;
 }
 
+// Read current text modal form values. Returns { text, fontSize, color, fontFamily, bold, italic }.
+// Called from: unified-editor.js (ueConfirmText) to create text annotation.
 function getTextModalSettings() {
   return {
     text: document.getElementById('text-input-field').value.trim(),
@@ -1730,7 +1780,7 @@ function getTextModalSettings() {
 function confirmTextInput() {
   // Check if we're in unified editor mode
   if (state.currentTool === 'unified-editor' && ueState.pendingTextPosition) {
-    ueConfirmText();
+    ueConfirmText(); // → unified-editor.js
     return;
   }
 
@@ -1766,7 +1816,8 @@ function confirmTextInput() {
   updateEditorStatus('Teks ditambahkan');
 }
 
-// Signature Modal
+// Open signature modal (draw or upload tab). Initializes SignaturePad canvas.
+// After signature is created, calls ueSetTool('signature') to start placement mode.
 function openSignatureModal() {
   // Minimize changelog when opening modal
   if (window.changelogAPI) {
@@ -1843,7 +1894,7 @@ function useSignature() {
     closeSignatureModal();
     // Check if in unified editor mode
     if (state.currentTool === 'unified-editor') {
-      ueSetTool('signature');
+      ueSetTool('signature'); // → unified-editor.js
       // Enable signature preview attached to cursor
       ueState.pendingSignature = true;
       ueState.signaturePreviewPos = null;
@@ -2038,11 +2089,11 @@ function useSignatureFromUpload() {
   closeSignatureBgModal();
   // Check if in unified editor mode
   if (state.currentTool === 'unified-editor') {
-    ueSetTool('signature');
+    ueSetTool('signature'); // → unified-editor.js
     // Enable signature preview attached to cursor
     ueState.pendingSignature = true;
     ueState.signaturePreviewPos = null;
-    ueUpdateStatus('Klik untuk menempatkan tanda tangan');
+    ueUpdateStatus('Klik untuk menempatkan tanda tangan'); // → unified-editor.js
   } else {
     setEditTool('signature');
     updateEditorStatus('Klik untuk menempatkan tanda tangan');
@@ -2074,7 +2125,7 @@ function applyEditorWatermark() {
 
   // Check if in unified editor mode
   if (state.currentTool === 'unified-editor') {
-    ueSaveEditUndoState();
+    ueSaveEditUndoState(); // → unified-editor.js
     const pageScale = ueState.pageScales[ueState.selectedPage] || { canvasWidth: 600, canvasHeight: 800 };
     const centerX = pageScale.canvasWidth / 2;
     const centerY = pageScale.canvasHeight / 2;
@@ -2102,7 +2153,7 @@ function applyEditorWatermark() {
     }
 
     closeEditorWatermarkModal();
-    ueRedrawAnnotations();
+    ueRedrawAnnotations(); // → unified-editor.js
     return;
   }
 
@@ -2163,7 +2214,7 @@ function applyEditorPageNumbers() {
   // Check if in unified editor mode
   if (state.currentTool === 'unified-editor') {
     const totalPages = ueState.pages.length;
-    ueSaveEditUndoState();
+    ueSaveEditUndoState(); // → unified-editor.js
 
     for (let i = 0; i < totalPages; i++) {
       const pageNum = startNum + i;
@@ -2214,7 +2265,7 @@ function applyEditorPageNumbers() {
     }
 
     closeEditorPageNumModal();
-    ueRedrawAnnotations();
+    ueRedrawAnnotations(); // → unified-editor.js
     showToast('Nomor halaman ditambahkan ke semua halaman', 'success');
     return;
   }

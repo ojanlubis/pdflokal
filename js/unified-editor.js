@@ -1,40 +1,92 @@
+/*
+ * ============================================================
+ * PDFLokal - unified-editor.js
+ * Unified PDF Editor Workspace
+ * ============================================================
+ *
+ * PURPOSE:
+ *   The flagship multi-document PDF editor. Handles file loading,
+ *   page rendering, sidebar thumbnails, canvas-based annotation
+ *   editing (whiteout, text, signatures), zoom, rotation, undo/redo,
+ *   PDF export, and the Gabungkan (page manager) modal.
+ *
+ * GLOBAL STATE DEFINED HERE:
+ *   - ueState {}       — Editor state (pages, annotations, zoom, etc.)
+ *   - uePmState {}     — Page manager modal state (line ~2150)
+ *
+ * FUNCTIONS EXPORTED (called by other files):
+ *   ueAddFiles(), initUnifiedEditor(), ueReset(), ueSelectPage(),
+ *   ueDownload(), ueUndoAnnotation(), ueRedoAnnotation(),
+ *   ueRotateCurrentPage(), ueSetTool(), ueRedrawAnnotations(),
+ *   ueSaveEditUndoState(), ueUpdateStatus(), ueConfirmText(),
+ *   uePmOpenModal(), uePmCloseModal(), uePmToggleExtractMode()
+ *
+ * FUNCTIONS IMPORTED (defined in other files):
+ *   From app.js:
+ *     showToast(), showFullscreenLoading(), hideFullscreenLoading(),
+ *     checkFileSize(), convertImageToPdf(), downloadBlob(),
+ *     getDownloadFilename(), pushModalState(), mobileState,
+ *     state (reads state.currentTool, state.signatureImage),
+ *     navHistory
+ *   From pdf-tools.js:
+ *     openSignatureModal(), openTextModal(), getTextModalSettings(),
+ *     optimizeSignatureImage()
+ *
+ * LOAD ORDER: Must load AFTER app.js AND pdf-tools.js
+ * ============================================================
+ */
+
 // ============================================================
-// UNIFIED EDITOR WORKSPACE
+// UNIFIED EDITOR STATE
 // ============================================================
 
 // State for unified editor
+// NOTE: Also read/written by app.js (keyboard shortcuts, mobile UI) and pdf-tools.js (modals)
 const ueState = {
-  pages: [],            // Array of { pageNum, sourceIndex, sourceName, rotation, canvas }
-  sourceFiles: [],      // Array of { name, bytes }
-  selectedPage: -1,     // Currently selected page index
-  currentTool: null,    // Current edit tool
-  annotations: {},      // Per-page annotations: { pageIndex: [...] }
-  undoStack: [],        // Undo stack for page operations
-  redoStack: [],        // Redo stack for page operations
-  editUndoStack: [],    // Undo stack for annotations
-  editRedoStack: [],    // Redo stack for annotations
-  selectedAnnotation: null,
-  pendingTextPosition: null,
-  pageScales: {},
-  devicePixelRatio: 1,
-  canvasSetup: false,
-  pageCache: null,      // Cached rendered page for smooth dragging
-  zoomLevel: 1.0,       // Zoom level (1.0 = fit width)
-  // Signature enhancements
-  pendingSignature: false,      // Whether signature is attached to cursor
-  signaturePreviewPos: null,    // Current cursor position for preview { x, y }
-  resizeHandle: null,           // Current resize handle being dragged ('tl', 'tr', 'bl', 'br')
-  resizeStartInfo: null,        // Initial annotation state when resize started
-  // Touch interaction state (shared with pinch-to-zoom handler)
-  isDragging: false,            // Whether annotation is being dragged
-  isResizing: false,            // Whether annotation is being resized
-  // Sidebar drag-drop state
-  sidebarDropIndicator: null,
-  // Track last annotation that showed "locked" toast (to avoid spam)
-  lastLockedToastAnnotation: null,
+  // --- Document data ---
+  pages: [],              // All loaded pages: [{ pageNum, sourceIndex, sourceName, rotation, canvas }]
+  sourceFiles: [],        // Source PDF files: [{ name, bytes }] — indexes match pages[].sourceIndex
+  selectedPage: -1,       // Index into pages[] of the currently visible page
+
+  // --- Editing tools ---
+  currentTool: null,      // Active annotation tool: 'select' | 'whiteout' | 'text' | 'signature' | null
+  annotations: {},        // Per-page annotation arrays: { pageIndex: [annotation, ...] }
+  selectedAnnotation: null, // Currently selected annotation: { pageIndex, index } or null
+  pendingTextPosition: null, // Where text will be placed on next confirm: { x, y } or null
+
+  // --- Undo/redo (two separate stacks: page ops vs annotations) ---
+  undoStack: [],          // Page operation history (reorder, delete, rotate)
+  redoStack: [],          // Page operation redo
+  editUndoStack: [],      // Annotation edit history (add, move, delete annotations)
+  editRedoStack: [],      // Annotation edit redo
+
+  // --- Rendering ---
+  pageScales: {},         // Per-page scale info: { pageIndex: { canvasWidth, canvasHeight, pdfWidth, pdfHeight, scale } }
+  devicePixelRatio: 1,    // Window.devicePixelRatio at render time
+  canvasSetup: false,     // Guard: true after canvas event listeners are attached
+  pageCache: null,        // Cached page render (ImageData) for smooth annotation dragging
+  zoomLevel: 1.0,         // Current zoom multiplier (1.0 = fit width)
+
+  // --- Signature placement ---
+  pendingSignature: false,  // true when signature image is "attached to cursor" awaiting click
+  signaturePreviewPos: null, // Cursor position for ghost preview: { x, y } or null
+  resizeHandle: null,       // Which corner handle is being dragged: 'tl' | 'tr' | 'bl' | 'br' | null
+  resizeStartInfo: null,    // Snapshot of annotation state when resize began
+
+  // --- Touch & drag interaction ---
+  isDragging: false,        // true while an annotation is being dragged (shared with pinch-to-zoom)
+  isResizing: false,        // true while an annotation is being resized
+  sidebarDropIndicator: null, // DOM element for sidebar drag-drop indicator
+
+  // --- UX ---
+  lastLockedToastAnnotation: null, // Tracks last signature that showed "locked" toast (prevents spam)
 };
 
-// Initialize unified editor file input
+// ============================================================
+// FILE LOADING & INPUT HANDLING
+// Functions: initUnifiedEditorInput, ueAddFiles, handlePdfFile, handleImageFile
+// ============================================================
+
 function initUnifiedEditorInput() {
   const input = document.getElementById('ue-file-input');
   if (input && !input._ueInitialized) {
@@ -56,7 +108,10 @@ function initUnifiedEditorInput() {
   }
 }
 
-// Add PDF and image files to unified editor
+// USER FLOW: File loading into unified editor
+// Called from: app.js (dropzone, Merge/Split cards), or ue-file-input in editor workspace
+// For each file → handlePdfFile (extracts all pages) or handleImageFile (converts to single-page PDF)
+// After loading → ueRenderThumbnails() + ueSelectPage(0) to show first page
 async function ueAddFiles(files) {
   if (!files || files.length === 0) return;
 
@@ -184,7 +239,11 @@ async function handleImageFile(file) {
   ueState.annotations[ueState.pages.length - 1] = [];
 }
 
-// Render thumbnails in sidebar
+// ============================================================
+// SIDEBAR THUMBNAILS & DRAG-DROP REORDER
+// Functions: ueRenderThumbnails, ueSetupSidebarDragDrop
+// ============================================================
+
 function ueRenderThumbnails() {
   const container = document.getElementById('ue-thumbnails');
   container.innerHTML = '';
@@ -387,7 +446,12 @@ function ueSetupSidebarDragDrop() {
   });
 }
 
-// Select a page
+// ============================================================
+// PAGE SELECTION & RENDERING
+// Functions: ueSelectPage, ueRenderSelectedPage
+// ============================================================
+
+// Switch to a specific page by index. Renders it on the canvas and highlights sidebar thumbnail.
 function ueSelectPage(index) {
   if (index < 0 || index >= ueState.pages.length) return;
 
@@ -496,7 +560,11 @@ async function ueRenderSelectedPage() {
   }
 }
 
-// Zoom controls
+// ============================================================
+// ZOOM & ROTATION
+// Functions: ueZoomIn, ueZoomOut, ueZoomReset, ueRotateCurrentPage, ueUpdateZoomDisplay
+// ============================================================
+
 function ueZoomIn() {
   ueState.zoomLevel = Math.min(ueState.zoomLevel + 0.25, 3);
   ueUpdateZoomDisplay();
@@ -540,7 +608,11 @@ function ueUpdateZoomDisplay() {
   }
 }
 
-// Setup canvas events for editing
+// ============================================================
+// CANVAS EVENT HANDLING (mouse, touch, drag, resize, double-click)
+// Functions: ueSetupCanvasEvents (single large closure)
+// ============================================================
+
 function ueSetupCanvasEvents() {
   if (ueState.canvasSetup) return;
   ueState.canvasSetup = true;
@@ -977,7 +1049,11 @@ function ueSetupCanvasEvents() {
   }
 }
 
-// Create inline text editor for annotation
+// ============================================================
+// INLINE TEXT EDITING (double-click to edit text annotations)
+// Functions: ueCreateInlineTextEditor
+// ============================================================
+
 function ueCreateInlineTextEditor(anno, pageIndex, index) {
   // Remove existing editor
   const existing = document.getElementById('inline-text-editor');
@@ -1086,7 +1162,23 @@ function ueCreateInlineTextEditor(anno, pageIndex, index) {
   sel.addRange(range);
 }
 
-// Place signature at position
+// ============================================================
+// SIGNATURE PLACEMENT & MANAGEMENT
+// ============================================================
+// USER FLOW: Signature end-to-end
+// 1. User clicks "Tanda Tangan" button → ueOpenSignatureModal() → openSignatureModal() [pdf-tools.js]
+// 2. User draws/uploads signature → useSignature() or useSignatureFromUpload() [pdf-tools.js]
+//    → sets state.signatureImage, calls ueSetTool('signature'), sets ueState.pendingSignature = true
+// 3. Signature ghost follows cursor via ueDrawSignaturePreview() (called from canvas mousemove)
+// 4. User clicks canvas → uePlaceSignature(x, y) → creates annotation, shows confirm button
+// 5. User clicks confirm → ueConfirmSignature() → locks annotation (locked=true)
+// 6. Locked signatures show "double-click to unlock" toast on click (once per signature)
+//
+// Functions: uePlaceSignature, ueDrawSignaturePreview, ueShowConfirmButton,
+//            ueUpdateConfirmButtonPosition, ueHideConfirmButton,
+//            ueConfirmSignature, ueDeleteSignature, ueUpdateDownloadButtonState
+// ============================================================
+
 function uePlaceSignature(x, y) {
   const pageIndex = ueState.selectedPage;
   if (pageIndex < 0 || !state.signatureImage) return;
@@ -1264,7 +1356,12 @@ function ueUpdateDownloadButtonState() {
   btn.classList.toggle('has-signatures', hasSignatures);
 }
 
-// Redraw annotations
+// ============================================================
+// ANNOTATION DRAWING & HIT TESTING
+// Functions: ueRedrawAnnotations, ueDrawAnnotation, ueDrawSelectionHandles,
+//            getTextBounds, ueFindAnnotationAt
+// ============================================================
+
 function ueRedrawAnnotations() {
   const canvas = document.getElementById('ue-canvas');
   const ctx = canvas.getContext('2d');
@@ -1435,7 +1532,11 @@ function ueFindAnnotationAt(x, y) {
   return null;
 }
 
-// Delete a page
+// ============================================================
+// PAGE OPERATIONS (delete, count, status)
+// Functions: ueDeletePage, ueUpdatePageCount, ueUpdateStatus
+// ============================================================
+
 function ueDeletePage(index) {
   if (ueState.pages.length <= 1) {
     showToast('Tidak bisa menghapus halaman terakhir', 'error');
@@ -1488,7 +1589,14 @@ function ueUpdateStatus(message, mobileMessage) {
   }
 }
 
-// Set current tool
+// ============================================================
+// TOOL SELECTION & MODAL WRAPPERS
+// Functions: ueSetTool, ueOpenSignatureModal, ueOpenTextModal, ueConfirmText,
+//            ueOpenWatermarkModal, ueOpenPageNumModal, toggleMoreTools,
+//            closeMoreTools, ueOpenProtectModal, closeEditorProtectModal,
+//            applyEditorProtect
+// ============================================================
+
 function ueSetTool(tool) {
   ueState.currentTool = tool;
 
@@ -1527,18 +1635,18 @@ function ueSetTool(tool) {
 function ueOpenSignatureModal() {
   // Dismiss the first-use tooltip when clicked
   ueDismissSignatureHint();
-  openSignatureModal();
+  openSignatureModal(); // → pdf-tools.js
   // After signature is created, switch to signature placement mode
 }
 
-// Open text modal - uses shared openTextModal()
+// Open text modal — delegates to shared modal in pdf-tools.js
 function ueOpenTextModal() {
-  openTextModal();
+  openTextModal(); // → pdf-tools.js
 }
 
 // Confirm text input - modified to work with unified editor
 function ueConfirmText() {
-  const settings = getTextModalSettings();
+  const settings = getTextModalSettings(); // → pdf-tools.js
 
   if (!settings.text) {
     showToast('Masukkan teks terlebih dahulu', 'error');
@@ -1655,7 +1763,13 @@ async function applyEditorProtect() {
   }
 }
 
-// Undo/Redo for page operations
+// ============================================================
+// UNDO / REDO (page operations + annotation operations)
+// Functions: ueSaveUndoState, ueUndo, ueRedo, ueRestorePages,
+//            ueSaveEditUndoState, ueUndoAnnotation, ueRedoAnnotation,
+//            ueClearPageAnnotations
+// ============================================================
+
 function ueSaveUndoState() {
   ueState.undoStack.push(JSON.parse(JSON.stringify(ueState.pages.map(p => ({
     pageNum: p.pageNum,
@@ -1760,7 +1874,21 @@ function ueClearPageAnnotations() {
   showToast('Semua edit di halaman ini dihapus', 'success');
 }
 
-// Download PDF
+// ============================================================
+// PDF EXPORT (build final PDF with annotations)
+// Functions: ueDownload (includes ueBuildFinalPDF logic inline)
+// Note: Contains font embedding (Montserrat, Carlito) from /fonts/
+// ============================================================
+//
+// USER FLOW: Download PDF
+// 1. User clicks "Download PDF" or Ctrl+S → ueDownload()
+// 2. Optimization check: if single file, no edits, no rotation → download original bytes (skip re-encoding)
+// 3. Otherwise: create new PDFDocument via pdf-lib →
+//    for each page: copy from source → apply rotation → embed annotations (whiteout, text, signatures)
+// 4. Font embedding: standard fonts (Helvetica, Times, Courier) built-in;
+//    custom fonts (Montserrat, Carlito) fetched from /fonts/ and embedded via fontkit
+// 5. Save with useObjectStreams compression → downloadBlob()
+
 async function ueDownload() {
   if (ueState.pages.length === 0) {
     showToast('Tidak ada halaman untuk diunduh', 'error');
@@ -2011,7 +2139,12 @@ async function ueDownload() {
   }
 }
 
-// Reset unified editor state
+// ============================================================
+// EDITOR LIFECYCLE (reset, init, signature hints, sidebar toggle)
+// Functions: ueReset, ueShowSignatureHint, ueDismissSignatureHint,
+//            initUnifiedEditor, ueToggleSidebar
+// ============================================================
+
 function ueReset() {
   ueState.pages = [];
   ueState.sourceFiles = [];
@@ -2136,15 +2269,22 @@ function ueToggleSidebar() {
 }
 
 // ============================================================
-// PAGE MANAGER MODAL FOR UNIFIED EDITOR
+// PAGE MANAGER MODAL ("Gabungkan" / Merge modal)
 // ============================================================
+// State: uePmState {}
+// Functions: uePmOpenModal, uePmCloseModal, uePmUpdateUI, uePmRenderPages,
+//            uePmEnableDragReorder, uePmReindexAnnotations, uePmRotatePage,
+//            uePmDeletePage, uePmToggleExtractMode, uePmTogglePageSelection,
+//            uePmSelectAll, uePmDeselectAll, uePmUpdateSelectionCount,
+//            uePmExtractSelected, initUePmFileInput, initUePmImageInput
 
+// NOTE: Also read by app.js (handleEditorCardWithFilePicker checks uePmState.extractMode)
 const uePmState = {
-  isOpen: false,
-  extractMode: false,
-  selectedForExtract: [],
-  draggedIndex: -1,
-  dropIndicator: null
+  isOpen: false,            // Whether the Gabungkan modal is currently visible
+  extractMode: false,       // true = "Split" mode (multi-select pages for extraction)
+  selectedForExtract: [],   // Array of page indices selected for split/extraction
+  draggedIndex: -1,         // Index of the page currently being dragged (-1 = none)
+  dropIndicator: null       // DOM element showing where dragged page will land
 };
 
 // Open the page manager modal

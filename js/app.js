@@ -1,9 +1,41 @@
 /*
  * ============================================================
- * PDFLokal - Main Application
+ * PDFLokal - app.js
+ * Core Application Logic & State Management
  * ============================================================
- * Client-side PDF & Image manipulation tool
- * No files are ever uploaded - everything runs in browser
+ *
+ * PURPOSE:
+ *   Bootstrap file. Manages global state, initialization, navigation,
+ *   file handling, utility functions, keyboard shortcuts, and mobile UI
+ *   for the unified editor.
+ *
+ * GLOBAL STATE DEFINED HERE:
+ *   - state {}           — Shared mutable state for all tools
+ *   - mobileState {}     — Device detection results (read-only by other files)
+ *   - navHistory {}      — Browser back-button navigation tracking
+ *
+ * FUNCTIONS EXPORTED (called by other files):
+ *   showToast(), showFullscreenLoading(), hideFullscreenLoading(),
+ *   formatFileSize(), downloadBlob(), getDownloadFilename(),
+ *   getOutputFilename(), checkFileSize(), loadImage(), escapeHtml(),
+ *   cleanupImage(), convertImageToPdf(), pushModalState(),
+ *   pushWorkspaceState(), closeAllModals(), showHome(), showTool(),
+ *   sleep(), debounce(), openShortcutsModal(), closeShortcutsModal()
+ *
+ * FUNCTIONS IMPORTED (defined in other files):
+ *   From unified-editor.js:
+ *     ueAddFiles(), initUnifiedEditor(), ueReset(), ueSelectPage(),
+ *     ueDownload(), ueUndoAnnotation(), ueRedoAnnotation(),
+ *     ueRotateCurrentPage(), ueSetTool(), ueRedrawAnnotations(),
+ *     uePmOpenModal(), uePmCloseModal(), uePmToggleExtractMode()
+ *   From unified-editor.js (state):
+ *     ueState, uePmState
+ *   From pdf-tools.js:
+ *     loadSignatureImage()
+ *   From changelog.js:
+ *     window.changelogAPI (hide, restore)
+ *
+ * LOAD ORDER: Must load AFTER changelog.js, BEFORE pdf-tools.js
  * ============================================================
  */
 
@@ -12,52 +44,64 @@
 // ============================================================
 
 const state = {
-  currentTool: null,
-  currentPDF: null,
-  currentPDFBytes: null,
-  currentImages: [],
-  mergeFiles: [],
-  splitPages: [],
-  rotatePages: [],
-  pagesOrder: [],
-  editAnnotations: {},
-  currentEditPage: 0,
-  currentEditTool: null,
-  cropRect: null,
-  currentCropPage: 0,
-  signaturePad: null,
-  signatureImage: null,
-  signatureUploadImage: null,  // For uploaded signature image
-  signatureUploadCanvas: null, // Canvas for signature bg removal
-  originalImage: null,
-  originalImageName: null,
-  // Additional state for proper cleanup
-  imgToPdfFiles: [],
-  pdfImgPages: [],
-  compressedBlob: null,
-  originalImageSize: 0,
-  originalWidth: 0,
-  originalHeight: 0,
-  // Track setup states to prevent duplicate event listeners
-  workspaceDropZonesSetup: new Set(),
-  editCanvasSetup: false,
-  // Track blob URLs for cleanup
-  blobUrls: [],
-  compressPreviewUrl: null,
-  // Page Manager unified state
-  pmPages: [], // Array of { pageNum, sourceFile, sourceName, rotation, selected, canvas }
-  pmSourceFiles: [], // Array of { name, bytes }
-  pmUndoStack: [],   // Undo stack for page manager
-  pmRedoStack: [],   // Redo stack for page manager
-  // Original filename tracking
-  originalPDFName: null,  // Original PDF filename for output naming
-  // Enhanced PDF Editor state
-  editUndoStack: [],           // Stack of previous annotation states for undo
-  editRedoStack: [],           // Stack of undone states for redo
-  selectedAnnotation: null,    // Currently selected annotation { pageNum, index }
-  pendingTextPosition: null,   // Position where text will be placed { x, y }
-  editPageScales: {},          // Per-page scale factors for accurate coordinate mapping
-  editDevicePixelRatio: 1,     // Device pixel ratio for high-DPI displays
+  // --- Active workspace ---
+  currentTool: null,            // Which workspace is showing ('unified-editor', 'compress-pdf', etc.)
+
+  // --- PDF loading (standalone tools: compress, protect, pdf-to-img) ---
+  currentPDF: null,             // pdfjsLib document object for the loaded PDF
+  currentPDFBytes: null,        // Raw ArrayBuffer of the loaded PDF file
+  currentPDFName: null,         // Filename of the currently loaded PDF (set on load)
+  originalPDFName: null,        // Original filename for output naming (e.g. "invoice.pdf")
+
+  // --- Image loading (compress, resize, convert, remove-bg tools) ---
+  originalImage: null,          // HTMLImageElement of the loaded image
+  originalImageName: null,      // Original filename
+  originalImageSize: 0,         // Original file size in bytes (for compression stats)
+  originalWidth: 0,             // Natural width of loaded image
+  originalHeight: 0,            // Natural height of loaded image
+  compressedBlob: null,         // Result blob after image compression
+  compressPreviewUrl: null,     // Object URL for compression preview (needs revoking)
+
+  // --- Standalone merge tool (pdf-tools.js merge workspace) ---
+  mergeFiles: [],               // Array of { name, bytes, thumbnail } for merge list
+  currentImages: [],            // Loaded images for standalone tools
+
+  // --- Standalone page manager (legacy, pdf-tools.js) ---
+  splitPages: [],               // Pages for split tool
+  rotatePages: [],              // Pages for rotate tool
+  pagesOrder: [],               // Page ordering state
+  pmPages: [],                  // Array of { pageNum, sourceFile, sourceName, rotation, selected, canvas }
+  pmSourceFiles: [],            // Array of { name, bytes }
+  pmUndoStack: [],              // Undo stack for standalone page manager
+  pmRedoStack: [],              // Redo stack for standalone page manager
+
+  // --- Legacy edit mode annotations (pdf-tools.js) ---
+  editAnnotations: {},          // Per-page annotations { pageNum: [...] }
+  currentEditPage: 0,           // Currently visible page in legacy editor
+  currentEditTool: null,        // Active tool ('whiteout', 'text', 'signature')
+  editUndoStack: [],            // Annotation undo history
+  editRedoStack: [],            // Annotation redo history
+  selectedAnnotation: null,     // Currently selected annotation { pageNum, index }
+  pendingTextPosition: null,    // Where text will be placed { x, y }
+  editPageScales: {},           // Per-page scale factors for coordinate mapping
+  editDevicePixelRatio: 1,      // Device pixel ratio for high-DPI displays
+  cropRect: null,               // (unused — crop feature was removed)
+  currentCropPage: 0,           // (unused — crop feature was removed)
+  editCanvasSetup: false,       // Guard: prevents duplicate canvas event listeners
+
+  // --- Signature (shared by legacy editor + unified editor, via pdf-tools.js) ---
+  signaturePad: null,           // SignaturePad instance (canvas-based drawing)
+  signatureImage: null,         // Final signature as canvas/image (optimized, ready to embed)
+  signatureUploadImage: null,   // Uploaded image before background removal
+  signatureUploadCanvas: null,  // Canvas used for signature bg removal preview
+
+  // --- Image to PDF tool (image-tools.js) ---
+  imgToPdfFiles: [],            // Array of loaded image files for PDF conversion
+  pdfImgPages: [],              // Rendered page canvases for PDF-to-image export
+
+  // --- Cleanup & guards ---
+  blobUrls: [],                 // All created object URLs (revoked on tool close)
+  workspaceDropZonesSetup: new Set(), // Tracks which workspaces have drop zones initialized
 };
 
 // ============================================================
@@ -67,11 +111,7 @@ const state = {
 const MAX_FILE_SIZE_WARNING = 20 * 1024 * 1024; // 20MB - show warning
 const MAX_FILE_SIZE_LIMIT = 100 * 1024 * 1024;  // 100MB - hard limit
 
-function formatFileSize(bytes) {
-  if (bytes < 1024) return bytes + ' B';
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-}
+// formatFileSize() is defined once in the UTILITY FUNCTIONS section (~line 1135)
 
 function checkFileSize(file) {
   if (file.size > MAX_FILE_SIZE_LIMIT) {
@@ -309,6 +349,11 @@ if (document.readyState === 'loading') {
   initApp();
 }
 
+// USER FLOW: Homepage dropzone
+// User drops/selects file → handleDroppedFiles() → detects type →
+//   PDF: showTool('unified-editor') → ueAddFiles() [unified-editor.js]
+//   Images (multiple): showTool('img-to-pdf') → addImagesToPDF() [image-tools.js]
+//   Image (single): showTool('compress-img') → loadImage() [app.js]
 function initDropZone() {
   const dropzone = document.getElementById('main-dropzone');
   const fileInput = document.getElementById('file-input');
@@ -336,6 +381,11 @@ function initDropZone() {
   });
 }
 
+// USER FLOW: Homepage tool cards
+// User clicks card → reads data-tool attribute →
+//   'merge-pdf': handleEditorCardWithFilePicker('merge') → file picker → unified editor + Gabungkan modal
+//   'split-pdf': handleEditorCardWithFilePicker('split') → file picker → unified editor + Gabungkan modal + extract mode
+//   anything else: showTool(tool) → hides home, shows workspace
 function initToolCards() {
   document.querySelectorAll('.tool-card:not(.disabled)').forEach(card => {
     card.addEventListener('click', () => {
@@ -343,11 +393,11 @@ function initToolCards() {
 
       // Handle merge-pdf and split-pdf separately (don't call showTool)
       if (tool === 'merge-pdf') {
-        handleMergePdfCard();
+        handleEditorCardWithFilePicker('merge');
         return;
       }
       if (tool === 'split-pdf') {
-        handleSplitPdfCard();
+        handleEditorCardWithFilePicker('split');
         return;
       }
 
@@ -356,24 +406,29 @@ function initToolCards() {
   });
 }
 
-function handleMergePdfCard() {
-  // Create or get hidden file input for merge
-  let mergeInput = document.getElementById('merge-pdf-input');
-  if (!mergeInput) {
-    mergeInput = document.createElement('input');
-    mergeInput.type = 'file';
-    mergeInput.id = 'merge-pdf-input';
-    mergeInput.multiple = true;
-    mergeInput.accept = '.pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/*';
-    mergeInput.style.display = 'none';
-    document.body.appendChild(mergeInput);
+// USER FLOW: Merge/Split PDF cards (bypasses showTool — keeps home visible during file picking)
+// 1. Creates hidden file input → triggers file picker
+// 2. On file selection: showFullscreenLoading → initUnifiedEditor → ueAddFiles → hide home → show editor
+// 3. Opens Gabungkan modal. If split: also enables extract mode after 100ms delay.
+// mode: 'merge' | 'split'
+function handleEditorCardWithFilePicker(mode) {
+  const inputId = mode + '-pdf-input';
+  let input = document.getElementById(inputId);
+  if (!input) {
+    input = document.createElement('input');
+    input.type = 'file';
+    input.id = inputId;
+    input.multiple = true;
+    input.accept = '.pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/*';
+    input.style.display = 'none';
+    document.body.appendChild(input);
 
-    mergeInput.addEventListener('change', async (e) => {
+    input.addEventListener('change', async (e) => {
       if (e.target.files.length > 0) {
         // Convert FileList to Array before resetting input
         const filesArray = Array.from(e.target.files);
         // Reset input immediately so same files can be selected again
-        mergeInput.value = '';
+        input.value = '';
 
         // Show loading overlay (home-view stays visible behind it)
         showFullscreenLoading('Memuat PDF...');
@@ -382,10 +437,10 @@ function handleMergePdfCard() {
           // Initialize unified editor in background
           const workspace = document.getElementById('unified-editor-workspace');
           if (workspace) {
-            initUnifiedEditor();
+            initUnifiedEditor(); // → unified-editor.js
 
             // Load the files into unified editor
-            await ueAddFiles(filesArray);
+            await ueAddFiles(filesArray); // → unified-editor.js
 
             // Now hide home-view and show editor
             document.getElementById('home-view').style.display = 'none';
@@ -401,78 +456,13 @@ function handleMergePdfCard() {
             }
 
             // Open the Gabungkan modal
-            uePmOpenModal();
+            uePmOpenModal(); // → unified-editor.js
 
-            // Hide loading overlay after modal is ready
             setTimeout(() => {
-              hideFullscreenLoading();
-            }, 100);
-          }
-        } catch (error) {
-          console.error('Error loading PDFs:', error);
-          hideFullscreenLoading();
-          showToast('Gagal memuat PDF', 'error');
-        }
-      }
-    });
-  }
-  // Trigger file selection
-  mergeInput.click();
-}
-
-function handleSplitPdfCard() {
-  // Create or get hidden file input for split
-  let splitInput = document.getElementById('split-pdf-input');
-  if (!splitInput) {
-    splitInput = document.createElement('input');
-    splitInput.type = 'file';
-    splitInput.id = 'split-pdf-input';
-    splitInput.multiple = true;
-    splitInput.accept = '.pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/*';
-    splitInput.style.display = 'none';
-    document.body.appendChild(splitInput);
-
-    splitInput.addEventListener('change', async (e) => {
-      if (e.target.files.length > 0) {
-        // Convert FileList to Array before resetting input
-        const filesArray = Array.from(e.target.files);
-        // Reset input immediately so same files can be selected again
-        splitInput.value = '';
-
-        // Show loading overlay (home-view stays visible behind it)
-        showFullscreenLoading('Memuat PDF...');
-
-        try {
-          // Initialize unified editor in background
-          const workspace = document.getElementById('unified-editor-workspace');
-          if (workspace) {
-            initUnifiedEditor();
-
-            // Load the files into unified editor
-            await ueAddFiles(filesArray);
-
-            // Now hide home-view and show editor
-            document.getElementById('home-view').style.display = 'none';
-            workspace.classList.add('active');
-            state.currentTool = 'unified-editor';
-            window.scrollTo(0, 0);
-            pushWorkspaceState('unified-editor');
-
-            // Initialize mobile enhancements
-            if (mobileState.isMobile || mobileState.isTouch) {
-              initMobileEditorEnhancements();
-              ueMobileUpdatePageIndicator();
-            }
-
-            // Open the Gabungkan modal
-            uePmOpenModal();
-
-            // Enable split mode
-            setTimeout(() => {
-              if (!uePmState.extractMode) {
-                uePmToggleExtractMode();
+              // Enable split/extract mode when opened from Split card
+              if (mode === 'split' && !uePmState.extractMode) {
+                uePmToggleExtractMode(); // → unified-editor.js
               }
-              // Hide loading overlay after split mode is ready
               hideFullscreenLoading();
             }, 100);
           }
@@ -485,7 +475,7 @@ function handleSplitPdfCard() {
     });
   }
   // Trigger file selection
-  splitInput.click();
+  input.click();
 }
 
 function initFileInputs() {
@@ -648,7 +638,7 @@ function initFileInputs() {
       if (e.target.files.length > 0) {
         showFullscreenLoading('Memuat tanda tangan...');
         try {
-          await loadSignatureImage(e.target.files[0]);
+          await loadSignatureImage(e.target.files[0]); // → pdf-tools.js
         } catch (error) {
           showToast('Gagal memuat tanda tangan', 'error');
         } finally {
@@ -751,10 +741,10 @@ async function handleDroppedFiles(files) {
       if (isPDF) {
         // Default to Unified Editor for all PDF operations
         showTool('unified-editor');
-        await ueAddFiles(files);
+        await ueAddFiles(files); // → unified-editor.js
       } else if (isImage && files.length > 1) {
         showTool('img-to-pdf');
-        await addImagesToPDF(files);
+        await addImagesToPDF(files); // → image-tools.js
       } else if (isImage) {
         showTool('compress-img');
         await loadImageForTool(file, 'compress-img');
@@ -969,6 +959,7 @@ function cleanupImage(img) {
 // NAVIGATION
 // ============================================================
 
+// Navigate back to homepage. Hides all workspaces, closes modals, resets tool state, cleans up blobs.
 function showHome(skipPushState = false) {
   document.getElementById('home-view').style.display = 'block';
   document.querySelectorAll('.workspace').forEach(ws => ws.classList.remove('active'));
@@ -990,6 +981,8 @@ function showHome(skipPushState = false) {
   navHistory.currentModal = null;
 }
 
+// Navigate to a workspace. Hides home, shows the workspace matching data-tool attribute.
+// For unified-editor: also calls initUnifiedEditor(). Sets up workspace drop zones on first visit.
 function showTool(tool, skipPushState = false) {
   // Hide changelog when leaving home-view
   if (window.changelogAPI) {
@@ -1124,7 +1117,7 @@ function resetState() {
 
   // Reset Unified Editor state
   if (typeof ueReset === 'function') {
-    ueReset();
+    ueReset(); // → unified-editor.js
   }
 }
 
@@ -1266,20 +1259,20 @@ document.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && key === 's') {
     e.preventDefault();
     if (state.currentTool === 'unified-editor' && ueState.pages.length > 0) {
-      ueDownload();
+      ueDownload(); // → unified-editor.js
     }
   }
 
   // Ctrl+Z for undo in unified editor
   if (key === 'z' && (e.ctrlKey || e.metaKey) && state.currentTool === 'unified-editor') {
     e.preventDefault();
-    ueUndoAnnotation();
+    ueUndoAnnotation(); // → unified-editor.js
   }
 
   // Ctrl+Y for redo in unified editor
   if (key === 'y' && (e.ctrlKey || e.metaKey) && state.currentTool === 'unified-editor') {
     e.preventDefault();
-    ueRedoAnnotation();
+    ueRedoAnnotation(); // → unified-editor.js
   }
 
   // Keyboard shortcuts for unified editor tools (only when not typing)
@@ -1436,6 +1429,17 @@ if ('serviceWorker' in navigator) {
 // ============================================================
 // MOBILE NAVIGATION & UI FUNCTIONS
 // ============================================================
+//
+// NOTE: These ueMobile*() functions live in app.js (not unified-editor.js)
+// because they handle mobile UI chrome that WRAPS the editor — bottom bar,
+// page picker overlay, tools dropdown, sign button. They read ueState from
+// unified-editor.js and call ueSelectPage(), but they OWN the mobile-specific
+// DOM elements (#ue-mobile-bottombar, #ue-mobile-page-picker, etc.).
+//
+// Functions: ueMobilePrevPage, ueMobileNextPage, ueMobileUpdatePageIndicator,
+//            ueMobileOpenPagePicker, ueMobileClosePagePicker,
+//            toggleMobileTools, closeMobileTools, ueMobileUpdateSignButton,
+//            initMobileEditorEnhancements
 
 /**
  * Navigate to previous page on mobile
