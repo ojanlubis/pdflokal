@@ -1,128 +1,27 @@
 /*
  * ============================================================
  * PDFLokal - app.js
- * Core Application Logic & State Management
+ * Application Bootstrap & Remaining Logic
  * ============================================================
  *
  * PURPOSE:
- *   Bootstrap file. Manages global state, initialization, navigation,
- *   file handling, utility functions, keyboard shortcuts, and mobile UI
- *   for the unified editor.
+ *   Bootstrap file. Handles initialization, file handling,
+ *   keyboard shortcuts, and mobile UI for the unified editor.
  *
- * GLOBAL STATE DEFINED HERE:
- *   - state {}           — Shared mutable state for all tools
- *   - mobileState {}     — Device detection results (read-only by other files)
- *   - navHistory {}      — Browser back-button navigation tracking
+ * STATE & UTILITIES: Moved to js/lib/state.js, js/lib/utils.js,
+ *   and js/lib/navigation.js (loaded as ES modules before this file).
  *
- * FUNCTIONS EXPORTED (called by other files):
- *   showToast(), showFullscreenLoading(), hideFullscreenLoading(),
- *   formatFileSize(), downloadBlob(), getDownloadFilename(),
- *   getOutputFilename(), checkFileSize(), loadImage(), escapeHtml(),
- *   cleanupImage(), convertImageToPdf(), pushModalState(),
- *   pushWorkspaceState(), closeAllModals(), showHome(), showTool(),
- *   sleep(), debounce(), openShortcutsModal(), closeShortcutsModal()
+ * GLOBALS AVAILABLE VIA WINDOW BRIDGE:
+ *   state, mobileState, navHistory, ueState, uePmState,
+ *   showToast, showFullscreenLoading, hideFullscreenLoading,
+ *   formatFileSize, downloadBlob, getDownloadFilename, checkFileSize,
+ *   loadImage, convertImageToPdf, cleanupImage, escapeHtml, sleep, debounce,
+ *   showHome, showTool, pushWorkspaceState, pushModalState, closeAllModals,
+ *   setupWorkspaceDropZone, resetState, initNavigationHistory
  *
- * FUNCTIONS IMPORTED (defined in other files):
- *   From unified-editor.js:
- *     ueAddFiles(), initUnifiedEditor(), ueReset(), ueSelectPage(),
- *     ueDownload(), ueUndoAnnotation(), ueRedoAnnotation(),
- *     ueRotateCurrentPage(), ueSetTool(), ueRedrawAnnotations(),
- *     uePmOpenModal(), uePmCloseModal(), uePmToggleExtractMode()
- *   From unified-editor.js (state):
- *     ueState, uePmState
- *   From pdf-tools.js:
- *     loadSignatureImage()
- *   From changelog.js:
- *     window.changelogAPI (hide, restore)
- *
- * LOAD ORDER: Must load AFTER changelog.js, BEFORE pdf-tools.js
+ * LOAD ORDER: Must load AFTER js/lib/*.js modules, BEFORE pdf-tools.js
  * ============================================================
  */
-
-// ============================================================
-// GLOBAL STATE
-// ============================================================
-
-const state = {
-  // --- Active workspace ---
-  currentTool: null,            // Which workspace is showing ('unified-editor', 'compress-pdf', etc.)
-
-  // --- PDF loading (standalone tools: compress, protect, pdf-to-img) ---
-  currentPDF: null,             // pdfjsLib document object for the loaded PDF
-  currentPDFBytes: null,        // Raw ArrayBuffer of the loaded PDF file
-  currentPDFName: null,         // Filename of the currently loaded PDF (set on load)
-  originalPDFName: null,        // Original filename for output naming (e.g. "invoice.pdf")
-
-  // --- Image loading (compress, resize, convert, remove-bg tools) ---
-  originalImage: null,          // HTMLImageElement of the loaded image
-  originalImageName: null,      // Original filename
-  originalImageSize: 0,         // Original file size in bytes (for compression stats)
-  originalWidth: 0,             // Natural width of loaded image
-  originalHeight: 0,            // Natural height of loaded image
-  compressedBlob: null,         // Result blob after image compression
-  compressPreviewUrl: null,     // Object URL for compression preview (needs revoking)
-
-  // --- Standalone merge tool (pdf-tools.js merge workspace) ---
-  mergeFiles: [],               // Array of { name, bytes, thumbnail } for merge list
-  currentImages: [],            // Loaded images for standalone tools
-
-  // --- Standalone page manager (legacy, pdf-tools.js) ---
-  splitPages: [],               // Pages for split tool
-  rotatePages: [],              // Pages for rotate tool
-  pagesOrder: [],               // Page ordering state
-  pmPages: [],                  // Array of { pageNum, sourceFile, sourceName, rotation, selected, canvas }
-  pmSourceFiles: [],            // Array of { name, bytes }
-  pmUndoStack: [],              // Undo stack for standalone page manager
-  pmRedoStack: [],              // Redo stack for standalone page manager
-
-  // --- Legacy edit mode annotations (pdf-tools.js) ---
-  editAnnotations: {},          // Per-page annotations { pageNum: [...] }
-  currentEditPage: 0,           // Currently visible page in legacy editor
-  currentEditTool: null,        // Active tool ('whiteout', 'text', 'signature')
-  editUndoStack: [],            // Annotation undo history
-  editRedoStack: [],            // Annotation redo history
-  selectedAnnotation: null,     // Currently selected annotation { pageNum, index }
-  pendingTextPosition: null,    // Where text will be placed { x, y }
-  editPageScales: {},           // Per-page scale factors for coordinate mapping
-  editDevicePixelRatio: 1,      // Device pixel ratio for high-DPI displays
-  cropRect: null,               // (unused — crop feature was removed)
-  currentCropPage: 0,           // (unused — crop feature was removed)
-  editCanvasSetup: false,       // Guard: prevents duplicate canvas event listeners
-
-  // --- Signature (shared by legacy editor + unified editor, via pdf-tools.js) ---
-  signaturePad: null,           // SignaturePad instance (canvas-based drawing)
-  signatureImage: null,         // Final signature as canvas/image (optimized, ready to embed)
-  signatureUploadImage: null,   // Uploaded image before background removal
-  signatureUploadCanvas: null,  // Canvas used for signature bg removal preview
-
-  // --- Image to PDF tool (image-tools.js) ---
-  imgToPdfFiles: [],            // Array of loaded image files for PDF conversion
-  pdfImgPages: [],              // Rendered page canvases for PDF-to-image export
-
-  // --- Cleanup & guards ---
-  blobUrls: [],                 // All created object URLs (revoked on tool close)
-  workspaceDropZonesSetup: new Set(), // Tracks which workspaces have drop zones initialized
-};
-
-// ============================================================
-// FILE SIZE LIMITS
-// ============================================================
-
-const MAX_FILE_SIZE_WARNING = 20 * 1024 * 1024; // 20MB - show warning
-const MAX_FILE_SIZE_LIMIT = 100 * 1024 * 1024;  // 100MB - hard limit
-
-// formatFileSize() is defined once in the UTILITY FUNCTIONS section (~line 1135)
-
-function checkFileSize(file) {
-  if (file.size > MAX_FILE_SIZE_LIMIT) {
-    showToast(`File "${file.name}" terlalu besar (${formatFileSize(file.size)}). Maksimal 100MB.`, 'error');
-    return false;
-  }
-  if (file.size > MAX_FILE_SIZE_WARNING) {
-    showToast(`File "${file.name}" berukuran ${formatFileSize(file.size)}. File besar mungkin memerlukan waktu lebih lama untuk diproses.`, 'info');
-  }
-  return true;
-}
 
 // ============================================================
 // BROWSER COMPATIBILITY CHECK
@@ -146,16 +45,8 @@ function checkBrowserCompatibility() {
 }
 
 // ============================================================
-// MOBILE STATE & DETECTION
+// MOBILE DETECTION
 // ============================================================
-
-const mobileState = {
-  isMobile: false,
-  isTouch: false,
-  orientation: 'portrait',
-  viewportWidth: 0,
-  viewportHeight: 0
-};
 
 function detectMobile() {
   mobileState.viewportWidth = window.innerWidth;
@@ -200,118 +91,6 @@ function detectMobile() {
   }
 }
 
-// Debounce helper for resize events
-function debounce(fn, delay) {
-  let timeoutId;
-  return function(...args) {
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => fn.apply(this, args), delay);
-  };
-}
-
-// ============================================================
-// NAVIGATION HISTORY MANAGEMENT
-// ============================================================
-
-const navHistory = {
-  currentView: 'home',      // 'home', 'workspace', 'modal'
-  currentWorkspace: null,   // Current tool name when in workspace
-  currentModal: null        // Current modal id when modal is open
-};
-
-// Push state when entering workspace
-function pushWorkspaceState(tool) {
-  history.pushState({ view: 'workspace', tool }, '', `#${tool}`);
-  navHistory.currentView = 'workspace';
-  navHistory.currentWorkspace = tool;
-  navHistory.currentModal = null;
-}
-
-// Push state when opening modal
-function pushModalState(modalId) {
-  history.pushState({
-    view: 'modal',
-    modal: modalId,
-    tool: navHistory.currentWorkspace
-  }, '', null);
-  navHistory.currentView = 'modal';
-  navHistory.currentModal = modalId;
-}
-
-// Close all modals
-function closeAllModals() {
-  // Close signature modal
-  const sigModal = document.getElementById('signature-modal');
-  if (sigModal?.classList.contains('active')) {
-    sigModal.classList.remove('active');
-  }
-
-  // Close signature background modal
-  const sigBgModal = document.getElementById('signature-bg-modal');
-  if (sigBgModal?.classList.contains('active')) {
-    sigBgModal.classList.remove('active');
-  }
-
-  // Close text modal
-  const textModal = document.getElementById('text-input-modal');
-  if (textModal?.classList.contains('active')) {
-    textModal.classList.remove('active');
-  }
-
-  // Close page manager modal
-  const pmModal = document.getElementById('ue-gabungkan-modal');
-  if (pmModal?.classList.contains('active')) {
-    if (typeof uePmCloseModal === 'function') {
-      uePmCloseModal(true); // true = skip history manipulation
-    }
-  }
-
-  // Close watermark modal
-  const wmModal = document.getElementById('editor-watermark-modal');
-  if (wmModal?.classList.contains('active')) {
-    wmModal.classList.remove('active');
-  }
-
-  // Close page number modal
-  const pnModal = document.getElementById('editor-pagenum-modal');
-  if (pnModal?.classList.contains('active')) {
-    pnModal.classList.remove('active');
-  }
-
-  // Close protect modal
-  const protectModal = document.getElementById('editor-protect-modal');
-  if (protectModal?.classList.contains('active')) {
-    protectModal.classList.remove('active');
-  }
-
-  navHistory.currentModal = null;
-}
-
-// Handle browser back button
-function initNavigationHistory() {
-  // Set initial state
-  history.replaceState({ view: 'home' }, '', window.location.pathname);
-
-  window.addEventListener('popstate', (event) => {
-    if (event.state) {
-      if (event.state.view === 'workspace') {
-        // Close any open modal, stay in workspace
-        closeAllModals();
-        navHistory.currentView = 'workspace';
-        navHistory.currentModal = null;
-      } else if (event.state.view === 'home') {
-        // Go back to home
-        closeAllModals();
-        showHome(true); // true = skip pushState
-      }
-    } else {
-      // No state = we're at home or initial load
-      closeAllModals();
-      showHome(true);
-    }
-  });
-}
-
 // ============================================================
 // INITIALIZATION
 // ============================================================
@@ -349,17 +128,16 @@ if (document.readyState === 'loading') {
   initApp();
 }
 
-// USER FLOW: Homepage dropzone
-// User drops/selects file → handleDroppedFiles() → detects type →
-//   PDF: showTool('unified-editor') → ueAddFiles() [unified-editor.js]
-//   Images (multiple): showTool('img-to-pdf') → addImagesToPDF() [image-tools.js]
-//   Image (single): showTool('compress-img') → loadImage() [app.js]
+// ============================================================
+// DROPZONE
+// ============================================================
+
 function initDropZone() {
   const dropzone = document.getElementById('main-dropzone');
   const fileInput = document.getElementById('file-input');
 
   dropzone.addEventListener('click', () => fileInput.click());
-  
+
   dropzone.addEventListener('dragover', (e) => {
     e.preventDefault();
     dropzone.classList.add('drag-over');
@@ -381,11 +159,10 @@ function initDropZone() {
   });
 }
 
-// USER FLOW: Homepage tool cards
-// User clicks card → reads data-tool attribute →
-//   'merge-pdf': handleEditorCardWithFilePicker('merge') → file picker → unified editor + Gabungkan modal
-//   'split-pdf': handleEditorCardWithFilePicker('split') → file picker → unified editor + Gabungkan modal + extract mode
-//   anything else: showTool(tool) → hides home, shows workspace
+// ============================================================
+// TOOL CARDS
+// ============================================================
+
 function initToolCards() {
   document.querySelectorAll('.tool-card:not(.disabled)').forEach(card => {
     card.addEventListener('click', () => {
@@ -406,11 +183,7 @@ function initToolCards() {
   });
 }
 
-// USER FLOW: Merge/Split PDF cards (bypasses showTool — keeps home visible during file picking)
-// 1. Creates hidden file input → triggers file picker
-// 2. On file selection: showFullscreenLoading → initUnifiedEditor → ueAddFiles → hide home → show editor
-// 3. Opens Gabungkan modal. If split: also enables extract mode after 100ms delay.
-// mode: 'merge' | 'split'
+// Merge/Split PDF cards (bypasses showTool — keeps home visible during file picking)
 function handleEditorCardWithFilePicker(mode) {
   const inputId = mode + '-pdf-input';
   let input = document.getElementById(inputId);
@@ -425,43 +198,33 @@ function handleEditorCardWithFilePicker(mode) {
 
     input.addEventListener('change', async (e) => {
       if (e.target.files.length > 0) {
-        // Convert FileList to Array before resetting input
         const filesArray = Array.from(e.target.files);
-        // Reset input immediately so same files can be selected again
         input.value = '';
 
-        // Show loading overlay (home-view stays visible behind it)
         showFullscreenLoading('Memuat PDF...');
 
         try {
-          // Initialize unified editor in background
           const workspace = document.getElementById('unified-editor-workspace');
           if (workspace) {
-            initUnifiedEditor(); // → unified-editor.js
+            initUnifiedEditor();
+            await ueAddFiles(filesArray);
 
-            // Load the files into unified editor
-            await ueAddFiles(filesArray); // → unified-editor.js
-
-            // Now hide home-view and show editor
             document.getElementById('home-view').style.display = 'none';
             workspace.classList.add('active');
             state.currentTool = 'unified-editor';
             window.scrollTo(0, 0);
             pushWorkspaceState('unified-editor');
 
-            // Initialize mobile enhancements
             if (mobileState.isMobile || mobileState.isTouch) {
               initMobileEditorEnhancements();
               ueMobileUpdatePageIndicator();
             }
 
-            // Open the Gabungkan modal
-            uePmOpenModal(); // → unified-editor.js
+            uePmOpenModal();
 
             setTimeout(() => {
-              // Enable split/extract mode when opened from Split card
               if (mode === 'split' && !uePmState.extractMode) {
-                uePmToggleExtractMode(); // → unified-editor.js
+                uePmToggleExtractMode();
               }
               hideFullscreenLoading();
             }, 100);
@@ -474,9 +237,12 @@ function handleEditorCardWithFilePicker(mode) {
       }
     });
   }
-  // Trigger file selection
   input.click();
 }
+
+// ============================================================
+// FILE INPUTS
+// ============================================================
 
 function initFileInputs() {
   // Image to PDF input
@@ -654,10 +420,7 @@ function initFileInputs() {
 }
 
 function initDropHints() {
-  // Handle both old .drop-hint class and new .dropzone class in workspaces
-  // Exclude main-dropzone which has its own handler in initDropZone()
   document.querySelectorAll('.drop-hint, .workspace .dropzone, .preview-area .dropzone, .page-grid .dropzone, .file-list .dropzone').forEach(hint => {
-    // Skip the main homepage dropzone
     if (hint.id === 'main-dropzone') return;
 
     hint.addEventListener('dragover', (e) => {
@@ -670,7 +433,6 @@ function initDropHints() {
     hint.addEventListener('drop', (e) => {
       e.preventDefault();
       hint.classList.remove('drag-over');
-      // The workspace drop handler will handle the actual file processing
     });
   });
 }
@@ -691,8 +453,7 @@ function initSignaturePad() {
       backgroundColor: 'rgb(255, 255, 255)',
       penColor: 'rgb(0, 0, 0)'
     });
-    
-    // Resize canvas
+
     function resizeCanvas() {
       const ratio = Math.max(window.devicePixelRatio || 1, 1);
       canvas.width = canvas.offsetWidth * ratio;
@@ -700,7 +461,7 @@ function initSignaturePad() {
       canvas.getContext('2d').scale(ratio, ratio);
       state.signaturePad.clear();
     }
-    
+
     window.addEventListener('resize', resizeCanvas);
     setTimeout(resizeCanvas, 100);
   }
@@ -715,7 +476,6 @@ async function handleDroppedFiles(files) {
 
   const file = files[0];
 
-  // Check file size
   if (!checkFileSize(file)) return;
 
   const isPDF = file.type === 'application/pdf';
@@ -726,25 +486,21 @@ async function handleDroppedFiles(files) {
     return;
   }
 
-  // Mobile: reject images on main dropzone (only allow PDF)
   if (mobileState.isMobile && isImage && !isPDF) {
     showToast('Di perangkat mobile, gunakan tool khusus gambar untuk memproses gambar.', 'info');
     return;
   }
 
-  // Show loading state
   showFullscreenLoading(isPDF ? 'Memuat PDF...' : 'Memuat gambar...');
 
   try {
-    // If no tool is selected, suggest based on file type
     if (!state.currentTool) {
       if (isPDF) {
-        // Default to Unified Editor for all PDF operations
         showTool('unified-editor');
-        await ueAddFiles(files); // → unified-editor.js
+        await ueAddFiles(files);
       } else if (isImage && files.length > 1) {
         showTool('img-to-pdf');
-        await addImagesToPDF(files); // → image-tools.js
+        await addImagesToPDF(files);
       } else if (isImage) {
         showTool('compress-img');
         await loadImageForTool(file, 'compress-img');
@@ -763,11 +519,9 @@ async function loadPDFForTool(file, tool) {
     const arrayBuffer = await file.arrayBuffer();
     state.currentPDFBytes = new Uint8Array(arrayBuffer);
     state.currentPDFName = file.name;
-    
-    // Load with PDF.js for rendering
+
     state.currentPDF = await pdfjsLib.getDocument({ data: state.currentPDFBytes.slice() }).promise;
-    
-    // Initialize tool-specific views
+
     switch (tool) {
       case 'pdf-to-img':
         await renderPdfImgPages();
@@ -784,7 +538,6 @@ async function loadPDFForTool(file, tool) {
     }
   } catch (error) {
     console.error('Error loading PDF:', error);
-    // Provide more specific error messages
     const errorMsg = error.message || '';
     if (errorMsg.includes('password') || errorMsg.includes('encrypted')) {
       showToast('PDF ini dilindungi password. File tidak dapat dibuka tanpa password.', 'error');
@@ -803,7 +556,6 @@ async function loadImageForTool(file, tool) {
 
     switch (tool) {
       case 'compress-img':
-        // Hide drop hint, show comparison
         const compressHint = document.getElementById('compress-img-hint');
         const compressComparison = document.getElementById('compress-img-comparison');
         if (compressHint) compressHint.classList.add('hidden');
@@ -816,7 +568,6 @@ async function loadImageForTool(file, tool) {
         document.getElementById('compress-img-btn').disabled = false;
         break;
       case 'resize':
-        // Hide drop hint, show preview
         const resizeHint = document.getElementById('resize-hint');
         const resizePreviewBox = document.getElementById('resize-preview-box');
         if (resizeHint) resizeHint.classList.add('hidden');
@@ -831,7 +582,6 @@ async function loadImageForTool(file, tool) {
         document.getElementById('resize-btn').disabled = false;
         break;
       case 'convert-img':
-        // Hide drop hint, show preview
         const convertHint = document.getElementById('convert-hint');
         const convertPreviewBox = document.getElementById('convert-preview-box');
         if (convertHint) convertHint.classList.add('hidden');
@@ -843,7 +593,6 @@ async function loadImageForTool(file, tool) {
         document.getElementById('convert-btn').disabled = false;
         break;
       case 'remove-bg':
-        // Hide drop hint, show comparison
         const removeBgHint = document.getElementById('remove-bg-hint');
         const removeBgComparison = document.getElementById('remove-bg-comparison');
         if (removeBgHint) removeBgHint.classList.add('hidden');
@@ -860,377 +609,6 @@ async function loadImageForTool(file, tool) {
   }
 }
 
-function loadImage(file) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    const blobUrl = URL.createObjectURL(file);
-    img.onload = () => {
-      // Store the blob URL on the image for later cleanup
-      img._blobUrl = blobUrl;
-      resolve(img);
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(blobUrl);
-      reject(new Error('Failed to load image'));
-    };
-    img.src = blobUrl;
-  });
-}
-
-/**
- * Convert image file to single-page PDF
- * @param {File} imageFile - Image file to convert
- * @returns {Promise<Uint8Array>} PDF bytes
- */
-async function convertImageToPdf(imageFile) {
-  try {
-    // Load image to get dimensions
-    const img = await loadImage(imageFile);
-
-    // Create new PDF document
-    const pdfDoc = await PDFLib.PDFDocument.create();
-
-    // Read image bytes
-    const arrayBuffer = await imageFile.arrayBuffer();
-    const imgBytes = new Uint8Array(arrayBuffer);
-
-    // Embed image based on MIME type
-    let embeddedImage;
-    const mimeType = imageFile.type.toLowerCase();
-
-    if (mimeType === 'image/png') {
-      embeddedImage = await pdfDoc.embedPng(imgBytes);
-    } else if (mimeType === 'image/jpeg' || mimeType === 'image/jpg') {
-      embeddedImage = await pdfDoc.embedJpg(imgBytes);
-    } else {
-      // Convert other formats (WebP, GIF, etc.) to PNG via Canvas
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0);
-
-      const pngBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-      const pngBytes = new Uint8Array(await pngBlob.arrayBuffer());
-      embeddedImage = await pdfDoc.embedPng(pngBytes);
-    }
-
-    // Create page matching image dimensions exactly
-    const page = pdfDoc.addPage([embeddedImage.width, embeddedImage.height]);
-
-    // Draw image to fill entire page
-    page.drawImage(embeddedImage, {
-      x: 0,
-      y: 0,
-      width: embeddedImage.width,
-      height: embeddedImage.height
-    });
-
-    // Clean up blob URL
-    if (img._blobUrl) {
-      URL.revokeObjectURL(img._blobUrl);
-    }
-
-    // Return PDF bytes
-    return await pdfDoc.save();
-
-  } catch (error) {
-    console.error('Image conversion failed:', error);
-    throw new Error(`Gagal mengonversi ${imageFile.name}. Format tidak didukung.`);
-  }
-}
-
-// Helper function to escape HTML and prevent XSS
-function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
-
-// Helper function to revoke blob URL from an image
-function cleanupImage(img) {
-  if (img && img._blobUrl) {
-    URL.revokeObjectURL(img._blobUrl);
-    img._blobUrl = null;
-  }
-}
-
-// ============================================================
-// NAVIGATION
-// ============================================================
-
-// Navigate back to homepage. Hides all workspaces, closes modals, resets tool state, cleans up blobs.
-function showHome(skipPushState = false) {
-  document.getElementById('home-view').style.display = 'block';
-  document.querySelectorAll('.workspace').forEach(ws => ws.classList.remove('active'));
-  closeAllModals();
-  state.currentTool = null;
-  resetState();
-
-  // Restore changelog badge when returning to home
-  if (window.changelogAPI) {
-    window.changelogAPI.restore();
-  }
-
-  // Update navigation history
-  if (!skipPushState) {
-    history.pushState({ view: 'home' }, '', '#');
-  }
-  navHistory.currentView = 'home';
-  navHistory.currentWorkspace = null;
-  navHistory.currentModal = null;
-}
-
-// Navigate to a workspace. Hides home, shows the workspace matching data-tool attribute.
-// For unified-editor: also calls initUnifiedEditor(). Sets up workspace drop zones on first visit.
-function showTool(tool, skipPushState = false) {
-  // Hide changelog when leaving home-view
-  if (window.changelogAPI) {
-    window.changelogAPI.hide();
-  }
-
-  document.getElementById('home-view').style.display = 'none';
-  document.querySelectorAll('.workspace').forEach(ws => ws.classList.remove('active'));
-
-  const workspace = document.getElementById(`${tool}-workspace`);
-  if (workspace) {
-    workspace.classList.add('active');
-    state.currentTool = tool;
-
-    // Scroll to top when opening workspace
-    window.scrollTo(0, 0);
-
-    // Push browser history state
-    if (!skipPushState) {
-      pushWorkspaceState(tool);
-    }
-
-    // Setup drop zones for workspaces
-    setupWorkspaceDropZone(tool);
-
-    // Initialize unified editor when opened
-    if (tool === 'unified-editor') {
-      initUnifiedEditor();
-
-      // Initialize mobile enhancements
-      if (mobileState.isMobile || mobileState.isTouch) {
-        setTimeout(() => {
-          initMobileEditorEnhancements();
-          ueMobileUpdatePageIndicator();
-        }, 100);
-      }
-    }
-  }
-}
-
-function setupWorkspaceDropZone(tool) {
-  // Prevent duplicate event listeners
-  if (state.workspaceDropZonesSetup.has(tool)) {
-    return;
-  }
-
-  const workspace = document.getElementById(`${tool}-workspace`);
-  if (!workspace) return;
-
-  state.workspaceDropZonesSetup.add(tool);
-
-  workspace.addEventListener('dragover', (e) => {
-    e.preventDefault();
-  });
-
-  workspace.addEventListener('drop', async (e) => {
-    e.preventDefault();
-    const files = e.dataTransfer.files;
-
-    if (files.length === 0) return;
-
-    // Determine loading message based on file type
-    const isPDF = files[0].type === 'application/pdf';
-    const loadingMessage = isPDF ? 'Memuat PDF...' : 'Memuat gambar...';
-
-    showFullscreenLoading(loadingMessage);
-    try {
-      if (tool === 'merge') {
-        await addMergeFiles(files);
-      } else if (tool === 'img-to-pdf') {
-        await addImagesToPDF(files);
-      } else if (files.length === 1) {
-        const file = files[0];
-        if (file.type === 'application/pdf') {
-          await loadPDFForTool(file, tool);
-        } else if (file.type.startsWith('image/')) {
-          await loadImageForTool(file, tool);
-        }
-      }
-    } catch (error) {
-      console.error('Error handling dropped files:', error);
-      showToast('Gagal memuat file', 'error');
-    } finally {
-      hideFullscreenLoading();
-    }
-  });
-}
-
-function resetState() {
-  state.currentPDF = null;
-  state.currentPDFBytes = null;
-  state.currentImages = [];
-  state.mergeFiles = [];
-  state.splitPages = [];
-  state.rotatePages = [];
-  state.pagesOrder = [];
-  state.editAnnotations = {};
-  state.currentEditPage = 0;
-
-  // Cleanup original image blob URL
-  cleanupImage(state.originalImage);
-  state.originalImage = null;
-  state.originalImageName = null;
-  state.originalImageSize = 0;
-  state.originalWidth = 0;
-  state.originalHeight = 0;
-
-  // Cleanup images to PDF
-  state.imgToPdfFiles.forEach(item => cleanupImage(item.img));
-  state.imgToPdfFiles = [];
-
-  // Reset other state
-  state.pdfImgPages = [];
-  state.compressedBlob = null;
-  state.cropRect = null;
-  state.currentCropPage = 0;
-  state.currentEditTool = null;
-  state.signatureImage = null;
-
-  // Cleanup compress preview URL
-  if (state.compressPreviewUrl) {
-    URL.revokeObjectURL(state.compressPreviewUrl);
-    state.compressPreviewUrl = null;
-  }
-
-  // Reset canvas setup flags so they can be re-initialized
-  state.editCanvasSetup = false;
-
-  // Reset Page Manager state
-  state.pmPages = [];
-  state.pmSourceFiles = [];
-
-  // Reset Unified Editor state
-  if (typeof ueReset === 'function') {
-    ueReset(); // → unified-editor.js
-  }
-}
-
-// ============================================================
-// UTILITY FUNCTIONS
-// ============================================================
-
-function formatFileSize(bytes) {
-  if (bytes === 0) return '0 Bytes';
-  const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-}
-
-// Generate output filename: [original]_[suffix].ext
-function getOutputFilename(suffix, ext = 'pdf', originalName = null) {
-  const baseName = originalName || state.currentPDFName || state.originalImageName || 'output';
-  // Remove extension from base name
-  const nameWithoutExt = baseName.replace(/\.[^/.]+$/, '');
-  return `${nameWithoutExt}_${suffix}.${ext}`;
-}
-
-/**
- * Constructs download filename with _pdflokal.id suffix
- * @param {Object} options - Configuration object
- * @param {string} options.originalName - Original uploaded filename (with or without extension)
- * @param {string} [options.suffix] - Optional descriptive suffix (e.g., 'page1', 'page2')
- * @param {string} options.extension - Output file extension (pdf, png, jpg, etc.)
- * @returns {string} Formatted filename: {basename}[_suffix]_pdflokal.id.{extension}
- */
-function getDownloadFilename(options) {
-  const { originalName, suffix = '', extension } = options;
-
-  // Handle missing original name (fallback to 'output')
-  if (!originalName) {
-    const filename = suffix
-      ? `output_${suffix}_pdflokal.id.${extension}`
-      : `output_pdflokal.id.${extension}`;
-    return filename;
-  }
-
-  // Remove extension from original name
-  const baseName = originalName.replace(/\.[^/.]+$/, '');
-
-  // Build: {basename}[_suffix]_pdflokal.id.{extension}
-  const filename = suffix
-    ? `${baseName}_${suffix}_pdflokal.id.${extension}`
-    : `${baseName}_pdflokal.id.${extension}`;
-
-  return filename;
-}
-
-function downloadBlob(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-function showToast(message, type = 'info') {
-  const container = document.getElementById('toast-container');
-
-  const toast = document.createElement('div');
-  toast.className = `toast ${type}`;
-  toast.innerHTML = `
-    ${type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ'}
-    <span>${message}</span>
-  `;
-
-  container.appendChild(toast);
-
-  setTimeout(() => {
-    toast.style.animation = 'slideIn 0.3s ease reverse';
-    setTimeout(() => toast.remove(), 300);
-  }, 3000);
-}
-
-// Full-screen loading overlay for merge/split operations
-function showFullscreenLoading(message = 'Memuat PDF...') {
-  let overlay = document.getElementById('fullscreen-loading-overlay');
-  if (!overlay) {
-    overlay = document.createElement('div');
-    overlay.id = 'fullscreen-loading-overlay';
-    overlay.innerHTML = `
-      <div class="fullscreen-loading-content">
-        <div class="fullscreen-loading-spinner"></div>
-        <p class="fullscreen-loading-text">${message}</p>
-      </div>
-    `;
-    document.body.appendChild(overlay);
-  } else {
-    overlay.querySelector('.fullscreen-loading-text').textContent = message;
-    overlay.style.display = 'flex';
-  }
-}
-
-function hideFullscreenLoading() {
-  const overlay = document.getElementById('fullscreen-loading-overlay');
-  if (overlay) {
-    overlay.style.display = 'none';
-  }
-}
-
-
 // ============================================================
 // KEYBOARD SHORTCUTS
 // ============================================================
@@ -1238,13 +616,11 @@ function hideFullscreenLoading() {
 document.addEventListener('keydown', (e) => {
   const key = e.key.toLowerCase();
 
-  // Skip if user is typing in an input field
   const activeEl = document.activeElement;
   const isTyping = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable);
 
   // Escape - close modals or go back home
   if (e.key === 'Escape') {
-    // Check if any modal is open first
     const shortcutsModal = document.getElementById('shortcuts-modal');
     if (shortcutsModal && shortcutsModal.classList.contains('active')) {
       closeShortcutsModal();
@@ -1259,25 +635,24 @@ document.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && key === 's') {
     e.preventDefault();
     if (state.currentTool === 'unified-editor' && ueState.pages.length > 0) {
-      ueDownload(); // → unified-editor.js
+      ueDownload();
     }
   }
 
   // Ctrl+Z for undo in unified editor
   if (key === 'z' && (e.ctrlKey || e.metaKey) && state.currentTool === 'unified-editor') {
     e.preventDefault();
-    ueUndoAnnotation(); // → unified-editor.js
+    ueUndoAnnotation();
   }
 
   // Ctrl+Y for redo in unified editor
   if (key === 'y' && (e.ctrlKey || e.metaKey) && state.currentTool === 'unified-editor') {
     e.preventDefault();
-    ueRedoAnnotation(); // → unified-editor.js
+    ueRedoAnnotation();
   }
 
   // Keyboard shortcuts for unified editor tools (only when not typing)
   if (state.currentTool === 'unified-editor' && !isTyping) {
-    // Tool shortcuts (require a page to be selected)
     if (ueState.selectedPage >= 0) {
       if (key === 'v' && !e.ctrlKey && !e.metaKey) {
         ueSetTool('select');
@@ -1300,7 +675,6 @@ document.addEventListener('keydown', (e) => {
       }
     }
 
-    // Arrow key navigation
     if (e.key === 'ArrowLeft' && ueState.selectedPage > 0) {
       e.preventDefault();
       ueSelectPage(ueState.selectedPage - 1);
@@ -1309,7 +683,6 @@ document.addEventListener('keydown', (e) => {
       ueSelectPage(ueState.selectedPage + 1);
     }
 
-    // ? to show keyboard shortcuts help
     if (e.key === '?' || (e.shiftKey && key === '/')) {
       e.preventDefault();
       openShortcutsModal();
@@ -1342,7 +715,7 @@ function closeShortcutsModal() {
 document.addEventListener('paste', async (e) => {
   const items = e.clipboardData?.items;
   if (!items) return;
-  
+
   for (const item of items) {
     if (item.type.startsWith('image/')) {
       const file = item.getAsFile();
@@ -1361,119 +734,31 @@ document.addEventListener('paste', async (e) => {
 });
 
 // ============================================================
-// SERVICE WORKER (for offline support - optional)
-// ============================================================
-
-// Uncomment to enable offline support
-/*
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
-      .then(registration => {
-        console.log('SW registered:', registration);
-      })
-      .catch(error => {
-        console.log('SW registration failed:', error);
-      });
-  });
-}
-*/
-
-// ============================================================
-// FUTURE BACKEND FEATURES
-// ============================================================
-/*
- * The following features require server-side processing and cannot
- * be implemented purely in the browser:
- * 
- * 1. PDF to Word (.docx) conversion
- * 2. PDF to Excel (.xlsx) conversion
- * 3. Word/Excel/PowerPoint to PDF conversion
- * 4. OCR (Optical Character Recognition)
- * 
- * Implementation options when ready:
- * 
- * Option 1: Serverless Functions + LibreOffice
- *   - Deploy on AWS Lambda / Google Cloud Functions / Vercel
- *   - Use libreoffice-lambda: https://github.com/nickatnight/libreoffice-lambda
- *   - Pros: Pay per use, scales automatically
- *   - Cons: Cold start latency, 50MB limit on Lambda
- * 
- * Option 2: CloudConvert API
- *   - https://cloudconvert.com/api
- *   - Cost: ~$0.01-0.05 per conversion
- *   - Pros: Reliable, high quality, many formats
- *   - Cons: External dependency, cost per conversion
- * 
- * Option 3: Self-hosted LibreOffice
- *   - Docker container with LibreOffice headless
- *   - Use unoconv or LibreOffice CLI
- *   - Pros: No external costs, full control
- *   - Cons: Need to manage infrastructure
- * 
- * Option 4: Gotenberg
- *   - https://gotenberg.dev/
- *   - Docker-based conversion service
- *   - Pros: Easy to deploy, many formats
- *   - Cons: Need to manage infrastructure
- * 
- * Privacy considerations for server features:
- *   - Files should be deleted immediately after processing
- *   - Use HTTPS for all transfers
- *   - Consider client-side encryption before upload
- *   - Be transparent with users about data handling
- * 
- * When to implement: When MAU > 10K or donation revenue covers costs
- */
-
-// ============================================================
 // MOBILE NAVIGATION & UI FUNCTIONS
 // ============================================================
-//
-// NOTE: These ueMobile*() functions live in app.js (not unified-editor.js)
-// because they handle mobile UI chrome that WRAPS the editor — bottom bar,
-// page picker overlay, tools dropdown, sign button. They read ueState from
-// unified-editor.js and call ueSelectPage(), but they OWN the mobile-specific
-// DOM elements (#ue-mobile-bottombar, #ue-mobile-page-picker, etc.).
-//
-// Functions: ueMobilePrevPage, ueMobileNextPage, ueMobileUpdatePageIndicator,
-//            ueMobileOpenPagePicker, ueMobileClosePagePicker,
-//            toggleMobileTools, closeMobileTools, ueMobileUpdateSignButton,
-//            initMobileEditorEnhancements
 
-/**
- * Navigate to previous page on mobile
- */
 function ueMobilePrevPage() {
   if (ueState.selectedPage > 0) {
     ueSelectPage(ueState.selectedPage - 1);
     ueMobileUpdatePageIndicator();
 
-    // Haptic feedback
     if (mobileState.isTouch && navigator.vibrate) {
       navigator.vibrate(10);
     }
   }
 }
 
-/**
- * Navigate to next page on mobile
- */
 function ueMobileNextPage() {
   if (ueState.selectedPage < ueState.pages.length - 1) {
     ueSelectPage(ueState.selectedPage + 1);
     ueMobileUpdatePageIndicator();
 
-    // Haptic feedback
     if (mobileState.isTouch && navigator.vibrate) {
       navigator.vibrate(10);
     }
   }
 }
 
-/**
- * Update the mobile page indicator display
- */
 function ueMobileUpdatePageIndicator() {
   const indicator = document.getElementById('ue-mobile-page-indicator');
   const prevBtn = document.getElementById('ue-mobile-prev');
@@ -1490,16 +775,12 @@ function ueMobileUpdatePageIndicator() {
   if (nextBtn) nextBtn.disabled = ueState.selectedPage >= ueState.pages.length - 1;
 }
 
-/**
- * Open the mobile page picker modal
- */
 function ueMobileOpenPagePicker() {
   const picker = document.getElementById('ue-mobile-page-picker');
   const grid = document.getElementById('ue-mobile-page-grid');
 
   if (!picker || !grid || ueState.pages.length === 0) return;
 
-  // Build thumbnail grid
   grid.innerHTML = '';
   ueState.pages.forEach((page, index) => {
     const thumb = document.createElement('div');
@@ -1509,16 +790,14 @@ function ueMobileOpenPagePicker() {
       ueMobileUpdatePageIndicator();
       ueMobileClosePagePicker();
 
-      // Haptic feedback
       if (mobileState.isTouch && navigator.vibrate) {
         navigator.vibrate(10);
       }
     };
 
-    // Clone thumbnail canvas
     if (page.canvas) {
       const thumbCanvas = document.createElement('canvas');
-      const scale = 0.3; // Smaller scale for picker
+      const scale = 0.3;
       thumbCanvas.width = page.canvas.width * scale;
       thumbCanvas.height = page.canvas.height * scale;
       const ctx = thumbCanvas.getContext('2d');
@@ -1526,7 +805,6 @@ function ueMobileOpenPagePicker() {
       thumb.appendChild(thumbCanvas);
     }
 
-    // Page number badge
     const num = document.createElement('span');
     num.className = 'mobile-page-thumb-number';
     num.textContent = index + 1;
@@ -1536,27 +814,17 @@ function ueMobileOpenPagePicker() {
   });
 
   picker.classList.add('active');
-
-  // Prevent body scroll
   document.body.style.overflow = 'hidden';
 }
 
-/**
- * Close the mobile page picker modal
- */
 function ueMobileClosePagePicker() {
   const picker = document.getElementById('ue-mobile-page-picker');
   if (picker) {
     picker.classList.remove('active');
   }
-
-  // Restore body scroll
   document.body.style.overflow = '';
 }
 
-/**
- * Toggle mobile tools dropdown
- */
 function toggleMobileTools() {
   const dropdown = document.getElementById('mobile-tools-dropdown');
   if (dropdown) {
@@ -1564,9 +832,6 @@ function toggleMobileTools() {
   }
 }
 
-/**
- * Close mobile tools dropdown
- */
 function closeMobileTools() {
   const dropdown = document.getElementById('mobile-tools-dropdown');
   if (dropdown) {
@@ -1574,14 +839,10 @@ function closeMobileTools() {
   }
 }
 
-/**
- * Update mobile sign button state (show checkmark when signature exists)
- */
 function ueMobileUpdateSignButton() {
   const signBtn = document.getElementById('ue-mobile-sign-btn');
   if (!signBtn) return;
 
-  // Check if there are any signatures on the current page
   const currentPageAnnotations = ueState.annotations[ueState.selectedPage] || [];
   const hasSignature = currentPageAnnotations.some(a => a.type === 'signature');
 
@@ -1600,18 +861,6 @@ document.addEventListener('click', function(e) {
   }
 });
 
-// ============================================================
-// ENHANCED TOUCH HANDLING FOR UNIFIED EDITOR
-// ============================================================
-
-/**
- * Initialize mobile-specific enhancements when editor loads
- * Note: Pinch-to-zoom was removed due to conflicts with signature dragging.
- * Users can use the zoom +/- buttons in the toolbar instead.
- */
 function initMobileEditorEnhancements() {
   // Placeholder for future mobile-specific enhancements
-  // Pinch-to-zoom removed - use toolbar zoom buttons instead
 }
-
-// Mobile UI updates are handled directly inside ueSelectPage (unified-editor.js)

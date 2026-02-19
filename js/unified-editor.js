@@ -40,14 +40,7 @@
 // CONSTANTS
 // ============================================================
 
-// CSS font-family mapping (used in annotation drawing, inline editor, and text bounds)
-const CSS_FONT_MAP = {
-  'Helvetica': 'Helvetica, Arial, sans-serif',
-  'Times-Roman': 'Times New Roman, Times, serif',
-  'Courier': 'Courier New, Courier, monospace',
-  'Montserrat': 'Montserrat, sans-serif',
-  'Carlito': 'Carlito, Calibri, sans-serif'
-};
+// CSS_FONT_MAP is now defined in js/lib/state.js and available via window.CSS_FONT_MAP
 
 // ============================================================
 // CANVAS UTILITIES (extracted from ueSetupCanvasEvents closure)
@@ -105,50 +98,7 @@ function ueGetResizeHandle(anno, x, y) {
 // UNIFIED EDITOR STATE
 // ============================================================
 
-// State for unified editor
-// NOTE: Also read/written by app.js (keyboard shortcuts, mobile UI) and pdf-tools.js (modals)
-const ueState = {
-  // --- Document data ---
-  pages: [],              // All loaded pages: [{ pageNum, sourceIndex, sourceName, rotation, canvas }]
-  sourceFiles: [],        // Source PDF files: [{ name, bytes }] — indexes match pages[].sourceIndex
-  selectedPage: -1,       // Index into pages[] of the currently visible page
-
-  // --- Editing tools ---
-  currentTool: null,      // Active annotation tool: 'select' | 'whiteout' | 'text' | 'signature' | null
-  annotations: {},        // Per-page annotation arrays: { pageIndex: [annotation, ...] }
-  selectedAnnotation: null, // Currently selected annotation: { pageIndex, index } or null
-  pendingTextPosition: null, // Where text will be placed on next confirm: { x, y } or null
-
-  // --- Undo/redo (two separate stacks: page ops vs annotations) ---
-  undoStack: [],          // Page operation history (reorder, delete, rotate)
-  redoStack: [],          // Page operation redo
-  editUndoStack: [],      // Annotation edit history (add, move, delete annotations)
-  editRedoStack: [],      // Annotation edit redo
-
-  // --- Rendering ---
-  pageScales: {},         // Per-page scale info: { pageIndex: { canvasWidth, canvasHeight, pdfWidth, pdfHeight, scale } }
-  devicePixelRatio: 1,    // Window.devicePixelRatio at render time
-  eventsSetup: false,     // Guard: true after event delegation is attached to container
-  pageCanvases: [],       // Per-page DOM: [{ slot: HTMLElement, canvas: HTMLCanvasElement, rendered: bool }]
-  pageCaches: {},         // Per-page cached renders: { pageIndex: ImageData } for smooth annotation redraw
-  pageObserver: null,     // IntersectionObserver instance for lazy page rendering
-  scrollSyncEnabled: true, // false during programmatic scrollIntoView to prevent feedback loop
-  zoomLevel: 1.0,         // Current zoom multiplier (1.0 = fit width)
-
-  // --- Signature placement ---
-  pendingSignature: false,  // true when signature image is "attached to cursor" awaiting click
-  signaturePreviewPos: null, // Cursor position for ghost preview: { x, y } or null
-  resizeHandle: null,       // Which corner handle is being dragged: 'tl' | 'tr' | 'bl' | 'br' | null
-  resizeStartInfo: null,    // Snapshot of annotation state when resize began
-
-  // --- Touch & drag interaction ---
-  isDragging: false,        // true while an annotation is being dragged (shared with pinch-to-zoom)
-  isResizing: false,        // true while an annotation is being resized
-  sidebarDropIndicator: null, // DOM element for sidebar drag-drop indicator
-
-  // --- UX ---
-  lastLockedToastAnnotation: null, // Tracks last signature that showed "locked" toast (prevents spam)
-};
+// ueState is now defined in js/lib/state.js and available via window.ueState
 
 // ============================================================
 // FILE LOADING & INPUT HANDLING
@@ -2597,14 +2547,7 @@ function ueToggleSidebar() {
 //            uePmSelectAll, uePmDeselectAll, uePmUpdateSelectionCount,
 //            uePmExtractSelected, initUePmFileInput, initUePmImageInput
 
-// NOTE: Also read by app.js (handleEditorCardWithFilePicker checks uePmState.extractMode)
-const uePmState = {
-  isOpen: false,            // Whether the Gabungkan modal is currently visible
-  extractMode: false,       // true = "Split" mode (multi-select pages for extraction)
-  selectedForExtract: [],   // Array of page indices selected for split/extraction
-  draggedIndex: -1,         // Index of the page currently being dragged (-1 = none)
-  dropIndicator: null       // DOM element showing where dragged page will land
-};
+// uePmState is now defined in js/lib/state.js and available via window.uePmState
 
 // Open the page manager modal
 function uePmOpenModal() {
