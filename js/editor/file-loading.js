@@ -57,6 +57,9 @@ export async function ueAddFiles(files) {
     }
   }
 
+  // Wait one frame for layout reflow (workspace may have just become visible)
+  await new Promise(resolve => requestAnimationFrame(resolve));
+
   // Rebuild page slots for new page count
   ueCreatePageSlots();
 

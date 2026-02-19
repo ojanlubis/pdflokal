@@ -7,23 +7,11 @@ import { ueState } from '../lib/state.js';
 import { showToast, showFullscreenLoading, hideFullscreenLoading } from '../lib/utils.js';
 
 // ============================================================
-// SIDEBAR FILE DROPDOWN
+// FILE OPERATIONS
 // ============================================================
-
-export function toggleSidebarFileMenu(e) {
-  e.stopPropagation();
-  const dropdown = e.target.closest('.sidebar-file-dropdown');
-  if (dropdown) dropdown.classList.toggle('open');
-}
-
-export function closeSidebarFileMenu() {
-  const dropdown = document.querySelector('.sidebar-file-dropdown');
-  if (dropdown) dropdown.classList.remove('open');
-}
 
 // Replace all files: reset editor, then open file picker
 export function ueReplaceFiles() {
-  closeSidebarFileMenu();
   let input = document.getElementById('ue-replace-input');
   if (!input) return;
 
@@ -50,11 +38,29 @@ export function ueReplaceFiles() {
   input.click();
 }
 
-// Close file menu when clicking outside
+// Editor header file dropdown
+export function toggleEditorFileMenu(e) {
+  e.stopPropagation();
+  const dropdown = document.getElementById('editor-file-dropdown');
+  if (dropdown) dropdown.classList.toggle('open');
+}
+
+export function closeEditorFileMenu() {
+  const dropdown = document.getElementById('editor-file-dropdown');
+  if (dropdown) dropdown.classList.remove('open');
+}
+
+// Close file menus when clicking outside
 document.addEventListener('click', (e) => {
-  const dropdown = document.querySelector('.sidebar-file-dropdown');
-  if (dropdown && dropdown.classList.contains('open') && !dropdown.contains(e.target)) {
-    dropdown.classList.remove('open');
+  // Sidebar file dropdown
+  const sidebarDropdown = document.querySelector('.unified-sidebar .sidebar-file-dropdown');
+  if (sidebarDropdown && sidebarDropdown.classList.contains('open') && !sidebarDropdown.contains(e.target)) {
+    sidebarDropdown.classList.remove('open');
+  }
+  // Editor header file dropdown
+  const editorDropdown = document.getElementById('editor-file-dropdown');
+  if (editorDropdown && editorDropdown.classList.contains('open') && !editorDropdown.contains(e.target)) {
+    editorDropdown.classList.remove('open');
   }
 });
 
@@ -63,29 +69,14 @@ export function ueRenderThumbnails() {
   const container = document.getElementById('ue-thumbnails');
   container.innerHTML = '';
 
-  const sidebar = document.getElementById('unified-sidebar');
-
   if (ueState.pages.length === 0) {
-    if (sidebar) sidebar.style.removeProperty('--sidebar-w');
     container.innerHTML = `
       <div class="drop-hint" onclick="document.getElementById('ue-file-input').click()">
-        <svg class="drop-hint-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width: 32px; height: 32px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-        <span class="drop-hint-text" style="font-size: 0.8125rem;">Upload PDF</span>
+        <svg class="drop-hint-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width: 24px; height: 24px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <span class="drop-hint-text" style="font-size: 0.75rem;">Upload PDF</span>
       </div>
     `;
     return;
-  }
-
-  // Adapt sidebar width to first page's aspect ratio (desktop only).
-  // Thumbnail max-height is 180px in CSS, so derive width from that.
-  if (sidebar && window.innerWidth > 768) {
-    const first = ueState.pages[0];
-    if (first && first.canvas) {
-      const aspect = first.canvas.width / first.canvas.height;
-      const thumbW = 180 * aspect;
-      const sidebarW = Math.round(Math.min(300, Math.max(160, thumbW + 40)));
-      sidebar.style.setProperty('--sidebar-w', sidebarW + 'px');
-    }
   }
 
   ueState.pages.forEach((page, index) => {

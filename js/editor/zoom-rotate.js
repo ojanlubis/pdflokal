@@ -43,8 +43,9 @@ export function ueRotateCurrentPage() {
 }
 
 export function ueUpdateZoomDisplay() {
+  const pct = Math.round(ueState.zoomLevel * 100) + '%';
   const display = document.getElementById('ue-zoom-level');
-  if (display) {
-    display.textContent = Math.round(ueState.zoomLevel * 100) + '%';
-  }
+  if (display) display.textContent = pct;
+  const bottomDisplay = document.getElementById('ue-zoom-level-bottom');
+  if (bottomDisplay) bottomDisplay.textContent = pct;
 }

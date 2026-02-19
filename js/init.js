@@ -133,6 +133,33 @@ function initApp() {
   initSignaturePad();
   setupKeyboardShortcuts();
   initNavigationHistory();
+  initModalBackdropClose();
+}
+
+// ============================================================
+// MODAL BACKDROP CLOSE (click outside to close)
+// ============================================================
+
+function initModalBackdropClose() {
+  // Map modal IDs to their close functions
+  const modalCloseMap = {
+    'signature-modal': 'closeSignatureModal',
+    'signature-bg-modal': 'closeSignatureBgModal',
+    'text-input-modal': 'closeTextModal',
+    'editor-watermark-modal': 'closeEditorWatermarkModal',
+    'editor-pagenum-modal': 'closeEditorPageNumModal',
+    'editor-protect-modal': 'closeEditorProtectModal',
+    'ue-gabungkan-modal': 'uePmCloseModal',
+  };
+
+  document.addEventListener('click', (e) => {
+    const target = e.target;
+    // Only fire when clicking directly on the backdrop (not its children)
+    const closeFn = modalCloseMap[target.id];
+    if (closeFn && target.classList.contains('active') && typeof window[closeFn] === 'function') {
+      window[closeFn]();
+    }
+  });
 }
 
 // Modules execute after DOM parsing — readyState is 'interactive' or later
@@ -225,6 +252,7 @@ function handleEditorCardWithFilePicker(mode) {
 
             document.getElementById('home-view').style.display = 'none';
             workspace.classList.add('active');
+            document.body.classList.add('editor-active');
             state.currentTool = 'unified-editor';
             window.scrollTo(0, 0);
             pushWorkspaceState('unified-editor');

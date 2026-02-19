@@ -1131,8 +1131,8 @@ a:hover {
 .editor-tool-btn {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-sm);
-  padding: var(--space-sm) var(--space-md);
+  gap: 6px;
+  padding: 7px 12px;
   background: var(--bg-secondary);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-md);
@@ -1163,7 +1163,7 @@ a:hover {
   color: white;
   border-color: var(--accent-primary);
   font-weight: 600;
-  padding: var(--space-sm) var(--space-lg);
+  padding: 7px 16px;
 }
 
 .editor-tool-btn--primary:hover {
@@ -1184,7 +1184,7 @@ a:hover {
   color: var(--text-primary);
   border: 2px solid var(--text-tertiary);
   font-weight: 600;
-  padding: var(--space-sm) var(--space-lg);
+  padding: 6px 16px;
 }
 
 .editor-tool-btn--signature:hover {
@@ -1949,7 +1949,7 @@ a:hover {
 .editor-toolbar {
   display: flex;
   flex-direction: column;
-  gap: var(--space-sm);
+  gap: 6px;
   margin-bottom: var(--space-lg);
   padding-bottom: var(--space-lg);
   border-bottom: 1px solid var(--border-light);
@@ -1958,13 +1958,13 @@ a:hover {
 .editor-toolbar-line {
   display: flex;
   align-items: center;
-  gap: var(--space-md);
+  gap: var(--space-sm);
   width: 100%;
   overflow: visible;
 }
 
 .editor-toolbar-line--actions {
-  padding-top: var(--space-sm);
+  padding-top: 6px;
   border-top: 1px solid var(--border-light);
 }
 
@@ -1979,7 +1979,7 @@ a:hover {
 
 .editor-tool-divider {
   width: 1px;
-  height: 32px;
+  height: 28px;
   background: var(--border-light);
 }
 
@@ -2560,7 +2560,7 @@ a:hover {
    ============================================================ */
 
 #unified-editor-workspace.workspace {
-  padding: var(--space-md) 0;
+  padding: 0;
 }
 
 #unified-editor-workspace.workspace.active {
@@ -2580,39 +2580,55 @@ a:hover {
 
 .unified-editor-layout {
   display: flex;
-  align-items: stretch;
-  gap: var(--space-sm);
-  flex: 1;
-  min-height: 0; /* Allow flex child to shrink below content size */
-  overflow: hidden;
+  align-items: flex-start;
+  gap: 0;
+  min-height: 0;
 }
 
 /* Sidebar */
 .unified-sidebar {
-  width: var(--sidebar-w, 280px);
-  min-width: var(--sidebar-w, 280px);
-  max-height: 100vh;
+  width: 160px;
+  min-width: 160px;
+  min-height: calc(100vh - 70px); /* header 40px + bottom bar 30px — always fill */
+  max-height: calc(100vh - 70px);
   position: sticky;
-  top: var(--space-md);
+  top: 40px; /* Below editor header */
   background: var(--bg-secondary);
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius-lg);
+  border-right: 1px solid var(--border-light);
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
-
 .unified-sidebar-header {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
-  padding: var(--space-md);
+  gap: var(--space-xs);
+  padding: var(--space-sm);
   border-bottom: 1px solid var(--border-light);
+  flex-shrink: 0;
+}
+
+.sidebar-kelola-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.sidebar-kelola-btn:hover {
   background: var(--bg-tertiary);
 }
 
-/* Sidebar File Dropdown */
+/* File Dropdown (used in editor header) */
 .sidebar-file-dropdown {
   position: relative;
 }
@@ -2676,30 +2692,14 @@ a:hover {
   margin: var(--space-xs) 0;
 }
 
-/* Page count badge in sidebar header */
-.sidebar-page-badge {
-  font-size: 0.6875rem;
-  font-weight: 500;
-  color: var(--text-tertiary);
-  background: var(--bg-primary);
-  border: 1px solid var(--border-light);
-  border-radius: 10px;
-  padding: 1px 8px;
-  margin-left: auto;
-  white-space: nowrap;
-}
-
-.sidebar-page-badge:empty {
-  display: none;
-}
 
 .unified-thumbnails {
   flex: 1;
   overflow-y: auto;
-  padding: var(--space-md);
+  padding: var(--space-sm);
   display: flex;
   flex-direction: column;
-  gap: var(--space-md);
+  gap: var(--space-sm);
 }
 
 .unified-thumbnails .drop-hint {
@@ -2726,7 +2726,7 @@ a:hover {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 80px;
+  min-height: 50px;
 }
 
 /* Portrait PDF thumbnail */
@@ -2736,7 +2736,7 @@ a:hover {
 
 /* Landscape PDF thumbnail - ensure minimum visibility */
 .ue-thumbnail.landscape {
-  min-height: 100px;
+  min-height: 60px;
 }
 
 .ue-thumbnail:hover {
@@ -2765,7 +2765,7 @@ a:hover {
 
 .ue-thumbnail canvas {
   max-width: 100%;
-  max-height: 180px;
+  max-height: 120px;
   width: auto;
   height: auto;
   display: block;
@@ -2829,40 +2829,21 @@ a:hover {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  min-height: 0; /* Allow flex child to shrink — critical for scroll containment */
-  background: var(--bg-tertiary);
-  border-radius: var(--radius-lg);
-  padding: var(--space-sm);
+  min-height: 0;
 }
 
-.unified-main .editor-toolbar {
-  margin-bottom: 0;
-  flex-shrink: 0;
-  overflow: visible;
-}
-
-/* Status bar above canvas */
-.ue-status-bar {
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border-light);
-  padding: var(--space-sm) var(--space-md);
-  font-size: 0.8125rem;
-  color: var(--text-secondary);
-  text-align: center;
-  border-radius: var(--radius-md) var(--radius-md) 0 0;
-  margin-top: var(--space-sm);
-}
+/* Old toolbar removed — floating toolbar replaces it */
 
 .unified-canvas-wrapper {
   display: flex;
   flex-direction: column;
   align-items: center;
+  flex: 1;
+  min-width: 0;
   background: var(--canvas-bg);
-  border-radius: 0 0 var(--radius-md) var(--radius-md);
   position: relative; /* For confirm button positioning */
-  overflow-y: auto; /* Vertical scroll for stacked pages */
   overflow-x: auto; /* Horizontal scroll when zoomed */
-  /* Height is set by JS based on first page dimensions via ueSetWrapperHeight() */
+  /* Body scroll — no overflow-y here, document scrolls naturally */
 }
 
 /* Pages container — vertical stack of all pages, scrollable within wrapper */
@@ -2913,6 +2894,364 @@ a:hover {
   height: 28px;
 }
 
+/* ============================================================
+   EDITOR REDESIGN — Hide site chrome in editor mode
+   ============================================================ */
+body.editor-active .header,
+body.editor-active .footer {
+  display: none !important;
+}
+
+/* Break out of .container max-width in editor mode — full viewport */
+body.editor-active .container {
+  max-width: none;
+  padding: 0;
+}
+
+/* ============================================================
+   EDITOR REDESIGN — Editor Header Bar
+   ============================================================ */
+.editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 40px;
+  padding: 0 var(--space-md);
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-light);
+  flex-shrink: 0;
+  z-index: 100;
+  position: sticky;
+  top: 0;
+}
+
+.editor-header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+.editor-header-file-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-family: inherit;
+  transition: all var(--transition-fast);
+}
+
+.editor-header-file-btn:hover {
+  background: var(--bg-hover);
+}
+
+.editor-header-brand {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 0.9375rem;
+  color: var(--text-primary);
+  text-decoration: none;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.editor-header-brand:hover {
+  color: var(--accent-primary);
+}
+
+.editor-header-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.editor-header-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: all var(--transition-fast);
+}
+
+.editor-header-icon-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+/* Show sun in dark mode, moon in light mode */
+.editor-header-icon-btn .icon-moon { display: block; }
+.editor-header-icon-btn .icon-sun { display: none; }
+html[data-theme="dark"] .editor-header-icon-btn .icon-moon { display: none; }
+html[data-theme="dark"] .editor-header-icon-btn .icon-sun { display: block; }
+
+.btn--download-editor-header {
+  padding: 5px 14px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+/* Editor header file dropdown - reuse sidebar-file-menu styles */
+#editor-file-dropdown .sidebar-file-menu {
+  top: calc(100% + 4px);
+  left: 0;
+  right: auto;
+}
+
+/* ---- Editor Bottom Bar ---- */
+.editor-bottom-bar {
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-light);
+  padding: 0 var(--space-sm);
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.editor-bottom-left {
+  flex: 1;
+}
+
+.editor-bottom-center {
+  flex: 1;
+  text-align: center;
+}
+
+.editor-bottom-support {
+  color: var(--text-tertiary);
+  text-decoration: none;
+  font-size: 0.6875rem;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+
+.editor-bottom-support:hover {
+  opacity: 1;
+  color: var(--text-secondary);
+}
+
+.editor-bottom-right {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.editor-bottom-zoom {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.editor-bottom-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+
+.editor-bottom-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.editor-bottom-zoom-level {
+  font-size: 0.6875rem;
+  min-width: 36px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.editor-bottom-page-indicator {
+  font-size: 0.6875rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* Vertical scroll snap — pages snap to center when scrolling */
+body.editor-active {
+  scroll-snap-type: y proximity;
+}
+
+.ue-page-slot {
+  scroll-snap-align: center;
+}
+
+/* Add bottom padding to pages container so last page isn't hidden behind bottom bar */
+body.editor-active #ue-pages-container {
+  padding-bottom: max(40vh, 50px);
+}
+
+/* Hide floating ? button — moved to bottom bar */
+body.editor-active .shortcuts-help-btn {
+  display: none;
+}
+
+/* ---- Floating Toolbar ---- */
+.floating-toolbar {
+  position: sticky;
+  top: 40px; /* flush below editor header */
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-light);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+html[data-theme="dark"] .floating-toolbar {
+  background: rgba(30, 30, 30, 0.85);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+@supports not (backdrop-filter: blur(12px)) {
+  .floating-toolbar { background: rgba(255, 255, 255, 0.95); }
+  html[data-theme="dark"] .floating-toolbar { background: rgba(30, 30, 30, 0.95); }
+}
+
+.ft-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  background: none;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+
+.ft-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.ft-btn.active {
+  background: var(--accent-primary);
+  color: white;
+}
+
+.ft-btn svg {
+  flex-shrink: 0;
+}
+
+.ft-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--border-light);
+  margin: 0 2px;
+  flex-shrink: 0;
+}
+
+/* Signature wrapper for tooltip positioning */
+.ft-signature-wrapper {
+  position: relative;
+}
+
+/* More dropdown */
+.ft-more-wrapper {
+  position: relative;
+}
+
+.ft-more-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 180px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  padding: 4px;
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s, visibility 0.15s;
+  z-index: 100;
+}
+
+.ft-more-dropdown.active {
+  visibility: visible;
+  opacity: 1;
+  pointer-events: all;
+}
+
+.ft-more-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  color: var(--text-primary);
+  text-align: left;
+  transition: background 0.12s;
+}
+
+.ft-more-item:hover {
+  background: var(--bg-hover);
+}
+
+.ft-more-item--danger {
+  color: var(--danger);
+}
+
+.ft-more-divider {
+  height: 1px;
+  background: var(--border-light);
+  margin: 4px 0;
+}
+
+/* Remove old toolbar styles from unified-main — toolbar is gone */
+.unified-main .editor-toolbar {
+  display: none;
+}
+
 /* Desktop - ensure proper canvas sizing */
 @media (min-width: 901px) {
   /* Desktop: scroll containment chain must be preserved */
@@ -2920,46 +3259,55 @@ a:hover {
 
 /* Mobile Responsive */
 @media (max-width: 900px) {
-  #unified-editor-workspace.workspace.active {
-    height: 100vh;
-    max-height: 100vh;
+  /* Editor header: compact */
+  .editor-header {
+    height: 36px;
+    padding: 0 var(--space-sm);
+  }
+
+  .editor-header-brand {
+    font-size: 0.75rem;
+    gap: 4px;
+  }
+
+  /* Icon-only download on mobile */
+  .btn--download-editor-header .ft-label,
+  .btn--download-editor-header {
+    padding: 4px 8px;
+    font-size: 0.75rem;
+  }
+
+  /* Hide sidebar on mobile — use page picker modal */
+  .unified-sidebar {
+    display: none;
   }
 
   .unified-editor-layout {
     flex-direction: column;
-    flex: 1;
-    min-height: 0;
   }
 
-  .unified-sidebar {
-    width: 100%;
-    min-width: auto;
-    max-height: 180px;
-    transition: max-height 0.3s ease;
+  /* Floating toolbar: fixed, icon-only */
+  .floating-toolbar {
+    position: fixed;
+    top: 36px;
+    left: 50%;
+    transform: translateX(-50%);
+    margin: 0;
+    padding: 4px 6px;
+    gap: 1px;
   }
 
-
-  .unified-thumbnails {
-    flex-direction: row;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    gap: var(--space-sm);
-    padding: var(--space-sm);
+  .ft-label {
+    display: none;
   }
 
-  .ue-thumbnail {
-    width: 100px;
-    min-height: 60px;
-    flex-shrink: 0;
+  .ft-btn {
+    padding: 6px 8px;
   }
 
-  .ue-thumbnail.landscape {
-    width: 140px;
-    min-height: 70px;
-  }
-
-  .ue-thumbnail canvas {
-    max-height: 100px;
+  /* Bottom bar: hide on mobile */
+  .editor-bottom-bar {
+    display: none;
   }
 
   .unified-main {
@@ -2970,7 +3318,7 @@ a:hover {
   .unified-canvas-wrapper {
     flex: 1;
     min-height: 0;
-    height: auto !important; /* Override JS-set height on mobile — use flex instead */
+    height: auto !important;
   }
 }
 
@@ -3644,69 +3992,18 @@ body.is-touch .btn:active {
     display: none !important;
   }
 
-  /* Hide desktop toolbar first line (tools) */
-  #unified-editor-workspace .editor-toolbar-line:first-child {
-    display: none !important;
-  }
-
-  /* Simplify toolbar line 2 - zoom left, download right */
-  #unified-editor-workspace .editor-toolbar-line--actions {
-    justify-content: space-between;
-    padding: var(--space-sm) max(var(--space-md), var(--sar)) var(--space-sm) max(var(--space-md), var(--sal));
-    border-top: none;
-  }
-
-  #unified-editor-workspace .editor-tool-divider {
-    display: none !important;
-  }
-
-  #unified-editor-workspace .editor-toolbar-spacer {
-    display: none;
-  }
-
-  /* Show zoom controls on mobile */
-  #unified-editor-workspace .editor-zoom-group {
-    display: flex !important;
-    gap: var(--space-xs);
-  }
-
-  #unified-editor-workspace .editor-zoom-group .zoom-level {
-    min-width: 45px;
-    font-size: 0.75rem;
-  }
-
-  /* Keep download button visible */
-  #unified-editor-workspace .btn--download-hero {
-    width: auto;
-    padding: var(--space-sm) var(--space-lg);
-    font-size: 0.875rem;
-  }
-
-  /* Adjust main content for bottom bar */
+  /* Adjust main content for mobile bottom bar */
   #unified-editor-workspace .unified-main {
+    padding: 0;
     padding-bottom: calc(var(--mobile-bottombar-height) + var(--sab) + var(--space-md));
   }
 
-  /* Canvas wrapper optimization - full width with safe area padding */
+  /* Canvas wrapper - full width with safe area padding */
   #unified-editor-workspace .unified-canvas-wrapper {
     flex: 1;
     min-height: 0;
     padding: 0 var(--sar) 0 var(--sal);
-    overflow-y: auto;
-    overflow-x: auto;
     -webkit-overflow-scrolling: touch;
-  }
-
-  /* Status bar mobile styling - respect safe areas */
-  #unified-editor-workspace .ue-status-bar {
-    font-size: 0.75rem;
-    padding: var(--space-xs) max(var(--space-sm), var(--sar)) var(--space-xs) max(var(--space-sm), var(--sal));
-  }
-
-  /* Editor toolbar adjustments */
-  #unified-editor-workspace .editor-toolbar {
-    padding: 0;
-    gap: 0;
   }
 
   /* Unified editor layout goes full width */
@@ -3714,13 +4011,8 @@ body.is-touch .btn:active {
     flex-direction: column;
   }
 
-  /* Remove workspace padding on mobile for full-width canvas */
+  /* Remove workspace padding on mobile */
   #unified-editor-workspace.workspace {
-    padding: 0;
-  }
-
-  /* Remove unified-main padding on mobile - canvas goes full width */
-  #unified-editor-workspace .unified-main {
     padding: 0;
   }
 

@@ -28,6 +28,7 @@ export function ueReset() {
   ueState.pageCanvases = [];
   if (ueState.pageObserver) { ueState.pageObserver.disconnect(); ueState.pageObserver = null; }
   ueState.scrollSyncEnabled = true;
+  window._ueScrollSyncSetup = false;
   ueState.zoomLevel = 1.0;
   ueUpdateZoomDisplay();
 

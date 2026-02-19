@@ -5,7 +5,7 @@
 
 import { ueState, state, navHistory } from '../lib/state.js';
 import { showToast, downloadBlob, getDownloadFilename } from '../lib/utils.js';
-import { pushModalState } from '../lib/navigation.js';
+import { pushModalState, showHome } from '../lib/navigation.js';
 import { ueHideConfirmButton } from './signatures.js';
 import { ueRedrawAnnotations } from './annotations.js';
 import { ueSaveEditUndoState } from './undo-redo.js';
@@ -25,7 +25,8 @@ export function ueSetTool(tool) {
     ueState.signaturePreviewPos = null;
   }
 
-  document.querySelectorAll('#unified-editor-workspace .editor-tool-btn').forEach(btn => {
+  // Update active state on both old toolbar buttons and floating toolbar buttons
+  document.querySelectorAll('#unified-editor-workspace .editor-tool-btn, #floating-toolbar .ft-btn[data-edit-tool]').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.editTool === tool);
   });
 
@@ -118,7 +119,24 @@ document.addEventListener('click', (e) => {
   if (container && !container.contains(e.target)) {
     closeMoreTools();
   }
+  // Floating toolbar more dropdown
+  const ftWrapper = document.querySelector('.ft-more-wrapper');
+  if (ftWrapper && !ftWrapper.contains(e.target)) {
+    closeFloatingMore();
+  }
 });
+
+// Floating toolbar More dropdown
+export function toggleFloatingMore(e) {
+  e.stopPropagation();
+  const dropdown = document.getElementById('ft-more-dropdown');
+  if (dropdown) dropdown.classList.toggle('active');
+}
+
+export function closeFloatingMore() {
+  const dropdown = document.getElementById('ft-more-dropdown');
+  if (dropdown) dropdown.classList.remove('active');
+}
 
 // Kunci PDF modal
 export function ueOpenProtectModal() {
@@ -168,4 +186,19 @@ export async function applyEditorProtect() {
     console.error('Error protecting PDF:', error);
     showToast('Gagal mengunci PDF', 'error');
   }
+}
+
+// Navigate home from editor (with unsaved work warning)
+export function editorGoHome(event) {
+  if (event) event.preventDefault();
+
+  const hasAnnotations = Object.values(ueState.annotations).some(arr => arr && arr.length > 0);
+  const hasRotation = ueState.pages.some(p => p.rotation && p.rotation !== 0);
+
+  if (ueState.pages.length > 0 && (hasAnnotations || hasRotation)) {
+    if (!confirm('Kamu punya perubahan yang belum di-download. Yakin ingin kembali ke beranda?')) {
+      return;
+    }
+  }
+  showHome();
 }

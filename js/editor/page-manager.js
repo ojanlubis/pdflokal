@@ -45,17 +45,19 @@ export function uePmCloseModal(skipHistoryBack = false) {
   document.getElementById('ue-pm-extract-actions').style.display = 'none';
   document.getElementById('ue-pm-extract-btn').style.display = 'none';
 
-  ueRenderThumbnails();
-  ueUpdatePageCount();
-
-  if (ueState.selectedPage >= 0) {
-    ueRenderSelectedPage();
-  }
-
   navHistory.currentModal = null;
   if (!skipHistoryBack && navHistory.currentView === 'modal') {
     history.back();
   }
+
+  // Heavy rendering after modal visually closes (defer to next frame)
+  requestAnimationFrame(() => {
+    ueRenderThumbnails();
+    ueUpdatePageCount();
+    if (ueState.selectedPage >= 0) {
+      ueRenderSelectedPage();
+    }
+  });
 }
 
 function uePmUpdateUI() {

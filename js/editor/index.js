@@ -35,7 +35,7 @@ export {
   ueDeletePage, ueUpdatePageCount, ueUpdateStatus
 } from './page-rendering.js';
 
-export { ueRenderThumbnails, toggleSidebarFileMenu, closeSidebarFileMenu, ueReplaceFiles } from './sidebar.js';
+export { ueRenderThumbnails, ueReplaceFiles, toggleEditorFileMenu, closeEditorFileMenu } from './sidebar.js';
 
 export { initUnifiedEditorInput, ueAddFiles } from './file-loading.js';
 
@@ -45,7 +45,9 @@ export {
   ueSetTool, ueOpenSignatureModal, ueOpenTextModal, ueConfirmText,
   ueOpenWatermarkModal, ueOpenPageNumModal,
   toggleMoreTools, closeMoreTools,
-  ueOpenProtectModal, closeEditorProtectModal, applyEditorProtect
+  toggleFloatingMore, closeFloatingMore,
+  ueOpenProtectModal, closeEditorProtectModal, applyEditorProtect,
+  editorGoHome
 } from './tools.js';
 
 export { ueBuildFinalPDF, ueDownload } from './pdf-export.js';
@@ -130,11 +132,11 @@ window.ueUpdatePageCount = ueUpdatePageCount;
 window.ueUpdateStatus = ueUpdateStatus;
 
 // Sidebar
-import { ueRenderThumbnails, toggleSidebarFileMenu, closeSidebarFileMenu, ueReplaceFiles } from './sidebar.js';
+import { ueRenderThumbnails, ueReplaceFiles, toggleEditorFileMenu, closeEditorFileMenu } from './sidebar.js';
 window.ueRenderThumbnails = ueRenderThumbnails;
-window.toggleSidebarFileMenu = toggleSidebarFileMenu;
-window.closeSidebarFileMenu = closeSidebarFileMenu;
 window.ueReplaceFiles = ueReplaceFiles;
+window.toggleEditorFileMenu = toggleEditorFileMenu;
+window.closeEditorFileMenu = closeEditorFileMenu;
 
 // File loading
 import { initUnifiedEditorInput, ueAddFiles } from './file-loading.js';
@@ -146,7 +148,7 @@ import { ueSetupCanvasEvents } from './canvas-events.js';
 window.ueSetupCanvasEvents = ueSetupCanvasEvents;
 
 // Tools
-import { ueSetTool, ueOpenSignatureModal, ueOpenTextModal, ueConfirmText, ueOpenWatermarkModal, ueOpenPageNumModal, toggleMoreTools, closeMoreTools, ueOpenProtectModal, closeEditorProtectModal, applyEditorProtect } from './tools.js';
+import { ueSetTool, ueOpenSignatureModal, ueOpenTextModal, ueConfirmText, ueOpenWatermarkModal, ueOpenPageNumModal, toggleMoreTools, closeMoreTools, toggleFloatingMore, closeFloatingMore, ueOpenProtectModal, closeEditorProtectModal, applyEditorProtect, editorGoHome } from './tools.js';
 window.ueSetTool = ueSetTool;
 window.ueOpenSignatureModal = ueOpenSignatureModal;
 window.ueOpenTextModal = ueOpenTextModal;
@@ -155,9 +157,12 @@ window.ueOpenWatermarkModal = ueOpenWatermarkModal;
 window.ueOpenPageNumModal = ueOpenPageNumModal;
 window.toggleMoreTools = toggleMoreTools;
 window.closeMoreTools = closeMoreTools;
+window.toggleFloatingMore = toggleFloatingMore;
+window.closeFloatingMore = closeFloatingMore;
 window.ueOpenProtectModal = ueOpenProtectModal;
 window.closeEditorProtectModal = closeEditorProtectModal;
 window.applyEditorProtect = applyEditorProtect;
+window.editorGoHome = editorGoHome;
 
 // PDF export
 import { ueBuildFinalPDF, ueDownload } from './pdf-export.js';

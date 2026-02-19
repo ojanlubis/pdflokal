@@ -173,9 +173,6 @@ export function ueDeleteSignature(annoRef) {
 
 // Update download button state (pulse animation when signatures exist)
 export function ueUpdateDownloadButtonState() {
-  const btn = document.getElementById('ue-download-btn');
-  if (!btn) return;
-
   // Check if any signatures exist
   let hasSignatures = false;
   for (const pageIndex in ueState.annotations) {
@@ -185,5 +182,6 @@ export function ueUpdateDownloadButtonState() {
     }
   }
 
-  btn.classList.toggle('has-signatures', hasSignatures);
+  const btn = document.getElementById('ue-download-btn');
+  if (btn) btn.classList.toggle('has-signatures', hasSignatures);
 }

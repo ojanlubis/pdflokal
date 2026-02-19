@@ -32,7 +32,9 @@ export function ueCreatePageSlots() {
 
   // Calculate placeholder dimensions from thumbnail aspect ratios
   const wrapper = document.getElementById('ue-canvas-wrapper');
-  const maxWidth = wrapper ? wrapper.clientWidth - 16 : 600;
+  let maxWidth = wrapper ? wrapper.clientWidth - 16 : 600;
+  // Guard: if layout hasn't reflowed yet, use a sensible fallback
+  if (maxWidth <= 100) maxWidth = 600;
 
   for (let i = 0; i < ueState.pages.length; i++) {
     const slot = document.createElement('div');
@@ -76,26 +78,13 @@ export function ueCreatePageSlots() {
   ueSetWrapperHeight();
 }
 
-// Set canvas wrapper height to show ~1 full page on desktop.
+// No-op — body scroll replaces wrapper scroll; no fixed height needed.
 export function ueSetWrapperHeight() {
   const wrapper = document.getElementById('ue-canvas-wrapper');
-  if (!wrapper || ueState.pages.length === 0) return;
-
-  // Only apply on desktop (>900px)
-  if (window.innerWidth <= 900) {
-    wrapper.style.height = '';
-    return;
-  }
-
-  const firstPC = ueState.pageCanvases[0];
-  if (!firstPC) return;
-
-  const canvasH = firstPC.canvas.offsetHeight || parseInt(firstPC.canvas.style.height) || 600;
-  const wrapperH = canvasH + 80;
-  wrapper.style.height = wrapperH + 'px';
+  if (wrapper) wrapper.style.height = '';
 }
 
-// Lightweight sidebar highlight
+// Lightweight sidebar highlight + bottom bar page indicator
 export function ueHighlightThumbnail(index) {
   const thumbnails = document.querySelectorAll('#ue-thumbnails .ue-thumb');
   thumbnails.forEach((thumb, i) => {
@@ -110,9 +99,10 @@ export function ueHighlightThumbnail(index) {
     pc.slot.classList.toggle('selected', i === index);
   });
 
-  const badge = document.getElementById('ue-page-count-badge');
-  if (badge) {
-    badge.textContent = ueState.pages.length > 0 ? ueState.pages.length + ' hal.' : '';
+  // Update bottom bar page indicator
+  const pageIndicator = document.getElementById('ue-page-indicator');
+  if (pageIndicator && ueState.pages.length > 0) {
+    pageIndicator.textContent = 'Hal ' + (index + 1) + '/' + ueState.pages.length;
   }
 }
 
@@ -266,11 +256,9 @@ export function ueRenderSelectedPage() {
 export function ueSetupIntersectionObserver() {
   if (ueState.pageObserver) ueState.pageObserver.disconnect();
 
-  const wrapper = document.getElementById('ue-canvas-wrapper');
-  if (!wrapper) return;
-
   const visiblePages = new Set();
 
+  // root: null → observe against viewport (body scroll)
   ueState.pageObserver = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
       const slot = entry.target;
@@ -296,7 +284,7 @@ export function ueSetupIntersectionObserver() {
       }
     });
   }, {
-    root: wrapper,
+    root: null,
     rootMargin: '200px 0px'
   });
 
@@ -306,25 +294,25 @@ export function ueSetupIntersectionObserver() {
 }
 
 export function ueSetupScrollSync() {
-  const wrapper = document.getElementById('ue-canvas-wrapper');
-  if (!wrapper || wrapper._scrollSyncSetup) return;
-  wrapper._scrollSyncSetup = true;
+  if (window._ueScrollSyncSetup) return;
+  window._ueScrollSyncSetup = true;
 
   let scrollTimeout;
-  wrapper.addEventListener('scroll', () => {
+  window.addEventListener('scroll', () => {
+    // Only sync when unified editor is active
+    if (state.currentTool !== 'unified-editor') return;
     if (ueState.scrollSyncEnabled === false) return;
 
     clearTimeout(scrollTimeout);
     scrollTimeout = setTimeout(() => {
-      const wrapperRect = wrapper.getBoundingClientRect();
-      const wrapperCenter = wrapperRect.top + wrapperRect.height / 2;
+      const viewportCenter = window.innerHeight / 2;
       let closestIndex = 0;
       let closestDistance = Infinity;
 
       ueState.pageCanvases.forEach((pc, i) => {
         const slotRect = pc.slot.getBoundingClientRect();
         const slotCenter = slotRect.top + slotRect.height / 2;
-        const distance = Math.abs(slotCenter - wrapperCenter);
+        const distance = Math.abs(slotCenter - viewportCenter);
         if (distance < closestDistance) {
           closestDistance = distance;
           closestIndex = i;
@@ -404,9 +392,12 @@ export function ueDeletePage(index) {
 }
 
 export function ueUpdatePageCount() {
-  const badge = document.getElementById('ue-page-count-badge');
-  if (badge) {
-    badge.textContent = ueState.pages.length > 0 ? ueState.pages.length + ' hal.' : '';
+  // Update bottom bar page indicator
+  const pageIndicator = document.getElementById('ue-page-indicator');
+  if (pageIndicator) {
+    const current = ueState.selectedPage >= 0 ? ueState.selectedPage + 1 : 1;
+    const total = ueState.pages.length || 1;
+    pageIndicator.textContent = 'Hal ' + current + '/' + total;
   }
 }
 

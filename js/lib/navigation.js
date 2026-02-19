@@ -105,7 +105,8 @@ export function showHome(skipPushState = false) {
   state.currentTool = null;
   resetState();
 
-  // Restore changelog badge when returning to home
+  // Restore site chrome and changelog badge when returning to home
+  document.body.classList.remove('editor-active');
   if (window.changelogAPI) {
     window.changelogAPI.restore();
   }
@@ -144,6 +145,11 @@ export function showTool(tool, skipPushState = false) {
 
     // Setup drop zones for workspaces
     setupWorkspaceDropZone(tool);
+
+    // Hide site chrome when entering editor
+    if (tool === 'unified-editor') {
+      document.body.classList.add('editor-active');
+    }
 
     // Initialize unified editor when opened
     if (tool === 'unified-editor') {

@@ -23,6 +23,11 @@
 // Changelog data - Add new updates at the beginning of the array
 const changelogData = [
   {
+    title: "Editor Lebih Luas dan Rapi! \u{2728}",
+    description: "Tampilan editor PDF sekarang jauh lebih luas \u{1F64C} Toolbar, header, dan sidebar sudah dirapikan supaya dokumen kamu jadi lebih besar dan enak dilihat. Semua fitur tetap ada di tempatnya \u{2014} cuma lebih rapi dan nggak makan tempat.",
+    date: "20 Februari 2026"
+  },
+  {
     title: "Keamanan Ditingkatkan! \u{1F512}",
     description: "PDFLokal sekarang pakai security headers untuk perlindungan ekstra. Plus, ada halaman <a href=\"privasi.html\">Kebijakan Privasi</a> baru biar kamu lebih yakin data kamu aman. Intinya: file kamu tetap 100% di perangkat kamu, nggak kemana-mana!",
     date: "18 Januari 2026"
