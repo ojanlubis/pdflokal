@@ -53,9 +53,10 @@ const CSS_FONT_MAP = {
 // CANVAS UTILITIES (extracted from ueSetupCanvasEvents closure)
 // ============================================================
 
-// Get the currently active canvas element (single-canvas for now, multi-canvas in Phase 2)
+// Get the canvas element for the currently selected page
 function ueGetCurrentCanvas() {
-  return document.getElementById('ue-canvas');
+  const entry = ueState.pageCanvases[ueState.selectedPage];
+  return entry ? entry.canvas : null;
 }
 
 // Convert mouse/touch event coords to canvas-pixel coords
@@ -127,8 +128,11 @@ const ueState = {
   // --- Rendering ---
   pageScales: {},         // Per-page scale info: { pageIndex: { canvasWidth, canvasHeight, pdfWidth, pdfHeight, scale } }
   devicePixelRatio: 1,    // Window.devicePixelRatio at render time
-  canvasSetup: false,     // Guard: true after canvas event listeners are attached
-  pageCache: null,        // Cached page render (ImageData) for smooth annotation dragging
+  eventsSetup: false,     // Guard: true after event delegation is attached to container
+  pageCanvases: [],       // Per-page DOM: [{ slot: HTMLElement, canvas: HTMLCanvasElement, rendered: bool }]
+  pageCaches: {},         // Per-page cached renders: { pageIndex: ImageData } for smooth annotation redraw
+  pageObserver: null,     // IntersectionObserver instance for lazy page rendering
+  scrollSyncEnabled: true, // false during programmatic scrollIntoView to prevent feedback loop
   zoomLevel: 1.0,         // Current zoom multiplier (1.0 = fit width)
 
   // --- Signature placement ---
@@ -203,6 +207,9 @@ async function ueAddFiles(files) {
       showToast(error.message || `Gagal memuat ${file.name}`, 'error');
     }
   }
+
+  // Rebuild page slots for new page count
+  ueCreatePageSlots();
 
   ueRenderThumbnails();
   ueUpdatePageCount();
@@ -511,6 +518,119 @@ function ueSetupSidebarDragDrop() {
 }
 
 // ============================================================
+// PAGE SLOTS & MULTI-CANVAS DOM
+// Functions: ueCreatePageSlots, ueHighlightThumbnail
+// ============================================================
+
+// Create (or rebuild) one .ue-page-slot > canvas per page inside #ue-pages-container.
+// Called after files are loaded, pages added/removed, or undo/redo restores pages.
+function ueCreatePageSlots() {
+  const container = document.getElementById('ue-pages-container');
+  if (!container) return;
+
+  // Disconnect previous observer before rebuilding
+  if (ueState.pageObserver) ueState.pageObserver.disconnect();
+
+  container.innerHTML = '';
+  ueState.pageCanvases = [];
+
+  // Calculate placeholder dimensions from thumbnail aspect ratios
+  const wrapper = document.getElementById('ue-canvas-wrapper');
+  const maxWidth = wrapper ? wrapper.clientWidth - 16 : 600;
+
+  for (let i = 0; i < ueState.pages.length; i++) {
+    const slot = document.createElement('div');
+    slot.className = 'ue-page-slot';
+    slot.dataset.pageIndex = i;
+
+    const canvas = document.createElement('canvas');
+    canvas.className = 'ue-page-canvas';
+
+    // Set placeholder size from thumbnail dimensions so IntersectionObserver works.
+    // Use first page's aspect ratio as default for consistent sizing.
+    const pageInfo = ueState.pages[i];
+    const refPage = pageInfo.canvas || (ueState.pages[0] && ueState.pages[0].canvas);
+    if (refPage) {
+      const aspect = refPage.height / refPage.width;
+      const placeholderW = Math.min(maxWidth, 800);
+      const placeholderH = Math.round(placeholderW * aspect);
+      const dpr = window.devicePixelRatio || 1;
+      // Set both CSS size and canvas buffer so unrendered pages show as blank white
+      canvas.style.width = placeholderW + 'px';
+      canvas.style.height = placeholderH + 'px';
+      canvas.width = placeholderW * dpr;
+      canvas.height = placeholderH * dpr;
+    }
+
+    slot.appendChild(canvas);
+    container.appendChild(slot);
+
+    ueState.pageCanvases.push({ slot, canvas, rendered: false });
+  }
+
+  // Apply current tool cursor to all canvases
+  if (ueState.currentTool) {
+    ueState.pageCanvases.forEach(pc => {
+      pc.canvas.className = 'ue-page-canvas tool-' + ueState.currentTool;
+    });
+  }
+
+  // Setup lazy rendering observer
+  ueSetupIntersectionObserver();
+
+  // Set wrapper height based on first page (desktop only)
+  ueSetWrapperHeight();
+}
+
+// Set canvas wrapper height to show ~1 full page on desktop.
+// On mobile, CSS overrides this with height: auto !important.
+function ueSetWrapperHeight() {
+  const wrapper = document.getElementById('ue-canvas-wrapper');
+  if (!wrapper || ueState.pages.length === 0) return;
+
+  // Only apply on desktop (>900px)
+  if (window.innerWidth <= 900) {
+    wrapper.style.height = '';
+    return;
+  }
+
+  // Use first page slot's canvas CSS height as reference
+  const firstPC = ueState.pageCanvases[0];
+  if (!firstPC) return;
+
+  const canvasH = firstPC.canvas.offsetHeight || parseInt(firstPC.canvas.style.height) || 600;
+  // Add padding for gap and breathing room (container padding + gap + a little extra)
+  const wrapperH = canvasH + 80;
+  wrapper.style.height = wrapperH + 'px';
+}
+
+// Lightweight sidebar highlight — toggles .selected class without full ueRenderThumbnails() call.
+// Used by scroll sync and event delegation to avoid expensive thumbnail re-renders.
+function ueHighlightThumbnail(index) {
+  // Highlight sidebar thumbnail
+  const thumbnails = document.querySelectorAll('#ue-thumbnails .ue-thumb');
+  thumbnails.forEach((thumb, i) => {
+    thumb.classList.toggle('selected', i === index);
+  });
+
+  // Scroll sidebar thumbnail into view
+  if (thumbnails[index]) {
+    thumbnails[index].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+
+  // Highlight page slot in main canvas area
+  ueState.pageCanvases.forEach((pc, i) => {
+    pc.slot.classList.toggle('selected', i === index);
+  });
+
+  // Update page count footer
+  const footer = document.getElementById('ue-page-count');
+  if (footer) {
+    footer.textContent = ueState.pages.length + ' halaman';
+  }
+}
+
+// ============================================================
 // PAGE SELECTION & RENDERING
 // Functions: ueSelectPage, ueRenderSelectedPage
 // ============================================================
@@ -524,12 +644,26 @@ function ueSelectPage(index) {
   ueHideConfirmButton();
 
   ueState.selectedPage = index;
-  ueRenderThumbnails();
-  ueRenderSelectedPage();
 
-  // Show canvas, hide empty state
+  // Show pages container, hide empty state
   document.getElementById('ue-empty-state').style.display = 'none';
-  ueGetCurrentCanvas().style.display = 'block';
+  const pagesContainer = document.getElementById('ue-pages-container');
+  if (pagesContainer) pagesContainer.style.display = 'flex';
+
+  // Scroll the selected page into view (suppress scroll-sync feedback loop)
+  const entry = ueState.pageCanvases[index];
+  if (entry) {
+    ueState.scrollSyncEnabled = false;
+    entry.slot.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(() => { ueState.scrollSyncEnabled = true; }, 500);
+  }
+
+  // Ensure the page is rendered
+  if (entry && !entry.rendered) {
+    ueRenderPageCanvas(index);
+  }
+
+  ueHighlightThumbnail(index);
 
   ueUpdateStatus(
     'Halaman ' + (index + 1) + ' dipilih. Gunakan alat di atas untuk mengedit.',
@@ -545,50 +679,47 @@ function ueSelectPage(index) {
   }
 }
 
-// Render lock to prevent concurrent renders
-let ueRenderLock = false;
+// Set of page indices currently being rendered (prevents concurrent renders of same page)
+const ueRenderingPages = new Set();
 
-// Render selected page on main canvas
-async function ueRenderSelectedPage() {
-  if (ueState.selectedPage < 0) return;
-  if (ueRenderLock) return; // Skip if already rendering
+// Render a single page to its own canvas
+async function ueRenderPageCanvas(index) {
+  if (index < 0 || index >= ueState.pages.length) return;
+  if (ueRenderingPages.has(index)) return;
 
-  ueRenderLock = true;
+  ueRenderingPages.add(index);
 
-  const pageInfo = ueState.pages[ueState.selectedPage];
+  const pageInfo = ueState.pages[index];
   const sourceFile = ueState.sourceFiles[pageInfo.sourceIndex];
+  const entry = ueState.pageCanvases[index];
+  if (!entry) { ueRenderingPages.delete(index); return; }
 
   try {
     const pdf = await pdfjsLib.getDocument({ data: sourceFile.bytes.slice() }).promise;
     const page = await pdf.getPage(pageInfo.pageNum + 1);
 
-    const canvas = ueGetCurrentCanvas();
+    const canvas = entry.canvas;
     const ctx = canvas.getContext('2d');
     const dpr = ueState.devicePixelRatio = window.devicePixelRatio || 1;
 
-    // Calculate scale based on width only - allow vertical scrolling
     const wrapper = document.getElementById('ue-canvas-wrapper');
-    const maxWidth = wrapper.clientWidth - 16;  // Small margin for cleaner appearance
+    const maxWidth = wrapper.clientWidth - 16;
     const naturalViewport = page.getViewport({ scale: 1, rotation: pageInfo.rotation });
 
-    // Ensure we have valid dimensions
     if (maxWidth <= 100) {
-      console.warn('Invalid wrapper dimensions, retrying...', { maxWidth });
-      ueRenderLock = false;
-      setTimeout(() => ueRenderSelectedPage(), 150);
+      ueRenderingPages.delete(index);
+      setTimeout(() => ueRenderPageCanvas(index), 150);
       return;
     }
 
-    // Scale to fit width, then apply zoom level
     let baseScale = maxWidth / naturalViewport.width;
     let scale = baseScale * ueState.zoomLevel;
-    scale = Math.max(scale, 0.25);  // Minimum scale
-    scale = Math.min(scale, 4);     // Maximum scale
+    scale = Math.max(scale, 0.25);
+    scale = Math.min(scale, 4);
 
     const viewport = page.getViewport({ scale, rotation: pageInfo.rotation });
 
-    // Store scale info
-    ueState.pageScales[ueState.selectedPage] = {
+    ueState.pageScales[index] = {
       scale,
       pdfWidth: naturalViewport.width,
       pdfHeight: naturalViewport.height,
@@ -596,7 +727,6 @@ async function ueRenderSelectedPage() {
       canvasHeight: viewport.height
     };
 
-    // Set canvas size
     canvas.width = viewport.width * dpr;
     canvas.height = viewport.height * dpr;
     canvas.style.width = viewport.width + 'px';
@@ -605,23 +735,152 @@ async function ueRenderSelectedPage() {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     await page.render({ canvasContext: ctx, viewport }).promise;
 
-    // Cache the page for smooth annotation drawing
-    ueState.pageCache = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    ueState.pageCaches[index] = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    entry.rendered = true;
 
-    // Draw annotations
-    ueRedrawAnnotations();
+    ueRedrawPageAnnotations(index);
 
-    // Setup canvas events if not done
-    if (!ueState.canvasSetup) {
+    if (!ueState.eventsSetup) {
       ueSetupCanvasEvents();
     }
-
   } catch (error) {
-    console.error('Error rendering page:', error);
-    showToast('Gagal merender halaman', 'error');
+    console.error('Error rendering page ' + index + ':', error);
   } finally {
-    ueRenderLock = false;
+    ueRenderingPages.delete(index);
   }
+}
+
+// Redraw annotations on a specific page's canvas
+function ueRedrawPageAnnotations(index) {
+  const entry = ueState.pageCanvases[index];
+  if (!entry || !entry.rendered) return;
+
+  const canvas = entry.canvas;
+  const ctx = canvas.getContext('2d');
+
+  const cache = ueState.pageCaches[index];
+  if (cache) ctx.putImageData(cache, 0, 0);
+  ctx.setTransform(ueState.devicePixelRatio, 0, 0, ueState.devicePixelRatio, 0, 0);
+
+  const annotations = ueState.annotations[index] || [];
+  annotations.forEach((anno, i) => {
+    const isSelected = ueState.selectedAnnotation &&
+      ueState.selectedAnnotation.pageIndex === index &&
+      ueState.selectedAnnotation.index === i;
+    ueDrawAnnotation(ctx, anno, isSelected);
+  });
+}
+
+// Render all currently visible pages (used after zoom/resize)
+let ueRenderVisibleRafId = null;
+function ueRenderVisiblePages() {
+  // Debounce with rAF to avoid flooding renders during rapid zoom/resize
+  if (ueRenderVisibleRafId) cancelAnimationFrame(ueRenderVisibleRafId);
+  ueRenderVisibleRafId = requestAnimationFrame(() => {
+    ueRenderVisibleRafId = null;
+    ueState.pageCanvases.forEach((pc, i) => {
+      // Re-render pages that are already rendered (visible or recently visible)
+      if (pc.rendered) {
+        pc.rendered = false; // Force re-render
+        ueRenderPageCanvas(i);
+      }
+    });
+  });
+}
+
+// Compatibility wrapper — renders the selected page
+function ueRenderSelectedPage() {
+  if (ueState.selectedPage >= 0) {
+    const entry = ueState.pageCanvases[ueState.selectedPage];
+    if (entry) entry.rendered = false; // Force re-render
+    ueRenderPageCanvas(ueState.selectedPage);
+  }
+}
+
+// Setup IntersectionObserver for lazy rendering
+function ueSetupIntersectionObserver() {
+  if (ueState.pageObserver) ueState.pageObserver.disconnect();
+
+  const wrapper = document.getElementById('ue-canvas-wrapper');
+  if (!wrapper) return;
+
+  // Track which pages are currently in/near viewport for memory management
+  const visiblePages = new Set();
+
+  ueState.pageObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      const slot = entry.target;
+      const index = parseInt(slot.dataset.pageIndex, 10);
+      if (isNaN(index)) return;
+
+      const pc = ueState.pageCanvases[index];
+      if (!pc) return;
+
+      if (entry.isIntersecting) {
+        visiblePages.add(index);
+        if (!pc.rendered) ueRenderPageCanvas(index);
+      } else {
+        visiblePages.delete(index);
+        // Un-render pages far from viewport to save memory (keep slot dimensions)
+        if (pc.rendered && ueState.pageCanvases.length > 8) {
+          const nearVisible = Array.from(visiblePages).some(v => Math.abs(v - index) <= 3);
+          if (!nearVisible) {
+            pc.canvas.getContext('2d').clearRect(0, 0, pc.canvas.width, pc.canvas.height);
+            pc.rendered = false;
+            delete ueState.pageCaches[index];
+          }
+        }
+      }
+    });
+  }, {
+    root: wrapper,
+    rootMargin: '200px 0px' // Pre-render pages 200px above/below viewport
+  });
+
+  // Observe all page slots
+  ueState.pageCanvases.forEach(pc => {
+    ueState.pageObserver.observe(pc.slot);
+  });
+}
+
+// Scroll sync: update selectedPage based on scroll position
+function ueSetupScrollSync() {
+  const wrapper = document.getElementById('ue-canvas-wrapper');
+  if (!wrapper || wrapper._scrollSyncSetup) return;
+  wrapper._scrollSyncSetup = true;
+
+  let scrollTimeout;
+  wrapper.addEventListener('scroll', () => {
+    if (ueState.scrollSyncEnabled === false) return;
+
+    clearTimeout(scrollTimeout);
+    scrollTimeout = setTimeout(() => {
+      const wrapperRect = wrapper.getBoundingClientRect();
+      const wrapperCenter = wrapperRect.top + wrapperRect.height / 2;
+      let closestIndex = 0;
+      let closestDistance = Infinity;
+
+      ueState.pageCanvases.forEach((pc, i) => {
+        const slotRect = pc.slot.getBoundingClientRect();
+        const slotCenter = slotRect.top + slotRect.height / 2;
+        const distance = Math.abs(slotCenter - wrapperCenter);
+        if (distance < closestDistance) {
+          closestDistance = distance;
+          closestIndex = i;
+        }
+      });
+
+      if (closestIndex !== ueState.selectedPage) {
+        ueState.selectedPage = closestIndex;
+        ueHighlightThumbnail(closestIndex);
+
+        // Update mobile UI
+        if (typeof ueMobileUpdatePageIndicator === 'function') {
+          ueMobileUpdatePageIndicator();
+        }
+      }
+    }, 100);
+  });
 }
 
 // ============================================================
@@ -632,19 +891,19 @@ async function ueRenderSelectedPage() {
 function ueZoomIn() {
   ueState.zoomLevel = Math.min(ueState.zoomLevel + 0.25, 3);
   ueUpdateZoomDisplay();
-  ueRenderSelectedPage();
+  ueRenderVisiblePages();
 }
 
 function ueZoomOut() {
   ueState.zoomLevel = Math.max(ueState.zoomLevel - 0.25, 0.5);
   ueUpdateZoomDisplay();
-  ueRenderSelectedPage();
+  ueRenderVisiblePages();
 }
 
 function ueZoomReset() {
   ueState.zoomLevel = 1.0;
   ueUpdateZoomDisplay();
-  ueRenderSelectedPage();
+  ueRenderVisiblePages();
 }
 
 // Rotate current page 90 degrees clockwise
@@ -678,10 +937,12 @@ function ueUpdateZoomDisplay() {
 // ============================================================
 
 function ueSetupCanvasEvents() {
-  if (ueState.canvasSetup) return;
-  ueState.canvasSetup = true;
+  if (ueState.eventsSetup) return;
+  ueState.eventsSetup = true;
 
-  const canvas = ueGetCurrentCanvas();
+  // Event delegation: attach to the pages container, not individual canvases
+  const container = document.getElementById('ue-pages-container');
+  if (!container) return;
 
   // Closure state for drag/draw operations
   // Note: isDragging/isResizing live on ueState (not here) for sharing with pinch-to-zoom handler
@@ -697,24 +958,60 @@ function ueSetupCanvasEvents() {
   const DOUBLE_TAP_DELAY = 300;
   const DOUBLE_TAP_DISTANCE = 30;
 
-  // Helper: build info object from mouse event
-  function infoFromMouse(e) {
-    const coords = ueGetCoords(e, canvas);
-    return { canvas, pageIndex: ueState.selectedPage, x: coords.x, y: coords.y };
+  // Find the canvas and page index from an event target (delegation helper)
+  function getCanvasAndIndex(target) {
+    const canvas = target.closest ? target.closest('.ue-page-slot canvas') : null;
+    if (!canvas) return null;
+    const slot = canvas.parentElement;
+    const pageIndex = parseInt(slot.dataset.pageIndex, 10);
+    if (isNaN(pageIndex)) return null;
+    return { canvas, pageIndex };
   }
 
-  // Helper: build info object from touch event (works for touchstart, touchmove, AND touchend)
+  // Build info from mouse event (returns null if not on a canvas)
+  function infoFromMouse(e) {
+    const hit = getCanvasAndIndex(e.target);
+    if (!hit) return null;
+    const coords = ueGetCoords(e, hit.canvas);
+    return { canvas: hit.canvas, pageIndex: hit.pageIndex, x: coords.x, y: coords.y };
+  }
+
+  // Build info from touch event (returns null if not on a canvas)
   function infoFromTouch(e) {
     const touch = (e.touches && e.touches.length) ? e.touches[0] : e.changedTouches[0];
-    const coords = ueGetCoords(touch, canvas);
-    return { canvas, pageIndex: ueState.selectedPage, x: coords.x, y: coords.y };
+    // For touch events, target is always the element where touchstart began
+    const hit = getCanvasAndIndex(e.target);
+    if (!hit) return null;
+    const coords = ueGetCoords(touch, hit.canvas);
+    return { canvas: hit.canvas, pageIndex: hit.pageIndex, x: coords.x, y: coords.y };
   }
 
-  canvas.addEventListener('mousedown', (e) => handleDown(infoFromMouse(e)));
-  canvas.addEventListener('mousemove', (e) => handleMove(infoFromMouse(e)));
-  canvas.addEventListener('mouseup', (e) => handleUp(infoFromMouse(e)));
-  canvas.addEventListener('dblclick', (e) => handleDoubleClick(infoFromMouse(e)));
-  canvas.addEventListener('mouseleave', () => {
+  container.addEventListener('mousedown', (e) => {
+    const info = infoFromMouse(e);
+    if (!info) return;
+    // Auto-select the page that was clicked
+    if (info.pageIndex !== ueState.selectedPage) {
+      ueState.selectedPage = info.pageIndex;
+      ueHighlightThumbnail(info.pageIndex);
+    }
+    handleDown(info);
+  });
+  container.addEventListener('mousemove', (e) => {
+    const info = infoFromMouse(e);
+    if (!info) return;
+    handleMove(info);
+  });
+  container.addEventListener('mouseup', (e) => {
+    const info = infoFromMouse(e);
+    if (!info) return;
+    handleUp(info);
+  });
+  container.addEventListener('dblclick', (e) => {
+    const info = infoFromMouse(e);
+    if (!info) return;
+    handleDoubleClick(info);
+  });
+  container.addEventListener('mouseleave', () => {
     isDrawing = false;
     ueState.isDragging = false;
     ueState.isResizing = false;
@@ -724,9 +1021,25 @@ function ueSetupCanvasEvents() {
     }
   });
 
-  canvas.addEventListener('touchstart', (e) => {
-    e.preventDefault();
+  container.addEventListener('touchstart', (e) => {
     const info = infoFromTouch(e);
+    if (!info) return;
+
+    // Only preventDefault when a tool is active or we hit an annotation
+    // Otherwise let the browser handle native scrolling
+    const toolActive = ueState.currentTool && ueState.currentTool !== 'select';
+    const hitAnno = ueState.currentTool === 'select' &&
+      ueFindAnnotationAt(info.pageIndex, info.x, info.y);
+    const pendingSig = ueState.pendingSignature && state.signatureImage;
+    if (toolActive || hitAnno || pendingSig) {
+      e.preventDefault();
+    }
+
+    // Auto-select the page that was touched
+    if (info.pageIndex !== ueState.selectedPage) {
+      ueState.selectedPage = info.pageIndex;
+      ueHighlightThumbnail(info.pageIndex);
+    }
 
     // Double-tap detection
     const now = Date.now();
@@ -745,14 +1058,22 @@ function ueSetupCanvasEvents() {
     handleDown(info);
   }, { passive: false });
 
-  canvas.addEventListener('touchmove', (e) => {
-    e.preventDefault();
-    handleMove(infoFromTouch(e));
+  container.addEventListener('touchmove', (e) => {
+    const info = infoFromTouch(e);
+    if (!info) return;
+    // Only preventDefault when actively interacting (dragging, drawing, resizing)
+    if (ueState.isDragging || ueState.isResizing || isDrawing ||
+        (ueState.currentTool && ueState.currentTool !== 'select')) {
+      e.preventDefault();
+    }
+    handleMove(info);
   }, { passive: false });
 
-  canvas.addEventListener('touchend', (e) => {
+  container.addEventListener('touchend', (e) => {
+    const info = infoFromTouch(e);
+    if (!info) return;
     e.preventDefault();
-    handleUp(infoFromTouch(e));
+    handleUp(info);
   }, { passive: false });
 
   // --- Event handlers (accept { canvas, pageIndex, x, y }) ---
@@ -1336,21 +1657,9 @@ function ueUpdateDownloadButtonState() {
 // ============================================================
 
 function ueRedrawAnnotations() {
-  const canvas = ueGetCurrentCanvas();
-  const ctx = canvas.getContext('2d');
-
-  // Restore cached page
-  if (ueState.pageCache) {
-    ctx.putImageData(ueState.pageCache, 0, 0);
-  }
-  ctx.setTransform(ueState.devicePixelRatio, 0, 0, ueState.devicePixelRatio, 0, 0);
-
-  const annotations = ueState.annotations[ueState.selectedPage] || [];
-  annotations.forEach((anno, i) => {
-    const isSelected = ueState.selectedAnnotation &&
-      ueState.selectedAnnotation.pageIndex === ueState.selectedPage &&
-      ueState.selectedAnnotation.index === i;
-    ueDrawAnnotation(ctx, anno, isSelected);
+  // Redraw annotations on all rendered pages
+  ueState.pageCanvases.forEach((pc, i) => {
+    if (pc.rendered) ueRedrawPageAnnotations(i);
   });
 }
 
@@ -1471,8 +1780,20 @@ function getTextBounds(anno, ctx) {
 }
 
 // Find annotation at position
-function ueFindAnnotationAt(x, y) {
-  const annotations = ueState.annotations[ueState.selectedPage] || [];
+function ueFindAnnotationAt(pageIndexOrX, xOrY, maybeY) {
+  // Supports both (pageIndex, x, y) and legacy (x, y) signatures
+  let pageIndex, x, y;
+  if (maybeY !== undefined) {
+    pageIndex = pageIndexOrX;
+    x = xOrY;
+    y = maybeY;
+  } else {
+    pageIndex = ueState.selectedPage;
+    x = pageIndexOrX;
+    y = xOrY;
+  }
+
+  const annotations = ueState.annotations[pageIndex] || [];
   for (let i = annotations.length - 1; i >= 0; i--) {
     const anno = annotations[i];
     let bounds;
@@ -1489,7 +1810,7 @@ function ueFindAnnotationAt(x, y) {
         continue;
     }
     if (x >= bounds.x && x <= bounds.x + bounds.w && y >= bounds.y && y <= bounds.y + bounds.h) {
-      return { pageIndex: ueState.selectedPage, index: i };
+      return { pageIndex, index: i };
     }
   }
   return null;
@@ -1512,7 +1833,7 @@ function ueDeletePage(index) {
 
   // Reindex annotations
   const newAnnotations = {};
-  Object.keys(ueState.annotations).forEach((key, i) => {
+  Object.keys(ueState.annotations).forEach((key) => {
     const idx = parseInt(key);
     if (idx > index) {
       newAnnotations[idx - 1] = ueState.annotations[idx];
@@ -1521,6 +1842,25 @@ function ueDeletePage(index) {
     }
   });
   ueState.annotations = newAnnotations;
+
+  // Remove slot from DOM and rebuild pageCanvases / pageCaches
+  const removed = ueState.pageCanvases.splice(index, 1);
+  if (removed[0]) removed[0].slot.remove();
+  delete ueState.pageCaches[index];
+
+  // Re-index pageCaches and slot data attributes
+  const newCaches = {};
+  Object.keys(ueState.pageCaches).forEach((key) => {
+    const idx = parseInt(key);
+    newCaches[idx > index ? idx - 1 : idx] = ueState.pageCaches[idx];
+  });
+  ueState.pageCaches = newCaches;
+  ueState.pageCanvases.forEach((pc, i) => {
+    pc.slot.dataset.pageIndex = i;
+  });
+
+  // Re-setup observer so its internal visiblePages set is fresh
+  ueSetupIntersectionObserver();
 
   // Adjust selection
   if (ueState.selectedPage >= ueState.pages.length) {
@@ -1580,10 +1920,10 @@ function ueSetTool(tool) {
     btn.classList.toggle('active', btn.dataset.editTool === tool);
   });
 
-  const canvas = ueGetCurrentCanvas();
-  if (canvas) {
-    canvas.className = 'editor-canvas tool-' + tool;
-  }
+  // Apply cursor class to ALL page canvases
+  ueState.pageCanvases.forEach(pc => {
+    pc.canvas.className = 'ue-page-canvas tool-' + tool;
+  });
 
   const toolNames = {
     'select': 'Pilih & pindahkan anotasi',
@@ -1792,6 +2132,8 @@ async function ueRestorePages(pagesData) {
       canvas
     });
   }
+  ueState.pageCaches = {};
+  ueCreatePageSlots();
   ueRenderThumbnails();
   ueUpdatePageCount();
   if (ueState.selectedPage >= ueState.pages.length) {
@@ -2121,12 +2463,20 @@ function ueReset() {
   ueState.selectedAnnotation = null;
   ueState.pendingTextPosition = null;
   ueState.pageScales = {};
-  ueState.pageCache = null;
+  ueState.pageCaches = {};
+  ueState.pageCanvases = [];
+  if (ueState.pageObserver) { ueState.pageObserver.disconnect(); ueState.pageObserver = null; }
+  ueState.scrollSyncEnabled = true;
   ueState.zoomLevel = 1.0;
   ueUpdateZoomDisplay();
 
   document.getElementById('ue-empty-state').style.display = 'flex';
-  ueGetCurrentCanvas().style.display = 'none';
+  // Clear pages container
+  const pagesContainer = document.getElementById('ue-pages-container');
+  if (pagesContainer) {
+    pagesContainer.innerHTML = '';
+    pagesContainer.style.display = 'none';
+  }
   document.getElementById('ue-download-btn').disabled = true;
   ueRenderThumbnails();
   ueUpdatePageCount();
@@ -2197,14 +2547,18 @@ function initUnifiedEditor() {
     });
   }
 
-  // Setup resize handler for responsive canvas
+  // Setup scroll sync for continuous vertical scroll
+  ueSetupScrollSync();
+
+  // Setup resize handler — re-render visible pages on window resize
   if (!window._ueResizeHandler) {
     let resizeTimeout;
     window._ueResizeHandler = () => {
       clearTimeout(resizeTimeout);
       resizeTimeout = setTimeout(() => {
-        if (state.currentTool === 'unified-editor' && ueState.selectedPage >= 0) {
-          ueRenderSelectedPage();
+        if (state.currentTool === 'unified-editor' && ueState.pages.length > 0) {
+          ueSetWrapperHeight();
+          ueRenderVisiblePages();
         }
       }, 200);
     };
@@ -2223,10 +2577,10 @@ function ueToggleSidebar() {
   const isCollapsed = sidebar.classList.contains('collapsed');
   toggleBtn.title = isCollapsed ? 'Tampilkan sidebar' : 'Sembunyikan sidebar';
 
-  // Re-render the selected page to recalculate canvas size after transition
+  // Re-render visible pages to recalculate canvas size after transition
   setTimeout(() => {
-    if (ueState.selectedPage >= 0) {
-      ueRenderSelectedPage();
+    if (ueState.pages.length > 0) {
+      ueRenderVisiblePages();
     }
   }, 350); // Wait for CSS transition to complete
 }

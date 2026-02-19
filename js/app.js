@@ -1614,8 +1614,4 @@ function initMobileEditorEnhancements() {
   // Pinch-to-zoom removed - use toolbar zoom buttons instead
 }
 
-// Hook into existing ueRenderSelectedPage to update mobile UI
-const originalUeRenderSelectedPage = typeof ueRenderSelectedPage === 'function' ? ueRenderSelectedPage : null;
-
-// We need to hook into when pages change to update mobile UI
-// This is done by patching ueSelectPage after it's defined
+// Mobile UI updates are handled directly inside ueSelectPage (unified-editor.js)

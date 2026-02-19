@@ -1324,21 +1324,7 @@ a:hover {
   }
 }
 
-.editor-canvas-wrapper {
-  display: flex;
-  justify-content: center;
-  background: var(--canvas-bg);
-  border-radius: var(--radius-md);
-  padding: var(--space-lg);
-  min-height: 500px;
-  height: auto;
-}
-
-.editor-canvas {
-  background: white;
-  box-shadow: var(--shadow-lg);
-  cursor: crosshair;
-}
+/* Legacy .editor-canvas-wrapper and .editor-canvas removed — unified editor uses .ue-page-slot canvas */
 
 .editor-page-nav {
   display: flex;
@@ -2344,12 +2330,12 @@ a:hover {
 }
 
 /* Canvas Cursors */
-.editor-canvas.tool-select { cursor: default; }
-.editor-canvas.tool-whiteout { cursor: crosshair; }
-.editor-canvas.tool-text { cursor: text; }
-.editor-canvas.tool-signature { cursor: copy; }
-.editor-canvas.dragging { cursor: grabbing; }
-.editor-canvas.resizing { cursor: nwse-resize; }
+.ue-page-canvas.tool-select { cursor: default; }
+.ue-page-canvas.tool-whiteout { cursor: crosshair; }
+.ue-page-canvas.tool-text { cursor: text; }
+.ue-page-canvas.tool-signature { cursor: copy; }
+.ue-page-canvas.dragging { cursor: grabbing; }
+.ue-page-canvas.resizing { cursor: nwse-resize; }
 
 /* Annotation Resize Handles (rendered via CSS overlay) */
 .resize-handle {
@@ -2582,7 +2568,6 @@ a:hover {
 #unified-editor-workspace.workspace.active {
   display: flex;
   flex-direction: column;
-  height: auto;
 }
 
 #unified-editor-workspace .workspace-header {
@@ -2597,10 +2582,10 @@ a:hover {
 
 .unified-editor-layout {
   display: flex;
-  align-items: flex-start;
+  align-items: stretch;
   gap: var(--space-sm);
   flex: 1;
-  min-height: 1200;
+  min-height: 0; /* Allow flex child to shrink below content size */
   overflow: hidden;
 }
 
@@ -2834,7 +2819,7 @@ a:hover {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  min-height: 200;
+  min-height: 0; /* Allow flex child to shrink — critical for scroll containment */
   background: var(--bg-tertiary);
   border-radius: var(--radius-lg);
   padding: var(--space-sm);
@@ -2860,21 +2845,41 @@ a:hover {
 
 .unified-canvas-wrapper {
   display: flex;
-  align-items: flex-start;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
   background: var(--canvas-bg);
   border-radius: 0 0 var(--radius-md) var(--radius-md);
-  padding: var(--space-md);
-  min-height: 500px;
-  height: auto;
   position: relative; /* For confirm button positioning */
-  overflow: auto; /* Allow scrolling when canvas is zoomed */
+  overflow-y: auto; /* Vertical scroll for stacked pages */
+  overflow-x: auto; /* Horizontal scroll when zoomed */
+  /* Height is set by JS based on first page dimensions via ueSetWrapperHeight() */
 }
 
-#ue-canvas {
-  background: #ffffff !important; /* Always white for PDF accuracy */
+/* Pages container — vertical stack of all pages, scrollable within wrapper */
+#ue-pages-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: var(--space-md) 0;
+  padding-bottom: 40vh; /* Extra space so last page can scroll to center */
+}
+
+/* Individual page slot */
+.ue-page-slot {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.ue-page-slot canvas {
+  display: block;
+  background: #ffffff;
   box-shadow: var(--shadow-lg);
-  /* Size is controlled by JavaScript */
+}
+
+.ue-page-slot.selected canvas {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
 }
 
 .unified-empty-state {
@@ -2900,30 +2905,20 @@ a:hover {
 
 /* Desktop - ensure proper canvas sizing */
 @media (min-width: 901px) {
-  .unified-editor-layout {
-    height: auto;
-  }
-
-  .unified-main {
-    height: auto;
-    overflow: visible;
-  }
-
-  .unified-canvas-wrapper {
-    min-height: 500px;
-    height: auto;
-  }
+  /* Desktop: scroll containment chain must be preserved */
 }
 
 /* Mobile Responsive */
 @media (max-width: 900px) {
   #unified-editor-workspace.workspace.active {
-    height: auto;
+    height: 100vh;
+    max-height: 100vh;
   }
 
   .unified-editor-layout {
     flex-direction: column;
-    flex: none;
+    flex: 1;
+    min-height: 0;
   }
 
   .unified-sidebar {
@@ -2967,13 +2962,14 @@ a:hover {
   }
 
   .unified-main {
-    min-height: auto;
-    height: auto;
+    flex: 1;
+    min-height: 0;
   }
 
   .unified-canvas-wrapper {
-    min-height: 500px;
-    height: auto;
+    flex: 1;
+    min-height: 0;
+    height: auto !important; /* Override JS-set height on mobile — use flex instead */
   }
 }
 
@@ -3695,10 +3691,11 @@ body.is-touch .btn:active {
 
   /* Canvas wrapper optimization - full width with safe area padding */
   #unified-editor-workspace .unified-canvas-wrapper {
-    min-height: auto;
-    height: auto;
+    flex: 1;
+    min-height: 0;
     padding: 0 var(--sar) 0 var(--sal);
-    overflow: auto;
+    overflow-y: auto;
+    overflow-x: auto;
     -webkit-overflow-scrolling: touch;
   }
 
