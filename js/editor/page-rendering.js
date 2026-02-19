@@ -110,9 +110,9 @@ export function ueHighlightThumbnail(index) {
     pc.slot.classList.toggle('selected', i === index);
   });
 
-  const footer = document.getElementById('ue-page-count');
-  if (footer) {
-    footer.textContent = ueState.pages.length + ' halaman';
+  const badge = document.getElementById('ue-page-count-badge');
+  if (badge) {
+    badge.textContent = ueState.pages.length > 0 ? ueState.pages.length + ' hal.' : '';
   }
 }
 
@@ -404,7 +404,10 @@ export function ueDeletePage(index) {
 }
 
 export function ueUpdatePageCount() {
-  document.getElementById('ue-page-count').textContent = ueState.pages.length + ' halaman';
+  const badge = document.getElementById('ue-page-count-badge');
+  if (badge) {
+    badge.textContent = ueState.pages.length > 0 ? ueState.pages.length + ' hal.' : '';
+  }
 }
 
 // Update status (supports different message for mobile)

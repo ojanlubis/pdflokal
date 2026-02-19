@@ -35,7 +35,7 @@ export {
   ueDeletePage, ueUpdatePageCount, ueUpdateStatus
 } from './page-rendering.js';
 
-export { ueRenderThumbnails, ueToggleSidebar } from './sidebar.js';
+export { ueRenderThumbnails, toggleSidebarFileMenu, closeSidebarFileMenu, ueReplaceFiles } from './sidebar.js';
 
 export { initUnifiedEditorInput, ueAddFiles } from './file-loading.js';
 
@@ -130,9 +130,11 @@ window.ueUpdatePageCount = ueUpdatePageCount;
 window.ueUpdateStatus = ueUpdateStatus;
 
 // Sidebar
-import { ueRenderThumbnails, ueToggleSidebar } from './sidebar.js';
+import { ueRenderThumbnails, toggleSidebarFileMenu, closeSidebarFileMenu, ueReplaceFiles } from './sidebar.js';
 window.ueRenderThumbnails = ueRenderThumbnails;
-window.ueToggleSidebar = ueToggleSidebar;
+window.toggleSidebarFileMenu = toggleSidebarFileMenu;
+window.closeSidebarFileMenu = closeSidebarFileMenu;
+window.ueReplaceFiles = ueReplaceFiles;
 
 // File loading
 import { initUnifiedEditorInput, ueAddFiles } from './file-loading.js';

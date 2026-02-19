@@ -1,16 +1,69 @@
 /*
  * PDFLokal - editor/sidebar.js (ES Module)
- * Sidebar thumbnails and drag-drop reordering
+ * Sidebar file dropdown, thumbnails, and drag-drop reordering
  */
 
 import { ueState } from '../lib/state.js';
+import { showToast } from '../lib/utils.js';
+
+// ============================================================
+// SIDEBAR FILE DROPDOWN
+// ============================================================
+
+export function toggleSidebarFileMenu(e) {
+  e.stopPropagation();
+  const dropdown = e.target.closest('.sidebar-file-dropdown');
+  if (dropdown) dropdown.classList.toggle('open');
+}
+
+export function closeSidebarFileMenu() {
+  const dropdown = document.querySelector('.sidebar-file-dropdown');
+  if (dropdown) dropdown.classList.remove('open');
+}
+
+// Replace all files: reset editor, then open file picker
+export function ueReplaceFiles() {
+  closeSidebarFileMenu();
+  let input = document.getElementById('ue-replace-input');
+  if (!input) return;
+
+  // One-shot handler so it doesn't stack
+  const handler = async (e) => {
+    input.removeEventListener('change', handler);
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    input.value = '';
+
+    // Reset editor then load new files
+    window.ueReset();
+    try {
+      await window.ueAddFiles(files);
+    } catch (err) {
+      console.error('Error replacing files:', err);
+      showToast('Gagal memuat file', 'error');
+    }
+  };
+  input.addEventListener('change', handler);
+  input.click();
+}
+
+// Close file menu when clicking outside
+document.addEventListener('click', (e) => {
+  const dropdown = document.querySelector('.sidebar-file-dropdown');
+  if (dropdown && dropdown.classList.contains('open') && !dropdown.contains(e.target)) {
+    dropdown.classList.remove('open');
+  }
+});
 
 // Render sidebar thumbnails
 export function ueRenderThumbnails() {
   const container = document.getElementById('ue-thumbnails');
   container.innerHTML = '';
 
+  const sidebar = document.getElementById('unified-sidebar');
+
   if (ueState.pages.length === 0) {
+    if (sidebar) sidebar.style.removeProperty('--sidebar-w');
     container.innerHTML = `
       <div class="drop-hint" onclick="document.getElementById('ue-file-input').click()">
         <svg class="drop-hint-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width: 32px; height: 32px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
@@ -18,6 +71,18 @@ export function ueRenderThumbnails() {
       </div>
     `;
     return;
+  }
+
+  // Adapt sidebar width to first page's aspect ratio (desktop only).
+  // Thumbnail max-height is 180px in CSS, so derive width from that.
+  if (sidebar && window.innerWidth > 768) {
+    const first = ueState.pages[0];
+    if (first && first.canvas) {
+      const aspect = first.canvas.width / first.canvas.height;
+      const thumbW = 180 * aspect;
+      const sidebarW = Math.round(Math.min(300, Math.max(160, thumbW + 40)));
+      sidebar.style.setProperty('--sidebar-w', sidebarW + 'px');
+    }
   }
 
   ueState.pages.forEach((page, index) => {
@@ -200,23 +265,4 @@ function ueSetupSidebarDragDrop() {
 
     removeDropIndicator();
   });
-}
-
-// Toggle sidebar visibility
-export function ueToggleSidebar() {
-  const sidebar = document.getElementById('unified-sidebar');
-  const toggleBtn = sidebar.querySelector('.sidebar-toggle-btn');
-
-  sidebar.classList.toggle('collapsed');
-
-  const isCollapsed = sidebar.classList.contains('collapsed');
-  toggleBtn.title = isCollapsed ? 'Tampilkan sidebar' : 'Sembunyikan sidebar';
-
-  // ueRenderVisiblePages lives in page-rendering.js, which imports sidebar.js —
-  // so importing page-rendering here would be circular.
-  setTimeout(() => {
-    if (ueState.pages.length > 0) {
-      window.ueRenderVisiblePages();
-    }
-  }, 350);
 }

@@ -433,19 +433,51 @@
         <!-- Left Sidebar: Page Thumbnails -->
         <div class="unified-sidebar" id="unified-sidebar">
           <div class="unified-sidebar-header">
-            <button class="sidebar-toggle-btn" onclick="ueToggleSidebar()" title="Sembunyikan sidebar">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M15 18l-6-6 6-6" />
-              </svg>
-            </button>
-            <span class="sidebar-title">Halaman</span>
-            <button class="btn btn-secondary btn-sm ue-manage-btn" onclick="uePmOpenModal()" title="Gabungkan & Split">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 5v14M5 12h14" />
-              </svg>
-              Merge
-            </button>
+            <div class="sidebar-file-dropdown">
+              <button class="btn btn-secondary btn-sm sidebar-file-btn" onclick="toggleSidebarFileMenu(event)" title="File">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/>
+                  <polyline points="13 2 13 9 20 9"/>
+                </svg>
+                File
+                <svg class="sidebar-file-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="6 9 12 15 18 9"/>
+                </svg>
+              </button>
+              <div class="sidebar-file-menu" id="sidebar-file-menu">
+                <button class="sidebar-file-menu-item" onclick="document.getElementById('ue-file-input').click(); closeSidebarFileMenu()">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 5v14M5 12h14"/>
+                  </svg>
+                  Tambah File
+                </button>
+                <button class="sidebar-file-menu-item" onclick="ueReplaceFiles()">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/>
+                  </svg>
+                  Ganti File
+                </button>
+                <div class="sidebar-file-menu-divider"></div>
+                <button class="sidebar-file-menu-item" onclick="uePmOpenModal(); closeSidebarFileMenu()">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+                    <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
+                  </svg>
+                  Kelola Halaman
+                </button>
+                <div class="sidebar-file-menu-divider"></div>
+                <button class="sidebar-file-menu-item" onclick="ueDownload(); closeSidebarFileMenu()">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                  Download PDF
+                </button>
+              </div>
+            </div>
+            <span class="sidebar-page-badge" id="ue-page-count-badge"></span>
             <input type="file" id="ue-file-input" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/*"
+              style="display:none">
+            <input type="file" id="ue-replace-input" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/*"
               style="display:none">
           </div>
           <div class="unified-thumbnails" id="ue-thumbnails">
@@ -459,8 +491,7 @@
               <span class="drop-hint-text" style="font-size: 0.8125rem;">Upload PDF atau Gambar</span>
             </div>
           </div>
-          <div class="unified-sidebar-footer">
-            <span class="sidebar-page-count" id="ue-page-count">0 halaman</span>
+          <div class="unified-sidebar-footer" id="unified-sidebar-footer">
           </div>
         </div>
 

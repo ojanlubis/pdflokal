@@ -2589,8 +2589,8 @@ a:hover {
 
 /* Sidebar */
 .unified-sidebar {
-  width: 280px;
-  min-width: 280px;
+  width: var(--sidebar-w, 280px);
+  min-width: var(--sidebar-w, 280px);
   max-height: 100vh;
   position: sticky;
   top: var(--space-md);
@@ -2600,58 +2600,8 @@ a:hover {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  transition: width 0.3s ease, min-width 0.3s ease;
 }
 
-/* Collapsed sidebar state */
-.unified-sidebar.collapsed {
-  width: 48px;
-  min-width: 48px;
-}
-
-.unified-sidebar.collapsed .sidebar-title,
-.unified-sidebar.collapsed .unified-sidebar-header .btn,
-.unified-sidebar.collapsed .unified-thumbnails,
-.unified-sidebar.collapsed .unified-sidebar-footer {
-  display: none;
-}
-
-.unified-sidebar.collapsed .unified-sidebar-header {
-  justify-content: center;
-  padding: var(--space-md) var(--space-sm);
-}
-
-.unified-sidebar.collapsed .sidebar-toggle-btn svg {
-  transform: rotate(180deg);
-}
-
-/* Sidebar toggle button */
-.sidebar-toggle-btn {
-  width: 28px;
-  height: 28px;
-  min-width: 28px;
-  padding: 0;
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius-sm);
-  background: var(--bg-secondary);
-  color: var(--text-secondary);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all var(--transition-fast);
-  flex-shrink: 0;
-}
-
-.sidebar-toggle-btn:hover {
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-  border-color: var(--border-medium);
-}
-
-.sidebar-toggle-btn svg {
-  transition: transform 0.3s ease;
-}
 
 .unified-sidebar-header {
   display: flex;
@@ -2662,11 +2612,85 @@ a:hover {
   background: var(--bg-tertiary);
 }
 
-.sidebar-title {
-  font-size: 0.875rem;
+/* Sidebar File Dropdown */
+.sidebar-file-dropdown {
+  position: relative;
+}
+
+.sidebar-file-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8125rem;
   font-weight: 600;
+}
+
+.sidebar-file-chevron {
+  margin-left: 2px;
+  transition: transform 0.2s ease;
+}
+
+.sidebar-file-dropdown.open .sidebar-file-chevron {
+  transform: rotate(180deg);
+}
+
+.sidebar-file-menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 170px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  z-index: 100;
+  padding: var(--space-xs) 0;
+}
+
+.sidebar-file-dropdown.open .sidebar-file-menu {
+  display: block;
+}
+
+.sidebar-file-menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  border: none;
+  background: none;
   color: var(--text-primary);
-  flex: 1;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+.sidebar-file-menu-item:hover {
+  background: var(--bg-tertiary);
+}
+
+.sidebar-file-menu-divider {
+  height: 1px;
+  background: var(--border-light);
+  margin: var(--space-xs) 0;
+}
+
+/* Page count badge in sidebar header */
+.sidebar-page-badge {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  padding: 1px 8px;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.sidebar-page-badge:empty {
+  display: none;
 }
 
 .unified-thumbnails {
@@ -2686,19 +2710,7 @@ a:hover {
 }
 
 .unified-sidebar-footer {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  padding: var(--space-sm) var(--space-md);
-  border-top: 1px solid var(--border-light);
-  background: var(--bg-tertiary);
-}
-
-.sidebar-page-count {
-  flex: 1;
-  text-align: right;
-  font-size: 0.75rem;
-  color: var(--text-tertiary);
+  display: none;
 }
 
 /* Thumbnail Items */
@@ -2926,15 +2938,6 @@ a:hover {
     transition: max-height 0.3s ease;
   }
 
-  .unified-sidebar.collapsed {
-    width: 100%;
-    min-width: auto;
-    max-height: 48px;
-  }
-
-  .unified-sidebar.collapsed .sidebar-toggle-btn svg {
-    transform: rotate(90deg);
-  }
 
   .unified-thumbnails {
     flex-direction: row;
@@ -2976,9 +2979,6 @@ a:hover {
    ============================================================ */
 
 /* Kelola button in sidebar - slightly more prominent */
-.ue-manage-btn {
-  flex-shrink: 0;
-}
 
 /* Modal box - larger size for page management */
 .ue-pm-modal-box {
