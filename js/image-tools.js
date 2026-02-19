@@ -1,6 +1,6 @@
 /*
  * ============================================================
- * PDFLokal - image-tools.js
+ * PDFLokal - image-tools.js (ES Module)
  * Client-Side Image Processing Tools
  * ============================================================
  *
@@ -8,24 +8,27 @@
  *   All image manipulation tools: compress, resize, convert format,
  *   images-to-PDF, and background removal. Uses Canvas API exclusively.
  *
- * GLOBAL STATE USED:
- *   - state {} (from app.js) — reads/writes state.originalImage,
- *     state.originalImageName, state.originalImageSize, state.originalWidth,
- *     state.originalHeight, state.compressedBlob, state.compressPreviewUrl,
- *     state.imgToPdfFiles, state.removeBgCanvas
+ * IMPORTS:
+ *   - state from lib/state.js
+ *   - showToast, formatFileSize, downloadBlob, getDownloadFilename,
+ *     loadImage, escapeHtml from lib/utils.js
  *
- * FUNCTIONS EXPORTED (called by other files): None — all called from HTML onclick
+ * EXTERNAL GLOBALS (from non-module scripts):
+ *   - enableDragReorder() from pdf-tools.js (via window)
+ *   - PDFLib from vendor/pdf-lib.min.js (via window)
  *
- * FUNCTIONS IMPORTED (defined in other files):
- *   From app.js:
- *     state, showToast(), formatFileSize(), downloadBlob(),
- *     getDownloadFilename(), loadImage(), escapeHtml()
- *   From pdf-tools.js:
- *     enableDragReorder()
- *
- * LOAD ORDER: Must load AFTER app.js AND pdf-tools.js
  * ============================================================
  */
+
+import { state } from './lib/state.js';
+import {
+  showToast,
+  formatFileSize,
+  downloadBlob,
+  getDownloadFilename,
+  loadImage,
+  escapeHtml
+} from './lib/utils.js';
 
 // ============================================================
 // COMPRESS IMAGE
@@ -116,7 +119,6 @@ function updateRemoveBgPreview() {
     const b = data[i + 2];
 
     // Check if pixel is white/near-white based on threshold
-    // All RGB values must be >= threshold to be considered "white"
     if (r >= threshold && g >= threshold && b >= threshold) {
       data[i + 3] = 0; // Set alpha to 0 (transparent)
     }
@@ -150,9 +152,9 @@ function downloadRemovedBgImage() {
 function onResizeChange(changedField) {
   const lock = document.getElementById('resize-lock').checked;
   if (!lock || !state.originalWidth || !state.originalHeight) return;
-  
+
   const aspectRatio = state.originalWidth / state.originalHeight;
-  
+
   if (changedField === 'width') {
     const newWidth = parseInt(document.getElementById('resize-width').value) || 0;
     document.getElementById('resize-height').value = Math.round(newWidth / aspectRatio);
@@ -160,18 +162,18 @@ function onResizeChange(changedField) {
     const newHeight = parseInt(document.getElementById('resize-height').value) || 0;
     document.getElementById('resize-width').value = Math.round(newHeight * aspectRatio);
   }
-  
+
   updateResizeDimensions();
 }
 
 function applyResizePercent() {
   const percent = parseInt(document.getElementById('resize-percent').value);
   if (!percent || !state.originalWidth || !state.originalHeight) return;
-  
+
   document.getElementById('resize-width').value = Math.round(state.originalWidth * percent / 100);
   document.getElementById('resize-height').value = Math.round(state.originalHeight * percent / 100);
   document.getElementById('resize-percent').value = '';
-  
+
   updateResizeDimensions();
 }
 
@@ -184,28 +186,28 @@ function updateResizeDimensions() {
 function downloadResizedImage() {
   const newWidth = parseInt(document.getElementById('resize-width').value);
   const newHeight = parseInt(document.getElementById('resize-height').value);
-  
+
   if (!newWidth || !newHeight || !state.originalImage) {
     showToast('Masukkan dimensi yang valid', 'error');
     return;
   }
-  
+
   const canvas = document.createElement('canvas');
   canvas.width = newWidth;
   canvas.height = newHeight;
   const ctx = canvas.getContext('2d');
-  
+
   // Use better quality interpolation
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
-  
+
   ctx.drawImage(state.originalImage, 0, 0, newWidth, newHeight);
-  
+
   // Determine format from original
   const ext = state.originalImageName.split('.').pop().toLowerCase();
   let mimeType = 'image/png';
   let extension = 'png';
-  
+
   if (['jpg', 'jpeg'].includes(ext)) {
     mimeType = 'image/jpeg';
     extension = 'jpg';
@@ -213,7 +215,7 @@ function downloadResizedImage() {
     mimeType = 'image/webp';
     extension = 'webp';
   }
-  
+
   canvas.toBlob((blob) => {
     downloadBlob(blob, getDownloadFilename({originalName: state.originalImageName, extension: extension}));
     showToast('Gambar berhasil diubah ukurannya!', 'success');
@@ -229,26 +231,26 @@ function convertImage() {
     showToast('Tidak ada gambar untuk dikonversi', 'error');
     return;
   }
-  
+
   const format = document.getElementById('convert-format').value;
   const quality = parseInt(document.getElementById('convert-quality').value) / 100;
-  
+
   const canvas = document.createElement('canvas');
   canvas.width = state.originalImage.naturalWidth;
   canvas.height = state.originalImage.naturalHeight;
   const ctx = canvas.getContext('2d');
-  
+
   // For PNG with transparency, fill white background for JPEG
   if (format === 'jpeg') {
     ctx.fillStyle = 'white';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
-  
+
   ctx.drawImage(state.originalImage, 0, 0);
-  
+
   const mimeType = `image/${format}`;
   const extension = format === 'jpeg' ? 'jpg' : format;
-  
+
   canvas.toBlob((blob) => {
     downloadBlob(blob, getDownloadFilename({originalName: state.originalImageName, extension: extension}));
     showToast('Gambar berhasil dikonversi!', 'success');
@@ -267,16 +269,16 @@ async function addImagesToPDF(files) {
     fileList.innerHTML = '';
     fileList.classList.remove('empty');
   }
-  
+
   for (const file of files) {
     if (!file.type.startsWith('image/')) {
       showToast(`${file.name} bukan file gambar`, 'error');
       continue;
     }
-    
+
     try {
       const img = await loadImage(file);
-      
+
       // Create thumbnail
       const canvas = document.createElement('canvas');
       const maxSize = 120;
@@ -285,25 +287,26 @@ async function addImagesToPDF(files) {
       canvas.height = img.naturalHeight * ratio;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      
+
       const fileItem = createImageFileItem(file.name, formatFileSize(file.size), canvas.toDataURL(), state.imgToPdfFiles.length);
       fileList.appendChild(fileItem);
-      
+
       state.imgToPdfFiles.push({
         name: file.name,
         file: file,
         img: img
       });
-      
+
     } catch (error) {
       console.error('Error processing image:', error);
       showToast(`Gagal memproses ${file.name}`, 'error');
     }
   }
-  
+
   updateImgPdfAddButton();
   document.getElementById('img-pdf-btn').disabled = state.imgToPdfFiles.length === 0;
-  enableDragReorder('img-pdf-file-list', state.imgToPdfFiles);
+  // enableDragReorder is from pdf-tools.js (still a global script)
+  window.enableDragReorder('img-pdf-file-list', state.imgToPdfFiles);
 }
 
 function createImageFileItem(name, size, thumbnail, index) {
@@ -324,7 +327,7 @@ function createImageFileItem(name, size, thumbnail, index) {
       <div class="file-item-name" title="${safeName}">${safeName}</div>
       <div class="file-item-size">${safeSize}</div>
     </div>
-    <button class="file-item-remove">×</button>
+    <button class="file-item-remove">\u00d7</button>
   `;
 
   // Add click handler safely (avoid inline onclick with index)
@@ -337,7 +340,7 @@ function updateImgPdfAddButton() {
   const fileList = document.getElementById('img-pdf-file-list');
   const existing = fileList.querySelector('.add-file-btn');
   if (existing) existing.remove();
-  
+
   const addBtn = document.createElement('button');
   addBtn.className = 'add-file-btn';
   addBtn.innerHTML = `
@@ -365,7 +368,6 @@ function refreshImgPdfList() {
     return;
   }
 
-  // Use for loop to maintain order (synchronous since we're just drawing to canvas)
   for (let i = 0; i < state.imgToPdfFiles.length; i++) {
     const imgFile = state.imgToPdfFiles[i];
     const canvas = document.createElement('canvas');
@@ -377,9 +379,9 @@ function refreshImgPdfList() {
     ctx.drawImage(imgFile.img, 0, 0, canvas.width, canvas.height);
 
     const fileItem = createImageFileItem(imgFile.name, '', canvas.toDataURL(), i);
-    const addBtn = fileList.querySelector('.add-file-btn');
-    if (addBtn) {
-      fileList.insertBefore(fileItem, addBtn);
+    const addBtnEl = fileList.querySelector('.add-file-btn');
+    if (addBtnEl) {
+      fileList.insertBefore(fileItem, addBtnEl);
     } else {
       fileList.appendChild(fileItem);
     }
@@ -387,44 +389,44 @@ function refreshImgPdfList() {
 
   updateImgPdfAddButton();
   document.getElementById('img-pdf-btn').disabled = state.imgToPdfFiles.length === 0;
-  enableDragReorder('img-pdf-file-list', state.imgToPdfFiles);
+  window.enableDragReorder('img-pdf-file-list', state.imgToPdfFiles);
 }
 
 async function imagesToPDF() {
   if (state.imgToPdfFiles.length === 0) return;
-  
+
   const pageSize = document.getElementById('img-pdf-size').value;
   const orientation = document.getElementById('img-pdf-orientation').value;
-  
+
   const progress = document.getElementById('img-pdf-progress');
   const progressFill = progress.querySelector('.progress-fill');
   const progressText = progress.querySelector('.progress-text');
-  
+
   progress.classList.remove('hidden');
   document.getElementById('img-pdf-btn').disabled = true;
-  
+
   try {
     const pdfDoc = await PDFLib.PDFDocument.create();
-    
+
     // Page dimensions
     const pageSizes = {
       a4: { width: 595.28, height: 841.89 },
       letter: { width: 612, height: 792 }
     };
-    
+
     for (let i = 0; i < state.imgToPdfFiles.length; i++) {
       progressText.textContent = `Memproses gambar ${i + 1} dari ${state.imgToPdfFiles.length}...`;
       progressFill.style.width = `${((i + 1) / state.imgToPdfFiles.length) * 100}%`;
-      
+
       const imgFile = state.imgToPdfFiles[i];
       const img = imgFile.img;
-      
+
       // Get image bytes
       const imgBytes = await fetch(img.src).then(res => res.arrayBuffer());
-      
+
       let embeddedImg;
       const fileType = imgFile.file.type;
-      
+
       if (fileType === 'image/png') {
         embeddedImg = await pdfDoc.embedPng(imgBytes);
       } else if (fileType === 'image/jpeg' || fileType === 'image/jpg') {
@@ -440,24 +442,22 @@ async function imagesToPDF() {
         const pngBytes = await fetch(pngDataUrl).then(res => res.arrayBuffer());
         embeddedImg = await pdfDoc.embedPng(pngBytes);
       }
-      
+
       let pageWidth, pageHeight;
-      
+
       if (pageSize === 'fit') {
-        // Page size matches image
         pageWidth = embeddedImg.width;
         pageHeight = embeddedImg.height;
       } else {
         const dimensions = pageSizes[pageSize];
-        
-        // Determine orientation
+
         let isLandscape = false;
         if (orientation === 'landscape') {
           isLandscape = true;
         } else if (orientation === 'auto') {
           isLandscape = embeddedImg.width > embeddedImg.height;
         }
-        
+
         if (isLandscape) {
           pageWidth = dimensions.height;
           pageHeight = dimensions.width;
@@ -466,13 +466,13 @@ async function imagesToPDF() {
           pageHeight = dimensions.height;
         }
       }
-      
+
       const page = pdfDoc.addPage([pageWidth, pageHeight]);
-      
+
       // Calculate image position to fit and center
       let imgWidth = embeddedImg.width;
       let imgHeight = embeddedImg.height;
-      
+
       if (pageSize !== 'fit') {
         const scale = Math.min(
           (pageWidth - 40) / imgWidth,
@@ -481,10 +481,10 @@ async function imagesToPDF() {
         imgWidth *= scale;
         imgHeight *= scale;
       }
-      
+
       const x = (pageWidth - imgWidth) / 2;
       const y = (pageHeight - imgHeight) / 2;
-      
+
       page.drawImage(embeddedImg, {
         x,
         y,
@@ -492,13 +492,13 @@ async function imagesToPDF() {
         height: imgHeight,
       });
     }
-    
+
     progressText.textContent = 'Menyimpan PDF...';
     const pdfBytes = await pdfDoc.save();
 
     downloadBlob(new Blob([pdfBytes], { type: 'application/pdf' }), getDownloadFilename({originalName: state.imgToPdfFiles[0]?.name, extension: 'pdf'}));
     showToast('PDF berhasil dibuat!', 'success');
-    
+
   } catch (error) {
     console.error('Error creating PDF from images:', error);
     showToast('Gagal membuat PDF', 'error');
@@ -508,3 +508,30 @@ async function imagesToPDF() {
   }
 }
 
+// Exports
+export {
+  updateCompressPreview,
+  downloadCompressedImage,
+  updateRemoveBgPreview,
+  downloadRemovedBgImage,
+  onResizeChange,
+  applyResizePercent,
+  downloadResizedImage,
+  convertImage,
+  addImagesToPDF,
+  imagesToPDF,
+  refreshImgPdfList
+};
+
+// Window bridges (for HTML onclick handlers)
+window.updateCompressPreview = updateCompressPreview;
+window.downloadCompressedImage = downloadCompressedImage;
+window.updateRemoveBgPreview = updateRemoveBgPreview;
+window.downloadRemovedBgImage = downloadRemovedBgImage;
+window.onResizeChange = onResizeChange;
+window.applyResizePercent = applyResizePercent;
+window.downloadResizedImage = downloadResizedImage;
+window.convertImage = convertImage;
+window.addImagesToPDF = addImagesToPDF;
+window.imagesToPDF = imagesToPDF;
+window.refreshImgPdfList = refreshImgPdfList;
