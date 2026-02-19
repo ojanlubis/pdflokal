@@ -42,19 +42,17 @@ export function ueSetTool(tool) {
   ueUpdateStatus(toolNames[tool] || 'Pilih alat untuk mengedit');
 }
 
-// Open signature modal (use window.* for pdf-tools functions)
+// openSignatureModal, openTextModal, getTextModalSettings live in js/pdf-tools/.
+// tools.js ↔ lifecycle.js is also circular, so ueDismissSignatureHint goes through window.*.
 export function ueOpenSignatureModal() {
-  // Dismiss first-use tooltip (use window.* for lifecycle function)
   window.ueDismissSignatureHint();
   window.openSignatureModal();
 }
 
-// Open text modal
 export function ueOpenTextModal() {
   window.openTextModal();
 }
 
-// Confirm text input for unified editor
 export function ueConfirmText() {
   const settings = window.getTextModalSettings();
 
@@ -153,7 +151,7 @@ export async function applyEditorProtect() {
   }
 
   try {
-    // Build PDF with current annotations first
+    // ueBuildFinalPDF lives in pdf-export.js; tools ↔ pdf-export is circular.
     const pdfBytes = await window.ueBuildFinalPDF();
     const pdfDoc = await PDFLib.PDFDocument.load(pdfBytes);
 

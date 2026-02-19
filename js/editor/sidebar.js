@@ -212,7 +212,8 @@ export function ueToggleSidebar() {
   const isCollapsed = sidebar.classList.contains('collapsed');
   toggleBtn.title = isCollapsed ? 'Tampilkan sidebar' : 'Sembunyikan sidebar';
 
-  // Re-render visible pages to recalculate canvas size after transition
+  // ueRenderVisiblePages lives in page-rendering.js, which imports sidebar.js —
+  // so importing page-rendering here would be circular.
   setTimeout(() => {
     if (ueState.pages.length > 0) {
       window.ueRenderVisiblePages();

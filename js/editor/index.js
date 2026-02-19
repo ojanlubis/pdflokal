@@ -63,8 +63,12 @@ export {
 } from './lifecycle.js';
 
 // ============================================================
-// Window bridges (for HTML onclick handlers and non-module scripts)
+// Window bridges
 // ============================================================
+// index.html has ~88 inline onclick="fn()" handlers that need global access.
+// These assignments make every editor function available on window.*.
+// They also provide the global names that other modules reference via window.*
+// to break circular import chains (see comments in individual modules).
 
 // Canvas utils
 import { ueGetCurrentCanvas, ueGetCoords, ueGetResizeHandle, getTextBounds } from './canvas-utils.js';

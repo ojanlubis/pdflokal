@@ -146,8 +146,9 @@ document.addEventListener('click', function(e) {
 // MOBILE EDITOR ENHANCEMENTS
 // ============================================================
 
+// Called by navigation.js (showTool) and init.js when the editor opens.
+// Currently a no-op; exists as a hook point for mobile-specific setup.
 export function initMobileEditorEnhancements() {
-  // Placeholder for future mobile-specific enhancements
 }
 
 // ============================================================

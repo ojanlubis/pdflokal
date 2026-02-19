@@ -57,7 +57,8 @@ export function uePlaceSignature(x, y) {
       navigator.vibrate(20);
     }
 
-    // Update mobile sign button state
+    // mobile-ui.js registers this as a window global. The bare `typeof` check
+    // works because window properties are accessible as bare names from ES modules.
     if (typeof ueMobileUpdateSignButton === 'function') {
       ueMobileUpdateSignButton();
     }

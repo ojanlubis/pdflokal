@@ -125,6 +125,8 @@ export function ueSelectPage(index) {
 
   // Clear selection and confirm button when switching pages
   ueState.selectedAnnotation = null;
+  // ueHideConfirmButton lives in signatures.js; importing it here would create
+  // a circular chain (page-rendering ↔ signatures via canvas-events).
   window.ueHideConfirmButton();
 
   ueState.selectedPage = index;
@@ -154,7 +156,9 @@ export function ueSelectPage(index) {
     'Halaman ' + (index + 1) + ' dipilih. Gunakan toolbar di bawah untuk pindah halaman.'
   );
 
-  // Update mobile UI
+  // These mobile-ui.js functions are registered as window globals by that module.
+  // The bare `typeof` check works because window properties are accessible as
+  // bare names in the global scope, even from ES modules.
   if (typeof ueMobileUpdatePageIndicator === 'function') {
     ueMobileUpdatePageIndicator();
   }
@@ -331,6 +335,7 @@ export function ueSetupScrollSync() {
         ueState.selectedPage = closestIndex;
         ueHighlightThumbnail(closestIndex);
 
+        // mobile-ui.js window global — see comment in ueSelectPage above
         if (typeof ueMobileUpdatePageIndicator === 'function') {
           ueMobileUpdatePageIndicator();
         }
