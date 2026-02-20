@@ -92,12 +92,15 @@ export function ueRenderThumbnails() {
     // Use window.* to avoid circular import with page-rendering
     item.onclick = () => window.ueSelectPage(index);
 
-    // Clone the thumbnail canvas
+    // Clone the thumbnail canvas (prefer rendered main canvas, fall back to pre-rendered thumb)
     const thumbCanvas = document.createElement('canvas');
-    thumbCanvas.width = canvasWidth;
-    thumbCanvas.height = canvasHeight;
-    if (realCanvas && realCanvas instanceof HTMLCanvasElement) {
-      thumbCanvas.getContext('2d').drawImage(realCanvas, 0, 0);
+    const sourceCanvas = (realCanvas && realCanvas instanceof HTMLCanvasElement && ueState.pageCanvases[index]?.rendered)
+      ? realCanvas
+      : page.thumbCanvas;
+    thumbCanvas.width = sourceCanvas ? sourceCanvas.width : canvasWidth;
+    thumbCanvas.height = sourceCanvas ? sourceCanvas.height : canvasHeight;
+    if (sourceCanvas) {
+      thumbCanvas.getContext('2d').drawImage(sourceCanvas, 0, 0);
     }
     if (page.rotation && page.rotation !== 0) {
       thumbCanvas.style.transform = `rotate(${page.rotation}deg)`;

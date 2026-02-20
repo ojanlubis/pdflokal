@@ -102,13 +102,22 @@ async function handlePdfFile(file) {
     const page = await pdf.getPage(i + 1);
     const viewport = page.getViewport({ scale: 0.5 });
 
-    // Store dimensions only — actual rendering happens lazily via IntersectionObserver
+    // Render a small thumbnail canvas for sidebar (cheap at ~150px wide)
+    const thumbScale = 150 / page.getViewport({ scale: 1 }).width;
+    const thumbVp = page.getViewport({ scale: thumbScale });
+    const thumbCanvas = document.createElement('canvas');
+    thumbCanvas.width = Math.round(thumbVp.width);
+    thumbCanvas.height = Math.round(thumbVp.height);
+    const thumbCtx = thumbCanvas.getContext('2d');
+    await page.render({ canvasContext: thumbCtx, viewport: thumbVp }).promise;
+
     ueState.pages.push({
       pageNum: i,
       sourceIndex,
       sourceName,
       rotation: 0,
       canvas: { width: viewport.width, height: viewport.height },
+      thumbCanvas,
       isFromImage: false
     });
 
@@ -134,13 +143,22 @@ async function handleImageFile(file) {
   const page = await pdf.getPage(1);
   const viewport = page.getViewport({ scale: 0.5 });
 
-  // Store dimensions only — actual rendering happens lazily via IntersectionObserver
+  // Render a small thumbnail canvas for sidebar
+  const thumbScale = 150 / page.getViewport({ scale: 1 }).width;
+  const thumbVp = page.getViewport({ scale: thumbScale });
+  const thumbCanvas = document.createElement('canvas');
+  thumbCanvas.width = Math.round(thumbVp.width);
+  thumbCanvas.height = Math.round(thumbVp.height);
+  const thumbCtx = thumbCanvas.getContext('2d');
+  await page.render({ canvasContext: thumbCtx, viewport: thumbVp }).promise;
+
   ueState.pages.push({
     pageNum: 0,
     sourceIndex,
     sourceName,
     rotation: 0,
     canvas: { width: viewport.width, height: viewport.height },
+    thumbCanvas,
     isFromImage: true
   });
 

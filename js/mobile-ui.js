@@ -74,12 +74,17 @@ export function ueMobileOpenPagePicker() {
 
     if (page.canvas) {
       const realCanvas = ueState.pageCanvases[index]?.canvas;
+      const sourceCanvas = (realCanvas && realCanvas instanceof HTMLCanvasElement && ueState.pageCanvases[index]?.rendered)
+        ? realCanvas
+        : page.thumbCanvas;
       const thumbCanvas = document.createElement('canvas');
       const scale = 0.3;
-      thumbCanvas.width = (realCanvas ? realCanvas.width : page.canvas.width) * scale;
-      thumbCanvas.height = (realCanvas ? realCanvas.height : page.canvas.height) * scale;
-      if (realCanvas && realCanvas instanceof HTMLCanvasElement) {
-        thumbCanvas.getContext('2d').drawImage(realCanvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
+      const refWidth = sourceCanvas ? sourceCanvas.width : page.canvas.width;
+      const refHeight = sourceCanvas ? sourceCanvas.height : page.canvas.height;
+      thumbCanvas.width = refWidth * scale;
+      thumbCanvas.height = refHeight * scale;
+      if (sourceCanvas) {
+        thumbCanvas.getContext('2d').drawImage(sourceCanvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
       }
       thumb.appendChild(thumbCanvas);
     }

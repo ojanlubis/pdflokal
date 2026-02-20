@@ -204,6 +204,7 @@ export function ueApplyToAllPages(annoRef) {
       subtype: 'paraf',
       image: anno.image,
       imageId: anno.imageId,
+      cachedImg: anno.cachedImg,
       x: anno.x,
       y: anno.y,
       width: anno.width,

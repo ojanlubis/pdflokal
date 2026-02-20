@@ -91,11 +91,14 @@ export function uePmRenderPages() {
     }
 
     const realCanvas = ueState.pageCanvases[index]?.canvas;
+    const sourceCanvas = (realCanvas && realCanvas instanceof HTMLCanvasElement && ueState.pageCanvases[index]?.rendered)
+      ? realCanvas
+      : page.thumbCanvas;
     const canvas = document.createElement('canvas');
-    canvas.width = realCanvas ? realCanvas.width : page.canvas.width;
-    canvas.height = realCanvas ? realCanvas.height : page.canvas.height;
-    if (realCanvas && realCanvas instanceof HTMLCanvasElement) {
-      canvas.getContext('2d').drawImage(realCanvas, 0, 0);
+    canvas.width = sourceCanvas ? sourceCanvas.width : page.canvas.width;
+    canvas.height = sourceCanvas ? sourceCanvas.height : page.canvas.height;
+    if (sourceCanvas) {
+      canvas.getContext('2d').drawImage(sourceCanvas, 0, 0);
     }
     if (page.rotation !== 0) {
       canvas.style.transform = `rotate(${page.rotation}deg)`;

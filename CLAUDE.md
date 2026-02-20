@@ -109,11 +109,13 @@ The flagship multi-document PDF editor. When users drop a PDF on the homepage, i
 
 **Signatures:** Upload images (with background removal), draw, auto-lock after placement, double-click to unlock, delete button.
 
+**Paraf (Initials):** Draw-only modal (no upload tab), smaller default size (80px vs 150px signature). Uses `type: 'signature'` with `subtype: 'paraf'` — zero changes needed in annotations/export/undo. "Semua Hal." button copies paraf to all pages at same position. Functions in `signature-modal.js` (openParafModal, useParaf, etc.) + `signatures.js` (ueApplyToAllPages).
+
 **Keyboard Shortcuts:**
 | Key | Action |
 |-----|--------|
 | V | Select/Edit | W | Whiteout | T | Text | S | Signature |
-| R | Rotate 90 CW | Delete | Delete annotation |
+| P | Paraf | R | Rotate 90 CW | Delete | Delete annotation |
 | Ctrl+Z/Y | Undo/Redo | Ctrl+S | Download PDF |
 | Arrow L/R | Navigate pages | ? | Shortcuts help | Escape | Close/Home |
 
@@ -203,7 +205,7 @@ Hero + dropzone (opens editor), PDF tool cards (Editor, Merge, Split, PDF-to-Ima
 
 ### Named Constants (js/lib/state.js)
 
-`UNDO_STACK_LIMIT` (50), `SIGNATURE_DEFAULT_WIDTH` (150px), `OBSERVER_ROOT_MARGIN` ('200px 0px'), `DOUBLE_TAP_DELAY` (300ms), `DOUBLE_TAP_DISTANCE` (30px).
+`UNDO_STACK_LIMIT` (50), `SIGNATURE_DEFAULT_WIDTH` (150px), `PARAF_DEFAULT_WIDTH` (80px), `OBSERVER_ROOT_MARGIN` ('200px 0px'), `DOUBLE_TAP_DELAY` (300ms), `DOUBLE_TAP_DISTANCE` (30px).
 
 ### Reliability Patterns
 
@@ -225,7 +227,7 @@ Hero + dropzone (opens editor), PDF tool cards (Editor, Merge, Split, PDF-to-Ima
 
 **Performance:**
 - PDF.js uses real Web Worker (`workerSrc` points to self-hosted file, falls back to fake worker offline)
-- Page loading is lazy: `handlePdfFile` stores dimensions only, actual rendering via IntersectionObserver
+- Page loading is lazy: `handlePdfFile` stores dimensions only, actual rendering via IntersectionObserver. Debounced `ueRenderThumbnails()` call after each lazy render to keep sidebar in sync
 - Undo stack uses `imageRegistry` to avoid cloning base64 strings (stores `imageId` references)
 - Pinch-to-zoom supported via 2-finger touch detection in `canvas-events.js`
 
@@ -240,6 +242,7 @@ Hero + dropzone (opens editor), PDF tool cards (Editor, Merge, Split, PDF-to-Ima
 - IntersectionObserver root is `null` (viewport), NOT the wrapper element
 - Merge/Split card flow bypasses `showTool()` - must manually add `body.editor-active`
 - Layout race condition: `showTool()` makes workspace visible but browser hasn't reflowed - use rAF
+- **Lazy rendering**: `ueState.pages[i].canvas` is a `{width, height}` placeholder, NOT a real HTMLCanvasElement. Real canvases live in `ueState.pageCanvases[i].canvas`. Never call `drawImage()`, `getContext()`, or `toDataURL()` on `page.canvas` — always use `ueState.pageCanvases[i].canvas` with an `instanceof HTMLCanvasElement` guard
 
 ## Changelog System
 
