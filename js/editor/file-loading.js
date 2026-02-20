@@ -91,9 +91,10 @@ async function handlePdfFile(file) {
   const sourceIndex = ueState.sourceFiles.length;
   const sourceName = file.name.replace('.pdf', '').substring(0, 15);
 
-  ueState.sourceFiles.push({ name: file.name, bytes });
+  ueState.sourceFiles.push({ name: file.name, bytes, numPages: 0 });
 
   const pdf = await loadPdfDocument(bytes);
+  ueState.sourceFiles[sourceIndex].numPages = pdf.numPages;
 
   for (let i = 0; i < pdf.numPages; i++) {
     const page = await pdf.getPage(i + 1);
@@ -131,7 +132,8 @@ async function handleImageFile(file) {
 
   ueState.sourceFiles.push({
     name: file.name,
-    bytes: bytesCopy
+    bytes: bytesCopy,
+    numPages: 1
   });
 
   const pdf = await loadPdfDocument(pdfBytes);

@@ -111,10 +111,18 @@ export async function ueBuildFinalPDF() {
     const annotations = ueState.annotations[i] || [];
     if (annotations.length > 0) {
       const page = newDoc.getPages()[i];
-      const { width, height } = page.getSize();
-      const scaleInfo = ueState.pageScales[i] || { canvasWidth: width, canvasHeight: height };
-      const scaleX = width / scaleInfo.canvasWidth;
-      const scaleY = height / scaleInfo.canvasHeight;
+      const pageSize = page.getSize();
+      // Use pageScales from PDF.js rendering for consistent coordinate mapping.
+      // page.getSize() (pdf-lib MediaBox) can differ from PDF.js viewport dimensions
+      // when PDFs have CropBox or non-standard page definitions.
+      const scaleInfo = ueState.pageScales[i];
+      const pdfW = scaleInfo ? scaleInfo.pdfWidth : pageSize.width;
+      const pdfH = scaleInfo ? scaleInfo.pdfHeight : pageSize.height;
+      const canvasW = scaleInfo ? scaleInfo.canvasWidth : pageSize.width;
+      const canvasH = scaleInfo ? scaleInfo.canvasHeight : pageSize.height;
+      const scaleX = pdfW / canvasW;
+      const scaleY = pdfH / canvasH;
+      const height = pdfH;
 
       for (const anno of annotations) {
         switch (anno.type) {
@@ -202,7 +210,12 @@ export async function ueDownload() {
     let isUnmodified = true;
     const sourceFile = ueState.sourceFiles[0];
 
-    for (let i = 0; i < ueState.pages.length; i++) {
+    // Check page count matches source (catches deleted pages)
+    if (sourceFile.numPages && ueState.pages.length !== sourceFile.numPages) {
+      isUnmodified = false;
+    }
+
+    for (let i = 0; isUnmodified && i < ueState.pages.length; i++) {
       const page = ueState.pages[i];
       if (page.sourceIndex !== 0 || page.pageNum !== i || page.rotation !== 0) {
         isUnmodified = false;
