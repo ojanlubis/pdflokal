@@ -3,21 +3,16 @@
  * Page number modal logic for both unified editor and legacy editor
  */
 
-import { state, navHistory, ueState } from '../lib/state.js';
+import { state, ueState, createPageNumberAnnotation } from '../lib/state.js';
 import { showToast } from '../lib/utils.js';
-import { pushModalState } from '../lib/navigation.js';
+import { openModal, closeModal } from '../lib/navigation.js';
 
 export function openEditorPageNumModal() {
-  document.getElementById('editor-pagenum-modal').classList.add('active');
-  pushModalState('editor-pagenum-modal');
+  openModal('editor-pagenum-modal');
 }
 
 export function closeEditorPageNumModal(skipHistoryBack = false) {
-  document.getElementById('editor-pagenum-modal').classList.remove('active');
-  navHistory.currentModal = null;
-  if (!skipHistoryBack && navHistory.currentView === 'modal') {
-    history.back();
-  }
+  closeModal('editor-pagenum-modal', skipHistoryBack);
 }
 
 export function applyEditorPageNumbers() {
@@ -68,15 +63,9 @@ export function applyEditorPageNumbers() {
       }
 
       if (!ueState.annotations[i]) ueState.annotations[i] = [];
-      ueState.annotations[i].push({
-        type: 'pageNumber',
-        text,
-        fontSize,
-        color: '#000000',
-        x,
-        y,
-        position
-      });
+      ueState.annotations[i].push(createPageNumberAnnotation({
+        text, fontSize, x, y, position
+      }));
     }
 
     closeEditorPageNumModal();
@@ -125,15 +114,9 @@ export function applyEditorPageNumbers() {
         x = canvasWidth / 2; y = canvasHeight - margin;
     }
 
-    state.editAnnotations[i].push({
-      type: 'pageNumber',
-      text,
-      fontSize,
-      color: '#000000',
-      x,
-      y,
-      position
-    });
+    state.editAnnotations[i].push(createPageNumberAnnotation({
+      text, fontSize, x, y, position
+    }));
   }
 
   closeEditorPageNumModal();

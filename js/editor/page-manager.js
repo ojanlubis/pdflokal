@@ -3,9 +3,9 @@
  * Gabungkan (page manager) modal: drag-drop reorder, rotate, delete, split/extract
  */
 
-import { ueState, uePmState, navHistory } from '../lib/state.js';
+import { ueState, uePmState } from '../lib/state.js';
 import { showToast, showFullscreenLoading, hideFullscreenLoading, downloadBlob, getDownloadFilename } from '../lib/utils.js';
-import { pushModalState } from '../lib/navigation.js';
+import { openModal, closeModal } from '../lib/navigation.js';
 import { ueRenderThumbnails } from './sidebar.js';
 import { ueUpdatePageCount, ueRenderSelectedPage, ueSetupIntersectionObserver } from './page-rendering.js';
 import { getThumbnailSource } from './canvas-utils.js';
@@ -29,8 +29,7 @@ export function uePmOpenModal() {
   uePmRenderPages();
   uePmUpdateUI();
 
-  document.getElementById('ue-gabungkan-modal').classList.add('active');
-  pushModalState('ue-gabungkan-modal');
+  openModal('ue-gabungkan-modal');
 
   initUePmFileInput();
   initUePmImageInput();
@@ -39,7 +38,6 @@ export function uePmOpenModal() {
 // Close the page manager modal
 export function uePmCloseModal(skipHistoryBack = false) {
   uePmState.isOpen = false;
-  document.getElementById('ue-gabungkan-modal').classList.remove('active');
 
   if (uePmState.dropIndicator && uePmState.dropIndicator.parentNode) {
     uePmState.dropIndicator.remove();
@@ -49,10 +47,7 @@ export function uePmCloseModal(skipHistoryBack = false) {
   document.getElementById('ue-pm-extract-actions').style.display = 'none';
   document.getElementById('ue-pm-extract-btn').style.display = 'none';
 
-  navHistory.currentModal = null;
-  if (!skipHistoryBack && navHistory.currentView === 'modal') {
-    history.back();
-  }
+  closeModal('ue-gabungkan-modal', skipHistoryBack);
 
   // Heavy rendering after modal visually closes (defer to next frame)
   requestAnimationFrame(() => {

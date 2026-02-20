@@ -38,6 +38,28 @@ export function checkFileSize(file) {
 }
 
 // ============================================================
+// FILE TYPE HELPERS
+// ============================================================
+
+export function isPDF(file) {
+  return file.type === 'application/pdf';
+}
+
+export function isImage(file) {
+  return file.type.startsWith('image/');
+}
+
+export const ACCEPTED_FILE_TYPES = '.pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/*';
+
+// ============================================================
+// PDF.js DOCUMENT LOADING
+// ============================================================
+
+export async function loadPdfDocument(bytes) {
+  return pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+}
+
+// ============================================================
 // FILENAMES
 // ============================================================
 
@@ -362,5 +384,8 @@ window.sleep = sleep;
 window.debounce = debounce;
 window.safeLocalGet = safeLocalGet;
 window.safeLocalSet = safeLocalSet;
+window.isPDF = isPDF;
+window.isImage = isImage;
+window.loadPdfDocument = loadPdfDocument;
 window.trapFocus = trapFocus;
 window.releaseFocus = releaseFocus;

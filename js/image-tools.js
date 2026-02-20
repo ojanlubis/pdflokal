@@ -30,7 +30,8 @@ import {
   getDownloadFilename,
   loadImage,
   escapeHtml,
-  makeWhiteTransparent
+  makeWhiteTransparent,
+  isImage
 } from './lib/utils.js';
 import { enableDragReorder } from './pdf-tools/drag-reorder.js';
 
@@ -259,7 +260,7 @@ async function addImagesToPDF(files) {
   }
 
   for (const file of files) {
-    if (!file.type.startsWith('image/')) {
+    if (!isImage(file)) {
       showToast(`${file.name} bukan file gambar`, 'error');
       continue;
     }

@@ -4,7 +4,7 @@
  */
 
 import { ueState, UNDO_STACK_LIMIT, getRegisteredImage, createPageInfo } from '../lib/state.js';
-import { showToast } from '../lib/utils.js';
+import { showToast, loadPdfDocument } from '../lib/utils.js';
 import { ueRedrawAnnotations } from './annotations.js';
 
 // Clone annotations without duplicating large base64 image strings.
@@ -89,7 +89,7 @@ async function ueRestorePages(pagesData) {
   ueState.pages = [];
   for (const pageData of pagesData) {
     const source = ueState.sourceFiles[pageData.sourceIndex];
-    const pdf = await pdfjsLib.getDocument({ data: source.bytes.slice() }).promise;
+    const pdf = await loadPdfDocument(source.bytes);
     const page = await pdf.getPage(pageData.pageNum + 1);
     const viewport = page.getViewport({ scale: 0.5, rotation: pageData.rotation });
 

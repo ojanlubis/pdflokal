@@ -8,18 +8,18 @@
  * and workspace drop zones.
  *
  * IMPORTS: state, navHistory, mobileState from ./state.js
- *          showToast, cleanupImage from ./utils.js
+ *          showToast, cleanupImage, isPDF, isImage from ./utils.js
  *
  * NOTE: Calls to unified-editor functions (initUnifiedEditor,
- *       ueReset, uePmCloseModal) go through window.* since
- *       unified-editor.js is still a global script in Phase 1.
+ *       ueReset, uePmCloseModal) go through window.* to break
+ *       circular import chains (editor modules import from here).
  *
  * LOAD ORDER: After state.js and utils.js
  * ============================================================
  */
 
 import { state, navHistory, mobileState } from './state.js';
-import { showToast, showFullscreenLoading, hideFullscreenLoading, cleanupImage } from './utils.js';
+import { showToast, showFullscreenLoading, hideFullscreenLoading, cleanupImage, isPDF, isImage } from './utils.js';
 
 // ============================================================
 // HISTORY STATE MANAGEMENT
@@ -44,12 +44,37 @@ export function pushModalState(modalId) {
   navHistory.currentModal = modalId;
 }
 
+// Open a standard modal (add .active + push history)
+export function openModal(id) {
+  const el = document.getElementById(id);
+  if (el) {
+    el.classList.add('active');
+    pushModalState(id);
+  }
+}
+
+// Close a standard modal (remove .active + history back)
+export function closeModal(id, skipHistoryBack = false) {
+  const el = document.getElementById(id);
+  if (el) el.classList.remove('active');
+  navHistory.currentModal = null;
+  if (!skipHistoryBack && navHistory.currentView === 'modal') {
+    history.back();
+  }
+}
+
 // Close all modals
 export function closeAllModals() {
   // Close signature modal
   const sigModal = document.getElementById('signature-modal');
   if (sigModal?.classList.contains('active')) {
     sigModal.classList.remove('active');
+  }
+
+  // Close paraf modal
+  const parafModal = document.getElementById('paraf-modal');
+  if (parafModal?.classList.contains('active')) {
+    parafModal.classList.remove('active');
   }
 
   // Close signature background modal
@@ -198,8 +223,8 @@ export function setupWorkspaceDropZone(tool) {
     if (files.length === 0) return;
 
     // Determine loading message based on file type
-    const isPDF = files[0].type === 'application/pdf';
-    const loadingMessage = isPDF ? 'Memuat PDF...' : 'Memuat gambar...';
+    const filePDF = isPDF(files[0]);
+    const loadingMessage = filePDF ? 'Memuat PDF...' : 'Memuat gambar...';
 
     showFullscreenLoading(loadingMessage);
     try {
@@ -207,9 +232,9 @@ export function setupWorkspaceDropZone(tool) {
         await window.addImagesToPDF(files);
       } else if (files.length === 1) {
         const file = files[0];
-        if (file.type === 'application/pdf') {
+        if (isPDF(file)) {
           await window.loadPDFForTool(file, tool);
-        } else if (file.type.startsWith('image/')) {
+        } else if (isImage(file)) {
           await window.loadImageForTool(file, tool);
         }
       }
@@ -252,8 +277,6 @@ export function resetState() {
   // Reset other state
   state.pdfImgPages = [];
   state.compressedBlob = null;
-  state.cropRect = null;
-  state.currentCropPage = 0;
   state.currentEditTool = null;
   state.signatureImage = null;
 
@@ -310,6 +333,8 @@ export function initNavigationHistory() {
 
 window.pushWorkspaceState = pushWorkspaceState;
 window.pushModalState = pushModalState;
+window.openModal = openModal;
+window.closeModal = closeModal;
 window.closeAllModals = closeAllModals;
 window.showHome = showHome;
 window.showTool = showTool;

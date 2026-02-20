@@ -3,21 +3,16 @@
  * Watermark modal logic for both unified editor and legacy editor
  */
 
-import { state, navHistory, ueState } from '../lib/state.js';
+import { state, ueState, createWatermarkAnnotation } from '../lib/state.js';
 import { showToast } from '../lib/utils.js';
-import { pushModalState } from '../lib/navigation.js';
+import { openModal, closeModal } from '../lib/navigation.js';
 
 export function openEditorWatermarkModal() {
-  document.getElementById('editor-watermark-modal').classList.add('active');
-  pushModalState('editor-watermark-modal');
+  openModal('editor-watermark-modal');
 }
 
 export function closeEditorWatermarkModal(skipHistoryBack = false) {
-  document.getElementById('editor-watermark-modal').classList.remove('active');
-  navHistory.currentModal = null;
-  if (!skipHistoryBack && navHistory.currentView === 'modal') {
-    history.back();
-  }
+  closeModal('editor-watermark-modal', skipHistoryBack);
 }
 
 export function applyEditorWatermark() {
@@ -35,21 +30,18 @@ export function applyEditorWatermark() {
     const centerX = pageScale.canvasWidth / 2;
     const centerY = pageScale.canvasHeight / 2;
 
-    const watermarkAnno = {
-      type: 'watermark',
-      text,
-      fontSize,
-      color,
-      opacity,
-      rotation,
-      x: centerX,
-      y: centerY
-    };
+    const watermarkAnno = createWatermarkAnnotation({
+      text, fontSize, color, opacity, rotation,
+      x: centerX, y: centerY
+    });
 
     if (applyTo === 'all') {
       for (let i = 0; i < ueState.pages.length; i++) {
         if (!ueState.annotations[i]) ueState.annotations[i] = [];
-        ueState.annotations[i].push({ ...watermarkAnno });
+        ueState.annotations[i].push(createWatermarkAnnotation({
+          text, fontSize, color, opacity, rotation,
+          x: centerX, y: centerY
+        }));
       }
       showToast('Watermark diterapkan ke semua halaman', 'success');
     } else {
@@ -70,20 +62,17 @@ export function applyEditorWatermark() {
   const centerX = pageScale.canvasWidth / 2;
   const centerY = pageScale.canvasHeight / 2;
 
-  const watermarkAnno = {
-    type: 'watermark',
-    text,
-    fontSize,
-    color,
-    opacity,
-    rotation,
-    x: centerX,
-    y: centerY
-  };
+  const watermarkAnno = createWatermarkAnnotation({
+    text, fontSize, color, opacity, rotation,
+    x: centerX, y: centerY
+  });
 
   if (applyTo === 'all') {
     for (let i = 0; i < state.currentPDF.numPages; i++) {
-      state.editAnnotations[i].push({ ...watermarkAnno });
+      state.editAnnotations[i].push(createWatermarkAnnotation({
+        text, fontSize, color, opacity, rotation,
+        x: centerX, y: centerY
+      }));
     }
     showToast('Watermark diterapkan ke semua halaman', 'success');
   } else {

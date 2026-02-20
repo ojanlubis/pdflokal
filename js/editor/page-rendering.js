@@ -5,7 +5,7 @@
  */
 
 import { ueState, state, mobileState, OBSERVER_ROOT_MARGIN } from '../lib/state.js';
-import { showToast } from '../lib/utils.js';
+import { showToast, loadPdfDocument } from '../lib/utils.js';
 import { ueRedrawPageAnnotations } from './annotations.js';
 import { ueRenderThumbnails } from './sidebar.js';
 
@@ -185,7 +185,7 @@ export async function ueRenderPageCanvas(index) {
   try {
     const pdf = await pdfDocCache.get(pageInfo.sourceIndex)
       || await (async () => {
-        const doc = await pdfjsLib.getDocument({ data: sourceFile.bytes.slice() }).promise;
+        const doc = await loadPdfDocument(sourceFile.bytes);
         pdfDocCache.set(pageInfo.sourceIndex, doc);
         return doc;
       })();

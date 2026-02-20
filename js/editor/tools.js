@@ -3,9 +3,9 @@
  * Tool selection, modal wrappers, more-tools dropdown, protect modal
  */
 
-import { ueState, state, navHistory } from '../lib/state.js';
+import { ueState, state, createTextAnnotation } from '../lib/state.js';
 import { showToast, downloadBlob, getDownloadFilename } from '../lib/utils.js';
-import { pushModalState, showHome } from '../lib/navigation.js';
+import { openModal, closeModal, showHome } from '../lib/navigation.js';
 import { ueHideConfirmButton } from './signatures.js';
 import { ueRedrawAnnotations } from './annotations.js';
 import { ueSaveEditUndoState } from './undo-redo.js';
@@ -74,8 +74,7 @@ export function ueConfirmText() {
 
   ueSaveEditUndoState();
   if (!ueState.annotations[ueState.selectedPage]) ueState.annotations[ueState.selectedPage] = [];
-  ueState.annotations[ueState.selectedPage].push({
-    type: 'text',
+  ueState.annotations[ueState.selectedPage].push(createTextAnnotation({
     text: settings.text,
     x: ueState.pendingTextPosition.x,
     y: ueState.pendingTextPosition.y,
@@ -84,9 +83,9 @@ export function ueConfirmText() {
     fontFamily: settings.fontFamily,
     bold: settings.bold,
     italic: settings.italic
-  });
+  }));
 
-  document.getElementById('text-input-modal').classList.remove('active');
+  closeModal('text-input-modal');
   ueRedrawAnnotations();
   ueState.pendingTextPosition = null;
   ueSetTool('select');
@@ -94,14 +93,12 @@ export function ueConfirmText() {
 
 // Watermark modal
 export function ueOpenWatermarkModal() {
-  document.getElementById('editor-watermark-modal').classList.add('active');
-  pushModalState('editor-watermark-modal');
+  openModal('editor-watermark-modal');
 }
 
 // Page number modal
 export function ueOpenPageNumModal() {
-  document.getElementById('editor-pagenum-modal').classList.add('active');
-  pushModalState('editor-pagenum-modal');
+  openModal('editor-pagenum-modal');
 }
 
 // More Tools Dropdown
@@ -151,18 +148,13 @@ export function closeFloatingMore() {
 
 // Kunci PDF modal
 export function ueOpenProtectModal() {
-  document.getElementById('editor-protect-modal').classList.add('active');
   document.getElementById('editor-protect-password').value = '';
   document.getElementById('editor-protect-confirm').value = '';
-  pushModalState('editor-protect-modal');
+  openModal('editor-protect-modal');
 }
 
 export function closeEditorProtectModal(skipHistoryBack = false) {
-  document.getElementById('editor-protect-modal').classList.remove('active');
-  navHistory.currentModal = null;
-  if (!skipHistoryBack && navHistory.currentView === 'modal') {
-    history.back();
-  }
+  closeModal('editor-protect-modal', skipHistoryBack);
 }
 
 export async function applyEditorProtect() {

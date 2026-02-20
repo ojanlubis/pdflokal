@@ -3,9 +3,9 @@
  * Text annotation modal logic
  */
 
-import { state, navHistory, CSS_FONT_MAP } from '../lib/state.js';
+import { state, CSS_FONT_MAP } from '../lib/state.js';
 import { showToast } from '../lib/utils.js';
-import { pushModalState } from '../lib/navigation.js';
+import { openModal, closeModal } from '../lib/navigation.js';
 
 function initTextModalControls() {
   const boldBtn = document.getElementById('modal-text-bold');
@@ -45,9 +45,7 @@ export function openTextModal() {
     window.changelogAPI.minimize();
   }
 
-  const modal = document.getElementById('text-input-modal');
-  modal.classList.add('active');
-  pushModalState('text-input-modal');
+  openModal('text-input-modal');
 
   const textInput = document.getElementById('text-input-field');
   textInput.value = '';
@@ -80,13 +78,8 @@ export function openTextModal() {
 }
 
 export function closeTextModal(skipHistoryBack = false) {
-  const modal = document.getElementById('text-input-modal');
-  modal.classList.remove('active');
   state.pendingTextPosition = null;
-  navHistory.currentModal = null;
-  if (!skipHistoryBack && navHistory.currentView === 'modal') {
-    history.back();
-  }
+  closeModal('text-input-modal', skipHistoryBack);
 }
 
 export function updateTextPreview() {

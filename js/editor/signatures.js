@@ -3,7 +3,7 @@
  * Signature placement, preview, confirm, delete
  */
 
-import { ueState, state, mobileState, SIGNATURE_DEFAULT_WIDTH, registerImage } from '../lib/state.js';
+import { ueState, state, mobileState, SIGNATURE_DEFAULT_WIDTH, registerImage, createSignatureAnnotation } from '../lib/state.js';
 import { showToast } from '../lib/utils.js';
 import { ueGetCurrentCanvas } from './canvas-utils.js';
 import { ueRedrawAnnotations } from './annotations.js';
@@ -34,8 +34,7 @@ export async function uePlaceSignature(x, y) {
   const sigHeight = sigWidth / aspectRatio;
   const subtype = ueState.pendingSubtype || null;
   const imageId = registerImage(state.signatureImage);
-  const newAnno = {
-    type: 'signature',
+  const newAnno = createSignatureAnnotation({
     image: state.signatureImage,
     imageId,
     x: x - sigWidth / 2,
@@ -43,9 +42,8 @@ export async function uePlaceSignature(x, y) {
     width: sigWidth,
     height: sigHeight,
     cachedImg: img,
-    locked: false
-  };
-  if (subtype) newAnno.subtype = subtype;
+    subtype
+  });
   ueState.annotations[pageIndex].push(newAnno);
 
   const newIndex = ueState.annotations[pageIndex].length - 1;
@@ -199,9 +197,7 @@ export function ueApplyToAllPages(annoRef) {
   for (let i = 0; i < ueState.pages.length; i++) {
     if (i === currentPageIndex) continue;
     if (!ueState.annotations[i]) ueState.annotations[i] = [];
-    ueState.annotations[i].push({
-      type: 'signature',
-      subtype: 'paraf',
+    ueState.annotations[i].push(createSignatureAnnotation({
       image: anno.image,
       imageId: anno.imageId,
       cachedImg: anno.cachedImg,
@@ -209,8 +205,9 @@ export function ueApplyToAllPages(annoRef) {
       y: anno.y,
       width: anno.width,
       height: anno.height,
-      locked: true
-    });
+      locked: true,
+      subtype: 'paraf'
+    }));
   }
 
   // Lock the current one too

@@ -4,7 +4,7 @@
  */
 
 import { ueState, createPageInfo } from '../lib/state.js';
-import { showToast, showFullscreenLoading, hideFullscreenLoading, checkFileSize, convertImageToPdf } from '../lib/utils.js';
+import { showToast, showFullscreenLoading, hideFullscreenLoading, checkFileSize, convertImageToPdf, isPDF, isImage, loadPdfDocument } from '../lib/utils.js';
 import { ueCreatePageSlots, ueSelectPage, ueUpdatePageCount } from './page-rendering.js';
 import { ueRenderThumbnails } from './sidebar.js';
 import { ueSaveUndoState } from './undo-redo.js';
@@ -45,10 +45,7 @@ export async function ueAddFiles(files) {
 
   try {
   for (const file of files) {
-    const isPdf = file.type === 'application/pdf';
-    const isImage = file.type.startsWith('image/');
-
-    if (!isPdf && !isImage) {
+    if (!isPDF(file) && !isImage(file)) {
       showToast(`File ${file.name} bukan PDF atau gambar. Diabaikan.`, 'warning');
       continue;
     }
@@ -56,7 +53,7 @@ export async function ueAddFiles(files) {
     if (!checkFileSize(file)) continue;
 
     try {
-      if (isPdf) {
+      if (isPDF(file)) {
         await handlePdfFile(file);
       } else {
         await handleImageFile(file);
@@ -96,7 +93,7 @@ async function handlePdfFile(file) {
 
   ueState.sourceFiles.push({ name: file.name, bytes });
 
-  const pdf = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+  const pdf = await loadPdfDocument(bytes);
 
   for (let i = 0; i < pdf.numPages; i++) {
     const page = await pdf.getPage(i + 1);
@@ -137,7 +134,7 @@ async function handleImageFile(file) {
     bytes: bytesCopy
   });
 
-  const pdf = await pdfjsLib.getDocument({ data: pdfBytes }).promise;
+  const pdf = await loadPdfDocument(pdfBytes);
   const page = await pdf.getPage(1);
   const viewport = page.getViewport({ scale: 0.5 });
 

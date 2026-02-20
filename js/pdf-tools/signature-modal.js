@@ -5,16 +5,14 @@
 
 import { state, navHistory, ueState, PARAF_DEFAULT_WIDTH } from '../lib/state.js';
 import { showToast, loadImage, makeWhiteTransparent, setupCanvasDPR } from '../lib/utils.js';
-import { pushModalState } from '../lib/navigation.js';
+import { openModal, closeModal } from '../lib/navigation.js';
 
 export function openSignatureModal() {
   if (window.changelogAPI) {
     window.changelogAPI.minimize();
   }
 
-  const modal = document.getElementById('signature-modal');
-  modal.classList.add('active');
-  pushModalState('signature-modal');
+  openModal('signature-modal');
 
   // Default to upload tab
   switchSignatureTab('upload');
@@ -27,12 +25,7 @@ export function openSignatureModal() {
 }
 
 export function closeSignatureModal(skipHistoryBack = false) {
-  const modal = document.getElementById('signature-modal');
-  modal.classList.remove('active');
-  navHistory.currentModal = null;
-  if (!skipHistoryBack && navHistory.currentView === 'modal') {
-    history.back();
-  }
+  closeModal('signature-modal', skipHistoryBack);
 }
 
 export function clearSignature() {
@@ -215,9 +208,7 @@ export function openParafModal() {
     window.changelogAPI.minimize();
   }
 
-  const modal = document.getElementById('paraf-modal');
-  modal.classList.add('active');
-  pushModalState('paraf-modal');
+  openModal('paraf-modal');
 
   setTimeout(() => {
     const canvas = document.getElementById('paraf-canvas');
@@ -227,12 +218,7 @@ export function openParafModal() {
 }
 
 export function closeParafModal(skipHistoryBack = false) {
-  const modal = document.getElementById('paraf-modal');
-  modal.classList.remove('active');
-  navHistory.currentModal = null;
-  if (!skipHistoryBack && navHistory.currentView === 'modal') {
-    history.back();
-  }
+  closeModal('paraf-modal', skipHistoryBack);
 }
 
 export function clearParaf() {

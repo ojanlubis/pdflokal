@@ -10,7 +10,8 @@
 import { state, mobileState, ueState, uePmState } from './lib/state.js';
 import {
   showToast, showFullscreenLoading, hideFullscreenLoading,
-  formatFileSize, checkFileSize, loadImage, debounce, setupCanvasDPR
+  formatFileSize, checkFileSize, loadImage, debounce, setupCanvasDPR,
+  isPDF, isImage, loadPdfDocument
 } from './lib/utils.js';
 import {
   showTool, showHome, pushWorkspaceState, initNavigationHistory
@@ -466,30 +467,30 @@ async function handleDroppedFiles(files) {
 
   if (!checkFileSize(file)) return;
 
-  const isPDF = file.type === 'application/pdf';
-  const isImage = file.type.startsWith('image/');
+  const filePDF = isPDF(file);
+  const fileImage = isImage(file);
 
-  if (!isPDF && !isImage) {
+  if (!filePDF && !fileImage) {
     showToast('File tidak didukung. Gunakan PDF, JPG, PNG, atau WebP.', 'error');
     return;
   }
 
-  if (mobileState.isMobile && isImage && !isPDF) {
+  if (mobileState.isMobile && fileImage && !filePDF) {
     showToast('Di perangkat mobile, gunakan tool khusus gambar untuk memproses gambar.', 'info');
     return;
   }
 
-  showFullscreenLoading(isPDF ? 'Memuat PDF...' : 'Memuat gambar...');
+  showFullscreenLoading(filePDF ? 'Memuat PDF...' : 'Memuat gambar...');
 
   try {
     if (!state.currentTool) {
-      if (isPDF) {
+      if (filePDF) {
         showTool('unified-editor');
         await ueAddFiles(files);
-      } else if (isImage && files.length > 1) {
+      } else if (fileImage && files.length > 1) {
         showTool('img-to-pdf');
         await addImagesToPDF(files);
-      } else if (isImage) {
+      } else if (fileImage) {
         showTool('compress-img');
         await loadImageForTool(file, 'compress-img');
       }
@@ -508,7 +509,7 @@ async function loadPDFForTool(file, tool) {
     state.currentPDFBytes = new Uint8Array(arrayBuffer);
     state.currentPDFName = file.name;
 
-    state.currentPDF = await pdfjsLib.getDocument({ data: state.currentPDFBytes.slice() }).promise;
+    state.currentPDF = await loadPdfDocument(state.currentPDFBytes);
 
     switch (tool) {
       case 'pdf-to-img':

@@ -4,7 +4,7 @@
  * and inline text editing
  */
 
-import { ueState, state, mobileState, CSS_FONT_MAP, UNDO_STACK_LIMIT, DOUBLE_TAP_DELAY, DOUBLE_TAP_DISTANCE } from '../lib/state.js';
+import { ueState, state, mobileState, CSS_FONT_MAP, UNDO_STACK_LIMIT, DOUBLE_TAP_DELAY, DOUBLE_TAP_DISTANCE, createWhiteoutAnnotation } from '../lib/state.js';
 import { showToast } from '../lib/utils.js';
 import { ueGetCoords, ueGetResizeHandle, ueGetCurrentCanvas, getTextBounds } from './canvas-utils.js';
 import { ueRedrawAnnotations, ueFindAnnotationAt } from './annotations.js';
@@ -398,13 +398,12 @@ export function ueSetupCanvasEvents() {
       const height = Math.abs(y - startY);
       if (width > 5 && height > 5) {
         ueSaveEditUndoState();
-        ueState.annotations[pageIndex].push({
-          type: 'whiteout',
+        ueState.annotations[pageIndex].push(createWhiteoutAnnotation({
           x: Math.min(startX, x),
           y: Math.min(startY, y),
           width,
           height
-        });
+        }));
         ueRedrawAnnotations();
       }
     } else if (ueState.currentTool === 'text') {

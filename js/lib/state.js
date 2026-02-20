@@ -58,8 +58,6 @@ export const state = {
   pendingTextPosition: null,    // Where text will be placed { x, y }
   editPageScales: {},           // Per-page scale factors for coordinate mapping
   editDevicePixelRatio: 1,      // Device pixel ratio for high-DPI displays
-  cropRect: null,               // (unused — crop feature was removed)
-  currentCropPage: 0,           // (unused — crop feature was removed)
   editCanvasSetup: false,       // Guard: prevents duplicate canvas event listeners
 
   // --- Signature (shared by legacy editor + unified editor, via pdf-tools.js) ---
@@ -179,6 +177,32 @@ export const ueState = {
 // must use this to guarantee a consistent shape. (SSOT)
 export function createPageInfo({ pageNum, sourceIndex, sourceName, rotation = 0, canvas, thumbCanvas = null, isFromImage = false }) {
   return { pageNum, sourceIndex, sourceName, rotation, canvas, thumbCanvas, isFromImage };
+}
+
+// ============================================================
+// ANNOTATION FACTORIES (SSOT for annotation shapes)
+// ============================================================
+
+export function createWhiteoutAnnotation({ x, y, width, height }) {
+  return { type: 'whiteout', x, y, width, height };
+}
+
+export function createTextAnnotation({ text, x, y, fontSize, color, fontFamily, bold = false, italic = false }) {
+  return { type: 'text', text, x, y, fontSize, color, fontFamily, bold, italic };
+}
+
+export function createSignatureAnnotation({ image, imageId, x, y, width, height, cachedImg = null, locked = false, subtype = null }) {
+  const anno = { type: 'signature', image, imageId, x, y, width, height, cachedImg, locked };
+  if (subtype) anno.subtype = subtype;
+  return anno;
+}
+
+export function createWatermarkAnnotation({ text, fontSize, color, opacity, rotation, x, y }) {
+  return { type: 'watermark', text, fontSize, color, opacity, rotation, x, y };
+}
+
+export function createPageNumberAnnotation({ text, fontSize, color = '#000000', x, y, position }) {
+  return { type: 'pageNumber', text, fontSize, color, x, y, position };
 }
 
 // ============================================================
