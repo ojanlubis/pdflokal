@@ -4,12 +4,13 @@
  * and inline text editing
  */
 
-import { ueState, state, CSS_FONT_MAP, UNDO_STACK_LIMIT, DOUBLE_TAP_DELAY, DOUBLE_TAP_DISTANCE } from '../lib/state.js';
+import { ueState, state, mobileState, CSS_FONT_MAP, UNDO_STACK_LIMIT, DOUBLE_TAP_DELAY, DOUBLE_TAP_DISTANCE } from '../lib/state.js';
 import { showToast } from '../lib/utils.js';
 import { ueGetCoords, ueGetResizeHandle, ueGetCurrentCanvas, getTextBounds } from './canvas-utils.js';
 import { ueRedrawAnnotations, ueFindAnnotationAt } from './annotations.js';
 import { ueSaveEditUndoState } from './undo-redo.js';
 import { ueHighlightThumbnail } from './page-rendering.js';
+import { ueZoomIn, ueZoomOut } from './zoom-rotate.js';
 import {
   uePlaceSignature, ueDrawSignaturePreview,
   ueShowConfirmButton, ueHideConfirmButton, ueUpdateConfirmButtonPosition
@@ -32,6 +33,10 @@ export function ueSetupCanvasEvents() {
   // Double-tap detection state
   let touchLastTap = 0;
   let touchLastCoords = null;
+
+  // Pinch-to-zoom state
+  let pinchStartDist = 0;
+  let isPinching = false;
 
   function getCanvasAndIndex(target) {
     const canvas = target.closest ? target.closest('.ue-page-slot canvas') : null;
@@ -92,6 +97,16 @@ export function ueSetupCanvasEvents() {
   });
 
   container.addEventListener('touchstart', (e) => {
+    // Pinch-to-zoom: detect 2-finger touch
+    if (e.touches.length === 2) {
+      isPinching = true;
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      pinchStartDist = Math.sqrt(dx * dx + dy * dy);
+      e.preventDefault();
+      return;
+    }
+
     const info = infoFromTouch(e);
     if (!info) return;
 
@@ -126,6 +141,20 @@ export function ueSetupCanvasEvents() {
   }, { passive: false });
 
   container.addEventListener('touchmove', (e) => {
+    // Pinch-to-zoom: track finger distance
+    if (isPinching && e.touches.length === 2) {
+      e.preventDefault();
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const delta = dist - pinchStartDist;
+      if (Math.abs(delta) > 30) {
+        if (delta > 0) ueZoomIn(); else ueZoomOut();
+        pinchStartDist = dist;
+      }
+      return;
+    }
+
     const info = infoFromTouch(e);
     if (!info) return;
     if (ueState.isDragging || ueState.isResizing || isDrawing ||
@@ -136,6 +165,10 @@ export function ueSetupCanvasEvents() {
   }, { passive: false });
 
   container.addEventListener('touchend', (e) => {
+    if (isPinching) {
+      isPinching = false;
+      return;
+    }
     const info = infoFromTouch(e);
     if (!info) return;
     e.preventDefault();
@@ -497,11 +530,29 @@ function ueCreateInlineTextEditor(anno, pageIndex, index) {
     }
   });
 
-  editor.addEventListener('blur', () => setTimeout(saveEdit, 100));
+  // On mobile, use longer delay to prevent premature save when virtual keyboard opens
+  const blurDelay = mobileState.isTouch ? 300 : 100;
+  editor.addEventListener('blur', () => setTimeout(saveEdit, blurDelay));
 
   wrapper.style.position = 'relative';
   wrapper.appendChild(editor);
   editor.focus();
+
+  // On mobile, reposition editor when virtual keyboard resizes the viewport
+  if (window.visualViewport && mobileState.isTouch) {
+    const repositionEditor = () => {
+      const vv = window.visualViewport;
+      const editorRect = editor.getBoundingClientRect();
+      // If editor is below the visible viewport (hidden by keyboard), scroll it into view
+      if (editorRect.bottom > vv.height + vv.offsetTop) {
+        editor.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    };
+    window.visualViewport.addEventListener('resize', repositionEditor);
+    editor.addEventListener('blur', () => {
+      window.visualViewport.removeEventListener('resize', repositionEditor);
+    }, { once: true });
+  }
 
   const range = document.createRange();
   range.selectNodeContents(editor);

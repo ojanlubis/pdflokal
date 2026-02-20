@@ -301,6 +301,48 @@ export function setupCanvasDPR(canvas) {
 }
 
 // ============================================================
+// MODAL FOCUS MANAGEMENT
+// ============================================================
+
+const focusTrapStack = [];
+
+export function trapFocus(modalEl) {
+  const trigger = document.activeElement;
+  focusTrapStack.push({ modal: modalEl, trigger });
+
+  const focusable = modalEl.querySelectorAll(
+    'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+  );
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+
+  if (first) first.focus();
+
+  const handler = (e) => {
+    if (e.key !== 'Tab') return;
+    if (focusable.length === 0) { e.preventDefault(); return; }
+    if (e.shiftKey) {
+      if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+    } else {
+      if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+  };
+  modalEl._focusTrapHandler = handler;
+  modalEl.addEventListener('keydown', handler);
+}
+
+export function releaseFocus(modalEl) {
+  if (modalEl._focusTrapHandler) {
+    modalEl.removeEventListener('keydown', modalEl._focusTrapHandler);
+    delete modalEl._focusTrapHandler;
+  }
+  const entry = focusTrapStack.pop();
+  if (entry && entry.trigger && entry.trigger.focus) {
+    entry.trigger.focus();
+  }
+}
+
+// ============================================================
 // WINDOW BRIDGE (for non-module scripts and onclick handlers)
 // ============================================================
 
@@ -320,3 +362,5 @@ window.sleep = sleep;
 window.debounce = debounce;
 window.safeLocalGet = safeLocalGet;
 window.safeLocalSet = safeLocalSet;
+window.trapFocus = trapFocus;
+window.releaseFocus = releaseFocus;

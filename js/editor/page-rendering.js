@@ -293,7 +293,7 @@ export function ueSetupIntersectionObserver() {
         if (!pc.rendered) ueRenderPageCanvas(index);
       } else {
         visiblePages.delete(index);
-        if (pc.rendered && ueState.pageCanvases.length > 8) {
+        if (pc.rendered && ueState.pageCanvases.length > 4) {
           const nearVisible = Array.from(visiblePages).some(v => Math.abs(v - index) <= 3);
           if (!nearVisible) {
             pc.canvas.getContext('2d').clearRect(0, 0, pc.canvas.width, pc.canvas.height);

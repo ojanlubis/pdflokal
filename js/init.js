@@ -15,6 +15,7 @@ import {
 import {
   showTool, showHome, pushWorkspaceState, initNavigationHistory
 } from './lib/navigation.js';
+import { trapFocus, releaseFocus } from './lib/utils.js';
 
 // Feature modules (side-effect imports — set up window bridges on load)
 import './theme.js';
@@ -160,6 +161,21 @@ function initModalBackdropClose() {
       window[closeFn]();
     }
   });
+
+  // Auto focus-trap: observe .active class on all modals
+  const modalIds = Object.keys(modalCloseMap).concat('shortcuts-modal');
+  modalIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const observer = new MutationObserver(() => {
+      if (el.classList.contains('active')) {
+        trapFocus(el);
+      } else if (el._focusTrapHandler) {
+        releaseFocus(el);
+      }
+    });
+    observer.observe(el, { attributes: true, attributeFilter: ['class'] });
+  });
 }
 
 // Modules execute after DOM parsing — readyState is 'interactive' or later
@@ -178,6 +194,12 @@ function initDropZone() {
   const fileInput = document.getElementById('file-input');
 
   dropzone.addEventListener('click', () => fileInput.click());
+  dropzone.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      fileInput.click();
+    }
+  });
 
   dropzone.addEventListener('dragover', (e) => {
     e.preventDefault();
@@ -206,6 +228,14 @@ function initDropZone() {
 
 function initToolCards() {
   document.querySelectorAll('.tool-card:not(.disabled)').forEach(card => {
+    card.setAttribute('tabindex', '0');
+    card.setAttribute('role', 'button');
+    card.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        card.click();
+      }
+    });
     card.addEventListener('click', () => {
       const tool = card.dataset.tool;
 

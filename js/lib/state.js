@@ -176,6 +176,32 @@ export const uePmState = {
 };
 
 // ============================================================
+// SHARED IMAGE REGISTRY (prevents base64 duplication in undo stack)
+// ============================================================
+
+export const imageRegistry = new Map();
+let imageRegistryNextId = 0;
+
+export function registerImage(dataUrl) {
+  // Check if this exact dataUrl is already registered
+  for (const [id, url] of imageRegistry) {
+    if (url === dataUrl) return id;
+  }
+  const id = 'img_' + (imageRegistryNextId++);
+  imageRegistry.set(id, dataUrl);
+  return id;
+}
+
+export function getRegisteredImage(id) {
+  return imageRegistry.get(id);
+}
+
+export function clearImageRegistry() {
+  imageRegistry.clear();
+  imageRegistryNextId = 0;
+}
+
+// ============================================================
 // CSS FONT MAP (used in annotation drawing, inline editor, text bounds)
 // ============================================================
 

@@ -3,7 +3,7 @@
  * Signature placement, preview, confirm, delete
  */
 
-import { ueState, state, mobileState, SIGNATURE_DEFAULT_WIDTH } from '../lib/state.js';
+import { ueState, state, mobileState, SIGNATURE_DEFAULT_WIDTH, registerImage } from '../lib/state.js';
 import { showToast } from '../lib/utils.js';
 import { ueGetCurrentCanvas } from './canvas-utils.js';
 import { ueRedrawAnnotations } from './annotations.js';
@@ -32,9 +32,11 @@ export async function uePlaceSignature(x, y) {
   const aspectRatio = img.width / img.height;
   const sigWidth = SIGNATURE_DEFAULT_WIDTH;
   const sigHeight = sigWidth / aspectRatio;
+  const imageId = registerImage(state.signatureImage);
   const newAnno = {
     type: 'signature',
     image: state.signatureImage,
+    imageId,
     x: x - sigWidth / 2,
     y: y - sigHeight / 2,
     width: sigWidth,

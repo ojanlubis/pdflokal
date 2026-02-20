@@ -3,9 +3,40 @@
  * Undo/redo for both page operations and annotation operations
  */
 
-import { ueState, UNDO_STACK_LIMIT } from '../lib/state.js';
+import { ueState, UNDO_STACK_LIMIT, getRegisteredImage } from '../lib/state.js';
 import { showToast } from '../lib/utils.js';
 import { ueRedrawAnnotations } from './annotations.js';
+
+// Clone annotations without duplicating large base64 image strings.
+// Signature annotations store imageId (registry key) instead of raw image data.
+function cloneAnnotations(annotations) {
+  const result = {};
+  for (const key in annotations) {
+    result[key] = annotations[key].map(anno => {
+      const clone = { ...anno };
+      // Strip cached HTMLImageElement (not serializable anyway)
+      delete clone.cachedImg;
+      // For signatures, store only imageId reference (not the full base64 string)
+      if (clone.type === 'signature' && clone.imageId) {
+        delete clone.image;
+      }
+      return clone;
+    });
+  }
+  return JSON.parse(JSON.stringify(result));
+}
+
+function restoreAnnotations(cloned) {
+  // Re-hydrate signature image references from registry
+  for (const key in cloned) {
+    cloned[key].forEach(anno => {
+      if (anno.type === 'signature' && anno.imageId && !anno.image) {
+        anno.image = getRegisteredImage(anno.imageId);
+      }
+    });
+  }
+  return cloned;
+}
 
 // --- Page operation undo/redo ---
 
@@ -51,7 +82,7 @@ export function ueRedo() {
 async function ueRestorePages(pagesData) {
   ueState.isRestoring = true;
   try {
-  // Regenerate pages from pagesData
+  // Regenerate pages from pagesData — store dimensions only, render lazily
   ueState.pages = [];
   for (const pageData of pagesData) {
     const source = ueState.sourceFiles[pageData.sourceIndex];
@@ -59,14 +90,9 @@ async function ueRestorePages(pagesData) {
     const page = await pdf.getPage(pageData.pageNum + 1);
     const viewport = page.getViewport({ scale: 0.5, rotation: pageData.rotation });
 
-    const canvas = document.createElement('canvas');
-    canvas.width = viewport.width;
-    canvas.height = viewport.height;
-    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-
     ueState.pages.push({
       ...pageData,
-      canvas
+      canvas: { width: viewport.width, height: viewport.height }
     });
   }
   ueState.pageCaches = {};
@@ -92,23 +118,23 @@ async function ueRestorePages(pagesData) {
 // --- Annotation undo/redo ---
 
 export function ueSaveEditUndoState() {
-  ueState.editUndoStack.push(JSON.parse(JSON.stringify(ueState.annotations)));
+  ueState.editUndoStack.push(cloneAnnotations(ueState.annotations));
   ueState.editRedoStack = [];
   if (ueState.editUndoStack.length > UNDO_STACK_LIMIT) ueState.editUndoStack.shift();
 }
 
 export function ueUndoAnnotation() {
   if (ueState.editUndoStack.length === 0) return;
-  ueState.editRedoStack.push(JSON.parse(JSON.stringify(ueState.annotations)));
-  ueState.annotations = ueState.editUndoStack.pop();
+  ueState.editRedoStack.push(cloneAnnotations(ueState.annotations));
+  ueState.annotations = restoreAnnotations(ueState.editUndoStack.pop());
   ueState.selectedAnnotation = null;
   ueRedrawAnnotations();
 }
 
 export function ueRedoAnnotation() {
   if (ueState.editRedoStack.length === 0) return;
-  ueState.editUndoStack.push(JSON.parse(JSON.stringify(ueState.annotations)));
-  ueState.annotations = ueState.editRedoStack.pop();
+  ueState.editUndoStack.push(cloneAnnotations(ueState.annotations));
+  ueState.annotations = restoreAnnotations(ueState.editRedoStack.pop());
   ueState.selectedAnnotation = null;
   ueRedrawAnnotations();
 }

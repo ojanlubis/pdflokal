@@ -102,19 +102,13 @@ async function handlePdfFile(file) {
     const page = await pdf.getPage(i + 1);
     const viewport = page.getViewport({ scale: 0.5 });
 
-    const canvas = document.createElement('canvas');
-    canvas.width = viewport.width;
-    canvas.height = viewport.height;
-    const ctx = canvas.getContext('2d');
-
-    await page.render({ canvasContext: ctx, viewport }).promise;
-
+    // Store dimensions only — actual rendering happens lazily via IntersectionObserver
     ueState.pages.push({
       pageNum: i,
       sourceIndex,
       sourceName,
       rotation: 0,
-      canvas,
+      canvas: { width: viewport.width, height: viewport.height },
       isFromImage: false
     });
 
@@ -138,22 +132,15 @@ async function handleImageFile(file) {
 
   const pdf = await pdfjsLib.getDocument({ data: pdfBytes }).promise;
   const page = await pdf.getPage(1);
-
   const viewport = page.getViewport({ scale: 0.5 });
 
-  const canvas = document.createElement('canvas');
-  canvas.width = viewport.width;
-  canvas.height = viewport.height;
-  const ctx = canvas.getContext('2d');
-
-  await page.render({ canvasContext: ctx, viewport }).promise;
-
+  // Store dimensions only — actual rendering happens lazily via IntersectionObserver
   ueState.pages.push({
     pageNum: 0,
     sourceIndex,
     sourceName,
     rotation: 0,
-    canvas,
+    canvas: { width: viewport.width, height: viewport.height },
     isFromImage: true
   });
 

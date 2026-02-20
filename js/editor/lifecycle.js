@@ -3,7 +3,7 @@
  * Editor initialization, reset, signature hints
  */
 
-import { ueState, state } from '../lib/state.js';
+import { ueState, state, clearImageRegistry } from '../lib/state.js';
 import { showToast, showFullscreenLoading, hideFullscreenLoading, safeLocalGet, safeLocalSet } from '../lib/utils.js';
 import { initUnifiedEditorInput, ueAddFiles } from './file-loading.js';
 import { ueRenderThumbnails } from './sidebar.js';
@@ -31,6 +31,7 @@ export function ueReset() {
   ueState.isRestoring = false;
   ueRemoveScrollSync();
   clearPdfDocCache();
+  clearImageRegistry();
   if (window._ueResizeHandler) {
     window.removeEventListener('resize', window._ueResizeHandler);
     delete window._ueResizeHandler;

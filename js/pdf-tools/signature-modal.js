@@ -70,9 +70,10 @@ export function useSignature() {
 export function switchSignatureTab(tab) {
   document.querySelectorAll('.signature-tab').forEach(btn => {
     const text = btn.textContent.toLowerCase().trim();
-    const shouldBeActive = (tab === 'upload' && text === 'upload gambar') ||
+    const shouldBeActive = (tab === 'upload' && text.includes('upload')) ||
                           (tab === 'draw' && text === 'gambar');
     btn.classList.toggle('active', shouldBeActive);
+    btn.setAttribute('aria-selected', String(shouldBeActive));
   });
 
   document.getElementById('signature-draw-tab').classList.toggle('active', tab === 'draw');

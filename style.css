@@ -3358,6 +3358,12 @@ body.is-touch .btn:active {
   font-weight: 600;
 }
 
+/* Mobile Zoom Controls */
+.mobile-zoom-controls {
+  display: flex;
+  gap: 4px;
+}
+
 /* Mobile Tools Dropdown */
 .mobile-tools-wrapper {
   position: relative;
@@ -3601,8 +3607,8 @@ body.is-touch .btn:active {
    Mobile Editor Layout Overrides
    ============================================================ */
 
-@media (max-width: 767px) {
-  /* Show mobile bottom bar */
+@media (max-width: 900px) {
+  /* Show mobile bottom bar (aligned with sidebar hide breakpoint) */
   #unified-editor-workspace .mobile-bottom-bar {
     display: flex;
   }
