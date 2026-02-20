@@ -28,12 +28,12 @@ pdflokal/
 │   ├── theme.js              # Theme toggle (light/dark)
 │   ├── image-tools.js        # Image tools (compress, resize, convert, etc.)
 │   ├── lib/
-│   │   ├── state.js          # All state objects + constants (CSS_FONT_MAP, UNDO_STACK_LIMIT, etc.)
+│   │   ├── state.js          # State objects, constants, SSOT helpers (createPageInfo, getDefaultUeState)
 │   │   ├── utils.js          # showToast, downloadBlob, makeWhiteTransparent, setupCanvasDPR, etc.
 │   │   └── navigation.js     # showHome, showTool, pushState, closeAllModals
 │   ├── editor/               # Unified Editor (~14 modules)
 │   │   ├── index.js          # Barrel re-exports + window bridges
-│   │   ├── canvas-utils.js   # ueGetCurrentCanvas, ueGetCoords, ueGetResizeHandle
+│   │   ├── canvas-utils.js   # ueGetCurrentCanvas, ueGetCoords, ueGetResizeHandle, getThumbnailSource
 │   │   ├── annotations.js    # ueRedrawAnnotations, draw helpers, hit testing
 │   │   ├── canvas-events.js  # Mouse/touch event delegation on pages container
 │   │   ├── file-loading.js   # ueAddFiles, handlePdfFile, handleImageFile
@@ -57,6 +57,7 @@ pdflokal/
 │   └── vendor/               # Self-hosted libs (2.6 MB) for offline support
 ├── fonts/              # Self-hosted fonts (268KB, Latin charset)
 ├── docs/               # Design + reference docs
+│   ├── architecture.md # SSOT patterns diagram (scattered vs centralized)
 │   ├── editor-redesign.md
 │   ├── patterns.md     # Code patterns and examples
 │   └── security.md     # Security headers, CSP, library details
@@ -84,6 +85,11 @@ State objects live in `js/lib/state.js`. Key objects:
 
 - **`ueState`** - Unified Editor state (pages, annotations, tools, undo stacks, rendering, guards)
 - **`uePmState`** - Gabungkan Modal state (merge/split mode, selection, drag)
+
+**SSOT helpers** (Single Source of Truth — see [docs/architecture.md](docs/architecture.md)):
+- **`getDefaultUeState()`** (state.js) — returns all default ueState values. Used by initial definition + `ueReset()`. Adding a new field here automatically gets it reset.
+- **`createPageInfo()`** (state.js) — factory for page objects. All code paths that create pages must use this (file-loading, undo-redo). Guarantees consistent shape.
+- **`getThumbnailSource(pageIndex)`** (canvas-utils.js) — resolves best canvas for thumbnails. Used by sidebar, mobile picker, and Gabungkan modal.
 
 Refer to `js/lib/state.js` for full shape and comments on each field.
 
@@ -176,6 +182,10 @@ Hero + dropzone (opens editor), PDF tool cards (Editor, Merge, Split, PDF-to-Ima
 6. Export from module -> barrel `index.js` -> window bridge if needed
 7. Test across multiple pages and files
 
+**When adding new state fields:** Add to `getDefaultUeState()` in state.js — `ueReset()` will automatically clear it.
+
+**When adding new page properties:** Add to `createPageInfo()` in state.js — all page creation paths get the field automatically.
+
 **Multi-canvas notes:**
 - Use `ueGetCurrentCanvas()` (never `getElementById('ue-canvas')`)
 - Use `ueGetCoords(e, canvas, dpr)` for coordinate conversion
@@ -192,6 +202,9 @@ Hero + dropzone (opens editor), PDF tool cards (Editor, Merge, Split, PDF-to-Ima
 
 | Helper | Location | Purpose |
 |--------|----------|---------|
+| `createPageInfo({...})` | state.js | **SSOT** factory for page objects — all page creation must use this |
+| `getDefaultUeState()` | state.js | **SSOT** default state values — used by init + ueReset() |
+| `getThumbnailSource(pageIndex)` | canvas-utils.js | **SSOT** resolve best canvas for thumbnail (rendered or thumbCanvas) |
 | `ueGetCurrentCanvas()` | canvas-utils.js | Get selected page's canvas |
 | `ueGetCoords(e, canvas, dpr)` | canvas-utils.js | Mouse/touch -> canvas coords |
 | `getCanvasAndCoords(e)` | canvas-events.js | Event delegation helper |
@@ -227,7 +240,7 @@ Hero + dropzone (opens editor), PDF tool cards (Editor, Merge, Split, PDF-to-Ima
 
 **Performance:**
 - PDF.js uses real Web Worker (`workerSrc` points to self-hosted file, falls back to fake worker offline)
-- Page loading is lazy: `handlePdfFile` stores dimensions only, actual rendering via IntersectionObserver. Debounced `ueRenderThumbnails()` call after each lazy render to keep sidebar in sync
+- Page loading is lazy: `handlePdfFile` stores dimensions + pre-renders 150px thumbnail (`page.thumbCanvas`) for instant sidebar previews. Full rendering via IntersectionObserver. Debounced `ueRenderThumbnails()` after each lazy render upgrades thumbnails to full-res
 - Undo stack uses `imageRegistry` to avoid cloning base64 strings (stores `imageId` references)
 - Pinch-to-zoom supported via 2-finger touch detection in `canvas-events.js`
 
@@ -242,7 +255,7 @@ Hero + dropzone (opens editor), PDF tool cards (Editor, Merge, Split, PDF-to-Ima
 - IntersectionObserver root is `null` (viewport), NOT the wrapper element
 - Merge/Split card flow bypasses `showTool()` - must manually add `body.editor-active`
 - Layout race condition: `showTool()` makes workspace visible but browser hasn't reflowed - use rAF
-- **Lazy rendering**: `ueState.pages[i].canvas` is a `{width, height}` placeholder, NOT a real HTMLCanvasElement. Real canvases live in `ueState.pageCanvases[i].canvas`. Never call `drawImage()`, `getContext()`, or `toDataURL()` on `page.canvas` — always use `ueState.pageCanvases[i].canvas` with an `instanceof HTMLCanvasElement` guard
+- **Lazy rendering**: `ueState.pages[i].canvas` is a `{width, height}` placeholder, NOT an HTMLCanvasElement. Real canvases live in `ueState.pageCanvases[i].canvas`. Pre-rendered thumbnails (150px) live in `page.thumbCanvas`. For thumbnail rendering, always use `getThumbnailSource(index)` — never access page.canvas directly for drawing
 
 ## Changelog System
 
@@ -275,7 +288,7 @@ Edit `changelogData` array in `js/changelog.js`. Add new entries at the beginnin
 
 **Don't modify without good reason:** `vercel.json`, vendor libs, privacy promises, Indonesian UI language
 
-**Detailed references:** [docs/patterns.md](docs/patterns.md) (code examples), [docs/security.md](docs/security.md) (CSP, headers, libraries)
+**Detailed references:** [docs/patterns.md](docs/patterns.md) (code examples), [docs/security.md](docs/security.md) (CSP, headers, libraries), [docs/architecture.md](docs/architecture.md) (SSOT patterns)
 
 ---
 
