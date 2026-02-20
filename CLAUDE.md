@@ -33,15 +33,15 @@ pdflokal/
 ├── security.txt        # Security contact info (served at /.well-known/security.txt)
 ├── humans.txt          # Team credits
 ├── js/                 # Native ES modules (no build step, no bundler)
-│   ├── init.js               # Main entry point — bootstrap, dropzone, tool cards, file handling
+│   ├── init.js               # Main entry point — bootstrap, dropzone, tool cards, setupFileInput factory
 │   ├── keyboard.js           # Keyboard shortcuts + shortcuts modal
 │   ├── mobile-ui.js          # Mobile navigation, page picker, tools dropdown
 │   ├── changelog.js          # Changelog notification system
 │   ├── theme.js              # Theme toggle (light/dark)
 │   ├── image-tools.js        # Image processing tools (compress, resize, convert, etc.)
 │   ├── lib/                  # Shared foundations (no cross-deps)
-│   │   ├── state.js          # All state objects (ueState, uePmState, state, mobileState, CSS_FONT_MAP)
-│   │   ├── utils.js          # showToast, downloadBlob, formatFileSize, etc.
+│   │   ├── state.js          # All state objects + constants (CSS_FONT_MAP, UNDO_STACK_LIMIT, etc.)
+│   │   ├── utils.js          # showToast, downloadBlob, makeWhiteTransparent, setupCanvasDPR, etc.
 │   │   └── navigation.js     # showHome, showTool, pushState, closeAllModals
 │   ├── editor/               # Unified Editor (~14 modules, from unified-editor.js)
 │   │   ├── index.js          # Barrel re-exports + window bridges
@@ -64,7 +64,7 @@ pdflokal/
 │   │   ├── text-modal.js
 │   │   ├── watermark-modal.js
 │   │   ├── pagenum-modal.js
-│   │   ├── standalone-tools.js  # Standalone workspace tools (compress, pdf-to-img, protect)
+│   │   ├── standalone-tools.js  # PDF-to-Image, Compress PDF, Protect PDF only (~250 lines)
 │   │   └── drag-reorder.js      # enableDragReorder utility
 │   └── vendor/               # Self-hosted libraries (2.6 MB) for offline support
 │       ├── pdf-lib.min.js
@@ -109,7 +109,7 @@ The entire application is in `index.html`. Features are organized as:
 - All app code uses native `import`/`export` — no bundler needed
 - `js/init.js` is the root that imports all modules transitively
 - Each module directory has a barrel file (`index.js`) with re-exports + window bridges
-- Window bridges (`window.fn = fn`) are used for HTML `onclick` handlers (88 total)
+- Window bridges (`window.fn = fn`) are used for HTML `onclick` handlers
 - Vendor libraries remain as global `<script>` tags, accessed via `window.*` in modules
 
 ### State Management
@@ -247,10 +247,13 @@ Features:
 **Removed Tools:**
 - Crop PDF (removed)
 - Unlock PDF / Buka Kunci (removed completely)
-- Legacy Edit PDF (merged into Unified Editor)
-- Legacy Kelola Halaman / Page Manager (merged into Unified Editor)
+- Legacy Edit PDF (code removed — merged into Unified Editor)
+- Legacy Kelola Halaman / Page Manager (code removed — merged into Unified Editor)
+- Legacy Merge/Split/Rotate standalone workspaces (code removed from standalone-tools.js)
 - Watermark standalone workspace (removed - now only in Unified Editor via "Lainnya")
 - Page Numbers standalone workspace (removed - now only in Unified Editor via "Lainnya")
+
+**Note:** All legacy standalone tool code (~1,400 lines) was removed in Feb 2026 cleanup. `standalone-tools.js` now only contains PDF-to-Image, Compress, and Protect functions. The signature-modal.js and text-modal.js no longer have legacy editor branches — they only target the Unified Editor.
 
 ### Image Tools
 - **Compress Image**: Quality slider with live preview and savings percentage
@@ -993,6 +996,29 @@ All modals automatically close when clicking the backdrop. This is handled by a 
 modal.style.display = 'flex';  // Workaround for old CSS pattern
 modal.style.display = '';      // Cleanup
 ```
+
+### Shared Utilities (js/lib/utils.js)
+
+Common canvas operations extracted to avoid duplication across modules:
+
+- **`makeWhiteTransparent(canvas, threshold)`** — Pixel-loop that sets white/near-white pixels transparent. Used in: image-tools.js (Remove Background), signature-modal.js (draw + upload paths).
+- **`setupCanvasDPR(canvas)`** — Scales canvas buffer for devicePixelRatio, returns ratio. Used in: init.js (signature pad), signature-modal.js (draw tab setup).
+
+### Named Constants (js/lib/state.js)
+
+Magic numbers extracted to named constants for maintainability:
+
+```javascript
+export const UNDO_STACK_LIMIT = 50;        // Max undo/redo stack size
+export const SIGNATURE_DEFAULT_WIDTH = 150; // Default signature placement width (px)
+export const OBSERVER_ROOT_MARGIN = '200px 0px'; // IntersectionObserver buffer
+export const DOUBLE_TAP_DELAY = 300;        // Max ms between taps for double-tap
+export const DOUBLE_TAP_DISTANCE = 30;      // Max px drift for double-tap
+```
+
+### File Input Handler Factory (js/init.js)
+
+`setupFileInput(inputId, { loadingMsg, errorMsg, handler, allFiles })` — DRY factory for file input `change` handlers. Wraps loading overlay, error handling, and input reset. All 9 file inputs use this pattern.
 
 ### Reliability & Hardening Patterns
 
