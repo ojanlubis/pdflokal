@@ -28,9 +28,9 @@ pdflokal/
 │   ├── theme.js              # Theme toggle (light/dark)
 │   ├── image-tools.js        # Image tools (compress, resize, convert, etc.)
 │   ├── lib/
-│   │   ├── state.js          # State objects, constants, SSOT helpers (createPageInfo, getDefaultUeState)
-│   │   ├── utils.js          # showToast, downloadBlob, makeWhiteTransparent, setupCanvasDPR, etc.
-│   │   └── navigation.js     # showHome, showTool, pushState, closeAllModals
+│   │   ├── state.js          # State objects, constants, SSOT helpers, annotation factories
+│   │   ├── utils.js          # showToast, downloadBlob, isPDF, isImage, loadPdfDocument, etc.
+│   │   └── navigation.js     # showHome, showTool, openModal, closeModal, closeAllModals
 │   ├── editor/               # Unified Editor (~14 modules)
 │   │   ├── index.js          # Barrel re-exports + window bridges
 │   │   ├── canvas-utils.js   # ueGetCurrentCanvas, ueGetCoords, ueGetResizeHandle, getThumbnailSource
@@ -90,6 +90,10 @@ State objects live in `js/lib/state.js`. Key objects:
 - **`getDefaultUeState()`** (state.js) — returns all default ueState values. Used by initial definition + `ueReset()`. Adding a new field here automatically gets it reset.
 - **`createPageInfo()`** (state.js) — factory for page objects. All code paths that create pages must use this (file-loading, undo-redo). Guarantees consistent shape.
 - **`getThumbnailSource(pageIndex)`** (canvas-utils.js) — resolves best canvas for thumbnails. Used by sidebar, mobile picker, and Gabungkan modal.
+- **Annotation factories** (state.js) — `createWhiteoutAnnotation`, `createTextAnnotation`, `createSignatureAnnotation`, `createWatermarkAnnotation`, `createPageNumberAnnotation`. All annotation creation must use these.
+- **`openModal(id)` / `closeModal(id, skipHistoryBack)`** (navigation.js) — standard modal open/close with history management. Use for all modals except signature-bg-modal (custom replaceState).
+- **`isPDF(file)` / `isImage(file)`** (utils.js) — file type checks. Use instead of inline `file.type ===` comparisons.
+- **`loadPdfDocument(bytes)`** (utils.js) — loads PDF.js document with defensive `.slice()`. Use instead of raw `pdfjsLib.getDocument()`.
 
 Refer to `js/lib/state.js` for full shape and comments on each field.
 
@@ -174,7 +178,7 @@ Hero + dropzone (opens editor), PDF tool cards (Editor, Merge, Split, PDF-to-Ima
 
 ### Extending the Unified Editor
 
-1. Add annotation type to `ueState.annotations` (in `js/lib/state.js`)
+1. Add annotation factory to `js/lib/state.js` (e.g. `createMyAnnotation()`) and use it everywhere
 2. Add tool button in toolbar or "Lainnya" dropdown
 3. Implement logic in relevant `js/editor/` module (events delegated on `#ue-pages-container`)
 4. Add rendering in `pdf-export.js` (`ueBuildFinalPDF`)
@@ -195,8 +199,9 @@ Hero + dropzone (opens editor), PDF tool cards (Editor, Merge, Split, PDF-to-Ima
 
 1. Add button in `#more-tools-dropdown` in index.html
 2. Create modal HTML following `editor-*-modal` pattern
-3. Add JS: `ueOpen[Tool]Modal()`, `closeEditor[Tool]Modal()`, `applyEditor[Tool]()`
-4. Dropdown uses `position: fixed` for overflow handling
+3. Add JS: use `openModal(id)` / `closeModal(id)` from navigation.js for open/close
+4. Add `applyEditor[Tool]()` logic using annotation factories from state.js
+5. Dropdown uses `position: fixed` for overflow handling
 
 ### Common Helpers
 
@@ -204,7 +209,11 @@ Hero + dropzone (opens editor), PDF tool cards (Editor, Merge, Split, PDF-to-Ima
 |--------|----------|---------|
 | `createPageInfo({...})` | state.js | **SSOT** factory for page objects — all page creation must use this |
 | `getDefaultUeState()` | state.js | **SSOT** default state values — used by init + ueReset() |
+| `create*Annotation({...})` | state.js | **SSOT** annotation factories (Whiteout, Text, Signature, Watermark, PageNumber) |
 | `getThumbnailSource(pageIndex)` | canvas-utils.js | **SSOT** resolve best canvas for thumbnail (rendered or thumbCanvas) |
+| `openModal(id)` / `closeModal(id)` | navigation.js | **SSOT** modal open/close with history management |
+| `isPDF(file)` / `isImage(file)` | utils.js | **SSOT** file type validation |
+| `loadPdfDocument(bytes)` | utils.js | **SSOT** PDF.js document loading with defensive .slice() |
 | `ueGetCurrentCanvas()` | canvas-utils.js | Get selected page's canvas |
 | `ueGetCoords(e, canvas, dpr)` | canvas-utils.js | Mouse/touch -> canvas coords |
 | `getCanvasAndCoords(e)` | canvas-events.js | Event delegation helper |
