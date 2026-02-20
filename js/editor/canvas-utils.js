@@ -5,6 +5,16 @@
 
 import { ueState, CSS_FONT_MAP } from '../lib/state.js';
 
+// Resolve best canvas source for a thumbnail at the given page index.
+// Prefers the rendered main canvas, falls back to pre-rendered thumbCanvas. (SSOT)
+export function getThumbnailSource(pageIndex) {
+  const entry = ueState.pageCanvases[pageIndex];
+  if (entry?.rendered && entry.canvas instanceof HTMLCanvasElement) {
+    return entry.canvas;
+  }
+  return ueState.pages[pageIndex]?.thumbCanvas || null;
+}
+
 // Get the canvas element for the currently selected page
 export function ueGetCurrentCanvas() {
   const entry = ueState.pageCanvases[ueState.selectedPage];

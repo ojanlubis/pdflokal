@@ -4,7 +4,7 @@
  */
 
 // Re-export everything
-export { ueGetCurrentCanvas, ueGetCoords, ueGetResizeHandle } from './canvas-utils.js';
+export { ueGetCurrentCanvas, ueGetCoords, ueGetResizeHandle, getThumbnailSource } from './canvas-utils.js';
 
 export {
   ueRedrawAnnotations, ueRedrawPageAnnotations,
@@ -73,7 +73,8 @@ export {
 // to break circular import chains (see comments in individual modules).
 
 // Canvas utils
-import { ueGetCurrentCanvas, ueGetCoords, ueGetResizeHandle } from './canvas-utils.js';
+import { ueGetCurrentCanvas, ueGetCoords, ueGetResizeHandle, getThumbnailSource } from './canvas-utils.js';
+window.getThumbnailSource = getThumbnailSource;
 window.ueGetCurrentCanvas = ueGetCurrentCanvas;
 window.ueGetCoords = ueGetCoords;
 window.ueGetResizeHandle = ueGetResizeHandle;

@@ -3,7 +3,7 @@
  * File input handling, PDF and image loading
  */
 
-import { ueState } from '../lib/state.js';
+import { ueState, createPageInfo } from '../lib/state.js';
 import { showToast, showFullscreenLoading, hideFullscreenLoading, checkFileSize, convertImageToPdf } from '../lib/utils.js';
 import { ueCreatePageSlots, ueSelectPage, ueUpdatePageCount } from './page-rendering.js';
 import { ueRenderThumbnails } from './sidebar.js';
@@ -111,15 +111,13 @@ async function handlePdfFile(file) {
     const thumbCtx = thumbCanvas.getContext('2d');
     await page.render({ canvasContext: thumbCtx, viewport: thumbVp }).promise;
 
-    ueState.pages.push({
+    ueState.pages.push(createPageInfo({
       pageNum: i,
       sourceIndex,
       sourceName,
-      rotation: 0,
       canvas: { width: viewport.width, height: viewport.height },
       thumbCanvas,
-      isFromImage: false
-    });
+    }));
 
     ueState.annotations[ueState.pages.length - 1] = [];
   }
@@ -152,15 +150,14 @@ async function handleImageFile(file) {
   const thumbCtx = thumbCanvas.getContext('2d');
   await page.render({ canvasContext: thumbCtx, viewport: thumbVp }).promise;
 
-  ueState.pages.push({
+  ueState.pages.push(createPageInfo({
     pageNum: 0,
     sourceIndex,
     sourceName,
-    rotation: 0,
     canvas: { width: viewport.width, height: viewport.height },
     thumbCanvas,
-    isFromImage: true
-  });
+    isFromImage: true,
+  }));
 
   ueState.annotations[ueState.pages.length - 1] = [];
 }

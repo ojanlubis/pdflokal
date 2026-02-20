@@ -3,7 +3,7 @@
  * Editor initialization, reset, signature hints
  */
 
-import { ueState, state, clearImageRegistry } from '../lib/state.js';
+import { ueState, state, clearImageRegistry, getDefaultUeState } from '../lib/state.js';
 import { showToast, showFullscreenLoading, hideFullscreenLoading, safeLocalGet, safeLocalSet } from '../lib/utils.js';
 import { initUnifiedEditorInput, ueAddFiles } from './file-loading.js';
 import { ueRenderThumbnails } from './sidebar.js';
@@ -12,25 +12,11 @@ import { ueUpdateZoomDisplay } from './zoom-rotate.js';
 
 // Reset unified editor state
 export function ueReset() {
-  ueState.pages = [];
-  ueState.sourceFiles = [];
-  ueState.selectedPage = -1;
-  ueState.currentTool = null;
-  ueState.annotations = {};
-  ueState.undoStack = [];
-  ueState.redoStack = [];
-  ueState.editUndoStack = [];
-  ueState.editRedoStack = [];
-  ueState.selectedAnnotation = null;
-  ueState.pendingTextPosition = null;
-  ueState.pendingSignatureWidth = null;
-  ueState.pendingSubtype = null;
-  ueState.pageScales = {};
-  ueState.pageCaches = {};
-  ueState.pageCanvases = [];
+  // Reset all value fields to defaults (SSOT — adding a field to getDefaultUeState is enough)
+  Object.assign(ueState, getDefaultUeState());
+
+  // Side-effect cleanup (not just value resets)
   if (ueState.pageObserver) { ueState.pageObserver.disconnect(); ueState.pageObserver = null; }
-  ueState.scrollSyncEnabled = true;
-  ueState.isRestoring = false;
   ueRemoveScrollSync();
   clearPdfDocCache();
   clearImageRegistry();

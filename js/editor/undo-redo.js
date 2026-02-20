@@ -3,7 +3,7 @@
  * Undo/redo for both page operations and annotation operations
  */
 
-import { ueState, UNDO_STACK_LIMIT, getRegisteredImage } from '../lib/state.js';
+import { ueState, UNDO_STACK_LIMIT, getRegisteredImage, createPageInfo } from '../lib/state.js';
 import { showToast } from '../lib/utils.js';
 import { ueRedrawAnnotations } from './annotations.js';
 
@@ -45,7 +45,8 @@ export function ueSaveUndoState() {
     pageNum: p.pageNum,
     sourceIndex: p.sourceIndex,
     sourceName: p.sourceName,
-    rotation: p.rotation
+    rotation: p.rotation,
+    isFromImage: p.isFromImage
   })))));
   ueState.redoStack = [];
   if (ueState.undoStack.length > UNDO_STACK_LIMIT) ueState.undoStack.shift();
@@ -58,7 +59,8 @@ export function ueUndo() {
     pageNum: p.pageNum,
     sourceIndex: p.sourceIndex,
     sourceName: p.sourceName,
-    rotation: p.rotation
+    rotation: p.rotation,
+    isFromImage: p.isFromImage
   })))));
 
   const prevState = ueState.undoStack.pop();
@@ -72,7 +74,8 @@ export function ueRedo() {
     pageNum: p.pageNum,
     sourceIndex: p.sourceIndex,
     sourceName: p.sourceName,
-    rotation: p.rotation
+    rotation: p.rotation,
+    isFromImage: p.isFromImage
   })))));
 
   const nextState = ueState.redoStack.pop();
@@ -98,11 +101,11 @@ async function ueRestorePages(pagesData) {
     thumbCanvas.height = Math.round(thumbVp.height);
     await page.render({ canvasContext: thumbCanvas.getContext('2d'), viewport: thumbVp }).promise;
 
-    ueState.pages.push({
+    ueState.pages.push(createPageInfo({
       ...pageData,
       canvas: { width: viewport.width, height: viewport.height },
-      thumbCanvas
-    });
+      thumbCanvas,
+    }));
   }
   ueState.pageCaches = {};
 

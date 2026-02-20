@@ -4,6 +4,7 @@
  */
 
 import { ueState } from '../lib/state.js';
+import { getThumbnailSource } from './canvas-utils.js';
 import { showToast, showFullscreenLoading, hideFullscreenLoading } from '../lib/utils.js';
 
 // ============================================================
@@ -81,10 +82,9 @@ export function ueRenderThumbnails() {
 
   ueState.pages.forEach((page, index) => {
     const item = document.createElement('div');
-    // Use rendered DOM canvas if available, otherwise fall back to dimension placeholder
-    const realCanvas = ueState.pageCanvases[index]?.canvas;
-    const canvasWidth = realCanvas ? realCanvas.width : page.canvas.width;
-    const canvasHeight = realCanvas ? realCanvas.height : page.canvas.height;
+    const sourceCanvas = getThumbnailSource(index);
+    const canvasWidth = sourceCanvas ? sourceCanvas.width : page.canvas.width;
+    const canvasHeight = sourceCanvas ? sourceCanvas.height : page.canvas.height;
     const isLandscape = canvasWidth > canvasHeight;
     item.className = 'ue-thumbnail' + (index === ueState.selectedPage ? ' selected' : '') + (isLandscape ? ' landscape' : ' portrait');
     item.draggable = true;
@@ -92,11 +92,8 @@ export function ueRenderThumbnails() {
     // Use window.* to avoid circular import with page-rendering
     item.onclick = () => window.ueSelectPage(index);
 
-    // Clone the thumbnail canvas (prefer rendered main canvas, fall back to pre-rendered thumb)
+    // Clone the thumbnail canvas
     const thumbCanvas = document.createElement('canvas');
-    const sourceCanvas = (realCanvas && realCanvas instanceof HTMLCanvasElement && ueState.pageCanvases[index]?.rendered)
-      ? realCanvas
-      : page.thumbCanvas;
     thumbCanvas.width = sourceCanvas ? sourceCanvas.width : canvasWidth;
     thumbCanvas.height = sourceCanvas ? sourceCanvas.height : canvasHeight;
     if (sourceCanvas) {

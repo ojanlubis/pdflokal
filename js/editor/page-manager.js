@@ -8,6 +8,7 @@ import { showToast, showFullscreenLoading, hideFullscreenLoading, downloadBlob, 
 import { pushModalState } from '../lib/navigation.js';
 import { ueRenderThumbnails } from './sidebar.js';
 import { ueUpdatePageCount, ueRenderSelectedPage, ueSetupIntersectionObserver } from './page-rendering.js';
+import { getThumbnailSource } from './canvas-utils.js';
 import { ueAddFiles } from './file-loading.js';
 import { ueSaveUndoState } from './undo-redo.js';
 
@@ -90,10 +91,7 @@ export function uePmRenderPages() {
       item.classList.add('selected');
     }
 
-    const realCanvas = ueState.pageCanvases[index]?.canvas;
-    const sourceCanvas = (realCanvas && realCanvas instanceof HTMLCanvasElement && ueState.pageCanvases[index]?.rendered)
-      ? realCanvas
-      : page.thumbCanvas;
+    const sourceCanvas = getThumbnailSource(index);
     const canvas = document.createElement('canvas');
     canvas.width = sourceCanvas ? sourceCanvas.width : page.canvas.width;
     canvas.height = sourceCanvas ? sourceCanvas.height : page.canvas.height;

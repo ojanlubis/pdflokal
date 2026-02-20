@@ -121,53 +121,65 @@ export const navHistory = {
 // UNIFIED EDITOR STATE
 // ============================================================
 
+// Default values for ueState — used by initial definition and ueReset().
+// Adding a new field here automatically gets it reset. (SSOT)
+export function getDefaultUeState() {
+  return {
+    // --- Document data ---
+    pages: [],
+    sourceFiles: [],
+    selectedPage: -1,
+    // --- Editing tools ---
+    currentTool: null,
+    annotations: {},
+    selectedAnnotation: null,
+    pendingTextPosition: null,
+    // --- Undo/redo ---
+    undoStack: [],
+    redoStack: [],
+    editUndoStack: [],
+    editRedoStack: [],
+    // --- Rendering ---
+    pageScales: {},
+    pageCaches: {},
+    pageCanvases: [],
+    scrollSyncEnabled: true,
+    zoomLevel: 1.0,
+    // --- Signature placement ---
+    pendingSignature: false,
+    signaturePreviewPos: null,
+    pendingSignatureWidth: null,
+    pendingSubtype: null,
+    resizeHandle: null,
+    resizeStartInfo: null,
+    // --- Interaction ---
+    isDragging: false,
+    isResizing: false,
+    sidebarDropIndicator: null,
+    // --- UX ---
+    lastLockedToastAnnotation: null,
+    // --- Guards ---
+    isRestoring: false,
+  };
+}
+
 export const ueState = {
-  // --- Document data ---
-  pages: [],              // All loaded pages: [{ pageNum, sourceIndex, sourceName, rotation, canvas }]
-  sourceFiles: [],        // Source PDF files: [{ name, bytes }] — indexes match pages[].sourceIndex
-  selectedPage: -1,       // Index into pages[] of the currently visible page
-
-  // --- Editing tools ---
-  currentTool: null,      // Active annotation tool: 'select' | 'whiteout' | 'text' | 'signature' | null
-  annotations: {},        // Per-page annotation arrays: { pageIndex: [annotation, ...] }
-  selectedAnnotation: null, // Currently selected annotation: { pageIndex, index } or null
-  pendingTextPosition: null, // Where text will be placed on next confirm: { x, y } or null
-
-  // --- Undo/redo (two separate stacks: page ops vs annotations) ---
-  undoStack: [],          // Page operation history (reorder, delete, rotate)
-  redoStack: [],          // Page operation redo
-  editUndoStack: [],      // Annotation edit history (add, move, delete annotations)
-  editRedoStack: [],      // Annotation edit redo
-
-  // --- Rendering ---
-  pageScales: {},         // Per-page scale info: { pageIndex: { canvasWidth, canvasHeight, pdfWidth, pdfHeight, scale } }
-  devicePixelRatio: 1,    // Window.devicePixelRatio at render time
-  eventsSetup: false,     // Guard: true after event delegation is attached to container
-  pageCanvases: [],       // Per-page DOM: [{ slot: HTMLElement, canvas: HTMLCanvasElement, rendered: bool }]
-  pageCaches: {},         // Per-page cached renders: { pageIndex: ImageData } for smooth annotation redraw
-  pageObserver: null,     // IntersectionObserver instance for lazy page rendering
-  scrollSyncEnabled: true, // false during programmatic scrollIntoView to prevent feedback loop
-  zoomLevel: 1.0,         // Current zoom multiplier (1.0 = fit width)
-
-  // --- Signature placement ---
-  pendingSignature: false,  // true when signature image is "attached to cursor" awaiting click
-  signaturePreviewPos: null, // Cursor position for ghost preview: { x, y } or null
-  pendingSignatureWidth: null, // Override default width for placement (e.g. paraf = 80px)
-  pendingSubtype: null,     // Annotation subtype: 'paraf' or null
-  resizeHandle: null,       // Which corner handle is being dragged: 'tl' | 'tr' | 'bl' | 'br' | null
-  resizeStartInfo: null,    // Snapshot of annotation state when resize began
-
-  // --- Touch & drag interaction ---
-  isDragging: false,        // true while an annotation is being dragged (shared with pinch-to-zoom)
-  isResizing: false,        // true while an annotation is being resized
-  sidebarDropIndicator: null, // DOM element for sidebar drag-drop indicator
-
-  // --- UX ---
-  lastLockedToastAnnotation: null, // Tracks last signature that showed "locked" toast (prevents spam)
-
-  // --- Guards ---
-  isRestoring: false,             // true during undo/redo page restoration (blocks scroll sync, new undo/redo)
+  ...getDefaultUeState(),
+  // Fields that persist across resets (intentionally NOT in getDefaultUeState):
+  devicePixelRatio: 1,    // Set on init, updated on render
+  eventsSetup: false,     // Guard: true after event delegation attached (one-time setup)
+  pageObserver: null,     // IntersectionObserver — needs .disconnect() side effect on reset
 };
+
+// ============================================================
+// PAGE OBJECT FACTORY (SSOT for page shape)
+// ============================================================
+
+// Single factory for creating page info objects. All code paths that add pages
+// must use this to guarantee a consistent shape. (SSOT)
+export function createPageInfo({ pageNum, sourceIndex, sourceName, rotation = 0, canvas, thumbCanvas = null, isFromImage = false }) {
+  return { pageNum, sourceIndex, sourceName, rotation, canvas, thumbCanvas, isFromImage };
+}
 
 // ============================================================
 // PAGE MANAGER (GABUNGKAN) MODAL STATE

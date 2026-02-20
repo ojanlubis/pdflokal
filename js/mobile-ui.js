@@ -4,7 +4,7 @@
  */
 
 import { ueState, mobileState } from './lib/state.js';
-import { ueSelectPage } from './editor/index.js';
+import { ueSelectPage, getThumbnailSource } from './editor/index.js';
 
 // ============================================================
 // MOBILE PAGE NAVIGATION
@@ -73,10 +73,7 @@ export function ueMobileOpenPagePicker() {
     };
 
     if (page.canvas) {
-      const realCanvas = ueState.pageCanvases[index]?.canvas;
-      const sourceCanvas = (realCanvas && realCanvas instanceof HTMLCanvasElement && ueState.pageCanvases[index]?.rendered)
-        ? realCanvas
-        : page.thumbCanvas;
+      const sourceCanvas = getThumbnailSource(index);
       const thumbCanvas = document.createElement('canvas');
       const scale = 0.3;
       const refWidth = sourceCanvas ? sourceCanvas.width : page.canvas.width;
