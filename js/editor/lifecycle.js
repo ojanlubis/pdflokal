@@ -23,6 +23,8 @@ export function ueReset() {
   ueState.editRedoStack = [];
   ueState.selectedAnnotation = null;
   ueState.pendingTextPosition = null;
+  ueState.pendingSignatureWidth = null;
+  ueState.pendingSubtype = null;
   ueState.pageScales = {};
   ueState.pageCaches = {};
   ueState.pageCanvases = [];

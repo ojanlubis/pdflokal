@@ -23,6 +23,8 @@ export function ueSetTool(tool) {
   if (tool !== 'signature' && tool !== 'paraf') {
     ueState.pendingSignature = false;
     ueState.signaturePreviewPos = null;
+    ueState.pendingSignatureWidth = null;
+    ueState.pendingSubtype = null;
   }
 
   // Update active state on both old toolbar buttons and floating toolbar buttons

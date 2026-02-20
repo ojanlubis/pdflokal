@@ -82,7 +82,7 @@ export function ueRedo() {
 async function ueRestorePages(pagesData) {
   ueState.isRestoring = true;
   try {
-  // Regenerate pages from pagesData — store dimensions only, render lazily
+  // Regenerate pages from pagesData — store dimensions + thumbnail, render lazily
   ueState.pages = [];
   for (const pageData of pagesData) {
     const source = ueState.sourceFiles[pageData.sourceIndex];
@@ -90,9 +90,18 @@ async function ueRestorePages(pagesData) {
     const page = await pdf.getPage(pageData.pageNum + 1);
     const viewport = page.getViewport({ scale: 0.5, rotation: pageData.rotation });
 
+    // Re-render thumbnail canvas for sidebar (matches file-loading.js pattern)
+    const thumbScale = 150 / page.getViewport({ scale: 1 }).width;
+    const thumbVp = page.getViewport({ scale: thumbScale, rotation: pageData.rotation });
+    const thumbCanvas = document.createElement('canvas');
+    thumbCanvas.width = Math.round(thumbVp.width);
+    thumbCanvas.height = Math.round(thumbVp.height);
+    await page.render({ canvasContext: thumbCanvas.getContext('2d'), viewport: thumbVp }).promise;
+
     ueState.pages.push({
       ...pageData,
-      canvas: { width: viewport.width, height: viewport.height }
+      canvas: { width: viewport.width, height: viewport.height },
+      thumbCanvas
     });
   }
   ueState.pageCaches = {};
