@@ -1,0 +1,114 @@
+name: Bug Report
+description: Something isn't working correctly
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Please fill in the details below so we (or our AI assistants) can reproduce and fix the issue quickly.
+
+        **AI contributors:** Read `CLAUDE.md` for full architecture context before investigating.
+
+  - type: dropdown
+    id: tool
+    attributes:
+      label: Which tool/feature?
+      options:
+        - Editor PDF (unified editor)
+        - Signature / Paraf
+        - Text annotations
+        - Whiteout
+        - Watermark
+        - Page numbers
+        - Gabungkan / Split (page manager)
+        - PDF to Image
+        - Compress PDF
+        - Protect PDF
+        - Image tools (compress, resize, convert, remove bg)
+        - Image to PDF
+        - Homepage / Navigation
+        - Mobile UI
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Describe the bug clearly. What did you expect vs what actually happened?
+      placeholder: |
+        Expected: Watermark should appear on all pages
+        Actual: Watermark only appears on page 1
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Numbered steps to trigger the bug. Be specific about file types and actions.
+      placeholder: |
+        1. Open pdflokal.id
+        2. Drop a 3-page PDF
+        3. Click "Lainnya" > "Watermark"
+        4. Set "Semua halaman" and click "Terapkan"
+        5. Only page 1 has the watermark
+    validations:
+      required: true
+
+  - type: dropdown
+    id: browser
+    attributes:
+      label: Browser
+      options:
+        - Chrome
+        - Firefox
+        - Safari
+        - Edge
+        - Samsung Internet
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: device
+    attributes:
+      label: Device
+      options:
+        - Desktop
+        - Mobile (Android)
+        - Mobile (iOS)
+        - Tablet
+    validations:
+      required: true
+
+  - type: textarea
+    id: console
+    attributes:
+      label: Console errors (if any)
+      description: Open browser DevTools (F12) > Console tab. Paste any red error messages.
+      render: shell
+
+  - type: textarea
+    id: file-info
+    attributes:
+      label: File details (if relevant)
+      description: File type, size, number of pages, or anything special about the file.
+      placeholder: "PDF, 5 pages, ~2MB, contains images and text"
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Screenshots, screen recordings, or anything else that helps.
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        **For AI contributors investigating this bug:**
+        - Start with `CLAUDE.md` for architecture overview
+        - Key files: `js/lib/state.js` (state), `js/editor/` (editor modules), `js/pdf-tools/` (modal logic)
+        - Use SSOT helpers (annotation factories, `openModal`/`closeModal`, `loadPdfDocument`)
+        - Test with `npx serve` + hard refresh (Ctrl+Shift+R)

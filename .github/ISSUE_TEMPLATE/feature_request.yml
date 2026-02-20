@@ -1,0 +1,85 @@
+name: Feature Request
+description: Suggest a new feature or improvement
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have an idea for PDFLokal? We'd love to hear it!
+
+        **AI contributors:** Read `CLAUDE.md` before implementing. All features must be 100% client-side and UI text must be in Indonesian.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the user need or pain point.
+      placeholder: "Users often need to add page numbers but the current options are limited..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: How should it work? Be as specific as you can.
+      placeholder: |
+        Add a "Header/Footer" option that lets users:
+        - Choose from preset templates
+        - Add custom text with date placeholders
+        - Preview before applying
+    validations:
+      required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      options:
+        - PDF editing (annotations, tools)
+        - Page management (merge, split, reorder)
+        - Image tools
+        - UI/UX improvement
+        - Mobile experience
+        - Accessibility
+        - Performance
+        - New tool
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Can this be done 100% client-side?
+      description: PDFLokal never uploads files. Features requiring a server are out of scope for now.
+      options:
+        - "Yes - fully client-side"
+        - "Partially - some parts need a server"
+        - "No - requires server"
+        - "Not sure"
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Have you tried other approaches or workarounds?
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Mockups, screenshots, links to similar features in other tools.
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        **For AI contributors implementing this feature:**
+        - Read `CLAUDE.md` — especially "Extending the Unified Editor" and "Adding to Lainnya Dropdown"
+        - All UI text in Indonesian (informal "kamu" tone)
+        - Use SSOT helpers: annotation factories, `openModal`/`closeModal`, `createPageInfo`
+        - New exports need barrel `index.js` entry + `window.*` bridge if used in HTML onclick
+        - Test on both desktop and mobile (breakpoint: 900px)

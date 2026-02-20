@@ -4,6 +4,7 @@
 [![GitHub stars](https://img.shields.io/github/stars/ojanlubis/pdflokal)](https://github.com/ojanlubis/pdflokal/stargazers)
 [![Client-Side Only](https://img.shields.io/badge/Privacy-100%25%20Client--Side-brightgreen.svg)](https://www.pdflokal.id/privasi.html)
 [![Security Headers](https://img.shields.io/badge/Security-Headers%20Enabled-green.svg)](https://www.pdflokal.id/.well-known/security.txt)
+[![AI Contributions Welcome](https://img.shields.io/badge/AI-Contributions%20Welcome-blueviolet.svg)](CONTRIBUTING.md)
 
 > **Urus dokumen langsung di browser.** Cepat, gratis, file tidak pernah diupload.
 
@@ -13,40 +14,46 @@ PDFLokal adalah tool PDF gratis untuk pengguna Indonesia. Semua proses berjalan 
 
 ## Update Terbaru
 
+**Februari 2026:**
+- **Editor UI redesign** — floating toolbar, compact sidebar, bottom bar, mobile-optimized layout
+- **Paraf (initials)** — draw and place initials with "Semua Hal." button to apply to all pages
+- **Lazy page rendering** — instant thumbnails on load, full rendering via IntersectionObserver
+- **Pinch-to-zoom** on mobile
+- **Inline text editing** — double-click text annotations to edit in-place
+- **SSOT architecture** — centralized helpers for annotations, modals, file types, PDF loading
+- **Accessibility** — ARIA roles, focus traps, keyboard navigation for all modals and tools
+- **Performance** — PDF.js Web Worker, image registry for undo optimization, page cache eviction
+
 **Januari 2026:**
-- 🔒 **Security headers** - CSP, X-Frame-Options, dan perlindungan keamanan lainnya
-- 📜 **Halaman privasi** - Kebijakan privasi lengkap dalam Bahasa Indonesia
-- 📴 **Offline mode!** PDFLokal sekarang bisa dipakai tanpa internet (kecuali fitur Proteksi PDF)
-- 🔒 Self-hosted libraries - semua library utama tersimpan lokal, tidak perlu CDN
-- ✨ Tanda tangan bisa di-unlock dengan double-click untuk diedit
-- 🗑️ Tombol hapus signature dengan sekali klik
-- 🎨 Changelog notification system yang smooth dan non-intrusive
-- 🏗️ Refactoring ke modular JavaScript architecture untuk maintainability
-- 🌐 Self-hosted fonts untuk akses di restricted networks
-- 📱 Mobile UX improvements (action buttons kini muncul di mobile)
+- Security headers (CSP, X-Frame-Options)
+- Halaman privasi lengkap
+- Offline mode dengan self-hosted libraries
+- Modular ES module architecture
+- Self-hosted fonts untuk restricted networks
 
 ## Fitur
 
 ### PDF Tools
-- **Editor PDF** - Editor lengkap dengan whiteout, teks (5 font choices, bold/italic, warna), tanda tangan (upload gambar dengan background removal, unlock untuk edit, hapus dengan sekali klik), watermark, nomor halaman, dan proteksi password
-- **Gabung PDF** - Gabungkan beberapa PDF menjadi satu dengan drag-drop reordering
-- **Pisah PDF** - Ekstrak halaman tertentu sebagai PDF terpisah
-- **Kompres PDF** - Kurangi ukuran file (kompres gambar dalam PDF)
-- **PDF ke Gambar** - Export halaman sebagai PNG/JPG
-- **Proteksi PDF** - Tambahkan password ke PDF
+- **Editor PDF** — Unified editor with whiteout, text (5 fonts, bold/italic, color), signatures (upload with background removal, draw, auto-lock, double-click to unlock), paraf/initials, watermark, page numbers, password protection
+- **Gabung PDF** — Merge multiple PDFs and images with drag-drop reordering
+- **Split PDF** — Extract selected pages as a separate PDF
+- **Kompres PDF** — Reduce file size by compressing embedded images
+- **PDF ke Gambar** — Export pages as PNG/JPG with batch download
+- **Proteksi PDF** — Add password protection
 
 ### Image Tools
-- **Kompres Gambar** - Kurangi ukuran file dengan kontrol kualitas
-- **Ubah Ukuran** - Resize dengan lock aspect ratio
-- **Convert Format** - JPG, PNG, WebP
-- **Gambar ke PDF** - Gabungkan gambar menjadi PDF
-- **Hapus Background** - Hapus latar belakang putih untuk PNG transparan
+- **Kompres Gambar** — Reduce file size with quality control
+- **Ubah Ukuran** — Resize with locked aspect ratio
+- **Convert Format** — JPG, PNG, WebP
+- **Gambar ke PDF** — Combine images into a single PDF
+- **Hapus Background** — Remove white backgrounds for transparent PNG
 
 ## Privasi
 
-- **100% Client-side** - Semua proses di browser
-- **Tidak ada upload** - File tidak pernah meninggalkan perangkat
-- **Open source** - Kode bisa diperiksa siapa saja
+- **100% Client-side** — All processing happens in the browser
+- **No uploads** — Files never leave your device
+- **Open source** — Code can be inspected by anyone
+- **Security headers** — CSP, X-Frame-Options, and more ([details](docs/security.md))
 
 ## Cara Pakai
 
@@ -58,139 +65,113 @@ Tidak perlu install, tidak perlu daftar, tidak perlu bayar.
 
 ## Development
 
-### Prerequisites
-- Browser modern (Chrome, Firefox, Safari, Edge)
-- Web server lokal (opsional, bisa langsung buka file HTML)
-
 ### Run Locally
 ```bash
-# Clone repository
 git clone https://github.com/ojanlubis/pdflokal
 cd pdflokal
-
-# Buka dengan web server (opsional)
 npx serve .
-# atau
-python -m http.server 8000
-
-# Atau langsung buka index.html di browser
+# Open http://localhost:3000
+# Always hard refresh (Ctrl+Shift+R) after changes — npx serve caches aggressively
 ```
 
 ### Tech Stack
-- **Vanilla HTML/CSS/JS** - No build step, no framework, modular IIFE pattern
-- **[pdf-lib](https://pdf-lib.js.org/)** - PDF manipulation (self-hosted)
-- **[PDF.js](https://mozilla.github.io/pdf.js/)** - PDF rendering & thumbnails (self-hosted)
-- **[Signature Pad](https://github.com/szimek/signature_pad)** - Tanda tangan digital (self-hosted)
-- **[fontkit](https://github.com/foliojs/fontkit)** - Custom font embedding (self-hosted)
-- **[pdf-encrypt-lite](https://github.com/nicholasohjj/pdf-encrypt-lite)** - PDF password encryption (CDN - requires internet)
-- **Canvas API** - Image processing
-- **Self-hosted fonts** - Montserrat, Carlito, Plus Jakarta Sans
-- **Self-hosted libraries** - 5/6 core libraries stored locally (2.6 MB) for offline support
+- **Vanilla JS** — Native ES modules, no build step, no framework
+- **[pdf-lib](https://pdf-lib.js.org/)** — PDF manipulation (self-hosted)
+- **[PDF.js](https://mozilla.github.io/pdf.js/)** — PDF rendering with Web Worker (self-hosted)
+- **[Signature Pad](https://github.com/szimek/signature_pad)** — Digital signatures (self-hosted)
+- **[fontkit](https://github.com/foliojs/fontkit)** — Custom font embedding (self-hosted)
+- **[pdf-encrypt-lite](https://github.com/nicholasohjj/pdf-encrypt-lite)** — PDF password encryption (CDN)
+- **Canvas API** — Image processing
+- **Self-hosted fonts** — Montserrat, Carlito, Plus Jakarta Sans (268KB)
 
 ### Project Structure
 ```
 pdflokal/
-├── index.html      # Main application
-├── dukung.html     # Donation page
-├── style.css       # All styles
-├── js/             # Modularized JavaScript
-│   ├── changelog.js      # Changelog notification system
-│   ├── app.js            # Core app logic & state management
-│   ├── pdf-tools.js      # PDF tools (text, signature, whiteout modals)
-│   ├── unified-editor.js # Unified PDF editor workspace
-│   ├── image-tools.js    # Image processing tools
-│   └── vendor/           # Self-hosted libraries (2.6 MB)
-│       ├── pdf-lib.min.js
-│       ├── fontkit.umd.min.js
-│       ├── pdf.min.js
-│       ├── pdf.worker.min.js
-│       └── signature_pad.umd.min.js
-├── fonts/          # Self-hosted fonts (268KB total)
-│   ├── montserrat-*.woff2
-│   ├── carlito-*.woff2
-│   └── plusjakartasans-*.woff2
-├── images/         # UI assets
-└── README.md
+├── index.html              # Single-page application
+├── style.css               # All styles
+├── CLAUDE.md               # Technical reference for AI and developers
+├── CONTRIBUTING.md          # Contribution guide
+├── js/
+│   ├── init.js             # Entry point (imports all modules)
+│   ├── lib/
+│   │   ├── state.js        # State, constants, annotation factories
+│   │   ├── utils.js        # Helpers (toast, download, file type checks)
+│   │   └── navigation.js   # Routing, modal helpers, history
+│   ├── editor/             # Unified Editor (14 modules)
+│   │   ├── index.js        # Barrel exports + window bridges
+│   │   ├── canvas-events.js
+│   │   ├── file-loading.js
+│   │   ├── annotations.js
+│   │   ├── signatures.js
+│   │   ├── page-manager.js
+│   │   ├── page-rendering.js
+│   │   ├── pdf-export.js
+│   │   └── ...
+│   ├── pdf-tools/          # PDF tool modals (7 modules)
+│   ├── image-tools.js      # Image processing tools
+│   └── vendor/             # Self-hosted libraries (2.6 MB)
+├── fonts/                  # Self-hosted fonts
+├── docs/                   # Architecture and reference docs
+└── images/                 # UI assets
 ```
+
+**For detailed architecture, conventions, and SSOT patterns, see [`CLAUDE.md`](CLAUDE.md).**
 
 ## Kontribusi
 
-Kontribusi selalu disambut! Beberapa cara untuk berkontribusi:
+Contributions are welcome from humans and AI assistants! See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide.
 
-1. **Laporkan Bug** - Buka issue jika menemukan masalah
-2. **Request Fitur** - Sarankan fitur baru via issue
-3. **Pull Request** - Perbaiki bug atau tambah fitur
-4. **Share** - Ceritakan tentang PDFLokal ke orang lain
-5. **Donasi** - Bantu biaya development via [halaman donasi](https://www.pdflokal.id/dukung.html)
+Quick summary:
+1. **Report bugs** — use the [bug report template](https://github.com/ojanlubis/pdflokal/issues/new?template=bug_report.yml)
+2. **Request features** — use the [feature request template](https://github.com/ojanlubis/pdflokal/issues/new?template=feature_request.yml)
+3. **Submit PRs** — fork, branch, follow [CONTRIBUTING.md](CONTRIBUTING.md), submit
 
-### Development Guidelines
-- **Gunakan vanilla JS** - Hindari dependencies baru kecuali benar-benar perlu
-- **Semua fitur harus client-side** - Tidak boleh butuh server
-- **Modular architecture** - Kode diorganisir dalam `js/` folder dengan IIFE pattern:
-  - `js/app.js` - Core logic & state management
-  - `js/unified-editor.js` - Unified editor workspace
-  - `js/pdf-tools.js` - PDF tool modals
-  - `js/image-tools.js` - Image processing
-  - `js/changelog.js` - Changelog system
-- **UI harus responsive** - Test di desktop dan mobile
-- **Copy dalam Bahasa Indonesia** - Semua UI text harus bahasa Indonesia
-- **Test di berbagai browser** - Chrome, Firefox, Safari, Edge sebelum PR
-- **Lihat CLAUDE.md** - Untuk detail teknis arsitektur dan patterns
+### For AI Contributors
+
+Point your AI assistant to `CLAUDE.md` — it contains everything needed to understand the codebase: architecture, patterns, helpers, gotchas, and conventions. The issue templates are structured (YAML forms) for easy parsing.
 
 ## Limitasi
 
-Beberapa hal yang perlu diketahui:
-
-1. **Kompres PDF** - Hanya bisa kompres gambar di dalam PDF, bukan struktur PDF itu sendiri
-2. **File besar** - File >50MB mungkin lambat atau crash di beberapa device
-3. **PDF kompleks** - Beberapa PDF dengan enkripsi atau font khusus mungkin tidak bisa diproses
-4. **Browser lama** - Butuh browser modern dengan support ES6+
+1. **Kompres PDF** — Only compresses images inside PDFs, not PDF structure itself
+2. **File besar** — Files >50MB may be slow on some devices
+3. **PDF kompleks** — Some encrypted PDFs or PDFs with special fonts may not work
+4. **Browser lama** — Requires a modern browser with ES6+ support
 
 ### Fitur yang Butuh Server (Coming Soon)
-- PDF ke Word
-- PDF ke Excel
-- Word/Excel ke PDF
+- PDF ke Word / Excel
+- Word / Excel ke PDF
 - OCR (text recognition)
-
-Fitur ini akan ditambahkan ketika ada resources untuk server-side processing.
 
 ## Lisensi & Commercial Use
 
-PDFLokal adalah open source dengan lisensi AGPL-3.0 untuk kepentingan:
-- Pembelajaran dan edukasi
-- Self-hosting untuk penggunaan internal/pribadi
-- Kontribusi dan improvement
+PDFLokal is open source under [AGPL-3.0](LICENSE).
 
-**Untuk commercial derivatives atau rebranding:**
-- Wajib memberikan atribusi jelas ke PDFLokal
-- Link ke repo original: github.com/ojanlubis/pdflokal
-- Tidak boleh claim sebagai karya original
-- Source code modifikasi wajib tetap open source dan dibagikan
+**Allowed:**
+- Learning and education
+- Self-hosting for internal/personal use
+- Contributing improvements back
 
-**Khusus untuk web service:**
-Jika menjalankan versi modifikasi sebagai layanan web publik, wajib menyediakan akses ke source code lengkap sesuai ketentuan AGPL-3.0.
+**Commercial derivatives or rebranding:**
+- Must attribute PDFLokal clearly
+- Link to original repo: github.com/ojanlubis/pdflokal
+- Modified source code must remain open source (AGPL-3.0 requirement)
+- Web services running modified versions must provide source code access
 
-Jika ingin diskusi commercial use, hubungi via GitHub Issues.
-
-Lihat file [LICENSE](LICENSE) untuk detail lengkap.
+Questions about commercial use? Open a GitHub issue.
 
 ## Contributors
 
 Terima kasih kepada semua yang telah berkontribusi:
 
-- [@hamdi1611](https://github.com/hamdi1611) - Signature UX improvements (unlock, delete, mobile layout)
-
-Ingin berkontribusi? Lihat [panduan kontribusi](#kontribusi) di atas.
+- [@hamdi1611](https://github.com/hamdi1611) — Signature UX improvements
 
 ## Credits
 
 - [pdf-lib](https://pdf-lib.js.org/) by Andrew Dillon
 - [PDF.js](https://mozilla.github.io/pdf.js/) by Mozilla
 - [Signature Pad](https://github.com/szimek/signature_pad) by Szymon Nowak
-- Inspired by [iLovePDF](https://www.ilovepdf.com/), [Smallpdf](https://smallpdf.com/), dan [Squoosh](https://squoosh.app/)
+- Inspired by [iLovePDF](https://www.ilovepdf.com/), [Smallpdf](https://smallpdf.com/), and [Squoosh](https://squoosh.app/)
 
 ---
 
 **Made with love in Indonesia**
-
-Punya pertanyaan? Buka issue atau hubungi via GitHub.

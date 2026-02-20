@@ -1,4 +1,25 @@
-# Claude stuff
-.claude
-claude.md
-CLAUDE.md
+# Claude Code (per-user AI config, not project docs)
+.claude/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Test artifacts
+test*.pdf
+test*.png
+*.screenshot.png
+screenshots/
+
+# Temp files
+*.tmp
+*.log
+node_modules/
