@@ -68,6 +68,9 @@ export const state = {
   signatureUploadImage: null,   // Uploaded image before background removal
   signatureUploadCanvas: null,  // Canvas used for signature bg removal preview
 
+  // --- Paraf (initials) ---
+  parafPad: null,               // SignaturePad instance for paraf canvas
+
   // --- Image to PDF tool (image-tools.js) ---
   imgToPdfFiles: [],            // Array of loaded image files for PDF conversion
   pdfImgPages: [],              // Rendered page canvases for PDF-to-image export
@@ -87,6 +90,7 @@ export const MAX_FILE_SIZE_LIMIT = 100 * 1024 * 1024;  // 100MB - hard limit
 // Editor constants
 export const UNDO_STACK_LIMIT = 50;             // Max undo/redo history entries
 export const SIGNATURE_DEFAULT_WIDTH = 150;     // Default signature placement width (px)
+export const PARAF_DEFAULT_WIDTH = 80;          // Default paraf/initials placement width (px)
 export const OBSERVER_ROOT_MARGIN = '200px 0px'; // IntersectionObserver lazy-load buffer
 export const DOUBLE_TAP_DELAY = 300;            // ms threshold for double-tap detection
 export const DOUBLE_TAP_DISTANCE = 30;          // px threshold for double-tap proximity
@@ -148,6 +152,8 @@ export const ueState = {
   // --- Signature placement ---
   pendingSignature: false,  // true when signature image is "attached to cursor" awaiting click
   signaturePreviewPos: null, // Cursor position for ghost preview: { x, y } or null
+  pendingSignatureWidth: null, // Override default width for placement (e.g. paraf = 80px)
+  pendingSubtype: null,     // Annotation subtype: 'paraf' or null
   resizeHandle: null,       // Which corner handle is being dragged: 'tl' | 'tr' | 'bl' | 'br' | null
   resizeStartInfo: null,    // Snapshot of annotation state when resize began
 

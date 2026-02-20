@@ -508,6 +508,10 @@
                 <span class="tooltip-arrow"></span>
               </div>
             </div>
+            <button class="ft-btn" id="ft-paraf-btn" data-edit-tool="paraf" onclick="ueOpenParafModal()" title="Paraf (P)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3l6 6-9 9H6v-6L15 3z"/><path d="M6 21h12"/></svg>
+              <span class="ft-label">Paraf</span>
+            </button>
             <button class="ft-btn" data-edit-tool="text" onclick="ueSetTool('text')" title="Tambah Teks (T)">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>
               <span class="ft-label">Teks</span>
@@ -566,6 +570,7 @@
             <div class="signature-btn-wrapper" id="signature-btn-wrapper" style="display: none;">
               <!-- Signature confirm button (positioned dynamically) -->
               <button class="signature-confirm-btn" id="signature-confirm-btn">Konfirmasi</button>
+              <button class="signature-confirm-btn" id="signature-allpages-btn" style="display: none;">Semua Hal.</button>
               <button class="signature-delete-btn" id="signature-delete-btn">✕</button>
             </div>
             <div class="unified-empty-state" id="ue-empty-state">
@@ -661,6 +666,12 @@
                 <path d="M4 7V4h16v3M9 20h6M12 4v16" />
               </svg>
               Teks
+            </button>
+            <button class="mobile-tool-item" role="menuitem" onclick="ueOpenParafModal(); closeMobileTools()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M15 3l6 6-9 9H6v-6L15 3z"/><path d="M6 21h12"/>
+              </svg>
+              Paraf
             </button>
           </div>
         </div>
@@ -1231,6 +1242,19 @@
     </div>
   </div>
 
+  <!-- Paraf (Initials) Modal -->
+  <div id="paraf-modal" class="signature-modal" role="dialog" aria-modal="true" aria-label="Buat Paraf">
+    <div class="signature-box">
+      <h3>Buat Paraf</h3>
+      <canvas id="paraf-canvas" class="signature-canvas"></canvas>
+      <div class="signature-actions">
+        <button class="btn btn-secondary" onclick="clearParaf()">Hapus</button>
+        <button class="btn btn-ghost" onclick="closeParafModal()">Batal</button>
+        <button class="btn btn-primary" onclick="useParaf()">Gunakan</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Text Input Modal -->
   <div id="text-input-modal" class="edit-modal" role="dialog" aria-modal="true" aria-label="Tambah teks">
     <div class="edit-modal-box">
@@ -1506,6 +1530,7 @@
           <div class="shortcut-item"><kbd>W</kbd> <span>Whiteout</span></div>
           <div class="shortcut-item"><kbd>T</kbd> <span>Tambah Teks</span></div>
           <div class="shortcut-item"><kbd>S</kbd> <span>Tanda Tangan</span></div>
+          <div class="shortcut-item"><kbd>P</kbd> <span>Paraf</span></div>
           <div class="shortcut-item"><kbd>R</kbd> <span>Putar Halaman</span></div>
         </div>
         <div class="shortcut-group">

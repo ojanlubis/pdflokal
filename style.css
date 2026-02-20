@@ -2023,6 +2023,7 @@ a:hover {
 .ue-page-canvas.tool-whiteout { cursor: crosshair; }
 .ue-page-canvas.tool-text { cursor: text; }
 .ue-page-canvas.tool-signature { cursor: copy; }
+.ue-page-canvas.tool-paraf { cursor: copy; }
 .ue-page-canvas.dragging { cursor: grabbing; }
 .ue-page-canvas.resizing { cursor: nwse-resize; }
 

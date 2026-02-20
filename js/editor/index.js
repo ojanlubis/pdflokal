@@ -25,7 +25,8 @@ export {
 export {
   uePlaceSignature, ueDrawSignaturePreview,
   ueShowConfirmButton, ueUpdateConfirmButtonPosition, ueHideConfirmButton,
-  ueConfirmSignature, ueDeleteSignature, ueUpdateDownloadButtonState
+  ueConfirmSignature, ueDeleteSignature, ueUpdateDownloadButtonState,
+  ueApplyToAllPages
 } from './signatures.js';
 
 export {
@@ -42,7 +43,7 @@ export { initUnifiedEditorInput, ueAddFiles } from './file-loading.js';
 export { ueSetupCanvasEvents } from './canvas-events.js';
 
 export {
-  ueSetTool, ueOpenSignatureModal, ueOpenTextModal, ueConfirmText,
+  ueSetTool, ueOpenSignatureModal, ueOpenParafModal, ueOpenTextModal, ueConfirmText,
   ueOpenWatermarkModal, ueOpenPageNumModal,
   toggleFloatingMore, closeFloatingMore,
   ueOpenProtectModal, closeEditorProtectModal, applyEditorProtect,
@@ -104,8 +105,9 @@ window.ueRotateCurrentPage = ueRotateCurrentPage;
 window.ueUpdateZoomDisplay = ueUpdateZoomDisplay;
 
 // Signatures
-import { uePlaceSignature, ueDrawSignaturePreview, ueShowConfirmButton, ueUpdateConfirmButtonPosition, ueHideConfirmButton, ueConfirmSignature, ueDeleteSignature, ueUpdateDownloadButtonState } from './signatures.js';
+import { uePlaceSignature, ueDrawSignaturePreview, ueShowConfirmButton, ueUpdateConfirmButtonPosition, ueHideConfirmButton, ueConfirmSignature, ueDeleteSignature, ueUpdateDownloadButtonState, ueApplyToAllPages } from './signatures.js';
 window.uePlaceSignature = uePlaceSignature;
+window.ueApplyToAllPages = ueApplyToAllPages;
 window.ueDrawSignaturePreview = ueDrawSignaturePreview;
 window.ueShowConfirmButton = ueShowConfirmButton;
 window.ueUpdateConfirmButtonPosition = ueUpdateConfirmButtonPosition;
@@ -146,9 +148,10 @@ import { ueSetupCanvasEvents } from './canvas-events.js';
 window.ueSetupCanvasEvents = ueSetupCanvasEvents;
 
 // Tools
-import { ueSetTool, ueOpenSignatureModal, ueOpenTextModal, ueConfirmText, ueOpenWatermarkModal, ueOpenPageNumModal, toggleFloatingMore, closeFloatingMore, ueOpenProtectModal, closeEditorProtectModal, applyEditorProtect, editorGoHome } from './tools.js';
+import { ueSetTool, ueOpenSignatureModal, ueOpenParafModal, ueOpenTextModal, ueConfirmText, ueOpenWatermarkModal, ueOpenPageNumModal, toggleFloatingMore, closeFloatingMore, ueOpenProtectModal, closeEditorProtectModal, applyEditorProtect, editorGoHome } from './tools.js';
 window.ueSetTool = ueSetTool;
 window.ueOpenSignatureModal = ueOpenSignatureModal;
+window.ueOpenParafModal = ueOpenParafModal;
 window.ueOpenTextModal = ueOpenTextModal;
 window.ueConfirmText = ueConfirmText;
 window.ueOpenWatermarkModal = ueOpenWatermarkModal;

@@ -410,7 +410,7 @@ export function ueSetupCanvasEvents() {
     } else if (ueState.currentTool === 'text') {
       ueState.pendingTextPosition = { x: startX, y: startY };
       window.ueOpenTextModal();
-    } else if (ueState.currentTool === 'signature' && state.signatureImage) {
+    } else if ((ueState.currentTool === 'signature' || ueState.currentTool === 'paraf') && state.signatureImage) {
       uePlaceSignature(startX, startY);
     }
   }

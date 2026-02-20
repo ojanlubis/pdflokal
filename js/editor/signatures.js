@@ -30,8 +30,9 @@ export async function uePlaceSignature(x, y) {
   if (!ueState.annotations[pageIndex]) ueState.annotations[pageIndex] = [];
 
   const aspectRatio = img.width / img.height;
-  const sigWidth = SIGNATURE_DEFAULT_WIDTH;
+  const sigWidth = ueState.pendingSignatureWidth || SIGNATURE_DEFAULT_WIDTH;
   const sigHeight = sigWidth / aspectRatio;
+  const subtype = ueState.pendingSubtype || null;
   const imageId = registerImage(state.signatureImage);
   const newAnno = {
     type: 'signature',
@@ -44,6 +45,7 @@ export async function uePlaceSignature(x, y) {
     cachedImg: img,
     locked: false
   };
+  if (subtype) newAnno.subtype = subtype;
   ueState.annotations[pageIndex].push(newAnno);
 
   const newIndex = ueState.annotations[pageIndex].length - 1;
@@ -51,6 +53,8 @@ export async function uePlaceSignature(x, y) {
 
   ueState.pendingSignature = false;
   ueState.signaturePreviewPos = null;
+  ueState.pendingSignatureWidth = null;
+  ueState.pendingSubtype = null;
 
   ueRedrawAnnotations();
   ueShowConfirmButton(newAnno, ueState.selectedAnnotation);
@@ -79,7 +83,7 @@ export function ueDrawSignaturePreview(x, y) {
 
   if (img.complete) {
     const aspectRatio = img.width / img.height;
-    const sigWidth = SIGNATURE_DEFAULT_WIDTH;
+    const sigWidth = ueState.pendingSignatureWidth || SIGNATURE_DEFAULT_WIDTH;
     const sigHeight = sigWidth / aspectRatio;
 
     // Draw semi-transparent preview centered on cursor
@@ -112,6 +116,17 @@ export function ueShowConfirmButton(anno, annoRef) {
 
   const deleteBtn = document.getElementById('signature-delete-btn');
   deleteBtn.onclick = () => ueDeleteSignature(annoRef);
+
+  // Show "Semua Hal." button only for paraf annotations
+  const allPagesBtn = document.getElementById('signature-allpages-btn');
+  if (allPagesBtn) {
+    if (anno.subtype === 'paraf' && ueState.pages.length > 1) {
+      allPagesBtn.style.display = '';
+      allPagesBtn.onclick = () => ueApplyToAllPages(annoRef);
+    } else {
+      allPagesBtn.style.display = 'none';
+    }
+  }
 
   ueUpdateConfirmButtonPosition(anno);
 }
@@ -171,6 +186,38 @@ export function ueDeleteSignature(annoRef) {
     ueRedrawAnnotations();
     showToast('Tanda tangan dihapus', 'success');
   }
+}
+
+// Apply paraf to all pages
+export function ueApplyToAllPages(annoRef) {
+  const anno = ueState.annotations[annoRef.pageIndex]?.[annoRef.index];
+  if (!anno) return;
+
+  ueSaveEditUndoState();
+
+  const currentPageIndex = annoRef.pageIndex;
+  for (let i = 0; i < ueState.pages.length; i++) {
+    if (i === currentPageIndex) continue;
+    if (!ueState.annotations[i]) ueState.annotations[i] = [];
+    ueState.annotations[i].push({
+      type: 'signature',
+      subtype: 'paraf',
+      image: anno.image,
+      imageId: anno.imageId,
+      x: anno.x,
+      y: anno.y,
+      width: anno.width,
+      height: anno.height,
+      locked: true
+    });
+  }
+
+  // Lock the current one too
+  anno.locked = true;
+  ueHideConfirmButton();
+  ueState.selectedAnnotation = null;
+  ueRedrawAnnotations();
+  showToast('Paraf diterapkan ke semua halaman', 'success');
 }
 
 // Update download button state (pulse animation when signatures exist)

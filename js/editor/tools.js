@@ -20,7 +20,7 @@ export function ueSetTool(tool) {
     ueHideConfirmButton();
   }
 
-  if (tool !== 'signature') {
+  if (tool !== 'signature' && tool !== 'paraf') {
     ueState.pendingSignature = false;
     ueState.signaturePreviewPos = null;
   }
@@ -38,7 +38,8 @@ export function ueSetTool(tool) {
     'select': 'Pilih & pindahkan anotasi',
     'whiteout': 'Klik dan seret untuk menggambar area whiteout',
     'text': 'Klik untuk menambah teks',
-    'signature': 'Klik untuk menempatkan tanda tangan'
+    'signature': 'Klik untuk menempatkan tanda tangan',
+    'paraf': 'Klik untuk menempatkan paraf'
   };
   ueUpdateStatus(toolNames[tool] || 'Pilih alat untuk mengedit');
 }
@@ -48,6 +49,11 @@ export function ueSetTool(tool) {
 export function ueOpenSignatureModal() {
   window.ueDismissSignatureHint();
   window.openSignatureModal();
+}
+
+export function ueOpenParafModal() {
+  window.ueDismissSignatureHint();
+  window.openParafModal();
 }
 
 export function ueOpenTextModal() {

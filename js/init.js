@@ -132,6 +132,7 @@ function initApp() {
   initFileInputs();
   initRangeSliders();
   initSignaturePad();
+  initParafPad();
   setupKeyboardShortcuts();
   initNavigationHistory();
   initModalBackdropClose();
@@ -151,6 +152,7 @@ function initModalBackdropClose() {
     'editor-pagenum-modal': 'closeEditorPageNumModal',
     'editor-protect-modal': 'closeEditorProtectModal',
     'ue-gabungkan-modal': 'uePmCloseModal',
+    'paraf-modal': 'closeParafModal',
   };
 
   document.addEventListener('click', (e) => {
@@ -428,6 +430,24 @@ function initSignaturePad() {
     function resizeCanvas() {
       setupCanvasDPR(canvas);
       state.signaturePad.clear();
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+    setTimeout(resizeCanvas, 100);
+  }
+}
+
+function initParafPad() {
+  const canvas = document.getElementById('paraf-canvas');
+  if (canvas && typeof SignaturePad !== 'undefined') {
+    state.parafPad = new SignaturePad(canvas, {
+      backgroundColor: 'rgb(255, 255, 255)',
+      penColor: 'rgb(0, 0, 0)'
+    });
+
+    function resizeCanvas() {
+      setupCanvasDPR(canvas);
+      state.parafPad.clear();
     }
 
     window.addEventListener('resize', resizeCanvas);

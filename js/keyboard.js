@@ -7,7 +7,7 @@ import { state, ueState } from './lib/state.js';
 import { showHome } from './lib/navigation.js';
 import {
   ueDownload, ueUndoAnnotation, ueRedoAnnotation, ueSaveEditUndoState,
-  ueSetTool, ueOpenSignatureModal, ueRotateCurrentPage,
+  ueSetTool, ueOpenSignatureModal, ueOpenParafModal, ueRotateCurrentPage,
   ueRedrawAnnotations, ueSelectPage
 } from './editor/index.js';
 
@@ -65,6 +65,8 @@ export function setupKeyboardShortcuts() {
           ueSetTool('text');
         } else if (key === 's' && !e.ctrlKey && !e.metaKey) {
           ueOpenSignatureModal();
+        } else if (key === 'p' && !e.ctrlKey && !e.metaKey) {
+          ueOpenParafModal();
         } else if (key === 'r' && !e.ctrlKey && !e.metaKey) {
           ueRotateCurrentPage();
         } else if (e.key === 'Delete' || e.key === 'Backspace') {

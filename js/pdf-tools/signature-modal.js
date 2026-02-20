@@ -3,7 +3,7 @@
  * Signature capture, upload, and background removal modal logic
  */
 
-import { state, navHistory, ueState } from '../lib/state.js';
+import { state, navHistory, ueState, PARAF_DEFAULT_WIDTH } from '../lib/state.js';
 import { showToast, loadImage, makeWhiteTransparent, setupCanvasDPR } from '../lib/utils.js';
 import { pushModalState } from '../lib/navigation.js';
 
@@ -204,4 +204,64 @@ export function useSignatureFromUpload() {
   ueState.signaturePreviewPos = null;
   window.ueUpdateStatus('Klik untuk menempatkan tanda tangan');
   showToast('Klik pada PDF untuk menempatkan tanda tangan', 'success');
+}
+
+// ============================================================
+// PARAF (INITIALS) MODAL
+// ============================================================
+
+export function openParafModal() {
+  if (window.changelogAPI) {
+    window.changelogAPI.minimize();
+  }
+
+  const modal = document.getElementById('paraf-modal');
+  modal.classList.add('active');
+  pushModalState('paraf-modal');
+
+  setTimeout(() => {
+    const canvas = document.getElementById('paraf-canvas');
+    setupCanvasDPR(canvas);
+    if (state.parafPad) state.parafPad.clear();
+  }, 100);
+}
+
+export function closeParafModal(skipHistoryBack = false) {
+  const modal = document.getElementById('paraf-modal');
+  modal.classList.remove('active');
+  navHistory.currentModal = null;
+  if (!skipHistoryBack && navHistory.currentView === 'modal') {
+    history.back();
+  }
+}
+
+export function clearParaf() {
+  if (state.parafPad) {
+    state.parafPad.clear();
+  }
+}
+
+export function useParaf() {
+  if (state.parafPad && !state.parafPad.isEmpty()) {
+    const parafCanvas = document.getElementById('paraf-canvas');
+
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = parafCanvas.width;
+    tempCanvas.height = parafCanvas.height;
+    const ctx = tempCanvas.getContext('2d');
+    ctx.drawImage(parafCanvas, 0, 0);
+
+    makeWhiteTransparent(tempCanvas, 240);
+    state.signatureImage = optimizeSignatureImage(tempCanvas);
+
+    closeParafModal();
+    window.ueSetTool('paraf');
+    ueState.pendingSignature = true;
+    ueState.signaturePreviewPos = null;
+    ueState.pendingSignatureWidth = PARAF_DEFAULT_WIDTH;
+    ueState.pendingSubtype = 'paraf';
+    showToast('Klik pada PDF untuk menempatkan paraf', 'success');
+  } else {
+    showToast('Buat paraf terlebih dahulu', 'error');
+  }
 }

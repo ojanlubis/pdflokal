@@ -25,7 +25,11 @@ export {
   closeSignatureBgModal,
   updateSignatureBgPreview,
   optimizeSignatureImage,
-  useSignatureFromUpload
+  useSignatureFromUpload,
+  openParafModal,
+  closeParafModal,
+  clearParaf,
+  useParaf
 } from './signature-modal.js';
 
 export {
@@ -70,7 +74,8 @@ import {
   openSignatureModal, closeSignatureModal, clearSignature, useSignature,
   switchSignatureTab, loadSignatureImage, openSignatureBgModal,
   closeSignatureBgModal, updateSignatureBgPreview, optimizeSignatureImage,
-  useSignatureFromUpload
+  useSignatureFromUpload,
+  openParafModal, closeParafModal, clearParaf, useParaf
 } from './signature-modal.js';
 window.openSignatureModal = openSignatureModal;
 window.closeSignatureModal = closeSignatureModal;
@@ -83,6 +88,10 @@ window.closeSignatureBgModal = closeSignatureBgModal;
 window.updateSignatureBgPreview = updateSignatureBgPreview;
 window.optimizeSignatureImage = optimizeSignatureImage;
 window.useSignatureFromUpload = useSignatureFromUpload;
+window.openParafModal = openParafModal;
+window.closeParafModal = closeParafModal;
+window.clearParaf = clearParaf;
+window.useParaf = useParaf;
 
 // Watermark modal
 import { openEditorWatermarkModal, closeEditorWatermarkModal, applyEditorWatermark } from './watermark-modal.js';

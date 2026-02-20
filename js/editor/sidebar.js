@@ -81,7 +81,11 @@ export function ueRenderThumbnails() {
 
   ueState.pages.forEach((page, index) => {
     const item = document.createElement('div');
-    const isLandscape = page.canvas.width > page.canvas.height;
+    // Use rendered DOM canvas if available, otherwise fall back to dimension placeholder
+    const realCanvas = ueState.pageCanvases[index]?.canvas;
+    const canvasWidth = realCanvas ? realCanvas.width : page.canvas.width;
+    const canvasHeight = realCanvas ? realCanvas.height : page.canvas.height;
+    const isLandscape = canvasWidth > canvasHeight;
     item.className = 'ue-thumbnail' + (index === ueState.selectedPage ? ' selected' : '') + (isLandscape ? ' landscape' : ' portrait');
     item.draggable = true;
     item.dataset.index = index;
@@ -90,9 +94,11 @@ export function ueRenderThumbnails() {
 
     // Clone the thumbnail canvas
     const thumbCanvas = document.createElement('canvas');
-    thumbCanvas.width = page.canvas.width;
-    thumbCanvas.height = page.canvas.height;
-    thumbCanvas.getContext('2d').drawImage(page.canvas, 0, 0);
+    thumbCanvas.width = canvasWidth;
+    thumbCanvas.height = canvasHeight;
+    if (realCanvas && realCanvas instanceof HTMLCanvasElement) {
+      thumbCanvas.getContext('2d').drawImage(realCanvas, 0, 0);
+    }
     if (page.rotation && page.rotation !== 0) {
       thumbCanvas.style.transform = `rotate(${page.rotation}deg)`;
     }
