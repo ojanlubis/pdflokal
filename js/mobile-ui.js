@@ -73,12 +73,14 @@ export function ueMobileOpenPagePicker() {
     };
 
     if (page.canvas) {
+      const realCanvas = ueState.pageCanvases[index]?.canvas;
       const thumbCanvas = document.createElement('canvas');
       const scale = 0.3;
-      thumbCanvas.width = page.canvas.width * scale;
-      thumbCanvas.height = page.canvas.height * scale;
-      const ctx = thumbCanvas.getContext('2d');
-      ctx.drawImage(page.canvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
+      thumbCanvas.width = (realCanvas ? realCanvas.width : page.canvas.width) * scale;
+      thumbCanvas.height = (realCanvas ? realCanvas.height : page.canvas.height) * scale;
+      if (realCanvas && realCanvas instanceof HTMLCanvasElement) {
+        thumbCanvas.getContext('2d').drawImage(realCanvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
+      }
       thumb.appendChild(thumbCanvas);
     }
 

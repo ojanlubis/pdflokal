@@ -12,6 +12,9 @@ import { ueRenderThumbnails } from './sidebar.js';
 // Set of page indices currently being rendered (prevents concurrent renders of same page)
 const ueRenderingPages = new Set();
 
+// Debounced thumbnail refresh after lazy page renders
+let thumbnailRefreshTimer = null;
+
 // rAF debounce ID for ueRenderVisiblePages
 let ueRenderVisibleRafId = null;
 
@@ -234,6 +237,10 @@ export async function ueRenderPageCanvas(index) {
     entry.rendered = true;
 
     ueRedrawPageAnnotations(index);
+
+    // Refresh thumbnails after lazy render (debounced to batch multiple page renders)
+    clearTimeout(thumbnailRefreshTimer);
+    thumbnailRefreshTimer = setTimeout(() => ueRenderThumbnails(), 200);
 
     // Setup canvas events once (use window.* to avoid circular import)
     if (!ueState.eventsSetup) {

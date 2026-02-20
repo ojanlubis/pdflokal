@@ -90,10 +90,13 @@ export function uePmRenderPages() {
       item.classList.add('selected');
     }
 
+    const realCanvas = ueState.pageCanvases[index]?.canvas;
     const canvas = document.createElement('canvas');
-    canvas.width = page.canvas.width;
-    canvas.height = page.canvas.height;
-    canvas.getContext('2d').drawImage(page.canvas, 0, 0);
+    canvas.width = realCanvas ? realCanvas.width : page.canvas.width;
+    canvas.height = realCanvas ? realCanvas.height : page.canvas.height;
+    if (realCanvas && realCanvas instanceof HTMLCanvasElement) {
+      canvas.getContext('2d').drawImage(realCanvas, 0, 0);
+    }
     if (page.rotation !== 0) {
       canvas.style.transform = `rotate(${page.rotation}deg)`;
     }
