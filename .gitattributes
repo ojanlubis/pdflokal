@@ -1,0 +1,12 @@
+# Normalize line endings to LF on commit (Mac/Linux standard)
+* text=auto eol=lf
+
+# Vendor files and binaries — don't touch
+*.min.js binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.svg text eol=lf
+*.pdf binary
+*.woff binary
+*.woff2 binary
