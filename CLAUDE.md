@@ -9,6 +9,15 @@
 - **Tech**: Vanilla JS, native ES modules, no build step, no frameworks
 - **Libraries**: pdf-lib, PDF.js, Signature Pad, Canvas API (see [docs/security.md](docs/security.md) for versions/details)
 
+## Planned Improvements
+
+Read **[docs/strengths.md](docs/strengths.md)** first — explains WHY vanilla JS, WHY no framework, and WHY AI as primary developer is the core architectural decision.
+
+See **[docs/future-architecture.md](docs/future-architecture.md)** before starting any major refactor.
+Two key ideas captured there:
+1. **Reactive state layer** — pub/sub on `ueState` to fix canvas/sidebar/modal desync
+2. **Web Workers** — offload PDF export + compression off the main thread
+
 ## Core Architecture
 
 ### File Structure
