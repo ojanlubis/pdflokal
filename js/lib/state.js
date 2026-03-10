@@ -92,6 +92,10 @@ export const PARAF_DEFAULT_WIDTH = 80;          // Default paraf/initials placem
 export const OBSERVER_ROOT_MARGIN = '200px 0px'; // IntersectionObserver lazy-load buffer
 export const DOUBLE_TAP_DELAY = 300;            // ms threshold for double-tap detection
 export const DOUBLE_TAP_DISTANCE = 30;          // px threshold for double-tap proximity
+// WHY: At 200% browser zoom on Retina (DPR 4), each A4 canvas = ~42MB GPU memory.
+// 5 pages = 400MB+, causing Chrome to silently fail canvas allocation.
+// DPR 2 is visually indistinguishable from 3-4 on all screens.
+export const MAX_CANVAS_DPR = 2;
 
 // ============================================================
 // MOBILE STATE (device detection results)

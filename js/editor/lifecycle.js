@@ -3,7 +3,7 @@
  * Editor initialization, reset, signature hints
  */
 
-import { ueState, state, clearImageRegistry, getDefaultUeState } from '../lib/state.js';
+import { ueState, state, clearImageRegistry, getDefaultUeState, MAX_CANVAS_DPR } from '../lib/state.js';
 import { showToast, showFullscreenLoading, hideFullscreenLoading, safeLocalGet, safeLocalSet } from '../lib/utils.js';
 import { initUnifiedEditorInput, ueAddFiles } from './file-loading.js';
 import { ueRenderThumbnails } from './sidebar.js';
@@ -67,7 +67,7 @@ export function ueDismissSignatureHint() {
 // Initialize when showing unified editor
 export function initUnifiedEditor() {
   initUnifiedEditorInput();
-  ueState.devicePixelRatio = window.devicePixelRatio || 1;
+  ueState.devicePixelRatio = Math.min(window.devicePixelRatio || 1, MAX_CANVAS_DPR);
 
   ueShowSignatureHint();
 

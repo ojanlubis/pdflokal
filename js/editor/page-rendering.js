@@ -4,7 +4,7 @@
  * page selection, page deletion, status updates
  */
 
-import { ueState, state, mobileState, OBSERVER_ROOT_MARGIN } from '../lib/state.js';
+import { ueState, state, mobileState, OBSERVER_ROOT_MARGIN, MAX_CANVAS_DPR } from '../lib/state.js';
 import { showToast, loadPdfDocument } from '../lib/utils.js';
 import { ueRedrawPageAnnotations } from './annotations.js';
 import { ueRenderThumbnails } from './sidebar.js';
@@ -26,6 +26,9 @@ let scrollSyncTimeoutId = null;
 
 // Scroll handler reference (for cleanup in ueRemoveScrollSync)
 let scrollHandler = null;
+
+// Resize handler reference (for cleanup in ueRemoveScrollSync)
+let resizeHandler = null;
 
 // PDF.js document cache — reuse across renders, destroyed on reset
 const pdfDocCache = new Map();
@@ -66,11 +69,12 @@ export function ueCreatePageSlots() {
       const aspect = refPage.height / refPage.width;
       const placeholderW = Math.min(maxWidth, 800);
       const placeholderH = Math.round(placeholderW * aspect);
-      const dpr = window.devicePixelRatio || 1;
       canvas.style.width = placeholderW + 'px';
       canvas.style.height = placeholderH + 'px';
-      canvas.width = placeholderW * dpr;
-      canvas.height = placeholderH * dpr;
+      // WHY: Placeholders only need correct CSS dimensions for IntersectionObserver.
+      // Buffer at 1x — will be overwritten at clamped DPR when actually rendered.
+      canvas.width = placeholderW;
+      canvas.height = placeholderH;
     }
 
     slot.appendChild(canvas);
@@ -196,7 +200,10 @@ export async function ueRenderPageCanvas(index) {
 
     const canvas = entry.canvas;
     const ctx = canvas.getContext('2d');
-    const dpr = ueState.devicePixelRatio = window.devicePixelRatio || 1;
+    // WHY: Clamp DPR to MAX_CANVAS_DPR. At 200% zoom on Retina, raw DPR = 4,
+    // making each A4 canvas ~42MB. Clamping to 2 keeps quality sharp while
+    // preventing GPU memory exhaustion that silently breaks canvas allocation.
+    const dpr = ueState.devicePixelRatio = Math.min(window.devicePixelRatio || 1, MAX_CANVAS_DPR);
 
     const wrapper = document.getElementById('ue-canvas-wrapper');
     const maxWidth = wrapper.clientWidth - 16;
@@ -370,6 +377,20 @@ export function ueSetupScrollSync() {
     }, 100);
   };
   window.addEventListener('scroll', scrollHandler);
+
+  // WHY: Browser zoom triggers 'resize'. Re-render pages so canvas buffers
+  // match new DPR/viewport. Debounced to avoid re-rendering during drag-resize.
+  let resizeTimeout;
+  resizeHandler = () => {
+    if (state.currentTool !== 'unified-editor') return;
+    if (ueState.pages.length === 0) return;
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(() => {
+      ueCreatePageSlots();
+      ueRenderVisiblePages();
+    }, 300);
+  };
+  window.addEventListener('resize', resizeHandler);
 }
 
 // Remove scroll sync listener (called from ueReset)
@@ -377,6 +398,10 @@ export function ueRemoveScrollSync() {
   if (scrollHandler) {
     window.removeEventListener('scroll', scrollHandler);
     scrollHandler = null;
+  }
+  if (resizeHandler) {
+    window.removeEventListener('resize', resizeHandler);
+    resizeHandler = null;
   }
   window._ueScrollSyncSetup = false;
 }

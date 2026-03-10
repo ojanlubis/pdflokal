@@ -22,8 +22,11 @@ export function ueGetCurrentCanvas() {
 }
 
 // Convert mouse/touch event coords to canvas-pixel coords
+// WHY: Must use the same DPR that was used to render the canvas (ueState.devicePixelRatio,
+// clamped to MAX_CANVAS_DPR). Using raw window.devicePixelRatio at high zoom would
+// mismatch the canvas buffer scale, causing annotation placement to be offset.
 export function ueGetCoords(e, canvas) {
-  const dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 4));
+  const dpr = ueState.devicePixelRatio || Math.min(window.devicePixelRatio || 1, 2);
   const rect = canvas.getBoundingClientRect();
   const x = (e.clientX - rect.left) * (canvas.width / canvas.clientWidth / dpr);
   const y = (e.clientY - rect.top) * (canvas.height / canvas.clientHeight / dpr);
