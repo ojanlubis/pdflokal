@@ -61,9 +61,10 @@ export function getTextBounds(anno, ctx) {
   };
 }
 
-// Draw a source canvas onto a new canvas with rotation applied.
-// Swaps dimensions for 90/270° so thumbnails don't overflow.
-// Returns the new canvas (or a plain copy if rotation is 0).
+// SINGLE SOURCE OF TRUTH — all rotated thumbnails must use this.
+// WHY not CSS transform:rotate(): CSS rotate on original-dimension canvas causes overflow
+// on 90/270° (portrait canvas rotated sideways). This function swaps canvas dimensions
+// and draws the image pre-rotated. Used by sidebar.js and page-manager.js.
 export function drawRotatedThumbnail(sourceCanvas, rotation) {
   const deg = ((rotation % 360) + 360) % 360;
   const swap = (deg === 90 || deg === 270);

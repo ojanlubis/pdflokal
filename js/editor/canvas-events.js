@@ -28,6 +28,9 @@ export function ueSetupCanvasEvents() {
   let startX, startY;
   let dragOffsetX, dragOffsetY;
   let hasMovedOrResized = false;
+  // WHY deep clone: preChangeState captures full annotation state before resize/drag via
+  // JSON.parse(JSON.stringify()). Shallow clone would share nested object references,
+  // making the undo snapshot mutate along with live state.
   let preChangeState = null;
 
   // Double-tap detection state
@@ -98,6 +101,8 @@ export function ueSetupCanvasEvents() {
 
   container.addEventListener('touchstart', (e) => {
     // Pinch-to-zoom: detect 2-finger touch
+    // WHY manual distance calc instead of e.scale: e.scale is unreliable across browsers
+    // (missing in Firefox, inconsistent in Safari). Manual Pythagorean distance is cross-browser safe.
     if (e.touches.length === 2) {
       isPinching = true;
       const dx = e.touches[0].clientX - e.touches[1].clientX;
@@ -234,6 +239,8 @@ export function ueSetupCanvasEvents() {
         ueState.lastLockedToastAnnotation = null;
         ueState.isDragging = true;
         dragOffsetX = x - anno.x;
+        // WHY fontSize offset: Text annotations use baseline Y (bottom of first line),
+        // not top-left. Subtract fontSize to get bounding box top for drag offset.
         dragOffsetY = y - (anno.type === 'text' ? anno.y - anno.fontSize : anno.y);
         ueRedrawAnnotations();
         ueShowConfirmButton(anno, clicked);
@@ -529,7 +536,9 @@ function ueCreateInlineTextEditor(anno, pageIndex, index) {
     }
   });
 
-  // On mobile, use longer delay to prevent premature save when virtual keyboard opens
+  // WHY 300ms on mobile: Virtual keyboard open/close fires blur on the text editor.
+  // 300ms delay prevents premature save when user taps keyboard toolbar buttons.
+  // Shorter delay causes text loss on slower devices.
   const blurDelay = mobileState.isTouch ? 300 : 100;
   editor.addEventListener('blur', () => setTimeout(saveEdit, blurDelay));
 

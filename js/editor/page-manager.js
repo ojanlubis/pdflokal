@@ -23,7 +23,9 @@ export function uePmOpenModal() {
   uePmState.extractMode = false;
   uePmState.selectedForExtract = [];
 
-  // Disconnect lazy-render observer while modal is open (prevents stale renders)
+  // WHY: Observer disconnected because pageCanvases array becomes stale after
+  // reorder/delete in the modal. Observer would trigger renders with wrong page indices.
+  // Reconnected via ueCreatePageSlots() in uePmCloseModal.
   if (ueState.pageObserver) ueState.pageObserver.disconnect();
 
   uePmRenderPages();
@@ -49,7 +51,8 @@ export function uePmCloseModal(skipHistoryBack = false) {
 
   closeModal('ue-gabungkan-modal', skipHistoryBack);
 
-  // Heavy rendering after modal visually closes (defer to next frame)
+  // WHY rAF: Defer heavy DOM rebuild until after modal CSS transition completes.
+  // Without rAF, ueCreatePageSlots layout thrashes during close animation.
   requestAnimationFrame(() => {
     // Rebuild DOM slots + pageCanvases to match reordered/deleted pages
     ueCreatePageSlots();
@@ -330,9 +333,11 @@ function uePmEnableDragReorder() {
   });
 }
 
-// Rebuild annotation and cache mapping after page reorder/delete.
-// Takes a snapshot of the pages array BEFORE the splice.
-// Uses reference equality to map old positions to new positions.
+// SINGLE SOURCE OF TRUTH — all page reorder/delete operations must call this to remap
+// annotations and pageCaches. Uses reference equality (indexOf on page objects) to handle
+// arbitrary reorder. Without this, annotations display on wrong pages after splice.
+// WHY reference equality: page objects are unique references; indexOf finds the new position
+// of the same object even after splice. This survives any reorder pattern.
 export function rebuildAnnotationMapping(oldPages) {
   const oldAnnotations = { ...ueState.annotations };
   const oldCaches = { ...ueState.pageCaches };

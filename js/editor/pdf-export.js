@@ -192,6 +192,8 @@ export async function ueBuildFinalPDF() {
   });
 }
 
+// WHY: Prevents double-click triggering two concurrent PDF builds.
+// PDF generation is async and modifies shared pdf-lib document.
 let isDownloading = false;
 
 // Download PDF

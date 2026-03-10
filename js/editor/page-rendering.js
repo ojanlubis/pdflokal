@@ -9,7 +9,8 @@ import { showToast, loadPdfDocument } from '../lib/utils.js';
 import { ueRedrawPageAnnotations } from './annotations.js';
 import { ueRenderThumbnails } from './sidebar.js';
 
-// Set of page indices currently being rendered (prevents concurrent renders of same page)
+// WHY: Prevents same page rendering twice concurrently. PDF.js render is async;
+// duplicate renders corrupt canvas (overlapping drawImage calls).
 const ueRenderingPages = new Set();
 
 // Debounced thumbnail refresh after lazy page renders
@@ -18,7 +19,9 @@ let thumbnailRefreshTimer = null;
 // rAF debounce ID for ueRenderVisiblePages
 let ueRenderVisibleRafId = null;
 
-// Scroll sync timeout ID (cleared on rapid page selection to prevent deadlock)
+// WHY: scrollSyncEnabled prevents feedback loop — ueSelectPage() calls scrollIntoView()
+// which triggers scroll handler which calls ueSelectPage(). Disabled during programmatic
+// scroll, re-enabled after 500ms. scrollSyncTimeoutId prevents stacking.
 let scrollSyncTimeoutId = null;
 
 // Scroll handler reference (for cleanup in ueRemoveScrollSync)
@@ -199,6 +202,9 @@ export async function ueRenderPageCanvas(index) {
     const maxWidth = wrapper.clientWidth - 16;
     const naturalViewport = page.getViewport({ scale: 1, rotation: pageInfo.rotation });
 
+    // WHY: Layout reflow race — workspace may be visible but clientWidth not yet computed.
+    // Retry after 150ms rather than fail. Happens on first load when showTool() and
+    // ueCreatePageSlots() run in same frame.
     if (maxWidth <= 100) {
       ueRenderingPages.delete(index);
       setTimeout(() => ueRenderPageCanvas(index), 150);
@@ -242,7 +248,8 @@ export async function ueRenderPageCanvas(index) {
     clearTimeout(thumbnailRefreshTimer);
     thumbnailRefreshTimer = setTimeout(() => ueRenderThumbnails(), 200);
 
-    // Setup canvas events once (use window.* to avoid circular import)
+    // WHY window.*: page-rendering ↔ canvas-events circular import.
+    // canvas-events imports ueRenderPageCanvas; page-rendering needs ueSetupCanvasEvents.
     if (!ueState.eventsSetup) {
       window.ueSetupCanvasEvents();
     }
@@ -254,6 +261,8 @@ export async function ueRenderPageCanvas(index) {
 }
 
 // Render all currently visible pages (used after zoom/resize)
+// WHY rAF: Coalesces rapid zoom/resize events into single render pass.
+// Timeout-based debounce causes mid-paint jank; rAF is paint-cycle-aware.
 export function ueRenderVisiblePages() {
   if (ueRenderVisibleRafId) cancelAnimationFrame(ueRenderVisibleRafId);
   ueRenderVisibleRafId = requestAnimationFrame(() => {
@@ -300,6 +309,8 @@ export function ueSetupIntersectionObserver() {
         if (!pc.rendered) ueRenderPageCanvas(index);
       } else {
         visiblePages.delete(index);
+        // WHY threshold 4: Each canvas ~4MB at 2x DPR. Clearing offscreen canvases
+        // balances memory vs re-render cost. Was 8, reduced after mobile OOM reports.
         if (pc.rendered && ueState.pageCanvases.length > 4) {
           const nearVisible = Array.from(visiblePages).some(v => Math.abs(v - index) <= 3);
           if (!nearVisible) {
@@ -392,7 +403,8 @@ export function ueDeletePage(index) {
     window.ueHideConfirmButton();
   }
 
-  // Use window.* to avoid circular import with undo-redo
+  // WHY window.*: page-rendering ↔ undo-redo circular import.
+  // undo-redo imports ueCreatePageSlots from page-rendering.
   window.ueSaveUndoState();
   const oldPages = [...ueState.pages];
   ueState.pages.splice(index, 1);

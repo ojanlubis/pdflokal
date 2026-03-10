@@ -181,6 +181,9 @@ export function createPageInfo({ pageNum, sourceIndex, sourceName, rotation = 0,
 
 // ============================================================
 // ANNOTATION FACTORIES (SSOT for annotation shapes)
+// SINGLE SOURCE OF TRUTH — all annotation creation must use these factories.
+// Never construct annotation objects inline. Adding a field here guarantees
+// all annotations get it.
 // ============================================================
 
 export function createWhiteoutAnnotation({ x, y, width, height }) {

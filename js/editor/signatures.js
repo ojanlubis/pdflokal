@@ -57,6 +57,7 @@ export async function uePlaceSignature(x, y) {
   ueRedrawAnnotations();
   ueShowConfirmButton(newAnno, ueState.selectedAnnotation);
 
+  // WHY window.*: signatures ↔ tools circular import. tools imports signature modal openers.
   window.ueSetTool('select');
   ueUpdateDownloadButtonState();
 

@@ -7,8 +7,9 @@ import { ueState, UNDO_STACK_LIMIT, getRegisteredImage, createPageInfo } from '.
 import { showToast, loadPdfDocument } from '../lib/utils.js';
 import { ueRedrawAnnotations } from './annotations.js';
 
-// Clone annotations without duplicating large base64 image strings.
-// Signature annotations store imageId (registry key) instead of raw image data.
+// WHY: Strips cachedImg (HTMLImageElement, not cloneable) and image (base64 string, huge).
+// Stores imageId reference instead — getRegisteredImage() recovers the data on restore.
+// Without this, undo stack would clone megabytes of base64 per snapshot.
 function cloneAnnotations(annotations) {
   const result = {};
   for (const key in annotations) {
@@ -83,6 +84,8 @@ export function ueRedo() {
 }
 
 async function ueRestorePages(pagesData) {
+  // WHY: isRestoring flag prevents scroll-sync and other listeners from interfering
+  // while pages are being rebuilt async during undo/redo.
   ueState.isRestoring = true;
   try {
   // Regenerate pages from pagesData — store dimensions + thumbnail, render lazily

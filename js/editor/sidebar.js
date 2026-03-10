@@ -89,7 +89,8 @@ export function ueRenderThumbnails() {
     item.className = 'ue-thumbnail' + (index === ueState.selectedPage ? ' selected' : '') + (isLandscape ? ' landscape' : ' portrait');
     item.draggable = true;
     item.dataset.index = index;
-    // Use window.* to avoid circular import with page-rendering
+    // WHY window.*: sidebar ↔ page-rendering circular import. sidebar exports
+    // ueRenderThumbnails which page-rendering imports. window.* breaks the reverse direction.
     item.onclick = () => window.ueSelectPage(index);
 
     // Clone the thumbnail canvas (draw rotation into canvas instead of CSS transform)

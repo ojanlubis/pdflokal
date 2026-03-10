@@ -9,6 +9,7 @@ import { ueCreatePageSlots, ueSelectPage, ueUpdatePageCount } from './page-rende
 import { ueRenderThumbnails } from './sidebar.js';
 import { ueSaveUndoState } from './undo-redo.js';
 
+// WHY: Prevents concurrent ueAddFiles calls. PDF.js render is async; overlapping loads corrupt page state.
 let isLoadingFiles = false;
 
 export function initUnifiedEditorInput() {
@@ -64,7 +65,8 @@ export async function ueAddFiles(files) {
     }
   }
 
-  // Wait one frame for layout reflow (workspace may have just become visible)
+  // WHY: showTool() makes workspace visible but browser hasn't reflowed yet.
+  // clientWidth returns 0 without this frame delay. Page slot dimensions would be wrong.
   await new Promise(resolve => requestAnimationFrame(resolve));
 
   // Rebuild page slots for new page count

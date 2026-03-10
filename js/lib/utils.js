@@ -39,6 +39,7 @@ export function checkFileSize(file) {
 
 // ============================================================
 // FILE TYPE HELPERS
+// SINGLE SOURCE OF TRUTH — never use inline file.type === checks. Import these.
 // ============================================================
 
 export function isPDF(file) {
@@ -53,6 +54,9 @@ export const ACCEPTED_FILE_TYPES = '.pdf,.png,.jpg,.jpeg,.webp,application/pdf,i
 
 // ============================================================
 // PDF.js DOCUMENT LOADING
+// SINGLE SOURCE OF TRUTH — never use raw pdfjsLib.getDocument().
+// WHY .slice(): Prevents detached ArrayBuffer errors when the same bytes
+// are loaded multiple times (PDF.js transfers ownership of the buffer).
 // ============================================================
 
 export async function loadPdfDocument(bytes) {

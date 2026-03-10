@@ -44,7 +44,8 @@ export function pushModalState(modalId) {
   navHistory.currentModal = modalId;
 }
 
-// Open a standard modal (add .active + push history)
+// SINGLE SOURCE OF TRUTH — all modal open/close must use openModal/closeModal.
+// Handles .active class, navHistory, history.pushState/back(). Never toggle modal classes manually.
 export function openModal(id) {
   const el = document.getElementById(id);
   if (el) {
