@@ -4,11 +4,11 @@
  * and inline text editing
  */
 
-import { ueState, state, mobileState, CSS_FONT_MAP, UNDO_STACK_LIMIT, DOUBLE_TAP_DELAY, DOUBLE_TAP_DISTANCE, createWhiteoutAnnotation } from '../lib/state.js';
+import { ueState, state, mobileState, buildCanvasFont, DOUBLE_TAP_DELAY, DOUBLE_TAP_DISTANCE, createWhiteoutAnnotation } from '../lib/state.js';
 import { showToast } from '../lib/utils.js';
 import { ueGetCoords, ueGetResizeHandle, ueGetCurrentCanvas, getTextBounds } from './canvas-utils.js';
 import { ueRedrawAnnotations, ueFindAnnotationAt } from './annotations.js';
-import { ueSaveEditUndoState } from './undo-redo.js';
+import { ueSaveEditUndoState, uePushAnnotationSnapshot } from './undo-redo.js';
 import { ueHighlightThumbnail } from './page-rendering.js';
 import { ueZoomIn, ueZoomOut } from './zoom-rotate.js';
 import {
@@ -371,9 +371,7 @@ export function ueSetupCanvasEvents() {
   function handleUp({ canvas, pageIndex, x, y }) {
     if (ueState.isResizing) {
       if (hasMovedOrResized && preChangeState) {
-        ueState.editUndoStack.push(preChangeState);
-        ueState.editRedoStack = [];
-        if (ueState.editUndoStack.length > UNDO_STACK_LIMIT) ueState.editUndoStack.shift();
+        uePushAnnotationSnapshot(preChangeState);
       }
       ueState.isResizing = false;
       ueState.resizeHandle = null;
@@ -386,9 +384,7 @@ export function ueSetupCanvasEvents() {
 
     if (ueState.isDragging) {
       if (hasMovedOrResized && preChangeState) {
-        ueState.editUndoStack.push(preChangeState);
-        ueState.editRedoStack = [];
-        if (ueState.editUndoStack.length > UNDO_STACK_LIMIT) ueState.editUndoStack.shift();
+        uePushAnnotationSnapshot(preChangeState);
       }
       ueState.isDragging = false;
       hasMovedOrResized = false;
@@ -468,12 +464,6 @@ function ueCreateInlineTextEditor(anno, pageIndex, index) {
   const top = bounds.y * scaleY + (canvasRect.top - wrapperRect.top);
   const fontSize = anno.fontSize * scaleX;
 
-  let fontStyle = '';
-  if (anno.italic) fontStyle += 'italic ';
-  if (anno.bold) fontStyle += 'bold ';
-
-  const cssFontFamily = CSS_FONT_MAP[anno.fontFamily] || CSS_FONT_MAP['Helvetica'];
-
   // Hide original text
   anno._editing = true;
   ueRedrawAnnotations();
@@ -487,7 +477,7 @@ function ueCreateInlineTextEditor(anno, pageIndex, index) {
     left: ${left}px;
     top: ${top}px;
     min-width: 20px;
-    font: ${fontStyle}${fontSize}px ${cssFontFamily};
+    font: ${buildCanvasFont(anno, fontSize)};
     color: ${anno.color || '#000000'};
     background: transparent;
     border: 1px dashed rgba(0, 123, 255, 0.4);
@@ -509,10 +499,7 @@ function ueCreateInlineTextEditor(anno, pageIndex, index) {
     delete anno._editing;
 
     if (newText && newText !== originalText) {
-      const undoState = JSON.parse(JSON.stringify(ueState.annotations));
-      ueState.editUndoStack.push(undoState);
-      ueState.editRedoStack = [];
-      if (ueState.editUndoStack.length > UNDO_STACK_LIMIT) ueState.editUndoStack.shift();
+      uePushAnnotationSnapshot(JSON.parse(JSON.stringify(ueState.annotations)));
       anno.text = newText;
     }
 

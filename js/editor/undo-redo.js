@@ -1,11 +1,17 @@
 /*
  * PDFLokal - editor/undo-redo.js (ES Module)
- * Undo/redo for both page operations and annotation operations
+ * Unified undo/redo stack for both page operations and annotation operations.
+ *
+ * WHY unified: Users expect Ctrl+Z to undo the last action regardless of type.
+ * Separate stacks meant page reorder/delete was never undoable from the UI.
+ * Each entry is tagged { type: 'page' | 'annotation', ... } so the correct
+ * restore logic runs on undo/redo.
  */
 
 import { ueState, UNDO_STACK_LIMIT, getRegisteredImage, createPageInfo } from '../lib/state.js';
 import { showToast, loadPdfDocument } from '../lib/utils.js';
 import { ueRedrawAnnotations } from './annotations.js';
+import { renderPageThumbnail } from './canvas-utils.js';
 
 // WHY: Strips cachedImg (HTMLImageElement, not cloneable) and image (base64 string, huge).
 // Stores imageId reference instead — getRegisteredImage() recovers the data on restore.
@@ -39,49 +45,88 @@ function restoreAnnotations(cloned) {
   return cloned;
 }
 
-// --- Page operation undo/redo ---
-
-export function ueSaveUndoState() {
-  ueState.undoStack.push(JSON.parse(JSON.stringify(ueState.pages.map(p => ({
+// Serialize current page order/rotation for the undo stack (lightweight, no canvases)
+function serializePages() {
+  return JSON.parse(JSON.stringify(ueState.pages.map(p => ({
     pageNum: p.pageNum,
     sourceIndex: p.sourceIndex,
     sourceName: p.sourceName,
     rotation: p.rotation,
     isFromImage: p.isFromImage
-  })))));
+  }))));
+}
+
+// ============================================================
+// UNIFIED SAVE FUNCTIONS
+// ============================================================
+
+// Save page state before reorder/delete/rotate operations
+export function ueSaveUndoState() {
+  ueState.undoStack.push({ type: 'page', pages: serializePages() });
   ueState.redoStack = [];
   if (ueState.undoStack.length > UNDO_STACK_LIMIT) ueState.undoStack.shift();
 }
 
+// Save annotation state before annotation changes
+export function ueSaveEditUndoState() {
+  ueState.undoStack.push({ type: 'annotation', annotations: cloneAnnotations(ueState.annotations) });
+  ueState.redoStack = [];
+  if (ueState.undoStack.length > UNDO_STACK_LIMIT) ueState.undoStack.shift();
+}
+
+// SINGLE SOURCE OF TRUTH — push a pre-captured annotation snapshot to the unified stack.
+// WHY needed: canvas-events.js captures preChangeState before drag/resize starts,
+// then pushes it only if the user actually moved something. Can't use ueSaveEditUndoState()
+// because that captures state at push time, not at drag-start time.
+export function uePushAnnotationSnapshot(snapshot) {
+  ueState.undoStack.push({ type: 'annotation', annotations: snapshot });
+  ueState.redoStack = [];
+  if (ueState.undoStack.length > UNDO_STACK_LIMIT) ueState.undoStack.shift();
+}
+
+// ============================================================
+// UNIFIED UNDO / REDO
+// ============================================================
+
 export function ueUndo() {
   if (ueState.undoStack.length === 0 || ueState.isRestoring) return;
-  // Save current state to redo
-  ueState.redoStack.push(JSON.parse(JSON.stringify(ueState.pages.map(p => ({
-    pageNum: p.pageNum,
-    sourceIndex: p.sourceIndex,
-    sourceName: p.sourceName,
-    rotation: p.rotation,
-    isFromImage: p.isFromImage
-  })))));
 
-  const prevState = ueState.undoStack.pop();
-  ueRestorePages(prevState);
+  const entry = ueState.undoStack.pop();
+
+  if (entry.type === 'page') {
+    ueState.redoStack.push({ type: 'page', pages: serializePages() });
+    ueRestorePages(entry.pages);
+    showToast('Undo halaman', 'info');
+  } else if (entry.type === 'annotation') {
+    ueState.redoStack.push({ type: 'annotation', annotations: cloneAnnotations(ueState.annotations) });
+    ueState.annotations = restoreAnnotations(entry.annotations);
+    ueState.selectedAnnotation = null;
+    ueRedrawAnnotations();
+    showToast('Undo edit', 'info');
+  }
 }
 
 export function ueRedo() {
   if (ueState.redoStack.length === 0 || ueState.isRestoring) return;
-  // Save current to undo
-  ueState.undoStack.push(JSON.parse(JSON.stringify(ueState.pages.map(p => ({
-    pageNum: p.pageNum,
-    sourceIndex: p.sourceIndex,
-    sourceName: p.sourceName,
-    rotation: p.rotation,
-    isFromImage: p.isFromImage
-  })))));
 
-  const nextState = ueState.redoStack.pop();
-  ueRestorePages(nextState);
+  const entry = ueState.redoStack.pop();
+
+  if (entry.type === 'page') {
+    ueState.undoStack.push({ type: 'page', pages: serializePages() });
+    ueRestorePages(entry.pages);
+    showToast('Redo halaman', 'info');
+  } else if (entry.type === 'annotation') {
+    ueState.undoStack.push({ type: 'annotation', annotations: cloneAnnotations(ueState.annotations) });
+    ueState.annotations = restoreAnnotations(entry.annotations);
+    ueState.selectedAnnotation = null;
+    ueRedrawAnnotations();
+    showToast('Redo edit', 'info');
+  }
 }
+
+// ============================================================
+// PAGE RESTORE (async — reloads PDFs, re-renders thumbnails)
+// ============================================================
 
 async function ueRestorePages(pagesData) {
   // WHY: isRestoring flag prevents scroll-sync and other listeners from interfering
@@ -96,13 +141,7 @@ async function ueRestorePages(pagesData) {
     const page = await pdf.getPage(pageData.pageNum + 1);
     const viewport = page.getViewport({ scale: 0.5, rotation: pageData.rotation });
 
-    // Re-render thumbnail canvas for sidebar (matches file-loading.js pattern)
-    const thumbScale = 150 / page.getViewport({ scale: 1 }).width;
-    const thumbVp = page.getViewport({ scale: thumbScale, rotation: pageData.rotation });
-    const thumbCanvas = document.createElement('canvas');
-    thumbCanvas.width = Math.round(thumbVp.width);
-    thumbCanvas.height = Math.round(thumbVp.height);
-    await page.render({ canvasContext: thumbCanvas.getContext('2d'), viewport: thumbVp }).promise;
+    const thumbCanvas = await renderPageThumbnail(page, { rotation: pageData.rotation });
 
     ueState.pages.push(createPageInfo({
       ...pageData,
@@ -130,29 +169,9 @@ async function ueRestorePages(pagesData) {
   }
 }
 
-// --- Annotation undo/redo ---
-
-export function ueSaveEditUndoState() {
-  ueState.editUndoStack.push(cloneAnnotations(ueState.annotations));
-  ueState.editRedoStack = [];
-  if (ueState.editUndoStack.length > UNDO_STACK_LIMIT) ueState.editUndoStack.shift();
-}
-
-export function ueUndoAnnotation() {
-  if (ueState.editUndoStack.length === 0) return;
-  ueState.editRedoStack.push(cloneAnnotations(ueState.annotations));
-  ueState.annotations = restoreAnnotations(ueState.editUndoStack.pop());
-  ueState.selectedAnnotation = null;
-  ueRedrawAnnotations();
-}
-
-export function ueRedoAnnotation() {
-  if (ueState.editRedoStack.length === 0) return;
-  ueState.editUndoStack.push(cloneAnnotations(ueState.annotations));
-  ueState.annotations = restoreAnnotations(ueState.editRedoStack.pop());
-  ueState.selectedAnnotation = null;
-  ueRedrawAnnotations();
-}
+// ============================================================
+// CONVENIENCE
+// ============================================================
 
 // Clear page annotations
 export function ueClearPageAnnotations() {

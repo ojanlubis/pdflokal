@@ -6,7 +6,7 @@
 import { state, ueState } from './lib/state.js';
 import { showHome } from './lib/navigation.js';
 import {
-  ueDownload, ueUndoAnnotation, ueRedoAnnotation, ueSaveEditUndoState,
+  ueDownload, ueUndo, ueRedo, ueSaveEditUndoState,
   ueSetTool, ueOpenSignatureModal, ueOpenParafModal, ueRotateCurrentPage,
   ueRedrawAnnotations, ueSelectPage,
   ueZoomIn,
@@ -48,13 +48,13 @@ export function setupKeyboardShortcuts() {
     // Ctrl+Z for undo in unified editor
     if (key === 'z' && (e.ctrlKey || e.metaKey) && state.currentTool === 'unified-editor') {
       e.preventDefault();
-      ueUndoAnnotation();
+      ueUndo();
     }
 
     // Ctrl+Y for redo in unified editor
     if (key === 'y' && (e.ctrlKey || e.metaKey) && state.currentTool === 'unified-editor') {
       e.preventDefault();
-      ueRedoAnnotation();
+      ueRedo();
     }
 
     // Keyboard shortcuts for unified editor tools (only when not typing)

@@ -13,7 +13,7 @@ export {
 
 export {
   ueSaveUndoState, ueUndo, ueRedo,
-  ueSaveEditUndoState, ueUndoAnnotation, ueRedoAnnotation,
+  ueSaveEditUndoState, uePushAnnotationSnapshot,
   ueClearPageAnnotations
 } from './undo-redo.js';
 
@@ -88,13 +88,12 @@ window.ueDrawSelectionHandles = ueDrawSelectionHandles;
 window.ueFindAnnotationAt = ueFindAnnotationAt;
 
 // Undo/Redo
-import { ueSaveUndoState, ueUndo, ueRedo, ueSaveEditUndoState, ueUndoAnnotation, ueRedoAnnotation, ueClearPageAnnotations } from './undo-redo.js';
+import { ueSaveUndoState, ueUndo, ueRedo, ueSaveEditUndoState, uePushAnnotationSnapshot, ueClearPageAnnotations } from './undo-redo.js';
 window.ueSaveUndoState = ueSaveUndoState;
 window.ueUndo = ueUndo;
 window.ueRedo = ueRedo;
 window.ueSaveEditUndoState = ueSaveEditUndoState;
-window.ueUndoAnnotation = ueUndoAnnotation;
-window.ueRedoAnnotation = ueRedoAnnotation;
+window.uePushAnnotationSnapshot = uePushAnnotationSnapshot;
 window.ueClearPageAnnotations = ueClearPageAnnotations;
 
 // Zoom & Rotate

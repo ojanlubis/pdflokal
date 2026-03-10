@@ -3,7 +3,7 @@
  * Annotation drawing, rendering, and hit testing
  */
 
-import { ueState, CSS_FONT_MAP } from '../lib/state.js';
+import { ueState, buildCanvasFont } from '../lib/state.js';
 import { ueGetCurrentCanvas, getTextBounds } from './canvas-utils.js';
 
 // Redraw annotations on all rendered pages
@@ -46,14 +46,7 @@ export function ueDrawAnnotation(ctx, anno, isSelected) {
       // Skip rendering if currently being edited
       if (anno._editing) break;
 
-      // Build font string with bold/italic and family
-      let fontStyle = '';
-      if (anno.italic) fontStyle += 'italic ';
-      if (anno.bold) fontStyle += 'bold ';
-
-      const cssFontFamily = CSS_FONT_MAP[anno.fontFamily] || CSS_FONT_MAP['Helvetica'];
-
-      ctx.font = `${fontStyle}${anno.fontSize}px ${cssFontFamily}`;
+      ctx.font = buildCanvasFont(anno);
       ctx.fillStyle = anno.color;
       const lines = anno.text.split('\n');
       lines.forEach((line, i) => ctx.fillText(line, anno.x, anno.y + i * anno.fontSize * 1.2));

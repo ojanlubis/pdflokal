@@ -132,11 +132,9 @@ export function getDefaultUeState() {
     annotations: {},
     selectedAnnotation: null,
     pendingTextPosition: null,
-    // --- Undo/redo ---
+    // --- Undo/redo (unified stack, entries tagged { type: 'page'|'annotation', ... }) ---
     undoStack: [],
     redoStack: [],
-    editUndoStack: [],
-    editRedoStack: [],
     // --- Rendering ---
     pageScales: {},
     pageCaches: {},
@@ -257,6 +255,17 @@ export const CSS_FONT_MAP = {
   'Montserrat': 'Montserrat, sans-serif',
   'Carlito': 'Carlito, Calibri, sans-serif'
 };
+
+// SINGLE SOURCE OF TRUTH — builds CSS font string from annotation properties.
+// WHY centralized: the if(italic)...if(bold)...CSS_FONT_MAP pattern was in 3 files.
+// fontSize param allows callers to override (e.g. scaled fontSize for inline editor).
+export function buildCanvasFont(anno, fontSize) {
+  let style = '';
+  if (anno.italic) style += 'italic ';
+  if (anno.bold) style += 'bold ';
+  const family = CSS_FONT_MAP[anno.fontFamily] || CSS_FONT_MAP['Helvetica'];
+  return `${style}${fontSize ?? anno.fontSize}px ${family}`;
+}
 
 // ============================================================
 // WINDOW BRIDGE (for non-module scripts and onclick handlers)

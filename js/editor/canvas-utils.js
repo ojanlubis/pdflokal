@@ -3,7 +3,7 @@
  * Canvas utility functions: coordinate conversion, hit testing, text bounds
  */
 
-import { ueState, CSS_FONT_MAP } from '../lib/state.js';
+import { ueState, buildCanvasFont } from '../lib/state.js';
 
 // Resolve best canvas source for a thumbnail at the given page index.
 // Prefers the rendered main canvas, falls back to pre-rendered thumbCanvas. (SSOT)
@@ -37,12 +37,7 @@ export function getTextBounds(anno, ctx) {
     ctx = canvas.getContext('2d');
   }
 
-  let fontStyle = '';
-  if (anno.italic) fontStyle += 'italic ';
-  if (anno.bold) fontStyle += 'bold ';
-
-  const cssFontFamily = CSS_FONT_MAP[anno.fontFamily] || CSS_FONT_MAP['Helvetica'];
-  ctx.font = `${fontStyle}${anno.fontSize}px ${cssFontFamily}`;
+  ctx.font = buildCanvasFont(anno);
 
   const lines = anno.text.split('\n');
   let maxWidth = 0;
@@ -59,6 +54,19 @@ export function getTextBounds(anno, ctx) {
     width: maxWidth,
     height: totalHeight
   };
+}
+
+// SINGLE SOURCE OF TRUTH — render a PDF.js page to a thumbnail canvas.
+// WHY centralized: identical render logic was duplicated in file-loading.js and undo-redo.js.
+// Both need a pre-rendered small canvas for sidebar/modal preview before lazy full render.
+export async function renderPageThumbnail(pdfPage, { targetWidth = 300, rotation = 0 } = {}) {
+  const thumbScale = targetWidth / pdfPage.getViewport({ scale: 1 }).width;
+  const thumbVp = pdfPage.getViewport({ scale: thumbScale, rotation });
+  const thumbCanvas = document.createElement('canvas');
+  thumbCanvas.width = Math.round(thumbVp.width);
+  thumbCanvas.height = Math.round(thumbVp.height);
+  await pdfPage.render({ canvasContext: thumbCanvas.getContext('2d'), viewport: thumbVp }).promise;
+  return thumbCanvas;
 }
 
 // SINGLE SOURCE OF TRUTH — all rotated thumbnails must use this.

@@ -244,26 +244,9 @@ function uePmEnableDragReorder() {
       const targetIndex = parseInt(item.dataset.index);
       const rect = item.getBoundingClientRect();
       const midpoint = rect.left + rect.width / 2;
-      const insertBefore = e.clientX < midpoint;
+      const insertAt = e.clientX < midpoint ? targetIndex : targetIndex + 1;
 
-      const oldPages = [...ueState.pages];
-      const viewedPage = ueState.pages[ueState.selectedPage];
-      let insertAt = insertBefore ? targetIndex : targetIndex + 1;
-
-      const [movedPage] = ueState.pages.splice(draggedIndex, 1);
-
-      if (draggedIndex < insertAt) {
-        insertAt--;
-      }
-
-      ueState.pages.splice(insertAt, 0, movedPage);
-      rebuildAnnotationMapping(oldPages);
-
-      const newViewedIndex = ueState.pages.indexOf(viewedPage);
-      if (newViewedIndex !== -1) {
-        ueState.selectedPage = newViewedIndex;
-      }
-
+      uePmReorderPage(draggedIndex, insertAt);
       uePmRenderPages();
       removeDropIndicator();
     });
@@ -302,35 +285,31 @@ function uePmEnableDragReorder() {
     }
 
     const items = Array.from(container.querySelectorAll('.ue-pm-page-item'));
-    let insertAt = 0;
-
     const nextSibling = indicator.nextElementSibling;
-    if (nextSibling && nextSibling.classList.contains('ue-pm-page-item')) {
-      insertAt = parseInt(nextSibling.dataset.index);
-    } else {
-      insertAt = items.length;
-    }
+    const insertAt = (nextSibling && nextSibling.classList.contains('ue-pm-page-item'))
+      ? parseInt(nextSibling.dataset.index)
+      : items.length;
 
-    const oldPages = [...ueState.pages];
-    const viewedPage = ueState.pages[ueState.selectedPage];
-
-    const [movedPage] = ueState.pages.splice(draggedIndex, 1);
-
-    if (draggedIndex < insertAt) {
-      insertAt--;
-    }
-
-    ueState.pages.splice(insertAt, 0, movedPage);
-    rebuildAnnotationMapping(oldPages);
-
-    const newViewedIndex = ueState.pages.indexOf(viewedPage);
-    if (newViewedIndex !== -1) {
-      ueState.selectedPage = newViewedIndex;
-    }
-
+    uePmReorderPage(draggedIndex, insertAt);
     uePmRenderPages();
     removeDropIndicator();
   });
+}
+
+// SINGLE SOURCE OF TRUTH — performs the splice + remap + selectedPage tracking for drag-drop reorder.
+// WHY centralized: item-level and container-level drop handlers had identical logic.
+// Both must splice, rebuildAnnotationMapping, and track selectedPage — missing any step causes desync.
+function uePmReorderPage(fromIndex, insertAt) {
+  const oldPages = [...ueState.pages];
+  const viewedPage = ueState.pages[ueState.selectedPage];
+
+  const [movedPage] = ueState.pages.splice(fromIndex, 1);
+  if (fromIndex < insertAt) insertAt--;
+  ueState.pages.splice(insertAt, 0, movedPage);
+  rebuildAnnotationMapping(oldPages);
+
+  const newViewedIndex = ueState.pages.indexOf(viewedPage);
+  if (newViewedIndex !== -1) ueState.selectedPage = newViewedIndex;
 }
 
 // SINGLE SOURCE OF TRUTH — all page reorder/delete operations must call this to remap

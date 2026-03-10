@@ -8,6 +8,7 @@ import { showToast, showFullscreenLoading, hideFullscreenLoading, checkFileSize,
 import { ueCreatePageSlots, ueSelectPage, ueUpdatePageCount } from './page-rendering.js';
 import { ueRenderThumbnails } from './sidebar.js';
 import { ueSaveUndoState } from './undo-redo.js';
+import { renderPageThumbnail } from './canvas-utils.js';
 
 // WHY: Prevents concurrent ueAddFiles calls. PDF.js render is async; overlapping loads corrupt page state.
 let isLoadingFiles = false;
@@ -102,14 +103,7 @@ async function handlePdfFile(file) {
     const page = await pdf.getPage(i + 1);
     const viewport = page.getViewport({ scale: 0.5 });
 
-    // Render thumbnail canvas for sidebar + modal (~300px wide)
-    const thumbScale = 300 / page.getViewport({ scale: 1 }).width;
-    const thumbVp = page.getViewport({ scale: thumbScale });
-    const thumbCanvas = document.createElement('canvas');
-    thumbCanvas.width = Math.round(thumbVp.width);
-    thumbCanvas.height = Math.round(thumbVp.height);
-    const thumbCtx = thumbCanvas.getContext('2d');
-    await page.render({ canvasContext: thumbCtx, viewport: thumbVp }).promise;
+    const thumbCanvas = await renderPageThumbnail(page);
 
     ueState.pages.push(createPageInfo({
       pageNum: i,
@@ -142,14 +136,7 @@ async function handleImageFile(file) {
   const page = await pdf.getPage(1);
   const viewport = page.getViewport({ scale: 0.5 });
 
-  // Render thumbnail canvas for sidebar + modal (~300px wide)
-  const thumbScale = 300 / page.getViewport({ scale: 1 }).width;
-  const thumbVp = page.getViewport({ scale: thumbScale });
-  const thumbCanvas = document.createElement('canvas');
-  thumbCanvas.width = Math.round(thumbVp.width);
-  thumbCanvas.height = Math.round(thumbVp.height);
-  const thumbCtx = thumbCanvas.getContext('2d');
-  await page.render({ canvasContext: thumbCtx, viewport: thumbVp }).promise;
+  const thumbCanvas = await renderPageThumbnail(page);
 
   ueState.pages.push(createPageInfo({
     pageNum: 0,
