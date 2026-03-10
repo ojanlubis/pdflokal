@@ -240,6 +240,9 @@ Hero + dropzone (opens editor), PDF tool cards (Editor, Merge, Split, PDF-to-Ima
 | `openModal(id)` / `closeModal(id)` | navigation.js | **SSOT** modal open/close with history management |
 | `isPDF(file)` / `isImage(file)` | utils.js | **SSOT** file type validation |
 | `loadPdfDocument(bytes)` | utils.js | **SSOT** PDF.js document loading with defensive .slice() |
+| `ueAddAnnotation(pageIndex, anno)` | annotations.js | **SSOT** add annotation to page, returns index |
+| `ueRemoveAnnotation(pageIndex, annoIndex)` | annotations.js | **SSOT** remove annotation + clear selection |
+| `ueReorderPages(fromIndex, insertAt)` | page-manager.js | **SSOT** reorder pages with annotation mapping rebuild |
 | `ueGetCurrentCanvas()` | canvas-utils.js | Get selected page's canvas |
 | `ueGetCoords(e, canvas, dpr)` | canvas-utils.js | Mouse/touch -> canvas coords |
 | `getCanvasAndCoords(e)` | canvas-events.js | Event delegation helper |
@@ -253,7 +256,7 @@ Hero + dropzone (opens editor), PDF tool cards (Editor, Merge, Split, PDF-to-Ima
 
 ### Named Constants (js/lib/state.js)
 
-`UNDO_STACK_LIMIT` (50), `SIGNATURE_DEFAULT_WIDTH` (150px), `PARAF_DEFAULT_WIDTH` (80px), `OBSERVER_ROOT_MARGIN` ('200px 0px'), `DOUBLE_TAP_DELAY` (300ms), `DOUBLE_TAP_DISTANCE` (30px).
+`UNDO_STACK_LIMIT` (50), `SIGNATURE_DEFAULT_WIDTH` (150px), `PARAF_DEFAULT_WIDTH` (80px), `OBSERVER_ROOT_MARGIN` ('200px 0px'), `DOUBLE_TAP_DELAY` (300ms), `DOUBLE_TAP_DISTANCE` (30px), `MAX_CANVAS_DPR` (2 — clamps devicePixelRatio for canvas rendering, prevents GPU memory exhaustion at high zoom).
 
 ### Reliability Patterns
 

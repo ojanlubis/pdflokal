@@ -2891,11 +2891,9 @@ html[data-theme="dark"] .floating-toolbar {
     gap: 4px;
   }
 
-  /* Icon-only download on mobile */
-  .btn--download-editor-header .ft-label,
+  /* Icon-only download on mobile — text hidden by .ft-label rule below */
   .btn--download-editor-header {
     padding: 4px 8px;
-    font-size: 0.75rem;
   }
 
   /* Hide sidebar on mobile — use page picker modal */
@@ -3472,6 +3470,16 @@ body.is-touch .btn:active {
   flex-shrink: 0;
 }
 
+/* Icon-only sign button on narrow screens to prevent truncation */
+@media (max-width: 420px) {
+  .mobile-sign-btn {
+    padding: var(--space-sm);
+  }
+  .mobile-sign-btn span {
+    display: none;
+  }
+}
+
 /* ============================================================
    Mobile Page Picker
    ============================================================ */
@@ -3636,6 +3644,9 @@ body.is-touch .btn:active {
   /* Unified editor layout goes full width */
   #unified-editor-workspace .unified-editor-layout {
     flex-direction: column;
+    /* WHY: Parent has align-items: flex-start for desktop row layout.
+       In column mode, flex-start prevents children from filling width. */
+    align-items: stretch;
   }
 
   /* Remove workspace padding on mobile */

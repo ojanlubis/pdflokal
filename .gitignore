@@ -1,6 +1,9 @@
 # Claude Code (per-user AI config, not project docs)
 .claude/
 
+# MCP config (contains local paths)
+.mcp.json
+
 # OS files
 .DS_Store
 Thumbs.db
@@ -13,10 +16,11 @@ desktop.ini
 .vscode/
 .idea/
 
-# Test artifacts
+# Test artifacts & Playwright screenshots
 test*.pdf
 test*.png
 *.screenshot.png
+responsive-*.png
 screenshots/
 
 # Temp files
