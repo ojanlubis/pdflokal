@@ -98,7 +98,7 @@ State objects live in `js/lib/state.js`. Key objects:
 **SSOT helpers** (Single Source of Truth — see [docs/architecture.md](docs/architecture.md)):
 - **`getDefaultUeState()`** (state.js) — returns all default ueState values. Used by initial definition + `ueReset()`. Adding a new field here automatically gets it reset.
 - **`createPageInfo()`** (state.js) — factory for page objects. All code paths that create pages must use this (file-loading, undo-redo). Guarantees consistent shape.
-- **`getThumbnailSource(pageIndex)`** (canvas-utils.js) — resolves best canvas for thumbnails. Used by sidebar, mobile picker, and Gabungkan modal.
+- **`getThumbnailSource(pageIndex)`** (canvas-utils.js) — resolves best canvas for thumbnails. Used by sidebar and mobile picker. **Exception**: Gabungkan modal uses `page.thumbCanvas` directly (pageCanvases stale while modal open).
 - **Annotation factories** (state.js) — `createWhiteoutAnnotation`, `createTextAnnotation`, `createSignatureAnnotation`, `createWatermarkAnnotation`, `createPageNumberAnnotation`. All annotation creation must use these.
 - **`openModal(id)` / `closeModal(id, skipHistoryBack)`** (navigation.js) — standard modal open/close with history management. Use for all modals except signature-bg-modal (custom replaceState).
 - **`isPDF(file)` / `isImage(file)`** (utils.js) — file type checks. Use instead of inline `file.type ===` comparisons.
@@ -275,7 +275,7 @@ Hero + dropzone (opens editor), PDF tool cards (Editor, Merge, Split, PDF-to-Ima
 
 **Performance:**
 - PDF.js uses real Web Worker (`workerSrc` points to self-hosted file, falls back to fake worker offline)
-- Page loading is lazy: `handlePdfFile` stores dimensions + pre-renders 150px thumbnail (`page.thumbCanvas`) for instant sidebar previews. Full rendering via IntersectionObserver. Debounced `ueRenderThumbnails()` after each lazy render upgrades thumbnails to full-res
+- Page loading is lazy: `handlePdfFile` stores dimensions + pre-renders 300px thumbnail (`page.thumbCanvas`) for instant sidebar/modal previews. Full rendering via IntersectionObserver. Debounced `ueRenderThumbnails()` after each lazy render upgrades thumbnails to full-res
 - Undo stack uses `imageRegistry` to avoid cloning base64 strings (stores `imageId` references)
 - Pinch-to-zoom supported via 2-finger touch detection in `canvas-events.js`
 
@@ -283,14 +283,14 @@ Hero + dropzone (opens editor), PDF tool cards (Editor, Merge, Split, PDF-to-Ima
 
 ## Important Gotchas
 
-- `npx serve` aggressively caches - always Ctrl+Shift+R after changes
+- `npx serve` aggressively caches - always Cmd+Shift+R (macOS) / Ctrl+Shift+R (Windows) after changes
 - Canvas `.width`/`.height` (buffer) vs `.style.width`/`.style.height` (display) - both must be set
 - Touch events: blocking `preventDefault` breaks scroll on mobile
 - `scrollIntoView` triggers scroll sync loops - use `scrollSyncEnabled` flag
 - IntersectionObserver root is `null` (viewport), NOT the wrapper element
 - Merge/Split card flow bypasses `showTool()` - must manually add `body.editor-active`
 - Layout race condition: `showTool()` makes workspace visible but browser hasn't reflowed - use rAF
-- **Lazy rendering**: `ueState.pages[i].canvas` is a `{width, height}` placeholder, NOT an HTMLCanvasElement. Real canvases live in `ueState.pageCanvases[i].canvas`. Pre-rendered thumbnails (150px) live in `page.thumbCanvas`. For thumbnail rendering, always use `getThumbnailSource(index)` — never access page.canvas directly for drawing
+- **Lazy rendering**: `ueState.pages[i].canvas` is a `{width, height}` placeholder, NOT an HTMLCanvasElement. Real canvases live in `ueState.pageCanvases[i].canvas`. Pre-rendered thumbnails (300px) live in `page.thumbCanvas`. For sidebar/main thumbnails, use `getThumbnailSource(index)`. For Gabungkan modal, use `page.thumbCanvas` directly (pageCanvases stale during modal). Never access page.canvas directly for drawing
 
 ## Changelog System
 
