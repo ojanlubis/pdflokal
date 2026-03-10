@@ -96,12 +96,15 @@ export function setupKeyboardShortcuts() {
         openShortcutsModal();
       }
       
-      if (e.key === '=' || (e.key === '=' && e.shiftKey) || e.key === '+') {
+      if (e.key === '+' || e.key === '=') {
+        e.preventDefault();
         ueZoomIn();
       } else if (e.key === '-') {
+        e.preventDefault();
         ueZoomOut();
-      } else if (e.key === '0'){
-        ueZoomReset()
+      } else if (e.key === '0') {
+        e.preventDefault();
+        ueZoomReset();
       }
     }
   });
