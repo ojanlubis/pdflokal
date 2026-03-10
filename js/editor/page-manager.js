@@ -7,8 +7,8 @@ import { ueState, uePmState } from '../lib/state.js';
 import { showToast, showFullscreenLoading, hideFullscreenLoading, downloadBlob, getDownloadFilename } from '../lib/utils.js';
 import { openModal, closeModal } from '../lib/navigation.js';
 import { ueRenderThumbnails } from './sidebar.js';
-import { ueUpdatePageCount, ueRenderSelectedPage, ueSetupIntersectionObserver } from './page-rendering.js';
-import { getThumbnailSource } from './canvas-utils.js';
+import { ueUpdatePageCount, ueRenderSelectedPage, ueSetupIntersectionObserver, ueCreatePageSlots } from './page-rendering.js';
+import { drawRotatedThumbnail } from './canvas-utils.js';
 import { ueAddFiles } from './file-loading.js';
 import { ueSaveUndoState } from './undo-redo.js';
 
@@ -51,10 +51,10 @@ export function uePmCloseModal(skipHistoryBack = false) {
 
   // Heavy rendering after modal visually closes (defer to next frame)
   requestAnimationFrame(() => {
+    // Rebuild DOM slots + pageCanvases to match reordered/deleted pages
+    ueCreatePageSlots();
     ueRenderThumbnails();
     ueUpdatePageCount();
-    // Reconnect lazy-render observer (disconnected in uePmOpenModal)
-    ueSetupIntersectionObserver();
     if (ueState.selectedPage >= 0) {
       ueRenderSelectedPage();
     }
@@ -86,15 +86,19 @@ export function uePmRenderPages() {
       item.classList.add('selected');
     }
 
-    const sourceCanvas = getThumbnailSource(index);
-    const canvas = document.createElement('canvas');
-    canvas.width = sourceCanvas ? sourceCanvas.width : page.canvas.width;
-    canvas.height = sourceCanvas ? sourceCanvas.height : page.canvas.height;
-    if (sourceCanvas) {
-      canvas.getContext('2d').drawImage(sourceCanvas, 0, 0);
-    }
-    if (page.rotation !== 0) {
-      canvas.style.transform = `rotate(${page.rotation}deg)`;
+    // Use thumbCanvas directly — pageCanvases is stale while modal is open
+    // (observer is disconnected, indices don't match after reorder)
+    const sourceCanvas = page.thumbCanvas || null;
+    let canvas;
+    if (sourceCanvas && page.rotation !== 0) {
+      canvas = drawRotatedThumbnail(sourceCanvas, page.rotation);
+    } else {
+      canvas = document.createElement('canvas');
+      canvas.width = sourceCanvas ? sourceCanvas.width : page.canvas.width;
+      canvas.height = sourceCanvas ? sourceCanvas.height : page.canvas.height;
+      if (sourceCanvas) {
+        canvas.getContext('2d').drawImage(sourceCanvas, 0, 0);
+      }
     }
     item.appendChild(canvas);
 
@@ -352,9 +356,13 @@ function uePmRotatePage(index, degrees) {
 
   const item = document.querySelector(`.ue-pm-page-item[data-index="${index}"]`);
   if (item) {
-    const canvas = item.querySelector('canvas');
-    if (canvas) {
-      canvas.style.transform = page.rotation !== 0 ? `rotate(${page.rotation}deg)` : '';
+    const oldCanvas = item.querySelector('canvas');
+    const sourceCanvas = ueState.pages[index]?.thumbCanvas || null;
+    if (oldCanvas && sourceCanvas) {
+      const newCanvas = page.rotation !== 0
+        ? drawRotatedThumbnail(sourceCanvas, page.rotation)
+        : (() => { const c = document.createElement('canvas'); c.width = sourceCanvas.width; c.height = sourceCanvas.height; c.getContext('2d').drawImage(sourceCanvas, 0, 0); return c; })();
+      oldCanvas.replaceWith(newCanvas);
     }
 
     let rotBadge = item.querySelector('.ue-pm-rotation-badge');

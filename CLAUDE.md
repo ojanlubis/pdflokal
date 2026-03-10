@@ -15,7 +15,7 @@ Read **[docs/strengths.md](docs/strengths.md)** first — explains WHY vanilla J
 
 See **[docs/future-architecture.md](docs/future-architecture.md)** before starting any major refactor.
 Two key ideas captured there:
-1. **Reactive state layer** — pub/sub on `ueState` to fix canvas/sidebar/modal desync
+1. **Reactive state layer** — pub/sub on `ueState` for annotation sync (note: the main Gabungkan desync bug was fixed in Mar 2026 by calling `ueCreatePageSlots()` on modal close — pub/sub is still useful but less urgent)
 2. **Web Workers** — offload PDF export + compression off the main thread
 
 ## Core Architecture
@@ -42,7 +42,7 @@ pdflokal/
 │   │   └── navigation.js     # showHome, showTool, openModal, closeModal, closeAllModals
 │   ├── editor/               # Unified Editor (~14 modules)
 │   │   ├── index.js          # Barrel re-exports + window bridges
-│   │   ├── canvas-utils.js   # ueGetCurrentCanvas, ueGetCoords, ueGetResizeHandle, getThumbnailSource
+│   │   ├── canvas-utils.js   # ueGetCurrentCanvas, ueGetCoords, ueGetResizeHandle, getThumbnailSource, drawRotatedThumbnail
 │   │   ├── annotations.js    # ueRedrawAnnotations, draw helpers, hit testing
 │   │   ├── canvas-events.js  # Mouse/touch event delegation on pages container
 │   │   ├── file-loading.js   # ueAddFiles, handlePdfFile, handleImageFile
@@ -169,6 +169,22 @@ Hero + dropzone (opens editor), PDF tool cards (Editor, Merge, Split, PDF-to-Ima
 - **Signatures:** `optimizeSignatureImage()` resizes >1500px, JPEG 85% for photos, PNG only for transparency
 - **Export:** `useObjectStreams: true`, format-aware embedding (`embedJpg`/`embedPng`)
 
+## Maintainability (MUST READ)
+
+> Every Claude session starts with total amnesia. Maintainability = "can a future Claude with zero memory work on any file safely?"
+
+**The 3-question test** (before modifying any file):
+1. Can I understand it in one read?
+2. If I modify one behavior, how much unrelated code must I understand?
+3. Can I break something unrelated by touching it?
+
+**Principles:**
+1. **One rule, one home.** Search before creating. Mark with `// SINGLE SOURCE OF TRUTH` comment. Never reimplement inline what a helper already does.
+2. **WHY comments, not WHAT.** Every non-obvious function gets a `// WHY:` comment explaining what breaks if changed and who decided. Future Claude can't ask "why is this here?" — the comment answers preemptively.
+3. **Operation functions own mutation + sync.** Never mutate `ueState.pages` or `ueState.annotations` directly from UI code. Use SSOT operation helpers that bundle the mutation with all required render/sync calls. This prevents the class of bugs where a caller forgets to call `rebuildAnnotationMapping()` or `ueCreatePageSlots()`.
+4. **Files are self-contained.** Imports for functionality: fine. Imports for understanding: problem. If you need to read 3 other files to understand one function, refactor.
+5. **Parallel arrays are a liability.** `ueState.pages` and `ueState.pageCanvases` must stay in sync — any splice on one must be reflected in the other. Prefer structures that travel together (e.g., `thumbCanvas` on the page object) over parallel arrays.
+
 ## Development Guidelines
 
 ### Critical Rules
@@ -220,6 +236,7 @@ Hero + dropzone (opens editor), PDF tool cards (Editor, Merge, Split, PDF-to-Ima
 | `getDefaultUeState()` | state.js | **SSOT** default state values — used by init + ueReset() |
 | `create*Annotation({...})` | state.js | **SSOT** annotation factories (Whiteout, Text, Signature, Watermark, PageNumber) |
 | `getThumbnailSource(pageIndex)` | canvas-utils.js | **SSOT** resolve best canvas for thumbnail (rendered or thumbCanvas) |
+| `drawRotatedThumbnail(src, rot)` | canvas-utils.js | Draw thumbnail with rotation baked in (swaps dimensions for 90/270°) — use instead of CSS `transform: rotate()` |
 | `openModal(id)` / `closeModal(id)` | navigation.js | **SSOT** modal open/close with history management |
 | `isPDF(file)` / `isImage(file)` | utils.js | **SSOT** file type validation |
 | `loadPdfDocument(bytes)` | utils.js | **SSOT** PDF.js document loading with defensive .slice() |

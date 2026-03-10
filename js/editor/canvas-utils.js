@@ -61,6 +61,27 @@ export function getTextBounds(anno, ctx) {
   };
 }
 
+// Draw a source canvas onto a new canvas with rotation applied.
+// Swaps dimensions for 90/270° so thumbnails don't overflow.
+// Returns the new canvas (or a plain copy if rotation is 0).
+export function drawRotatedThumbnail(sourceCanvas, rotation) {
+  const deg = ((rotation % 360) + 360) % 360;
+  const swap = (deg === 90 || deg === 270);
+  const w = sourceCanvas.width;
+  const h = sourceCanvas.height;
+
+  const out = document.createElement('canvas');
+  out.width = swap ? h : w;
+  out.height = swap ? w : h;
+
+  const ctx = out.getContext('2d');
+  ctx.translate(out.width / 2, out.height / 2);
+  ctx.rotate((deg * Math.PI) / 180);
+  ctx.drawImage(sourceCanvas, -w / 2, -h / 2);
+
+  return out;
+}
+
 // Check if (x, y) is on a resize handle of the given annotation
 export function ueGetResizeHandle(anno, x, y) {
   if (anno.locked) return null;

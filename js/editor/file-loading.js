@@ -100,8 +100,8 @@ async function handlePdfFile(file) {
     const page = await pdf.getPage(i + 1);
     const viewport = page.getViewport({ scale: 0.5 });
 
-    // Render a small thumbnail canvas for sidebar (cheap at ~150px wide)
-    const thumbScale = 150 / page.getViewport({ scale: 1 }).width;
+    // Render thumbnail canvas for sidebar + modal (~300px wide)
+    const thumbScale = 300 / page.getViewport({ scale: 1 }).width;
     const thumbVp = page.getViewport({ scale: thumbScale });
     const thumbCanvas = document.createElement('canvas');
     thumbCanvas.width = Math.round(thumbVp.width);
@@ -140,8 +140,8 @@ async function handleImageFile(file) {
   const page = await pdf.getPage(1);
   const viewport = page.getViewport({ scale: 0.5 });
 
-  // Render a small thumbnail canvas for sidebar
-  const thumbScale = 150 / page.getViewport({ scale: 1 }).width;
+  // Render thumbnail canvas for sidebar + modal (~300px wide)
+  const thumbScale = 300 / page.getViewport({ scale: 1 }).width;
   const thumbVp = page.getViewport({ scale: thumbScale });
   const thumbCanvas = document.createElement('canvas');
   thumbCanvas.width = Math.round(thumbVp.width);

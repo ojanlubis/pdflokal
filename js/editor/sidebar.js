@@ -4,7 +4,7 @@
  */
 
 import { ueState } from '../lib/state.js';
-import { getThumbnailSource } from './canvas-utils.js';
+import { getThumbnailSource, drawRotatedThumbnail } from './canvas-utils.js';
 import { showToast, showFullscreenLoading, hideFullscreenLoading } from '../lib/utils.js';
 
 // ============================================================
@@ -92,15 +92,17 @@ export function ueRenderThumbnails() {
     // Use window.* to avoid circular import with page-rendering
     item.onclick = () => window.ueSelectPage(index);
 
-    // Clone the thumbnail canvas
-    const thumbCanvas = document.createElement('canvas');
-    thumbCanvas.width = sourceCanvas ? sourceCanvas.width : canvasWidth;
-    thumbCanvas.height = sourceCanvas ? sourceCanvas.height : canvasHeight;
-    if (sourceCanvas) {
-      thumbCanvas.getContext('2d').drawImage(sourceCanvas, 0, 0);
-    }
-    if (page.rotation && page.rotation !== 0) {
-      thumbCanvas.style.transform = `rotate(${page.rotation}deg)`;
+    // Clone the thumbnail canvas (draw rotation into canvas instead of CSS transform)
+    let thumbCanvas;
+    if (sourceCanvas && page.rotation && page.rotation !== 0) {
+      thumbCanvas = drawRotatedThumbnail(sourceCanvas, page.rotation);
+    } else {
+      thumbCanvas = document.createElement('canvas');
+      thumbCanvas.width = sourceCanvas ? sourceCanvas.width : canvasWidth;
+      thumbCanvas.height = sourceCanvas ? sourceCanvas.height : canvasHeight;
+      if (sourceCanvas) {
+        thumbCanvas.getContext('2d').drawImage(sourceCanvas, 0, 0);
+      }
     }
     item.appendChild(thumbCanvas);
 
