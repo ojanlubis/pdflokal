@@ -8,7 +8,10 @@ import { showHome } from './lib/navigation.js';
 import {
   ueDownload, ueUndoAnnotation, ueRedoAnnotation, ueSaveEditUndoState,
   ueSetTool, ueOpenSignatureModal, ueOpenParafModal, ueRotateCurrentPage,
-  ueRedrawAnnotations, ueSelectPage
+  ueRedrawAnnotations, ueSelectPage,
+  ueZoomIn,
+  ueZoomOut,
+  ueZoomReset
 } from './editor/index.js';
 
 // ============================================================
@@ -91,6 +94,14 @@ export function setupKeyboardShortcuts() {
       if (e.key === '?' || (e.shiftKey && key === '/')) {
         e.preventDefault();
         openShortcutsModal();
+      }
+      
+      if (e.key === '=' || (e.key === '=' && e.shiftKey) || e.key === '+') {
+        ueZoomIn();
+      } else if (e.key === '-') {
+        ueZoomOut();
+      } else if (e.key === '0'){
+        ueZoomReset()
       }
     }
   });
