@@ -4,7 +4,7 @@
  */
 
 import { ueState, buildCanvasFont } from '../lib/state.js';
-import { ueGetCurrentCanvas, getTextBounds } from './canvas-utils.js';
+import { getTextBounds } from './canvas-utils.js';
 
 // Redraw annotations on all rendered pages
 export function ueRedrawAnnotations() {

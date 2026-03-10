@@ -165,11 +165,11 @@ export function ueSelectPage(index) {
   // These mobile-ui.js functions are registered as window globals by that module.
   // The bare `typeof` check works because window properties are accessible as
   // bare names in the global scope, even from ES modules.
-  if (typeof ueMobileUpdatePageIndicator === 'function') {
-    ueMobileUpdatePageIndicator();
+  if (typeof window.ueMobileUpdatePageIndicator === 'function') {
+    window.ueMobileUpdatePageIndicator();
   }
-  if (typeof ueMobileUpdateSignButton === 'function') {
-    ueMobileUpdateSignButton();
+  if (typeof window.ueMobileUpdateSignButton === 'function') {
+    window.ueMobileUpdateSignButton();
   }
 }
 
@@ -363,8 +363,8 @@ export function ueSetupScrollSync() {
         ueHighlightThumbnail(closestIndex);
 
         // mobile-ui.js window global — see comment in ueSelectPage above
-        if (typeof ueMobileUpdatePageIndicator === 'function') {
-          ueMobileUpdatePageIndicator();
+        if (typeof window.ueMobileUpdatePageIndicator === 'function') {
+          window.ueMobileUpdatePageIndicator();
         }
       }
     }, 100);

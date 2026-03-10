@@ -61,8 +61,8 @@ export async function uePlaceSignature(x, y) {
     navigator.vibrate(20);
   }
 
-  if (typeof ueMobileUpdateSignButton === 'function') {
-    ueMobileUpdateSignButton();
+  if (typeof window.ueMobileUpdateSignButton === 'function') {
+    window.ueMobileUpdateSignButton();
   }
 }
 

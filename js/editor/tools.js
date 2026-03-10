@@ -3,7 +3,7 @@
  * Tool selection, modal wrappers, more-tools dropdown, protect modal
  */
 
-import { ueState, state, createTextAnnotation } from '../lib/state.js';
+import { ueState, createTextAnnotation } from '../lib/state.js';
 import { showToast, downloadBlob, getDownloadFilename } from '../lib/utils.js';
 import { openModal, closeModal, showHome } from '../lib/navigation.js';
 import { ueHideConfirmButton } from './signatures.js';

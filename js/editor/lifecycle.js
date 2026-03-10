@@ -7,7 +7,7 @@ import { ueState, state, clearImageRegistry, getDefaultUeState } from '../lib/st
 import { showToast, showFullscreenLoading, hideFullscreenLoading, safeLocalGet, safeLocalSet } from '../lib/utils.js';
 import { initUnifiedEditorInput, ueAddFiles } from './file-loading.js';
 import { ueRenderThumbnails } from './sidebar.js';
-import { ueCreatePageSlots, ueSetupScrollSync, ueSetWrapperHeight, ueUpdatePageCount, ueRenderVisiblePages, ueRemoveScrollSync, clearPdfDocCache } from './page-rendering.js';
+import { ueSetupScrollSync, ueSetWrapperHeight, ueUpdatePageCount, ueRenderVisiblePages, ueRemoveScrollSync, clearPdfDocCache } from './page-rendering.js';
 import { ueUpdateZoomDisplay } from './zoom-rotate.js';
 
 // Reset unified editor state

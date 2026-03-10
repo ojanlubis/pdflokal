@@ -7,7 +7,7 @@ import { ueState, uePmState } from '../lib/state.js';
 import { showToast, showFullscreenLoading, hideFullscreenLoading, downloadBlob, getDownloadFilename } from '../lib/utils.js';
 import { openModal, closeModal } from '../lib/navigation.js';
 import { ueRenderThumbnails } from './sidebar.js';
-import { ueUpdatePageCount, ueRenderSelectedPage, ueSetupIntersectionObserver, ueCreatePageSlots } from './page-rendering.js';
+import { ueUpdatePageCount, ueRenderSelectedPage, ueCreatePageSlots } from './page-rendering.js';
 import { drawRotatedThumbnail } from './canvas-utils.js';
 import { ueAddFiles } from './file-loading.js';
 import { ueSaveUndoState } from './undo-redo.js';
