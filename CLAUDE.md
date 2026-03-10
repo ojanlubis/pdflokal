@@ -30,21 +30,25 @@ pdflokal/
 ├── style.css           # All styles (includes @font-face)
 ├── vercel.json         # Security headers, CSP, rewrites
 ├── js/
-│   ├── init.js               # Entry point: bootstrap, dropzone, tool cards, setupFileInput factory
+│   ├── init.js               # Entry point: bootstrap, compat check, mobile detection
+│   ├── init-file-handling.js  # Dropzone, file inputs, paste handler, setupFileInput factory
+│   ├── init-ui.js            # Tool cards, signature pads, modal backdrop close
 │   ├── keyboard.js           # Keyboard shortcuts + modal
 │   ├── mobile-ui.js          # Mobile nav, page picker, tools dropdown
 │   ├── changelog.js          # Changelog notification system
 │   ├── theme.js              # Theme toggle (light/dark)
-│   ├── image-tools.js        # Image tools (compress, resize, convert, etc.)
+│   ├── image-tools.js        # Image tools (compress, resize, convert, remove-bg)
+│   ├── img-to-pdf.js         # Images-to-PDF tool (add, reorder, generate)
 │   ├── lib/
 │   │   ├── state.js          # State objects, constants, SSOT helpers, annotation factories
 │   │   ├── utils.js          # showToast, downloadBlob, isPDF, isImage, loadPdfDocument, etc.
 │   │   └── navigation.js     # showHome, showTool, openModal, closeModal, closeAllModals
-│   ├── editor/               # Unified Editor (~14 modules)
+│   ├── editor/               # Unified Editor (~15 modules)
 │   │   ├── index.js          # Barrel re-exports + window bridges
 │   │   ├── canvas-utils.js   # ueGetCurrentCanvas, ueGetCoords, ueGetResizeHandle, getThumbnailSource, drawRotatedThumbnail
 │   │   ├── annotations.js    # ueRedrawAnnotations, draw helpers, hit testing
 │   │   ├── canvas-events.js  # Mouse/touch event delegation on pages container
+│   │   ├── inline-editor.js  # Inline text editing overlay (double-click to edit)
 │   │   ├── file-loading.js   # ueAddFiles, handlePdfFile, handleImageFile
 │   │   ├── lifecycle.js      # initUnifiedEditor, ueReset, signature hints
 │   │   ├── page-manager.js   # Gabungkan modal (uePm* functions)
