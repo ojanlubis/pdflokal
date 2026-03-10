@@ -8,7 +8,8 @@ export { ueGetCurrentCanvas, ueGetCoords, ueGetResizeHandle, getThumbnailSource 
 
 export {
   ueRedrawAnnotations, ueRedrawPageAnnotations,
-  ueDrawAnnotation, ueDrawSelectionHandles, ueFindAnnotationAt
+  ueDrawAnnotation, ueDrawSelectionHandles, ueFindAnnotationAt,
+  ueAddAnnotation, ueRemoveAnnotation
 } from './annotations.js';
 
 export {
@@ -54,7 +55,7 @@ export { ueBuildFinalPDF, ueDownload } from './pdf-export.js';
 
 export {
   uePmOpenModal, uePmCloseModal, uePmRenderPages,
-  rebuildAnnotationMapping,
+  rebuildAnnotationMapping, ueReorderPages,
   uePmToggleExtractMode, uePmTogglePageSelection,
   uePmSelectAll, uePmDeselectAll, uePmExtractSelected
 } from './page-manager.js';
@@ -80,12 +81,14 @@ window.ueGetCoords = ueGetCoords;
 window.ueGetResizeHandle = ueGetResizeHandle;
 
 // Annotations
-import { ueRedrawAnnotations, ueRedrawPageAnnotations, ueDrawAnnotation, ueDrawSelectionHandles, ueFindAnnotationAt } from './annotations.js';
+import { ueRedrawAnnotations, ueRedrawPageAnnotations, ueDrawAnnotation, ueDrawSelectionHandles, ueFindAnnotationAt, ueAddAnnotation, ueRemoveAnnotation } from './annotations.js';
 window.ueRedrawAnnotations = ueRedrawAnnotations;
 window.ueRedrawPageAnnotations = ueRedrawPageAnnotations;
 window.ueDrawAnnotation = ueDrawAnnotation;
 window.ueDrawSelectionHandles = ueDrawSelectionHandles;
 window.ueFindAnnotationAt = ueFindAnnotationAt;
+window.ueAddAnnotation = ueAddAnnotation;
+window.ueRemoveAnnotation = ueRemoveAnnotation;
 
 // Undo/Redo
 import { ueSaveUndoState, ueUndo, ueRedo, ueSaveEditUndoState, uePushAnnotationSnapshot, ueClearPageAnnotations } from './undo-redo.js';
@@ -169,11 +172,12 @@ window.ueBuildFinalPDF = ueBuildFinalPDF;
 window.ueDownload = ueDownload;
 
 // Page manager
-import { uePmOpenModal, uePmCloseModal, uePmRenderPages, rebuildAnnotationMapping, uePmToggleExtractMode, uePmTogglePageSelection, uePmSelectAll, uePmDeselectAll, uePmExtractSelected } from './page-manager.js';
+import { uePmOpenModal, uePmCloseModal, uePmRenderPages, rebuildAnnotationMapping, ueReorderPages, uePmToggleExtractMode, uePmTogglePageSelection, uePmSelectAll, uePmDeselectAll, uePmExtractSelected } from './page-manager.js';
 window.uePmOpenModal = uePmOpenModal;
 window.uePmCloseModal = uePmCloseModal;
 window.uePmRenderPages = uePmRenderPages;
 window.rebuildAnnotationMapping = rebuildAnnotationMapping;
+window.ueReorderPages = ueReorderPages;
 window.uePmToggleExtractMode = uePmToggleExtractMode;
 window.uePmTogglePageSelection = uePmTogglePageSelection;
 window.uePmSelectAll = uePmSelectAll;

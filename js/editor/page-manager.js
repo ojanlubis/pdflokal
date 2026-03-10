@@ -246,7 +246,7 @@ function uePmEnableDragReorder() {
       const midpoint = rect.left + rect.width / 2;
       const insertAt = e.clientX < midpoint ? targetIndex : targetIndex + 1;
 
-      uePmReorderPage(draggedIndex, insertAt);
+      ueReorderPages(draggedIndex, insertAt);
       uePmRenderPages();
       removeDropIndicator();
     });
@@ -290,16 +290,16 @@ function uePmEnableDragReorder() {
       ? parseInt(nextSibling.dataset.index)
       : items.length;
 
-    uePmReorderPage(draggedIndex, insertAt);
+    ueReorderPages(draggedIndex, insertAt);
     uePmRenderPages();
     removeDropIndicator();
   });
 }
 
-// SINGLE SOURCE OF TRUTH — performs the splice + remap + selectedPage tracking for drag-drop reorder.
-// WHY centralized: item-level and container-level drop handlers had identical logic.
-// Both must splice, rebuildAnnotationMapping, and track selectedPage — missing any step causes desync.
-function uePmReorderPage(fromIndex, insertAt) {
+// SINGLE SOURCE OF TRUTH — performs the splice + remap + selectedPage tracking for page reorder.
+// WHY centralized: sidebar drag-drop, modal item-drop, and modal container-drop all need identical logic.
+// All must splice, rebuildAnnotationMapping, and track selectedPage — missing any step causes desync.
+export function ueReorderPages(fromIndex, insertAt) {
   const oldPages = [...ueState.pages];
   const viewedPage = ueState.pages[ueState.selectedPage];
 

@@ -6,6 +6,7 @@
 import { state, ueState, createPageNumberAnnotation } from '../lib/state.js';
 import { showToast } from '../lib/utils.js';
 import { openModal, closeModal } from '../lib/navigation.js';
+import { ueAddAnnotation } from '../editor/annotations.js';
 
 export function openEditorPageNumModal() {
   openModal('editor-pagenum-modal');
@@ -62,8 +63,7 @@ export function applyEditorPageNumbers() {
           x = canvasWidth / 2; y = canvasHeight - margin;
       }
 
-      if (!ueState.annotations[i]) ueState.annotations[i] = [];
-      ueState.annotations[i].push(createPageNumberAnnotation({
+      ueAddAnnotation(i, createPageNumberAnnotation({
         text, fontSize, x, y, position
       }));
     }

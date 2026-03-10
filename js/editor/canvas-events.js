@@ -7,7 +7,7 @@
 import { ueState, state, mobileState, buildCanvasFont, DOUBLE_TAP_DELAY, DOUBLE_TAP_DISTANCE, createWhiteoutAnnotation } from '../lib/state.js';
 import { showToast } from '../lib/utils.js';
 import { ueGetCoords, ueGetResizeHandle, ueGetCurrentCanvas, getTextBounds } from './canvas-utils.js';
-import { ueRedrawAnnotations, ueFindAnnotationAt } from './annotations.js';
+import { ueRedrawAnnotations, ueFindAnnotationAt, ueAddAnnotation } from './annotations.js';
 import { ueSaveEditUndoState, uePushAnnotationSnapshot } from './undo-redo.js';
 import { ueHighlightThumbnail } from './page-rendering.js';
 import { ueZoomIn, ueZoomOut } from './zoom-rotate.js';
@@ -401,7 +401,7 @@ export function ueSetupCanvasEvents() {
       const height = Math.abs(y - startY);
       if (width > 5 && height > 5) {
         ueSaveEditUndoState();
-        ueState.annotations[pageIndex].push(createWhiteoutAnnotation({
+        ueAddAnnotation(pageIndex, createWhiteoutAnnotation({
           x: Math.min(startX, x),
           y: Math.min(startY, y),
           width,

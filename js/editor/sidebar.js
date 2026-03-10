@@ -239,26 +239,8 @@ function ueSetupSidebarDragDrop() {
       insertAt = items.length;
     }
 
-    // Snapshot pages BEFORE splice for reference-based reindex
-    const oldPages = [...ueState.pages];
-    const viewedPage = ueState.pages[ueState.selectedPage];
-
-    const [movedPage] = ueState.pages.splice(draggedIndex, 1);
-
-    if (draggedIndex < insertAt) {
-      insertAt--;
-    }
-
-    ueState.pages.splice(insertAt, 0, movedPage);
-
-    // Rebuild annotations + caches using reference equality
-    window.rebuildAnnotationMapping(oldPages);
-
-    // Update selectedPage to follow the viewed page
-    const newViewedIndex = ueState.pages.indexOf(viewedPage);
-    if (newViewedIndex !== -1) {
-      ueState.selectedPage = newViewedIndex;
-    }
+    // Use SSOT helper — bundles splice + rebuildAnnotationMapping + selectedPage tracking
+    window.ueReorderPages(draggedIndex, insertAt);
 
     // Rebuild page slots (fixes observer stale indices) + re-render sidebar
     container._sidebarDragSetup = false;

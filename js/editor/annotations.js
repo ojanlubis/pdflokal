@@ -110,6 +110,33 @@ export function ueDrawSelectionHandles(ctx, x, y, width, height) {
   ctx.fillRect(x + width - handleSize / 2 + 2, y + height - handleSize / 2 + 2, handleSize, handleSize);
 }
 
+// ============================================================
+// ANNOTATION MUTATION HELPERS (SSOT)
+// ============================================================
+
+// SINGLE SOURCE OF TRUTH — add an annotation to a page.
+// WHY centralized: 7 call sites previously inlined `if (!array) array = []; array.push(anno)`.
+// Forgetting the init guard caused undefined errors on pages with no prior annotations.
+// Returns the new annotation index (useful for setting selectedAnnotation).
+export function ueAddAnnotation(pageIndex, anno) {
+  if (!ueState.annotations[pageIndex]) ueState.annotations[pageIndex] = [];
+  ueState.annotations[pageIndex].push(anno);
+  return ueState.annotations[pageIndex].length - 1;
+}
+
+// SINGLE SOURCE OF TRUTH — remove an annotation by index.
+// WHY centralized: 2 call sites inlined splice + selection clearing.
+// Forgetting to clear selectedAnnotation causes stale reference bugs (handles drawn on wrong anno).
+export function ueRemoveAnnotation(pageIndex, annoIndex) {
+  if (!ueState.annotations[pageIndex]) return;
+  ueState.annotations[pageIndex].splice(annoIndex, 1);
+  if (ueState.selectedAnnotation &&
+      ueState.selectedAnnotation.pageIndex === pageIndex &&
+      ueState.selectedAnnotation.index === annoIndex) {
+    ueState.selectedAnnotation = null;
+  }
+}
+
 // Find annotation at position
 export function ueFindAnnotationAt(pageIndexOrX, xOrY, maybeY) {
   // Supports both (pageIndex, x, y) and legacy (x, y) signatures

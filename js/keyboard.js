@@ -8,7 +8,7 @@ import { showHome } from './lib/navigation.js';
 import {
   ueDownload, ueUndo, ueRedo, ueSaveEditUndoState,
   ueSetTool, ueOpenSignatureModal, ueOpenParafModal, ueRotateCurrentPage,
-  ueRedrawAnnotations, ueSelectPage,
+  ueRedrawAnnotations, ueRemoveAnnotation, ueSelectPage,
   ueZoomIn,
   ueZoomOut,
   ueZoomReset
@@ -76,8 +76,7 @@ export function setupKeyboardShortcuts() {
           if (ueState.selectedAnnotation) {
             e.preventDefault();
             ueSaveEditUndoState();
-            ueState.annotations[ueState.selectedAnnotation.pageIndex].splice(ueState.selectedAnnotation.index, 1);
-            ueState.selectedAnnotation = null;
+            ueRemoveAnnotation(ueState.selectedAnnotation.pageIndex, ueState.selectedAnnotation.index);
             ueRedrawAnnotations();
           }
         }

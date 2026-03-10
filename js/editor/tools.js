@@ -7,7 +7,7 @@ import { ueState, state, createTextAnnotation } from '../lib/state.js';
 import { showToast, downloadBlob, getDownloadFilename } from '../lib/utils.js';
 import { openModal, closeModal, showHome } from '../lib/navigation.js';
 import { ueHideConfirmButton } from './signatures.js';
-import { ueRedrawAnnotations } from './annotations.js';
+import { ueRedrawAnnotations, ueAddAnnotation } from './annotations.js';
 import { ueSaveEditUndoState } from './undo-redo.js';
 import { ueUpdateStatus } from './page-rendering.js';
 
@@ -73,8 +73,7 @@ export function ueConfirmText() {
   }
 
   ueSaveEditUndoState();
-  if (!ueState.annotations[ueState.selectedPage]) ueState.annotations[ueState.selectedPage] = [];
-  ueState.annotations[ueState.selectedPage].push(createTextAnnotation({
+  ueAddAnnotation(ueState.selectedPage, createTextAnnotation({
     text: settings.text,
     x: ueState.pendingTextPosition.x,
     y: ueState.pendingTextPosition.y,

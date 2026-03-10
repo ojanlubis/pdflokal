@@ -6,7 +6,7 @@
 import { ueState, state, mobileState, SIGNATURE_DEFAULT_WIDTH, registerImage, createSignatureAnnotation } from '../lib/state.js';
 import { showToast } from '../lib/utils.js';
 import { ueGetCurrentCanvas } from './canvas-utils.js';
-import { ueRedrawAnnotations } from './annotations.js';
+import { ueRedrawAnnotations, ueAddAnnotation, ueRemoveAnnotation } from './annotations.js';
 import { ueSaveEditUndoState } from './undo-redo.js';
 
 // Place signature on canvas at (x, y)
@@ -27,8 +27,6 @@ export async function uePlaceSignature(x, y) {
   // Save undo AFTER image loads (prevents race with undo during load)
   ueSaveEditUndoState();
 
-  if (!ueState.annotations[pageIndex]) ueState.annotations[pageIndex] = [];
-
   const aspectRatio = img.width / img.height;
   const sigWidth = ueState.pendingSignatureWidth || SIGNATURE_DEFAULT_WIDTH;
   const sigHeight = sigWidth / aspectRatio;
@@ -44,9 +42,7 @@ export async function uePlaceSignature(x, y) {
     cachedImg: img,
     subtype
   });
-  ueState.annotations[pageIndex].push(newAnno);
-
-  const newIndex = ueState.annotations[pageIndex].length - 1;
+  const newIndex = ueAddAnnotation(pageIndex, newAnno);
   ueState.selectedAnnotation = { pageIndex, index: newIndex };
 
   ueState.pendingSignature = false;
@@ -179,9 +175,8 @@ export function ueDeleteSignature(annoRef) {
   const anno = ueState.annotations[annoRef.pageIndex][annoRef.index];
   if (anno) {
     ueSaveEditUndoState();
-    ueState.annotations[annoRef.pageIndex].splice(annoRef.index, 1);
+    ueRemoveAnnotation(annoRef.pageIndex, annoRef.index);
     ueHideConfirmButton();
-    ueState.selectedAnnotation = null;
     ueRedrawAnnotations();
     showToast('Tanda tangan dihapus', 'success');
   }
@@ -197,8 +192,7 @@ export function ueApplyToAllPages(annoRef) {
   const currentPageIndex = annoRef.pageIndex;
   for (let i = 0; i < ueState.pages.length; i++) {
     if (i === currentPageIndex) continue;
-    if (!ueState.annotations[i]) ueState.annotations[i] = [];
-    ueState.annotations[i].push(createSignatureAnnotation({
+    ueAddAnnotation(i, createSignatureAnnotation({
       image: anno.image,
       imageId: anno.imageId,
       cachedImg: anno.cachedImg,

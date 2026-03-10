@@ -6,6 +6,7 @@
 import { state, ueState, createWatermarkAnnotation } from '../lib/state.js';
 import { showToast } from '../lib/utils.js';
 import { openModal, closeModal } from '../lib/navigation.js';
+import { ueAddAnnotation } from '../editor/annotations.js';
 
 export function openEditorWatermarkModal() {
   openModal('editor-watermark-modal');
@@ -37,15 +38,14 @@ export function applyEditorWatermark() {
 
     if (applyTo === 'all') {
       for (let i = 0; i < ueState.pages.length; i++) {
-        if (!ueState.annotations[i]) ueState.annotations[i] = [];
-        ueState.annotations[i].push(createWatermarkAnnotation({
+        ueAddAnnotation(i, createWatermarkAnnotation({
           text, fontSize, color, opacity, rotation,
           x: centerX, y: centerY
         }));
       }
       showToast('Watermark diterapkan ke semua halaman', 'success');
     } else {
-      ueState.annotations[ueState.selectedPage].push(watermarkAnno);
+      ueAddAnnotation(ueState.selectedPage, watermarkAnno);
       showToast('Watermark diterapkan', 'success');
     }
 
