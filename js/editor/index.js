@@ -43,6 +43,8 @@ export { initUnifiedEditorInput, ueAddFiles } from './file-loading.js';
 
 export { ueSetupCanvasEvents } from './canvas-events.js';
 
+export { ueCreateInlineTextEditor } from './inline-editor.js';
+
 export {
   ueSetTool, ueOpenSignatureModal, ueOpenParafModal, ueOpenTextModal, ueConfirmText,
   ueOpenWatermarkModal, ueOpenPageNumModal,
