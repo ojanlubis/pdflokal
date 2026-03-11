@@ -7,7 +7,7 @@
 - **Language**: Indonesian (UI text, all copy) - informal "kamu" tone
 - **Key Principle**: Privacy first - everything client-side
 - **Tech**: Vanilla JS, native ES modules, no build step, no frameworks
-- **Libraries**: pdf-lib, PDF.js, Signature Pad, Canvas API (see [docs/security.md](docs/security.md) for versions/details)
+- **Libraries**: pdf-lib, PDF.js, Signature Pad, pdf-encrypt-lite, Canvas API — all self-hosted in `js/vendor/`, zero CDN deps (see [docs/security.md](docs/security.md))
 
 ## Planned Improvements
 
@@ -67,7 +67,7 @@ pdflokal/
 │   │   ├── pagenum-modal.js
 │   │   ├── standalone-tools.js  # PDF-to-Image, Compress PDF, Protect PDF only
 │   │   └── drag-reorder.js
-│   └── vendor/               # Self-hosted libs (2.6 MB) for offline support
+│   └── vendor/               # Self-hosted libs (2.6 MB), zero CDN deps
 ├── fonts/              # Self-hosted fonts (268KB, Latin charset)
 ├── docs/               # Design + reference docs
 │   ├── architecture.md # SSOT patterns diagram (scattered vs centralized)
@@ -265,7 +265,7 @@ Hero + dropzone (opens editor), PDF tool cards (Editor, Merge, Split, PDF-to-Ima
 ### Reliability Patterns
 
 **Race condition guards:**
-- `isLoadingFiles` (file-loading.js), `isDownloading` (pdf-export.js), `isRestoring` (ueState), `ueRenderingPages` Set (page-rendering.js), `saved` closure (inline text editor)
+- `isLoadingFiles` (file-loading.js), `isDownloading` (pdf-export.js), `isRestoring` (ueState), `ueRenderingPages` Set (page-rendering.js), `saved` closure (inline text editor), `isGenerating` (img-to-pdf.js), `isProcessingDrop` (init-file-handling.js)
 
 **Resource lifecycle:**
 - `pdfDocCache` Map caches PDF.js docs, `.destroy()` on reset
