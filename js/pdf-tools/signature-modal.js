@@ -123,7 +123,7 @@ export function closeSignatureBgModal(skipHistoryBack = false) {
   const modal = document.getElementById('signature-bg-modal');
   modal.classList.remove('active');
 
-  if (state.signatureUploadImage && state.signatureUploadImage._blobUrl) {
+  if (state.signatureUploadImage?._blobUrl) {
     URL.revokeObjectURL(state.signatureUploadImage._blobUrl);
   }
   state.signatureUploadImage = null;
@@ -138,7 +138,7 @@ export function closeSignatureBgModal(skipHistoryBack = false) {
 export function updateSignatureBgPreview() {
   if (!state.signatureUploadImage) return;
 
-  const threshold = parseInt(document.getElementById('sig-bg-threshold').value);
+  const threshold = Number.parseInt(document.getElementById('sig-bg-threshold').value);
   document.getElementById('sig-bg-threshold-value').textContent = threshold;
 
   const canvas = document.getElementById('sig-bg-preview');

@@ -47,8 +47,8 @@ export function ueSetupCanvasEvents() {
     const canvas = target.closest ? target.closest('.ue-page-slot canvas') : null;
     if (!canvas) return null;
     const slot = canvas.parentElement;
-    const pageIndex = parseInt(slot.dataset.pageIndex, 10);
-    if (isNaN(pageIndex)) return null;
+    const pageIndex = Number.parseInt(slot.dataset.pageIndex, 10);
+    if (Number.isNaN(pageIndex)) return null;
     return { canvas, pageIndex };
   }
 
@@ -60,7 +60,7 @@ export function ueSetupCanvasEvents() {
   }
 
   function infoFromTouch(e) {
-    const touch = (e.touches && e.touches.length) ? e.touches[0] : e.changedTouches[0];
+    const touch = (e.touches?.length) ? e.touches[0] : e.changedTouches[0];
     const hit = getCanvasAndIndex(e.target);
     if (!hit) return null;
     const coords = ueGetCoords(touch, hit.canvas);
@@ -425,7 +425,7 @@ export function ueSetupCanvasEvents() {
     const anno = ueState.annotations[result.pageIndex][result.index];
 
     // Unlock signature
-    if (anno && anno.type === 'signature' && anno.locked) {
+    if (anno?.type === 'signature' && anno.locked) {
       anno.locked = false;
       ueState.lastLockedToastAnnotation = null;
       ueRedrawAnnotations();

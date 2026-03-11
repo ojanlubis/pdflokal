@@ -42,9 +42,9 @@ function resolveFontName(fontFamily, bold, italic) {
 function parseHexColor(hex) {
   const h = hex.replace('#', '');
   return PDFLib.rgb(
-    parseInt(h.substr(0, 2), 16) / 255,
-    parseInt(h.substr(2, 2), 16) / 255,
-    parseInt(h.substr(4, 2), 16) / 255
+    Number.parseInt(h.substr(0, 2), 16) / 255,
+    Number.parseInt(h.substr(2, 2), 16) / 255,
+    Number.parseInt(h.substr(4, 2), 16) / 255
   );
 }
 

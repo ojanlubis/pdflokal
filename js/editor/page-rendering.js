@@ -65,7 +65,7 @@ export function ueCreatePageSlots() {
 
     // Set placeholder size from thumbnail dimensions so IntersectionObserver works.
     const pageInfo = ueState.pages[i];
-    const refPage = pageInfo.canvas || (ueState.pages[0] && ueState.pages[0].canvas);
+    const refPage = pageInfo.canvas || ueState.pages[0]?.canvas;
     if (refPage) {
       const aspect = refPage.height / refPage.width;
       const placeholderW = Math.min(maxWidth, 800);
@@ -307,8 +307,8 @@ export function ueSetupIntersectionObserver() {
   ueState.pageObserver = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
       const slot = entry.target;
-      const index = parseInt(slot.dataset.pageIndex, 10);
-      if (isNaN(index)) return;
+      const index = Number.parseInt(slot.dataset.pageIndex, 10);
+      if (Number.isNaN(index)) return;
 
       const pc = ueState.pageCanvases[index];
       if (!pc) return;
@@ -425,7 +425,7 @@ export function ueDeletePage(index) {
   }
 
   // Clear selected annotation if it's on the deleted page
-  if (ueState.selectedAnnotation && ueState.selectedAnnotation.pageIndex === index) {
+  if (ueState.selectedAnnotation?.pageIndex === index) {
     ueState.selectedAnnotation = null;
     window.ueHideConfirmButton();
   }

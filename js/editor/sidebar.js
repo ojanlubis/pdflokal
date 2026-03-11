@@ -61,12 +61,12 @@ export function closeEditorFileMenu() {
 document.addEventListener('click', (e) => {
   // Sidebar file dropdown
   const sidebarDropdown = document.querySelector('.unified-sidebar .sidebar-file-dropdown');
-  if (sidebarDropdown && sidebarDropdown.classList.contains('open') && !sidebarDropdown.contains(e.target)) {
+  if (sidebarDropdown?.classList.contains('open') && !sidebarDropdown.contains(e.target)) {
     sidebarDropdown.classList.remove('open');
   }
   // Editor header file dropdown
   const editorDropdown = document.getElementById('editor-file-dropdown');
-  if (editorDropdown && editorDropdown.classList.contains('open') && !editorDropdown.contains(e.target)) {
+  if (editorDropdown?.classList.contains('open') && !editorDropdown.contains(e.target)) {
     editorDropdown.classList.remove('open');
   }
 });
@@ -162,7 +162,7 @@ function ueSetupSidebarDragDrop() {
   }
 
   function removeDropIndicator() {
-    if (ueState.sidebarDropIndicator && ueState.sidebarDropIndicator.parentNode) {
+    if (ueState.sidebarDropIndicator?.parentNode) {
       ueState.sidebarDropIndicator.remove();
     }
   }
@@ -174,7 +174,7 @@ function ueSetupSidebarDragDrop() {
     // Use window.* to avoid circular import with undo-redo
     window.ueSaveUndoState();
     draggedItem = item;
-    draggedIndex = parseInt(item.dataset.index);
+    draggedIndex = Number.parseInt(item.dataset.index);
     item.classList.add('dragging');
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', draggedIndex);
@@ -230,7 +230,7 @@ function ueSetupSidebarDragDrop() {
     if (!draggedItem) return;
 
     const indicator = ueState.sidebarDropIndicator;
-    if (!indicator || !indicator.parentNode) {
+    if (!indicator?.parentNode) {
       removeDropIndicator();
       return;
     }
@@ -239,8 +239,8 @@ function ueSetupSidebarDragDrop() {
     let insertAt = 0;
 
     const nextSibling = indicator.nextElementSibling;
-    if (nextSibling && nextSibling.classList.contains('ue-thumbnail')) {
-      insertAt = parseInt(nextSibling.dataset.index);
+    if (nextSibling?.classList.contains('ue-thumbnail')) {
+      insertAt = Number.parseInt(nextSibling.dataset.index);
     } else {
       insertAt = items.length;
     }

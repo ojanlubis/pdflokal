@@ -40,7 +40,7 @@ export { addImagesToPDF, imagesToPDF, refreshImgPdfList } from './img-to-pdf.js'
 async function updateCompressPreview() {
   if (!state.originalImage) return;
 
-  const quality = parseInt(document.getElementById('compress-quality').value) / 100;
+  const quality = Number.parseInt(document.getElementById('compress-quality').value) / 100;
   const format = document.getElementById('compress-format').value;
 
   // Update slider display
@@ -97,7 +97,7 @@ function downloadCompressedImage() {
 function updateRemoveBgPreview() {
   if (!state.originalImage) return;
 
-  const threshold = parseInt(document.getElementById('remove-bg-threshold').value);
+  const threshold = Number.parseInt(document.getElementById('remove-bg-threshold').value);
 
   // Update slider display
   document.getElementById('remove-bg-threshold-value').textContent = threshold;
@@ -145,10 +145,10 @@ function onResizeChange(changedField) {
   const aspectRatio = state.originalWidth / state.originalHeight;
 
   if (changedField === 'width') {
-    const newWidth = parseInt(document.getElementById('resize-width').value) || 0;
+    const newWidth = Number.parseInt(document.getElementById('resize-width').value) || 0;
     document.getElementById('resize-height').value = Math.round(newWidth / aspectRatio);
   } else {
-    const newHeight = parseInt(document.getElementById('resize-height').value) || 0;
+    const newHeight = Number.parseInt(document.getElementById('resize-height').value) || 0;
     document.getElementById('resize-width').value = Math.round(newHeight * aspectRatio);
   }
 
@@ -156,7 +156,7 @@ function onResizeChange(changedField) {
 }
 
 function applyResizePercent() {
-  const percent = parseInt(document.getElementById('resize-percent').value);
+  const percent = Number.parseInt(document.getElementById('resize-percent').value);
   if (!percent || !state.originalWidth || !state.originalHeight) return;
 
   document.getElementById('resize-width').value = Math.round(state.originalWidth * percent / 100);
@@ -173,8 +173,8 @@ function updateResizeDimensions() {
 }
 
 function downloadResizedImage() {
-  const newWidth = parseInt(document.getElementById('resize-width').value);
-  const newHeight = parseInt(document.getElementById('resize-height').value);
+  const newWidth = Number.parseInt(document.getElementById('resize-width').value);
+  const newHeight = Number.parseInt(document.getElementById('resize-height').value);
 
   if (!newWidth || !newHeight || !state.originalImage) {
     showToast('Masukkan dimensi yang valid', 'error');
@@ -224,7 +224,7 @@ function convertImage() {
   }
 
   const format = document.getElementById('convert-format').value;
-  const quality = parseInt(document.getElementById('convert-quality').value) / 100;
+  const quality = Number.parseInt(document.getElementById('convert-quality').value) / 100;
 
   const canvas = document.createElement('canvas');
   canvas.width = state.originalImage.naturalWidth;

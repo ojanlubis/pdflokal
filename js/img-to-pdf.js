@@ -92,7 +92,7 @@ function createImageFileItem(name, size, thumbnail, index) {
   // WHY: Read dataset.index at click time (not closure capture) so drag-reorder
   // doesn't cause the wrong item to be deleted.
   div.querySelector('.file-item-remove').addEventListener('click', () => {
-    removeImgPdfFile(parseInt(div.dataset.index, 10));
+    removeImgPdfFile(Number.parseInt(div.dataset.index, 10));
   });
 
   return div;

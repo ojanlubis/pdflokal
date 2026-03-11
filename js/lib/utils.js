@@ -23,7 +23,7 @@ export function formatFileSize(bytes) {
   const k = 1024;
   const sizes = ['Bytes', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
 export function checkFileSize(file) {
@@ -194,7 +194,7 @@ export function loadImage(file) {
 
 // Helper function to revoke blob URL from an image
 export function cleanupImage(img) {
-  if (img && img._blobUrl) {
+  if (img?._blobUrl) {
     URL.revokeObjectURL(img._blobUrl);
     img._blobUrl = null;
   }
@@ -363,7 +363,7 @@ export function releaseFocus(modalEl) {
     delete modalEl._focusTrapHandler;
   }
   const entry = focusTrapStack.pop();
-  if (entry && entry.trigger && entry.trigger.focus) {
+  if (entry?.trigger?.focus) {
     entry.trigger.focus();
   }
 }

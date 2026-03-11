@@ -17,7 +17,7 @@ export function ueRedrawAnnotations() {
 // Redraw annotations on a specific page's canvas
 export function ueRedrawPageAnnotations(index) {
   const entry = ueState.pageCanvases[index];
-  if (!entry || !entry.rendered) return;
+  if (!entry?.rendered) return;
 
   const canvas = entry.canvas;
   const ctx = canvas.getContext('2d');
@@ -36,7 +36,7 @@ export function ueRedrawPageAnnotations(index) {
 }
 
 function drawSignatureAnnotation(ctx, anno, isSelected) {
-  if (anno.cachedImg && anno.cachedImg.complete) {
+  if (anno.cachedImg?.complete) {
     ctx.drawImage(anno.cachedImg, anno.x, anno.y, anno.width, anno.height);
     if (isSelected && !anno.locked) {
       ueDrawSelectionHandles(ctx, anno.x, anno.y, anno.width, anno.height);

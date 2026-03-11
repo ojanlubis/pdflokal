@@ -43,7 +43,7 @@ export function uePmOpenModal() {
 export function uePmCloseModal(skipHistoryBack = false) {
   uePmState.isOpen = false;
 
-  if (uePmState.dropIndicator && uePmState.dropIndicator.parentNode) {
+  if (uePmState.dropIndicator?.parentNode) {
     uePmState.dropIndicator.remove();
   }
 
@@ -186,7 +186,7 @@ function uePmEnableDragReorder() {
   }
 
   function removeDropIndicator() {
-    if (uePmState.dropIndicator && uePmState.dropIndicator.parentNode) {
+    if (uePmState.dropIndicator?.parentNode) {
       uePmState.dropIndicator.remove();
     }
   }
@@ -199,7 +199,7 @@ function uePmEnableDragReorder() {
       }
       ueSaveUndoState();
       draggedItem = item;
-      draggedIndex = parseInt(item.dataset.index);
+      draggedIndex = Number.parseInt(item.dataset.index);
       uePmState.draggedIndex = draggedIndex;
       item.classList.add('dragging');
       e.dataTransfer.effectAllowed = 'move';
@@ -242,7 +242,7 @@ function uePmEnableDragReorder() {
       e.stopPropagation();
       if (!draggedItem) return;
 
-      const targetIndex = parseInt(item.dataset.index);
+      const targetIndex = Number.parseInt(item.dataset.index);
       const rect = item.getBoundingClientRect();
       const midpoint = rect.left + rect.width / 2;
       const insertAt = e.clientX < midpoint ? targetIndex : targetIndex + 1;
@@ -280,15 +280,15 @@ function uePmEnableDragReorder() {
     e.preventDefault();
 
     const indicator = uePmState.dropIndicator;
-    if (!indicator || !indicator.parentNode) {
+    if (!indicator?.parentNode) {
       removeDropIndicator();
       return;
     }
 
     const items = Array.from(container.querySelectorAll('.ue-pm-page-item'));
     const nextSibling = indicator.nextElementSibling;
-    const insertAt = (nextSibling && nextSibling.classList.contains('ue-pm-page-item'))
-      ? parseInt(nextSibling.dataset.index)
+    const insertAt = (nextSibling?.classList.contains('ue-pm-page-item'))
+      ? Number.parseInt(nextSibling.dataset.index)
       : items.length;
 
     ueReorderPages(draggedIndex, insertAt);

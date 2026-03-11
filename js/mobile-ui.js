@@ -155,7 +155,7 @@ document.addEventListener('click', function(e) {
   const dropdown = document.getElementById('mobile-tools-dropdown');
   const moreBtn = document.getElementById('ue-mobile-more-btn');
 
-  if (dropdown && dropdown.classList.contains('active')) {
+  if (dropdown?.classList.contains('active')) {
     if (!dropdown.contains(e.target) && e.target !== moreBtn && !moreBtn.contains(e.target)) {
       closeMobileTools();
     }

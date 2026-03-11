@@ -77,7 +77,7 @@ export function setupKeyboardShortcuts() {
     // Escape — close modals or go home
     if (e.key === 'Escape') {
       const shortcutsModal = document.getElementById('shortcuts-modal');
-      if (shortcutsModal && shortcutsModal.classList.contains('active')) {
+      if (shortcutsModal?.classList.contains('active')) {
         closeShortcutsModal();
         return;
       }
