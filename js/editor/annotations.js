@@ -35,6 +35,25 @@ export function ueRedrawPageAnnotations(index) {
   });
 }
 
+function drawSignatureAnnotation(ctx, anno, isSelected) {
+  if (anno.cachedImg && anno.cachedImg.complete) {
+    ctx.drawImage(anno.cachedImg, anno.x, anno.y, anno.width, anno.height);
+    if (isSelected && !anno.locked) {
+      ueDrawSelectionHandles(ctx, anno.x, anno.y, anno.width, anno.height);
+    } else if (isSelected && anno.locked) {
+      // WHY: Locked signatures show green border instead of resize handles
+      ctx.strokeStyle = '#10B981';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([]);
+      ctx.strokeRect(anno.x - 2, anno.y - 2, anno.width + 4, anno.height + 4);
+    }
+  } else if (anno.image) {
+    const img = new Image();
+    img.src = anno.image;
+    anno.cachedImg = img;
+  }
+}
+
 // Draw a single annotation
 export function ueDrawAnnotation(ctx, anno, isSelected) {
   switch (anno.type) {
@@ -57,23 +76,7 @@ export function ueDrawAnnotation(ctx, anno, isSelected) {
       }
       break;
     case 'signature':
-      if (anno.cachedImg && anno.cachedImg.complete) {
-        ctx.drawImage(anno.cachedImg, anno.x, anno.y, anno.width, anno.height);
-        // Show handles only if selected and not locked
-        if (isSelected && !anno.locked) {
-          ueDrawSelectionHandles(ctx, anno.x, anno.y, anno.width, anno.height);
-        } else if (isSelected && anno.locked) {
-          // Draw a subtle locked indicator (just border, no handles)
-          ctx.strokeStyle = '#10B981';
-          ctx.lineWidth = 2;
-          ctx.setLineDash([]);
-          ctx.strokeRect(anno.x - 2, anno.y - 2, anno.width + 4, anno.height + 4);
-        }
-      } else if (anno.image) {
-        const img = new Image();
-        img.src = anno.image;
-        anno.cachedImg = img;
-      }
+      drawSignatureAnnotation(ctx, anno, isSelected);
       break;
     case 'watermark':
       ctx.save();

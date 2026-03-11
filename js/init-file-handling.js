@@ -174,6 +174,22 @@ function initDropHints() {
 // (state.currentPDF, state.currentPDFBytes). Flag prevents re-entry.
 let isProcessingDrop = false;
 
+async function routeDroppedFile(files, file, filePDF, fileImage) {
+  track('file_loaded', { tool: 'dropzone', fileType: filePDF ? 'pdf' : 'image' });
+  if (filePDF) {
+    const { ueAddFiles } = await import('./editor/index.js');
+    showTool('unified-editor');
+    await ueAddFiles(files);
+  } else if (fileImage && files.length > 1) {
+    const { addImagesToPDF } = await import('./image-tools.js');
+    showTool('img-to-pdf');
+    await addImagesToPDF(files);
+  } else if (fileImage) {
+    showTool('compress-img');
+    await loadImageForTool(file, 'compress-img');
+  }
+}
+
 async function handleDroppedFiles(files) {
   if (!files || files.length === 0) return;
   if (isProcessingDrop) return;
@@ -200,19 +216,7 @@ async function handleDroppedFiles(files) {
 
   try {
     if (!state.currentTool) {
-      track('file_loaded', { tool: 'dropzone', fileType: filePDF ? 'pdf' : 'image' });
-      if (filePDF) {
-        const { ueAddFiles } = await import('./editor/index.js');
-        showTool('unified-editor');
-        await ueAddFiles(files);
-      } else if (fileImage && files.length > 1) {
-        const { addImagesToPDF } = await import('./image-tools.js');
-        showTool('img-to-pdf');
-        await addImagesToPDF(files);
-      } else if (fileImage) {
-        showTool('compress-img');
-        await loadImageForTool(file, 'compress-img');
-      }
+      await routeDroppedFile(files, file, filePDF, fileImage);
     }
   } catch (error) {
     console.error('Error loading file:', error);

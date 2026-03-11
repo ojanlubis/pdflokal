@@ -370,30 +370,30 @@ export function ueSetupCanvasEvents() {
     ctx.setLineDash([]);
   }
 
+  // WHY: Resize and drag share the same commit-and-cleanup pattern.
+  // Extracted to reduce cognitive complexity in handleUp.
+  function commitGesture(pageIndex, canvas) {
+    if (hasMovedOrResized && preChangeState) {
+      uePushAnnotationSnapshot(preChangeState);
+      emit('annotations:modified', { pageIndex });
+    }
+    hasMovedOrResized = false;
+    preChangeState = null;
+    canvas.style.cursor = 'default';
+  }
+
   function handleUp({ canvas, pageIndex, x, y }) {
     if (ueState.isResizing) {
-      if (hasMovedOrResized && preChangeState) {
-        uePushAnnotationSnapshot(preChangeState);
-        emit('annotations:modified', { pageIndex });
-      }
+      commitGesture(pageIndex, canvas);
       ueState.isResizing = false;
       ueState.resizeHandle = null;
       ueState.resizeStartInfo = null;
-      hasMovedOrResized = false;
-      preChangeState = null;
-      canvas.style.cursor = 'default';
       return;
     }
 
     if (ueState.isDragging) {
-      if (hasMovedOrResized && preChangeState) {
-        uePushAnnotationSnapshot(preChangeState);
-        emit('annotations:modified', { pageIndex });
-      }
+      commitGesture(pageIndex, canvas);
       ueState.isDragging = false;
-      hasMovedOrResized = false;
-      preChangeState = null;
-      canvas.style.cursor = 'default';
       return;
     }
 
