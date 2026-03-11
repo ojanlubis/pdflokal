@@ -91,7 +91,9 @@ const changelogData = [
 
 // State
 let currentPage = 1;
-let currentState = 'hidden'; // 'hidden', 'expanded', 'collapsed'
+// WHY: Tracks changelog widget state for future use (e.g. toggle logic).
+// Assigned but not yet read — prefixed to suppress lint.
+let _currentState = 'hidden'; // 'hidden', 'expanded', 'collapsed'
 const itemsPerPage = 4;
 const totalPages = Math.ceil(changelogData.length / itemsPerPage);
 
@@ -120,7 +122,7 @@ function showExpanded() {
 
   notification.classList.add('active', 'expanded');
   notification.classList.remove('collapsed');
-  currentState = 'expanded';
+  _currentState = 'expanded';
 
   currentPage = 1;
   renderChangelog();
@@ -132,7 +134,7 @@ function showCollapsed() {
 
   notification.classList.add('active', 'collapsed');
   notification.classList.remove('expanded');
-  currentState = 'collapsed';
+  _currentState = 'collapsed';
 }
 
 function openChangelog() {
@@ -145,7 +147,7 @@ function minimizeChangelog() {
 
   notification.classList.remove('expanded');
   notification.classList.add('collapsed');
-  currentState = 'collapsed';
+  _currentState = 'collapsed';
 
   const latestChangelogTitle = changelogData[0].title;
   localStorage.setItem('pdflokal_changelog_last_closed', latestChangelogTitle);
@@ -156,7 +158,7 @@ function closeChangelog() {
   if (!notification) return;
 
   notification.classList.remove('active', 'expanded', 'collapsed');
-  currentState = 'hidden';
+  _currentState = 'hidden';
 
   const latestChangelogTitle = changelogData[0].title;
   localStorage.setItem('pdflokal_changelog_last_closed', latestChangelogTitle);

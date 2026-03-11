@@ -19,7 +19,7 @@ on('pages:changed', () => ueRenderThumbnails());
 
 // Replace all files: reset editor, then open file picker
 export function ueReplaceFiles() {
-  let input = document.getElementById('ue-replace-input');
+  const input = document.getElementById('ue-replace-input');
   if (!input) return;
 
   // One-shot handler so it doesn't stack

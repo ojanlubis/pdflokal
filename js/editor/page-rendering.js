@@ -220,7 +220,7 @@ export async function ueRenderPageCanvas(index) {
       return;
     }
 
-    let baseScale = maxWidth / naturalViewport.width;
+    const baseScale = maxWidth / naturalViewport.width;
     let scale = baseScale * ueState.zoomLevel;
     scale = Math.max(scale, 0.25);
     scale = Math.min(scale, 4);
@@ -410,7 +410,7 @@ export function ueRemoveScrollSync() {
 
 // Clear PDF document cache (called from ueReset)
 export function clearPdfDocCache() {
-  pdfDocCache.forEach(doc => { try { doc.destroy(); } catch (e) { /* ignore */ } });
+  pdfDocCache.forEach(doc => { try { doc.destroy(); } catch (_e) { /* ignore */ } });
   pdfDocCache.clear();
 }
 

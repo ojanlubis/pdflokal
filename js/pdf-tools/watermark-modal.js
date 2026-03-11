@@ -57,7 +57,6 @@ export function applyEditorWatermark() {
   // Legacy editor path
   window.saveUndoState();
 
-  const canvas = document.getElementById('edit-canvas');
   const pageScale = state.editPageScales[state.currentEditPage];
   const centerX = pageScale.canvasWidth / 2;
   const centerY = pageScale.canvasHeight / 2;

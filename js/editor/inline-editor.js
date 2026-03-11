@@ -9,7 +9,7 @@ import { ueGetCurrentCanvas, getTextBounds } from './canvas-utils.js';
 import { ueRedrawAnnotations } from './annotations.js';
 import { uePushAnnotationSnapshot } from './undo-redo.js';
 
-export function ueCreateInlineTextEditor(anno, pageIndex, index) {
+export function ueCreateInlineTextEditor(anno, pageIndex) {
   const existing = document.getElementById('inline-text-editor');
   if (existing) existing.remove();
 

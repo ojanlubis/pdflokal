@@ -154,13 +154,15 @@ export async function showPDFPreview(containerId) {
     canvas.style.borderRadius = 'var(--radius-md)';
     canvas.style.boxShadow = 'var(--shadow-paper)';
 
-  } catch (error) {
+  } catch (_error) {
     container.innerHTML = '<p style="color: var(--text-tertiary)">Gagal memuat preview</p>';
   }
 }
 
 export async function compressPDF() {
-  const quality = parseInt(document.getElementById('pdf-quality').value) / 100;
+  // TODO: quality slider value not yet used — pdf-lib save() doesn't support image recompression.
+  // Keeping the DOM read for when real compression is implemented.
+  const _quality = parseInt(document.getElementById('pdf-quality').value) / 100;
 
   const progress = document.getElementById('compress-pdf-progress');
   const progressFill = progress.querySelector('.progress-fill');

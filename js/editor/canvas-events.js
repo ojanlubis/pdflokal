@@ -183,7 +183,7 @@ export function ueSetupCanvasEvents() {
 
   // --- Event handlers ---
 
-  function handleDown({ canvas, pageIndex, x, y }) {
+  function handleDown({ x, y }) {
     startX = x;
     startY = y;
 
@@ -258,7 +258,7 @@ export function ueSetupCanvasEvents() {
     isDrawing = true;
   }
 
-  function handleMove({ canvas, pageIndex, x, y }) {
+  function handleMove({ canvas, x, y }) {
     if (ueState.currentTool === 'select' && ueState.selectedAnnotation && !ueState.isResizing && !ueState.isDragging) {
       const anno = ueState.annotations[ueState.selectedAnnotation.pageIndex][ueState.selectedAnnotation.index];
       const handle = ueGetResizeHandle(anno, x, y);
@@ -420,7 +420,7 @@ export function ueSetupCanvasEvents() {
     }
   }
 
-  function handleDoubleClick({ canvas, pageIndex, x, y }) {
+  function handleDoubleClick({ x, y }) {
     if (ueState.currentTool !== 'select') return;
 
     const result = ueFindAnnotationAt(x, y);
@@ -439,6 +439,6 @@ export function ueSetupCanvasEvents() {
 
     // Edit text annotation
     if (!anno || anno.type !== 'text' || anno.locked) return;
-    ueCreateInlineTextEditor(anno, result.pageIndex, result.index);
+    ueCreateInlineTextEditor(anno, result.pageIndex);
   }
 }
