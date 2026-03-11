@@ -4,8 +4,14 @@
  */
 
 import { ueState } from '../lib/state.js';
+import { on } from '../lib/events.js';
 import { getThumbnailSource, drawRotatedThumbnail } from './canvas-utils.js';
 import { showToast, showFullscreenLoading, hideFullscreenLoading } from '../lib/utils.js';
+
+// WHY: Subscribe to pages:changed so thumbnails auto-refresh when pages are
+// added/removed/reordered. Replaces manual ueRenderThumbnails() calls scattered
+// across file-loading, page-manager, page-rendering, and undo-redo.
+on('pages:changed', () => ueRenderThumbnails());
 
 // ============================================================
 // FILE OPERATIONS

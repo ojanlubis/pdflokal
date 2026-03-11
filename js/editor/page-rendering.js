@@ -5,6 +5,7 @@
  */
 
 import { ueState, state, mobileState, OBSERVER_ROOT_MARGIN, MAX_CANVAS_DPR } from '../lib/state.js';
+import { emit } from '../lib/events.js';
 import { showToast, loadPdfDocument } from '../lib/utils.js';
 import { ueRedrawPageAnnotations } from './annotations.js';
 import { ueRenderThumbnails } from './sidebar.js';
@@ -139,6 +140,7 @@ export function ueSelectPage(index) {
   window.ueHideConfirmButton();
 
   ueState.selectedPage = index;
+  emit('page:selected', { index });
 
   // Show pages container, hide empty state
   document.getElementById('ue-empty-state').style.display = 'none';
@@ -452,8 +454,7 @@ export function ueDeletePage(index) {
     ueState.selectedPage = ueState.pages.length - 1;
   }
 
-  ueRenderThumbnails();
-  ueUpdatePageCount();
+  emit('pages:changed', { source: 'user' });
 
   if (ueState.selectedPage >= 0) {
     ueSelectPage(ueState.selectedPage);

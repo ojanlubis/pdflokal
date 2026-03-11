@@ -4,10 +4,10 @@
  */
 
 import { ueState, uePmState } from '../lib/state.js';
+import { emit } from '../lib/events.js';
 import { showToast, showFullscreenLoading, hideFullscreenLoading, downloadBlob, getDownloadFilename } from '../lib/utils.js';
 import { openModal, closeModal } from '../lib/navigation.js';
-import { ueRenderThumbnails } from './sidebar.js';
-import { ueUpdatePageCount, ueRenderSelectedPage, ueCreatePageSlots } from './page-rendering.js';
+import { ueRenderSelectedPage, ueCreatePageSlots } from './page-rendering.js';
 import { drawRotatedThumbnail } from './canvas-utils.js';
 import { ueAddFiles } from './file-loading.js';
 import { ueSaveUndoState } from './undo-redo.js';
@@ -56,8 +56,7 @@ export function uePmCloseModal(skipHistoryBack = false) {
   requestAnimationFrame(() => {
     // Rebuild DOM slots + pageCanvases to match reordered/deleted pages
     ueCreatePageSlots();
-    ueRenderThumbnails();
-    ueUpdatePageCount();
+    emit('pages:changed', { source: 'user' });
     if (ueState.selectedPage >= 0) {
       ueRenderSelectedPage();
     }
@@ -307,6 +306,7 @@ export function ueReorderPages(fromIndex, insertAt) {
   if (fromIndex < insertAt) insertAt--;
   ueState.pages.splice(insertAt, 0, movedPage);
   rebuildAnnotationMapping(oldPages);
+  emit('pages:changed', { source: 'user' });
 
   const newViewedIndex = ueState.pages.indexOf(viewedPage);
   if (newViewedIndex !== -1) ueState.selectedPage = newViewedIndex;
@@ -389,6 +389,7 @@ function uePmDeletePage(index) {
 
   ueState.pages.splice(index, 1);
   rebuildAnnotationMapping(oldPages);
+  emit('pages:changed', { source: 'user' });
 
   if (wasViewingDeletedPage) {
     ueState.selectedPage = Math.min(index, ueState.pages.length - 1);

@@ -4,6 +4,7 @@
  */
 
 import { ueState, state, mobileState, SIGNATURE_DEFAULT_WIDTH, registerImage, createSignatureAnnotation } from '../lib/state.js';
+import { emit } from '../lib/events.js';
 import { showToast } from '../lib/utils.js';
 import { ueGetCurrentCanvas } from './canvas-utils.js';
 import { ueRedrawAnnotations, ueAddAnnotation, ueRemoveAnnotation } from './annotations.js';
@@ -51,6 +52,7 @@ export async function uePlaceSignature(x, y) {
   ueState.pendingSubtype = null;
 
   ueRedrawAnnotations();
+  emit('annotations:modified', { pageIndex });
   ueShowConfirmButton(newAnno, ueState.selectedAnnotation);
 
   // WHY window.*: signatures ↔ tools circular import. tools imports signature modal openers.
@@ -178,6 +180,7 @@ export function ueDeleteSignature(annoRef) {
     ueRemoveAnnotation(annoRef.pageIndex, annoRef.index);
     ueHideConfirmButton();
     ueRedrawAnnotations();
+    emit('annotations:modified', { pageIndex: annoRef.pageIndex });
     showToast('Tanda tangan dihapus', 'success');
   }
 }
@@ -210,6 +213,7 @@ export function ueApplyToAllPages(annoRef) {
   ueHideConfirmButton();
   ueState.selectedAnnotation = null;
   ueRedrawAnnotations();
+  emit('annotations:modified', { pageIndex: -1 });
   showToast('Paraf diterapkan ke semua halaman', 'success');
 }
 

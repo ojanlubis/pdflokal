@@ -4,9 +4,9 @@
  */
 
 import { ueState, createPageInfo } from '../lib/state.js';
+import { emit } from '../lib/events.js';
 import { showToast, showFullscreenLoading, hideFullscreenLoading, checkFileSize, convertImageToPdf, isPDF, isImage, loadPdfDocument } from '../lib/utils.js';
-import { ueCreatePageSlots, ueSelectPage, ueUpdatePageCount } from './page-rendering.js';
-import { ueRenderThumbnails } from './sidebar.js';
+import { ueCreatePageSlots, ueSelectPage } from './page-rendering.js';
 import { ueSaveUndoState } from './undo-redo.js';
 import { renderPageThumbnail } from './canvas-utils.js';
 
@@ -73,8 +73,7 @@ export async function ueAddFiles(files) {
   // Rebuild page slots for new page count
   ueCreatePageSlots();
 
-  ueRenderThumbnails();
-  ueUpdatePageCount();
+  emit('pages:changed', { source: 'user' });
   document.getElementById('ue-download-btn').disabled = false;
 
   // Auto-select first page if none selected

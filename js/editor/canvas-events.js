@@ -4,6 +4,7 @@
  */
 
 import { ueState, state, DOUBLE_TAP_DELAY, DOUBLE_TAP_DISTANCE, createWhiteoutAnnotation } from '../lib/state.js';
+import { emit } from '../lib/events.js';
 import { showToast } from '../lib/utils.js';
 import { ueGetCoords, ueGetResizeHandle, getTextBounds } from './canvas-utils.js';
 import { ueRedrawAnnotations, ueFindAnnotationAt, ueAddAnnotation } from './annotations.js';
@@ -372,6 +373,7 @@ export function ueSetupCanvasEvents() {
     if (ueState.isResizing) {
       if (hasMovedOrResized && preChangeState) {
         uePushAnnotationSnapshot(preChangeState);
+        emit('annotations:modified', { pageIndex });
       }
       ueState.isResizing = false;
       ueState.resizeHandle = null;
@@ -385,6 +387,7 @@ export function ueSetupCanvasEvents() {
     if (ueState.isDragging) {
       if (hasMovedOrResized && preChangeState) {
         uePushAnnotationSnapshot(preChangeState);
+        emit('annotations:modified', { pageIndex });
       }
       ueState.isDragging = false;
       hasMovedOrResized = false;

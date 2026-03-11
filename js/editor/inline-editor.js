@@ -4,6 +4,7 @@
  */
 
 import { ueState, mobileState, buildCanvasFont } from '../lib/state.js';
+import { emit } from '../lib/events.js';
 import { ueGetCurrentCanvas, getTextBounds } from './canvas-utils.js';
 import { ueRedrawAnnotations } from './annotations.js';
 import { uePushAnnotationSnapshot } from './undo-redo.js';
@@ -65,6 +66,7 @@ export function ueCreateInlineTextEditor(anno, pageIndex, index) {
     if (newText && newText !== originalText) {
       uePushAnnotationSnapshot(JSON.parse(JSON.stringify(ueState.annotations)));
       anno.text = newText;
+      emit('annotations:modified', { pageIndex });
     }
 
     ueRedrawAnnotations();

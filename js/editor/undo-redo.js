@@ -9,6 +9,7 @@
  */
 
 import { ueState, UNDO_STACK_LIMIT, getRegisteredImage, createPageInfo } from '../lib/state.js';
+import { emit } from '../lib/events.js';
 import { showToast, loadPdfDocument } from '../lib/utils.js';
 import { ueRedrawAnnotations } from './annotations.js';
 import { renderPageThumbnail } from './canvas-utils.js';
@@ -102,6 +103,7 @@ export function ueUndo() {
     ueState.annotations = restoreAnnotations(entry.annotations);
     ueState.selectedAnnotation = null;
     ueRedrawAnnotations();
+    emit('annotations:changed', { source: 'restore' });
     showToast('Undo edit', 'info');
   }
 }
@@ -120,6 +122,7 @@ export function ueRedo() {
     ueState.annotations = restoreAnnotations(entry.annotations);
     ueState.selectedAnnotation = null;
     ueRedrawAnnotations();
+    emit('annotations:changed', { source: 'restore' });
     showToast('Redo edit', 'info');
   }
 }
@@ -151,10 +154,9 @@ async function ueRestorePages(pagesData) {
   }
   ueState.pageCaches = {};
 
-  // Use window.* to avoid circular imports with page-rendering and sidebar
+  // Use window.* to avoid circular imports with page-rendering
   window.ueCreatePageSlots();
-  window.ueRenderThumbnails();
-  window.ueUpdatePageCount();
+  emit('pages:changed', { source: 'restore' });
   if (ueState.selectedPage >= ueState.pages.length) {
     ueState.selectedPage = ueState.pages.length - 1;
   }

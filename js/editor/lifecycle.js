@@ -4,10 +4,15 @@
  */
 
 import { ueState, state, clearImageRegistry, getDefaultUeState, MAX_CANVAS_DPR } from '../lib/state.js';
+import { on } from '../lib/events.js';
 import { showToast, showFullscreenLoading, hideFullscreenLoading, safeLocalGet, safeLocalSet } from '../lib/utils.js';
 import { initUnifiedEditorInput, ueAddFiles } from './file-loading.js';
 import { ueRenderThumbnails } from './sidebar.js';
 import { ueSetupScrollSync, ueSetWrapperHeight, ueUpdatePageCount, ueRenderVisiblePages, ueRemoveScrollSync, clearPdfDocCache } from './page-rendering.js';
+
+// WHY: Subscribe to pages:changed so page count auto-updates when pages change.
+// Replaces manual ueUpdatePageCount() calls scattered across modules.
+on('pages:changed', () => ueUpdatePageCount());
 import { ueUpdateZoomDisplay } from './zoom-rotate.js';
 
 // Reset unified editor state
