@@ -66,7 +66,11 @@ export function ueMobileOpenPagePicker() {
   ueState.pages.forEach((page, index) => {
     const thumb = document.createElement('div');
     thumb.className = 'mobile-page-thumb' + (index === ueState.selectedPage ? ' selected' : '');
-    thumb.onclick = () => {
+    thumb.setAttribute('role', 'button');
+    thumb.setAttribute('tabindex', '0');
+    thumb.setAttribute('aria-label', `Halaman ${index + 1}`);
+
+    const selectThisPage = () => {
       window.ueSelectPage(index);
       ueMobileUpdatePageIndicator();
       ueMobileClosePagePicker();
@@ -75,6 +79,14 @@ export function ueMobileOpenPagePicker() {
         navigator.vibrate(10);
       }
     };
+    thumb.onclick = selectThisPage;
+    // WHY: div[role="button"] needs explicit keydown for Enter/Space activation.
+    thumb.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        selectThisPage();
+      }
+    });
 
     if (page.canvas) {
       const sourceCanvas = window.getThumbnailSource(index);

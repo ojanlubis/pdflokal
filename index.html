@@ -411,7 +411,7 @@
       <p class="mb-lg" style="color: var(--text-secondary);">⚠️ Catatan: Fitur ini mengoptimasi struktur PDF. Kompresi
         gambar memerlukan server dan belum tersedia. Hasil bervariasi.</p>
       <div class="preview-area" id="compress-pdf-preview">
-        <div class="dropzone" onclick="document.getElementById('compress-pdf-input').click()">
+        <div class="dropzone" role="button" tabindex="0" onclick="document.getElementById('compress-pdf-input').click()">
           <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
             stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -425,7 +425,7 @@
       </div>
       <div class="controls">
         <div class="control-group">
-          <label>Kualitas Gambar:</label>
+          <label for="pdf-quality">Kualitas Gambar:</label>
         </div>
         <div class="range-slider">
           <input type="range" id="pdf-quality" min="10" max="100" value="60">
@@ -503,7 +503,7 @@
               style="display:none">
           </div>
           <div class="unified-thumbnails" id="ue-thumbnails">
-            <div class="drop-hint" onclick="document.getElementById('ue-file-input').click()">
+            <div class="drop-hint" role="button" tabindex="0" onclick="document.getElementById('ue-file-input').click()">
               <svg class="drop-hint-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
                 style="width: 32px; height: 32px;">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -597,7 +597,7 @@
               <button class="signature-delete-btn" id="signature-delete-btn">✕</button>
             </div>
             <div class="unified-empty-state" id="ue-empty-state">
-              <div class="dropzone" onclick="document.getElementById('ue-file-input').click()">
+              <div class="dropzone" role="button" tabindex="0" onclick="document.getElementById('ue-file-input').click()">
                 <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
                   stroke-linecap="round" stroke-linejoin="round">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -762,7 +762,7 @@
         </h2>
       </div>
       <div class="page-grid empty" id="pdf-img-pages">
-        <div class="dropzone" onclick="document.getElementById('pdf-img-input').click()">
+        <div class="dropzone" role="button" tabindex="0" onclick="document.getElementById('pdf-img-input').click()">
           <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
             stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -776,14 +776,14 @@
       </div>
       <div class="controls">
         <div class="control-group">
-          <label>Format:</label>
+          <label for="img-format">Format:</label>
           <select id="img-format">
             <option value="png">PNG</option>
             <option value="jpeg">JPG</option>
           </select>
         </div>
         <div class="control-group">
-          <label>Skala:</label>
+          <label for="img-scale">Skala:</label>
           <select id="img-scale">
             <option value="1">1x (72 DPI)</option>
             <option value="2" selected>2x (144 DPI)</option>
@@ -824,7 +824,7 @@
         </h2>
       </div>
       <div class="preview-area" id="protect-preview">
-        <div class="dropzone" onclick="document.getElementById('protect-input').click()">
+        <div class="dropzone" role="button" tabindex="0" onclick="document.getElementById('protect-input').click()">
           <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
             stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -838,11 +838,11 @@
       </div>
       <div class="controls">
         <div class="control-group">
-          <label>Password:</label>
+          <label for="protect-password">Password:</label>
           <input type="password" id="protect-password" placeholder="Masukkan password">
         </div>
         <div class="control-group">
-          <label>Konfirmasi:</label>
+          <label for="protect-password-confirm">Konfirmasi:</label>
           <input type="password" id="protect-password-confirm" placeholder="Konfirmasi password">
         </div>
       </div>
@@ -872,7 +872,7 @@
         </h2>
       </div>
       <div class="preview-area" id="compress-img-area">
-        <div class="dropzone" id="compress-img-hint" onclick="document.getElementById('compress-img-input').click()">
+        <div class="dropzone" id="compress-img-hint" role="button" tabindex="0" onclick="document.getElementById('compress-img-input').click()">
           <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
             stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -897,14 +897,14 @@
       </div>
       <div class="controls">
         <div class="control-group">
-          <label>Kualitas:</label>
+          <label for="compress-quality">Kualitas:</label>
         </div>
         <div class="range-slider">
           <input type="range" id="compress-quality" min="10" max="100" value="80" oninput="updateCompressPreview()">
           <span class="range-value">80%</span>
         </div>
         <div class="control-group">
-          <label>Format output:</label>
+          <label for="compress-format">Format output:</label>
           <select id="compress-format" onchange="updateCompressPreview()">
             <option value="jpeg">JPG</option>
             <option value="png">PNG</option>
@@ -938,7 +938,7 @@
         </h2>
       </div>
       <div class="preview-area" id="resize-area">
-        <div class="dropzone" id="resize-hint" onclick="document.getElementById('resize-input').click()">
+        <div class="dropzone" id="resize-hint" role="button" tabindex="0" onclick="document.getElementById('resize-input').click()">
           <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
             stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -956,12 +956,12 @@
       </div>
       <div class="controls">
         <div class="control-group">
-          <label>Lebar:</label>
+          <label for="resize-width">Lebar:</label>
           <input type="number" id="resize-width" min="1" oninput="onResizeChange('width')">
           <span>px</span>
         </div>
         <div class="control-group">
-          <label>Tinggi:</label>
+          <label for="resize-height">Tinggi:</label>
           <input type="number" id="resize-height" min="1" oninput="onResizeChange('height')">
           <span>px</span>
         </div>
@@ -971,7 +971,7 @@
           </label>
         </div>
         <div class="control-group">
-          <label>Atau persentase:</label>
+          <label for="resize-percent">Atau persentase:</label>
           <select id="resize-percent" onchange="applyResizePercent()">
             <option value="">Pilih...</option>
             <option value="25">25%</option>
@@ -1008,7 +1008,7 @@
         </h2>
       </div>
       <div class="preview-area" id="convert-area">
-        <div class="dropzone" id="convert-hint" onclick="document.getElementById('convert-input').click()">
+        <div class="dropzone" id="convert-hint" role="button" tabindex="0" onclick="document.getElementById('convert-input').click()">
           <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
             stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -1026,7 +1026,7 @@
       </div>
       <div class="controls">
         <div class="control-group">
-          <label>Convert ke:</label>
+          <label for="convert-format">Convert ke:</label>
           <select id="convert-format">
             <option value="jpeg">JPG</option>
             <option value="png">PNG</option>
@@ -1034,7 +1034,7 @@
           </select>
         </div>
         <div class="control-group" id="convert-quality-group">
-          <label>Kualitas:</label>
+          <label for="convert-quality">Kualitas:</label>
         </div>
         <div class="range-slider" id="convert-quality-slider" style="max-width: 200px;">
           <input type="range" id="convert-quality" min="10" max="100" value="90">
@@ -1067,7 +1067,7 @@
         </h2>
       </div>
       <div class="file-list empty" id="img-pdf-file-list">
-        <div class="dropzone" onclick="document.getElementById('img-pdf-input').click()">
+        <div class="dropzone" role="button" tabindex="0" onclick="document.getElementById('img-pdf-input').click()">
           <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
             stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -1087,7 +1087,7 @@
         </button>
         <input type="file" id="img-pdf-input" multiple accept="image/*" style="display:none">
         <div class="control-group">
-          <label>Ukuran halaman:</label>
+          <label for="img-pdf-size">Ukuran halaman:</label>
           <select id="img-pdf-size">
             <option value="a4">A4</option>
             <option value="letter">Letter</option>
@@ -1095,7 +1095,7 @@
           </select>
         </div>
         <div class="control-group">
-          <label>Orientasi:</label>
+          <label for="img-pdf-orientation">Orientasi:</label>
           <select id="img-pdf-orientation">
             <option value="portrait">Portrait</option>
             <option value="landscape">Landscape</option>
@@ -1137,7 +1137,7 @@
       <p class="mb-lg" style="color: var(--text-secondary);">Upload gambar dan atur threshold untuk mengubah warna
         putih/terang menjadi transparan.</p>
       <div class="preview-area" id="remove-bg-area">
-        <div class="dropzone" id="remove-bg-hint" onclick="document.getElementById('remove-bg-input').click()">
+        <div class="dropzone" id="remove-bg-hint" role="button" tabindex="0" onclick="document.getElementById('remove-bg-input').click()">
           <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
             stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -1163,7 +1163,7 @@
       </div>
       <div class="controls">
         <div class="control-group">
-          <label>Threshold Putih:</label>
+          <label for="remove-bg-threshold">Threshold Putih:</label>
         </div>
         <div class="range-slider">
           <input type="range" id="remove-bg-threshold" min="200" max="255" value="240"
@@ -1251,7 +1251,7 @@
         </div>
         <div class="controls" style="justify-content: center; margin-top: var(--space-lg);">
           <div class="control-group">
-            <label>Threshold:</label>
+            <label for="sig-bg-threshold">Threshold:</label>
           </div>
           <div class="range-slider" style="max-width: 250px;">
             <input type="range" id="sig-bg-threshold" min="180" max="255" value="230"
@@ -1290,7 +1290,7 @@
         <div class="edit-text-options">
           <!-- Font Family -->
           <div class="edit-option-group">
-            <label>Font</label>
+            <label for="modal-font-family">Font</label>
             <select id="modal-font-family">
               <option value="Helvetica" selected>Helvetica</option>
               <option value="Times-Roman">Times Roman</option>
@@ -1302,7 +1302,7 @@
 
           <!-- Font Size - Number Input -->
           <div class="edit-option-group">
-            <label>Ukuran</label>
+            <label for="modal-font-size">Ukuran</label>
             <div class="font-size-input-wrap">
               <input type="number" id="modal-font-size" value="16" min="6" max="120" step="1">
               <span class="font-size-unit">pt</span>
@@ -1325,21 +1325,21 @@
 
         <!-- Color Options -->
         <div class="edit-text-color-section">
-          <label>Warna</label>
+          <label for="modal-text-color">Warna</label>
           <div class="color-options-row">
             <div class="color-presets">
               <button type="button" class="color-preset-btn" data-color="#000000" style="background:#000000"
-                title="Hitam"></button>
+                title="Hitam" aria-label="Hitam"></button>
               <button type="button" class="color-preset-btn" data-color="#DC2626" style="background:#DC2626"
-                title="Merah"></button>
+                title="Merah" aria-label="Merah"></button>
               <button type="button" class="color-preset-btn" data-color="#2563EB" style="background:#2563EB"
-                title="Biru"></button>
+                title="Biru" aria-label="Biru"></button>
               <button type="button" class="color-preset-btn" data-color="#16A34A" style="background:#16A34A"
-                title="Hijau"></button>
+                title="Hijau" aria-label="Hijau"></button>
               <button type="button" class="color-preset-btn" data-color="#9333EA" style="background:#9333EA"
-                title="Ungu"></button>
+                title="Ungu" aria-label="Ungu"></button>
               <button type="button" class="color-preset-btn" data-color="#EA580C" style="background:#EA580C"
-                title="Oranye"></button>
+                title="Oranye" aria-label="Oranye"></button>
             </div>
             <input type="color" id="modal-text-color" value="#000000" title="Pilih warna lain">
           </div>
@@ -1363,12 +1363,12 @@
       <h3>Tambah Watermark</h3>
       <div class="edit-modal-content">
         <div class="edit-option-group">
-          <label>Teks Watermark</label>
+          <label for="editor-wm-text">Teks Watermark</label>
           <input type="text" id="editor-wm-text" class="edit-text-input" value="CONFIDENTIAL" style="min-height: auto;">
         </div>
         <div class="edit-text-options">
           <div class="edit-option-group">
-            <label>Ukuran Font</label>
+            <label for="editor-wm-size">Ukuran Font</label>
             <select id="editor-wm-size">
               <option value="24">24pt</option>
               <option value="36">36pt</option>
@@ -1378,15 +1378,15 @@
             </select>
           </div>
           <div class="edit-option-group">
-            <label>Warna</label>
+            <label for="editor-wm-color">Warna</label>
             <input type="color" id="editor-wm-color" value="#888888">
           </div>
           <div class="edit-option-group">
-            <label>Opacity</label>
+            <label for="editor-wm-opacity">Opacity</label>
             <input type="range" id="editor-wm-opacity" min="10" max="100" value="30">
           </div>
           <div class="edit-option-group">
-            <label>Rotasi</label>
+            <label for="editor-wm-rotation">Rotasi</label>
             <select id="editor-wm-rotation">
               <option value="-45" selected>-45°</option>
               <option value="-30">-30°</option>
@@ -1397,7 +1397,7 @@
           </div>
         </div>
         <div class="edit-option-group">
-          <label>Terapkan ke</label>
+          <label for="editor-wm-pages">Terapkan ke</label>
           <select id="editor-wm-pages">
             <option value="all">Semua halaman</option>
             <option value="current">Halaman ini saja</option>
@@ -1418,7 +1418,7 @@
       <div class="edit-modal-content">
         <div class="edit-text-options">
           <div class="edit-option-group">
-            <label>Posisi</label>
+            <label for="editor-pn-position">Posisi</label>
             <select id="editor-pn-position">
               <option value="bottom-center" selected>Bawah Tengah</option>
               <option value="bottom-left">Bawah Kiri</option>
@@ -1429,7 +1429,7 @@
             </select>
           </div>
           <div class="edit-option-group">
-            <label>Format</label>
+            <label for="editor-pn-format">Format</label>
             <select id="editor-pn-format">
               <option value="number" selected>1, 2, 3...</option>
               <option value="page-of">Halaman 1 dari N</option>
@@ -1437,7 +1437,7 @@
             </select>
           </div>
           <div class="edit-option-group">
-            <label>Ukuran Font</label>
+            <label for="editor-pn-size">Ukuran Font</label>
             <select id="editor-pn-size">
               <option value="10">10pt</option>
               <option value="12" selected>12pt</option>
@@ -1446,7 +1446,7 @@
             </select>
           </div>
           <div class="edit-option-group">
-            <label>Mulai dari</label>
+            <label for="editor-pn-start">Mulai dari</label>
             <input type="number" id="editor-pn-start" value="1" min="1" style="width: 60px;">
           </div>
         </div>
@@ -1464,11 +1464,11 @@
       <h3>Kunci PDF</h3>
       <div class="edit-modal-content">
         <div class="edit-option-group" style="width: 100%;">
-          <label>Password</label>
+          <label for="editor-protect-password">Password</label>
           <input type="password" id="editor-protect-password" class="edit-text-input" placeholder="Masukkan password">
         </div>
         <div class="edit-option-group" style="width: 100%;">
-          <label>Konfirmasi Password</label>
+          <label for="editor-protect-confirm">Konfirmasi Password</label>
           <input type="password" id="editor-protect-confirm" class="edit-text-input" placeholder="Konfirmasi password">
         </div>
         <p class="modal-note">PDF akan di-download dengan proteksi password</p>

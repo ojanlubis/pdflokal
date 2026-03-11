@@ -151,6 +151,17 @@ function initDropHints() {
       e.preventDefault();
       hint.classList.remove('drag-over');
     });
+
+    // WHY: div[role="button"] needs explicit keydown for Enter/Space activation.
+    // Native <button> gets this for free, but dropzones are divs for drag-drop styling.
+    if (hint.getAttribute('role') === 'button') {
+      hint.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          hint.click();
+        }
+      });
+    }
   });
 }
 
