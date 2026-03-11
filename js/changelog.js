@@ -23,6 +23,11 @@
 // Changelog data - Add new updates at the beginning of the array
 const changelogData = [
   {
+    title: "Hubungi Kami! 💬",
+    description: "Sekarang kamu bisa langsung ngobrol sama developer PDFLokal! Mau lapor bug, minta fitur baru, atau cuma mau bilang hai — tulis aja di <a href=\"https://forms.gle/KPDWVAuc91pVjuWq6\" target=\"_blank\">sini</a>. Anonim, gak perlu login.",
+    date: "11 Maret 2026"
+  },
+  {
     title: "Editor Lebih Luas dan Rapi! \u{2728}",
     description: "Tampilan editor PDF sekarang jauh lebih luas \u{1F64C} Toolbar, header, dan sidebar sudah dirapikan supaya dokumen kamu jadi lebih besar dan enak dilihat. Semua fitur tetap ada di tempatnya \u{2014} cuma lebih rapi dan nggak makan tempat.",
     date: "20 Februari 2026"
