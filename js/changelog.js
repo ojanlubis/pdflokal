@@ -109,9 +109,7 @@ function initChangelog() {
     badgeTitle.textContent = 'Update Terbaru!';
   }
 
-  if (!lastClosedTitle) {
-    showCollapsed();
-  } else if (lastClosedTitle !== latestChangelogTitle) {
+  if (!lastClosedTitle || lastClosedTitle !== latestChangelogTitle) {
     showCollapsed();
   }
 }
@@ -175,9 +173,7 @@ function restoreChangelog() {
   const latestChangelogTitle = changelogData[0].title;
   const lastClosedTitle = localStorage.getItem('pdflokal_changelog_last_closed');
 
-  if (lastClosedTitle && lastClosedTitle !== latestChangelogTitle) {
-    showCollapsed();
-  } else if (!lastClosedTitle) {
+  if (!lastClosedTitle || lastClosedTitle !== latestChangelogTitle) {
     showCollapsed();
   }
 }

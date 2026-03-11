@@ -171,25 +171,25 @@ export function uePmRenderPages() {
   uePmUpdateUI();
 }
 
+function uePmGetDropIndicator() {
+  if (!uePmState.dropIndicator) {
+    uePmState.dropIndicator = document.createElement('div');
+    uePmState.dropIndicator.className = 'ue-pm-drop-indicator';
+  }
+  return uePmState.dropIndicator;
+}
+
+function uePmRemoveDropIndicator() {
+  if (uePmState.dropIndicator?.parentNode) {
+    uePmState.dropIndicator.remove();
+  }
+}
+
 // Enable drag-drop reordering in page manager
 function uePmEnableDragReorder() {
   const container = document.getElementById('ue-pm-pages');
   let draggedItem = null;
   let draggedIndex = -1;
-
-  function getDropIndicator() {
-    if (!uePmState.dropIndicator) {
-      uePmState.dropIndicator = document.createElement('div');
-      uePmState.dropIndicator.className = 'ue-pm-drop-indicator';
-    }
-    return uePmState.dropIndicator;
-  }
-
-  function removeDropIndicator() {
-    if (uePmState.dropIndicator?.parentNode) {
-      uePmState.dropIndicator.remove();
-    }
-  }
 
   container.querySelectorAll('.ue-pm-page-item').forEach((item) => {
     item.addEventListener('dragstart', (e) => {
@@ -212,7 +212,7 @@ function uePmEnableDragReorder() {
         draggedItem = null;
       }
       uePmState.draggedIndex = -1;
-      removeDropIndicator();
+      uePmRemoveDropIndicator();
     });
 
     item.addEventListener('dragover', (e) => {
@@ -223,7 +223,7 @@ function uePmEnableDragReorder() {
 
       const rect = item.getBoundingClientRect();
       const midpoint = rect.left + rect.width / 2;
-      const indicator = getDropIndicator();
+      const indicator = uePmGetDropIndicator();
 
       if (e.clientX < midpoint) {
         item.before(indicator);
@@ -249,7 +249,7 @@ function uePmEnableDragReorder() {
 
       ueReorderPages(draggedIndex, insertAt);
       uePmRenderPages();
-      removeDropIndicator();
+      uePmRemoveDropIndicator();
     });
   });
 
@@ -261,7 +261,7 @@ function uePmEnableDragReorder() {
     const items = container.querySelectorAll('.ue-pm-page-item:not(.dragging)');
     if (items.length === 0) return;
 
-    const indicator = getDropIndicator();
+    const indicator = uePmGetDropIndicator();
     const firstItem = items[0];
     const lastItem = items[items.length - 1];
     const firstRect = firstItem.getBoundingClientRect();
@@ -281,7 +281,7 @@ function uePmEnableDragReorder() {
 
     const indicator = uePmState.dropIndicator;
     if (!indicator?.parentNode) {
-      removeDropIndicator();
+      uePmRemoveDropIndicator();
       return;
     }
 
@@ -293,7 +293,7 @@ function uePmEnableDragReorder() {
 
     ueReorderPages(draggedIndex, insertAt);
     uePmRenderPages();
-    removeDropIndicator();
+    uePmRemoveDropIndicator();
   });
 }
 

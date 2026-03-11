@@ -18,6 +18,15 @@ import {
   ueShowConfirmButton, ueHideConfirmButton, ueUpdateConfirmButtonPosition
 } from './signatures.js';
 
+function getCanvasAndIndex(target) {
+  const canvas = target.closest ? target.closest('.ue-page-slot canvas') : null;
+  if (!canvas) return null;
+  const slot = canvas.parentElement;
+  const pageIndex = Number.parseInt(slot.dataset.pageIndex, 10);
+  if (Number.isNaN(pageIndex)) return null;
+  return { canvas, pageIndex };
+}
+
 export function ueSetupCanvasEvents() {
   if (ueState.eventsSetup) return;
   ueState.eventsSetup = true;
@@ -42,15 +51,6 @@ export function ueSetupCanvasEvents() {
   // Pinch-to-zoom state
   let pinchStartDist = 0;
   let isPinching = false;
-
-  function getCanvasAndIndex(target) {
-    const canvas = target.closest ? target.closest('.ue-page-slot canvas') : null;
-    if (!canvas) return null;
-    const slot = canvas.parentElement;
-    const pageIndex = Number.parseInt(slot.dataset.pageIndex, 10);
-    if (Number.isNaN(pageIndex)) return null;
-    return { canvas, pageIndex };
-  }
 
   function infoFromMouse(e) {
     const hit = getCanvasAndIndex(e.target);

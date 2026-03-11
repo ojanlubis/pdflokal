@@ -62,7 +62,7 @@ export function ueDrawAnnotation(ctx, anno, isSelected) {
       ctx.fillRect(anno.x, anno.y, anno.width, anno.height);
       if (isSelected) ueDrawSelectionHandles(ctx, anno.x, anno.y, anno.width, anno.height);
       break;
-    case 'text':
+    case 'text': {
       // Skip rendering if currently being edited
       if (anno._editing) break;
 
@@ -75,6 +75,7 @@ export function ueDrawAnnotation(ctx, anno, isSelected) {
         ueDrawSelectionHandles(ctx, bounds.x - 2, bounds.y - 2, bounds.width + 4, bounds.height + 4);
       }
       break;
+    }
     case 'signature':
       drawSignatureAnnotation(ctx, anno, isSelected);
       break;
@@ -166,10 +167,11 @@ export function ueFindAnnotationAt(pageIndexOrX, xOrY, maybeY) {
       case 'signature':
         bounds = { x: anno.x, y: anno.y, w: anno.width, h: anno.height };
         break;
-      case 'text':
+      case 'text': {
         const textBounds = getTextBounds(anno);
         bounds = { x: textBounds.x, y: textBounds.y, w: textBounds.width, h: textBounds.height };
         break;
+      }
       default:
         continue;
     }

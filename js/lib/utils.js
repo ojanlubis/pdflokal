@@ -116,7 +116,7 @@ export function downloadBlob(blob, filename) {
   a.download = filename;
   document.body.appendChild(a);
   a.click();
-  document.body.removeChild(a);
+  a.remove();
   URL.revokeObjectURL(url);
 }
 
@@ -129,8 +129,11 @@ export function showToast(message, type = 'info') {
 
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
+  let icon = 'ℹ';
+  if (type === 'success') icon = '✓';
+  else if (type === 'error') icon = '✕';
   toast.innerHTML = `
-    ${type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ'}
+    ${icon}
     <span>${message}</span>
   `;
 
@@ -349,8 +352,8 @@ export function trapFocus(modalEl) {
     if (focusable.length === 0) { e.preventDefault(); return; }
     if (e.shiftKey) {
       if (document.activeElement === first) { e.preventDefault(); last.focus(); }
-    } else {
-      if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+    } else if (document.activeElement === last) {
+      e.preventDefault(); first.focus();
     }
   };
   modalEl._focusTrapHandler = handler;

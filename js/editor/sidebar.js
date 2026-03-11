@@ -144,6 +144,20 @@ export function ueRenderThumbnails() {
   ueSetupSidebarDragDrop();
 }
 
+function getSidebarDropIndicator() {
+  if (!ueState.sidebarDropIndicator) {
+    ueState.sidebarDropIndicator = document.createElement('div');
+    ueState.sidebarDropIndicator.className = 'ue-sidebar-drop-indicator';
+  }
+  return ueState.sidebarDropIndicator;
+}
+
+function removeSidebarDropIndicator() {
+  if (ueState.sidebarDropIndicator?.parentNode) {
+    ueState.sidebarDropIndicator.remove();
+  }
+}
+
 // Setup sidebar drag-drop reordering
 function ueSetupSidebarDragDrop() {
   const container = document.getElementById('ue-thumbnails');
@@ -152,20 +166,6 @@ function ueSetupSidebarDragDrop() {
 
   let draggedItem = null;
   let draggedIndex = -1;
-
-  function getDropIndicator() {
-    if (!ueState.sidebarDropIndicator) {
-      ueState.sidebarDropIndicator = document.createElement('div');
-      ueState.sidebarDropIndicator.className = 'ue-sidebar-drop-indicator';
-    }
-    return ueState.sidebarDropIndicator;
-  }
-
-  function removeDropIndicator() {
-    if (ueState.sidebarDropIndicator?.parentNode) {
-      ueState.sidebarDropIndicator.remove();
-    }
-  }
 
   container.addEventListener('dragstart', (e) => {
     const item = e.target.closest('.ue-thumbnail');
@@ -187,7 +187,7 @@ function ueSetupSidebarDragDrop() {
     }
     draggedItem = null;
     draggedIndex = -1;
-    removeDropIndicator();
+    removeSidebarDropIndicator();
   });
 
   container.addEventListener('dragover', (e) => {
@@ -200,7 +200,7 @@ function ueSetupSidebarDragDrop() {
       const items = container.querySelectorAll('.ue-thumbnail:not(.dragging)');
       if (items.length === 0) return;
 
-      const indicator = getDropIndicator();
+      const indicator = getSidebarDropIndicator();
       const firstItem = items[0];
       const lastItem = items[items.length - 1];
       const firstRect = firstItem.getBoundingClientRect();
@@ -216,7 +216,7 @@ function ueSetupSidebarDragDrop() {
 
     const rect = item.getBoundingClientRect();
     const midpoint = rect.top + rect.height / 2;
-    const indicator = getDropIndicator();
+    const indicator = getSidebarDropIndicator();
 
     if (e.clientY < midpoint) {
       item.before(indicator);
@@ -231,7 +231,7 @@ function ueSetupSidebarDragDrop() {
 
     const indicator = ueState.sidebarDropIndicator;
     if (!indicator?.parentNode) {
-      removeDropIndicator();
+      removeSidebarDropIndicator();
       return;
     }
 
@@ -253,6 +253,6 @@ function ueSetupSidebarDragDrop() {
     window.ueCreatePageSlots();
     ueRenderThumbnails();
 
-    removeDropIndicator();
+    removeSidebarDropIndicator();
   });
 }
