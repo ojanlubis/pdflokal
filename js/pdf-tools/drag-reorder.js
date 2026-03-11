@@ -30,9 +30,9 @@ export function enableDragReorder(containerId, stateArray, isPages = false) {
       const midX = rect.left + rect.width / 2;
 
       if (e.clientX < midX) {
-        container.insertBefore(draggedItem, item);
+        item.before(draggedItem);
       } else {
-        container.insertBefore(draggedItem, item.nextSibling);
+        item.after(draggedItem);
       }
 
       updateStateOrder(container, stateArray, isPages);
@@ -46,11 +46,11 @@ function updateStateOrder(container, stateArray, isPages) {
 
   items.forEach(item => {
     if (isPages) {
-      const pageNum = parseInt(item.dataset.page);
-      if (!isNaN(pageNum)) newOrder.push(pageNum);
+      const pageNum = Number.parseInt(item.dataset.page);
+      if (!Number.isNaN(pageNum)) newOrder.push(pageNum);
     } else {
-      const index = parseInt(item.dataset.index);
-      if (!isNaN(index) && stateArray[index]) {
+      const index = Number.parseInt(item.dataset.index);
+      if (!Number.isNaN(index) && stateArray[index]) {
         newOrder.push(stateArray[index]);
       }
     }

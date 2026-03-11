@@ -43,7 +43,7 @@ export function uePmOpenModal() {
 export function uePmCloseModal(skipHistoryBack = false) {
   uePmState.isOpen = false;
 
-  if (uePmState.dropIndicator && uePmState.dropIndicator.parentNode) {
+  if (uePmState.dropIndicator?.parentNode) {
     uePmState.dropIndicator.remove();
   }
 
@@ -171,25 +171,25 @@ export function uePmRenderPages() {
   uePmUpdateUI();
 }
 
+function uePmGetDropIndicator() {
+  if (!uePmState.dropIndicator) {
+    uePmState.dropIndicator = document.createElement('div');
+    uePmState.dropIndicator.className = 'ue-pm-drop-indicator';
+  }
+  return uePmState.dropIndicator;
+}
+
+function uePmRemoveDropIndicator() {
+  if (uePmState.dropIndicator?.parentNode) {
+    uePmState.dropIndicator.remove();
+  }
+}
+
 // Enable drag-drop reordering in page manager
 function uePmEnableDragReorder() {
   const container = document.getElementById('ue-pm-pages');
   let draggedItem = null;
   let draggedIndex = -1;
-
-  function getDropIndicator() {
-    if (!uePmState.dropIndicator) {
-      uePmState.dropIndicator = document.createElement('div');
-      uePmState.dropIndicator.className = 'ue-pm-drop-indicator';
-    }
-    return uePmState.dropIndicator;
-  }
-
-  function removeDropIndicator() {
-    if (uePmState.dropIndicator && uePmState.dropIndicator.parentNode) {
-      uePmState.dropIndicator.remove();
-    }
-  }
 
   container.querySelectorAll('.ue-pm-page-item').forEach((item) => {
     item.addEventListener('dragstart', (e) => {
@@ -199,7 +199,7 @@ function uePmEnableDragReorder() {
       }
       ueSaveUndoState();
       draggedItem = item;
-      draggedIndex = parseInt(item.dataset.index);
+      draggedIndex = Number.parseInt(item.dataset.index);
       uePmState.draggedIndex = draggedIndex;
       item.classList.add('dragging');
       e.dataTransfer.effectAllowed = 'move';
@@ -212,7 +212,7 @@ function uePmEnableDragReorder() {
         draggedItem = null;
       }
       uePmState.draggedIndex = -1;
-      removeDropIndicator();
+      uePmRemoveDropIndicator();
     });
 
     item.addEventListener('dragover', (e) => {
@@ -223,7 +223,7 @@ function uePmEnableDragReorder() {
 
       const rect = item.getBoundingClientRect();
       const midpoint = rect.left + rect.width / 2;
-      const indicator = getDropIndicator();
+      const indicator = uePmGetDropIndicator();
 
       if (e.clientX < midpoint) {
         item.before(indicator);
@@ -242,14 +242,14 @@ function uePmEnableDragReorder() {
       e.stopPropagation();
       if (!draggedItem) return;
 
-      const targetIndex = parseInt(item.dataset.index);
+      const targetIndex = Number.parseInt(item.dataset.index);
       const rect = item.getBoundingClientRect();
       const midpoint = rect.left + rect.width / 2;
       const insertAt = e.clientX < midpoint ? targetIndex : targetIndex + 1;
 
       ueReorderPages(draggedIndex, insertAt);
       uePmRenderPages();
-      removeDropIndicator();
+      uePmRemoveDropIndicator();
     });
   });
 
@@ -261,7 +261,7 @@ function uePmEnableDragReorder() {
     const items = container.querySelectorAll('.ue-pm-page-item:not(.dragging)');
     if (items.length === 0) return;
 
-    const indicator = getDropIndicator();
+    const indicator = uePmGetDropIndicator();
     const firstItem = items[0];
     const lastItem = items[items.length - 1];
     const firstRect = firstItem.getBoundingClientRect();
@@ -280,20 +280,20 @@ function uePmEnableDragReorder() {
     e.preventDefault();
 
     const indicator = uePmState.dropIndicator;
-    if (!indicator || !indicator.parentNode) {
-      removeDropIndicator();
+    if (!indicator?.parentNode) {
+      uePmRemoveDropIndicator();
       return;
     }
 
     const items = Array.from(container.querySelectorAll('.ue-pm-page-item'));
     const nextSibling = indicator.nextElementSibling;
-    const insertAt = (nextSibling && nextSibling.classList.contains('ue-pm-page-item'))
-      ? parseInt(nextSibling.dataset.index)
+    const insertAt = (nextSibling?.classList.contains('ue-pm-page-item'))
+      ? Number.parseInt(nextSibling.dataset.index)
       : items.length;
 
     ueReorderPages(draggedIndex, insertAt);
     uePmRenderPages();
-    removeDropIndicator();
+    uePmRemoveDropIndicator();
   });
 }
 
@@ -334,6 +334,36 @@ export function rebuildAnnotationMapping(oldPages) {
   ueState.pageCaches = newCaches;
 }
 
+function updateRotatedThumbnail(item, page) {
+  const oldCanvas = item.querySelector('canvas');
+  const sourceCanvas = page.thumbCanvas || null;
+  if (!oldCanvas || !sourceCanvas) return;
+
+  const newCanvas = page.rotation !== 0
+    ? drawRotatedThumbnail(sourceCanvas, page.rotation)
+    : (() => { const c = document.createElement('canvas'); c.width = sourceCanvas.width; c.height = sourceCanvas.height; c.getContext('2d').drawImage(sourceCanvas, 0, 0); return c; })();
+  oldCanvas.replaceWith(newCanvas);
+}
+
+function updateRotationBadge(item, page) {
+  let rotBadge = item.querySelector('.ue-pm-rotation-badge');
+  if (page.rotation !== 0) {
+    if (!rotBadge) {
+      rotBadge = document.createElement('span');
+      rotBadge.className = 'ue-pm-rotation-badge';
+      const actions = item.querySelector('.ue-pm-page-actions');
+      if (actions) {
+        actions.before(rotBadge);
+      } else {
+        item.appendChild(rotBadge);
+      }
+    }
+    rotBadge.textContent = page.rotation + '°';
+  } else if (rotBadge) {
+    rotBadge.remove();
+  }
+}
+
 // Rotate a page in the modal
 function uePmRotatePage(index, degrees) {
   ueSaveUndoState();
@@ -344,31 +374,8 @@ function uePmRotatePage(index, degrees) {
 
   const item = document.querySelector(`.ue-pm-page-item[data-index="${index}"]`);
   if (item) {
-    const oldCanvas = item.querySelector('canvas');
-    const sourceCanvas = ueState.pages[index]?.thumbCanvas || null;
-    if (oldCanvas && sourceCanvas) {
-      const newCanvas = page.rotation !== 0
-        ? drawRotatedThumbnail(sourceCanvas, page.rotation)
-        : (() => { const c = document.createElement('canvas'); c.width = sourceCanvas.width; c.height = sourceCanvas.height; c.getContext('2d').drawImage(sourceCanvas, 0, 0); return c; })();
-      oldCanvas.replaceWith(newCanvas);
-    }
-
-    let rotBadge = item.querySelector('.ue-pm-rotation-badge');
-    if (page.rotation !== 0) {
-      if (!rotBadge) {
-        rotBadge = document.createElement('span');
-        rotBadge.className = 'ue-pm-rotation-badge';
-        const actions = item.querySelector('.ue-pm-page-actions');
-        if (actions) {
-          item.insertBefore(rotBadge, actions);
-        } else {
-          item.appendChild(rotBadge);
-        }
-      }
-      rotBadge.textContent = page.rotation + '°';
-    } else if (rotBadge) {
-      rotBadge.remove();
-    }
+    updateRotatedThumbnail(item, page);
+    updateRotationBadge(item, page);
   }
 
   showToast('Halaman diputar', 'success');

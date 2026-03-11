@@ -18,6 +18,15 @@ import {
   ueShowConfirmButton, ueHideConfirmButton, ueUpdateConfirmButtonPosition
 } from './signatures.js';
 
+function getCanvasAndIndex(target) {
+  const canvas = target.closest ? target.closest('.ue-page-slot canvas') : null;
+  if (!canvas) return null;
+  const slot = canvas.parentElement;
+  const pageIndex = Number.parseInt(slot.dataset.pageIndex, 10);
+  if (Number.isNaN(pageIndex)) return null;
+  return { canvas, pageIndex };
+}
+
 export function ueSetupCanvasEvents() {
   if (ueState.eventsSetup) return;
   ueState.eventsSetup = true;
@@ -43,15 +52,6 @@ export function ueSetupCanvasEvents() {
   let pinchStartDist = 0;
   let isPinching = false;
 
-  function getCanvasAndIndex(target) {
-    const canvas = target.closest ? target.closest('.ue-page-slot canvas') : null;
-    if (!canvas) return null;
-    const slot = canvas.parentElement;
-    const pageIndex = parseInt(slot.dataset.pageIndex, 10);
-    if (isNaN(pageIndex)) return null;
-    return { canvas, pageIndex };
-  }
-
   function infoFromMouse(e) {
     const hit = getCanvasAndIndex(e.target);
     if (!hit) return null;
@@ -60,7 +60,7 @@ export function ueSetupCanvasEvents() {
   }
 
   function infoFromTouch(e) {
-    const touch = (e.touches && e.touches.length) ? e.touches[0] : e.changedTouches[0];
+    const touch = (e.touches?.length) ? e.touches[0] : e.changedTouches[0];
     const hit = getCanvasAndIndex(e.target);
     if (!hit) return null;
     const coords = ueGetCoords(touch, hit.canvas);
@@ -184,6 +184,74 @@ export function ueSetupCanvasEvents() {
 
   // --- Event handlers ---
 
+  // WHY: Extracted from handleDown to reduce cognitive complexity (S3776).
+  // Returns true if the event was fully handled (caller should return early).
+  function handleSelectDown(x, y) {
+    // Check resize handle on already-selected annotation
+    if (ueState.selectedAnnotation) {
+      const anno = ueState.annotations[ueState.selectedAnnotation.pageIndex][ueState.selectedAnnotation.index];
+      const handle = ueGetResizeHandle(anno, x, y);
+      if (handle) {
+        hasMovedOrResized = false;
+        preChangeState = JSON.parse(JSON.stringify(ueState.annotations));
+        ueState.isResizing = true;
+        ueState.resizeHandle = handle;
+
+        if (anno.type === 'text') {
+          const bounds = getTextBounds(anno);
+          ueState.resizeStartInfo = {
+            x: anno.x, y: anno.y, fontSize: anno.fontSize,
+            width: bounds.width, height: bounds.height
+          };
+        } else {
+          ueState.resizeStartInfo = {
+            x: anno.x, y: anno.y,
+            width: anno.width, height: anno.height,
+            aspectRatio: anno.width / anno.height
+          };
+        }
+        return true;
+      }
+    }
+
+    // Check if clicked on an annotation
+    const clicked = ueFindAnnotationAt(x, y);
+    if (clicked) {
+      const anno = ueState.annotations[clicked.pageIndex][clicked.index];
+      if (anno.locked) {
+        if (anno.type === 'signature') {
+          const annoId = `${clicked.pageIndex}-${clicked.index}`;
+          if (ueState.lastLockedToastAnnotation !== annoId) {
+            showToast('Tanda tangan terkunci. Klik dua kali untuk membuka kunci.', 'info');
+            ueState.lastLockedToastAnnotation = annoId;
+          }
+        }
+        ueState.selectedAnnotation = clicked;
+        ueRedrawAnnotations();
+        return true;
+      }
+      hasMovedOrResized = false;
+      preChangeState = JSON.parse(JSON.stringify(ueState.annotations));
+      ueState.selectedAnnotation = clicked;
+      ueState.lastLockedToastAnnotation = null;
+      ueState.isDragging = true;
+      dragOffsetX = x - anno.x;
+      // WHY fontSize offset: Text annotations use baseline Y (bottom of first line),
+      // not top-left. Subtract fontSize to get bounding box top for drag offset.
+      dragOffsetY = y - (anno.type === 'text' ? anno.y - anno.fontSize : anno.y);
+      ueRedrawAnnotations();
+      ueShowConfirmButton(anno, clicked);
+      return true;
+    }
+
+    // Clicked empty space — deselect
+    ueState.selectedAnnotation = null;
+    ueState.lastLockedToastAnnotation = null;
+    ueHideConfirmButton();
+    ueRedrawAnnotations();
+    return false;
+  }
+
   function handleDown({ x, y }) {
     startX = x;
     startY = y;
@@ -194,81 +262,64 @@ export function ueSetupCanvasEvents() {
     }
 
     if (ueState.currentTool === 'select') {
-      if (ueState.selectedAnnotation) {
-        const anno = ueState.annotations[ueState.selectedAnnotation.pageIndex][ueState.selectedAnnotation.index];
-        const handle = ueGetResizeHandle(anno, x, y);
-        if (handle) {
-          hasMovedOrResized = false;
-          preChangeState = JSON.parse(JSON.stringify(ueState.annotations));
-          ueState.isResizing = true;
-          ueState.resizeHandle = handle;
-
-          if (anno.type === 'text') {
-            const bounds = getTextBounds(anno);
-            ueState.resizeStartInfo = {
-              x: anno.x, y: anno.y, fontSize: anno.fontSize,
-              width: bounds.width, height: bounds.height
-            };
-          } else {
-            ueState.resizeStartInfo = {
-              x: anno.x, y: anno.y,
-              width: anno.width, height: anno.height,
-              aspectRatio: anno.width / anno.height
-            };
-          }
-          return;
-        }
-      }
-
-      const clicked = ueFindAnnotationAt(x, y);
-      if (clicked) {
-        const anno = ueState.annotations[clicked.pageIndex][clicked.index];
-        if (anno.locked) {
-          if (anno.type === 'signature') {
-            const annoId = `${clicked.pageIndex}-${clicked.index}`;
-            if (ueState.lastLockedToastAnnotation !== annoId) {
-              showToast('Tanda tangan terkunci. Klik dua kali untuk membuka kunci.', 'info');
-              ueState.lastLockedToastAnnotation = annoId;
-            }
-          }
-          ueState.selectedAnnotation = clicked;
-          ueRedrawAnnotations();
-          return;
-        }
-        hasMovedOrResized = false;
-        preChangeState = JSON.parse(JSON.stringify(ueState.annotations));
-        ueState.selectedAnnotation = clicked;
-        ueState.lastLockedToastAnnotation = null;
-        ueState.isDragging = true;
-        dragOffsetX = x - anno.x;
-        // WHY fontSize offset: Text annotations use baseline Y (bottom of first line),
-        // not top-left. Subtract fontSize to get bounding box top for drag offset.
-        dragOffsetY = y - (anno.type === 'text' ? anno.y - anno.fontSize : anno.y);
-        ueRedrawAnnotations();
-        ueShowConfirmButton(anno, clicked);
-        return;
-      } else {
-        ueState.selectedAnnotation = null;
-        ueState.lastLockedToastAnnotation = null;
-        ueHideConfirmButton();
-        ueRedrawAnnotations();
-      }
+      if (handleSelectDown(x, y)) return;
     }
 
     if (!ueState.currentTool || ueState.currentTool === 'select') return;
     isDrawing = true;
   }
 
+  // WHY: Per-type resize handlers extracted from handleMove to reduce complexity (S3776).
+  function resizeTextAnnotation(anno, info, handle, canvas, x) {
+    const ctx = canvas.getContext('2d');
+    const newWidth = (handle === 'br' || handle === 'tr')
+      ? Math.max(20, x - info.x)
+      : Math.max(20, info.x + info.width - x);
+    const scale = newWidth / info.width;
+    anno.fontSize = Math.max(6, Math.min(120, info.fontSize * scale));
+    const newBounds = getTextBounds(anno, ctx);
+    const fontDelta = anno.fontSize - info.fontSize;
+
+    if (handle === 'br') {
+      anno.x = info.x;
+      anno.y = info.y + fontDelta;
+    } else if (handle === 'bl') {
+      anno.x = info.x + info.width - newBounds.width;
+      anno.y = info.y + fontDelta;
+    } else if (handle === 'tr') {
+      anno.x = info.x;
+      anno.y = info.y + info.height - newBounds.height + fontDelta;
+    } else {
+      anno.x = info.x + info.width - newBounds.width;
+      anno.y = info.y + info.height - newBounds.height + fontDelta;
+    }
+  }
+
+  function resizeSignatureAnnotation(anno, info, handle, x) {
+    const newWidth = (handle === 'br' || handle === 'tr')
+      ? Math.max(50, x - info.x)
+      : Math.max(50, info.x + info.width - x);
+    const newHeight = newWidth / info.aspectRatio;
+
+    if (handle === 'br') {
+      anno.x = info.x; anno.y = info.y;
+    } else if (handle === 'bl') {
+      anno.x = info.x + info.width - newWidth; anno.y = info.y;
+    } else if (handle === 'tr') {
+      anno.x = info.x; anno.y = info.y + info.height - newHeight;
+    } else {
+      anno.x = info.x + info.width - newWidth; anno.y = info.y + info.height - newHeight;
+    }
+    anno.width = newWidth;
+    anno.height = newHeight;
+  }
+
   function handleMove({ canvas, x, y }) {
     if (ueState.currentTool === 'select' && ueState.selectedAnnotation && !ueState.isResizing && !ueState.isDragging) {
       const anno = ueState.annotations[ueState.selectedAnnotation.pageIndex][ueState.selectedAnnotation.index];
       const handle = ueGetResizeHandle(anno, x, y);
-      if (handle) {
-        const cursors = { 'tl': 'nwse-resize', 'tr': 'nesw-resize', 'bl': 'nesw-resize', 'br': 'nwse-resize' };
-        canvas.style.cursor = cursors[handle];
-      } else {
-        canvas.style.cursor = 'default';
-      }
+      const cursors = { 'tl': 'nwse-resize', 'tr': 'nesw-resize', 'bl': 'nesw-resize', 'br': 'nwse-resize' };
+      canvas.style.cursor = handle ? cursors[handle] : 'default';
     }
 
     if (ueState.pendingSignature && state.signatureImage) {
@@ -280,78 +331,21 @@ export function ueSetupCanvasEvents() {
 
     if (ueState.isResizing && ueState.selectedAnnotation && ueState.resizeStartInfo) {
       const anno = ueState.annotations[ueState.selectedAnnotation.pageIndex][ueState.selectedAnnotation.index];
-      const info = ueState.resizeStartInfo;
-      const handle = ueState.resizeHandle;
-
       if (anno.type === 'text') {
-        const ctx = canvas.getContext('2d');
-        let newWidth;
-        if (handle === 'br' || handle === 'tr') {
-          newWidth = Math.max(20, x - info.x);
-        } else {
-          newWidth = Math.max(20, info.x + info.width - x);
-        }
-        const scale = newWidth / info.width;
-        const newFontSize = Math.max(6, Math.min(120, info.fontSize * scale));
-        anno.fontSize = newFontSize;
-        const newBounds = getTextBounds(anno, ctx);
-
-        if (handle === 'br') {
-          anno.x = info.x;
-          anno.y = info.y + (anno.fontSize - info.fontSize);
-        } else if (handle === 'bl') {
-          anno.x = info.x + info.width - newBounds.width;
-          anno.y = info.y + (anno.fontSize - info.fontSize);
-        } else if (handle === 'tr') {
-          anno.x = info.x;
-          anno.y = info.y + info.height - newBounds.height + (anno.fontSize - info.fontSize);
-        } else if (handle === 'tl') {
-          anno.x = info.x + info.width - newBounds.width;
-          anno.y = info.y + info.height - newBounds.height + (anno.fontSize - info.fontSize);
-        }
-
-        hasMovedOrResized = true;
-        ueRedrawAnnotations();
-        ueUpdateConfirmButtonPosition(anno);
-        return;
-
+        resizeTextAnnotation(anno, ueState.resizeStartInfo, ueState.resizeHandle, canvas, x);
       } else if (anno.type === 'signature') {
-        let newWidth, newHeight, newX, newY;
-        if (handle === 'br') {
-          newWidth = Math.max(50, x - info.x);
-          newHeight = newWidth / info.aspectRatio;
-          newX = info.x; newY = info.y;
-        } else if (handle === 'bl') {
-          newWidth = Math.max(50, info.x + info.width - x);
-          newHeight = newWidth / info.aspectRatio;
-          newX = info.x + info.width - newWidth; newY = info.y;
-        } else if (handle === 'tr') {
-          newWidth = Math.max(50, x - info.x);
-          newHeight = newWidth / info.aspectRatio;
-          newX = info.x; newY = info.y + info.height - newHeight;
-        } else if (handle === 'tl') {
-          newWidth = Math.max(50, info.x + info.width - x);
-          newHeight = newWidth / info.aspectRatio;
-          newX = info.x + info.width - newWidth; newY = info.y + info.height - newHeight;
-        }
-        anno.x = newX; anno.y = newY;
-        anno.width = newWidth; anno.height = newHeight;
-        hasMovedOrResized = true;
-        ueRedrawAnnotations();
-        ueUpdateConfirmButtonPosition(anno);
-        return;
+        resizeSignatureAnnotation(anno, ueState.resizeStartInfo, ueState.resizeHandle, x);
       }
+      hasMovedOrResized = true;
+      ueRedrawAnnotations();
+      ueUpdateConfirmButtonPosition(anno);
+      return;
     }
 
     if (ueState.isDragging && ueState.selectedAnnotation) {
       const anno = ueState.annotations[ueState.selectedAnnotation.pageIndex][ueState.selectedAnnotation.index];
-      if (anno.type === 'text') {
-        anno.x = x - dragOffsetX;
-        anno.y = y - dragOffsetY + anno.fontSize;
-      } else {
-        anno.x = x - dragOffsetX;
-        anno.y = y - dragOffsetY;
-      }
+      anno.x = x - dragOffsetX;
+      anno.y = anno.type === 'text' ? y - dragOffsetY + anno.fontSize : y - dragOffsetY;
       hasMovedOrResized = true;
       ueRedrawAnnotations();
       ueUpdateConfirmButtonPosition(anno);
@@ -370,30 +364,30 @@ export function ueSetupCanvasEvents() {
     ctx.setLineDash([]);
   }
 
+  // WHY: Resize and drag share the same commit-and-cleanup pattern.
+  // Extracted to reduce cognitive complexity in handleUp.
+  function commitGesture(pageIndex, canvas) {
+    if (hasMovedOrResized && preChangeState) {
+      uePushAnnotationSnapshot(preChangeState);
+      emit('annotations:modified', { pageIndex });
+    }
+    hasMovedOrResized = false;
+    preChangeState = null;
+    canvas.style.cursor = 'default';
+  }
+
   function handleUp({ canvas, pageIndex, x, y }) {
     if (ueState.isResizing) {
-      if (hasMovedOrResized && preChangeState) {
-        uePushAnnotationSnapshot(preChangeState);
-        emit('annotations:modified', { pageIndex });
-      }
+      commitGesture(pageIndex, canvas);
       ueState.isResizing = false;
       ueState.resizeHandle = null;
       ueState.resizeStartInfo = null;
-      hasMovedOrResized = false;
-      preChangeState = null;
-      canvas.style.cursor = 'default';
       return;
     }
 
     if (ueState.isDragging) {
-      if (hasMovedOrResized && preChangeState) {
-        uePushAnnotationSnapshot(preChangeState);
-        emit('annotations:modified', { pageIndex });
-      }
+      commitGesture(pageIndex, canvas);
       ueState.isDragging = false;
-      hasMovedOrResized = false;
-      preChangeState = null;
-      canvas.style.cursor = 'default';
       return;
     }
 
@@ -431,7 +425,7 @@ export function ueSetupCanvasEvents() {
     const anno = ueState.annotations[result.pageIndex][result.index];
 
     // Unlock signature
-    if (anno && anno.type === 'signature' && anno.locked) {
+    if (anno?.type === 'signature' && anno.locked) {
       anno.locked = false;
       ueState.lastLockedToastAnnotation = null;
       ueRedrawAnnotations();

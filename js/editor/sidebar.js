@@ -61,12 +61,12 @@ export function closeEditorFileMenu() {
 document.addEventListener('click', (e) => {
   // Sidebar file dropdown
   const sidebarDropdown = document.querySelector('.unified-sidebar .sidebar-file-dropdown');
-  if (sidebarDropdown && sidebarDropdown.classList.contains('open') && !sidebarDropdown.contains(e.target)) {
+  if (sidebarDropdown?.classList.contains('open') && !sidebarDropdown.contains(e.target)) {
     sidebarDropdown.classList.remove('open');
   }
   // Editor header file dropdown
   const editorDropdown = document.getElementById('editor-file-dropdown');
-  if (editorDropdown && editorDropdown.classList.contains('open') && !editorDropdown.contains(e.target)) {
+  if (editorDropdown?.classList.contains('open') && !editorDropdown.contains(e.target)) {
     editorDropdown.classList.remove('open');
   }
 });
@@ -144,6 +144,20 @@ export function ueRenderThumbnails() {
   ueSetupSidebarDragDrop();
 }
 
+function getSidebarDropIndicator() {
+  if (!ueState.sidebarDropIndicator) {
+    ueState.sidebarDropIndicator = document.createElement('div');
+    ueState.sidebarDropIndicator.className = 'ue-sidebar-drop-indicator';
+  }
+  return ueState.sidebarDropIndicator;
+}
+
+function removeSidebarDropIndicator() {
+  if (ueState.sidebarDropIndicator?.parentNode) {
+    ueState.sidebarDropIndicator.remove();
+  }
+}
+
 // Setup sidebar drag-drop reordering
 function ueSetupSidebarDragDrop() {
   const container = document.getElementById('ue-thumbnails');
@@ -153,20 +167,6 @@ function ueSetupSidebarDragDrop() {
   let draggedItem = null;
   let draggedIndex = -1;
 
-  function getDropIndicator() {
-    if (!ueState.sidebarDropIndicator) {
-      ueState.sidebarDropIndicator = document.createElement('div');
-      ueState.sidebarDropIndicator.className = 'ue-sidebar-drop-indicator';
-    }
-    return ueState.sidebarDropIndicator;
-  }
-
-  function removeDropIndicator() {
-    if (ueState.sidebarDropIndicator && ueState.sidebarDropIndicator.parentNode) {
-      ueState.sidebarDropIndicator.remove();
-    }
-  }
-
   container.addEventListener('dragstart', (e) => {
     const item = e.target.closest('.ue-thumbnail');
     if (!item) return;
@@ -174,7 +174,7 @@ function ueSetupSidebarDragDrop() {
     // Use window.* to avoid circular import with undo-redo
     window.ueSaveUndoState();
     draggedItem = item;
-    draggedIndex = parseInt(item.dataset.index);
+    draggedIndex = Number.parseInt(item.dataset.index);
     item.classList.add('dragging');
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', draggedIndex);
@@ -187,7 +187,7 @@ function ueSetupSidebarDragDrop() {
     }
     draggedItem = null;
     draggedIndex = -1;
-    removeDropIndicator();
+    removeSidebarDropIndicator();
   });
 
   container.addEventListener('dragover', (e) => {
@@ -200,7 +200,7 @@ function ueSetupSidebarDragDrop() {
       const items = container.querySelectorAll('.ue-thumbnail:not(.dragging)');
       if (items.length === 0) return;
 
-      const indicator = getDropIndicator();
+      const indicator = getSidebarDropIndicator();
       const firstItem = items[0];
       const lastItem = items[items.length - 1];
       const firstRect = firstItem.getBoundingClientRect();
@@ -216,7 +216,7 @@ function ueSetupSidebarDragDrop() {
 
     const rect = item.getBoundingClientRect();
     const midpoint = rect.top + rect.height / 2;
-    const indicator = getDropIndicator();
+    const indicator = getSidebarDropIndicator();
 
     if (e.clientY < midpoint) {
       item.before(indicator);
@@ -230,8 +230,8 @@ function ueSetupSidebarDragDrop() {
     if (!draggedItem) return;
 
     const indicator = ueState.sidebarDropIndicator;
-    if (!indicator || !indicator.parentNode) {
-      removeDropIndicator();
+    if (!indicator?.parentNode) {
+      removeSidebarDropIndicator();
       return;
     }
 
@@ -239,8 +239,8 @@ function ueSetupSidebarDragDrop() {
     let insertAt = 0;
 
     const nextSibling = indicator.nextElementSibling;
-    if (nextSibling && nextSibling.classList.contains('ue-thumbnail')) {
-      insertAt = parseInt(nextSibling.dataset.index);
+    if (nextSibling?.classList.contains('ue-thumbnail')) {
+      insertAt = Number.parseInt(nextSibling.dataset.index);
     } else {
       insertAt = items.length;
     }
@@ -253,6 +253,6 @@ function ueSetupSidebarDragDrop() {
     window.ueCreatePageSlots();
     ueRenderThumbnails();
 
-    removeDropIndicator();
+    removeSidebarDropIndicator();
   });
 }

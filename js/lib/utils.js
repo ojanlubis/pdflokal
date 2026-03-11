@@ -23,7 +23,7 @@ export function formatFileSize(bytes) {
   const k = 1024;
   const sizes = ['Bytes', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
 export function checkFileSize(file) {
@@ -116,7 +116,7 @@ export function downloadBlob(blob, filename) {
   a.download = filename;
   document.body.appendChild(a);
   a.click();
-  document.body.removeChild(a);
+  a.remove();
   URL.revokeObjectURL(url);
 }
 
@@ -129,8 +129,11 @@ export function showToast(message, type = 'info') {
 
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
+  let icon = 'ℹ';
+  if (type === 'success') icon = '✓';
+  else if (type === 'error') icon = '✕';
   toast.innerHTML = `
-    ${type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ'}
+    ${icon}
     <span>${message}</span>
   `;
 
@@ -194,7 +197,7 @@ export function loadImage(file) {
 
 // Helper function to revoke blob URL from an image
 export function cleanupImage(img) {
-  if (img && img._blobUrl) {
+  if (img?._blobUrl) {
     URL.revokeObjectURL(img._blobUrl);
     img._blobUrl = null;
   }
@@ -349,8 +352,8 @@ export function trapFocus(modalEl) {
     if (focusable.length === 0) { e.preventDefault(); return; }
     if (e.shiftKey) {
       if (document.activeElement === first) { e.preventDefault(); last.focus(); }
-    } else {
-      if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+    } else if (document.activeElement === last) {
+      e.preventDefault(); first.focus();
     }
   };
   modalEl._focusTrapHandler = handler;
@@ -363,7 +366,7 @@ export function releaseFocus(modalEl) {
     delete modalEl._focusTrapHandler;
   }
   const entry = focusTrapStack.pop();
-  if (entry && entry.trigger && entry.trigger.focus) {
+  if (entry?.trigger?.focus) {
     entry.trigger.focus();
   }
 }

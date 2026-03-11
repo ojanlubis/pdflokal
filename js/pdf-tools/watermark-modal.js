@@ -19,10 +19,10 @@ export function closeEditorWatermarkModal(skipHistoryBack = false) {
 
 export function applyEditorWatermark() {
   const text = document.getElementById('editor-wm-text').value || 'WATERMARK';
-  const fontSize = parseInt(document.getElementById('editor-wm-size').value);
+  const fontSize = Number.parseInt(document.getElementById('editor-wm-size').value);
   const color = document.getElementById('editor-wm-color').value;
-  const opacity = parseInt(document.getElementById('editor-wm-opacity').value) / 100;
-  const rotation = parseInt(document.getElementById('editor-wm-rotation').value);
+  const opacity = Number.parseInt(document.getElementById('editor-wm-opacity').value) / 100;
+  const rotation = Number.parseInt(document.getElementById('editor-wm-rotation').value);
   const applyTo = document.getElementById('editor-wm-pages').value;
 
   // Check if in unified editor mode

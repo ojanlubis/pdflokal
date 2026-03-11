@@ -42,7 +42,7 @@ export async function renderPdfImgPages() {
     pageItem.className = 'page-item selected';
     pageItem.dataset.page = i;
     // WHY: Read dataset.page at click time to avoid stale closure over loop var `i`.
-    pageItem.onclick = () => togglePageSelection(pageItem, parseInt(pageItem.dataset.page, 10), 'pdf-img');
+    pageItem.onclick = () => togglePageSelection(pageItem, Number.parseInt(pageItem.dataset.page, 10), 'pdf-img');
 
     pageItem.innerHTML = `
       <canvas></canvas>
@@ -80,7 +80,7 @@ export async function convertPDFtoImages() {
   }
 
   const format = document.getElementById('img-format').value;
-  const scale = parseFloat(document.getElementById('img-scale').value);
+  const scale = Number.parseFloat(document.getElementById('img-scale').value);
 
   const progress = document.getElementById('pdf-img-progress');
   const progressFill = progress.querySelector('.progress-fill');
@@ -165,7 +165,7 @@ export async function showPDFPreview(containerId) {
 export async function compressPDF() {
   // TODO: quality slider value not yet used — pdf-lib save() doesn't support image recompression.
   // Keeping the DOM read for when real compression is implemented.
-  const _quality = parseInt(document.getElementById('pdf-quality').value) / 100;
+  const _quality = Number.parseInt(document.getElementById('pdf-quality').value) / 100;
 
   const progress = document.getElementById('compress-pdf-progress');
   const progressFill = progress.querySelector('.progress-fill');

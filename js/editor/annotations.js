@@ -17,7 +17,7 @@ export function ueRedrawAnnotations() {
 // Redraw annotations on a specific page's canvas
 export function ueRedrawPageAnnotations(index) {
   const entry = ueState.pageCanvases[index];
-  if (!entry || !entry.rendered) return;
+  if (!entry?.rendered) return;
 
   const canvas = entry.canvas;
   const ctx = canvas.getContext('2d');
@@ -35,6 +35,25 @@ export function ueRedrawPageAnnotations(index) {
   });
 }
 
+function drawSignatureAnnotation(ctx, anno, isSelected) {
+  if (anno.cachedImg?.complete) {
+    ctx.drawImage(anno.cachedImg, anno.x, anno.y, anno.width, anno.height);
+    if (isSelected && !anno.locked) {
+      ueDrawSelectionHandles(ctx, anno.x, anno.y, anno.width, anno.height);
+    } else if (isSelected && anno.locked) {
+      // WHY: Locked signatures show green border instead of resize handles
+      ctx.strokeStyle = '#10B981';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([]);
+      ctx.strokeRect(anno.x - 2, anno.y - 2, anno.width + 4, anno.height + 4);
+    }
+  } else if (anno.image) {
+    const img = new Image();
+    img.src = anno.image;
+    anno.cachedImg = img;
+  }
+}
+
 // Draw a single annotation
 export function ueDrawAnnotation(ctx, anno, isSelected) {
   switch (anno.type) {
@@ -43,7 +62,7 @@ export function ueDrawAnnotation(ctx, anno, isSelected) {
       ctx.fillRect(anno.x, anno.y, anno.width, anno.height);
       if (isSelected) ueDrawSelectionHandles(ctx, anno.x, anno.y, anno.width, anno.height);
       break;
-    case 'text':
+    case 'text': {
       // Skip rendering if currently being edited
       if (anno._editing) break;
 
@@ -56,24 +75,9 @@ export function ueDrawAnnotation(ctx, anno, isSelected) {
         ueDrawSelectionHandles(ctx, bounds.x - 2, bounds.y - 2, bounds.width + 4, bounds.height + 4);
       }
       break;
+    }
     case 'signature':
-      if (anno.cachedImg && anno.cachedImg.complete) {
-        ctx.drawImage(anno.cachedImg, anno.x, anno.y, anno.width, anno.height);
-        // Show handles only if selected and not locked
-        if (isSelected && !anno.locked) {
-          ueDrawSelectionHandles(ctx, anno.x, anno.y, anno.width, anno.height);
-        } else if (isSelected && anno.locked) {
-          // Draw a subtle locked indicator (just border, no handles)
-          ctx.strokeStyle = '#10B981';
-          ctx.lineWidth = 2;
-          ctx.setLineDash([]);
-          ctx.strokeRect(anno.x - 2, anno.y - 2, anno.width + 4, anno.height + 4);
-        }
-      } else if (anno.image) {
-        const img = new Image();
-        img.src = anno.image;
-        anno.cachedImg = img;
-      }
+      drawSignatureAnnotation(ctx, anno, isSelected);
       break;
     case 'watermark':
       ctx.save();
@@ -163,10 +167,11 @@ export function ueFindAnnotationAt(pageIndexOrX, xOrY, maybeY) {
       case 'signature':
         bounds = { x: anno.x, y: anno.y, w: anno.width, h: anno.height };
         break;
-      case 'text':
+      case 'text': {
         const textBounds = getTextBounds(anno);
         bounds = { x: textBounds.x, y: textBounds.y, w: textBounds.width, h: textBounds.height };
         break;
+      }
       default:
         continue;
     }

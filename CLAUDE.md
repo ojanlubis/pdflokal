@@ -9,6 +9,18 @@
 - **Tech**: Vanilla JS, native ES modules, no build step, no frameworks
 - **Libraries**: pdf-lib, PDF.js, Signature Pad, pdf-encrypt-lite, Canvas API — all self-hosted in `js/vendor/`, zero CDN deps (see [docs/security.md](docs/security.md))
 
+## Reference Projects
+
+Before making architectural decisions, check how mature open-source projects solve the same problem. Don't fly blind — learn from projects that have already solved similar challenges at scale.
+
+- **Excalidraw** ([github.com/excalidraw/excalidraw](https://github.com/excalidraw/excalidraw)) — Canvas-based drawing app. Similar: canvas rendering, annotations, tools, undo/redo. React/TS, 103K lines. Patterns: actions-per-file, separate renderer module, extensive tests.
+- **PDF.js** ([github.com/nicedoc/pdf.js](https://github.com/nicedoc/pdf.js)) — Mozilla's PDF renderer (we use it as a dep). Vanilla JS, Web Workers, canvas rendering. Patterns: viewer/core separation, worker-based processing.
+- **tldraw** ([github.com/tldraw/tldraw](https://github.com/tldraw/tldraw)) — Another canvas drawing app. React/TS. Patterns: state machine for tools, command pattern for undo/redo.
+- **Stirling-PDF** ([github.com/Stirling-Tools/Stirling-PDF](https://github.com/Stirling-Tools/Stirling-PDF)) — PDF manipulation tool (server-side Java, but similar feature set). Patterns: tool-per-module, clean separation of concerns.
+- **pdf-lib** ([github.com/Hopding/pdf-lib](https://github.com/Hopding/pdf-lib)) — We use this as a dep. Pure JS, no native deps. Patterns: builder pattern, immutable document model.
+
+When facing a design question ("how should we structure X?"), check how these projects handle it first.
+
 ## Planned Improvements
 
 Read **[docs/strengths.md](docs/strengths.md)** first — explains WHY vanilla JS, WHY no framework, and WHY AI as primary developer is the core architectural decision.

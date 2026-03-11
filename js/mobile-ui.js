@@ -155,7 +155,7 @@ document.addEventListener('click', function(e) {
   const dropdown = document.getElementById('mobile-tools-dropdown');
   const moreBtn = document.getElementById('ue-mobile-more-btn');
 
-  if (dropdown && dropdown.classList.contains('active')) {
+  if (dropdown?.classList.contains('active')) {
     if (!dropdown.contains(e.target) && e.target !== moreBtn && !moreBtn.contains(e.target)) {
       closeMobileTools();
     }
@@ -167,8 +167,10 @@ document.addEventListener('click', function(e) {
 // ============================================================
 
 // Called by navigation.js (showTool) and init.js when the editor opens.
-// Currently a no-op; exists as a hook point for mobile-specific setup.
+// WHY: Hook point for mobile-specific setup. No-op for now, but callers
+// already reference it — removing would break the interface contract.
 export function initMobileEditorEnhancements() {
+  // Intentionally empty — future mobile enhancements go here
 }
 
 // ============================================================

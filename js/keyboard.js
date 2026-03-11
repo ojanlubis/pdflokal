@@ -15,93 +15,96 @@ import { showHome, openModal, closeModal } from './lib/navigation.js';
 // KEYBOARD SHORTCUTS
 // ============================================================
 
+// WHY: Handler maps replace giant if/else chains to reduce cognitive complexity (S3776).
+// Each map entry is { handler, preventDefault }. Maps are checked in priority order.
+
+// Modifier shortcuts (Ctrl/Cmd + key) — always active in editor
+const modifierHandlers = {
+  s: { handler: () => { if (ueState.pages.length > 0) window.ueDownload(); } },
+  z: { handler: () => window.ueUndo() },
+  y: { handler: () => window.ueRedo() },
+};
+
+// Tool shortcuts (single key, no modifier) — only when page selected and not typing
+const toolHandlers = {
+  v: () => window.ueSetTool('select'),
+  w: () => window.ueSetTool('whiteout'),
+  t: () => window.ueSetTool('text'),
+  s: () => window.ueOpenSignatureModal(),
+  p: () => window.ueOpenParafModal(),
+  r: () => window.ueRotateCurrentPage(),
+};
+
+function handleDeleteKey(e) {
+  if (ueState.selectedAnnotation) {
+    e.preventDefault();
+    window.ueSaveEditUndoState();
+    window.ueRemoveAnnotation(ueState.selectedAnnotation.pageIndex, ueState.selectedAnnotation.index);
+    window.ueRedrawAnnotations();
+  }
+}
+
+function handleEditorNavigation(e) {
+  const key = e.key;
+  if (key === 'ArrowLeft' && ueState.selectedPage > 0) {
+    e.preventDefault();
+    window.ueSelectPage(ueState.selectedPage - 1);
+  } else if (key === 'ArrowRight' && ueState.selectedPage < ueState.pages.length - 1) {
+    e.preventDefault();
+    window.ueSelectPage(ueState.selectedPage + 1);
+  } else if (key === '?' || (e.shiftKey && e.key.toLowerCase() === '/')) {
+    e.preventDefault();
+    openShortcutsModal();
+  } else if (key === '+' || key === '=') {
+    e.preventDefault();
+    window.ueZoomIn();
+  } else if (key === '-') {
+    e.preventDefault();
+    window.ueZoomOut();
+  } else if (key === '0') {
+    e.preventDefault();
+    window.ueZoomReset();
+  }
+}
+
 export function setupKeyboardShortcuts() {
   document.addEventListener('keydown', (e) => {
     const key = e.key.toLowerCase();
-
     const activeEl = document.activeElement;
     const isTyping = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable);
+    const inEditor = state.currentTool === 'unified-editor';
 
-    // Escape - close modals or go back home
+    // Escape — close modals or go home
     if (e.key === 'Escape') {
       const shortcutsModal = document.getElementById('shortcuts-modal');
-      if (shortcutsModal && shortcutsModal.classList.contains('active')) {
+      if (shortcutsModal?.classList.contains('active')) {
         closeShortcutsModal();
         return;
       }
-      if (state.currentTool) {
-        showHome();
-      }
+      if (state.currentTool) showHome();
+      return;
     }
 
-    // Ctrl+S / Cmd+S - Download PDF in unified editor
-    if ((e.ctrlKey || e.metaKey) && key === 's') {
+    // Modifier combos (Ctrl/Cmd + key)
+    if ((e.ctrlKey || e.metaKey) && inEditor && modifierHandlers[key]) {
       e.preventDefault();
-      if (state.currentTool === 'unified-editor' && ueState.pages.length > 0) {
-        window.ueDownload();
-      }
+      modifierHandlers[key].handler();
+      return;
     }
 
-    // Ctrl+Z for undo in unified editor
-    if (key === 'z' && (e.ctrlKey || e.metaKey) && state.currentTool === 'unified-editor') {
-      e.preventDefault();
-      window.ueUndo();
-    }
-
-    // Ctrl+Y for redo in unified editor
-    if (key === 'y' && (e.ctrlKey || e.metaKey) && state.currentTool === 'unified-editor') {
-      e.preventDefault();
-      window.ueRedo();
-    }
-
-    // Keyboard shortcuts for unified editor tools (only when not typing)
-    if (state.currentTool === 'unified-editor' && !isTyping) {
+    // Editor tool/navigation shortcuts (only when not typing)
+    if (inEditor && !isTyping) {
       if (ueState.selectedPage >= 0) {
-        if (key === 'v' && !e.ctrlKey && !e.metaKey) {
-          window.ueSetTool('select');
-        } else if (key === 'w' && !e.ctrlKey && !e.metaKey) {
-          window.ueSetTool('whiteout');
-        } else if (key === 't' && !e.ctrlKey && !e.metaKey) {
-          window.ueSetTool('text');
-        } else if (key === 's' && !e.ctrlKey && !e.metaKey) {
-          window.ueOpenSignatureModal();
-        } else if (key === 'p' && !e.ctrlKey && !e.metaKey) {
-          window.ueOpenParafModal();
-        } else if (key === 'r' && !e.ctrlKey && !e.metaKey) {
-          window.ueRotateCurrentPage();
-        } else if (e.key === 'Delete' || e.key === 'Backspace') {
-          if (ueState.selectedAnnotation) {
-            e.preventDefault();
-            window.ueSaveEditUndoState();
-            window.ueRemoveAnnotation(ueState.selectedAnnotation.pageIndex, ueState.selectedAnnotation.index);
-            window.ueRedrawAnnotations();
-          }
+        if (!e.ctrlKey && !e.metaKey && toolHandlers[key]) {
+          toolHandlers[key]();
+          return;
+        }
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+          handleDeleteKey(e);
+          return;
         }
       }
-
-      if (e.key === 'ArrowLeft' && ueState.selectedPage > 0) {
-        e.preventDefault();
-        window.ueSelectPage(ueState.selectedPage - 1);
-      } else if (e.key === 'ArrowRight' && ueState.selectedPage < ueState.pages.length - 1) {
-        e.preventDefault();
-        window.ueSelectPage(ueState.selectedPage + 1);
-      }
-
-      if (e.key === '?' || (e.shiftKey && key === '/')) {
-        e.preventDefault();
-        openShortcutsModal();
-      }
-
-      if (e.key === '+' || e.key === '=') {
-        e.preventDefault();
-        window.ueZoomIn();
-      } else if (e.key === '-') {
-        e.preventDefault();
-        window.ueZoomOut();
-      } else if (e.key === '0') {
-        e.preventDefault();
-        window.ueZoomReset();
-      }
+      handleEditorNavigation(e);
     }
   });
 }

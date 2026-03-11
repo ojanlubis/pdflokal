@@ -8,7 +8,7 @@
   <script>
     (function() {
       const theme = localStorage.getItem('pdflokal_theme') || 'light';
-      document.documentElement.setAttribute('data-theme', theme);
+      document.documentElement.dataset.theme = theme;
     })();
   </script>
 
@@ -35,7 +35,8 @@
 
   <!-- Vercel Web Analytics -->
   <script>
-    window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+    if (!window.vaq) { window.vaq = []; }
+    window.va = window.va || function () { window.vaq.push(arguments); };
   </script>
   <script defer src="/_vercel/insights/script.js"></script>
 

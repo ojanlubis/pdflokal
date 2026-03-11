@@ -35,6 +35,27 @@ export function initUnifiedEditorInput() {
   }
 }
 
+async function processFile(file) {
+  if (!isPDF(file) && !isImage(file)) {
+    showToast(`File ${file.name} bukan PDF atau gambar. Diabaikan.`, 'warning');
+    return;
+  }
+  if (!checkFileSize(file)) return;
+
+  track('file_loaded', { tool: 'unified-editor', fileType: isPDF(file) ? 'pdf' : 'image' });
+
+  try {
+    if (isPDF(file)) {
+      await handlePdfFile(file);
+    } else {
+      await handleImageFile(file);
+    }
+  } catch (error) {
+    console.error('Error loading file:', error);
+    showToast(error.message || `Gagal memuat ${file.name}`, 'error');
+  }
+}
+
 // Load files into unified editor
 export async function ueAddFiles(files) {
   if (!files || files.length === 0) return;
@@ -48,25 +69,7 @@ export async function ueAddFiles(files) {
 
   try {
   for (const file of files) {
-    if (!isPDF(file) && !isImage(file)) {
-      showToast(`File ${file.name} bukan PDF atau gambar. Diabaikan.`, 'warning');
-      continue;
-    }
-
-    if (!checkFileSize(file)) continue;
-
-    track('file_loaded', { tool: 'unified-editor', fileType: isPDF(file) ? 'pdf' : 'image' });
-
-    try {
-      if (isPDF(file)) {
-        await handlePdfFile(file);
-      } else {
-        await handleImageFile(file);
-      }
-    } catch (error) {
-      console.error('Error loading file:', error);
-      showToast(error.message || `Gagal memuat ${file.name}`, 'error');
-    }
+    await processFile(file);
   }
 
   // WHY: showTool() makes workspace visible but browser hasn't reflowed yet.

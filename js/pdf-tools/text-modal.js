@@ -105,7 +105,7 @@ export function updateTextPreview() {
 export function getTextModalSettings() {
   return {
     text: document.getElementById('text-input-field').value.trim(),
-    fontSize: parseInt(document.getElementById('modal-font-size').value) || 16,
+    fontSize: Number.parseInt(document.getElementById('modal-font-size').value) || 16,
     color: document.getElementById('modal-text-color').value,
     fontFamily: document.getElementById('modal-font-family').value,
     bold: document.getElementById('modal-text-bold').classList.contains('active'),
@@ -114,7 +114,7 @@ export function getTextModalSettings() {
 }
 
 export function confirmTextInput() {
-  if (window.ueState && window.ueState.pendingTextPosition) {
+  if (window.ueState?.pendingTextPosition) {
     window.ueConfirmText();
     return;
   }

@@ -9,7 +9,7 @@
   <script>
     (function() {
       const theme = localStorage.getItem('pdflokal_theme') || 'light';
-      document.documentElement.setAttribute('data-theme', theme);
+      document.documentElement.dataset.theme = theme;
     })();
   </script>
 
@@ -173,7 +173,7 @@
 
       <!-- Drop Zone -->
       <div class="dropzone-container">
-        <div class="dropzone" id="main-dropzone" tabindex="0" role="button" aria-label="Upload file PDF atau gambar">
+        <button class="dropzone" id="main-dropzone" type="button" aria-label="Upload file PDF atau gambar">
           <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -183,7 +183,7 @@
           <h3>Seret file ke sini atau klik untuk pilih</h3>
           <p>PDF or Image</p>
           <input type="file" id="file-input" multiple accept=".pdf,image/*,application/pdf">
-        </div>
+        </button>
       </div>
       <!-- WHY: Inline script so dropzone is clickable BEFORE ES modules load.
            Module scripts are deferred — initDropZone() only runs after all static imports
@@ -411,7 +411,7 @@
       <p class="mb-lg" style="color: var(--text-secondary);">⚠️ Catatan: Fitur ini mengoptimasi struktur PDF. Kompresi
         gambar memerlukan server dan belum tersedia. Hasil bervariasi.</p>
       <div class="preview-area" id="compress-pdf-preview">
-        <div class="dropzone" role="button" tabindex="0" onclick="document.getElementById('compress-pdf-input').click()">
+        <button class="dropzone" type="button" onclick="document.getElementById('compress-pdf-input').click()">
           <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
             stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -421,7 +421,7 @@
           <h3>Seret file ke sini atau klik untuk pilih</h3>
           <p>PDF</p>
           <input type="file" id="compress-pdf-input" accept=".pdf" style="display:none">
-        </div>
+        </button>
       </div>
       <div class="controls">
         <div class="control-group">
@@ -473,10 +473,10 @@
             </div>
           </div>
         </div>
-        <a href="#" class="editor-header-brand" onclick="editorGoHome(event)">
+        <button type="button" class="editor-header-brand" onclick="editorGoHome(event)">
           <div class="logo-icon" style="width:24px;height:24px;font-size:0.7rem;">P</div>
           PDFLokal
-        </a>
+        </button>
         <div class="editor-header-right">
           <button class="editor-header-icon-btn" onclick="themeAPI.toggle()" title="Ganti tema" type="button">
             <svg class="icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
@@ -503,7 +503,7 @@
               style="display:none">
           </div>
           <div class="unified-thumbnails" id="ue-thumbnails">
-            <div class="drop-hint" role="button" tabindex="0" onclick="document.getElementById('ue-file-input').click()">
+            <button class="drop-hint" type="button" onclick="document.getElementById('ue-file-input').click()">
               <svg class="drop-hint-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
                 style="width: 32px; height: 32px;">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -511,7 +511,7 @@
                 <line x1="12" y1="3" x2="12" y2="15" />
               </svg>
               <span class="drop-hint-text" style="font-size: 0.8125rem;">Upload PDF atau Gambar</span>
-            </div>
+            </button>
           </div>
           <div class="unified-sidebar-footer" id="unified-sidebar-footer">
           </div>
@@ -597,7 +597,7 @@
               <button class="signature-delete-btn" id="signature-delete-btn">✕</button>
             </div>
             <div class="unified-empty-state" id="ue-empty-state">
-              <div class="dropzone" role="button" tabindex="0" onclick="document.getElementById('ue-file-input').click()">
+              <button class="dropzone" type="button" onclick="document.getElementById('ue-file-input').click()">
                 <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
                   stroke-linecap="round" stroke-linejoin="round">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -606,7 +606,7 @@
                 </svg>
                 <h3>Seret file ke sini atau klik untuk pilih</h3>
                 <p>PDF</p>
-              </div>
+              </button>
             </div>
             <div id="ue-pages-container" style="display: none;">
               <!-- Per-page canvases generated by ueCreatePageSlots() -->
@@ -762,7 +762,7 @@
         </h2>
       </div>
       <div class="page-grid empty" id="pdf-img-pages">
-        <div class="dropzone" role="button" tabindex="0" onclick="document.getElementById('pdf-img-input').click()">
+        <button class="dropzone" type="button" onclick="document.getElementById('pdf-img-input').click()">
           <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
             stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -772,7 +772,7 @@
           <h3>Seret file ke sini atau klik untuk pilih</h3>
           <p>PDF</p>
           <input type="file" id="pdf-img-input" accept=".pdf" style="display:none">
-        </div>
+        </button>
       </div>
       <div class="controls">
         <div class="control-group">
@@ -824,7 +824,7 @@
         </h2>
       </div>
       <div class="preview-area" id="protect-preview">
-        <div class="dropzone" role="button" tabindex="0" onclick="document.getElementById('protect-input').click()">
+        <button class="dropzone" type="button" onclick="document.getElementById('protect-input').click()">
           <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
             stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -834,7 +834,7 @@
           <h3>Seret file ke sini atau klik untuk pilih</h3>
           <p>PDF</p>
           <input type="file" id="protect-input" accept=".pdf" style="display:none">
-        </div>
+        </button>
       </div>
       <div class="controls">
         <div class="control-group">
@@ -872,7 +872,7 @@
         </h2>
       </div>
       <div class="preview-area" id="compress-img-area">
-        <div class="dropzone" id="compress-img-hint" role="button" tabindex="0" onclick="document.getElementById('compress-img-input').click()">
+        <button class="dropzone" id="compress-img-hint" type="button" onclick="document.getElementById('compress-img-input').click()">
           <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
             stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -882,7 +882,7 @@
           <h3>Seret file ke sini atau klik untuk pilih</h3>
           <p>JPG, PNG, WebP</p>
           <input type="file" id="compress-img-input" accept="image/*" style="display:none">
-        </div>
+        </button>
         <div class="preview-comparison hidden" id="compress-img-comparison">
           <div class="preview-box">
             <img id="compress-original" src="" alt="Original">
@@ -938,7 +938,7 @@
         </h2>
       </div>
       <div class="preview-area" id="resize-area">
-        <div class="dropzone" id="resize-hint" role="button" tabindex="0" onclick="document.getElementById('resize-input').click()">
+        <button class="dropzone" id="resize-hint" type="button" onclick="document.getElementById('resize-input').click()">
           <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
             stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -948,7 +948,7 @@
           <h3>Seret file ke sini atau klik untuk pilih</h3>
           <p>JPG, PNG, WebP</p>
           <input type="file" id="resize-input" accept="image/*" style="display:none">
-        </div>
+        </button>
         <div class="preview-box hidden" id="resize-preview-box">
           <img id="resize-preview" src="" alt="Preview">
           <p id="resize-dimensions">Dimensi: -</p>
@@ -1008,7 +1008,7 @@
         </h2>
       </div>
       <div class="preview-area" id="convert-area">
-        <div class="dropzone" id="convert-hint" role="button" tabindex="0" onclick="document.getElementById('convert-input').click()">
+        <button class="dropzone" id="convert-hint" type="button" onclick="document.getElementById('convert-input').click()">
           <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
             stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -1018,7 +1018,7 @@
           <h3>Seret file ke sini atau klik untuk pilih</h3>
           <p>JPG, PNG, WebP</p>
           <input type="file" id="convert-input" accept="image/*" style="display:none">
-        </div>
+        </button>
         <div class="preview-box hidden" id="convert-preview-box">
           <img id="convert-preview" src="" alt="Preview">
           <p id="convert-info">-</p>
@@ -1067,7 +1067,7 @@
         </h2>
       </div>
       <div class="file-list empty" id="img-pdf-file-list">
-        <div class="dropzone" role="button" tabindex="0" onclick="document.getElementById('img-pdf-input').click()">
+        <button class="dropzone" type="button" onclick="document.getElementById('img-pdf-input').click()">
           <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
             stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -1076,7 +1076,7 @@
           </svg>
           <h3>Seret file ke sini atau klik untuk pilih</h3>
           <p>JPG, PNG, WebP</p>
-        </div>
+        </button>
       </div>
       <div class="controls">
         <button class="btn btn-secondary" onclick="document.getElementById('img-pdf-input').click()">
@@ -1137,7 +1137,7 @@
       <p class="mb-lg" style="color: var(--text-secondary);">Upload gambar dan atur threshold untuk mengubah warna
         putih/terang menjadi transparan.</p>
       <div class="preview-area" id="remove-bg-area">
-        <div class="dropzone" id="remove-bg-hint" role="button" tabindex="0" onclick="document.getElementById('remove-bg-input').click()">
+        <button class="dropzone" id="remove-bg-hint" type="button" onclick="document.getElementById('remove-bg-input').click()">
           <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
             stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -1147,7 +1147,7 @@
           <h3>Seret file ke sini atau klik untuk pilih</h3>
           <p>JPG, PNG</p>
           <input type="file" id="remove-bg-input" accept="image/jpeg,image/png" style="display:none">
-        </div>
+        </button>
         <div class="preview-comparison hidden" id="remove-bg-comparison">
           <div class="preview-box">
             <img id="remove-bg-original" src="" alt="Original">
@@ -1196,7 +1196,7 @@
   </main>
 
   <!-- Signature Modal -->
-  <div id="signature-modal" class="signature-modal" role="dialog" aria-modal="true" aria-label="Buat tanda tangan">
+  <dialog id="signature-modal" class="signature-modal" aria-modal="true" aria-label="Buat tanda tangan">
     <div class="signature-box">
       <h3>Buat Tanda Tangan</h3>
       <div class="signature-tabs" role="tablist">
@@ -1229,10 +1229,10 @@
         </div>
       </div>
     </div>
-  </div>
+  </dialog>
 
   <!-- Signature Background Removal Modal -->
-  <div id="signature-bg-modal" class="edit-modal" role="dialog" aria-modal="true" aria-label="Hapus latar tanda tangan">
+  <dialog id="signature-bg-modal" class="edit-modal" aria-modal="true" aria-label="Hapus latar tanda tangan">
     <div class="edit-modal-box" style="max-width: 700px;">
       <h3>Hapus Latar Belakang Tanda Tangan</h3>
       <div class="edit-modal-content">
@@ -1265,10 +1265,10 @@
         <button class="btn btn-primary" onclick="useSignatureFromUpload()">Gunakan Tanda Tangan</button>
       </div>
     </div>
-  </div>
+  </dialog>
 
   <!-- Paraf (Initials) Modal -->
-  <div id="paraf-modal" class="signature-modal" role="dialog" aria-modal="true" aria-label="Buat Paraf">
+  <dialog id="paraf-modal" class="signature-modal" aria-modal="true" aria-label="Buat Paraf">
     <div class="signature-box">
       <h3>Buat Paraf</h3>
       <canvas id="paraf-canvas" class="signature-canvas"></canvas>
@@ -1278,10 +1278,10 @@
         <button class="btn btn-primary" onclick="useParaf()">Gunakan</button>
       </div>
     </div>
-  </div>
+  </dialog>
 
   <!-- Text Input Modal -->
-  <div id="text-input-modal" class="edit-modal" role="dialog" aria-modal="true" aria-label="Tambah teks">
+  <dialog id="text-input-modal" class="edit-modal" aria-modal="true" aria-label="Tambah teks">
     <div class="edit-modal-box">
       <h3>Tambah Teks</h3>
       <div class="edit-modal-content">
@@ -1355,10 +1355,10 @@
         <button class="btn btn-primary" onclick="confirmTextInput()">Tambah Teks</button>
       </div>
     </div>
-  </div>
+  </dialog>
 
   <!-- Editor Watermark Modal -->
-  <div id="editor-watermark-modal" class="edit-modal" role="dialog" aria-modal="true" aria-label="Watermark">
+  <dialog id="editor-watermark-modal" class="edit-modal" aria-modal="true" aria-label="Watermark">
     <div class="edit-modal-box">
       <h3>Tambah Watermark</h3>
       <div class="edit-modal-content">
@@ -1409,10 +1409,10 @@
         <button class="btn btn-primary" onclick="applyEditorWatermark()">Terapkan Watermark</button>
       </div>
     </div>
-  </div>
+  </dialog>
 
   <!-- Editor Page Number Modal -->
-  <div id="editor-pagenum-modal" class="edit-modal" role="dialog" aria-modal="true" aria-label="Nomor halaman">
+  <dialog id="editor-pagenum-modal" class="edit-modal" aria-modal="true" aria-label="Nomor halaman">
     <div class="edit-modal-box">
       <h3>Tambah Nomor Halaman</h3>
       <div class="edit-modal-content">
@@ -1456,10 +1456,10 @@
         <button class="btn btn-primary" onclick="applyEditorPageNumbers()">Terapkan Nomor</button>
       </div>
     </div>
-  </div>
+  </dialog>
 
   <!-- Kunci PDF Modal for Unified Editor -->
-  <div id="editor-protect-modal" class="edit-modal" role="dialog" aria-modal="true" aria-label="Proteksi PDF">
+  <dialog id="editor-protect-modal" class="edit-modal" aria-modal="true" aria-label="Proteksi PDF">
     <div class="edit-modal-box">
       <h3>Kunci PDF</h3>
       <div class="edit-modal-content">
@@ -1478,10 +1478,10 @@
         <button class="btn btn-primary" onclick="applyEditorProtect()">Kunci & Download</button>
       </div>
     </div>
-  </div>
+  </dialog>
 
   <!-- Gabungkan Halaman Modal for Unified Editor -->
-  <div id="ue-gabungkan-modal" class="edit-modal" role="dialog" aria-modal="true" aria-label="Kelola halaman">
+  <dialog id="ue-gabungkan-modal" class="edit-modal" aria-modal="true" aria-label="Kelola halaman">
     <div class="edit-modal-box ue-pm-modal-box">
       <div class="ue-pm-header">
         <h3>Gabungkan Halaman</h3>
@@ -1541,10 +1541,10 @@
         <button class="btn btn-ghost" onclick="uePmCloseModal()">Selesai</button>
       </div>
     </div>
-  </div>
+  </dialog>
 
   <!-- Keyboard Shortcuts Modal -->
-  <div class="shortcuts-modal" id="shortcuts-modal" role="dialog" aria-modal="true" aria-label="Pintasan keyboard">
+  <dialog class="shortcuts-modal" id="shortcuts-modal" aria-modal="true" aria-label="Pintasan keyboard">
     <div class="shortcuts-modal-backdrop" onclick="closeShortcutsModal()"></div>
     <div class="shortcuts-modal-box">
       <h3>Pintasan Keyboard</h3>
@@ -1579,10 +1579,10 @@
         <button class="btn btn-primary" onclick="closeShortcutsModal()">Tutup</button>
       </div>
     </div>
-  </div>
+  </dialog>
 
   <!-- Toast Container -->
-  <div class="toast-container" id="toast-container" aria-live="polite" role="status"></div>
+  <output class="toast-container" id="toast-container" aria-live="polite"></output>
 
   <!-- Footer -->
   <footer class="footer">
@@ -1630,7 +1630,7 @@
   <!-- Changelog Notification System -->
   <div class="changelog-notification" id="changelog-notification">
     <!-- Collapsed Badge View -->
-    <div class="changelog-badge" onclick="changelogAPI.open()">
+    <button type="button" class="changelog-badge" onclick="changelogAPI.open()">
       <div class="changelog-badge-icon">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M3 8l3.5 3.5L13 4.5"></path>
@@ -1639,7 +1639,7 @@
       <div class="changelog-badge-text">
         <span class="changelog-badge-title">Update Terbaru!</span>
       </div>
-    </div>
+    </button>
 
     <!-- Expanded Content View -->
     <div class="changelog-content-wrapper">

@@ -20,8 +20,8 @@ export function closeEditorPageNumModal(skipHistoryBack = false) {
 export function applyEditorPageNumbers() {
   const position = document.getElementById('editor-pn-position').value;
   const format = document.getElementById('editor-pn-format').value;
-  const fontSize = parseInt(document.getElementById('editor-pn-size').value);
-  const startNum = parseInt(document.getElementById('editor-pn-start').value) || 1;
+  const fontSize = Number.parseInt(document.getElementById('editor-pn-size').value);
+  const startNum = Number.parseInt(document.getElementById('editor-pn-start').value) || 1;
 
   // Check if in unified editor mode
   if (state.currentTool === 'unified-editor') {

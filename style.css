@@ -393,6 +393,16 @@ body, .header, .tool-card, .workspace, .modal, .btn, .dropzone {
   padding: 0;
 }
 
+/* WHY: <dialog> elements used with .active class toggle (not native showModal()).
+   Reset browser defaults so they behave like plain containers. */
+dialog {
+  border: none;
+  max-width: none;
+  max-height: none;
+  color: inherit;
+  background: transparent;
+}
+
 html {
   font-size: 16px;
   -webkit-font-smoothing: antialiased;
@@ -577,6 +587,11 @@ a:hover {
   cursor: pointer;
   transition: all var(--transition-normal);
   background: var(--bg-secondary);
+  /* WHY: Dropzones are now <button> elements — reset button defaults */
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  display: block;
 }
 
 .dropzone:hover,
@@ -2163,6 +2178,9 @@ a:hover {
   min-height: 150px;
   transition: all var(--transition-fast);
   cursor: pointer;
+  /* WHY: Drop hints are now <button> elements — reset button defaults */
+  width: 100%;
+  font: inherit;
 }
 
 .drop-hint:hover,
@@ -2669,6 +2687,12 @@ body.editor-active .container {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
+  /* WHY: Changed from <a> to <button> — reset button defaults */
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  padding: 0;
 }
 
 .editor-header-brand:hover {
@@ -4120,6 +4144,15 @@ kbd {
 
 .changelog-badge {
   display: none;
+  /* WHY: Changed from <div> to <button> — reset button defaults */
+  background: none;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  padding: 0;
+  text-align: left;
+  width: 100%;
 }
 
 .changelog-badge-icon {
