@@ -9,6 +9,7 @@ import { showToast, showFullscreenLoading, hideFullscreenLoading, checkFileSize,
 import { ueCreatePageSlots, ueSelectPage } from './page-rendering.js';
 import { ueSaveUndoState } from './undo-redo.js';
 import { renderPageThumbnail } from './canvas-utils.js';
+import { track } from '../lib/analytics.js';
 
 // WHY: Prevents concurrent ueAddFiles calls. PDF.js render is async; overlapping loads corrupt page state.
 let isLoadingFiles = false;
@@ -53,6 +54,8 @@ export async function ueAddFiles(files) {
     }
 
     if (!checkFileSize(file)) continue;
+
+    track('file_loaded', { tool: 'unified-editor', fileType: isPDF(file) ? 'pdf' : 'image' });
 
     try {
       if (isPDF(file)) {

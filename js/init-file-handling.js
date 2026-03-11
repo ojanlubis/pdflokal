@@ -10,6 +10,7 @@ import {
   isPDF, isImage, loadPdfDocument
 } from './lib/utils.js';
 import { showTool } from './lib/navigation.js';
+import { track } from './lib/analytics.js';
 
 // WHY: These were static imports that forced browser to load entire editor (15 modules)
 // + pdf-tools (7 modules) + image-tools before dropzone could be interactive.
@@ -199,6 +200,7 @@ async function handleDroppedFiles(files) {
 
   try {
     if (!state.currentTool) {
+      track('file_loaded', { tool: 'dropzone', fileType: filePDF ? 'pdf' : 'image' });
       if (filePDF) {
         const { ueAddFiles } = await import('./editor/index.js');
         showTool('unified-editor');

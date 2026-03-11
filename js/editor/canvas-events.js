@@ -12,6 +12,7 @@ import { ueSaveEditUndoState, uePushAnnotationSnapshot } from './undo-redo.js';
 import { ueCreateInlineTextEditor } from './inline-editor.js';
 import { ueHighlightThumbnail } from './page-rendering.js';
 import { ueZoomIn, ueZoomOut } from './zoom-rotate.js';
+import { track } from '../lib/analytics.js';
 import {
   uePlaceSignature, ueDrawSignaturePreview,
   ueShowConfirmButton, ueHideConfirmButton, ueUpdateConfirmButtonPosition
@@ -410,6 +411,7 @@ export function ueSetupCanvasEvents() {
           width,
           height
         }));
+        track('editor_action', { action: 'whiteout' });
         ueRedrawAnnotations();
       }
     } else if (ueState.currentTool === 'text') {

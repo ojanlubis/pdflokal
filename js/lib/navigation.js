@@ -20,6 +20,7 @@
 
 import { state, navHistory, mobileState } from './state.js';
 import { showToast, showFullscreenLoading, hideFullscreenLoading, cleanupImage, isPDF, isImage } from './utils.js';
+import { track } from './analytics.js';
 
 // ============================================================
 // HISTORY STATE MANAGEMENT
@@ -166,6 +167,7 @@ export function showTool(tool, skipPushState = false) {
   if (workspace) {
     workspace.classList.add('active');
     state.currentTool = tool;
+    track('tool_opened', { tool });
 
     // Scroll to top when opening workspace
     window.scrollTo(0, 0);

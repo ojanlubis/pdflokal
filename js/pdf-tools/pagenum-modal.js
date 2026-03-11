@@ -7,6 +7,7 @@ import { state, ueState, createPageNumberAnnotation } from '../lib/state.js';
 import { showToast } from '../lib/utils.js';
 import { openModal, closeModal } from '../lib/navigation.js';
 import { ueAddAnnotation } from '../editor/annotations.js';
+import { track } from '../lib/analytics.js';
 
 export function openEditorPageNumModal() {
   openModal('editor-pagenum-modal');
@@ -68,6 +69,7 @@ export function applyEditorPageNumbers() {
       }));
     }
 
+    track('editor_action', { action: 'pagenum' });
     closeEditorPageNumModal();
     window.ueRedrawAnnotations(); // -> unified-editor.js
     showToast('Nomor halaman ditambahkan ke semua halaman', 'success');

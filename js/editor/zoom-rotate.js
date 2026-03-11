@@ -5,6 +5,7 @@
 
 import { ueState } from '../lib/state.js';
 import { showToast } from '../lib/utils.js';
+import { track } from '../lib/analytics.js';
 import { ueRenderVisiblePages, ueRenderSelectedPage } from './page-rendering.js';
 import { ueRenderThumbnails } from './sidebar.js';
 import { ueSaveUndoState } from './undo-redo.js';
@@ -35,6 +36,7 @@ export function ueRotateCurrentPage() {
 
   const page = ueState.pages[ueState.selectedPage];
   page.rotation = ((page.rotation || 0) + 90) % 360;
+  track('editor_action', { action: 'rotate' });
 
   ueRenderSelectedPage();
   ueRenderThumbnails();

@@ -7,6 +7,7 @@ import { state, ueState, createWatermarkAnnotation } from '../lib/state.js';
 import { showToast } from '../lib/utils.js';
 import { openModal, closeModal } from '../lib/navigation.js';
 import { ueAddAnnotation } from '../editor/annotations.js';
+import { track } from '../lib/analytics.js';
 
 export function openEditorWatermarkModal() {
   openModal('editor-watermark-modal');
@@ -49,6 +50,7 @@ export function applyEditorWatermark() {
       showToast('Watermark diterapkan', 'success');
     }
 
+    track('editor_action', { action: 'watermark' });
     closeEditorWatermarkModal();
     window.ueRedrawAnnotations(); // -> unified-editor.js
     return;

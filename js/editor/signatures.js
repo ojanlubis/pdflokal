@@ -9,6 +9,7 @@ import { showToast } from '../lib/utils.js';
 import { ueGetCurrentCanvas } from './canvas-utils.js';
 import { ueRedrawAnnotations, ueAddAnnotation, ueRemoveAnnotation } from './annotations.js';
 import { ueSaveEditUndoState } from './undo-redo.js';
+import { track } from '../lib/analytics.js';
 
 // Place signature on canvas at (x, y)
 export async function uePlaceSignature(x, y) {
@@ -45,6 +46,7 @@ export async function uePlaceSignature(x, y) {
   });
   const newIndex = ueAddAnnotation(pageIndex, newAnno);
   ueState.selectedAnnotation = { pageIndex, index: newIndex };
+  track('editor_action', { action: subtype === 'paraf' ? 'paraf' : 'signature' });
 
   ueState.pendingSignature = false;
   ueState.signaturePreviewPos = null;

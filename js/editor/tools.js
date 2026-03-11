@@ -10,6 +10,7 @@ import { openModal, closeModal, showHome } from '../lib/navigation.js';
 import { ueHideConfirmButton } from './signatures.js';
 import { ueRedrawAnnotations, ueAddAnnotation } from './annotations.js';
 import { ueSaveEditUndoState } from './undo-redo.js';
+import { track } from '../lib/analytics.js';
 import { ueUpdateStatus } from './page-rendering.js';
 
 // Tool selection
@@ -75,6 +76,7 @@ export function ueConfirmText() {
   }
 
   ueSaveEditUndoState();
+  track('editor_action', { action: 'text' });
   ueAddAnnotation(ueState.selectedPage, createTextAnnotation({
     text: settings.text,
     x: ueState.pendingTextPosition.x,
@@ -183,6 +185,8 @@ export async function applyEditorProtect() {
     });
 
     downloadBlob(new Blob([protectedBytes], { type: 'application/pdf' }), getDownloadFilename({ originalName: ueState.sourceFiles[0]?.name, extension: 'pdf' }));
+    track('editor_action', { action: 'protect' });
+    track('download', { tool: 'unified-editor' });
 
     closeEditorProtectModal();
     showToast('PDF berhasil dikunci!', 'success');

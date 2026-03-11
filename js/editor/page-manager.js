@@ -11,6 +11,7 @@ import { ueRenderSelectedPage, ueCreatePageSlots } from './page-rendering.js';
 import { drawRotatedThumbnail } from './canvas-utils.js';
 import { ueAddFiles } from './file-loading.js';
 import { ueSaveUndoState } from './undo-redo.js';
+import { track } from '../lib/analytics.js';
 
 // Open the page manager modal
 export function uePmOpenModal() {
@@ -22,6 +23,7 @@ export function uePmOpenModal() {
   uePmState.isOpen = true;
   uePmState.extractMode = false;
   uePmState.selectedForExtract = [];
+  track('gabungkan_used', { pageCount: ueState.pages.length });
 
   // WHY: Observer disconnected because pageCanvases array becomes stale after
   // reorder/delete in the modal. Observer would trigger renders with wrong page indices.
@@ -306,6 +308,7 @@ export function ueReorderPages(fromIndex, insertAt) {
   if (fromIndex < insertAt) insertAt--;
   ueState.pages.splice(insertAt, 0, movedPage);
   rebuildAnnotationMapping(oldPages);
+  track('editor_action', { action: 'reorder' });
   emit('pages:changed', { source: 'user' });
 
   const newViewedIndex = ueState.pages.indexOf(viewedPage);
@@ -334,6 +337,7 @@ export function rebuildAnnotationMapping(oldPages) {
 // Rotate a page in the modal
 function uePmRotatePage(index, degrees) {
   ueSaveUndoState();
+  track('editor_action', { action: 'rotate' });
 
   const page = ueState.pages[index];
   page.rotation = ((page.rotation + degrees) % 360 + 360) % 360;
@@ -382,6 +386,7 @@ function uePmDeletePage(index) {
   }
 
   ueSaveUndoState();
+  track('editor_action', { action: 'delete_page' });
 
   const wasViewingDeletedPage = (ueState.selectedPage === index);
   const viewedPage = ueState.pages[ueState.selectedPage];
@@ -506,6 +511,7 @@ export async function uePmExtractSelected() {
 
     const bytes = await newDoc.save();
     downloadBlob(new Blob([bytes], { type: 'application/pdf' }), getDownloadFilename({ originalName: ueState.sourceFiles[0]?.name, extension: 'pdf' }));
+    track('editor_action', { action: 'split' });
 
     showToast(`${sortedIndices.length} halaman berhasil di-split!`, 'success');
 

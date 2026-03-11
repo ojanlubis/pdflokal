@@ -21,6 +21,7 @@
  */
 
 import { state } from './lib/state.js';
+import { track } from './lib/analytics.js';
 import {
   showToast,
   formatFileSize,
@@ -85,6 +86,7 @@ function downloadCompressedImage() {
   const format = document.getElementById('compress-format').value;
   const extension = format === 'jpeg' ? 'jpg' : format;
   downloadBlob(state.compressedBlob, getDownloadFilename({originalName: state.originalImageName, extension: extension}));
+  track('download', { tool: 'compress-img' });
   showToast('Gambar berhasil dikompres!', 'success');
 }
 
@@ -126,6 +128,7 @@ function downloadRemovedBgImage() {
   state.removeBgCanvas.toBlob((blob) => {
     if (blob) {
       downloadBlob(blob, getDownloadFilename({originalName: state.originalImageName, extension: 'png'}));
+      track('download', { tool: 'remove-bg' });
       showToast('Latar belakang berhasil dihapus!', 'success');
     }
   }, 'image/png');
@@ -205,6 +208,7 @@ function downloadResizedImage() {
   canvas.toBlob((blob) => {
     if (!blob) { showToast('Gagal membuat gambar. Coba ukuran lebih kecil.', 'error'); return; }
     downloadBlob(blob, getDownloadFilename({originalName: state.originalImageName, extension: extension}));
+    track('download', { tool: 'resize-img' });
     showToast('Gambar berhasil diubah ukurannya!', 'success');
   }, mimeType, 0.92);
 }
@@ -241,6 +245,7 @@ function convertImage() {
   canvas.toBlob((blob) => {
     if (!blob) { showToast('Gagal mengonversi gambar.', 'error'); return; }
     downloadBlob(blob, getDownloadFilename({originalName: state.originalImageName, extension: extension}));
+    track('download', { tool: 'convert-img' });
     showToast('Gambar berhasil dikonversi!', 'success');
   }, mimeType, quality);
 }

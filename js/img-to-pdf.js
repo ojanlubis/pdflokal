@@ -9,6 +9,7 @@ import {
   getDownloadFilename, loadImage, escapeHtml, isImage
 } from './lib/utils.js';
 import { enableDragReorder } from './pdf-tools/drag-reorder.js';
+import { track } from './lib/analytics.js';
 
 // ============================================================
 // IMAGES TO PDF
@@ -255,6 +256,7 @@ async function imagesToPDF() {
     const pdfBytes = await pdfDoc.save();
 
     downloadBlob(new Blob([pdfBytes], { type: 'application/pdf' }), getDownloadFilename({originalName: state.imgToPdfFiles[0]?.name, extension: 'pdf'}));
+    track('download', { tool: 'img-to-pdf' });
     showToast('PDF berhasil dibuat!', 'success');
 
   } catch (error) {

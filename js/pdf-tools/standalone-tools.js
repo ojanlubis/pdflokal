@@ -10,6 +10,7 @@ import {
   getDownloadFilename,
   sleep
 } from '../lib/utils.js';
+import { track } from '../lib/analytics.js';
 
 // ============================================================
 // PDF TO IMAGE
@@ -119,6 +120,7 @@ export async function convertPDFtoImages() {
       await sleep(100);
     }
 
+    track('download', { tool: 'pdf-to-img' });
     showToast('Semua halaman berhasil dikonversi!', 'success');
 
   } catch (error) {
@@ -199,6 +201,7 @@ export async function compressPDF() {
     const reduction = ((originalSize - newSize) / originalSize * 100).toFixed(1);
 
     downloadBlob(new Blob([bytes], { type: 'application/pdf' }), getDownloadFilename({originalName: state.currentPDFName, extension: 'pdf'}));
+    track('download', { tool: 'compress-pdf' });
 
     if (newSize < originalSize) {
       showToast(`PDF dikompres! Berkurang ${reduction}%`, 'success');
@@ -255,6 +258,7 @@ export async function protectPDF() {
     );
 
     downloadBlob(new Blob([encryptedBytes], { type: 'application/pdf' }), getDownloadFilename({originalName: state.currentPDFName, extension: 'pdf'}));
+    track('download', { tool: 'protect-pdf' });
     showToast('PDF berhasil diproteksi!', 'success');
 
   } catch (error) {

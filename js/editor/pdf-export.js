@@ -5,6 +5,7 @@
 
 import { ueState } from '../lib/state.js';
 import { showToast, downloadBlob, getDownloadFilename } from '../lib/utils.js';
+import { track } from '../lib/analytics.js';
 
 // Build final PDF bytes with all annotations embedded
 // Separated from ueDownload so applyEditorProtect can reuse it
@@ -237,6 +238,7 @@ export async function ueDownload() {
         new Blob([sourceFile.bytes], { type: 'application/pdf' }),
         getDownloadFilename({ originalName: sourceFile.name, extension: 'pdf' })
       );
+      track('download', { tool: 'unified-editor' });
       showToast('PDF berhasil diunduh!', 'success');
       return;
     }
@@ -255,6 +257,7 @@ export async function ueDownload() {
   try {
     const pdfBytes = await ueBuildFinalPDF();
     downloadBlob(new Blob([pdfBytes], { type: 'application/pdf' }), getDownloadFilename({ originalName: ueState.sourceFiles[0]?.name, extension: 'pdf' }));
+    track('download', { tool: 'unified-editor' });
     showToast('PDF berhasil diunduh!', 'success');
 
   } catch (error) {

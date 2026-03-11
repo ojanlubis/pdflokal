@@ -44,6 +44,7 @@ export default [
         devicePixelRatio: 'readonly',
         getComputedStyle: 'readonly',
         matchMedia: 'readonly',
+        crypto: 'readonly',
 
         // Vendor libs (loaded via <script> tags, accessed as window.*)
         pdfjsLib: 'readonly',
