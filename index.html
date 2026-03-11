@@ -185,6 +185,20 @@
           <input type="file" id="file-input" multiple accept=".pdf,image/*,application/pdf">
         </div>
       </div>
+      <!-- WHY: Inline script so dropzone is clickable BEFORE ES modules load.
+           Module scripts are deferred — initDropZone() only runs after all static imports
+           resolve. This inline handler works immediately on render. The file picker dialog
+           gives modules time to load before the user selects a file. -->
+      <script>
+        (function() {
+          var dz = document.getElementById('main-dropzone');
+          var fi = document.getElementById('file-input');
+          dz.addEventListener('click', function() { fi.click(); });
+          dz.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fi.click(); }
+          });
+        })();
+      </script>
 
       <!-- Privacy Badge -->
       <div class="privacy-badge">

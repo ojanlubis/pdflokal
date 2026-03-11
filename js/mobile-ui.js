@@ -4,7 +4,11 @@
  */
 
 import { ueState, mobileState } from './lib/state.js';
-import { ueSelectPage, getThumbnailSource } from './editor/index.js';
+
+// WHY: Editor functions accessed via window.* bridges (set by editor/index.js)
+// instead of static import. Static import pulled in 15 editor sub-modules and blocked
+// homepage from being interactive. These functions are only called when the editor is
+// active, so window bridges are guaranteed set by then.
 
 // ============================================================
 // MOBILE PAGE NAVIGATION
@@ -12,7 +16,7 @@ import { ueSelectPage, getThumbnailSource } from './editor/index.js';
 
 export function ueMobilePrevPage() {
   if (ueState.selectedPage > 0) {
-    ueSelectPage(ueState.selectedPage - 1);
+    window.ueSelectPage(ueState.selectedPage - 1);
     ueMobileUpdatePageIndicator();
 
     if (mobileState.isTouch && navigator.vibrate) {
@@ -23,7 +27,7 @@ export function ueMobilePrevPage() {
 
 export function ueMobileNextPage() {
   if (ueState.selectedPage < ueState.pages.length - 1) {
-    ueSelectPage(ueState.selectedPage + 1);
+    window.ueSelectPage(ueState.selectedPage + 1);
     ueMobileUpdatePageIndicator();
 
     if (mobileState.isTouch && navigator.vibrate) {
@@ -63,7 +67,7 @@ export function ueMobileOpenPagePicker() {
     const thumb = document.createElement('div');
     thumb.className = 'mobile-page-thumb' + (index === ueState.selectedPage ? ' selected' : '');
     thumb.onclick = () => {
-      ueSelectPage(index);
+      window.ueSelectPage(index);
       ueMobileUpdatePageIndicator();
       ueMobileClosePagePicker();
 
@@ -73,7 +77,7 @@ export function ueMobileOpenPagePicker() {
     };
 
     if (page.canvas) {
-      const sourceCanvas = getThumbnailSource(index);
+      const sourceCanvas = window.getThumbnailSource(index);
       const thumbCanvas = document.createElement('canvas');
       const scale = 0.3;
       const refWidth = sourceCanvas ? sourceCanvas.width : page.canvas.width;

@@ -14,8 +14,15 @@ import { initNavigationHistory } from './lib/navigation.js';
 // Feature modules (side-effect imports — set up window bridges on load)
 import './theme.js';
 import './changelog.js';
-import './pdf-tools/index.js';
-import './editor/index.js';
+
+// WHY: Dynamic import so homepage (dropzone, tool cards) is interactive immediately.
+// Editor + pdf-tools are ~260KB across 22 sub-modules. Static import blocks ALL code
+// until every module is fetched + parsed. Dynamic import loads them in background;
+// window bridges are ready well before user opens the editor.
+import('./editor/index.js');
+import('./pdf-tools/index.js');
+import('./mobile-ui.js');
+import('./image-tools.js');
 
 // Split-out init modules
 import { initDropZone, initFileInputs } from './init-file-handling.js';
