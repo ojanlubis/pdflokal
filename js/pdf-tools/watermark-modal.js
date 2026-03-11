@@ -66,6 +66,8 @@ export function applyEditorWatermark() {
     x: centerX, y: centerY
   });
 
+  // WHY: Legacy editor path uses state.editAnnotations directly (not ueAddAnnotation).
+  // ueAddAnnotation is for unified editor only — it writes to ueState.annotations.
   if (applyTo === 'all') {
     for (let i = 0; i < state.currentPDF.numPages; i++) {
       state.editAnnotations[i].push(createWatermarkAnnotation({

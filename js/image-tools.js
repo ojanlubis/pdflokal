@@ -203,6 +203,7 @@ function downloadResizedImage() {
   }
 
   canvas.toBlob((blob) => {
+    if (!blob) { showToast('Gagal membuat gambar. Coba ukuran lebih kecil.', 'error'); return; }
     downloadBlob(blob, getDownloadFilename({originalName: state.originalImageName, extension: extension}));
     showToast('Gambar berhasil diubah ukurannya!', 'success');
   }, mimeType, 0.92);
@@ -238,6 +239,7 @@ function convertImage() {
   const extension = format === 'jpeg' ? 'jpg' : format;
 
   canvas.toBlob((blob) => {
+    if (!blob) { showToast('Gagal mengonversi gambar.', 'error'); return; }
     downloadBlob(blob, getDownloadFilename({originalName: state.originalImageName, extension: extension}));
     showToast('Gambar berhasil dikonversi!', 'success');
   }, mimeType, quality);

@@ -96,6 +96,9 @@ export async function loadSignatureImage(file) {
   }
 }
 
+// WHY: Does NOT use openModal() because this modal replaces the signature modal
+// in the history stack (replaceState, not pushState). Using openModal() would push
+// a second history entry, making back-button require two taps. This is intentional.
 export function openSignatureBgModal() {
   if (window.changelogAPI) {
     window.changelogAPI.minimize();

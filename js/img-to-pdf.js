@@ -14,6 +14,21 @@ import { enableDragReorder } from './pdf-tools/drag-reorder.js';
 // IMAGES TO PDF
 // ============================================================
 
+// WHY: Button disable has TOCTOU gap — double-click before first tick can start
+// two concurrent PDF builds. Flag guard prevents this.
+let isGenerating = false;
+
+// SINGLE SOURCE OF TRUTH — thumbnail canvas from an Image element.
+// Used by addImagesToPDF and refreshImgPdfList (was duplicated in both).
+function createThumbnailDataUrl(img, maxSize = 120) {
+  const canvas = document.createElement('canvas');
+  const ratio = Math.min(maxSize / img.naturalWidth, maxSize / img.naturalHeight);
+  canvas.width = img.naturalWidth * ratio;
+  canvas.height = img.naturalHeight * ratio;
+  canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL();
+}
+
 async function addImagesToPDF(files) {
   const fileList = document.getElementById('img-pdf-file-list');
 
@@ -32,16 +47,7 @@ async function addImagesToPDF(files) {
     try {
       const img = await loadImage(file);
 
-      // Create thumbnail
-      const canvas = document.createElement('canvas');
-      const maxSize = 120;
-      const ratio = Math.min(maxSize / img.naturalWidth, maxSize / img.naturalHeight);
-      canvas.width = img.naturalWidth * ratio;
-      canvas.height = img.naturalHeight * ratio;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-      const fileItem = createImageFileItem(file.name, formatFileSize(file.size), canvas.toDataURL(), state.imgToPdfFiles.length);
+      const fileItem = createImageFileItem(file.name, formatFileSize(file.size), createThumbnailDataUrl(img), state.imgToPdfFiles.length);
       fileList.appendChild(fileItem);
 
       state.imgToPdfFiles.push({
@@ -82,8 +88,11 @@ function createImageFileItem(name, size, thumbnail, index) {
     <button class="file-item-remove">\u00d7</button>
   `;
 
-  // Add click handler safely (avoid inline onclick with index)
-  div.querySelector('.file-item-remove').addEventListener('click', () => removeImgPdfFile(index));
+  // WHY: Read dataset.index at click time (not closure capture) so drag-reorder
+  // doesn't cause the wrong item to be deleted.
+  div.querySelector('.file-item-remove').addEventListener('click', () => {
+    removeImgPdfFile(parseInt(div.dataset.index, 10));
+  });
 
   return div;
 }
@@ -122,15 +131,7 @@ function refreshImgPdfList() {
 
   for (let i = 0; i < state.imgToPdfFiles.length; i++) {
     const imgFile = state.imgToPdfFiles[i];
-    const canvas = document.createElement('canvas');
-    const maxSize = 120;
-    const ratio = Math.min(maxSize / imgFile.img.naturalWidth, maxSize / imgFile.img.naturalHeight);
-    canvas.width = imgFile.img.naturalWidth * ratio;
-    canvas.height = imgFile.img.naturalHeight * ratio;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(imgFile.img, 0, 0, canvas.width, canvas.height);
-
-    const fileItem = createImageFileItem(imgFile.name, '', canvas.toDataURL(), i);
+    const fileItem = createImageFileItem(imgFile.name, '', createThumbnailDataUrl(imgFile.img), i);
     const addBtnEl = fileList.querySelector('.add-file-btn');
     if (addBtnEl) {
       fileList.insertBefore(fileItem, addBtnEl);
@@ -146,6 +147,8 @@ function refreshImgPdfList() {
 
 async function imagesToPDF() {
   if (state.imgToPdfFiles.length === 0) return;
+  if (isGenerating) return;
+  isGenerating = true;
 
   const pageSize = document.getElementById('img-pdf-size').value;
   const orientation = document.getElementById('img-pdf-orientation').value;
@@ -173,9 +176,13 @@ async function imagesToPDF() {
       const imgFile = state.imgToPdfFiles[i];
       const img = imgFile.img;
 
-      // Get image bytes
-      const imgBytes = await fetch(img.src).then(res => res.arrayBuffer());
+      // WHY: file.arrayBuffer() reads from the original File object directly.
+      // Previous fetch(img.src) did an unnecessary round-trip through a blob URL.
+      const imgBytes = await imgFile.file.arrayBuffer();
 
+      // WHY: Embed-by-type logic is similar to convertImageToPdf() in utils.js,
+      // but this function adds page sizing/orientation/centering on top.
+      // Extracting a shared helper is deferred — the page-layout logic is tightly coupled.
       let embeddedImg;
       const fileType = imgFile.file.type;
 
@@ -184,14 +191,13 @@ async function imagesToPDF() {
       } else if (fileType === 'image/jpeg' || fileType === 'image/jpg') {
         embeddedImg = await pdfDoc.embedJpg(imgBytes);
       } else {
-        // Convert to PNG for other formats
+        // Convert to PNG for other formats (WebP, GIF, etc.)
         const canvas = document.createElement('canvas');
         canvas.width = img.naturalWidth;
         canvas.height = img.naturalHeight;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0);
-        const pngDataUrl = canvas.toDataURL('image/png');
-        const pngBytes = await fetch(pngDataUrl).then(res => res.arrayBuffer());
+        canvas.getContext('2d').drawImage(img, 0, 0);
+        const pngBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+        const pngBytes = new Uint8Array(await pngBlob.arrayBuffer());
         embeddedImg = await pdfDoc.embedPng(pngBytes);
       }
 
@@ -255,6 +261,7 @@ async function imagesToPDF() {
     console.error('Error creating PDF from images:', error);
     showToast('Gagal membuat PDF', 'error');
   } finally {
+    isGenerating = false;
     progress.classList.add('hidden');
     document.getElementById('img-pdf-btn').disabled = false;
   }

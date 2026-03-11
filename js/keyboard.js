@@ -4,15 +4,12 @@
  */
 
 import { state, ueState } from './lib/state.js';
-import { showHome } from './lib/navigation.js';
-import {
-  ueDownload, ueUndo, ueRedo, ueSaveEditUndoState,
-  ueSetTool, ueOpenSignatureModal, ueOpenParafModal, ueRotateCurrentPage,
-  ueRedrawAnnotations, ueRemoveAnnotation, ueSelectPage,
-  ueZoomIn,
-  ueZoomOut,
-  ueZoomReset
-} from './editor/index.js';
+import { showHome, openModal, closeModal } from './lib/navigation.js';
+
+// WHY: Editor functions accessed via window.* bridges (set by editor/index.js)
+// instead of static import. Static import of editor/index.js pulled in 15 sub-modules
+// and blocked homepage from being interactive. All these functions are only called
+// when state.currentTool === 'unified-editor', so window bridges are guaranteed set.
 
 // ============================================================
 // KEYBOARD SHORTCUTS
@@ -41,69 +38,69 @@ export function setupKeyboardShortcuts() {
     if ((e.ctrlKey || e.metaKey) && key === 's') {
       e.preventDefault();
       if (state.currentTool === 'unified-editor' && ueState.pages.length > 0) {
-        ueDownload();
+        window.ueDownload();
       }
     }
 
     // Ctrl+Z for undo in unified editor
     if (key === 'z' && (e.ctrlKey || e.metaKey) && state.currentTool === 'unified-editor') {
       e.preventDefault();
-      ueUndo();
+      window.ueUndo();
     }
 
     // Ctrl+Y for redo in unified editor
     if (key === 'y' && (e.ctrlKey || e.metaKey) && state.currentTool === 'unified-editor') {
       e.preventDefault();
-      ueRedo();
+      window.ueRedo();
     }
 
     // Keyboard shortcuts for unified editor tools (only when not typing)
     if (state.currentTool === 'unified-editor' && !isTyping) {
       if (ueState.selectedPage >= 0) {
         if (key === 'v' && !e.ctrlKey && !e.metaKey) {
-          ueSetTool('select');
+          window.ueSetTool('select');
         } else if (key === 'w' && !e.ctrlKey && !e.metaKey) {
-          ueSetTool('whiteout');
+          window.ueSetTool('whiteout');
         } else if (key === 't' && !e.ctrlKey && !e.metaKey) {
-          ueSetTool('text');
+          window.ueSetTool('text');
         } else if (key === 's' && !e.ctrlKey && !e.metaKey) {
-          ueOpenSignatureModal();
+          window.ueOpenSignatureModal();
         } else if (key === 'p' && !e.ctrlKey && !e.metaKey) {
-          ueOpenParafModal();
+          window.ueOpenParafModal();
         } else if (key === 'r' && !e.ctrlKey && !e.metaKey) {
-          ueRotateCurrentPage();
+          window.ueRotateCurrentPage();
         } else if (e.key === 'Delete' || e.key === 'Backspace') {
           if (ueState.selectedAnnotation) {
             e.preventDefault();
-            ueSaveEditUndoState();
-            ueRemoveAnnotation(ueState.selectedAnnotation.pageIndex, ueState.selectedAnnotation.index);
-            ueRedrawAnnotations();
+            window.ueSaveEditUndoState();
+            window.ueRemoveAnnotation(ueState.selectedAnnotation.pageIndex, ueState.selectedAnnotation.index);
+            window.ueRedrawAnnotations();
           }
         }
       }
 
       if (e.key === 'ArrowLeft' && ueState.selectedPage > 0) {
         e.preventDefault();
-        ueSelectPage(ueState.selectedPage - 1);
+        window.ueSelectPage(ueState.selectedPage - 1);
       } else if (e.key === 'ArrowRight' && ueState.selectedPage < ueState.pages.length - 1) {
         e.preventDefault();
-        ueSelectPage(ueState.selectedPage + 1);
+        window.ueSelectPage(ueState.selectedPage + 1);
       }
 
       if (e.key === '?' || (e.shiftKey && key === '/')) {
         e.preventDefault();
         openShortcutsModal();
       }
-      
+
       if (e.key === '+' || e.key === '=') {
         e.preventDefault();
-        ueZoomIn();
+        window.ueZoomIn();
       } else if (e.key === '-') {
         e.preventDefault();
-        ueZoomOut();
+        window.ueZoomOut();
       } else if (e.key === '0') {
         e.preventDefault();
-        ueZoomReset();
+        window.ueZoomReset();
       }
     }
   });
@@ -114,17 +111,11 @@ export function setupKeyboardShortcuts() {
 // ============================================================
 
 export function openShortcutsModal() {
-  const modal = document.getElementById('shortcuts-modal');
-  if (modal) {
-    modal.classList.add('active');
-  }
+  openModal('shortcuts-modal');
 }
 
 export function closeShortcutsModal() {
-  const modal = document.getElementById('shortcuts-modal');
-  if (modal) {
-    modal.classList.remove('active');
-  }
+  closeModal('shortcuts-modal');
 }
 
 // Window bridges for onclick handlers

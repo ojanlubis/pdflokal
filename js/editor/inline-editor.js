@@ -36,6 +36,8 @@ export function ueCreateInlineTextEditor(anno, pageIndex) {
   const editor = document.createElement('div');
   editor.id = 'inline-text-editor';
   editor.contentEditable = 'true';
+  editor.setAttribute('role', 'textbox');
+  editor.setAttribute('aria-label', 'Edit teks anotasi');
   editor.innerText = anno.text;
   editor.style.cssText = `
     position: absolute;

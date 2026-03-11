@@ -40,7 +40,8 @@ export async function renderPdfImgPages() {
     const pageItem = document.createElement('div');
     pageItem.className = 'page-item selected';
     pageItem.dataset.page = i;
-    pageItem.onclick = () => togglePageSelection(pageItem, i, 'pdf-img');
+    // WHY: Read dataset.page at click time to avoid stale closure over loop var `i`.
+    pageItem.onclick = () => togglePageSelection(pageItem, parseInt(pageItem.dataset.page, 10), 'pdf-img');
 
     pageItem.innerHTML = `
       <canvas></canvas>

@@ -114,6 +114,8 @@ export function applyEditorPageNumbers() {
         x = canvasWidth / 2; y = canvasHeight - margin;
     }
 
+    // WHY: Legacy editor path uses state.editAnnotations directly (not ueAddAnnotation).
+    // ueAddAnnotation is for unified editor only — it writes to ueState.annotations.
     state.editAnnotations[i].push(createPageNumberAnnotation({
       text, fontSize, x, y, position
     }));

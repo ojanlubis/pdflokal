@@ -10,11 +10,9 @@ import {
 } from './lib/utils.js';
 import { showTool, pushWorkspaceState } from './lib/navigation.js';
 import { trapFocus, releaseFocus } from './lib/utils.js';
-import {
-  initUnifiedEditor, ueAddFiles,
-  uePmOpenModal, uePmToggleExtractMode
-} from './editor/index.js';
-import { initMobileEditorEnhancements, ueMobileUpdatePageIndicator } from './mobile-ui.js';
+// WHY: editor + mobile-ui were static imports that forced the entire editor module tree
+// to load before any homepage UI could initialize. Now loaded on-demand when user
+// clicks Merge/Split cards — the only place these functions are used.
 
 // ============================================================
 // TOOL CARDS
@@ -71,8 +69,13 @@ function handleEditorCardWithFilePicker(mode) {
         try {
           const workspace = document.getElementById('unified-editor-workspace');
           if (workspace) {
-            initUnifiedEditor();
-            await ueAddFiles(filesArray);
+            const [editor, mobileUi] = await Promise.all([
+              import('./editor/index.js'),
+              import('./mobile-ui.js')
+            ]);
+
+            editor.initUnifiedEditor();
+            await editor.ueAddFiles(filesArray);
 
             document.getElementById('home-view').style.display = 'none';
             workspace.classList.add('active');
@@ -82,15 +85,15 @@ function handleEditorCardWithFilePicker(mode) {
             pushWorkspaceState('unified-editor');
 
             if (mobileState.isMobile || mobileState.isTouch) {
-              initMobileEditorEnhancements();
-              ueMobileUpdatePageIndicator();
+              mobileUi.initMobileEditorEnhancements();
+              mobileUi.ueMobileUpdatePageIndicator();
             }
 
-            uePmOpenModal();
+            editor.uePmOpenModal();
 
             setTimeout(() => {
               if (mode === 'split' && !uePmState.extractMode) {
-                uePmToggleExtractMode();
+                editor.uePmToggleExtractMode();
               }
               hideFullscreenLoading();
             }, 100);
@@ -131,11 +134,10 @@ export function initSignaturePad() {
       penColor: 'rgb(0, 0, 0)'
     });
 
-    function resizeCanvas() {
-      setupCanvasDPR(canvas);
-      state.signaturePad.clear();
-    }
-
+    // WHY: Store ref so resize listener can be removed on cleanup (prevents leak).
+    if (canvas._resizeHandler) window.removeEventListener('resize', canvas._resizeHandler);
+    const resizeCanvas = () => { setupCanvasDPR(canvas); state.signaturePad.clear(); };
+    canvas._resizeHandler = resizeCanvas;
     window.addEventListener('resize', resizeCanvas);
     setTimeout(resizeCanvas, 100);
   }
@@ -153,11 +155,10 @@ export function initParafPad() {
       penColor: 'rgb(0, 0, 0)'
     });
 
-    function resizeCanvas() {
-      setupCanvasDPR(canvas);
-      state.parafPad.clear();
-    }
-
+    // WHY: Store ref so resize listener can be removed on cleanup (prevents leak).
+    if (canvas._resizeHandler) window.removeEventListener('resize', canvas._resizeHandler);
+    const resizeCanvas = () => { setupCanvasDPR(canvas); state.parafPad.clear(); };
+    canvas._resizeHandler = resizeCanvas;
     window.addEventListener('resize', resizeCanvas);
     setTimeout(resizeCanvas, 100);
   }
@@ -190,10 +191,12 @@ export function initModalBackdropClose() {
   });
 
   // Auto focus-trap: observe .active class on all modals
+  // WHY: Store observer ref on element so it can be disconnected if needed (prevents leak).
   const modalIds = Object.keys(modalCloseMap).concat('shortcuts-modal');
   modalIds.forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
+    if (el._modalObserver) el._modalObserver.disconnect();
     const observer = new MutationObserver(() => {
       if (el.classList.contains('active')) {
         trapFocus(el);
@@ -201,6 +204,7 @@ export function initModalBackdropClose() {
         releaseFocus(el);
       }
     });
+    el._modalObserver = observer;
     observer.observe(el, { attributes: true, attributeFilter: ['class'] });
   });
 }

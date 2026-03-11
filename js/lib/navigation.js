@@ -116,6 +116,12 @@ export function closeAllModals() {
     protectModal.classList.remove('active');
   }
 
+  // Close shortcuts modal
+  const shortcutsModal = document.getElementById('shortcuts-modal');
+  if (shortcutsModal?.classList.contains('active')) {
+    shortcutsModal.classList.remove('active');
+  }
+
   navHistory.currentModal = null;
 }
 

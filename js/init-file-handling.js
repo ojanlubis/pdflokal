@@ -10,9 +10,11 @@ import {
   isPDF, isImage, loadPdfDocument
 } from './lib/utils.js';
 import { showTool } from './lib/navigation.js';
-import { ueAddFiles } from './editor/index.js';
-import { renderPdfImgPages, showPDFPreview, loadSignatureImage } from './pdf-tools/index.js';
-import { addImagesToPDF, updateCompressPreview, updateRemoveBgPreview } from './image-tools.js';
+
+// WHY: These were static imports that forced browser to load entire editor (15 modules)
+// + pdf-tools (7 modules) + image-tools before dropzone could be interactive.
+// Now loaded on-demand inside handlers — dropzone works immediately on page load.
+// Module cache ensures each import() resolves instantly after first load.
 
 // ============================================================
 // DROPZONE
@@ -22,13 +24,8 @@ export function initDropZone() {
   const dropzone = document.getElementById('main-dropzone');
   const fileInput = document.getElementById('file-input');
 
-  dropzone.addEventListener('click', () => fileInput.click());
-  dropzone.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      fileInput.click();
-    }
-  });
+  // WHY: click + keydown handlers are set by inline <script> in index.html
+  // for instant interactivity. Only drag/drop + file change need module code.
 
   dropzone.addEventListener('dragover', (e) => {
     e.preventDefault();
@@ -69,9 +66,13 @@ function setupFileInput(inputId, { loadingMsg, errorMsg, handler, allFiles = fal
   if (!input) return;
   input.addEventListener('change', async (e) => {
     if (e.target.files.length === 0) return;
+    // WHY: checkFileSize here (not in each handler) so ALL tool-specific
+    // file inputs get the 20MB warning / 100MB hard limit for free.
+    const firstFile = e.target.files[0];
+    if (!checkFileSize(firstFile)) { e.target.value = ''; return; }
     showFullscreenLoading(loadingMsg);
     try {
-      await handler(allFiles ? e.target.files : e.target.files[0]);
+      await handler(allFiles ? e.target.files : firstFile);
     } catch (error) {
       console.error(`Error: ${errorMsg}`, error);
       showToast(errorMsg, 'error');
@@ -100,7 +101,10 @@ export function initFileInputs() {
   // Image tools
   setupFileInput('img-pdf-input', {
     loadingMsg: 'Memuat gambar...', errorMsg: 'Gagal memuat gambar',
-    handler: (files) => addImagesToPDF(files), allFiles: true
+    handler: async (files) => {
+      const { addImagesToPDF } = await import('./image-tools.js');
+      await addImagesToPDF(files);
+    }, allFiles: true
   });
   setupFileInput('compress-img-input', {
     loadingMsg: 'Memuat gambar...', errorMsg: 'Gagal memuat gambar',
@@ -122,7 +126,10 @@ export function initFileInputs() {
   // Signature upload
   setupFileInput('signature-upload-input', {
     loadingMsg: 'Memuat tanda tangan...', errorMsg: 'Gagal memuat tanda tangan',
-    handler: (file) => loadSignatureImage(file)
+    handler: async (file) => {
+      const { loadSignatureImage } = await import('./pdf-tools/index.js');
+      await loadSignatureImage(file);
+    }
   });
 
   // Initialize drop hint drag-over effects
@@ -151,8 +158,14 @@ function initDropHints() {
 // FILE HANDLING
 // ============================================================
 
+// WHY: Rapid file drops can trigger concurrent loads that overwrite shared state
+// (state.currentPDF, state.currentPDFBytes). Flag prevents re-entry.
+let isProcessingDrop = false;
+
 async function handleDroppedFiles(files) {
   if (!files || files.length === 0) return;
+  if (isProcessingDrop) return;
+  isProcessingDrop = true;
 
   const file = files[0];
 
@@ -176,9 +189,11 @@ async function handleDroppedFiles(files) {
   try {
     if (!state.currentTool) {
       if (filePDF) {
+        const { ueAddFiles } = await import('./editor/index.js');
         showTool('unified-editor');
         await ueAddFiles(files);
       } else if (fileImage && files.length > 1) {
+        const { addImagesToPDF } = await import('./image-tools.js');
         showTool('img-to-pdf');
         await addImagesToPDF(files);
       } else if (fileImage) {
@@ -190,6 +205,7 @@ async function handleDroppedFiles(files) {
     console.error('Error loading file:', error);
     showToast('Gagal memuat file', 'error');
   } finally {
+    isProcessingDrop = false;
     hideFullscreenLoading();
   }
 }
@@ -202,17 +218,18 @@ async function loadPDFForTool(file, tool) {
 
     state.currentPDF = await loadPdfDocument(state.currentPDFBytes);
 
+    const pdfTools = await import('./pdf-tools/index.js');
     switch (tool) {
       case 'pdf-to-img':
-        await renderPdfImgPages();
+        await pdfTools.renderPdfImgPages();
         document.getElementById('pdf-img-btn').disabled = false;
         break;
       case 'compress-pdf':
-        await showPDFPreview('compress-pdf-preview');
+        await pdfTools.showPDFPreview('compress-pdf-preview');
         document.getElementById('compress-pdf-btn').disabled = false;
         break;
       case 'protect':
-        await showPDFPreview('protect-preview');
+        await pdfTools.showPDFPreview('protect-preview');
         document.getElementById('protect-btn').disabled = false;
         break;
     }
@@ -229,30 +246,31 @@ async function loadPDFForTool(file, tool) {
   }
 }
 
+// DRY helper: hide hint element, show preview container
+function showImageToolPreview(hintId, previewId) {
+  const hint = document.getElementById(hintId);
+  const preview = document.getElementById(previewId);
+  if (hint) hint.classList.add('hidden');
+  if (preview) preview.classList.remove('hidden');
+}
+
 async function loadImageForTool(file, tool) {
   try {
     state.originalImage = await loadImage(file);
     state.originalImageName = file.name;
 
+    const imageTools = await import('./image-tools.js');
     switch (tool) {
       case 'compress-img':
-        const compressHint = document.getElementById('compress-img-hint');
-        const compressComparison = document.getElementById('compress-img-comparison');
-        if (compressHint) compressHint.classList.add('hidden');
-        if (compressComparison) compressComparison.classList.remove('hidden');
-
+        showImageToolPreview('compress-img-hint', 'compress-img-comparison');
         document.getElementById('compress-original').src = state.originalImage.src;
         document.getElementById('compress-original-size').textContent = `Original: ${formatFileSize(file.size)}`;
         state.originalImageSize = file.size;
-        updateCompressPreview();
+        imageTools.updateCompressPreview();
         document.getElementById('compress-img-btn').disabled = false;
         break;
       case 'resize':
-        const resizeHint = document.getElementById('resize-hint');
-        const resizePreviewBox = document.getElementById('resize-preview-box');
-        if (resizeHint) resizeHint.classList.add('hidden');
-        if (resizePreviewBox) resizePreviewBox.classList.remove('hidden');
-
+        showImageToolPreview('resize-hint', 'resize-preview-box');
         document.getElementById('resize-preview').src = state.originalImage.src;
         document.getElementById('resize-width').value = state.originalImage.naturalWidth;
         document.getElementById('resize-height').value = state.originalImage.naturalHeight;
@@ -261,25 +279,18 @@ async function loadImageForTool(file, tool) {
         document.getElementById('resize-dimensions').textContent = `Dimensi: ${state.originalWidth} × ${state.originalHeight}`;
         document.getElementById('resize-btn').disabled = false;
         break;
-      case 'convert-img':
-        const convertHint = document.getElementById('convert-hint');
-        const convertPreviewBox = document.getElementById('convert-preview-box');
-        if (convertHint) convertHint.classList.add('hidden');
-        if (convertPreviewBox) convertPreviewBox.classList.remove('hidden');
-
+      case 'convert-img': {
+        showImageToolPreview('convert-hint', 'convert-preview-box');
         document.getElementById('convert-preview').src = state.originalImage.src;
         const ext = file.name.split('.').pop().toLowerCase();
         document.getElementById('convert-info').textContent = `Format saat ini: ${ext.toUpperCase()}`;
         document.getElementById('convert-btn').disabled = false;
         break;
+      }
       case 'remove-bg':
-        const removeBgHint = document.getElementById('remove-bg-hint');
-        const removeBgComparison = document.getElementById('remove-bg-comparison');
-        if (removeBgHint) removeBgHint.classList.add('hidden');
-        if (removeBgComparison) removeBgComparison.classList.remove('hidden');
-
+        showImageToolPreview('remove-bg-hint', 'remove-bg-comparison');
         document.getElementById('remove-bg-original').src = state.originalImage.src;
-        updateRemoveBgPreview();
+        imageTools.updateRemoveBgPreview();
         document.getElementById('remove-bg-btn').disabled = false;
         break;
     }
@@ -293,16 +304,18 @@ async function loadImageForTool(file, tool) {
 // HANDLE PASTE
 // ============================================================
 
-document.addEventListener('paste', async (e) => {
+// WHY: Named function (not anonymous) so it can be removed if module is re-initialized.
+async function handlePaste(e) {
   const items = e.clipboardData?.items;
   if (!items) return;
 
   for (const item of items) {
-    if (item.type.startsWith('image/')) {
+    // WHY: isImage() checks .type which exists on DataTransferItem too. Use SSOT helper.
+    if (isImage(item)) {
       const file = item.getAsFile();
       if (file) {
         if (state.currentTool === 'img-to-pdf') {
-          addImagesToPDF([file]);
+          import('./image-tools.js').then(m => m.addImagesToPDF([file]));
         } else if (state.currentTool === 'compress-img' || state.currentTool === 'resize' || state.currentTool === 'convert-img' || state.currentTool === 'remove-bg') {
           loadImageForTool(file, state.currentTool);
         } else if (!state.currentTool) {
@@ -312,7 +325,8 @@ document.addEventListener('paste', async (e) => {
       }
     }
   }
-});
+}
+document.addEventListener('paste', handlePaste);
 
 // ============================================================
 // Window bridges (for functions called from HTML onclick handlers)
