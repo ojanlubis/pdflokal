@@ -152,6 +152,26 @@
   --transition-fast: 150ms ease;
   --transition-normal: 200ms ease;
 
+  /* Z-Index Scale (SINGLE SOURCE OF TRUTH)
+     1   = internal stacking (icon inside button)
+     20  = canvas UI (signature buttons on page)
+     90  = floating toolbar (below header)
+     100 = chrome (header, bottom bars, editor header)
+     150 = dropdown overlays (above chrome)
+     200 = page picker overlay
+     1000 = modals + toast
+     9998 = changelog widget
+     10000 = fullscreen loading */
+  --z-internal: 1;
+  --z-canvas-ui: 20;
+  --z-toolbar: 90;
+  --z-chrome: 100;
+  --z-dropdown: 150;
+  --z-picker: 200;
+  --z-modal: 1000;
+  --z-changelog: 9998;
+  --z-loading: 10000;
+
   /* Safe Area Insets (for notched phones) */
   --sat: env(safe-area-inset-top, 0px);
   --sab: env(safe-area-inset-bottom, 0px);
@@ -267,7 +287,7 @@ html[data-theme="dark"] {
 
 .theme-toggle-icon {
   position: relative;
-  z-index: 1;
+  z-index: var(--z-internal);
   flex-shrink: 0;
   transition: all 0.3s ease;
   pointer-events: none;
@@ -419,7 +439,7 @@ a:hover {
 
 /* Header */
 .header {
-  z-index: 100;
+  z-index: var(--z-chrome);
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border-light);
   padding: var(--space-md) 0;
@@ -618,7 +638,7 @@ a:hover {
   }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 900px) {
   .tools-row {
     flex-direction: column;
     gap: var(--space-xl);
@@ -1152,7 +1172,7 @@ a:hover {
   border-radius: var(--radius-md);
   font-size: 0.875rem;
   white-space: nowrap;
-  z-index: 100;
+  z-index: var(--z-chrome);
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.3s ease, visibility 0.3s ease;
@@ -1193,7 +1213,7 @@ a:hover {
   font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
-  z-index: 20;
+  z-index: var(--z-canvas-ui);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   transition: all var(--transition-fast);
 }
@@ -1213,7 +1233,7 @@ a:hover {
   font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
-  z-index: 20;
+  z-index: var(--z-canvas-ui);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   transition: all var(--transition-fast);
 }
@@ -1256,7 +1276,7 @@ a:hover {
   display: none;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: var(--z-modal);
 }
 
 .signature-modal.active {
@@ -1455,7 +1475,7 @@ a:hover {
   position: fixed;
   bottom: var(--space-xl);
   right: var(--space-xl);
-  z-index: 1000;
+  z-index: var(--z-modal);
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
@@ -1503,7 +1523,7 @@ a:hover {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 10000;
+  z-index: var(--z-loading);
 }
 
 .fullscreen-loading-content {
@@ -1648,7 +1668,7 @@ a:hover {
    Responsive Design
    ============================================================ */
 
-@media (max-width: 768px) {
+@media (max-width: 900px) {
   .hero h1 {
     font-size: 1.75rem;
   }
@@ -1851,7 +1871,7 @@ a:hover {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: var(--z-modal);
   visibility: hidden;
   opacity: 0;
   pointer-events: none;
@@ -2104,7 +2124,7 @@ a:hover {
 .resize-handle.se { bottom: -5px; right: -5px; cursor: nwse-resize; }
 
 /* Mobile Responsive for Editor */
-@media (max-width: 768px) {
+@media (max-width: 900px) {
   .edit-modal-box {
     padding: var(--space-lg);
   }
@@ -2198,7 +2218,7 @@ a:hover {
   max-width: 500px;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 900px) {
   .drop-hint {
     padding: var(--space-lg);
     min-height: 120px;
@@ -2346,7 +2366,7 @@ a:hover {
   border: 1px solid var(--border-medium);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-lg);
-  z-index: 100;
+  z-index: var(--z-dropdown);
   padding: var(--space-xs) 0;
 }
 
@@ -2606,7 +2626,7 @@ body.editor-active .container {
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border-light);
   flex-shrink: 0;
-  z-index: 100;
+  z-index: var(--z-chrome);
   position: sticky;
   top: 0;
 }
@@ -2710,7 +2730,7 @@ html[data-theme="dark"] .editor-header-icon-btn .icon-sun { display: block; }
   bottom: 0;
   left: 0;
   right: 0;
-  z-index: 100;
+  z-index: var(--z-chrome);
   background: var(--bg-secondary);
   border-top: 1px solid var(--border-light);
   padding: 0 var(--space-sm);
@@ -2816,7 +2836,7 @@ body.editor-active .shortcuts-help-btn {
 .floating-toolbar {
   position: sticky;
   top: 40px; /* flush below editor header */
-  z-index: 90;
+  z-index: var(--z-toolbar);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2902,7 +2922,7 @@ html[data-theme="dark"] .floating-toolbar {
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.15s, visibility 0.15s;
-  z-index: 100;
+  z-index: var(--z-dropdown);
 }
 
 .ft-more-dropdown.active {
@@ -3294,7 +3314,7 @@ html[data-theme="dark"] .floating-toolbar {
 }
 
 /* Mobile responsive */
-@media (max-width: 768px) {
+@media (max-width: 900px) {
   .ue-pm-modal-box {
     max-height: 90vh;
     padding: var(--space-md);
@@ -3368,7 +3388,7 @@ body.is-touch .btn:active {
   background: var(--bg-secondary);
   border-top: 1px solid var(--border-light);
   box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.08);
-  z-index: 100;
+  z-index: var(--z-chrome);
   align-items: center;
   justify-content: space-between;
   padding-left: max(var(--space-sm), var(--sal));
@@ -3464,7 +3484,7 @@ body.is-touch .btn:active {
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
   min-width: 140px;
-  z-index: 150;
+  z-index: var(--z-dropdown);
   overflow: hidden;
 }
 
@@ -3559,7 +3579,7 @@ body.is-touch .btn:active {
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 200;
+  z-index: var(--z-picker);
 }
 
 .mobile-page-picker.active {
@@ -3906,7 +3926,7 @@ body.is-touch .resize-handle.se { bottom: -10px; right: -10px; }
   border: 1px solid var(--border-light);
   box-shadow: var(--shadow-md);
   cursor: pointer;
-  z-index: 100;
+  z-index: var(--z-chrome);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3931,7 +3951,7 @@ body.is-touch .resize-handle.se { bottom: -10px; right: -10px; }
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 1000;
+  z-index: var(--z-modal);
   display: none;
   align-items: center;
   justify-content: center;
@@ -4056,7 +4076,7 @@ kbd {
   position: fixed;
   bottom: 20px;
   right: 20px;
-  z-index: 9998;
+  z-index: var(--z-changelog);
   visibility: hidden;
   opacity: 0;
   pointer-events: none;
@@ -4303,7 +4323,7 @@ kbd {
 }
 
 /* Mobile Responsive */
-@media (max-width: 768px) {
+@media (max-width: 900px) {
   /* Collapsed badge stays compact */
   .changelog-notification.collapsed {
     bottom: 10px;
