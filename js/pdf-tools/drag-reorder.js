@@ -30,9 +30,9 @@ export function enableDragReorder(containerId, stateArray, isPages = false) {
       const midX = rect.left + rect.width / 2;
 
       if (e.clientX < midX) {
-        container.insertBefore(draggedItem, item);
+        item.before(draggedItem);
       } else {
-        container.insertBefore(draggedItem, item.nextSibling);
+        item.after(draggedItem);
       }
 
       updateStateOrder(container, stateArray, isPages);

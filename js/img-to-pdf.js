@@ -135,7 +135,7 @@ function refreshImgPdfList() {
     const fileItem = createImageFileItem(imgFile.name, '', createThumbnailDataUrl(imgFile.img), i);
     const addBtnEl = fileList.querySelector('.add-file-btn');
     if (addBtnEl) {
-      fileList.insertBefore(fileItem, addBtnEl);
+      addBtnEl.before(fileItem);
     } else {
       fileList.appendChild(fileItem);
     }

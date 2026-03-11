@@ -360,7 +360,7 @@ function uePmRotatePage(index, degrees) {
         rotBadge.className = 'ue-pm-rotation-badge';
         const actions = item.querySelector('.ue-pm-page-actions');
         if (actions) {
-          item.insertBefore(rotBadge, actions);
+          actions.before(rotBadge);
         } else {
           item.appendChild(rotBadge);
         }

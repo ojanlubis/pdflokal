@@ -9,7 +9,7 @@
   <script>
     (function() {
       const theme = localStorage.getItem('pdflokal_theme') || 'light';
-      document.documentElement.setAttribute('data-theme', theme);
+      document.documentElement.dataset.theme = theme;
     })();
   </script>
 
