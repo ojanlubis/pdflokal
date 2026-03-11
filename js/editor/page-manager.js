@@ -334,6 +334,36 @@ export function rebuildAnnotationMapping(oldPages) {
   ueState.pageCaches = newCaches;
 }
 
+function updateRotatedThumbnail(item, page) {
+  const oldCanvas = item.querySelector('canvas');
+  const sourceCanvas = page.thumbCanvas || null;
+  if (!oldCanvas || !sourceCanvas) return;
+
+  const newCanvas = page.rotation !== 0
+    ? drawRotatedThumbnail(sourceCanvas, page.rotation)
+    : (() => { const c = document.createElement('canvas'); c.width = sourceCanvas.width; c.height = sourceCanvas.height; c.getContext('2d').drawImage(sourceCanvas, 0, 0); return c; })();
+  oldCanvas.replaceWith(newCanvas);
+}
+
+function updateRotationBadge(item, page) {
+  let rotBadge = item.querySelector('.ue-pm-rotation-badge');
+  if (page.rotation !== 0) {
+    if (!rotBadge) {
+      rotBadge = document.createElement('span');
+      rotBadge.className = 'ue-pm-rotation-badge';
+      const actions = item.querySelector('.ue-pm-page-actions');
+      if (actions) {
+        actions.before(rotBadge);
+      } else {
+        item.appendChild(rotBadge);
+      }
+    }
+    rotBadge.textContent = page.rotation + '°';
+  } else if (rotBadge) {
+    rotBadge.remove();
+  }
+}
+
 // Rotate a page in the modal
 function uePmRotatePage(index, degrees) {
   ueSaveUndoState();
@@ -344,31 +374,8 @@ function uePmRotatePage(index, degrees) {
 
   const item = document.querySelector(`.ue-pm-page-item[data-index="${index}"]`);
   if (item) {
-    const oldCanvas = item.querySelector('canvas');
-    const sourceCanvas = ueState.pages[index]?.thumbCanvas || null;
-    if (oldCanvas && sourceCanvas) {
-      const newCanvas = page.rotation !== 0
-        ? drawRotatedThumbnail(sourceCanvas, page.rotation)
-        : (() => { const c = document.createElement('canvas'); c.width = sourceCanvas.width; c.height = sourceCanvas.height; c.getContext('2d').drawImage(sourceCanvas, 0, 0); return c; })();
-      oldCanvas.replaceWith(newCanvas);
-    }
-
-    let rotBadge = item.querySelector('.ue-pm-rotation-badge');
-    if (page.rotation !== 0) {
-      if (!rotBadge) {
-        rotBadge = document.createElement('span');
-        rotBadge.className = 'ue-pm-rotation-badge';
-        const actions = item.querySelector('.ue-pm-page-actions');
-        if (actions) {
-          actions.before(rotBadge);
-        } else {
-          item.appendChild(rotBadge);
-        }
-      }
-      rotBadge.textContent = page.rotation + '°';
-    } else if (rotBadge) {
-      rotBadge.remove();
-    }
+    updateRotatedThumbnail(item, page);
+    updateRotationBadge(item, page);
   }
 
   showToast('Halaman diputar', 'success');

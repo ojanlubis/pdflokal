@@ -146,6 +146,38 @@ function refreshImgPdfList() {
   enableDragReorder('img-pdf-file-list', state.imgToPdfFiles);
 }
 
+// WHY: Extracted from imagesToPDF loop to reduce cognitive complexity (S3776).
+// Handles embedding one image into a PDF page with sizing/orientation/centering.
+async function addImagePage(pdfDoc, imgFile, pageSize, orientation, pageSizes) {
+  const arrayBuffer = await imgFile.file.arrayBuffer();
+  const uint8 = new Uint8Array(arrayBuffer);
+
+  const isPng = imgFile.file.type === 'image/png';
+  const pdfImage = isPng
+    ? await pdfDoc.embedPng(uint8)
+    : await pdfDoc.embedJpg(uint8);
+
+  let { width: pw, height: ph } = pageSizes[pageSize] || pageSizes.a4;
+  if (orientation === 'landscape') {
+    [pw, ph] = [ph, pw];
+  }
+
+  const page = pdfDoc.addPage([pw, ph]);
+  const { width: imgW, height: imgH } = pdfImage.scale(1);
+
+  // Fit image within page while preserving aspect ratio
+  const scale = Math.min(pw / imgW, ph / imgH);
+  const drawW = imgW * scale;
+  const drawH = imgH * scale;
+
+  page.drawImage(pdfImage, {
+    x: (pw - drawW) / 2,
+    y: (ph - drawH) / 2,
+    width: drawW,
+    height: drawH,
+  });
+}
+
 async function imagesToPDF() {
   if (state.imgToPdfFiles.length === 0) return;
   if (isGenerating) return;
@@ -175,81 +207,7 @@ async function imagesToPDF() {
       progressFill.style.width = `${((i + 1) / state.imgToPdfFiles.length) * 100}%`;
 
       const imgFile = state.imgToPdfFiles[i];
-      const img = imgFile.img;
-
-      // WHY: file.arrayBuffer() reads from the original File object directly.
-      // Previous fetch(img.src) did an unnecessary round-trip through a blob URL.
-      const imgBytes = await imgFile.file.arrayBuffer();
-
-      // WHY: Embed-by-type logic is similar to convertImageToPdf() in utils.js,
-      // but this function adds page sizing/orientation/centering on top.
-      // Extracting a shared helper is deferred — the page-layout logic is tightly coupled.
-      let embeddedImg;
-      const fileType = imgFile.file.type;
-
-      if (fileType === 'image/png') {
-        embeddedImg = await pdfDoc.embedPng(imgBytes);
-      } else if (fileType === 'image/jpeg' || fileType === 'image/jpg') {
-        embeddedImg = await pdfDoc.embedJpg(imgBytes);
-      } else {
-        // Convert to PNG for other formats (WebP, GIF, etc.)
-        const canvas = document.createElement('canvas');
-        canvas.width = img.naturalWidth;
-        canvas.height = img.naturalHeight;
-        canvas.getContext('2d').drawImage(img, 0, 0);
-        const pngBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-        const pngBytes = new Uint8Array(await pngBlob.arrayBuffer());
-        embeddedImg = await pdfDoc.embedPng(pngBytes);
-      }
-
-      let pageWidth, pageHeight;
-
-      if (pageSize === 'fit') {
-        pageWidth = embeddedImg.width;
-        pageHeight = embeddedImg.height;
-      } else {
-        const dimensions = pageSizes[pageSize];
-
-        let isLandscape = false;
-        if (orientation === 'landscape') {
-          isLandscape = true;
-        } else if (orientation === 'auto') {
-          isLandscape = embeddedImg.width > embeddedImg.height;
-        }
-
-        if (isLandscape) {
-          pageWidth = dimensions.height;
-          pageHeight = dimensions.width;
-        } else {
-          pageWidth = dimensions.width;
-          pageHeight = dimensions.height;
-        }
-      }
-
-      const page = pdfDoc.addPage([pageWidth, pageHeight]);
-
-      // Calculate image position to fit and center
-      let imgWidth = embeddedImg.width;
-      let imgHeight = embeddedImg.height;
-
-      if (pageSize !== 'fit') {
-        const scale = Math.min(
-          (pageWidth - 40) / imgWidth,
-          (pageHeight - 40) / imgHeight
-        );
-        imgWidth *= scale;
-        imgHeight *= scale;
-      }
-
-      const x = (pageWidth - imgWidth) / 2;
-      const y = (pageHeight - imgHeight) / 2;
-
-      page.drawImage(embeddedImg, {
-        x,
-        y,
-        width: imgWidth,
-        height: imgHeight,
-      });
+      await addImagePage(pdfDoc, imgFile, pageSize, orientation, pageSizes);
     }
 
     progressText.textContent = 'Menyimpan PDF...';
