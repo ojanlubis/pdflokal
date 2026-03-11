@@ -1621,10 +1621,9 @@
   </script>
   <script src="js/vendor/signature_pad.umd.min.js"></script>
 
-  <!-- PDF Encryption Library (ES Module - kept on CDN due to module dependency complexity) -->
+  <!-- PDF Encryption Library (self-hosted, patched to use global PDFLib) -->
   <script type="module">
-    import { encryptPDF } from 'https://esm.sh/@pdfsmaller/pdf-encrypt-lite@1.0.1';
-    // Make it globally available for the main app
+    import { encryptPDF } from './js/vendor/pdf-encrypt-lite.min.js';
     window.encryptPDF = encryptPDF;
   </script>
 
