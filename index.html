@@ -116,7 +116,7 @@
 
   <!-- Vercel Web Analytics -->
   <script>
-    window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+    window.va = window.va || function () { if (!window.vaq) window.vaq = []; window.vaq.push(arguments); };
   </script>
   <script defer src="/_vercel/insights/script.js"></script>
 </head>
@@ -181,7 +181,7 @@
             <line x1="12" y1="3" x2="12" y2="15" />
           </svg>
           <h3>Seret file ke sini atau klik untuk pilih</h3>
-          <p>PDF or Image</p>
+          <p>PDF atau Gambar</p>
           <input type="file" id="file-input" multiple accept=".pdf,image/*,application/pdf">
         </button>
       </div>
@@ -207,7 +207,7 @@
           <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
           <path d="M7 11V7a5 5 0 0 1 10 0v4" />
         </svg>
-        <p>File tidak pernah meninggalkan perangkat Anda</p>
+        <p>File tidak pernah meninggalkan perangkat kamu</p>
       </div>
 
       <!-- Tools Section -->
@@ -351,7 +351,7 @@
         <div class="tools-category">
           <h2>Segera Hadir</h2>
           <div class="tools-grid">
-            <div class="tool-card disabled" title="Fitur ini butuh server. Coming soon!">
+            <div class="tool-card disabled" title="Rencana Development" aria-disabled="true">
               <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                 stroke-linecap="round" stroke-linejoin="round">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -363,7 +363,7 @@
               <h3>PDF → Word</h3>
               <p>Butuh server</p>
             </div>
-            <div class="tool-card disabled" title="Fitur ini butuh server. Coming soon!">
+            <div class="tool-card disabled" title="Rencana Development" aria-disabled="true">
               <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                 stroke-linecap="round" stroke-linejoin="round">
                 <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
@@ -375,7 +375,7 @@
               <h3>PDF → Excel</h3>
               <p>Butuh server</p>
             </div>
-            <div class="tool-card disabled" title="Fitur ini butuh server. Coming soon!">
+            <div class="tool-card disabled" title="Rencana Development" aria-disabled="true">
               <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                 stroke-linecap="round" stroke-linejoin="round">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -655,9 +655,9 @@
               <path d="M15 18l-6-6 6-6" />
             </svg>
           </button>
-          <span class="mobile-page-indicator" id="ue-mobile-page-indicator" onclick="ueMobileOpenPagePicker()">
+          <button type="button" class="mobile-page-indicator" id="ue-mobile-page-indicator" onclick="ueMobileOpenPagePicker()">
             Halaman <strong>1</strong> / 1
-          </span>
+          </button>
           <button class="mobile-nav-btn" id="ue-mobile-next" onclick="ueMobileNextPage()" title="Halaman berikutnya">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M9 18l6-6-6-6" />
@@ -723,7 +723,7 @@
 
       <!-- Mobile Page Picker Modal -->
       <div class="mobile-page-picker" id="ue-mobile-page-picker">
-        <div class="mobile-page-picker-backdrop" onclick="ueMobileClosePagePicker()"></div>
+        <button type="button" class="mobile-page-picker-backdrop" onclick="ueMobileClosePagePicker()" aria-label="Tutup pemilih halaman"></button>
         <div class="mobile-page-picker-content">
           <div class="mobile-page-picker-header">
             <span>Pilih Halaman</span>
@@ -1171,14 +1171,14 @@
           <span class="range-value" id="remove-bg-threshold-value">240</span>
         </div>
         <div class="control-group">
-          <label title="Semakin tinggi, semakin banyak warna terang yang dihapus">
+          <p class="control-hint" title="Semakin tinggi, semakin banyak warna terang yang dihapus">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
               style="vertical-align: middle; margin-right: 4px;">
               <circle cx="12" cy="12" r="10" />
               <path d="M12 16v-4M12 8h.01" />
             </svg>
             Tips: 255 = hanya putih murni, 200 = termasuk warna keabu-abuan
-          </label>
+          </p>
         </div>
       </div>
       <div class="action-bar">
@@ -1204,7 +1204,7 @@
         <button class="signature-tab" role="tab" aria-selected="false" onclick="switchSignatureTab('draw')">Gambar</button>
       </div>
       <div id="signature-upload-tab" class="signature-tab-content active">
-        <div class="signature-upload-area" id="signature-upload-hint"
+        <button type="button" class="signature-upload-area" id="signature-upload-hint"
           onclick="document.getElementById('signature-upload-input').click()">
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -1215,7 +1215,7 @@
           <span class="upload-hint-secondary">Bisa juga digunakan untuk stempel</span>
           <span>JPG • PNG</span>
           <input type="file" id="signature-upload-input" accept="image/jpeg,image/png" style="display:none">
-        </div>
+        </button>
         <div class="signature-actions">
           <button class="btn btn-ghost" onclick="closeSignatureModal()">Batal</button>
         </div>
@@ -1311,7 +1311,7 @@
 
           <!-- Bold/Italic -->
           <div class="edit-option-group">
-            <label>Gaya</label>
+            <span class="edit-option-label">Gaya</span>
             <div class="text-style-toggles">
               <button type="button" class="text-style-btn" id="modal-text-bold" title="Bold">
                 <strong>B</strong>
@@ -1545,7 +1545,7 @@
 
   <!-- Keyboard Shortcuts Modal -->
   <dialog class="shortcuts-modal" id="shortcuts-modal" aria-modal="true" aria-label="Pintasan keyboard">
-    <div class="shortcuts-modal-backdrop" onclick="closeShortcutsModal()"></div>
+    <button type="button" class="shortcuts-modal-backdrop" onclick="closeShortcutsModal()" aria-label="Tutup pintasan keyboard"></button>
     <div class="shortcuts-modal-box">
       <h3>Pintasan Keyboard</h3>
       <div class="shortcuts-modal-content">
@@ -1646,12 +1646,12 @@
       <div class="changelog-header">
         <h3>📣 Update Terbaru</h3>
         <div class="changelog-header-actions">
-          <button class="changelog-action-btn" onclick="changelogAPI.minimize()" title="Minimize">
+          <button class="changelog-action-btn" onclick="changelogAPI.minimize()" title="Perkecil">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="5" y1="12" x2="19" y2="12"></line>
             </svg>
           </button>
-          <button class="changelog-action-btn" onclick="changelogAPI.close()" title="Close">
+          <button class="changelog-action-btn" onclick="changelogAPI.close()" title="Tutup">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="18" y1="6" x2="6" y2="18"></line>
               <line x1="6" y1="6" x2="18" y2="18"></line>

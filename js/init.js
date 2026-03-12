@@ -97,7 +97,7 @@ function detectMobile() {
       mainFileInput.accept = '.pdf,image/*,application/pdf';
     }
     if (dropzoneSubtext) {
-      dropzoneSubtext.textContent = 'PDF or Image';
+      dropzoneSubtext.textContent = 'PDF atau Gambar';
     }
   }
 }
