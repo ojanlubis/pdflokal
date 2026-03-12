@@ -89,6 +89,66 @@ async function embedWatermarkAnnotation(page, anno, scaleX, scaleY, height, getF
   });
 }
 
+// WHY: Extracted from getFont to reduce cognitive complexity (S3776).
+async function embedCustomFont(newDoc, fontCache, fontName, bold) {
+  try {
+    const fontResponse = await fetch(CUSTOM_FONT_URLS[fontName]);
+    const fontBytes = await fontResponse.arrayBuffer();
+    fontCache[fontName] = await newDoc.embedFont(fontBytes);
+    console.log('[PDF Export] Embedded font:', fontName, `(${(fontBytes.byteLength / 1024).toFixed(1)}KB)`);
+    return fontCache[fontName];
+  } catch (err) {
+    console.error('[PDF Export] Failed to load font:', fontName, err);
+    const fallbackName = bold ? 'Helvetica-Bold' : 'Helvetica';
+    if (!fontCache[fallbackName]) {
+      fontCache[fallbackName] = await newDoc.embedFont(PDFLib.StandardFonts[fallbackName]);
+    }
+    return fontCache[fallbackName];
+  }
+}
+
+async function embedStandardFont(newDoc, fontCache, fontName, bold) {
+  const standardFont = PDFLib.StandardFonts[fontName];
+  if (!standardFont) {
+    console.error('[PDF Export] Invalid standard font name:', fontName);
+    const fallback = bold ? PDFLib.StandardFonts.HelveticaBold : PDFLib.StandardFonts.Helvetica;
+    fontCache[fontName] = await newDoc.embedFont(fallback);
+  } else {
+    fontCache[fontName] = await newDoc.embedFont(standardFont);
+  }
+  return fontCache[fontName];
+}
+
+// WHY: Extracted from ueBuildFinalPDF to reduce cognitive complexity (S3776).
+function resolvePageScales(i, pageSize) {
+  const scaleInfo = ueState.pageScales[i];
+  const pdfW = scaleInfo ? scaleInfo.pdfWidth : pageSize.width;
+  const pdfH = scaleInfo ? scaleInfo.pdfHeight : pageSize.height;
+  const canvasW = scaleInfo ? scaleInfo.canvasWidth : pageSize.width;
+  const canvasH = scaleInfo ? scaleInfo.canvasHeight : pageSize.height;
+  return { pdfW, pdfH, scaleX: pdfW / canvasW, scaleY: pdfH / canvasH };
+}
+
+async function embedAnnotationsOnPage(page, annotations, scaleX, scaleY, pdfH, getFont, newDoc) {
+  for (const anno of annotations) {
+    if (anno.type === 'whiteout') {
+      page.drawRectangle({
+        x: anno.x * scaleX,
+        y: pdfH - (anno.y + anno.height) * scaleY,
+        width: anno.width * scaleX,
+        height: anno.height * scaleY,
+        color: PDFLib.rgb(1, 1, 1)
+      });
+    } else if (anno.type === 'text') {
+      await embedTextAnnotation(page, anno, scaleX, scaleY, pdfH, getFont);
+    } else if (anno.type === 'signature') {
+      await embedSignatureAnnotation(page, anno, scaleX, scaleY, pdfH, newDoc);
+    } else if (anno.type === 'watermark') {
+      await embedWatermarkAnnotation(page, anno, scaleX, scaleY, pdfH, getFont);
+    }
+  }
+}
+
 // Build final PDF bytes with all annotations embedded
 // Separated from ueDownload so applyEditorProtect can reuse it
 export async function ueBuildFinalPDF() {
@@ -97,36 +157,11 @@ export async function ueBuildFinalPDF() {
   const fontCache = {};
 
   async function getFont(fontFamily, bold, italic) {
-    console.log('[PDF Export] getFont called:', { fontFamily, bold, italic });
     const { name: fontName, isCustom } = resolveFontName(fontFamily || 'Helvetica', bold, italic);
-
-    if (!fontCache[fontName]) {
-      if (isCustom) {
-        try {
-          const fontResponse = await fetch(CUSTOM_FONT_URLS[fontName]);
-          const fontBytes = await fontResponse.arrayBuffer();
-          fontCache[fontName] = await newDoc.embedFont(fontBytes);
-          console.log('[PDF Export] ✓ Embedded font:', fontName, `(${(fontBytes.byteLength / 1024).toFixed(1)}KB)`);
-        } catch (err) {
-          console.error('[PDF Export] ✗ Failed to load font:', fontName, err);
-          const fallbackName = bold ? 'Helvetica-Bold' : 'Helvetica';
-          if (!fontCache[fallbackName]) {
-            fontCache[fallbackName] = await newDoc.embedFont(PDFLib.StandardFonts[fallbackName]);
-          }
-          return fontCache[fallbackName];
-        }
-      } else {
-        const standardFont = PDFLib.StandardFonts[fontName];
-        if (!standardFont) {
-          console.error('[PDF Export] Invalid standard font name:', fontName);
-          const fallback = bold ? PDFLib.StandardFonts.HelveticaBold : PDFLib.StandardFonts.Helvetica;
-          fontCache[fontName] = await newDoc.embedFont(fallback);
-        } else {
-          fontCache[fontName] = await newDoc.embedFont(standardFont);
-        }
-      }
-    }
-    return fontCache[fontName];
+    if (fontCache[fontName]) return fontCache[fontName];
+    return isCustom
+      ? embedCustomFont(newDoc, fontCache, fontName, bold)
+      : embedStandardFont(newDoc, fontCache, fontName, bold);
   }
 
   for (let i = 0; i < ueState.pages.length; i++) {
@@ -135,46 +170,17 @@ export async function ueBuildFinalPDF() {
     const srcDoc = await PDFLib.PDFDocument.load(source.bytes);
 
     const [copiedPage] = await newDoc.copyPages(srcDoc, [pageInfo.pageNum]);
-
     if (pageInfo.rotation !== 0) {
       copiedPage.setRotation(PDFLib.degrees(pageInfo.rotation));
     }
-
     newDoc.addPage(copiedPage);
 
     const annotations = ueState.annotations[i] || [];
     if (annotations.length === 0) continue;
 
     const page = newDoc.getPages()[i];
-    const pageSize = page.getSize();
-    // Use pageScales from PDF.js rendering for consistent coordinate mapping.
-    // page.getSize() (pdf-lib MediaBox) can differ from PDF.js viewport dimensions
-    // when PDFs have CropBox or non-standard page definitions.
-    const scaleInfo = ueState.pageScales[i];
-    const pdfW = scaleInfo ? scaleInfo.pdfWidth : pageSize.width;
-    const pdfH = scaleInfo ? scaleInfo.pdfHeight : pageSize.height;
-    const canvasW = scaleInfo ? scaleInfo.canvasWidth : pageSize.width;
-    const canvasH = scaleInfo ? scaleInfo.canvasHeight : pageSize.height;
-    const scaleX = pdfW / canvasW;
-    const scaleY = pdfH / canvasH;
-
-    for (const anno of annotations) {
-      if (anno.type === 'whiteout') {
-        page.drawRectangle({
-          x: anno.x * scaleX,
-          y: pdfH - (anno.y + anno.height) * scaleY,
-          width: anno.width * scaleX,
-          height: anno.height * scaleY,
-          color: PDFLib.rgb(1, 1, 1)
-        });
-      } else if (anno.type === 'text') {
-        await embedTextAnnotation(page, anno, scaleX, scaleY, pdfH, getFont);
-      } else if (anno.type === 'signature') {
-        await embedSignatureAnnotation(page, anno, scaleX, scaleY, pdfH, newDoc);
-      } else if (anno.type === 'watermark') {
-        await embedWatermarkAnnotation(page, anno, scaleX, scaleY, pdfH, getFont);
-      }
-    }
+    const { pdfH, scaleX, scaleY } = resolvePageScales(i, page.getSize());
+    await embedAnnotationsOnPage(page, annotations, scaleX, scaleY, pdfH, getFont, newDoc);
   }
 
   return await newDoc.save({

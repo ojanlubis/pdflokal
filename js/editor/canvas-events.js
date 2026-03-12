@@ -27,6 +27,91 @@ function getCanvasAndIndex(target) {
   return { canvas, pageIndex };
 }
 
+// WHY: Module-level helpers (not closure-dependent) moved out of ueSetupCanvasEvents
+// to satisfy S7721 ("move function to outer scope").
+function infoFromMouse(e) {
+  const hit = getCanvasAndIndex(e.target);
+  if (!hit) return null;
+  const coords = ueGetCoords(e, hit.canvas);
+  return { canvas: hit.canvas, pageIndex: hit.pageIndex, x: coords.x, y: coords.y };
+}
+
+function infoFromTouch(e) {
+  const touch = (e.touches?.length) ? e.touches[0] : e.changedTouches[0];
+  const hit = getCanvasAndIndex(e.target);
+  if (!hit) return null;
+  const coords = ueGetCoords(touch, hit.canvas);
+  return { canvas: hit.canvas, pageIndex: hit.pageIndex, x: coords.x, y: coords.y };
+}
+
+function resizeTextAnnotation(anno, info, handle, canvas, x) {
+  const ctx = canvas.getContext('2d');
+  const newWidth = (handle === 'br' || handle === 'tr')
+    ? Math.max(20, x - info.x)
+    : Math.max(20, info.x + info.width - x);
+  const scale = newWidth / info.width;
+  anno.fontSize = Math.max(6, Math.min(120, info.fontSize * scale));
+  const newBounds = getTextBounds(anno, ctx);
+  const fontDelta = anno.fontSize - info.fontSize;
+
+  if (handle === 'br') {
+    anno.x = info.x;
+    anno.y = info.y + fontDelta;
+  } else if (handle === 'bl') {
+    anno.x = info.x + info.width - newBounds.width;
+    anno.y = info.y + fontDelta;
+  } else if (handle === 'tr') {
+    anno.x = info.x;
+    anno.y = info.y + info.height - newBounds.height + fontDelta;
+  } else {
+    anno.x = info.x + info.width - newBounds.width;
+    anno.y = info.y + info.height - newBounds.height + fontDelta;
+  }
+}
+
+function resizeSignatureAnnotation(anno, info, handle, x) {
+  const newWidth = (handle === 'br' || handle === 'tr')
+    ? Math.max(50, x - info.x)
+    : Math.max(50, info.x + info.width - x);
+  const newHeight = newWidth / info.aspectRatio;
+
+  if (handle === 'br') {
+    anno.x = info.x; anno.y = info.y;
+  } else if (handle === 'bl') {
+    anno.x = info.x + info.width - newWidth; anno.y = info.y;
+  } else if (handle === 'tr') {
+    anno.x = info.x; anno.y = info.y + info.height - newHeight;
+  } else {
+    anno.x = info.x + info.width - newWidth; anno.y = info.y + info.height - newHeight;
+  }
+  anno.width = newWidth;
+  anno.height = newHeight;
+}
+
+// WHY: Extracted from handleSelectDown to reduce cognitive complexity (S3776).
+// Handles the locked annotation click — shows toast for signatures, selects annotation.
+function handleLockedAnnotationClick(anno, clicked) {
+  if (anno.type === 'signature') {
+    const annoId = `${clicked.pageIndex}-${clicked.index}`;
+    if (ueState.lastLockedToastAnnotation !== annoId) {
+      showToast('Tanda tangan terkunci. Klik dua kali untuk membuka kunci.', 'info');
+      ueState.lastLockedToastAnnotation = annoId;
+    }
+  }
+  ueState.selectedAnnotation = clicked;
+  ueRedrawAnnotations();
+}
+
+// WHY: Extracted from handleMove to reduce cognitive complexity (S3776).
+function updateResizeCursor(canvas, x, y) {
+  if (!ueState.selectedAnnotation) return;
+  const anno = ueState.annotations[ueState.selectedAnnotation.pageIndex]?.[ueState.selectedAnnotation.index];
+  if (!anno) return;
+  const handle = ueGetResizeHandle(anno, x, y);
+  const cursors = { 'tl': 'nwse-resize', 'tr': 'nesw-resize', 'bl': 'nesw-resize', 'br': 'nwse-resize' };
+  canvas.style.cursor = handle ? cursors[handle] : 'default';
+}
+
 export function ueSetupCanvasEvents() {
   if (ueState.eventsSetup) return;
   ueState.eventsSetup = true;
@@ -51,21 +136,6 @@ export function ueSetupCanvasEvents() {
   // Pinch-to-zoom state
   let pinchStartDist = 0;
   let isPinching = false;
-
-  function infoFromMouse(e) {
-    const hit = getCanvasAndIndex(e.target);
-    if (!hit) return null;
-    const coords = ueGetCoords(e, hit.canvas);
-    return { canvas: hit.canvas, pageIndex: hit.pageIndex, x: coords.x, y: coords.y };
-  }
-
-  function infoFromTouch(e) {
-    const touch = (e.touches?.length) ? e.touches[0] : e.changedTouches[0];
-    const hit = getCanvasAndIndex(e.target);
-    if (!hit) return null;
-    const coords = ueGetCoords(touch, hit.canvas);
-    return { canvas: hit.canvas, pageIndex: hit.pageIndex, x: coords.x, y: coords.y };
-  }
 
   container.addEventListener('mousedown', (e) => {
     const info = infoFromMouse(e);
@@ -219,15 +289,7 @@ export function ueSetupCanvasEvents() {
     if (clicked) {
       const anno = ueState.annotations[clicked.pageIndex][clicked.index];
       if (anno.locked) {
-        if (anno.type === 'signature') {
-          const annoId = `${clicked.pageIndex}-${clicked.index}`;
-          if (ueState.lastLockedToastAnnotation !== annoId) {
-            showToast('Tanda tangan terkunci. Klik dua kali untuk membuka kunci.', 'info');
-            ueState.lastLockedToastAnnotation = annoId;
-          }
-        }
-        ueState.selectedAnnotation = clicked;
-        ueRedrawAnnotations();
+        handleLockedAnnotationClick(anno, clicked);
         return true;
       }
       hasMovedOrResized = false;
@@ -269,57 +331,9 @@ export function ueSetupCanvasEvents() {
     isDrawing = true;
   }
 
-  // WHY: Per-type resize handlers extracted from handleMove to reduce complexity (S3776).
-  function resizeTextAnnotation(anno, info, handle, canvas, x) {
-    const ctx = canvas.getContext('2d');
-    const newWidth = (handle === 'br' || handle === 'tr')
-      ? Math.max(20, x - info.x)
-      : Math.max(20, info.x + info.width - x);
-    const scale = newWidth / info.width;
-    anno.fontSize = Math.max(6, Math.min(120, info.fontSize * scale));
-    const newBounds = getTextBounds(anno, ctx);
-    const fontDelta = anno.fontSize - info.fontSize;
-
-    if (handle === 'br') {
-      anno.x = info.x;
-      anno.y = info.y + fontDelta;
-    } else if (handle === 'bl') {
-      anno.x = info.x + info.width - newBounds.width;
-      anno.y = info.y + fontDelta;
-    } else if (handle === 'tr') {
-      anno.x = info.x;
-      anno.y = info.y + info.height - newBounds.height + fontDelta;
-    } else {
-      anno.x = info.x + info.width - newBounds.width;
-      anno.y = info.y + info.height - newBounds.height + fontDelta;
-    }
-  }
-
-  function resizeSignatureAnnotation(anno, info, handle, x) {
-    const newWidth = (handle === 'br' || handle === 'tr')
-      ? Math.max(50, x - info.x)
-      : Math.max(50, info.x + info.width - x);
-    const newHeight = newWidth / info.aspectRatio;
-
-    if (handle === 'br') {
-      anno.x = info.x; anno.y = info.y;
-    } else if (handle === 'bl') {
-      anno.x = info.x + info.width - newWidth; anno.y = info.y;
-    } else if (handle === 'tr') {
-      anno.x = info.x; anno.y = info.y + info.height - newHeight;
-    } else {
-      anno.x = info.x + info.width - newWidth; anno.y = info.y + info.height - newHeight;
-    }
-    anno.width = newWidth;
-    anno.height = newHeight;
-  }
-
   function handleMove({ canvas, x, y }) {
-    if (ueState.currentTool === 'select' && ueState.selectedAnnotation && !ueState.isResizing && !ueState.isDragging) {
-      const anno = ueState.annotations[ueState.selectedAnnotation.pageIndex][ueState.selectedAnnotation.index];
-      const handle = ueGetResizeHandle(anno, x, y);
-      const cursors = { 'tl': 'nwse-resize', 'tr': 'nesw-resize', 'bl': 'nesw-resize', 'br': 'nwse-resize' };
-      canvas.style.cursor = handle ? cursors[handle] : 'default';
+    if (ueState.currentTool === 'select' && !ueState.isResizing && !ueState.isDragging) {
+      updateResizeCursor(canvas, x, y);
     }
 
     if (ueState.pendingSignature && state.signatureImage) {

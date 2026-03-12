@@ -44,27 +44,25 @@ function handleDeleteKey(e) {
   }
 }
 
-function handleEditorNavigation(e) {
-  const key = e.key;
-  if (key === 'ArrowLeft' && ueState.selectedPage > 0) {
-    e.preventDefault();
-    window.ueSelectPage(ueState.selectedPage - 1);
-  } else if (key === 'ArrowRight' && ueState.selectedPage < ueState.pages.length - 1) {
-    e.preventDefault();
-    window.ueSelectPage(ueState.selectedPage + 1);
-  } else if (key === '?' || (e.shiftKey && e.key.toLowerCase() === '/')) {
-    e.preventDefault();
-    openShortcutsModal();
-  } else if (key === '+' || key === '=') {
-    e.preventDefault();
-    window.ueZoomIn();
-  } else if (key === '-') {
-    e.preventDefault();
-    window.ueZoomOut();
-  } else if (key === '0') {
-    e.preventDefault();
-    window.ueZoomReset();
+// WHY: Navigation handlers extracted from keydown listener to reduce complexity (S3776).
+// Map pattern: key → { handler, preventDefault }. Same pattern as modifier/tool handlers.
+const navigationHandlers = {
+  'ArrowLeft': { handler: () => { if (ueState.selectedPage > 0) window.ueSelectPage(ueState.selectedPage - 1); }, preventDefault: true },
+  'ArrowRight': { handler: () => { if (ueState.selectedPage < ueState.pages.length - 1) window.ueSelectPage(ueState.selectedPage + 1); }, preventDefault: true },
+  '?': { handler: () => openShortcutsModal(), preventDefault: true },
+  '+': { handler: () => window.ueZoomIn(), preventDefault: true },
+  '=': { handler: () => window.ueZoomIn(), preventDefault: true },
+  '-': { handler: () => window.ueZoomOut(), preventDefault: true },
+  '0': { handler: () => window.ueZoomReset(), preventDefault: true },
+};
+
+function handleEscapeKey() {
+  const shortcutsModal = document.getElementById('shortcuts-modal');
+  if (shortcutsModal?.classList.contains('active')) {
+    closeShortcutsModal();
+    return;
   }
+  if (state.currentTool) showHome();
 }
 
 export function setupKeyboardShortcuts() {
@@ -74,16 +72,7 @@ export function setupKeyboardShortcuts() {
     const isTyping = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable);
     const inEditor = state.currentTool === 'unified-editor';
 
-    // Escape — close modals or go home
-    if (e.key === 'Escape') {
-      const shortcutsModal = document.getElementById('shortcuts-modal');
-      if (shortcutsModal?.classList.contains('active')) {
-        closeShortcutsModal();
-        return;
-      }
-      if (state.currentTool) showHome();
-      return;
-    }
+    if (e.key === 'Escape') { handleEscapeKey(); return; }
 
     // Modifier combos (Ctrl/Cmd + key)
     if ((e.ctrlKey || e.metaKey) && inEditor && modifierHandlers[key]) {
@@ -93,18 +82,23 @@ export function setupKeyboardShortcuts() {
     }
 
     // Editor tool/navigation shortcuts (only when not typing)
-    if (inEditor && !isTyping) {
-      if (ueState.selectedPage >= 0) {
-        if (!e.ctrlKey && !e.metaKey && toolHandlers[key]) {
-          toolHandlers[key]();
-          return;
-        }
-        if (e.key === 'Delete' || e.key === 'Backspace') {
-          handleDeleteKey(e);
-          return;
-        }
+    if (!inEditor || isTyping) return;
+
+    if (ueState.selectedPage >= 0) {
+      if (!e.ctrlKey && !e.metaKey && toolHandlers[key]) {
+        toolHandlers[key]();
+        return;
       }
-      handleEditorNavigation(e);
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        handleDeleteKey(e);
+        return;
+      }
+    }
+
+    const nav = navigationHandlers[e.key];
+    if (nav) {
+      if (nav.preventDefault) e.preventDefault();
+      nav.handler();
     }
   });
 }

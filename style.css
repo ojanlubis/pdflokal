@@ -367,10 +367,7 @@ html[data-theme="dark"] .theme-toggle-thumb {
   box-shadow: 0 2px 6px rgba(0,0,0,0.3);
 }
 
-/* Smooth theme transitions */
-html {
-  transition: background-color 0.3s ease, color 0.3s ease;
-}
+/* Smooth theme transitions — merged with main html block below */
 
 body, .header, .tool-card, .workspace, .modal, .btn, .dropzone {
   transition: background-color 0.3s ease,
@@ -407,6 +404,7 @@ html {
   font-size: 16px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 body {
@@ -1063,10 +1061,12 @@ a:hover {
   gap: var(--space-sm);
 }
 
-.control-group label {
+.control-group label,
+.control-hint {
   font-size: 0.875rem;
   color: var(--text-secondary);
   font-weight: 500;
+  margin: 0;
 }
 
 .control-group input[type="number"],
@@ -1371,10 +1371,13 @@ a:hover {
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  width: 100%;
   padding: var(--space-xl);
   border: 2px dashed var(--border-medium);
   border-radius: var(--radius-lg);
   background: var(--bg-tertiary);
+  font-family: inherit;
+  font-size: inherit;
   cursor: pointer;
   transition: all var(--transition-fast);
   min-height: 150px;
@@ -1948,7 +1951,8 @@ a:hover {
   gap: var(--space-xs);
 }
 
-.edit-option-group label {
+.edit-option-group label,
+.edit-option-group .edit-option-label {
   font-size: 0.8125rem;
   color: var(--text-secondary);
 }
@@ -2269,10 +2273,12 @@ a:hover {
 /* Unified Editor empty state dropzone */
 .unified-empty-state {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  text-align: center;
   height: 100%;
-  padding: var(--space-xl);
+  padding: var(--space-2xl);
 }
 
 .unified-empty-state .dropzone {
@@ -2584,6 +2590,7 @@ a:hover {
 .ue-page-slot {
   position: relative;
   flex-shrink: 0;
+  scroll-snap-align: center;
 }
 
 .ue-page-slot canvas {
@@ -2597,14 +2604,7 @@ a:hover {
   outline-offset: 2px;
 }
 
-.unified-empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  padding: var(--space-2xl);
-}
+/* REMOVED: duplicate .unified-empty-state — merged into first definition above */
 
 /* Button size modifier */
 .btn-sm {
@@ -2842,9 +2842,7 @@ body.editor-active {
   scroll-snap-type: y proximity;
 }
 
-.ue-page-slot {
-  scroll-snap-align: center;
-}
+/* REMOVED: duplicate .ue-page-slot — merged scroll-snap-align into first definition above */
 
 /* Add bottom padding to pages container so last page isn't hidden behind bottom bar */
 body.editor-active #ue-pages-container {
@@ -3210,7 +3208,7 @@ html[data-theme="dark"] .floating-toolbar {
   bottom: 24px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(59, 130, 246, 0.9);
+  background: rgba(30, 64, 175, 0.95);
   color: white;
   font-size: 0.5625rem;
   padding: 2px 6px;
@@ -3453,8 +3451,11 @@ body.is-touch .btn:active {
 .mobile-page-indicator {
   padding: var(--space-xs) var(--space-sm);
   font-size: 0.8125rem;
+  font-family: inherit;
   color: var(--text-secondary);
   cursor: pointer;
+  border: none;
+  background: none;
   border-radius: var(--radius-md);
   white-space: nowrap;
   -webkit-tap-highlight-color: transparent;
@@ -3616,7 +3617,10 @@ body.is-touch .btn:active {
   left: 0;
   right: 0;
   bottom: 0;
+  border: none;
+  padding: 0;
   background: rgba(0, 0, 0, 0.5);
+  cursor: default;
   animation: fadeIn 0.2s ease;
 }
 
@@ -3991,7 +3995,10 @@ body.is-touch .resize-handle.se { bottom: -10px; right: -10px; }
   left: 0;
   right: 0;
   bottom: 0;
+  border: none;
+  padding: 0;
   background: var(--overlay);
+  cursor: default;
 }
 
 .shortcuts-modal-box {
@@ -4161,7 +4168,7 @@ kbd {
   justify-content: center;
   width: 16px;
   height: 16px;
-  background: #ef4444;
+  background: #b91c1c;
   border-radius: var(--radius-md);
   color: white;
   flex-shrink: 0;
