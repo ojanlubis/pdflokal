@@ -1760,7 +1760,7 @@ a:hover {
   }
 
   .header-actions {
-    gap: var(--space-sm);
+    gap: var(--space-xs);
   }
 
   .header-actions .btn {
@@ -1790,13 +1790,21 @@ a:hover {
   .page-grid {
     grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
   }
-  
+
   .file-item {
     width: 100px;
   }
-  
+
   .file-item-preview {
     height: 120px;
+  }
+}
+
+/* WHY: Hide "Dukung Kami" text on very narrow screens to prevent header cramping.
+   The coffee emoji + link remain accessible. */
+@media (max-width: 380px) {
+  .header-actions .btn .btn-text {
+    display: none;
   }
 }
 
@@ -2029,8 +2037,8 @@ a:hover {
 }
 
 .text-style-btn {
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   border: 1px solid var(--border-light);
   border-radius: var(--radius-md);
   background: var(--bg-primary);
@@ -2078,8 +2086,8 @@ a:hover {
 }
 
 .color-preset-btn {
-  width: 28px;
-  height: 28px;
+  width: 36px;
+  height: 36px;
   border: 2px solid transparent;
   border-radius: var(--radius-sm);
   cursor: pointer;
@@ -2097,7 +2105,7 @@ a:hover {
 
 .color-options-row input[type="color"] {
   width: 36px;
-  height: 28px;
+  height: 36px;
   padding: 0;
   border: 1px solid var(--border-light);
   border-radius: var(--radius-sm);
@@ -3090,6 +3098,11 @@ html[data-theme="dark"] .floating-toolbar {
   line-height: 1;
   border-radius: var(--radius-sm);
   transition: all var(--transition-fast);
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .ue-pm-close-btn:hover {
@@ -4364,10 +4377,12 @@ kbd {
 
 /* Mobile Responsive */
 @media (max-width: 900px) {
-  /* Collapsed badge stays compact */
+  /* WHY: On mobile, collapsed badge sits at bottom-left to avoid
+     overlapping the main dropzone CTA area */
   .changelog-notification.collapsed {
     bottom: 10px;
-    right: 10px;
+    right: auto;
+    left: 10px;
     width: auto;
     max-width: calc(100vw - 20px);
   }
