@@ -3778,6 +3778,26 @@ body.is-touch .btn:active {
     align-items: stretch;
   }
 
+  /* WHY: scroll-snap-type: y proximity (line 2850) fights touch momentum
+     scrolling on mobile — pages jump/snap after finger lift. Desktop keeps
+     snap (less disruptive with trackpad/mouse wheel). */
+  body.editor-active {
+    scroll-snap-type: none;
+  }
+
+  /* WHY: Desktop align-items: center on #ue-pages-container (line 2591)
+     causes asymmetric horizontal scroll when zoomed on mobile — left side
+     is clipped. flex-start + margin auto = centered when unzoomed,
+     left-aligned when overflowing so scroll works both directions. */
+  #ue-pages-container {
+    align-items: flex-start;
+  }
+
+  .ue-page-slot {
+    margin-left: auto;
+    margin-right: auto;
+  }
+
   /* Remove workspace padding on mobile */
   #unified-editor-workspace.workspace {
     padding: 0;

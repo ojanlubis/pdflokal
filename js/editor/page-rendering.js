@@ -323,7 +323,11 @@ export function ueSetupIntersectionObserver() {
         if (pc.rendered && ueState.pageCanvases.length > 4) {
           const nearVisible = Array.from(visiblePages).some(v => Math.abs(v - index) <= 3);
           if (!nearVisible) {
-            pc.canvas.getContext('2d').clearRect(0, 0, pc.canvas.width, pc.canvas.height);
+            // WHY: Don't clearRect — canvas keeps its last painted content as a
+            // stale placeholder. clearRect causes visible white flash (100-500ms)
+            // while async PDF.js re-render runs. GPU memory is unchanged either way
+            // (canvas backing store is fixed by dimensions). CPU-side ImageData
+            // cache is still freed below for the actual memory savings.
             pc.rendered = false;
             delete ueState.pageCaches[index];
           }
@@ -332,7 +336,10 @@ export function ueSetupIntersectionObserver() {
     });
   }, {
     root: null,
-    rootMargin: OBSERVER_ROOT_MARGIN
+    // WHY: Mobile fast-scroll covers more distance per frame than desktop.
+    // 200px buffer isn't enough — pages enter viewport before render completes,
+    // causing visible blank canvases. 600px ≈ 1.5 screen heights of pre-render.
+    rootMargin: mobileState.isMobile ? '600px 0px' : OBSERVER_ROOT_MARGIN
   });
 
   ueState.pageCanvases.forEach(pc => {
