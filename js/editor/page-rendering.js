@@ -4,7 +4,7 @@
  * page selection, page deletion, status updates
  */
 
-import { ueState, state, mobileState, OBSERVER_ROOT_MARGIN, MAX_CANVAS_DPR } from '../lib/state.js';
+import { ueState, state, OBSERVER_ROOT_MARGIN, MAX_CANVAS_DPR } from '../lib/state.js';
 import { emit } from '../lib/events.js';
 import { showToast, loadPdfDocument } from '../lib/utils.js';
 import { ueRedrawPageAnnotations } from './annotations.js';
@@ -339,7 +339,9 @@ export function ueSetupIntersectionObserver() {
     // WHY: Mobile fast-scroll covers more distance per frame than desktop.
     // 200px buffer isn't enough — pages enter viewport before render completes,
     // causing visible blank canvases. 600px ≈ 1.5 screen heights of pre-render.
-    rootMargin: mobileState.isMobile ? '600px 0px' : OBSERVER_ROOT_MARGIN
+    // WHY: CSS @media is the single source of truth for mobile detection.
+    // matchMedia aligns with CSS breakpoint (900px), avoiding the old 768px mismatch.
+    rootMargin: window.matchMedia('(max-width: 900px)').matches ? '600px 0px' : OBSERVER_ROOT_MARGIN
   });
 
   ueState.pageCanvases.forEach(pc => {
@@ -482,7 +484,7 @@ export function ueUpdatePageCount() {
 export function ueUpdateStatus(message, mobileMessage) {
   const status = document.getElementById('ue-editor-status');
   if (status) {
-    if (mobileMessage && mobileState.isMobile) {
+    if (mobileMessage && window.matchMedia('(max-width: 900px)').matches) {
       status.textContent = mobileMessage;
     } else {
       status.textContent = message;

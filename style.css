@@ -3397,9 +3397,12 @@ html[data-theme="dark"] .floating-toolbar {
    MOBILE OPTIMIZATION STYLES
    ============================================================ */
 
-/* Mobile body adjustments */
-body.is-mobile {
-  overscroll-behavior: none;
+/* WHY: Replaced body.is-mobile (JS class) with @media query — single source of
+   truth for mobile detection. Prevents iOS elastic scroll beyond page bounds. */
+@media (max-width: 900px) {
+  body {
+    overscroll-behavior: none;
+  }
 }
 
 body.is-touch button:active,

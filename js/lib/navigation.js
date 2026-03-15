@@ -192,7 +192,7 @@ export function showTool(tool, skipPushState = false) {
       }
 
       // Initialize mobile enhancements
-      if (mobileState.isMobile || mobileState.isTouch) {
+      if (mobileState.isTouch) {
         setTimeout(() => {
           if (typeof window.initMobileEditorEnhancements === 'function') {
             window.initMobileEditorEnhancements();

@@ -8,7 +8,7 @@
 
 // Shared foundations
 import { mobileState } from './lib/state.js';
-import { showToast, debounce } from './lib/utils.js';
+import { showToast } from './lib/utils.js';
 import { initNavigationHistory } from './lib/navigation.js';
 
 // Feature modules (side-effect imports — set up window bridges on load)
@@ -59,46 +59,20 @@ function checkBrowserCompatibility() {
 // MOBILE DETECTION
 // ============================================================
 
+// WHY: Only detect touch capability — it doesn't change after init.
+// Layout decisions use CSS @media (max-width: 900px) as single source of truth.
+// Previous approach used JS width check at 768px which mismatched CSS at 900px,
+// causing unreliable behavior in the 768-900px range (tablet dead zone).
 function detectMobile() {
-  mobileState.viewportWidth = window.innerWidth;
-  mobileState.viewportHeight = window.innerHeight;
-  mobileState.isMobile = window.innerWidth < 768;
   mobileState.isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-  mobileState.orientation = window.innerHeight > window.innerWidth ? 'portrait' : 'landscape';
-
-  // Update body classes for CSS targeting
-  document.body.classList.toggle('is-mobile', mobileState.isMobile);
   document.body.classList.toggle('is-touch', mobileState.isTouch);
-  document.body.classList.toggle('is-landscape', mobileState.orientation === 'landscape');
 
-  // Update dropzone text for mobile/touch devices
+  // Update dropzone text for touch devices
   const dropzoneText = document.querySelector('#main-dropzone h3');
-  const dropzoneSubtext = document.querySelector('#main-dropzone p');
-  const mainFileInput = document.getElementById('file-input');
-
   if (dropzoneText) {
-    if (mobileState.isMobile || mobileState.isTouch) {
-      dropzoneText.textContent = 'Ketuk, lalu pilih Foto/Media untuk browse file PDF';
-    } else {
-      dropzoneText.textContent = 'Seret file ke sini atau klik untuk pilih';
-    }
-  }
-
-  // Mobile: PDF only on main dropzone
-  if (mobileState.isMobile) {
-    if (mainFileInput) {
-      mainFileInput.accept = '.pdf,application/pdf';
-    }
-    if (dropzoneSubtext) {
-      dropzoneSubtext.textContent = 'PDF';
-    }
-  } else {
-    if (mainFileInput) {
-      mainFileInput.accept = '.pdf,image/*,application/pdf';
-    }
-    if (dropzoneSubtext) {
-      dropzoneSubtext.textContent = 'PDF atau Gambar';
-    }
+    dropzoneText.textContent = mobileState.isTouch
+      ? 'Ketuk untuk pilih file'
+      : 'Seret file ke sini atau klik untuk pilih';
   }
 }
 
@@ -110,11 +84,8 @@ function initApp() {
   checkBrowserCompatibility();
   detectMobile();
 
-  // Listen for resize and orientation changes
-  window.addEventListener('resize', debounce(detectMobile, 150));
-  window.addEventListener('orientationchange', () => {
-    setTimeout(detectMobile, 100);
-  });
+  // WHY: No resize/orientation listeners needed for detectMobile — isTouch
+  // capability doesn't change. Layout adapts via CSS @media queries.
 
   // Initialize theme system
   if (window.themeAPI) {

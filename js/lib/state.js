@@ -101,12 +101,12 @@ export const MAX_CANVAS_DPR = 2;
 // MOBILE STATE (device detection results)
 // ============================================================
 
+// WHY: Only isTouch kept — capability-based, doesn't change after init.
+// Layout decisions use CSS @media (max-width: 900px) as single source of truth.
+// Removed: isMobile (768px width check mismatched CSS 900px breakpoint),
+// orientation/viewportWidth/viewportHeight (set but never read anywhere).
 export const mobileState = {
-  isMobile: false,
-  isTouch: false,
-  orientation: 'portrait',
-  viewportWidth: 0,
-  viewportHeight: 0
+  isTouch: false
 };
 
 // ============================================================

@@ -84,7 +84,7 @@ function handleEditorCardWithFilePicker(mode) {
             window.scrollTo(0, 0);
             pushWorkspaceState('unified-editor');
 
-            if (mobileState.isMobile || mobileState.isTouch) {
+            if (mobileState.isTouch) {
               mobileUi.initMobileEditorEnhancements();
               mobileUi.ueMobileUpdatePageIndicator();
             }

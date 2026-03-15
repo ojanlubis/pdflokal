@@ -3,7 +3,7 @@
  * File input wiring, dropzone, drag hints, paste handler, and file routing
  */
 
-import { state, mobileState } from './lib/state.js';
+import { state } from './lib/state.js';
 import {
   showToast, showFullscreenLoading, hideFullscreenLoading,
   formatFileSize, checkFileSize, loadImage,
@@ -187,26 +187,23 @@ async function handleDroppedFiles(files) {
   if (isProcessingDrop) return;
   isProcessingDrop = true;
 
-  const file = files[0];
-
-  if (!checkFileSize(file)) return;
-
-  const filePDF = isPDF(file);
-  const fileImage = isImage(file);
-
-  if (!filePDF && !fileImage) {
-    showToast('File tidak didukung. Gunakan PDF, JPG, PNG, atau WebP.', 'error');
-    return;
-  }
-
-  if (mobileState.isMobile && fileImage && !filePDF) {
-    showToast('Di perangkat mobile, gunakan tool khusus gambar untuk memproses gambar.', 'info');
-    return;
-  }
-
-  showFullscreenLoading(filePDF ? 'Memuat PDF...' : 'Memuat gambar...');
-
+  // WHY: All validation inside try block so `finally` always resets isProcessingDrop.
+  // Previously, early returns before try leaked the flag, locking out all future drops.
   try {
+    const file = files[0];
+
+    if (!checkFileSize(file)) return;
+
+    const filePDF = isPDF(file);
+    const fileImage = isImage(file);
+
+    if (!filePDF && !fileImage) {
+      showToast('File tidak didukung. Gunakan PDF, JPG, PNG, atau WebP.', 'error');
+      return;
+    }
+
+    showFullscreenLoading(filePDF ? 'Memuat PDF...' : 'Memuat gambar...');
+
     if (!state.currentTool) {
       await routeDroppedFile(files, file, filePDF, fileImage);
     }
