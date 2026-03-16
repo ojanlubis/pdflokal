@@ -46,6 +46,12 @@ export function ueCreatePageSlots() {
   // Disconnect previous observer before rebuilding
   if (ueState.pageObserver) ueState.pageObserver.disconnect();
 
+  // Revoke snapshot blob URLs from previous page canvases to prevent memory leak
+  ueState.pageCanvases.forEach(pc => {
+    if (pc._snapshotUrl) { URL.revokeObjectURL(pc._snapshotUrl); pc._snapshotUrl = null; }
+    if (pc._evictTimer) { clearTimeout(pc._evictTimer); pc._evictTimer = null; }
+  });
+
   container.innerHTML = '';
   ueState.pageCanvases = [];
 
@@ -267,6 +273,23 @@ export async function ueRenderPageCanvas(index) {
     entry.rendered = true;
 
     ueRedrawPageAnnotations(index);
+
+    // WHY: Mobile browsers silently purge offscreen canvas backing stores under
+    // GPU memory pressure (iOS Safari 384MB limit, Android Chrome similar).
+    // When user scrolls back, canvas is blank white until re-rendered (500ms-1s).
+    // Fix: snapshot rendered content as background-image on the canvas element.
+    // If browser purges canvas content, the CSS background shows through.
+    // Uses toBlob + createObjectURL (not toDataURL) for lower memory overhead.
+    try {
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        // Revoke previous snapshot URL to prevent memory leak
+        if (entry._snapshotUrl) URL.revokeObjectURL(entry._snapshotUrl);
+        entry._snapshotUrl = URL.createObjectURL(blob);
+        canvas.style.backgroundImage = `url(${entry._snapshotUrl})`;
+        canvas.style.backgroundSize = '100% 100%';
+      });
+    } catch (_e) { /* toBlob can fail on tainted canvases — ignore */ }
 
     // Refresh thumbnails after lazy render (debounced to batch multiple page renders)
     clearTimeout(thumbnailRefreshTimer);
