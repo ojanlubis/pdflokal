@@ -241,10 +241,19 @@ export async function ueRenderPageCanvas(index) {
       canvasHeight: viewport.height
     };
 
-    canvas.width = viewport.width * dpr;
-    canvas.height = viewport.height * dpr;
-    canvas.style.width = viewport.width + 'px';
-    canvas.style.height = viewport.height + 'px';
+    const newBufW = viewport.width * dpr;
+    const newBufH = viewport.height * dpr;
+
+    // WHY: Only reassign canvas.width/height if dimensions actually changed.
+    // Assigning canvas.width (even to the same value) clears all canvas content.
+    // For evicted pages being re-rendered at same zoom, this avoids a visible
+    // blank flash during the async PDF.js render.
+    if (canvas.width !== newBufW || canvas.height !== newBufH) {
+      canvas.width = newBufW;
+      canvas.height = newBufH;
+      canvas.style.width = viewport.width + 'px';
+      canvas.style.height = viewport.height + 'px';
+    }
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     await page.render({ canvasContext: ctx, viewport }).promise;
@@ -328,9 +337,11 @@ export function ueSetupIntersectionObserver() {
         if (!pc.rendered) ueRenderPageCanvas(index);
       } else {
         visiblePages.delete(index);
-        // WHY threshold 4: Each canvas ~4MB at 2x DPR. Clearing offscreen canvases
-        // balances memory vs re-render cost. Was 8, reduced after mobile OOM reports.
-        if (pc.rendered && ueState.pageCanvases.length > 4) {
+        // WHY threshold 10: Each canvas ~4MB at 2x DPR. Was 4, raised because
+        // eviction causes visible flicker on re-render (canvas.width wipes content).
+        // 10 pages × 4MB = 40MB — acceptable on both desktop and mobile.
+        // For larger docs, eviction is necessary to prevent OOM.
+        if (pc.rendered && ueState.pageCanvases.length > 10) {
           const nearVisible = Array.from(visiblePages).some(v => Math.abs(v - index) <= 3);
           if (!nearVisible) {
             // WHY: Don't clearRect — canvas keeps its last painted content as a
