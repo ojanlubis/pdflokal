@@ -132,10 +132,11 @@ export function showToast(message, type = 'info') {
   let icon = 'ℹ';
   if (type === 'success') icon = '✓';
   else if (type === 'error') icon = '✕';
-  toast.innerHTML = `
-    ${icon}
-    <span>${message}</span>
-  `;
+  const iconSpan = document.createTextNode(icon + ' ');
+  const textSpan = document.createElement('span');
+  textSpan.textContent = message;
+  toast.appendChild(iconSpan);
+  toast.appendChild(textSpan);
 
   container.appendChild(toast);
 
@@ -154,12 +155,16 @@ export function showFullscreenLoading(message = 'Memuat PDF...') {
   if (!overlay) {
     overlay = document.createElement('div');
     overlay.id = 'fullscreen-loading-overlay';
-    overlay.innerHTML = `
-      <div class="fullscreen-loading-content">
-        <div class="fullscreen-loading-spinner"></div>
-        <p class="fullscreen-loading-text">${message}</p>
-      </div>
-    `;
+    const content = document.createElement('div');
+    content.className = 'fullscreen-loading-content';
+    const spinner = document.createElement('div');
+    spinner.className = 'fullscreen-loading-spinner';
+    const text = document.createElement('p');
+    text.className = 'fullscreen-loading-text';
+    text.textContent = message;
+    content.appendChild(spinner);
+    content.appendChild(text);
+    overlay.appendChild(content);
     document.body.appendChild(overlay);
   } else {
     overlay.querySelector('.fullscreen-loading-text').textContent = message;

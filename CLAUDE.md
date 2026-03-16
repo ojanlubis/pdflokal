@@ -55,7 +55,7 @@ pdflokal/
 │   ├── lib/
 │   │   ├── state.js          # State objects, constants, SSOT helpers, annotation factories
 │   │   ├── utils.js          # showToast, downloadBlob, isPDF, isImage, loadPdfDocument, etc.
-│   │   └── navigation.js     # showHome, showTool, openModal, closeModal, closeAllModals
+│   │   └── navigation.js     # showHome, showTool, openModal, closeModal, closeAllModals (MODAL_IDS array)
 │   ├── editor/               # Unified Editor (~15 modules)
 │   │   ├── index.js          # Barrel re-exports + window bridges
 │   │   ├── canvas-utils.js   # ueGetCurrentCanvas, ueGetCoords, ueGetResizeHandle, getThumbnailSource, drawRotatedThumbnail
@@ -319,6 +319,8 @@ Hero + dropzone (opens editor), PDF tool cards (Editor, Merge, Split, PDF-to-Ima
 - **Scroll sync must NOT call ueSelectPage()**: `ueSelectPage()` triggers `scrollIntoView()` which fights user momentum scroll on mobile. Scroll sync only updates highlight + page indicator.
 - **Page selection border hidden on mobile**: `.ue-page-slot.selected canvas` outline only at `min-width: 901px`. `ueHighlightThumbnail()` skips DOM class toggling on mobile to avoid repaints.
 - **Known limitation**: Edge-scroll flicker (overscroll recomposition) is a browser-level issue. Fix requires switching from body scroll to container scroll (`overflow-y: auto` + `overscroll-behavior: contain`).
+- **`<dialog>` elements need explicit sizing**: Browser UA stylesheet sets `width: fit-content; height: fit-content; max-width: calc(100% - 2em)` on `<dialog>`. This overrides `right: 0; bottom: 0` stretch. All modal overlay classes (`.edit-modal`, `.signature-modal`, `.shortcuts-modal`) must set `width: 100%; height: 100%; max-width: none; max-height: none` to fill viewport. Without this, modals render top-left at content size instead of centered.
+- **`showToast()` and `showFullscreenLoading()` use DOM construction, not innerHTML**: Prevents XSS from user-controlled filenames. Never revert to innerHTML for these functions.
 
 ## Changelog System
 

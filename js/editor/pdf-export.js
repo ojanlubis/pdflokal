@@ -92,7 +92,12 @@ async function embedWatermarkAnnotation(page, anno, scaleX, scaleY, height, getF
 // WHY: Extracted from getFont to reduce cognitive complexity (S3776).
 async function embedCustomFont(newDoc, fontCache, fontName, bold) {
   try {
-    const fontResponse = await fetch(CUSTOM_FONT_URLS[fontName]);
+    // WHY: AbortController timeout prevents PDF export from hanging indefinitely
+    // if a self-hosted font file fails to load (e.g. offline, 404).
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    const fontResponse = await fetch(CUSTOM_FONT_URLS[fontName], { signal: controller.signal });
+    clearTimeout(timeoutId);
     const fontBytes = await fontResponse.arrayBuffer();
     fontCache[fontName] = await newDoc.embedFont(fontBytes);
     console.log('[PDF Export] Embedded font:', fontName, `(${(fontBytes.byteLength / 1024).toFixed(1)}KB)`);

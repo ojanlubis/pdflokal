@@ -6,37 +6,48 @@
 
 import { state } from '../lib/state.js';
 
+// WHY: Event delegation on the container instead of per-item listeners.
+// Previous approach added listeners to every .file-item on each call,
+// stacking N×listeners after N re-renders. Delegation adds once.
 export function enableDragReorder(containerId, stateArray, isPages = false) {
   const container = document.getElementById(containerId);
+  const selector = isPages ? '.page-item' : '.file-item';
+
+  // Prevent stacking: one set of delegated handlers per container
+  if (container._dragReorderSetup) return;
+  container._dragReorderSetup = true;
+
   let draggedItem = null;
 
-  container.querySelectorAll(isPages ? '.page-item' : '.file-item').forEach(item => {
-    item.addEventListener('dragstart', (e) => {
-      draggedItem = item;
-      item.classList.add('dragging');
-      e.dataTransfer.effectAllowed = 'move';
-    });
+  container.addEventListener('dragstart', (e) => {
+    const item = e.target.closest(selector);
+    if (!item) return;
+    draggedItem = item;
+    item.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+  });
 
-    item.addEventListener('dragend', () => {
-      item.classList.remove('dragging');
-      draggedItem = null;
-    });
+  container.addEventListener('dragend', (e) => {
+    const item = e.target.closest(selector);
+    if (item) item.classList.remove('dragging');
+    draggedItem = null;
+  });
 
-    item.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      if (item === draggedItem) return;
+  container.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    const item = e.target.closest(selector);
+    if (!item || item === draggedItem || !draggedItem) return;
 
-      const rect = item.getBoundingClientRect();
-      const midX = rect.left + rect.width / 2;
+    const rect = item.getBoundingClientRect();
+    const midX = rect.left + rect.width / 2;
 
-      if (e.clientX < midX) {
-        item.before(draggedItem);
-      } else {
-        item.after(draggedItem);
-      }
+    if (e.clientX < midX) {
+      item.before(draggedItem);
+    } else {
+      item.after(draggedItem);
+    }
 
-      updateStateOrder(container, stateArray, isPages);
-    });
+    updateStateOrder(container, stateArray, isPages);
   });
 }
 

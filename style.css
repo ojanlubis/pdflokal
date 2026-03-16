@@ -1285,8 +1285,10 @@ a:hover {
   position: fixed;
   top: 0;
   left: 0;
-  right: 0;
-  bottom: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
   background: var(--overlay);
   display: none;
   align-items: center;
@@ -1891,8 +1893,10 @@ a:hover {
   position: fixed;
   top: 0;
   left: 0;
-  right: 0;
-  bottom: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
   background: var(--overlay);
   display: flex;
   align-items: center;
@@ -4021,8 +4025,10 @@ body.is-touch .resize-handle.se { bottom: -10px; right: -10px; }
   position: fixed;
   top: 0;
   left: 0;
-  right: 0;
-  bottom: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
   z-index: var(--z-modal);
   display: none;
   align-items: center;

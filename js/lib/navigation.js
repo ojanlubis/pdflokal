@@ -65,62 +65,23 @@ export function closeModal(id, skipHistoryBack = false) {
   }
 }
 
-// Close all modals
+// WHY: Data-driven instead of 60 lines of copy-paste. Adding a new modal = one array entry.
+// Gabungkan modal is special-cased because uePmCloseModal() has side effects (pageCanvases rebuild).
+const MODAL_IDS = [
+  'signature-modal', 'paraf-modal', 'signature-bg-modal', 'text-input-modal',
+  'editor-watermark-modal', 'editor-pagenum-modal', 'editor-protect-modal', 'shortcuts-modal'
+];
+
 export function closeAllModals() {
-  // Close signature modal
-  const sigModal = document.getElementById('signature-modal');
-  if (sigModal?.classList.contains('active')) {
-    sigModal.classList.remove('active');
+  for (const id of MODAL_IDS) {
+    const el = document.getElementById(id);
+    if (el?.classList.contains('active')) el.classList.remove('active');
   }
 
-  // Close paraf modal
-  const parafModal = document.getElementById('paraf-modal');
-  if (parafModal?.classList.contains('active')) {
-    parafModal.classList.remove('active');
-  }
-
-  // Close signature background modal
-  const sigBgModal = document.getElementById('signature-bg-modal');
-  if (sigBgModal?.classList.contains('active')) {
-    sigBgModal.classList.remove('active');
-  }
-
-  // Close text modal
-  const textModal = document.getElementById('text-input-modal');
-  if (textModal?.classList.contains('active')) {
-    textModal.classList.remove('active');
-  }
-
-  // Close page manager modal
+  // Gabungkan modal needs its own close logic (rebuilds pageCanvases)
   const pmModal = document.getElementById('ue-gabungkan-modal');
-  if (pmModal?.classList.contains('active')) {
-    if (typeof window.uePmCloseModal === 'function') {
-      window.uePmCloseModal(true); // true = skip history manipulation
-    }
-  }
-
-  // Close watermark modal
-  const wmModal = document.getElementById('editor-watermark-modal');
-  if (wmModal?.classList.contains('active')) {
-    wmModal.classList.remove('active');
-  }
-
-  // Close page number modal
-  const pnModal = document.getElementById('editor-pagenum-modal');
-  if (pnModal?.classList.contains('active')) {
-    pnModal.classList.remove('active');
-  }
-
-  // Close protect modal
-  const protectModal = document.getElementById('editor-protect-modal');
-  if (protectModal?.classList.contains('active')) {
-    protectModal.classList.remove('active');
-  }
-
-  // Close shortcuts modal
-  const shortcutsModal = document.getElementById('shortcuts-modal');
-  if (shortcutsModal?.classList.contains('active')) {
-    shortcutsModal.classList.remove('active');
+  if (pmModal?.classList.contains('active') && typeof window.uePmCloseModal === 'function') {
+    window.uePmCloseModal(true);
   }
 
   navHistory.currentModal = null;

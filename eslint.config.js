@@ -45,6 +45,7 @@ export default [
         getComputedStyle: 'readonly',
         matchMedia: 'readonly',
         crypto: 'readonly',
+        AbortController: 'readonly',
 
         // Vendor libs (loaded via <script> tags, accessed as window.*)
         pdfjsLib: 'readonly',
