@@ -106,20 +106,26 @@ export function ueSetWrapperHeight() {
 
 // Lightweight sidebar highlight + bottom bar page indicator
 export function ueHighlightThumbnail(index) {
-  const thumbnails = document.querySelectorAll('#ue-thumbnails .ue-thumb');
-  thumbnails.forEach((thumb, i) => {
-    thumb.classList.toggle('selected', i === index);
-  });
+  // WHY: On mobile (≤900px), sidebar is hidden and page slot outline is hidden.
+  // Skip all DOM class toggling to avoid repaints during scroll sync.
+  const isMobileView = window.matchMedia('(max-width: 900px)').matches;
 
-  if (thumbnails[index]) {
-    thumbnails[index].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  if (!isMobileView) {
+    const thumbnails = document.querySelectorAll('#ue-thumbnails .ue-thumb');
+    thumbnails.forEach((thumb, i) => {
+      thumb.classList.toggle('selected', i === index);
+    });
+
+    if (thumbnails[index]) {
+      thumbnails[index].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+
+    ueState.pageCanvases.forEach((pc, i) => {
+      pc.slot.classList.toggle('selected', i === index);
+    });
   }
 
-  ueState.pageCanvases.forEach((pc, i) => {
-    pc.slot.classList.toggle('selected', i === index);
-  });
-
-  // Update bottom bar page indicator
+  // Update bottom bar page indicator (both desktop and mobile)
   const pageIndicator = document.getElementById('ue-page-indicator');
   if (pageIndicator && ueState.pages.length > 0) {
     pageIndicator.textContent = 'Hal ' + (index + 1) + '/' + ueState.pages.length;

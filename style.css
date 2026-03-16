@@ -2607,9 +2607,14 @@ a:hover {
   box-shadow: var(--shadow-lg);
 }
 
-.ue-page-slot.selected canvas {
-  outline: 2px solid var(--accent-primary);
-  outline-offset: 2px;
+/* WHY: Only show selected border on desktop where sidebar needs visual pairing.
+   On mobile, page indicator ("Hal 2/5") is sufficient. The outline caused
+   visible repaints during scroll sync updates, perceived as flicker. */
+@media (min-width: 901px) {
+  .ue-page-slot.selected canvas {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 2px;
+  }
 }
 
 /* REMOVED: duplicate .unified-empty-state — merged into first definition above */
