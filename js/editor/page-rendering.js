@@ -372,6 +372,8 @@ export function ueSetupScrollSync() {
     if (ueState.isRestoring) return;
 
     clearTimeout(scrollTimeout);
+    // WHY 150ms: Debounce scroll sync to avoid expensive getBoundingClientRect
+    // calls during momentum scroll. 100ms was too aggressive on mobile.
     scrollTimeout = setTimeout(() => {
       const viewportCenter = window.innerHeight / 2;
       let closestIndex = 0;
@@ -388,7 +390,11 @@ export function ueSetupScrollSync() {
       });
 
       if (closestIndex !== ueState.selectedPage) {
+        // WHY: Only update highlight — do NOT call ueSelectPage() here.
+        // ueSelectPage() calls scrollIntoView() which fights user scroll,
+        // causing auto-jump to top/bottom on mobile momentum scroll.
         ueState.selectedPage = closestIndex;
+        emit('page:selected', { index: closestIndex });
         ueHighlightThumbnail(closestIndex);
 
         // mobile-ui.js window global — see comment in ueSelectPage above
@@ -396,7 +402,7 @@ export function ueSetupScrollSync() {
           window.ueMobileUpdatePageIndicator();
         }
       }
-    }, 100);
+    }, 150);
   };
   window.addEventListener('scroll', scrollHandler);
 

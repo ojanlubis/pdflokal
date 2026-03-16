@@ -77,6 +77,13 @@ export async function ueAddFiles(files) {
     await processFile(file);
   }
 
+  // WHY: If no new pages were added (corrupt/encrypted PDF), restore empty state
+  // so user isn't stuck on a blank screen.
+  if (ueState.pages.length === 0) {
+    if (emptyState) emptyState.style.display = 'flex';
+    return;
+  }
+
   // WHY: showTool() makes workspace visible but browser hasn't reflowed yet.
   // clientWidth returns 0 without this frame delay. Page slot dimensions would be wrong.
   await new Promise(resolve => requestAnimationFrame(resolve));
