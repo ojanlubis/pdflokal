@@ -39,6 +39,54 @@ emit('pages:changed', { source: 'user' });
 
 ---
 
+## 1b. PageRenderer Class — COMPLETED (Mar 2026)
+
+### Implementation
+
+Extracted render-pipeline state from `page-rendering.js` into a `PageRenderer` class. 7 module-level closures + 1 window global became 8 instance properties. Singleton managed by `createPageRenderer()`/`destroyPageRenderer()`.
+
+```js
+// js/editor/page-rendering.js
+class PageRenderer {
+  _renderingPages = new Set()    // prevents duplicate concurrent renders
+  _thumbnailRefreshTimer = null  // debounce thumbnail upgrades
+  _renderVisibleRafId = null     // rAF debounce for zoom/resize
+  _scrollSyncTimeoutId = null    // scroll sync feedback loop guard
+  _scrollHandler = null          // for cleanup
+  _resizeHandler = null          // consolidated resize handler
+  _pdfDocCache = new Map()       // PDF.js document cache
+  _scrollSyncSetup = false       // setup guard
+
+  createPageSlots() { ... }
+  renderPageCanvas(index) { ... }
+  // ... 14 methods total + destroy()
+}
+
+// Thin wrappers preserve all original exports
+export function ueCreatePageSlots() { renderer?.createPageSlots(); }
+```
+
+### Design Decisions
+
+- **Class, not framework** — vanilla JS class encapsulating pipeline state. No DI, no observables.
+- **ueState stays shared** — `pageCanvases`, `pageObserver`, etc. stay in `ueState` (10+ modules reference them). Class only owns render-coordination state.
+- **Backward compat** — all 14 exports preserved as thin wrappers. Zero consumer changes.
+- **Consolidated resize handlers** — two duplicate handlers (lifecycle.js 200ms + page-rendering.js 300ms) merged into one 300ms handler in the class.
+- **Eliminated globals** — `window._ueScrollSyncSetup` and `window._ueResizeHandler` removed.
+
+### Lifecycle
+
+```
+initUnifiedEditor() → createPageRenderer() → ueSetupScrollSync()
+ueReset()           → destroyPageRenderer() (disconnect observer + remove listeners + clear cache)
+```
+
+### Future: Wire deviceCapability.maxCanvasPixels
+
+Constructor has a TODO to use `deviceCapability.maxCanvasPixels` for pixel-budget rendering.
+
+---
+
 ## 2. Web Workers for Heavy Operations (Priority: Medium)
 
 ### The Problem
@@ -96,7 +144,8 @@ that on main.
 
 1. Read `CLAUDE.md` first (always)
 2. Read `docs/architecture.md` for SSOT patterns
-3. Read `docs/patterns.md` for code conventions (includes event emitter pattern)
-4. Read this file for planned improvements (Section 1 is done, Section 2 is future)
+3. Read `docs/patterns.md` for code conventions (includes event emitter + PageRenderer patterns)
+4. Read this file for planned improvements (Sections 1 + 1b done, Section 2 is future)
 5. Read `js/lib/state.js` to understand current state shape before touching anything
 6. Read `js/lib/events.js` for the event emitter channels
+7. Read `js/editor/page-rendering.js` for the PageRenderer class (render pipeline owner)

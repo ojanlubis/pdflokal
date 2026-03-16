@@ -98,19 +98,21 @@ await processFiles(filesArray); // FileList would be empty if reset before conve
 </div>
 ```
 
-**Key functions:**
+**PageRenderer class** (`page-rendering.js`) — owns render pipeline as a singleton. Created by `createPageRenderer()` in `initUnifiedEditor()`, destroyed by `destroyPageRenderer()` in `ueReset()`. All original exports are thin wrappers delegating to the instance.
+
+**Key functions (wrappers → PageRenderer methods):**
 - `ueCreatePageSlots()` -- Builds DOM, sets placeholder dimensions, starts IntersectionObserver
 - `ueRenderPageCanvas(index)` -- Renders one page to its canvas (called by observer)
-- `ueRedrawPageAnnotations(index)` -- Restores page cache + draws annotations
+- `ueRedrawPageAnnotations(index)` -- Restores page cache + draws annotations (in annotations.js)
 - `ueRenderVisiblePages()` -- Re-renders all visible pages (rAF-throttled, for zoom/resize)
 - `ueSetupIntersectionObserver()` -- Lazy render + memory management (`root: null` for viewport)
 - `ueSetupScrollSync()` -- Window scroll -> selectedPage -> sidebar highlight (guarded by currentTool)
-- `ueGetCurrentCanvas()` -- Returns selected page's canvas element
-- `ueGetCoords(e, canvas, dpr)` -- Mouse/touch -> canvas coordinates
-- `ueGetResizeHandle(anno, x, y)` -- Hit test for annotation resize handles
-- `rebuildAnnotationMapping(oldPages)` -- Reference-based annotation/cache reindex after page reorder/delete
-- `clearPdfDocCache()` -- Destroys cached PDF.js documents (called from ueReset)
-- `ueRemoveScrollSync()` -- Cleans up window scroll listener (called from ueReset)
+- `ueGetCurrentCanvas()` -- Returns selected page's canvas element (in canvas-utils.js)
+- `ueGetCoords(e, canvas, dpr)` -- Mouse/touch -> canvas coordinates (in canvas-utils.js)
+- `ueGetResizeHandle(anno, x, y)` -- Hit test for annotation resize handles (in canvas-utils.js)
+- `rebuildAnnotationMapping(oldPages)` -- Reference-based annotation/cache reindex after page reorder/delete (in page-manager.js)
+- `clearPdfDocCache()` -- Destroys cached PDF.js documents (called from destroyPageRenderer)
+- `ueRemoveScrollSync()` -- Cleans up window scroll listener (called from destroyPageRenderer)
 
 **Layout reflow guard:**
 `ueAddFiles()` uses `await new Promise(resolve => requestAnimationFrame(resolve))` before `ueCreatePageSlots()` to ensure the browser has laid out the workspace (so `clientWidth` returns a real value, not 0).

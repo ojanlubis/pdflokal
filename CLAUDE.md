@@ -26,9 +26,10 @@ When facing a design question ("how should we structure X?"), check how these pr
 Read **[docs/strengths.md](docs/strengths.md)** first — explains WHY vanilla JS, WHY no framework, and WHY AI as primary developer is the core architectural decision.
 
 See **[docs/future-architecture.md](docs/future-architecture.md)** before starting any major refactor.
-Two key ideas captured there:
-1. **Reactive state layer** — pub/sub on `ueState` for annotation sync (note: the main Gabungkan desync bug was fixed in Mar 2026 by calling `ueCreatePageSlots()` on modal close — pub/sub is still useful but less urgent)
-2. **Web Workers** — offload PDF export + compression off the main thread
+Key ideas captured there:
+1. **Reactive state layer** — COMPLETED (Mar 2026). `js/lib/events.js` pub/sub emitter
+1b. **PageRenderer class** — COMPLETED (Mar 2026). Render pipeline encapsulated in `page-rendering.js`
+2. **Web Workers** — offload PDF export + compression off the main thread (future)
 
 ## Core Architecture
 
@@ -64,7 +65,7 @@ pdflokal/
 │   │   ├── file-loading.js   # ueAddFiles, handlePdfFile, handleImageFile
 │   │   ├── lifecycle.js      # initUnifiedEditor, ueReset, signature hints
 │   │   ├── page-manager.js   # Gabungkan modal (uePm* functions)
-│   │   ├── page-rendering.js # Page slots, canvas rendering, IntersectionObserver, scroll sync
+│   │   ├── page-rendering.js # PageRenderer class — slots, rendering, observer, scroll sync
 │   │   ├── pdf-export.js     # ueBuildFinalPDF, ueDownload, font embedding
 │   │   ├── sidebar.js        # Thumbnails, drag-drop reorder, toggle
 │   │   ├── signatures.js     # Signature placement, preview, confirm, delete
@@ -128,7 +129,7 @@ Refer to `js/lib/state.js` for full shape and comments on each field.
 
 The flagship multi-document PDF editor. When users drop a PDF on the homepage, it opens here.
 
-**Architecture:** Multi-canvas continuous vertical scroll. Each page gets its own `<canvas>` in `#ue-pages-container`. Body scroll with IntersectionObserver (`root: null`) for lazy rendering. See [docs/patterns.md](docs/patterns.md) for full function reference.
+**Architecture:** Multi-canvas continuous vertical scroll. Each page gets its own `<canvas>` in `#ue-pages-container`. Body scroll with IntersectionObserver (`root: null`) for lazy rendering. Render pipeline owned by `PageRenderer` class (singleton in `page-rendering.js`), created/destroyed by `lifecycle.js`. See [docs/patterns.md](docs/patterns.md) for full function reference.
 
 **Editor Layout:**
 - **Header** (40px, sticky top:0): `[File v] PDFLokal [moon] [Download PDF]`
@@ -264,6 +265,8 @@ Hero + dropzone (opens editor), PDF tool cards (Editor, Merge, Split, PDF-to-Ima
 | `getCanvasAndCoords(e)` | canvas-events.js | Event delegation helper |
 | `makeWhiteTransparent(canvas, threshold)` | utils.js | White pixels -> transparent |
 | `setupCanvasDPR(canvas)` | utils.js | Scale canvas for devicePixelRatio |
+| `createPageRenderer()` | page-rendering.js | **SSOT** create PageRenderer singleton (called by initUnifiedEditor) |
+| `destroyPageRenderer()` | page-rendering.js | **SSOT** destroy PageRenderer + cleanup (called by ueReset) |
 | `setupFileInput(inputId, opts)` | init.js | DRY file input handler factory |
 | `safeLocalGet(key)` / `safeLocalSet(key, val)` | utils.js | Private browsing-safe localStorage |
 | `trapFocus(modalEl)` / `releaseFocus(modalEl)` | utils.js | Modal focus trap + restore on close |
@@ -277,10 +280,10 @@ Hero + dropzone (opens editor), PDF tool cards (Editor, Merge, Split, PDF-to-Ima
 ### Reliability Patterns
 
 **Race condition guards:**
-- `isLoadingFiles` (file-loading.js), `isDownloading` (pdf-export.js), `isRestoring` (ueState), `ueRenderingPages` Set (page-rendering.js), `saved` closure (inline text editor), `isGenerating` (img-to-pdf.js), `isProcessingDrop` (init-file-handling.js)
+- `isLoadingFiles` (file-loading.js), `isDownloading` (pdf-export.js), `isRestoring` (ueState), `_renderingPages` Set (PageRenderer instance), `saved` closure (inline text editor), `isGenerating` (img-to-pdf.js), `isProcessingDrop` (init-file-handling.js)
 
 **Resource lifecycle:**
-- `pdfDocCache` Map caches PDF.js docs, `.destroy()` on reset
+- `_pdfDocCache` Map (PageRenderer) caches PDF.js docs, `.destroy()` on reset
 - `imageRegistry` Map in state.js deduplicates base64 signature data across undo snapshots
 - `ueRemoveScrollSync()` cleans up window scroll listener
 - IntersectionObserver disconnected during Gabungkan modal, reconnected on close
