@@ -46,12 +46,6 @@ export function ueCreatePageSlots() {
   // Disconnect previous observer before rebuilding
   if (ueState.pageObserver) ueState.pageObserver.disconnect();
 
-  // Revoke snapshot blob URLs from previous page canvases to prevent memory leak
-  ueState.pageCanvases.forEach(pc => {
-    if (pc._snapshotUrl) { URL.revokeObjectURL(pc._snapshotUrl); pc._snapshotUrl = null; }
-    if (pc._evictTimer) { clearTimeout(pc._evictTimer); pc._evictTimer = null; }
-  });
-
   container.innerHTML = '';
   ueState.pageCanvases = [];
 
@@ -274,32 +268,6 @@ export async function ueRenderPageCanvas(index) {
 
     ueRedrawPageAnnotations(index);
 
-    // WHY: Mobile browsers silently purge offscreen canvas backing stores under
-    // GPU memory pressure (iOS Safari 384MB limit, Android Chrome similar).
-    // When user scrolls back, canvas is blank (transparent) until re-rendered.
-    // Fix: create an <img> sibling behind the canvas (z-index 0 vs canvas z-index 1).
-    // Canvas has transparent background, so purged canvas shows img through.
-    // <img> elements don't get GPU-purged — browser can re-decode from blob.
-    // This is how Google Drive PDF viewer works: images for display, canvas for interaction.
-    try {
-      canvas.toBlob((blob) => {
-        if (!blob) return;
-        // Revoke previous snapshot URL to prevent memory leak
-        if (entry._snapshotUrl) URL.revokeObjectURL(entry._snapshotUrl);
-        entry._snapshotUrl = URL.createObjectURL(blob);
-
-        // Create or reuse the snapshot <img> behind the canvas
-        let img = entry.slot.querySelector('.ue-page-snapshot');
-        if (!img) {
-          img = document.createElement('img');
-          img.className = 'ue-page-snapshot';
-          img.setAttribute('aria-hidden', 'true');
-          entry.slot.insertBefore(img, canvas);
-        }
-        img.src = entry._snapshotUrl;
-      });
-    } catch (_e) { /* toBlob can fail on tainted canvases — ignore */ }
-
     // Refresh thumbnails after lazy render (debounced to batch multiple page renders)
     clearTimeout(thumbnailRefreshTimer);
     thumbnailRefreshTimer = setTimeout(() => ueRenderThumbnails(), 200);
@@ -348,8 +316,6 @@ export function ueRenderSelectedPage() {
 export function ueSetupIntersectionObserver() {
   if (ueState.pageObserver) ueState.pageObserver.disconnect();
 
-  const visiblePages = new Set();
-
   // root: null → observe against viewport (body scroll)
   ueState.pageObserver = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
@@ -360,38 +326,16 @@ export function ueSetupIntersectionObserver() {
       const pc = ueState.pageCanvases[index];
       if (!pc) return;
 
-      if (entry.isIntersecting) {
-        visiblePages.add(index);
-        // WHY: Cancel pending eviction — page scrolled back into view before
-        // the debounce fired. Prevents the evict→re-render cycle that causes
-        // visible flicker during mobile momentum scroll.
-        if (pc._evictTimer) { clearTimeout(pc._evictTimer); pc._evictTimer = null; }
-        if (!pc.rendered) ueRenderPageCanvas(index);
-      } else {
-        visiblePages.delete(index);
-        // WHY threshold 10: Each canvas ~4MB at 2x DPR. Was 4, raised because
-        // eviction causes visible flicker on re-render (canvas.width wipes content).
-        // 10 pages × 4MB = 40MB — acceptable on both desktop and mobile.
-        // For larger docs, eviction is necessary to prevent OOM.
-        if (pc.rendered && ueState.pageCanvases.length > 10) {
-          const nearVisible = Array.from(visiblePages).some(v => Math.abs(v - index) <= 3);
-          if (!nearVisible) {
-            // WHY: Don't clearRect — canvas keeps its last painted content as a
-            // stale placeholder. clearRect causes visible white flash (100-500ms)
-            // while async PDF.js re-render runs. GPU memory is unchanged either way
-            // (canvas backing store is fixed by dimensions). CPU-side ImageData
-            // cache is still freed below for the actual memory savings.
-            // WHY debounce 500ms: Mobile momentum scroll can rapidly move pages
-            // in and out of viewport. Immediate eviction causes re-render flicker.
-            // Delaying gives scroll a chance to settle before freeing memory.
-            if (pc._evictTimer) clearTimeout(pc._evictTimer);
-            pc._evictTimer = setTimeout(() => {
-              pc._evictTimer = null;
-              pc.rendered = false;
-              delete ueState.pageCaches[index];
-            }, 500);
-          }
-        }
+      // WHY: Only render pages entering viewport. NO eviction of pages leaving.
+      // Previous eviction code (clearRect, rendered=false, cache delete) caused
+      // visible white flash flicker on mobile when scrolling back to evicted pages.
+      // Canvas memory stays allocated (GPU backing store is fixed by dimensions
+      // regardless of content). Only CPU-side ImageData cache could be freed,
+      // but the re-render cost + flicker outweighs the memory savings.
+      // For very large documents (>50 pages), memory may become an issue —
+      // address with page-at-a-time mode in the future, not eviction.
+      if (entry.isIntersecting && !pc.rendered) {
+        ueRenderPageCanvas(index);
       }
     });
   }, {
