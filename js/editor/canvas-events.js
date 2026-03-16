@@ -248,7 +248,10 @@ export function ueSetupCanvasEvents() {
     }
     const info = infoFromTouch(e);
     if (!info) return;
-    e.preventDefault();
+    // WHY cancelable check: During momentum scroll, the browser marks touchend
+    // as non-cancelable. Calling preventDefault() on it triggers a browser
+    // intervention warning and can cause scroll jank / flicker.
+    if (e.cancelable) e.preventDefault();
     handleUp(info);
   }, { passive: false });
 

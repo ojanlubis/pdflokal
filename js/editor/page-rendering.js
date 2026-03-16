@@ -207,7 +207,12 @@ export async function ueRenderPageCanvas(index) {
     const page = await pdf.getPage(pageInfo.pageNum + 1);
 
     const canvas = entry.canvas;
-    const ctx = canvas.getContext('2d');
+    // WHY willReadFrequently: pageCaches stores getImageData() after each render,
+    // and ueRedrawPageAnnotations() calls putImageData() to restore clean state.
+    // Without this flag, each getImageData() triggers an expensive GPU→CPU sync
+    // that blocks the main thread (causes visible scroll jank on mobile).
+    // With the flag, Chrome keeps the bitmap in CPU memory — readbacks are instant.
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
     // WHY: Clamp DPR to MAX_CANVAS_DPR. At 200% zoom on Retina, raw DPR = 4,
     // making each A4 canvas ~42MB. Clamping to 2 keeps quality sharp while
     // preventing GPU memory exhaustion that silently breaks canvas allocation.

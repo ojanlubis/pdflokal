@@ -1618,7 +1618,10 @@
   <script>
     // Use real Web Worker for better performance (PDF parsing off main thread)
     // Falls back to fake worker (script tag above) if worker fetch fails (e.g. offline)
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'js/vendor/pdf.worker.min.js';
+    // WHY absolute path: Relative path can fail on hash-based URLs (/#unified-editor).
+    // Must match the self-hosted file exactly for real Web Worker to load.
+    // Falls back to fake worker (script tag above) if worker creation fails.
+    pdfjsLib.GlobalWorkerOptions.workerSrc = '/js/vendor/pdf.worker.min.js';
   </script>
   <script src="js/vendor/signature_pad.umd.min.js"></script>
 
