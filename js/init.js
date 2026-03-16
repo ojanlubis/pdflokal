@@ -99,12 +99,12 @@ function detectMobile() {
 // ============================================================
 
 // WHY: Version tag for cache debugging. Check console to confirm latest deploy is running.
-const APP_VERSION = '2026.03.16.2';
+const APP_VERSION = '2026.03.16.3';
 
 function initApp() {
-  console.log(`[PDFLokal] v${APP_VERSION} | ${deviceCapability.formFactor} | DPR ${window.devicePixelRatio}`);
   checkBrowserCompatibility();
   detectMobile();
+  console.log(`[PDFLokal] v${APP_VERSION} | ${deviceCapability.formFactor} (vw=${window.innerWidth}) | touch=${deviceCapability.isTouch} coarse=${deviceCapability.isCoarsePointer} | DPR ${window.devicePixelRatio}`);
 
   // WHY: No resize/orientation listeners needed for detectMobile — isTouch
   // capability doesn't change. Layout adapts via CSS @media queries.
