@@ -67,6 +67,11 @@ export async function ueAddFiles(files) {
   isLoadingFiles = true;
   ueSaveUndoState();
 
+  // WHY: Hide empty state immediately so it can't flash during async PDF parsing.
+  // ueSelectPage(0) also hides it later, but that runs after all files are parsed.
+  const emptyState = document.getElementById('ue-empty-state');
+  if (emptyState) emptyState.style.display = 'none';
+
   try {
   for (const file of files) {
     await processFile(file);

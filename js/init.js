@@ -7,7 +7,7 @@
  */
 
 // Shared foundations
-import { mobileState } from './lib/state.js';
+import { mobileState, deviceCapability } from './lib/state.js';
 import { showToast } from './lib/utils.js';
 import { initNavigationHistory } from './lib/navigation.js';
 
@@ -66,6 +66,24 @@ function checkBrowserCompatibility() {
 function detectMobile() {
   mobileState.isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
   document.body.classList.toggle('is-touch', mobileState.isTouch);
+
+  // Populate device capability object (SSOT for rendering decisions)
+  deviceCapability.isTouch = mobileState.isTouch;
+  deviceCapability.isCoarsePointer = window.matchMedia('(any-pointer: coarse)').matches;
+
+  // WHY: formFactor uses viewport width at init time. CSS @media remains SSOT for
+  // layout; this is for rendering parameters (pixel budget) that don't change mid-session.
+  const vw = window.innerWidth;
+  if (vw <= 599) {
+    deviceCapability.formFactor = 'phone';
+    deviceCapability.maxCanvasPixels = 5_242_880;  // 5MP — matches PDF.js mobile cap
+  } else if (vw <= 900) {
+    deviceCapability.formFactor = 'tablet';
+    deviceCapability.maxCanvasPixels = 10_000_000; // 10MP
+  } else {
+    deviceCapability.formFactor = 'desktop';
+    deviceCapability.maxCanvasPixels = 16_777_216; // 16MP
+  }
 
   // Update dropzone text for touch devices
   const dropzoneText = document.querySelector('#main-dropzone h3');

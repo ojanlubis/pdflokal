@@ -315,6 +315,10 @@ export function ueSetupIntersectionObserver() {
 
       if (entry.isIntersecting) {
         visiblePages.add(index);
+        // WHY: Cancel pending eviction — page scrolled back into view before
+        // the debounce fired. Prevents the evict→re-render cycle that causes
+        // visible flicker during mobile momentum scroll.
+        if (pc._evictTimer) { clearTimeout(pc._evictTimer); pc._evictTimer = null; }
         if (!pc.rendered) ueRenderPageCanvas(index);
       } else {
         visiblePages.delete(index);
@@ -328,8 +332,15 @@ export function ueSetupIntersectionObserver() {
             // while async PDF.js re-render runs. GPU memory is unchanged either way
             // (canvas backing store is fixed by dimensions). CPU-side ImageData
             // cache is still freed below for the actual memory savings.
-            pc.rendered = false;
-            delete ueState.pageCaches[index];
+            // WHY debounce 500ms: Mobile momentum scroll can rapidly move pages
+            // in and out of viewport. Immediate eviction causes re-render flicker.
+            // Delaying gives scroll a chance to settle before freeing memory.
+            if (pc._evictTimer) clearTimeout(pc._evictTimer);
+            pc._evictTimer = setTimeout(() => {
+              pc._evictTimer = null;
+              pc.rendered = false;
+              delete ueState.pageCaches[index];
+            }, 500);
           }
         }
       }

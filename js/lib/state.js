@@ -110,6 +110,20 @@ export const mobileState = {
 };
 
 // ============================================================
+// DEVICE CAPABILITY — populated by detectMobile() in init.js
+// ============================================================
+// WHY: Rendering pipeline needs device-class awareness (not just screen width).
+// Inspired by PDF.js maxCanvasPixels, Excalidraw formFactor, tldraw coarsePointer.
+// Used as a read-only reference for rendering decisions (pixel budget, etc.).
+
+export const deviceCapability = {
+  isTouch: false,           // 'ontouchstart' in window || maxTouchPoints > 0
+  isCoarsePointer: false,   // matchMedia('(any-pointer: coarse)')
+  formFactor: 'desktop',    // 'phone' | 'tablet' | 'desktop' (from viewport width)
+  maxCanvasPixels: 16_777_216 // 16MP desktop, 10MP tablet, 5MP phone
+};
+
+// ============================================================
 // NAVIGATION HISTORY
 // ============================================================
 

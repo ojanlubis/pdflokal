@@ -169,6 +169,11 @@ let isProcessingDrop = false;
 async function routeDroppedFile(files, file, filePDF, fileImage) {
   track('file_loaded', { tool: 'dropzone', fileType: filePDF ? 'pdf' : 'image' });
   if (filePDF) {
+    // WHY: Hide empty state BEFORE showTool so it never flashes.
+    // showTool → initUnifiedEditor leaves empty state visible; ueSelectPage hides it
+    // much later after async PDF parsing. Pre-hiding eliminates the flash.
+    const emptyState = document.getElementById('ue-empty-state');
+    if (emptyState) emptyState.style.display = 'none';
     const { ueAddFiles } = await import('./editor/index.js');
     showTool('unified-editor');
     await ueAddFiles(files);

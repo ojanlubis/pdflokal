@@ -66,6 +66,11 @@ function handleEditorCardWithFilePicker(mode) {
 
         showFullscreenLoading('Memuat PDF...');
 
+        // WHY: Hide empty state before editor init to prevent flash.
+        // Same pattern as routeDroppedFile in init-file-handling.js.
+        const emptyState = document.getElementById('ue-empty-state');
+        if (emptyState) emptyState.style.display = 'none';
+
         try {
           const workspace = document.getElementById('unified-editor-workspace');
           if (workspace) {
