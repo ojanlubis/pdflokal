@@ -1612,15 +1612,15 @@
   <!-- Libraries (Self-hosted for offline support and firewall compatibility) -->
   <script src="js/vendor/pdf-lib.min.js"></script>
   <script src="js/vendor/fontkit.umd.min.js"></script>
-  <!-- PDF.js worker loaded as fallback for offline fake worker mode -->
-  <script src="js/vendor/pdf.worker.min.js"></script>
   <script src="js/vendor/pdf.min.js"></script>
   <script>
-    // Use real Web Worker for better performance (PDF parsing off main thread)
-    // Falls back to fake worker (script tag above) if worker fetch fails (e.g. offline)
-    // WHY absolute path: Relative path can fail on hash-based URLs (/#unified-editor).
-    // Must match the self-hosted file exactly for real Web Worker to load.
-    // Falls back to fake worker (script tag above) if worker creation fails.
+    // WHY: workerSrc tells PDF.js to load the worker file as a real Web Worker
+    // (PDF parsing runs off main thread → scroll stays smooth during page render).
+    // Previously, pdf.worker.min.js was also loaded as a <script> tag for offline
+    // fallback, but that caused PDF.js to detect the worker code in global scope
+    // and SKIP creating a real Worker ("Setting up fake worker" in console).
+    // PDF.js has built-in fallback: if Worker creation fails (offline, CSP block),
+    // it automatically falls back to fake worker without the <script> tag.
     pdfjsLib.GlobalWorkerOptions.workerSrc = '/js/vendor/pdf.worker.min.js';
   </script>
   <script src="js/vendor/signature_pad.umd.min.js"></script>
