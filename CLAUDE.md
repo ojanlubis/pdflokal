@@ -272,7 +272,7 @@ Hero + dropzone (opens editor), PDF tool cards (Editor, Merge, Split, PDF-to-Ima
 
 ### Named Constants (js/lib/state.js)
 
-`UNDO_STACK_LIMIT` (50), `SIGNATURE_DEFAULT_WIDTH` (150px), `PARAF_DEFAULT_WIDTH` (80px), `OBSERVER_ROOT_MARGIN` ('200px 0px'), `DOUBLE_TAP_DELAY` (300ms), `DOUBLE_TAP_DISTANCE` (30px), `MAX_CANVAS_DPR` (2 — clamps devicePixelRatio for canvas rendering, prevents GPU memory exhaustion at high zoom).
+`UNDO_STACK_LIMIT` (50), `SIGNATURE_DEFAULT_WIDTH` (150px), `PARAF_DEFAULT_WIDTH` (80px), `OBSERVER_ROOT_MARGIN` ('200px 0px'), `DOUBLE_TAP_DELAY` (300ms), `DOUBLE_TAP_DISTANCE` (30px), `MAX_CANVAS_DPR` (2 — clamps devicePixelRatio for canvas rendering, prevents GPU memory exhaustion at high zoom). `deviceCapability` object — `isTouch`, `isCoarsePointer`, `formFactor`, `maxCanvasPixels` (populated by init.js).
 
 ### Reliability Patterns
 
@@ -284,7 +284,7 @@ Hero + dropzone (opens editor), PDF tool cards (Editor, Merge, Split, PDF-to-Ima
 - `imageRegistry` Map in state.js deduplicates base64 signature data across undo snapshots
 - `ueRemoveScrollSync()` cleans up window scroll listener
 - IntersectionObserver disconnected during Gabungkan modal, reconnected on close
-- Page cache cleanup threshold: 4 pages (offscreen canvases cleared when >4 pages loaded)
+- **No canvas eviction** — pages render once and stay. Eviction caused white flash flicker on mobile (canvas.width assignment clears content). Memory tradeoff: ~4MB per page stays allocated
 
 **Accessibility:**
 - All modals have `role="dialog" aria-modal="true"` + auto focus trap via MutationObserver in `initModalBackdropClose()`
@@ -296,6 +296,7 @@ Hero + dropzone (opens editor), PDF tool cards (Editor, Merge, Split, PDF-to-Ima
 - PDF.js uses real Web Worker (`workerSrc` points to self-hosted file, falls back to fake worker offline)
 - Page loading is lazy: `handlePdfFile` stores dimensions + pre-renders 300px thumbnail (`page.thumbCanvas`) for instant sidebar/modal previews. Full rendering via IntersectionObserver. Debounced `ueRenderThumbnails()` after each lazy render upgrades thumbnails to full-res
 - Undo stack uses `imageRegistry` to avoid cloning base64 strings (stores `imageId` references)
+- **Device capability detection:** `deviceCapability` object in state.js — `isTouch`, `isCoarsePointer`, `formFactor` ('phone'/'tablet'/'desktop'), `maxCanvasPixels` (5MP/10MP/16MP). Populated by `detectMobile()` in init.js. Foundation for future pixel-budget rendering.
 - Pinch-to-zoom supported via 2-finger touch detection in `canvas-events.js`
 
 **Key patterns:** `rebuildAnnotationMapping(oldPages)` for reference-based reindex, `requestAnimationFrame` guard before `ueCreatePageSlots()` for layout reflow. See [docs/patterns.md](docs/patterns.md) for code examples.
@@ -310,6 +311,11 @@ Hero + dropzone (opens editor), PDF tool cards (Editor, Merge, Split, PDF-to-Ima
 - Merge/Split card flow bypasses `showTool()` - must manually add `body.editor-active`
 - Layout race condition: `showTool()` makes workspace visible but browser hasn't reflowed - use rAF
 - **Lazy rendering**: `ueState.pages[i].canvas` is a `{width, height}` placeholder, NOT an HTMLCanvasElement. Real canvases live in `ueState.pageCanvases[i].canvas`. Pre-rendered thumbnails (300px) live in `page.thumbCanvas`. For sidebar/main thumbnails, use `getThumbnailSource(index)`. For Gabungkan modal, use `page.thumbCanvas` directly (pageCanvases stale during modal). Never access page.canvas directly for drawing
+- **Mobile canvas flicker**: Mobile browsers silently purge offscreen canvas GPU backing stores. Canvas eviction was removed because the evict→re-render cycle caused worse flicker than keeping all canvases alive. **Do NOT re-add canvas eviction** — it was tried extensively in Mar 2026 and every approach (debounced eviction, background-image fallback, img sibling fallback) made things worse. See `memory/mobile-rendering.md` for full analysis.
+- **Empty state flash**: `#ue-empty-state` must be hidden BEFORE `showTool()` when files are being loaded. Three code paths do this: `routeDroppedFile` (init-file-handling.js), `ueAddFiles` (file-loading.js), merge/split handler (init-ui.js). If `ueAddFiles` produces zero pages (corrupt PDF), empty state is restored.
+- **Scroll sync must NOT call ueSelectPage()**: `ueSelectPage()` triggers `scrollIntoView()` which fights user momentum scroll on mobile. Scroll sync only updates highlight + page indicator.
+- **Page selection border hidden on mobile**: `.ue-page-slot.selected canvas` outline only at `min-width: 901px`. `ueHighlightThumbnail()` skips DOM class toggling on mobile to avoid repaints.
+- **Known limitation**: Edge-scroll flicker (overscroll recomposition) is a browser-level issue. Fix requires switching from body scroll to container scroll (`overflow-y: auto` + `overscroll-behavior: contain`).
 
 ## Changelog System
 
