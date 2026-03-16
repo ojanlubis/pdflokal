@@ -98,7 +98,11 @@ function detectMobile() {
 // INITIALIZATION
 // ============================================================
 
+// WHY: Version tag for cache debugging. Check console to confirm latest deploy is running.
+const APP_VERSION = '2026.03.16.1';
+
 function initApp() {
+  console.log(`[PDFLokal] v${APP_VERSION} | ${deviceCapability.formFactor} | DPR ${window.devicePixelRatio}`);
   checkBrowserCompatibility();
   detectMobile();
 
