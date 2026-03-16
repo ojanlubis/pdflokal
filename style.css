@@ -2605,6 +2605,11 @@ a:hover {
   display: block;
   background: #ffffff;
   box-shadow: var(--shadow-lg);
+  /* WHY: Promote each canvas to its own GPU compositing layer.
+     Prevents browser from repainting canvas content during overscroll
+     bounce / rubber-banding on mobile. Without this, the compositor
+     may clear and redraw canvases when the viewport stretches. */
+  will-change: transform;
 }
 
 /* WHY: Only show selected border on desktop where sidebar needs visual pairing.
@@ -3402,8 +3407,11 @@ html[data-theme="dark"] .floating-toolbar {
    MOBILE OPTIMIZATION STYLES
    ============================================================ */
 
-/* WHY: Replaced body.is-mobile (JS class) with @media query — single source of
-   truth for mobile detection. Prevents iOS elastic scroll beyond page bounds. */
+/* WHY: Prevent iOS/Android elastic overscroll that causes canvas repaint flicker.
+   Applied on all viewports when editor is active (most important on mobile). */
+body.editor-active {
+  overscroll-behavior: none;
+}
 @media (max-width: 900px) {
   body {
     overscroll-behavior: none;
