@@ -31,6 +31,7 @@ export {
 } from './signatures.js';
 
 export {
+  createPageRenderer, destroyPageRenderer,
   ueCreatePageSlots, ueSetWrapperHeight, ueHighlightThumbnail,
   ueSelectPage, ueRenderPageCanvas, ueRenderVisiblePages, ueRenderSelectedPage,
   ueSetupIntersectionObserver, ueSetupScrollSync,
@@ -122,7 +123,9 @@ window.ueDeleteSignature = ueDeleteSignature;
 window.ueUpdateDownloadButtonState = ueUpdateDownloadButtonState;
 
 // Page rendering
-import { ueCreatePageSlots, ueSetWrapperHeight, ueHighlightThumbnail, ueSelectPage, ueRenderPageCanvas, ueRenderVisiblePages, ueRenderSelectedPage, ueSetupIntersectionObserver, ueSetupScrollSync, ueDeletePage, ueUpdatePageCount, ueUpdateStatus } from './page-rendering.js';
+import { createPageRenderer, destroyPageRenderer, ueCreatePageSlots, ueSetWrapperHeight, ueHighlightThumbnail, ueSelectPage, ueRenderPageCanvas, ueRenderVisiblePages, ueRenderSelectedPage, ueSetupIntersectionObserver, ueSetupScrollSync, ueDeletePage, ueUpdatePageCount, ueUpdateStatus } from './page-rendering.js';
+window.createPageRenderer = createPageRenderer;
+window.destroyPageRenderer = destroyPageRenderer;
 window.ueCreatePageSlots = ueCreatePageSlots;
 window.ueSetWrapperHeight = ueSetWrapperHeight;
 window.ueHighlightThumbnail = ueHighlightThumbnail;

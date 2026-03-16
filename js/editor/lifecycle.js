@@ -3,12 +3,12 @@
  * Editor initialization, reset, signature hints
  */
 
-import { ueState, state, clearImageRegistry, getDefaultUeState, MAX_CANVAS_DPR } from '../lib/state.js';
+import { ueState, clearImageRegistry, getDefaultUeState, MAX_CANVAS_DPR } from '../lib/state.js';
 import { on } from '../lib/events.js';
 import { showToast, showFullscreenLoading, hideFullscreenLoading, safeLocalGet, safeLocalSet } from '../lib/utils.js';
 import { initUnifiedEditorInput, ueAddFiles } from './file-loading.js';
 import { ueRenderThumbnails } from './sidebar.js';
-import { ueSetupScrollSync, ueSetWrapperHeight, ueUpdatePageCount, ueRenderVisiblePages, ueRemoveScrollSync, clearPdfDocCache } from './page-rendering.js';
+import { ueSetupScrollSync, ueUpdatePageCount, createPageRenderer, destroyPageRenderer } from './page-rendering.js';
 
 // WHY: Subscribe to pages:changed so page count auto-updates when pages change.
 // Replaces manual ueUpdatePageCount() calls scattered across modules.
@@ -21,14 +21,8 @@ export function ueReset() {
   Object.assign(ueState, getDefaultUeState());
 
   // Side-effect cleanup (not just value resets)
-  if (ueState.pageObserver) { ueState.pageObserver.disconnect(); ueState.pageObserver = null; }
-  ueRemoveScrollSync();
-  clearPdfDocCache();
+  destroyPageRenderer();
   clearImageRegistry();
-  if (window._ueResizeHandler) {
-    window.removeEventListener('resize', window._ueResizeHandler);
-    delete window._ueResizeHandler;
-  }
   ueState.zoomLevel = 1.0;
   ueUpdateZoomDisplay();
 
@@ -104,21 +98,9 @@ export function initUnifiedEditor() {
     });
   }
 
-  // Setup scroll sync for continuous vertical scroll
+  // Create renderer instance + setup scroll sync for continuous vertical scroll
+  // WHY explicit: constructor does NOT auto-call setupScrollSync() — caller controls
+  // when listeners attach. Resize handler is consolidated inside the class.
+  createPageRenderer();
   ueSetupScrollSync();
-
-  // Setup resize handler
-  if (!window._ueResizeHandler) {
-    let resizeTimeout;
-    window._ueResizeHandler = () => {
-      clearTimeout(resizeTimeout);
-      resizeTimeout = setTimeout(() => {
-        if (state.currentTool === 'unified-editor' && ueState.pages.length > 0) {
-          ueSetWrapperHeight();
-          ueRenderVisiblePages();
-        }
-      }, 200);
-    };
-    window.addEventListener('resize', window._ueResizeHandler);
-  }
 }
