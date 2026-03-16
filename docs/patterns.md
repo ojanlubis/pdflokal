@@ -240,6 +240,31 @@ if (isPDF(file)) { /* ... */ }
 if (isImage(file)) { /* ... */ }
 ```
 
+## Event Emitter Pattern (State Sync)
+
+Use `js/lib/events.js` for structural state changes. Import `emit` to notify, `on` to subscribe.
+
+```javascript
+import { emit } from '../lib/events.js';
+import { on } from '../lib/events.js';
+
+// Emitting after a state mutation
+ueState.pages.splice(index, 1);
+emit('pages:changed', { source: 'user' });
+
+// Subscribing (typically in module init)
+on('pages:changed', (detail) => {
+  if (detail?.source === 'restore') return; // skip during undo/redo
+  ueRenderThumbnails();
+});
+```
+
+**When to use events vs direct calls:**
+- **Events** — structural changes (add/remove pages, add/remove annotations, tool switch, page select)
+- **Direct calls** — hot-path rendering at 60fps (drag, resize, drawing preview). Use `ueRedrawAnnotations()` directly
+
+**Available channels:** `pages:changed`, `annotations:changed`, `annotations:modified`, `page:selected`, `tool:changed`
+
 ## Signature Image Optimization
 
 ```javascript

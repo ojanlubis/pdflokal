@@ -29,4 +29,10 @@ export function track(name, data = {}) {
     name,
     data: { ...data, session: sessionId }
   });
+
+  // WHY: Send same events to GA4 so we can compare dashboards.
+  // gtag() exists when Google tag script is loaded (not in local dev).
+  if (typeof window.gtag === 'function') {
+    window.gtag('event', name, data);
+  }
 }

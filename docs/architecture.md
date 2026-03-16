@@ -135,13 +135,26 @@ flowchart TB
     style CALLERS fill:#eff,stroke:#39c,stroke-width:2px
 ```
 
-### 1e. Additional SSOT Helpers
+### 1e. Event Emitter — `on` / `off` / `emit` (events.js)
+
+A lightweight pub/sub layer (~37 lines) that decouples state mutations from UI sync. Implemented Mar 2026.
+
+| Helper | Location | Purpose |
+|--------|----------|---------|
+| `on(event, fn)` | events.js | Subscribe to event, returns unsubscribe function |
+| `off(event, fn)` | events.js | Unsubscribe from event |
+| `emit(event, detail)` | events.js | Emit event to all subscribers |
+
+Channels: `pages:changed`, `annotations:changed`, `annotations:modified`, `page:selected`, `tool:changed`. See `docs/patterns.md` for usage.
+
+### 1f. Additional SSOT Helpers
 
 | Helper | Location | Purpose |
 |--------|----------|---------|
 | `openModal(id)` / `closeModal(id, skip)` | navigation.js | Standard modal open/close with `.active` class + history management |
 | `isPDF(file)` / `isImage(file)` | utils.js | File type validation (replaces inline `file.type ===` checks) |
 | `loadPdfDocument(bytes)` | utils.js | PDF.js document loading with defensive `.slice()` (replaces raw `pdfjsLib.getDocument()`) |
+| `track(name, data)` | analytics.js | Anonymous event tracking via Vercel Analytics + GA4 (no personal data) |
 
 ---
 

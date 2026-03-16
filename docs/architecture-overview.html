@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>PDFLokal Architecture Overview</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; background: #fafafa; color: #1a1a1a; }
+  h1 { border-bottom: 3px solid #2563eb; padding-bottom: 8px; }
+  h2 { color: #2563eb; margin-top: 40px; border-bottom: 1px solid #ddd; padding-bottom: 4px; }
+  h3 { color: #555; }
+  .mermaid { background: white; border-radius: 8px; padding: 20px; margin: 16px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+  .note { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 12px 16px; margin: 16px 0; border-radius: 0 8px 8px 0; }
+  .stats { display: flex; gap: 16px; flex-wrap: wrap; margin: 16px 0; }
+  .stat { background: white; border-radius: 8px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); min-width: 140px; text-align: center; }
+  .stat .num { font-size: 28px; font-weight: bold; color: #2563eb; }
+  .stat .label { font-size: 13px; color: #666; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+  th, td { text-align: left; padding: 8px 12px; border: 1px solid #ddd; }
+  th { background: #f1f5f9; }
+  code { background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+</style>
+</head>
+<body>
+<h1>PDFLokal — Full Architecture Overview</h1>
+<p>100% client-side PDF &amp; image manipulation tool. Vanilla JS, native ES modules, no build step.</p>
+
+<div class="stats">
+  <div class="stat"><div class="num">~30</div><div class="label">ES Modules</div></div>
+  <div class="stat"><div class="num">~7.8K</div><div class="label">Lines of Code</div></div>
+  <div class="stat"><div class="num">0</div><div class="label">npm Dependencies</div></div>
+  <div class="stat"><div class="num">6</div><div class="label">Vendor Libs (2.6MB)</div></div>
+  <div class="stat"><div class="num">5</div><div class="label">Event Channels</div></div>
+  <div class="stat"><div class="num">111</div><div class="label">Window Bridges</div></div>
+</div>
+
+<h2>1. High-Level Module Dependency Graph</h2>
+<pre class="mermaid">
+graph TB
+    subgraph HTML["index.html (Entry Point)"]
+        VENDOR["Vendor &lt;script&gt; tags<br/>(pdf-lib, fontkit, PDF.js, SignaturePad)"]
+        MODULE["&lt;script type=module src=js/init.js&gt;"]
+    end
+
+    subgraph INIT["Bootstrap Layer"]
+        init["js/init.js<br/><i>Entry point: compat check,<br/>mobile detection, bootstrap</i>"]
+        initFH["js/init-file-handling.js<br/><i>Dropzone, file inputs,<br/>paste handler</i>"]
+        initUI["js/init-ui.js<br/><i>Tool cards, signature pads,<br/>modal backdrop close</i>"]
+    end
+
+    subgraph LIB["Foundation Layer (js/lib/)"]
+        state["state.js<br/><i>ueState, uePmState,<br/>factories, constants</i>"]
+        utils["utils.js<br/><i>showToast, downloadBlob,<br/>isPDF, isImage, etc.</i>"]
+        nav["navigation.js<br/><i>showHome, showTool,<br/>openModal, closeModal</i>"]
+        events["events.js<br/><i>on/off/emit<br/>pub/sub emitter</i>"]
+        analytics["analytics.js<br/><i>track() → Vercel + GA4</i>"]
+    end
+
+    subgraph EDITOR["Unified Editor (js/editor/ — 15 modules)"]
+        editorIdx["index.js<br/><i>Barrel + 88 window bridges</i>"]
+        lifecycle["lifecycle.js<br/><i>initUnifiedEditor, ueReset</i>"]
+        fileLoad["file-loading.js<br/><i>ueAddFiles, handlePdf/Image</i>"]
+        pageRender["page-rendering.js<br/><i>ueCreatePageSlots, lazy render,<br/>IntersectionObserver</i>"]
+        canvasUtils["canvas-utils.js<br/><i>ueGetCurrentCanvas,<br/>ueGetCoords, thumbnails</i>"]
+        canvasEvents["canvas-events.js<br/><i>Mouse/touch delegation</i>"]
+        inlineEditor["inline-editor.js<br/><i>Double-click text editing</i>"]
+        annotations["annotations.js<br/><i>ueRedrawAnnotations,<br/>hit testing, draw helpers</i>"]
+        undoRedo["undo-redo.js<br/><i>Dual stacks: pages + annotations</i>"]
+        sidebar["sidebar.js<br/><i>Thumbnails, drag reorder</i>"]
+        signatures["signatures.js<br/><i>Place, confirm, delete, apply-all</i>"]
+        tools["tools.js<br/><i>ueSetTool, modal openers,<br/>More dropdown</i>"]
+        zoomRotate["zoom-rotate.js<br/><i>Zoom in/out/reset, rotate</i>"]
+        pageManager["page-manager.js<br/><i>Gabungkan modal,<br/>split/extract</i>"]
+        pdfExport["pdf-export.js<br/><i>ueBuildFinalPDF, ueDownload,<br/>font embedding</i>"]
+    end
+
+    subgraph PDFTOOLS["PDF Tool Modals (js/pdf-tools/ — 7 modules)"]
+        ptIdx["index.js<br/><i>Barrel + window bridges</i>"]
+        sigModal["signature-modal.js<br/><i>Draw/upload tabs, paraf</i>"]
+        textModal["text-modal.js<br/><i>Font, size, color, preview</i>"]
+        wmModal["watermark-modal.js"]
+        pnModal["pagenum-modal.js"]
+        standalone["standalone-tools.js<br/><i>PDF-to-Image, Compress, Protect</i>"]
+        dragReorder["drag-reorder.js"]
+    end
+
+    subgraph TOPLEVEL["Top-Level Modules"]
+        keyboard["keyboard.js<br/><i>Keyboard shortcuts</i>"]
+        theme["theme.js<br/><i>Dark/light toggle</i>"]
+        changelog["changelog.js<br/><i>Notification badge</i>"]
+        mobileUI["mobile-ui.js<br/><i>Mobile nav, page picker</i>"]
+        imageTools["image-tools.js<br/><i>Compress, resize, convert, remove-bg</i>"]
+        imgToPdf["img-to-pdf.js<br/><i>Images-to-PDF tool</i>"]
+    end
+
+    MODULE --> init
+    init --> initFH & initUI
+    init --> editorIdx & ptIdx
+    init --> keyboard & theme & changelog & mobileUI & imageTools & imgToPdf
+
+    editorIdx --> lifecycle & fileLoad & pageRender & canvasUtils & canvasEvents
+    editorIdx --> annotations & undoRedo & sidebar & signatures & tools & zoomRotate
+    editorIdx --> pageManager & pdfExport & inlineEditor
+
+    ptIdx --> sigModal & textModal & wmModal & pnModal & standalone & dragReorder
+
+    %% Foundation dependencies (simplified)
+    lifecycle --> state & nav & events
+    fileLoad --> state & utils & events
+    pageRender --> state & canvasUtils & events
+    canvasEvents --> state & canvasUtils & events
+    annotations --> state
+    sidebar --> state & canvasUtils & events
+    pdfExport --> state & utils
+    tools --> state & nav & events
+    signatures --> state & events
+    undoRedo --> state & events
+    pageManager --> state & canvasUtils & events
+    keyboard --> state & nav
+
+    VENDOR -.->|window.PDFLib| pdfExport
+    VENDOR -.->|window.pdfjsLib| fileLoad
+    VENDOR -.->|window.SignaturePad| sigModal
+
+    style LIB fill:#dfd,stroke:#393
+    style EDITOR fill:#e0e7ff,stroke:#4f46e5
+    style PDFTOOLS fill:#fef3c7,stroke:#d97706
+    style INIT fill:#f0fdf4,stroke:#16a34a
+    style HTML fill:#f1f5f9,stroke:#64748b
+</pre>
+
+<h2>2. Event Emitter Channels</h2>
+<pre class="mermaid">
+graph LR
+    subgraph EMITTERS["Emitters (9 modules)"]
+        direction TB
+        E1["annotations.js"]
+        E2["canvas-events.js"]
+        E3["file-loading.js"]
+        E4["inline-editor.js"]
+        E5["page-manager.js"]
+        E6["page-rendering.js"]
+        E7["signatures.js"]
+        E8["tools.js"]
+        E9["undo-redo.js"]
+    end
+
+    subgraph CHANNELS["Event Channels"]
+        direction TB
+        CH1["pages:changed"]
+        CH2["annotations:changed"]
+        CH3["annotations:modified"]
+        CH4["page:selected"]
+        CH5["tool:changed"]
+    end
+
+    subgraph SUBSCRIBERS["Subscribers"]
+        direction TB
+        S1["sidebar.js<br/>→ ueRenderThumbnails()"]
+        S2["lifecycle.js<br/>→ ueUpdatePageCount()"]
+    end
+
+    E3 & E5 & E9 --> CH1
+    E1 & E7 & E9 --> CH2
+    E2 & E4 --> CH3
+    E6 --> CH4
+    E8 --> CH5
+
+    CH1 --> S1 & S2
+    CH2 --> S1
+
+    style CHANNELS fill:#fef3c7,stroke:#d97706
+    style EMITTERS fill:#e0e7ff,stroke:#4f46e5
+    style SUBSCRIBERS fill:#dfd,stroke:#393
+</pre>
+
+<h2>3. Data Flow: File Drop → Edit → Download</h2>
+<pre class="mermaid">
+graph TB
+    A["User drops PDF"] --> B["init-file-handling.js<br/>dropzone handler"]
+    B --> C["navigation.js<br/>showTool('unified-editor')"]
+    C --> D["lifecycle.js<br/>initUnifiedEditor()"]
+    D --> E["file-loading.js<br/>ueAddFiles()"]
+
+    E --> F["handlePdfFile()"]
+    F --> G["PDF.js getDocument()"]
+    G --> H["createPageInfo() × N<br/>(state.js factory)"]
+    H --> I["Pre-render 300px<br/>thumbCanvas"]
+
+    I --> J["rAF guard"]
+    J --> K["page-rendering.js<br/>ueCreatePageSlots()"]
+    K --> L["IntersectionObserver<br/>(root: null, viewport)"]
+    L --> M["ueRenderPageCanvas()<br/>lazy render visible"]
+
+    M --> N["User edits<br/>(annotations, reorder, rotate)"]
+    N --> O["Click Download PDF"]
+    O --> P{"Modified?"}
+    P -->|No| Q["Download original bytes"]
+    P -->|Yes| R["pdf-export.js<br/>ueBuildFinalPDF()"]
+    R --> S["Embed annotations<br/>(whiteout, text, signatures)"]
+    S --> T["PDFDocument.save()<br/>useObjectStreams: true"]
+    T --> U["downloadBlob()"]
+
+    style A fill:#fecaca,stroke:#dc2626
+    style U fill:#bbf7d0,stroke:#16a34a
+    style H fill:#dfd,stroke:#393
+</pre>
+
+<h2>4. State Architecture</h2>
+<pre class="mermaid">
+graph TB
+    subgraph STATE["js/lib/state.js — SINGLE SOURCE OF TRUTH"]
+        direction TB
+        UE["<b>ueState</b><br/>pages[], sourceFiles[], selectedPage,<br/>currentTool, annotations{}, zoomLevel,<br/>signatureImage, pendingSignature,<br/>undoStack/redoStack, editUndoStack/editRedoStack,<br/>pageObserver, scrollSyncEnabled, isRestoring"]
+
+        PM["<b>uePmState</b><br/>extractMode, selectedPages Set,<br/>draggedIndex, insertMarkerIndex"]
+
+        APP["<b>state</b><br/>currentTool (active tool view name)"]
+
+        GD["<b>getDefaultUeState()</b><br/>Returns all defaults for ueReset()"]
+        CPI["<b>createPageInfo()</b><br/>Page object factory"]
+        AF["<b>Annotation Factories</b><br/>createWhiteout/Text/Signature/<br/>Watermark/PageNumber Annotation()"]
+        IR["<b>imageRegistry</b><br/>registerImage / getRegisteredImage"]
+    end
+
+    GD -->|"Object.assign"| UE
+    CPI -->|"creates"| UE
+    AF -->|"populates"| UE
+
+    style STATE fill:#dfd,stroke:#393,stroke-width:2px
+</pre>
+
+<h2>5. Editor UI Layout (Desktop)</h2>
+<pre class="mermaid">
+graph TB
+    subgraph LAYOUT["Editor Layout (body.editor-active)"]
+        direction TB
+        HEADER["<b>Editor Header</b> (40px, sticky top:0, z-chrome)<br/>[File v] PDFLokal [moon] [Download PDF]"]
+        TOOLBAR["<b>Floating Toolbar</b> (sticky top:40px, z-toolbar)<br/>[Sign | Text | Whiteout | Pilih | Rotate | More v]<br/>Frosted glass background"]
+
+        subgraph BODY["Body (scroll)"]
+            direction LR
+            SIDEBAR["<b>Sidebar</b><br/>160px sticky<br/>Kelola Halaman btn<br/>Thumbnails<br/>(drag-drop)"]
+            PAGES["<b>Pages Container</b><br/>#ue-pages-container<br/>Multi-canvas vertical scroll<br/>IntersectionObserver lazy render<br/>scroll-snap: y proximity"]
+        end
+
+        BOTTOM["<b>Bottom Bar</b> (30px, fixed bottom, z-chrome)<br/>Dukung Kami ... [- Zoom +] Hal 2/5 [?]"]
+    end
+
+    style HEADER fill:#e0e7ff,stroke:#4f46e5
+    style TOOLBAR fill:#fef3c7,stroke:#d97706
+    style SIDEBAR fill:#f0fdf4,stroke:#16a34a
+    style PAGES fill:#fff,stroke:#666
+    style BOTTOM fill:#e0e7ff,stroke:#4f46e5
+</pre>
+
+<h2>6. Undo/Redo System (Dual Stacks)</h2>
+<pre class="mermaid">
+graph LR
+    subgraph PAGEOPS["Page Operations Stack"]
+        PO1["Rotate"] & PO2["Reorder"] & PO3["Delete"] & PO4["Add Files"]
+        PO1 & PO2 & PO3 & PO4 --> US1["ueSaveUndoState()<br/>snapshot pages[]"]
+        US1 --> UNDO1["Ctrl+Z → ueUndo()<br/>ueRestorePages()"]
+        UNDO1 --> REDO1["Ctrl+Y → ueRedo()"]
+    end
+
+    subgraph ANNOOPS["Annotation Edits Stack"]
+        AO1["Add Whiteout"] & AO2["Add Text"] & AO3["Place Sig"] & AO4["Drag/Resize"]
+        AO1 & AO2 & AO3 & AO4 --> US2["ueSaveEditUndoState()<br/>cloneAnnotations()"]
+        US2 --> UNDO2["Ctrl+Z → ueUndoAnnotation()"]
+        UNDO2 --> REDO2["Ctrl+Y → ueRedoAnnotation()"]
+    end
+
+    NOTE["cloneAnnotations() strips cachedImg,<br/>stores imageId ref from imageRegistry"] -.-> US2
+
+    style PAGEOPS fill:#e0e7ff,stroke:#4f46e5
+    style ANNOOPS fill:#fef3c7,stroke:#d97706
+</pre>
+
+<h2>7. Module File Map</h2>
+
+<h3>Foundation (js/lib/)</h3>
+<table>
+<tr><th>File</th><th>Purpose</th><th>Key Exports</th></tr>
+<tr><td><code>state.js</code></td><td>All state objects, factories, constants</td><td>ueState, createPageInfo, getDefaultUeState, annotation factories, imageRegistry, CSS_FONT_MAP</td></tr>
+<tr><td><code>utils.js</code></td><td>Shared utilities</td><td>showToast, downloadBlob, isPDF, isImage, loadPdfDocument, makeWhiteTransparent, setupCanvasDPR, trapFocus</td></tr>
+<tr><td><code>navigation.js</code></td><td>View/modal management + history</td><td>showHome, showTool, openModal, closeModal, closeAllModals</td></tr>
+<tr><td><code>events.js</code></td><td>Pub/sub event emitter</td><td>on, off, emit</td></tr>
+<tr><td><code>analytics.js</code></td><td>Anonymous usage tracking</td><td>track</td></tr>
+</table>
+
+<h3>Editor (js/editor/)</h3>
+<table>
+<tr><th>File</th><th>Purpose</th></tr>
+<tr><td><code>index.js</code></td><td>Barrel re-exports + window.* bridges</td></tr>
+<tr><td><code>lifecycle.js</code></td><td>initUnifiedEditor, ueReset, signature hints</td></tr>
+<tr><td><code>file-loading.js</code></td><td>ueAddFiles, handlePdfFile, handleImageFile</td></tr>
+<tr><td><code>page-rendering.js</code></td><td>ueCreatePageSlots, IntersectionObserver, lazy render, scroll sync</td></tr>
+<tr><td><code>canvas-utils.js</code></td><td>ueGetCurrentCanvas, ueGetCoords, getThumbnailSource, drawRotatedThumbnail</td></tr>
+<tr><td><code>canvas-events.js</code></td><td>Mouse/touch event delegation on #ue-pages-container</td></tr>
+<tr><td><code>inline-editor.js</code></td><td>Double-click inline text editing overlay</td></tr>
+<tr><td><code>annotations.js</code></td><td>ueRedrawAnnotations, draw helpers, hit testing, ueAddAnnotation, ueRemoveAnnotation</td></tr>
+<tr><td><code>undo-redo.js</code></td><td>Dual undo stacks (page ops + annotation edits)</td></tr>
+<tr><td><code>sidebar.js</code></td><td>Thumbnails, drag-drop reorder, file menu toggle</td></tr>
+<tr><td><code>signatures.js</code></td><td>Signature placement, confirm, delete, apply-to-all-pages</td></tr>
+<tr><td><code>tools.js</code></td><td>ueSetTool, modal openers, More dropdown, editor go-home</td></tr>
+<tr><td><code>zoom-rotate.js</code></td><td>Zoom in/out/reset, rotate page</td></tr>
+<tr><td><code>page-manager.js</code></td><td>Gabungkan modal (merge/split/reorder/delete), rebuildAnnotationMapping</td></tr>
+<tr><td><code>pdf-export.js</code></td><td>ueBuildFinalPDF, ueDownload, font embedding, annotation embedding</td></tr>
+</table>
+
+<h3>PDF Tools (js/pdf-tools/)</h3>
+<table>
+<tr><th>File</th><th>Purpose</th></tr>
+<tr><td><code>index.js</code></td><td>Barrel re-exports + window bridges</td></tr>
+<tr><td><code>signature-modal.js</code></td><td>Signature draw/upload tabs, paraf (initials) modal</td></tr>
+<tr><td><code>text-modal.js</code></td><td>Text annotation modal (font, size, color, bold/italic, preview)</td></tr>
+<tr><td><code>watermark-modal.js</code></td><td>Watermark annotation modal</td></tr>
+<tr><td><code>pagenum-modal.js</code></td><td>Page number annotation modal</td></tr>
+<tr><td><code>standalone-tools.js</code></td><td>PDF-to-Image, Compress PDF, Protect PDF (non-editor tools)</td></tr>
+<tr><td><code>drag-reorder.js</code></td><td>Drag-drop reorder utility for modal grids</td></tr>
+</table>
+
+<h3>Top-Level Modules</h3>
+<table>
+<tr><th>File</th><th>Purpose</th></tr>
+<tr><td><code>init.js</code></td><td>Entry point: compat check, mobile detection, bootstrap all modules</td></tr>
+<tr><td><code>init-file-handling.js</code></td><td>Dropzone, file inputs, paste handler, setupFileInput factory</td></tr>
+<tr><td><code>init-ui.js</code></td><td>Tool cards, signature pads, modal backdrop close</td></tr>
+<tr><td><code>keyboard.js</code></td><td>Keyboard shortcuts + shortcuts help modal</td></tr>
+<tr><td><code>theme.js</code></td><td>Dark/light mode toggle</td></tr>
+<tr><td><code>changelog.js</code></td><td>Changelog notification badge system</td></tr>
+<tr><td><code>mobile-ui.js</code></td><td>Mobile nav, page picker, tools dropdown</td></tr>
+<tr><td><code>image-tools.js</code></td><td>Image compress, resize, convert format, remove background</td></tr>
+<tr><td><code>img-to-pdf.js</code></td><td>Images-to-PDF tool (add, reorder, generate)</td></tr>
+</table>
+
+<h2>8. Vendor Libraries &amp; Loading Order</h2>
+<pre class="mermaid">
+graph LR
+    subgraph VENDOR["&lt;script&gt; tags (loaded first, globals)"]
+        direction TB
+        V1["pdf-lib.min.js (513KB)<br/>→ window.PDFLib"]
+        V2["fontkit.umd.min.js (741KB)<br/>→ window.fontkit"]
+        V3["pdf.worker.min.js (1.1MB)<br/>→ Worker thread"]
+        V4["pdf.min.js (313KB)<br/>→ window.pdfjsLib"]
+        V5["signature_pad.umd.min.js (12KB)<br/>→ window.SignaturePad"]
+        V6["pdf-encrypt-lite.min.js (12KB)<br/>→ uses window.PDFLib"]
+    end
+
+    subgraph MODULES["&lt;script type=module&gt; (loaded after)"]
+        M1["js/init.js<br/>imports everything"]
+    end
+
+    V1 --> V2 --> V3 --> V4 --> V5
+    V5 --> M1
+    V6 -.->|"inline module import"| M1
+
+    style VENDOR fill:#fef3c7,stroke:#d97706
+    style MODULES fill:#e0e7ff,stroke:#4f46e5
+</pre>
+
+<h2>9. CSS Architecture</h2>
+<pre class="mermaid">
+graph TB
+    subgraph CSS["style.css"]
+        direction TB
+        Z["<b>Z-Index Scale (CSS vars)</b><br/>--z-internal: 1<br/>--z-canvas-ui: 20<br/>--z-toolbar: 90<br/>--z-chrome: 100<br/>--z-dropdown: 150<br/>--z-picker: 200<br/>--z-modal: 1000<br/>--z-changelog: 9998<br/>--z-loading: 10000"]
+
+        BP["<b>Breakpoint</b><br/>Single: max-width: 900px"]
+
+        THEME["<b>Theme</b><br/>CSS custom properties<br/>Toggled by body.dark-mode"]
+
+        MODAL["<b>Modal Pattern</b><br/>visibility: hidden + opacity: 0<br/>.active → visible + opacity: 1"]
+    end
+
+    style CSS fill:#f1f5f9,stroke:#64748b
+</pre>
+
+<h2>10. Circular Dependencies (resolved via window.*)</h2>
+<table>
+<tr><th>Module A</th><th>Module B</th><th>Resolution</th></tr>
+<tr><td>sidebar.js</td><td>page-rendering.js</td><td>sidebar uses <code>window.ueSelectPage()</code></td></tr>
+<tr><td>signatures.js</td><td>tools.js</td><td>signatures uses <code>window.ueSetTool()</code></td></tr>
+<tr><td>page-rendering.js</td><td>canvas-events.js</td><td>page-rendering uses <code>window.ueSetupCanvasEvents()</code></td></tr>
+<tr><td>page-rendering.js</td><td>undo-redo.js</td><td>page-rendering uses <code>window.ueSaveUndoState()</code></td></tr>
+</table>
+
+<h2>11. Race Condition Guards</h2>
+<table>
+<tr><th>Guard</th><th>Location</th><th>Protects Against</th></tr>
+<tr><td><code>isLoadingFiles</code></td><td>file-loading.js</td><td>Duplicate pages from double-drop</td></tr>
+<tr><td><code>isDownloading</code></td><td>pdf-export.js</td><td>Concurrent PDF builds</td></tr>
+<tr><td><code>isRestoring</code></td><td>ueState</td><td>Observer triggers during undo page rebuild</td></tr>
+<tr><td><code>ueRenderingPages</code> Set</td><td>page-rendering.js</td><td>Canvas corruption from parallel renders</td></tr>
+<tr><td><code>scrollSyncEnabled</code></td><td>page-rendering.js</td><td>Infinite scroll sync loops from scrollIntoView</td></tr>
+<tr><td><code>saved</code> closure</td><td>inline-editor.js</td><td>Double text save from blur + enter</td></tr>
+<tr><td><code>isGenerating</code></td><td>img-to-pdf.js</td><td>Concurrent image-to-PDF generation</td></tr>
+<tr><td><code>isProcessingDrop</code></td><td>init-file-handling.js</td><td>Duplicate file processing from rapid drops</td></tr>
+</table>
+
+<script>mermaid.initialize({ startOnLoad: true, theme: 'default', flowchart: { useMaxWidth: true, htmlLabels: true } });</script>
+</body>
+</html>

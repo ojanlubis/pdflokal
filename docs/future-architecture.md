@@ -5,75 +5,37 @@
 
 ---
 
-## 1. Reactive State Layer (Priority: High)
+## 1. Reactive State Layer — COMPLETED (Mar 2026)
 
-### The Problem
+### Implementation
 
-`ueState` is the SSOT for data, but rendering is manual. After any state mutation,
-code must manually call the right update functions:
-
-```js
-// Current — manual, error-prone
-ueState.pages.splice(index, 1)
-ueRedrawAnnotations()    // forget this → canvas wrong
-ueRenderThumbnails()     // forget this → sidebar wrong
-updateModal()            // forget this → modal wrong
-```
-
-Missing even one call causes the canvas, sidebar thumbnails, and Gabungkan modal
-to desync. This is the root cause of "manage page modal not wiring correctly"
-reported in first-hand testing.
-
-### The Idea
-
-Add a tiny pub/sub layer (~15 lines) to `js/lib/state.js`. Nothing subscribes
-automatically — each module declares what it cares about.
+Implemented as `js/lib/events.js` — a ~37 line synchronous event emitter (Fabric.js pattern).
 
 ```js
-// js/lib/state.js addition
-const subscribers = {}
+// js/lib/events.js — SINGLE SOURCE OF TRUTH
+import { on, off, emit } from '../lib/events.js';
 
-export function subscribe(key, fn) {
-  if (!subscribers[key]) subscribers[key] = []
-  subscribers[key].push(fn)
-}
-
-export function notify(key) {
-  (subscribers[key] || []).forEach(fn => fn())
-}
+on('pages:changed', (detail) => { /* react */ });   // returns unsubscribe fn
+emit('pages:changed', { source: 'user' });
 ```
 
-Each module subscribes once at init:
-```js
-// sidebar.js
-subscribe('pages', ueRenderThumbnails)
+### Event Channels
 
-// page-rendering.js
-subscribe('pages', ueRedrawAnnotations)
+| Event | Fires when | Detail |
+|-------|-----------|--------|
+| `pages:changed` | Pages added/removed/reordered/restored | `{ source: 'user' \| 'restore' }` |
+| `annotations:changed` | Annotation structurally added/removed | `{ pageIndex }` or `{ source: 'restore' }` |
+| `annotations:modified` | Gesture complete (mouseup/edit save) | `{ pageIndex }` |
+| `page:selected` | Current page changes | `{ index }` |
+| `tool:changed` | Active tool switches | `{ tool }` |
 
-// page-manager.js
-subscribe('pages', updateModal)
-```
+### Design Decisions
 
-State mutation becomes:
-```js
-ueState.pages.splice(index, 1)
-notify('pages')  // everything syncs automatically
-```
-
-### Why This Fits pdflokal
-
-- Pure vanilla JS — no library, no framework, no build step
-- ~15 lines total, lives entirely in state.js
-- Doesn't change existing ueState shape
-- This IS the core idea behind React, Vue, MobX — stripped to its essence
-- Future Claude: search for `subscribe(` and `notify(` to find all wired dependencies
-
-### Before Implementing
-
-- Audit every place ueState.pages / ueState.annotations is mutated
-- Map which update functions each mutation currently calls manually
-- That map becomes the subscription wiring
+- **Synchronous, no batching** — same as Fabric.js. Hot-path rendering (drag/resize at 60fps) uses direct `ueRedrawAnnotations()`, NOT events
+- **Source tagging** — `{ source: 'restore' }` lets subscribers skip redundant work during undo/redo
+- **Additive migration** — events supplement direct calls. If a subscriber is missed, app still works
+- **12 emitter files**, 2 subscriber files (sidebar.js, lifecycle.js) as of Mar 2026
+- Search for `emit(` and `on(` to find all wired dependencies
 
 ---
 
@@ -134,6 +96,7 @@ that on main.
 
 1. Read `CLAUDE.md` first (always)
 2. Read `docs/architecture.md` for SSOT patterns
-3. Read `docs/patterns.md` for code conventions
-4. Read this file for planned improvements
+3. Read `docs/patterns.md` for code conventions (includes event emitter pattern)
+4. Read this file for planned improvements (Section 1 is done, Section 2 is future)
 5. Read `js/lib/state.js` to understand current state shape before touching anything
+6. Read `js/lib/events.js` for the event emitter channels

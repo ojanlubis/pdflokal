@@ -1,6 +1,6 @@
 # PDFLokal System Flow — Every User Action in Detail
 
-> Generated 2026-02-20. Covers every user-facing action from homepage to download.
+> Generated 2026-02-20, updated 2026-03-16. Covers every user-facing action from homepage to download.
 
 ---
 
@@ -71,7 +71,7 @@ sequenceDiagram
             FL->>FL: pdfjsLib.getDocument(bytes)
             loop Each page
                 FL->>FL: page.getViewport(scale: 0.5)
-                FL->>FL: Pre-render 150px thumbCanvas
+                FL->>FL: Pre-render 300px thumbCanvas
                 FL->>State: createPageInfo({pageNum, sourceIndex, canvas:{w,h}, thumbCanvas})
                 FL->>State: annotations[pageIndex] = []
             end

@@ -24,11 +24,11 @@ Detailed security configuration and library documentation. See [CLAUDE.md](../CL
 
 ```
 default-src 'self';
-script-src 'self' 'unsafe-inline' 'unsafe-eval' https://esm.sh blob:;
+script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com blob:;
 style-src 'self' 'unsafe-inline';
-img-src 'self' data: blob:;
+img-src 'self' data: blob: https://www.google.com https://www.googleadservices.com https://googleads.g.doubleclick.net;
 font-src 'self';
-connect-src 'self' https://esm.sh;
+connect-src 'self' https://www.google-analytics.com https://analytics.google.com https://www.googletagmanager.com https://www.google.com;
 frame-ancestors 'none';
 base-uri 'self';
 form-action 'self';
@@ -40,6 +40,8 @@ object-src 'none'
 - `'unsafe-eval'`: Required by PDF.js and fontkit libraries for dynamic code execution
 - `'unsafe-inline'` for styles: Inline styles in HTML and dynamic style manipulation
 - Nonces would require server-side rendering or build step (against project philosophy)
+
+**Why Google domains:** Vercel Web Analytics + Google Analytics (GA4) for anonymous usage tracking. No personal data collected — only tool names, action types, and per-session IDs. See `js/lib/analytics.js`.
 
 **If adding new features that require external resources:**
 1. Test on Vercel preview first
@@ -67,7 +69,7 @@ Core libraries are self-hosted in `/js/vendor/` for offline support, firewall co
 | **PDF.js** | 3.11.174 | 313 KB | PDF rendering and thumbnails |
 | **PDF.js Worker** | 3.11.174 | 1.1 MB | PDF processing (loaded before pdf.min.js for offline fake worker) |
 | **Signature Pad** | 4.1.7 | 12 KB | Digital signature capture |
-| **pdf-encrypt-lite** | 1.0.1 | ~12 KB | PDF password encryption (CDN: esm.sh, requires internet) |
+| **pdf-encrypt-lite** | 1.0.1 | ~12 KB | PDF password encryption (self-hosted, patched to use `window.PDFLib`) |
 
 **Library Loading Order** (in index.html):
 ```html
@@ -81,7 +83,7 @@ Core libraries are self-hosted in `/js/vendor/` for offline support, firewall co
 
 **Note:** `workerSrc` points to the self-hosted worker file for real Web Worker support. PDF.js falls back to a fake (main-thread) worker if the file is unavailable offline.
 
-**Why pdf-encrypt-lite stays on CDN:** ES module with complex dependency tree; only used for "Protect PDF" (optional); bundling would require build tooling.
+**pdf-encrypt-lite is self-hosted** as of Mar 2026: patched to use `window.PDFLib` instead of ESM imports. Imported as ES module from `./js/vendor/pdf-encrypt-lite.min.js` via inline `<script type="module">` in index.html.
 
 ## Self-Hosted Fonts (268KB total, Latin charset)
 
