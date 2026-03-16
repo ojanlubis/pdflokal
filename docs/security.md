@@ -24,9 +24,9 @@ Detailed security configuration and library documentation. See [CLAUDE.md](../CL
 
 ```
 default-src 'self';
-script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com blob:;
+script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://googleads.g.doubleclick.net blob:;
 style-src 'self' 'unsafe-inline';
-img-src 'self' data: blob: https://www.google.com https://www.googleadservices.com https://googleads.g.doubleclick.net;
+img-src 'self' data: blob: https://www.google.com https://www.google.co.id https://www.googleadservices.com https://googleads.g.doubleclick.net;
 font-src 'self';
 connect-src 'self' https://www.google-analytics.com https://analytics.google.com https://www.googletagmanager.com https://www.google.com;
 frame-ancestors 'none';
