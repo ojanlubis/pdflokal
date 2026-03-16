@@ -276,18 +276,27 @@ export async function ueRenderPageCanvas(index) {
 
     // WHY: Mobile browsers silently purge offscreen canvas backing stores under
     // GPU memory pressure (iOS Safari 384MB limit, Android Chrome similar).
-    // When user scrolls back, canvas is blank white until re-rendered (500ms-1s).
-    // Fix: snapshot rendered content as background-image on the canvas element.
-    // If browser purges canvas content, the CSS background shows through.
-    // Uses toBlob + createObjectURL (not toDataURL) for lower memory overhead.
+    // When user scrolls back, canvas is blank (transparent) until re-rendered.
+    // Fix: create an <img> sibling behind the canvas (z-index 0 vs canvas z-index 1).
+    // Canvas has transparent background, so purged canvas shows img through.
+    // <img> elements don't get GPU-purged — browser can re-decode from blob.
+    // This is how Google Drive PDF viewer works: images for display, canvas for interaction.
     try {
       canvas.toBlob((blob) => {
         if (!blob) return;
         // Revoke previous snapshot URL to prevent memory leak
         if (entry._snapshotUrl) URL.revokeObjectURL(entry._snapshotUrl);
         entry._snapshotUrl = URL.createObjectURL(blob);
-        canvas.style.backgroundImage = `url(${entry._snapshotUrl})`;
-        canvas.style.backgroundSize = '100% 100%';
+
+        // Create or reuse the snapshot <img> behind the canvas
+        let img = entry.slot.querySelector('.ue-page-snapshot');
+        if (!img) {
+          img = document.createElement('img');
+          img.className = 'ue-page-snapshot';
+          img.setAttribute('aria-hidden', 'true');
+          entry.slot.insertBefore(img, canvas);
+        }
+        img.src = entry._snapshotUrl;
       });
     } catch (_e) { /* toBlob can fail on tainted canvases — ignore */ }
 

@@ -2603,13 +2603,29 @@ a:hover {
 
 .ue-page-slot canvas {
   display: block;
-  background: #ffffff;
+  /* WHY: transparent (not white) so the .ue-page-snapshot img behind it shows
+     through if the browser purges canvas backing store under GPU memory pressure.
+     White background would hide the fallback image. */
+  background: transparent;
   box-shadow: var(--shadow-lg);
-  /* WHY: Promote each canvas to its own GPU compositing layer.
-     Prevents browser from repainting canvas content during overscroll
-     bounce / rubber-banding on mobile. Without this, the compositor
-     may clear and redraw canvases when the viewport stretches. */
+  position: relative;
+  z-index: 1;
   will-change: transform;
+}
+
+/* WHY: Fallback image behind each canvas. Created by JS after page render.
+   Mobile browsers silently purge offscreen canvas GPU backing stores.
+   <img> elements don't get purged — browser can re-decode from blob source.
+   When canvas is purged (becomes transparent), this img shows through. */
+.ue-page-snapshot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  background: #ffffff;
+  display: block;
 }
 
 /* WHY: Only show selected border on desktop where sidebar needs visual pairing.
