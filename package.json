@@ -9,7 +9,9 @@
   "scripts": {
     "lint": "eslint js/",
     "lint:fix": "eslint js/ --fix",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui"
   },
   "repository": {
     "type": "git",
@@ -25,6 +27,8 @@
   "homepage": "https://github.com/ojanlubis/pdflokal#readme",
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "eslint": "^10.0.3"
+    "@playwright/test": "^1.60.0",
+    "eslint": "^10.0.3",
+    "serve": "^14.2.6"
   }
 }

@@ -22,6 +22,8 @@ test*.png
 *.screenshot.png
 responsive-*.png
 screenshots/
+playwright-report/
+test-results/
 
 # Temp files
 *.tmp

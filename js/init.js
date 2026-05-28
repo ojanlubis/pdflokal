@@ -10,6 +10,12 @@
 import { mobileState, deviceCapability } from './lib/state.js';
 import { showToast } from './lib/utils.js';
 import { initNavigationHistory } from './lib/navigation.js';
+import { installErrorCapture } from './lib/errors.js';
+
+// WHY: Install before anything else runs so we catch errors thrown during
+// dynamic module import and downstream init. track() no-ops when va() is
+// absent (local dev), so this is safe to call unconditionally.
+installErrorCapture();
 
 // Feature modules (side-effect imports — set up window bridges on load)
 import './theme.js';
