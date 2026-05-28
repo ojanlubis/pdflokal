@@ -4,7 +4,6 @@
  */
 
 import { ueState, buildCanvasFont } from '../lib/state.js';
-import { emit } from '../lib/events.js';
 import { getTextBounds } from './canvas-utils.js';
 
 // Redraw annotations on all rendered pages
@@ -126,7 +125,6 @@ export function ueDrawSelectionHandles(ctx, x, y, width, height) {
 export function ueAddAnnotation(pageIndex, anno) {
   if (!ueState.annotations[pageIndex]) ueState.annotations[pageIndex] = [];
   ueState.annotations[pageIndex].push(anno);
-  emit('annotations:changed', { pageIndex });
   return ueState.annotations[pageIndex].length - 1;
 }
 
@@ -136,7 +134,6 @@ export function ueAddAnnotation(pageIndex, anno) {
 export function ueRemoveAnnotation(pageIndex, annoIndex) {
   if (!ueState.annotations[pageIndex]) return;
   ueState.annotations[pageIndex].splice(annoIndex, 1);
-  emit('annotations:changed', { pageIndex });
   if (ueState.selectedAnnotation &&
       ueState.selectedAnnotation.pageIndex === pageIndex &&
       ueState.selectedAnnotation.index === annoIndex) {

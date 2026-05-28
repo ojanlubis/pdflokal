@@ -168,7 +168,6 @@ class PageRenderer {
     window.ueHideConfirmButton();
 
     ueState.selectedPage = index;
-    emit('page:selected', { index });
 
     // Show pages container, hide empty state
     document.getElementById('ue-empty-state').style.display = 'none';
@@ -414,7 +413,6 @@ class PageRenderer {
           // selectPage() calls scrollIntoView() which fights user scroll,
           // causing auto-jump to top/bottom on mobile momentum scroll.
           ueState.selectedPage = closestIndex;
-          emit('page:selected', { index: closestIndex });
           this.highlightThumbnail(closestIndex);
 
           // mobile-ui.js window global — see comment in selectPage above

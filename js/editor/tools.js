@@ -4,7 +4,6 @@
  */
 
 import { ueState, createTextAnnotation } from '../lib/state.js';
-import { emit } from '../lib/events.js';
 import { showToast, downloadBlob, getDownloadFilename } from '../lib/utils.js';
 import { openModal, closeModal, showHome } from '../lib/navigation.js';
 import { ueHideConfirmButton } from './signatures.js';
@@ -16,7 +15,6 @@ import { ueUpdateStatus } from './page-rendering.js';
 // Tool selection
 export function ueSetTool(tool) {
   ueState.currentTool = tool;
-  emit('tool:changed', { tool });
 
   if (tool !== 'select') {
     ueState.selectedAnnotation = null;

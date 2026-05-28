@@ -103,7 +103,6 @@ export function ueUndo() {
     ueState.annotations = restoreAnnotations(entry.annotations);
     ueState.selectedAnnotation = null;
     ueRedrawAnnotations();
-    emit('annotations:changed', { source: 'restore' });
     showToast('Undo edit', 'info');
   }
 }
@@ -122,7 +121,6 @@ export function ueRedo() {
     ueState.annotations = restoreAnnotations(entry.annotations);
     ueState.selectedAnnotation = null;
     ueRedrawAnnotations();
-    emit('annotations:changed', { source: 'restore' });
     showToast('Redo edit', 'info');
   }
 }

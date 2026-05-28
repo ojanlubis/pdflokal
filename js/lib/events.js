@@ -8,14 +8,16 @@
  * ueRenderThumbnails() or ueUpdatePageCount() after modifying pages.
  *
  * Events:
- *   pages:changed        — pages added/removed/reordered/restored
- *   annotations:changed  — annotation structurally added or removed
- *   annotations:modified — gesture complete (mouseup after drag/resize/edit)
- *   page:selected        — current page changed
- *   tool:changed         — active tool switched
+ *   pages:changed — pages added/removed/reordered/restored
+ *     Subscribers: sidebar (thumbnails), lifecycle (page count)
+ *     Detail: { source: 'user' | 'restore' }
  *
- * Detail objects include { source: 'user' | 'restore' } where applicable,
- * so subscribers can skip redundant work during undo/redo restores.
+ * NOTE: Earlier iterations defined annotations:changed, annotations:modified,
+ * page:selected, and tool:changed channels, but none ever gained a subscriber
+ * — direct calls (ueRedrawAnnotations etc.) were used instead. Those emits
+ * were removed in May 2026. Re-introduce a channel only when a second
+ * independent consumer of the same signal exists; otherwise prefer the
+ * direct call to keep the data flow obvious.
  */
 
 const listeners = {};

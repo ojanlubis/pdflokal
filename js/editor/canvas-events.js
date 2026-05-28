@@ -4,7 +4,6 @@
  */
 
 import { ueState, state, DOUBLE_TAP_DELAY, DOUBLE_TAP_DISTANCE, createWhiteoutAnnotation } from '../lib/state.js';
-import { emit } from '../lib/events.js';
 import { showToast } from '../lib/utils.js';
 import { ueGetCoords, ueGetResizeHandle, getTextBounds } from './canvas-utils.js';
 import { ueRedrawAnnotations, ueFindAnnotationAt, ueAddAnnotation } from './annotations.js';
@@ -383,10 +382,9 @@ export function ueSetupCanvasEvents() {
 
   // WHY: Resize and drag share the same commit-and-cleanup pattern.
   // Extracted to reduce cognitive complexity in handleUp.
-  function commitGesture(pageIndex, canvas) {
+  function commitGesture(canvas) {
     if (hasMovedOrResized && preChangeState) {
       uePushAnnotationSnapshot(preChangeState);
-      emit('annotations:modified', { pageIndex });
     }
     hasMovedOrResized = false;
     preChangeState = null;
@@ -395,7 +393,7 @@ export function ueSetupCanvasEvents() {
 
   function handleUp({ canvas, pageIndex, x, y }) {
     if (ueState.isResizing) {
-      commitGesture(pageIndex, canvas);
+      commitGesture(canvas);
       ueState.isResizing = false;
       ueState.resizeHandle = null;
       ueState.resizeStartInfo = null;
@@ -403,7 +401,7 @@ export function ueSetupCanvasEvents() {
     }
 
     if (ueState.isDragging) {
-      commitGesture(pageIndex, canvas);
+      commitGesture(canvas);
       ueState.isDragging = false;
       return;
     }
@@ -452,6 +450,6 @@ export function ueSetupCanvasEvents() {
 
     // Edit text annotation
     if (!anno || anno.type !== 'text' || anno.locked) return;
-    ueCreateInlineTextEditor(anno, result.pageIndex);
+    ueCreateInlineTextEditor(anno);
   }
 }
