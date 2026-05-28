@@ -13,7 +13,9 @@ jobs:
       runnable: ${{ steps.filter.outputs.runnable }}
     steps:
       - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
+      # Pinned to commit SHA per GitHub Actions supply-chain guidance.
+      # SHA = dorny/paths-filter v3.0.2 release. Bump explicitly when needed.
+      - uses: dorny/paths-filter@6852f92c20ea7fd3b0c25de3b5112db3a98da050 # v3
         id: filter
         with:
           filters: |

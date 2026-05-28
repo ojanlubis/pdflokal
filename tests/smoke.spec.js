@@ -150,22 +150,25 @@ test.describe('smoke', () => {
   });
 });
 
+// WHY: Shared by both inline-editor tests — opens the editor on annotation 0,
+// replaces the existing text, then exits via the given key (Enter or Escape).
+async function reopenAnnotationAndType(page, replacement, exitKey) {
+  await page.keyboard.press('v');
+  await dispatchDoubleClickOnAnnotation(page, 0, 0);
+  await page.waitForSelector('#inline-text-editor', { state: 'visible' });
+  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.type(replacement);
+  await page.keyboard.press(exitKey);
+  await page.waitForSelector('#inline-text-editor', { state: 'detached' });
+}
+
 test.describe('inline text editor', () => {
   test('regression #1: Escape cancels edit without kicking user home', async ({ page }) => {
     await page.goto('/');
     await loadSamplePdf(page);
     await addTextAnnotation(page, 0, { x: 100, y: 100, text: 'original' });
+    await reopenAnnotationAndType(page, 'changed', 'Escape');
 
-    // Switch to select tool, then double-click the annotation
-    await page.keyboard.press('v');
-    await dispatchDoubleClickOnAnnotation(page, 0, 0);
-    await page.waitForSelector('#inline-text-editor', { state: 'visible' });
-
-    await page.keyboard.press('ControlOrMeta+a');
-    await page.keyboard.type('changed');
-    await page.keyboard.press('Escape');
-
-    await page.waitForSelector('#inline-text-editor', { state: 'detached' });
     // Bug #1 invariant: user stays in editor — NOT kicked back to homepage
     await expect(page.locator('body')).toHaveClass(/editor-active/);
     // Bug #1 invariant: text was NOT mutated
@@ -177,15 +180,7 @@ test.describe('inline text editor', () => {
     await page.goto('/');
     await loadSamplePdf(page);
     await addTextAnnotation(page, 0, { x: 100, y: 100, text: 'before' });
-
-    await page.keyboard.press('v');
-    await dispatchDoubleClickOnAnnotation(page, 0, 0);
-    await page.waitForSelector('#inline-text-editor', { state: 'visible' });
-
-    await page.keyboard.press('ControlOrMeta+a');
-    await page.keyboard.type('after');
-    await page.keyboard.press('Enter');
-    await page.waitForSelector('#inline-text-editor', { state: 'detached' });
+    await reopenAnnotationAndType(page, 'after', 'Enter');
 
     const text = await page.evaluate(() => window.ueState.annotations[0][0].text);
     expect(text).toBe('after');
