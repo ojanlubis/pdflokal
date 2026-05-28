@@ -56,7 +56,11 @@ const navigationHandlers = {
   '0': { handler: () => window.ueZoomReset(), preventDefault: true },
 };
 
-function handleEscapeKey() {
+function handleEscapeKey(isTyping) {
+  // WHY: When typing in an input/textarea/contentEditable (e.g. inline text editor,
+  // signature name field), Escape is the local widget's own cancel gesture — must not
+  // bubble up to "navigate home" or close the surrounding workspace.
+  if (isTyping) return;
   const shortcutsModal = document.getElementById('shortcuts-modal');
   if (shortcutsModal?.classList.contains('active')) {
     closeShortcutsModal();
@@ -72,7 +76,7 @@ export function setupKeyboardShortcuts() {
     const isTyping = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable);
     const inEditor = state.currentTool === 'unified-editor';
 
-    if (e.key === 'Escape') { handleEscapeKey(); return; }
+    if (e.key === 'Escape') { handleEscapeKey(isTyping); return; }
 
     // Modifier combos (Ctrl/Cmd + key)
     if ((e.ctrlKey || e.metaKey) && inEditor && modifierHandlers[key]) {

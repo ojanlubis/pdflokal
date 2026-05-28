@@ -108,7 +108,11 @@ async function embedCustomFont(newDoc, fontCache, fontName, bold) {
     if (!fontCache[fallbackName]) {
       fontCache[fallbackName] = await newDoc.embedFont(PDFLib.StandardFonts[fallbackName]);
     }
-    return fontCache[fallbackName];
+    // WHY: Also cache under the requested fontName so future getFont(fontName) calls hit
+    // the cache. Without this, every annotation requesting a failed custom font re-enters
+    // embedCustomFont and re-waits the full 10s AbortController timeout (×N annotations).
+    fontCache[fontName] = fontCache[fallbackName];
+    return fontCache[fontName];
   }
 }
 

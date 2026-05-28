@@ -76,6 +76,10 @@ export function ueCreateInlineTextEditor(anno, pageIndex) {
   };
 
   const cancelEdit = () => {
+    // WHY saved=true: removing the editor below triggers blur, which queues saveEdit
+    // via setTimeout(blurDelay). Without this guard, Escape-cancelled edits would still
+    // commit ~100-300ms later and pollute the undo stack.
+    saved = true;
     delete anno._editing;
     ueRedrawAnnotations();
     editor.remove();
@@ -84,9 +88,14 @@ export function ueCreateInlineTextEditor(anno, pageIndex) {
   editor.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
+      e.stopPropagation();
       saveEdit();
     } else if (e.key === 'Escape') {
+      // WHY stopPropagation: the editor removes itself synchronously, so by the bubble
+      // phase activeElement has fallen back to <body>. Without this, the global Escape
+      // handler in keyboard.js sees no contentEditable and navigates the user home.
       e.preventDefault();
+      e.stopPropagation();
       cancelEdit();
     }
   });
