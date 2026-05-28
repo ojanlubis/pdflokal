@@ -48,44 +48,75 @@ function parseHexColor(hex) {
   );
 }
 
-async function embedTextAnnotation(page, anno, scaleX, scaleY, height, getFont) {
+// WHY: Map a point from the rotated canvas frame (top-left origin, Y-down, in scaled
+// rotated-viewport units) to the unrotated PDF frame (bottom-left origin, Y-up).
+// pdf-lib's setRotation() is metadata only — drawing happens in unrotated page space,
+// then the whole page rotates on display. So we pre-transform annotation coords here
+// and pair this with `rotate: PDFLib.degrees(rotation)` on drawText/drawImage so the
+// glyphs/image are oriented correctly after the page is /Rotate'd. wU/hU are the
+// UNROTATED page dims from page.getSize().
+function transformAnnotationCoords(rotation, xV, yV, wU, hU) {
+  switch (rotation) {
+    case 90:  return { x: yV,           y: xV };
+    case 180: return { x: wU - xV,      y: yV };
+    case 270: return { x: wU - yV,      y: hU - xV };
+    default:  return { x: xV,           y: hU - yV };
+  }
+}
+
+async function embedTextAnnotation(page, anno, scaleX, scaleY, ctx, getFont) {
   const textFont = await getFont(anno.fontFamily, anno.bold, anno.italic);
   const lines = anno.text.split('\n');
   const color = parseHexColor(anno.color);
+  const rotation = ctx.rotation;
+  const rotateParam = PDFLib.degrees(rotation);
   for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+    const xV = anno.x * scaleX;
+    const yV = (anno.y + lineIdx * anno.fontSize * 1.2) * scaleY;
+    const { x, y } = transformAnnotationCoords(rotation, xV, yV, ctx.wU, ctx.hU);
     page.drawText(lines[lineIdx], {
-      x: anno.x * scaleX,
-      y: height - (anno.y + lineIdx * anno.fontSize * 1.2) * scaleY,
+      x, y,
       size: anno.fontSize * scaleY,
       font: textFont,
-      color
+      color,
+      rotate: rotateParam,
     });
   }
 }
 
-async function embedSignatureAnnotation(page, anno, scaleX, scaleY, height, newDoc) {
+async function embedSignatureAnnotation(page, anno, scaleX, scaleY, ctx, newDoc) {
   const isJpeg = anno.image.startsWith('data:image/jpeg');
   const signatureImage = isJpeg
     ? await newDoc.embedJpg(anno.image)
     : await newDoc.embedPng(anno.image);
+  // Anchor pdf-lib drawImage at the canvas BOTTOM-LEFT of the image: transformed
+  // through the page rotation, this lands the visible image bottom-left exactly
+  // where the user placed it in the rotated canvas view.
+  const xV = anno.x * scaleX;
+  const yV = (anno.y + anno.height) * scaleY;
+  const { x, y } = transformAnnotationCoords(ctx.rotation, xV, yV, ctx.wU, ctx.hU);
   page.drawImage(signatureImage, {
-    x: anno.x * scaleX,
-    y: height - (anno.y + anno.height) * scaleY,
+    x, y,
     width: anno.width * scaleX,
-    height: anno.height * scaleY
+    height: anno.height * scaleY,
+    rotate: PDFLib.degrees(ctx.rotation),
   });
 }
 
-async function embedWatermarkAnnotation(page, anno, scaleX, scaleY, height, getFont) {
+async function embedWatermarkAnnotation(page, anno, scaleX, scaleY, ctx, getFont) {
   const wmFont = await getFont('Helvetica', false, false);
+  const xV = anno.x * scaleX;
+  const yV = anno.y * scaleY;
+  const { x, y } = transformAnnotationCoords(ctx.rotation, xV, yV, ctx.wU, ctx.hU);
+  // Watermark has its own user-specified tilt; combine with the page rotation
+  // so the visible tilt matches what the user saw in the editor.
   page.drawText(anno.text, {
-    x: anno.x * scaleX,
-    y: height - anno.y * scaleY,
+    x, y,
     size: anno.fontSize * scaleY,
     font: wmFont,
     color: parseHexColor(anno.color),
     opacity: anno.opacity,
-    rotate: PDFLib.degrees(anno.rotation)
+    rotate: PDFLib.degrees(ctx.rotation + (anno.rotation || 0))
   });
 }
 
@@ -138,22 +169,49 @@ function resolvePageScales(i, pageSize) {
   return { pdfW, pdfH, scaleX: pdfW / canvasW, scaleY: pdfH / canvasH };
 }
 
-async function embedAnnotationsOnPage(page, annotations, scaleX, scaleY, pdfH, getFont, newDoc) {
+// Whiteout: pdf-lib drawRectangle is axis-aligned in the unrotated page frame.
+// For 90°/270° page rotations the canvas-horizontal direction maps to PDF-vertical,
+// so width and height swap. The anchor is the corner of the canvas rect that becomes
+// the bottom-left of the unrotated PDF rect after the rotation transform.
+function whiteoutCornerAndDims(rotation, anno, scaleX, scaleY, wU, hU) {
+  const xC = anno.x, yC = anno.y, wC = anno.width, hC = anno.height;
+  // Which canvas corner ends up at PDF (min X, min Y) after the transform —
+  // see transformAnnotationCoords to verify by hand. Width/height in PDF swap
+  // for 90°/270° because canvas-horizontal maps to PDF-vertical and vice versa.
+  switch (rotation) {
+    case 90: {  // canvas TL → PDF bottom-left
+      const { x, y } = transformAnnotationCoords(90, xC * scaleX, yC * scaleY, wU, hU);
+      return { x, y, width: hC * scaleY, height: wC * scaleX };
+    }
+    case 180: {  // canvas TR → PDF bottom-left
+      const { x, y } = transformAnnotationCoords(180, (xC + wC) * scaleX, yC * scaleY, wU, hU);
+      return { x, y, width: wC * scaleX, height: hC * scaleY };
+    }
+    case 270: {  // canvas BR → PDF bottom-left
+      const { x, y } = transformAnnotationCoords(270, (xC + wC) * scaleX, (yC + hC) * scaleY, wU, hU);
+      return { x, y, width: hC * scaleY, height: wC * scaleX };
+    }
+    default: {  // rotation 0: canvas BL → PDF bottom-left
+      const { x, y } = transformAnnotationCoords(0, xC * scaleX, (yC + hC) * scaleY, wU, hU);
+      return { x, y, width: wC * scaleX, height: hC * scaleY };
+    }
+  }
+}
+
+async function embedAnnotationsOnPage(page, annotations, scaleX, scaleY, ctx, getFont, newDoc) {
   for (const anno of annotations) {
     if (anno.type === 'whiteout') {
+      const r = whiteoutCornerAndDims(ctx.rotation, anno, scaleX, scaleY, ctx.wU, ctx.hU);
       page.drawRectangle({
-        x: anno.x * scaleX,
-        y: pdfH - (anno.y + anno.height) * scaleY,
-        width: anno.width * scaleX,
-        height: anno.height * scaleY,
+        x: r.x, y: r.y, width: r.width, height: r.height,
         color: PDFLib.rgb(1, 1, 1)
       });
     } else if (anno.type === 'text') {
-      await embedTextAnnotation(page, anno, scaleX, scaleY, pdfH, getFont);
+      await embedTextAnnotation(page, anno, scaleX, scaleY, ctx, getFont);
     } else if (anno.type === 'signature') {
-      await embedSignatureAnnotation(page, anno, scaleX, scaleY, pdfH, newDoc);
+      await embedSignatureAnnotation(page, anno, scaleX, scaleY, ctx, newDoc);
     } else if (anno.type === 'watermark') {
-      await embedWatermarkAnnotation(page, anno, scaleX, scaleY, pdfH, getFont);
+      await embedWatermarkAnnotation(page, anno, scaleX, scaleY, ctx, getFont);
     }
   }
 }
@@ -188,8 +246,14 @@ export async function ueBuildFinalPDF() {
     if (annotations.length === 0) continue;
 
     const page = newDoc.getPages()[i];
-    const { pdfH, scaleX, scaleY } = resolvePageScales(i, page.getSize());
-    await embedAnnotationsOnPage(page, annotations, scaleX, scaleY, pdfH, getFont, newDoc);
+    const pageSize = page.getSize();
+    const { scaleX, scaleY } = resolvePageScales(i, pageSize);
+    // wU, hU are the UNROTATED page dims (MediaBox). pdf-lib's setRotation is
+    // metadata only — drawing happens in this unrotated frame, then the viewer
+    // applies the rotation. embedAnnotationsOnPage uses these + pageInfo.rotation
+    // to translate annotation coords from the rotated canvas frame.
+    const ctx = { rotation: pageInfo.rotation || 0, wU: pageSize.width, hU: pageSize.height };
+    await embedAnnotationsOnPage(page, annotations, scaleX, scaleY, ctx, getFont, newDoc);
   }
 
   return await newDoc.save({
