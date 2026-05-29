@@ -25,6 +25,11 @@ screenshots/
 playwright-report/
 test-results/
 
+# Secrets (Vercel/Sentry tokens, etc.) — never commit
+.env
+.env.*
+!.env.example
+
 # Temp files
 *.tmp
 *.log

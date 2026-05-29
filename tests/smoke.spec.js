@@ -125,6 +125,38 @@ test.describe('smoke', () => {
     expect(errors).toEqual([]);
   });
 
+  test('Sentry SDK loads with no CSP violations and is disabled off-prod', async ({ page }) => {
+    // Capture CSP violations before any script runs
+    await page.addInitScript(() => {
+      document.addEventListener('securitypolicyviolation', (e) => {
+        window.__cspViolations = window.__cspViolations || [];
+        window.__cspViolations.push({
+          directive: e.violatedDirective,
+          blockedURI: e.blockedURI,
+        });
+      });
+    });
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    const info = await page.evaluate(() => ({
+      sentryGlobal: typeof window.Sentry,
+      clientExists: !!window.Sentry?.getClient(),
+      enabled: !!window.Sentry?.getClient()?.getOptions()?.enabled,
+      release: window.Sentry?.getClient()?.getOptions()?.release,
+      cspViolations: window.__cspViolations || [],
+    }));
+
+    expect(info.sentryGlobal).toBe('object');
+    expect(info.clientExists).toBe(true);
+    // Off-prod (localhost / preview deploys) must stay silent — DSN exposed
+    // but no events sent. Prod-only enable is the privacy promise.
+    expect(info.enabled).toBe(false);
+    expect(typeof info.release).toBe('string');
+    expect(info.release.length).toBeGreaterThan(0);
+    expect(info.cspViolations).toEqual([]);
+  });
+
   test('dropping a PDF opens editor and renders all pages', async ({ page }) => {
     await page.goto('/');
     await loadSamplePdf(page);

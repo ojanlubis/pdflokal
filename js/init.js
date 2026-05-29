@@ -105,7 +105,9 @@ function detectMobile() {
 // ============================================================
 
 // WHY: Version tag for cache debugging. Check console to confirm latest deploy is running.
-const APP_VERSION = '2026.03.16.3';
+// Now sourced from window.APP_VERSION (set in index.html before Sentry init,
+// so Sentry's `release` field and this console log stay in lock-step).
+const APP_VERSION = window.APP_VERSION || 'dev';
 
 function initApp() {
   checkBrowserCompatibility();

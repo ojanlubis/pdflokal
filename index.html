@@ -1610,6 +1610,50 @@
   </footer>
 
   <!-- Libraries (Self-hosted for offline support and firewall compatibility) -->
+  <!-- Sentry browser SDK (self-hosted, with session replay).
+       WHY first among vendor scripts: errors thrown during pdf-lib / PDF.js
+       init must reach Sentry. Replay masks all DOM text + blocks canvas to
+       prevent leaking user PDF content (privacy-first commitment). -->
+  <script>window.APP_VERSION = '2026.03.16.3';</script>
+  <script src="js/vendor/sentry.min.js"></script>
+  <script>
+    Sentry.init({
+      dsn: 'https://0913dcff45e0045c49dfe1b14f34c65f@o4511472486580224.ingest.us.sentry.io/4511472494313472',
+      // Only enable on production. Localhost dev + Vercel previews stay silent.
+      enabled: location.hostname === 'pdflokal.id',
+      release: window.APP_VERSION,
+      sampleRate: 1.0,
+      replaysSessionSampleRate: 0.01,
+      replaysOnErrorSampleRate: 1.0,
+      integrations: [
+        Sentry.replayIntegration({
+          // Privacy-first: mask everything user-visible so replays are
+          // navigational only, never content-revealing.
+          maskAllText: true,
+          maskAllInputs: true,
+          blockAllMedia: true,
+          // Canvas holds user PDF pages — never record.
+          block: ['canvas']
+        })
+      ],
+      // Battle-tested ignore list adapted from Excalidraw's sentry.ts.
+      ignoreErrors: [
+        "undefined is not an object (evaluating 'window.__pad.performLoop')",
+        "InvalidStateError: Failed to execute 'transaction' on 'IDBDatabase': The database connection is closing.",
+        /(Failed to fetch|(fetch|loading) dynamically imported module)/i,
+        /QuotaExceededError: (The quota has been exceeded|.*setItem.*Storage)/i,
+        "Internal error opening backing store for indexedDB.open"
+      ],
+      beforeSend(event) {
+        // Strip URL fragments — they can carry sensitive UI state.
+        if (event.request?.url) {
+          event.request.url = event.request.url.replace(/#.*$/, '');
+        }
+        return event;
+      }
+    });
+  </script>
+
   <script src="js/vendor/pdf-lib.min.js"></script>
   <script src="js/vendor/fontkit.umd.min.js"></script>
   <script src="js/vendor/pdf.min.js"></script>
