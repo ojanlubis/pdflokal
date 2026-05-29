@@ -1620,7 +1620,9 @@
     Sentry.init({
       dsn: 'https://0913dcff45e0045c49dfe1b14f34c65f@o4511472486580224.ingest.us.sentry.io/4511472494313472',
       // Only enable on production. Localhost dev + Vercel previews stay silent.
-      enabled: location.hostname === 'pdflokal.id',
+      // WHY both hostnames: pdflokal.id 301-redirects to www.pdflokal.id —
+      // matching only the apex form leaves Sentry silently disabled in prod.
+      enabled: location.hostname === 'pdflokal.id' || location.hostname === 'www.pdflokal.id',
       release: window.APP_VERSION,
       sampleRate: 1.0,
       replaysSessionSampleRate: 0.01,
