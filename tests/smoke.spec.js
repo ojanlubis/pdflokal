@@ -144,6 +144,7 @@ test.describe('smoke', () => {
       clientExists: !!window.Sentry?.getClient(),
       enabled: !!window.Sentry?.getClient()?.getOptions()?.enabled,
       release: window.Sentry?.getClient()?.getOptions()?.release,
+      tunnel: window.Sentry?.getClient()?.getOptions()?.tunnel,
       cspViolations: window.__cspViolations || [],
     }));
 
@@ -154,6 +155,8 @@ test.describe('smoke', () => {
     expect(info.enabled).toBe(false);
     expect(typeof info.release).toBe('string');
     expect(info.release.length).toBeGreaterThan(0);
+    // Tunnel must be configured so ad blockers can't drop events.
+    expect(info.tunnel).toBe('/api/sentry-tunnel');
     expect(info.cspViolations).toEqual([]);
   });
 

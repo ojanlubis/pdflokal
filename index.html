@@ -1619,6 +1619,11 @@
   <script>
     Sentry.init({
       dsn: 'https://0913dcff45e0045c49dfe1b14f34c65f@o4511472486580224.ingest.us.sentry.io/4511472494313472',
+      // WHY tunnel: ad blockers (uBlock, AdGuard, Brave Shields, etc.) block
+      // *.ingest.sentry.io by default. For a privacy-first product, that's
+      // ~40-50% of users losing observability. Routing through our own domain
+      // recovers those events. See /api/sentry-tunnel.js for the proxy.
+      tunnel: '/api/sentry-tunnel',
       // Only enable on production. Localhost dev + Vercel previews stay silent.
       // WHY both hostnames: pdflokal.id 301-redirects to www.pdflokal.id —
       // matching only the apex form leaves Sentry silently disabled in prod.

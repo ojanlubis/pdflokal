@@ -26,6 +26,7 @@ jobs:
               - 'style.css'
               - 'vercel.json'
               - 'js/**'
+              - 'api/**'
               - 'tests/**'
               - 'fonts/**'
               - 'playwright.config.js'
