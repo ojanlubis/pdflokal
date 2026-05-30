@@ -24,6 +24,7 @@ responsive-*.png
 screenshots/
 playwright-report/
 test-results/
+tests/golden/actual/
 
 # Secrets (Vercel/Sentry tokens, etc.) — never commit
 .env

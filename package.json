@@ -11,7 +11,8 @@
     "lint:fix": "eslint js/ --fix",
     "test": "playwright test",
     "test:headed": "playwright test --headed",
-    "test:ui": "playwright test --ui"
+    "test:ui": "playwright test --ui",
+    "test:golden:update": "UPDATE_BASELINES=1 playwright test tests/golden"
   },
   "repository": {
     "type": "git",
