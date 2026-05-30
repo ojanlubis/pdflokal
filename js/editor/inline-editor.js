@@ -5,10 +5,18 @@
 
 import { ueState, mobileState, buildCanvasFont } from '../lib/state.js';
 import { ueGetCurrentCanvas, getTextBounds } from './canvas-utils.js';
-import { ueRedrawAnnotations } from './annotations.js';
+import { ueRedrawAnnotations, ueRemoveAnnotation } from './annotations.js';
 import { uePushAnnotationSnapshot } from './undo-redo.js';
 
-export function ueCreateInlineTextEditor(anno) {
+// WHY: opts.isNew = true when the annotation was just created via canvas click
+// (inline-on-first-create flow). Differs from the dblclick-on-existing path in
+// two ways:
+//   1. If user cancels (Escape) or saves with empty text, we remove the orphan
+//      annotation — there was no original text to preserve.
+//   2. On save, we capture the formatting back into ueState.lastTextOptions so
+//      the next text annotation reuses it.
+export function ueCreateInlineTextEditor(anno, opts = {}) {
+  const isNew = !!opts.isNew;
   const existing = document.getElementById('inline-text-editor');
   if (existing) existing.remove();
 
@@ -58,15 +66,54 @@ export function ueCreateInlineTextEditor(anno) {
   const originalText = anno.text;
   let saved = false;
 
+  const removeOrphan = () => {
+    // Find the orphan annotation by reference (page index may have changed if
+    // pages were reordered during the edit, though unlikely) and remove it.
+    for (const [pageKey, list] of Object.entries(ueState.annotations)) {
+      const idx = list.indexOf(anno);
+      if (idx >= 0) {
+        ueRemoveAnnotation(Number(pageKey), idx);
+        return;
+      }
+    }
+  };
+
   const saveEdit = () => {
     if (saved) return;
     saved = true;
     const newText = editor.innerText.trim();
     delete anno._editing;
 
+    // WHY: When a click-to-create annotation gets no text, leaving it would
+    // pollute the document with invisible empty annotations and the undo
+    // stack would have a wasted snapshot. Treat empty-on-save like cancel.
+    if (isNew && !newText) {
+      removeOrphan();
+      ueRedrawAnnotations();
+      editor.remove();
+      return;
+    }
+
     if (newText && newText !== originalText) {
       uePushAnnotationSnapshot(JSON.parse(JSON.stringify(ueState.annotations)));
       anno.text = newText;
+    }
+
+    // WHY: Capture this annotation's formatting so the next text creation
+    // reuses it. Sari fills 8 contract fields once-and-for-all in Helvetica
+    // 12pt → all 8 land in Helvetica 12pt without re-picking.
+    if (isNew) {
+      ueState.lastTextOptions = {
+        fontSize: anno.fontSize,
+        color: anno.color,
+        fontFamily: anno.fontFamily,
+        bold: !!anno.bold,
+        italic: !!anno.italic,
+      };
+      // Match the post-create behavior the modal flow had: drop the user into
+      // select mode so the newly created text can be moved/resized without
+      // accidentally spawning another annotation on the next click.
+      if (typeof window.ueSetTool === 'function') window.ueSetTool('select');
     }
 
     ueRedrawAnnotations();
@@ -79,6 +126,8 @@ export function ueCreateInlineTextEditor(anno) {
     // commit ~100-300ms later and pollute the undo stack.
     saved = true;
     delete anno._editing;
+    // Click-to-create annotations have no "original" state to preserve — drop them.
+    if (isNew) removeOrphan();
     ueRedrawAnnotations();
     editor.remove();
   };

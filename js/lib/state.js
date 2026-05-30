@@ -183,6 +183,18 @@ export const ueState = {
   devicePixelRatio: 1,    // Set on init, updated on render
   eventsSetup: false,     // Guard: true after event delegation attached (one-time setup)
   pageObserver: null,     // IntersectionObserver — needs .disconnect() side effect on reset
+  // WHY: Remembers the formatting of the last-typed text annotation so the next
+  // text annotation picks up the same style. Without this, every annotation
+  // would reset to Helvetica/16pt/black and Sari would re-pick the same font
+  // 8 times to fill a contract. Persists across file loads in the same session,
+  // hence outside getDefaultUeState. (UX audit finding H2.)
+  lastTextOptions: {
+    fontSize: 16,
+    color: '#000000',
+    fontFamily: 'Helvetica',
+    bold: false,
+    italic: false,
+  },
 };
 
 // ============================================================
