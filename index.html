@@ -673,31 +673,49 @@
               <circle cx="12" cy="19" r="1.5" />
             </svg>
           </button>
+          <!-- WHY: Mirrors the desktop "Lainnya" menu — Watermark, Nomor Halaman,
+               Kunci PDF, Undo, Redo, Hapus. Previously this dropdown duplicated
+               Pilih/Whiteout/Teks/Paraf which are already in the top toolbar.
+               Now Lainnya items get a thumb-reach entry point on mobile and the
+               top icon-toolbar isn't shadowed by a redundant text menu.
+               UX audit finding H6. -->
           <div class="mobile-tools-dropdown" id="mobile-tools-dropdown" role="menu">
-            <button class="mobile-tool-item" role="menuitem" onclick="ueSetTool('select'); closeMobileTools()">
+            <button class="mobile-tool-item" role="menuitem" onclick="ueOpenWatermarkModal(); closeMobileTools()">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z" />
-                <path d="M13 13l6 6" />
+                <path d="M12 2L4 6v6c0 5.5 3.5 10 8 10s8-4.5 8-10V6l-8-4z"/>
               </svg>
-              Pilih
+              Watermark
             </button>
-            <button class="mobile-tool-item" role="menuitem" onclick="ueSetTool('whiteout'); closeMobileTools()">
+            <button class="mobile-tool-item" role="menuitem" onclick="ueOpenPageNumModal(); closeMobileTools()">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
               </svg>
-              Whiteout
+              Nomor Halaman
             </button>
-            <button class="mobile-tool-item" role="menuitem" onclick="ueSetTool('text'); closeMobileTools()">
+            <button class="mobile-tool-item" role="menuitem" onclick="ueOpenProtectModal(); closeMobileTools()">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M4 7V4h16v3M9 20h6M12 4v16" />
+                <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
               </svg>
-              Teks
+              Kunci PDF
             </button>
-            <button class="mobile-tool-item" role="menuitem" onclick="ueOpenParafModal(); closeMobileTools()">
+            <div class="mobile-tool-divider" role="separator"></div>
+            <button class="mobile-tool-item" role="menuitem" onclick="ueUndo(); closeMobileTools()">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M15 3l6 6-9 9H6v-6L15 3z"/><path d="M6 21h12"/>
+                <path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/>
               </svg>
-              Paraf
+              Undo
+            </button>
+            <button class="mobile-tool-item" role="menuitem" onclick="ueRedo(); closeMobileTools()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/>
+              </svg>
+              Redo
+            </button>
+            <button class="mobile-tool-item mobile-tool-item--danger" role="menuitem" onclick="ueClearPageAnnotations(); closeMobileTools()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>
+              </svg>
+              Hapus Semua
             </button>
           </div>
         </div>

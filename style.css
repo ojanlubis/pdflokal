@@ -3051,6 +3051,24 @@ html[data-theme="dark"] .floating-toolbar {
     padding: 6px 8px;
   }
 
+  /* WHY: The top "Lainnya" 3-dots used to surface Watermark/Nomor Halaman/Kunci PDF/Undo/Redo/Hapus.
+     Those moved to the thumb-reach bottom #mobile-tools-dropdown (audit finding H6). Two 3-dots menus
+     fighting for the same items is the worst of both worlds, so the top one disappears on mobile. */
+  #ft-more-btn {
+    display: none;
+  }
+
+  /* Divider inside mobile tool dropdown — separates document actions from edit-history actions. */
+  .mobile-tool-divider {
+    height: 1px;
+    background: var(--border-light);
+    margin: 4px 0;
+  }
+
+  .mobile-tool-item--danger {
+    color: var(--danger);
+  }
+
   /* Bottom bar: hide on mobile */
   .editor-bottom-bar {
     display: none;
