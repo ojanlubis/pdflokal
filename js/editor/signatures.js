@@ -52,7 +52,18 @@ export async function uePlaceSignature(x, y) {
   ueState.pendingSignatureWidth = null;
   ueState.pendingSubtype = null;
 
+  // WHY: Paraf modal's "Tempel di semua halaman" checkbox is captured into
+  // ueState.pendingApplyToAllPages — act on it now, then clear. Skips the
+  // legacy "place one → click placed paraf → click Semua Hal." discovery path.
+  // Audit finding H7.
+  const applyAllNow = ueState.pendingApplyToAllPages && subtype === 'paraf' && ueState.pages.length > 1;
+  ueState.pendingApplyToAllPages = false;
+
   ueRedrawAnnotations();
+  if (applyAllNow) {
+    ueApplyToAllPages(ueState.selectedAnnotation);
+    return;
+  }
   ueShowConfirmButton(newAnno, ueState.selectedAnnotation);
 
   // WHY window.*: signatures ↔ tools circular import. tools imports signature modal openers.

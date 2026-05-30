@@ -164,6 +164,12 @@ export function getDefaultUeState() {
     signaturePreviewPos: null,
     pendingSignatureWidth: null,
     pendingSubtype: null,
+    // WHY: When the user checks "Tempel di semua halaman" before pressing Gunakan
+    // in the paraf modal, the very next paraf placement also clones onto every
+    // other page. Without this flag, the user had to discover post-placement
+    // that selecting the paraf surfaces a "Semua Hal." button — UX audit
+    // finding H7. Cleared after the first placement.
+    pendingApplyToAllPages: false,
     resizeHandle: null,
     resizeStartInfo: null,
     // --- Interaction ---
