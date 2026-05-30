@@ -45,13 +45,15 @@ async function reportAndAssert(scenarioName, results) {
   // In update mode every result will be 'baseline-written' — not a regression.
   const issues = results.filter((r) => r.action === 'mismatch' || r.action === 'no-baseline');
   if (issues.length > 0) {
-    // Format output for CI logs
     console.log(`Golden mismatch in "${scenarioName}":`);
     for (const issue of issues) {
       console.log(`  page ${issue.page}: ${issue.action}`);
-      if (issue.actualHash) console.log(`    actual:   ${issue.actualHash}`);
-      if (issue.baselineHash) console.log(`    baseline: ${issue.baselineHash}`);
-      if (issue.actualPath) console.log(`    saved:    ${issue.actualPath}`);
+      if (issue.dimsDiffer) console.log('    dimensions differ');
+      if (issue.diffPixels !== undefined) {
+        console.log(`    diff: ${issue.diffPixels}/${issue.total} px (${(issue.ratio * 100).toFixed(3)}%)`);
+      }
+      if (issue.actualPath) console.log(`    saved actual: ${issue.actualPath}`);
+      if (issue.diffPath) console.log(`    saved diff:   ${issue.diffPath}`);
     }
   }
   expect(issues, `${scenarioName}: ${issues.length} page(s) drifted`).toEqual([]);
