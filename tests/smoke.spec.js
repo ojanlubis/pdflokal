@@ -222,6 +222,53 @@ test.describe('inline text editor', () => {
   });
 });
 
+test.describe('escape cascade', () => {
+  // WHY: Companion to regression #1 but for the OTHER escape path. Before this
+  // fix, Escape from any modal/dropdown that wasn't `shortcuts-modal` fell
+  // through to showHome() and wiped the user's annotations. Documented in
+  // memory/ux-audit-2026-05-30.md (finding C1).
+  test('regression: Escape from signature modal closes only the modal', async ({ page }) => {
+    await page.goto('/');
+    await loadSamplePdf(page);
+    await addTextAnnotation(page, 0, { x: 100, y: 100, text: 'do-not-lose' });
+
+    await page.evaluate(() => window.ueOpenSignatureModal());
+    await page.waitForFunction(() => document.getElementById('signature-modal')?.classList.contains('active'));
+
+    await page.keyboard.press('Escape');
+
+    await page.waitForFunction(() => !document.getElementById('signature-modal')?.classList.contains('active'));
+    await expect(page.locator('body')).toHaveClass(/editor-active/);
+    const text = await page.evaluate(() => window.ueState.annotations[0][0]?.text);
+    expect(text).toBe('do-not-lose');
+  });
+
+  test('regression: Escape from Lainnya dropdown closes only the dropdown', async ({ page }) => {
+    await page.goto('/');
+    await loadSamplePdf(page);
+    await addTextAnnotation(page, 0, { x: 100, y: 100, text: 'still-here' });
+
+    await page.locator('#ft-more-btn').click();
+    await page.waitForFunction(() => document.getElementById('ft-more-dropdown')?.classList.contains('active'));
+
+    await page.keyboard.press('Escape');
+
+    await page.waitForFunction(() => !document.getElementById('ft-more-dropdown')?.classList.contains('active'));
+    await expect(page.locator('body')).toHaveClass(/editor-active/);
+    const text = await page.evaluate(() => window.ueState.annotations[0][0]?.text);
+    expect(text).toBe('still-here');
+  });
+
+  test('Escape with no overlay open still exits editor', async ({ page }) => {
+    await page.goto('/');
+    await loadSamplePdf(page);
+
+    await page.keyboard.press('Escape');
+
+    await expect(page.locator('body')).not.toHaveClass(/editor-active/);
+  });
+});
+
 test.describe('export pipeline', () => {
   test('regression #2: failed font fetch is NOT retried per annotation', async ({ page }) => {
     // WHY counter is local + reset before download: CSS @font-face also pulls

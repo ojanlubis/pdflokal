@@ -4,7 +4,30 @@
  */
 
 import { state, ueState } from './lib/state.js';
-import { showHome, openModal, closeModal } from './lib/navigation.js';
+import { showHome, openModal, closeModal, closeAllModals, hasOpenModal } from './lib/navigation.js';
+
+// WHY: Escape needs to dismiss any open dropdown before falling through to "exit editor".
+// These are the dropdown IDs that can be open inside the editor — kept here as a small
+// list because each is opened/closed by hand-rolled toggle functions, not via openModal().
+// If a new dropdown is added in the editor, add its ID here too.
+const EDITOR_DROPDOWN_IDS = ['ft-more-dropdown', 'mobile-tools-dropdown', 'more-tools-dropdown'];
+
+function closeOpenEditorDropdown() {
+  for (const id of EDITOR_DROPDOWN_IDS) {
+    const el = document.getElementById(id);
+    if (el?.classList.contains('active')) {
+      el.classList.remove('active');
+      return true;
+    }
+  }
+  // File menu in editor header uses `.open`, not `.active`
+  const fileDropdown = document.getElementById('editor-file-dropdown');
+  if (fileDropdown?.classList.contains('open')) {
+    fileDropdown.classList.remove('open');
+    return true;
+  }
+  return false;
+}
 
 // WHY: Editor functions accessed via window.* bridges (set by editor/index.js)
 // instead of static import. Static import of editor/index.js pulled in 15 sub-modules
@@ -61,11 +84,18 @@ function handleEscapeKey(isTyping) {
   // signature name field), Escape is the local widget's own cancel gesture — must not
   // bubble up to "navigate home" or close the surrounding workspace.
   if (isTyping) return;
-  const shortcutsModal = document.getElementById('shortcuts-modal');
-  if (shortcutsModal?.classList.contains('active')) {
-    closeShortcutsModal();
+
+  // WHY (cascade): Escape dismisses the topmost overlay, not the editor itself.
+  // Before the cascade existed, Escape from any modal/dropdown fell straight through
+  // to showHome() and wiped the user's in-progress edits. Documented in
+  // memory/ux-audit-2026-05-30.md (finding C1).
+  // Order: open modal -> open dropdown -> finally exit editor as a last resort.
+  if (hasOpenModal()) {
+    closeAllModals();
     return;
   }
+  if (closeOpenEditorDropdown()) return;
+
   if (state.currentTool) showHome();
 }
 
