@@ -114,6 +114,21 @@ function initApp() {
   detectMobile();
   console.log(`[PDFLokal] v${APP_VERSION} | ${deviceCapability.formFactor} (vw=${window.innerWidth}) | touch=${deviceCapability.isTouch} coarse=${deviceCapability.isCoarsePointer} | DPR ${window.devicePixelRatio}`);
 
+  // WHY Sentry tags: lets us filter the Issues dashboard by device class —
+  // critical for bugs like JAVASCRIPT-4 that only manifest on iOS touch.
+  // setTag is safe even when the SDK is disabled (off-prod) — no-ops cleanly.
+  if (typeof window.Sentry?.setTag === 'function') {
+    window.Sentry.setTag('form_factor', deviceCapability.formFactor);
+    window.Sentry.setTag('touch', deviceCapability.isTouch ? 'yes' : 'no');
+    window.Sentry.setTag('app_section', 'home');
+    window.Sentry.addBreadcrumb({
+      category: 'app.lifecycle',
+      level: 'info',
+      message: 'app_initialized',
+      data: { version: APP_VERSION, formFactor: deviceCapability.formFactor },
+    });
+  }
+
   // WHY: No resize/orientation listeners needed for detectMobile — isTouch
   // capability doesn't change. Layout adapts via CSS @media queries.
 

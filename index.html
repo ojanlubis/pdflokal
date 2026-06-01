@@ -1652,7 +1652,12 @@
       enabled: location.hostname === 'pdflokal.id' || location.hostname === 'www.pdflokal.id',
       release: window.APP_VERSION,
       sampleRate: 1.0,
-      replaysSessionSampleRate: 0.01,
+      // WHY 10%: replays are sampled on session START. At 1% we caught about
+      // 5 navigational replays per month — useful for UX research but thin.
+      // Bumped to 10% because privacy risk is zero (maskAllText + canvas
+      // blocked), free tier covers 50/mo, and 10x more sessions means we
+      // can review typical user journeys, not just the rare ones.
+      replaysSessionSampleRate: 0.10,
       replaysOnErrorSampleRate: 1.0,
       integrations: [
         Sentry.replayIntegration({
