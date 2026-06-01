@@ -87,6 +87,17 @@ export function closeAllModals() {
   navHistory.currentModal = null;
 }
 
+// WHY: handleEscapeKey in keyboard.js needs to know whether ANY overlay is open
+// before falling through to "exit editor". Without this check, Escape from a
+// modal/dropdown would kick the user back to the homepage and lose all work.
+// Keep MODAL_IDS the single source of truth — never duplicate the list elsewhere.
+export function hasOpenModal() {
+  if (MODAL_IDS.some(id => document.getElementById(id)?.classList.contains('active'))) {
+    return true;
+  }
+  return !!document.getElementById('ue-gabungkan-modal')?.classList.contains('active');
+}
+
 // ============================================================
 // NAVIGATION
 // ============================================================
@@ -306,6 +317,7 @@ window.pushModalState = pushModalState;
 window.openModal = openModal;
 window.closeModal = closeModal;
 window.closeAllModals = closeAllModals;
+window.hasOpenModal = hasOpenModal;
 window.showHome = showHome;
 window.showTool = showTool;
 window.setupWorkspaceDropZone = setupWorkspaceDropZone;
