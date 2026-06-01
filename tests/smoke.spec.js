@@ -281,3 +281,46 @@ test.describe('export pipeline', () => {
     expect(errors).toEqual([]);
   });
 });
+
+// UX audit C3: "Hapus Semua" (renamed to "Hapus Edit Halaman Ini") used to
+// fire instantly with no guard — one stray thumb tap wiped the page. Confirm
+// now intercepts; cancel must preserve annotations.
+test.describe('clear page annotations confirm', () => {
+  // WHY: createWhiteoutAnnotation is not on window — inline the shape here.
+  async function seedWhiteoutAnnotation(page, pageIndex, x = 10) {
+    await page.evaluate(({ p, ax }) => {
+      window.ueAddAnnotation(p, { type: 'whiteout', x: ax, y: 10, width: 50, height: 30 });
+    }, { p: pageIndex, ax: x });
+  }
+
+  test('cancel preserves annotations', async ({ page }) => {
+    await page.goto('/');
+    await loadSamplePdf(page);
+    await seedWhiteoutAnnotation(page, 0);
+
+    page.once('dialog', (dialog) => dialog.dismiss());
+    await page.evaluate(() => window.ueClearPageAnnotations());
+
+    const count = await page.evaluate(() => window.ueState.annotations[0].length);
+    expect(count).toBe(1);
+  });
+
+  test('accept clears current page only', async ({ page }) => {
+    await page.goto('/');
+    await loadSamplePdf(page);
+    await seedWhiteoutAnnotation(page, 0);
+    // Seed page 1 to prove it's untouched
+    await seedWhiteoutAnnotation(page, 1, 20);
+
+    page.once('dialog', (dialog) => {
+      expect(dialog.message()).toContain('Halaman 1');
+      return dialog.accept();
+    });
+    await page.evaluate(() => window.ueClearPageAnnotations());
+
+    const page0 = await page.evaluate(() => window.ueState.annotations[0].length);
+    const page1 = await page.evaluate(() => window.ueState.annotations[1].length);
+    expect(page0).toBe(0);
+    expect(page1).toBe(1);
+  });
+});
