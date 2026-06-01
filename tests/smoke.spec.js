@@ -312,6 +312,24 @@ test.describe('inline text on first creation', () => {
   });
 });
 
+test.describe('signature modal', () => {
+  // UX audit H4 — Gambar (draw) is the default tab. Without this, opening
+  // the signature modal on mobile (where finger-draw is the primary intent)
+  // showed Upload Foto first and added an extra tap for the common case.
+  test('opens with Gambar (draw) tab active', async ({ page }) => {
+    await page.goto('/');
+    await loadSamplePdf(page);
+    await page.evaluate(() => window.ueOpenSignatureModal());
+    await page.waitForFunction(() => document.getElementById('signature-modal')?.classList.contains('active'));
+
+    const activeTab = await page.evaluate(() => {
+      const tabs = document.querySelectorAll('#signature-modal button[role="tab"]');
+      return Array.from(tabs).find(t => t.getAttribute('aria-selected') === 'true')?.textContent?.trim();
+    });
+    expect(activeTab).toBe('Gambar');
+  });
+});
+
 test.describe('export pipeline', () => {
   test('regression #2: failed font fetch is NOT retried per annotation', async ({ page }) => {
     // WHY counter is local + reset before download: CSS @font-face also pulls

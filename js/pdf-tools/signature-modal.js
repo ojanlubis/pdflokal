@@ -14,8 +14,12 @@ export function openSignatureModal() {
 
   openModal('signature-modal');
 
-  // Default to upload tab
-  switchSignatureTab('upload');
+  // WHY: Default to draw tab (UX audit finding H4). On mobile especially,
+  // finger-drawn signatures are the primary intent — opening on Upload Foto
+  // forced an extra tap and read as "wrong app" to first-time signers.
+  // Desktop users with a "photo of signature on phone" workflow still get
+  // Upload Foto with one click.
+  switchSignatureTab('draw');
 
   setTimeout(() => {
     const canvas = document.getElementById('signature-canvas');
