@@ -78,6 +78,14 @@ export function ueCreateInlineTextEditor(anno, opts = {}) {
     }
   };
 
+  // WHY: After an isNew annotation closes (saved OR abandoned), drop the user
+  // into select mode. Otherwise the next canvas tap immediately spawns another
+  // empty annotation — a trap where Escape doesn't really cancel because the
+  // tool stays armed. Matches signature/whiteout post-action behavior.
+  const switchToSelectIfNew = () => {
+    if (isNew && typeof window.ueSetTool === 'function') window.ueSetTool('select');
+  };
+
   const saveEdit = () => {
     if (saved) return;
     saved = true;
@@ -91,6 +99,7 @@ export function ueCreateInlineTextEditor(anno, opts = {}) {
       removeOrphan();
       ueRedrawAnnotations();
       editor.remove();
+      switchToSelectIfNew();
       return;
     }
 
@@ -110,14 +119,11 @@ export function ueCreateInlineTextEditor(anno, opts = {}) {
         bold: !!anno.bold,
         italic: !!anno.italic,
       };
-      // Match the post-create behavior the modal flow had: drop the user into
-      // select mode so the newly created text can be moved/resized without
-      // accidentally spawning another annotation on the next click.
-      if (typeof window.ueSetTool === 'function') window.ueSetTool('select');
     }
 
     ueRedrawAnnotations();
     editor.remove();
+    switchToSelectIfNew();
   };
 
   const cancelEdit = () => {
@@ -130,6 +136,7 @@ export function ueCreateInlineTextEditor(anno, opts = {}) {
     if (isNew) removeOrphan();
     ueRedrawAnnotations();
     editor.remove();
+    switchToSelectIfNew();
   };
 
   editor.addEventListener('keydown', (e) => {
