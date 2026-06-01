@@ -3,7 +3,7 @@
  * Canvas event handling (mouse, touch, drag, resize, double-click)
  */
 
-import { ueState, state, DOUBLE_TAP_DELAY, DOUBLE_TAP_DISTANCE, createWhiteoutAnnotation } from '../lib/state.js';
+import { ueState, state, DOUBLE_TAP_DELAY, DOUBLE_TAP_DISTANCE, createWhiteoutAnnotation, createTextAnnotation } from '../lib/state.js';
 import { showToast } from '../lib/utils.js';
 import { ueGetCoords, ueGetResizeHandle, getTextBounds } from './canvas-utils.js';
 import { ueRedrawAnnotations, ueFindAnnotationAt, ueAddAnnotation } from './annotations.js';
@@ -424,8 +424,23 @@ export function ueSetupCanvasEvents() {
         ueRedrawAnnotations();
       }
     } else if (ueState.currentTool === 'text') {
-      ueState.pendingTextPosition = { x: startX, y: startY };
-      window.ueOpenTextModal();
+      // WHY: Inline editing on first creation (UX audit finding H1). The modal-per-text
+      // flow forced Sari to do 8 modal cycles for an 8-field contract; inline is the
+      // industry-standard pattern. We drop an empty annotation with lastTextOptions
+      // (filled style or factory defaults), then open the same inline editor used
+      // for double-click edits. Format defaults are remembered across annotations
+      // via ueState.lastTextOptions (finding H2).
+      ueSaveEditUndoState();
+      const newIndex = ueAddAnnotation(pageIndex, createTextAnnotation({
+        text: '',
+        x: startX,
+        y: startY,
+        ...ueState.lastTextOptions,
+      }));
+      ueState.selectedAnnotation = { pageIndex, index: newIndex };
+      const newAnno = ueState.annotations[pageIndex][newIndex];
+      track('editor_action', { action: 'text_inline' });
+      ueCreateInlineTextEditor(newAnno, { isNew: true });
     } else if ((ueState.currentTool === 'signature' || ueState.currentTool === 'paraf') && state.signatureImage) {
       uePlaceSignature(startX, startY);
     }

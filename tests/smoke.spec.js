@@ -40,14 +40,18 @@ async function getPageCanvasBox(page, pageIndex) {
   return await handle.boundingBox();
 }
 
-// WHY: Adds a text annotation via the canonical text-tool → modal → confirm
-// flow. Keeps each test free of UI plumbing.
+// WHY: Adds a text annotation via the canonical text-tool → inline-edit → Enter
+// flow that ships in PR2 (UX audit H1/H2). To pick a non-default fontFamily,
+// poke lastTextOptions before clicking — that's the same lever the user gets,
+// since with inline editing the modal isn't part of first creation anymore.
 async function addTextAnnotation(page, pageIndex, { x, y, text, fontFamily }) {
+  if (fontFamily) {
+    await page.evaluate((ff) => { window.ueState.lastTextOptions.fontFamily = ff; }, fontFamily);
+  }
   // WHY: Dispatch the mousedown/mouseup pair directly on the canvas and call
   // ueSetTool via the window bridge — both bypass focus/scroll quirks that
   // make page.mouse.click + page.keyboard.press unreliable for a tall canvas
-  // with a sticky overlay toolbar and a modal that owns focus between
-  // iterations.
+  // with a sticky overlay toolbar.
   await page.evaluate(() => window.ueSetTool('text'));
   await page.waitForFunction(() => window.ueState?.currentTool === 'text');
   await page.evaluate(({ p, cx, cy }) => {
@@ -59,19 +63,11 @@ async function addTextAnnotation(page, pageIndex, { x, y, text, fontFamily }) {
     canvas.dispatchEvent(new MouseEvent('mousedown', opts));
     canvas.dispatchEvent(new MouseEvent('mouseup', opts));
   }, { p: pageIndex, cx: x, cy: y });
-  await page.waitForFunction(() => {
-    const m = document.getElementById('text-input-modal');
-    return m && m.classList.contains('active');
-  });
-  await page.locator('#text-input-field').fill(text);
-  if (fontFamily) {
-    await page.locator('#modal-font-family').selectOption(fontFamily);
-  }
-  await page.evaluate(() => window.ueConfirmText());
-  await page.waitForFunction(() => {
-    const m = document.getElementById('text-input-modal');
-    return !m || !m.classList.contains('active');
-  });
+  await page.waitForSelector('#inline-text-editor');
+  await page.locator('#inline-text-editor').focus();
+  await page.keyboard.type(text);
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('#inline-text-editor', { state: 'detached' });
 }
 
 // WHY: Same reasoning as addTextAnnotation — dispatch events directly so we
@@ -266,6 +262,53 @@ test.describe('escape cascade', () => {
     await page.keyboard.press('Escape');
 
     await expect(page.locator('body')).not.toHaveClass(/editor-active/);
+  });
+});
+
+test.describe('inline text on first creation', () => {
+  // UX audit H1/H2 — first creation goes straight into the inline editor with
+  // last-used formatting, no modal in between.
+  test('Escape on empty new annotation removes the orphan', async ({ page }) => {
+    await page.goto('/');
+    await loadSamplePdf(page);
+
+    await page.evaluate(() => window.ueSetTool('text'));
+    await page.evaluate(() => {
+      const canvas = document.querySelector('.ue-page-slot canvas');
+      const rect = canvas.getBoundingClientRect();
+      const opts = { bubbles: true, cancelable: true, clientX: rect.left + 100, clientY: rect.top + 100, button: 0 };
+      canvas.dispatchEvent(new MouseEvent('mousedown', opts));
+      canvas.dispatchEvent(new MouseEvent('mouseup', opts));
+    });
+    await page.waitForSelector('#inline-text-editor');
+
+    // Annotation must exist while editing
+    expect(await page.evaluate(() => window.ueState.annotations[0]?.length)).toBe(1);
+
+    await page.locator('#inline-text-editor').focus();
+    await page.keyboard.press('Escape');
+    await page.waitForSelector('#inline-text-editor', { state: 'detached' });
+
+    // Orphan must be gone after cancel
+    expect(await page.evaluate(() => window.ueState.annotations[0]?.length || 0)).toBe(0);
+    await expect(page.locator('body')).toHaveClass(/editor-active/);
+  });
+
+  test('successful save updates lastTextOptions for the next annotation', async ({ page }) => {
+    await page.goto('/');
+    await loadSamplePdf(page);
+    await page.evaluate(() => { window.ueState.lastTextOptions.fontFamily = 'Carlito'; });
+    await addTextAnnotation(page, 0, { x: 80, y: 80, text: 'first' });
+
+    // The created annotation must reflect the lastTextOptions we forced
+    const first = await page.evaluate(() => window.ueState.annotations[0][0]);
+    expect(first.fontFamily).toBe('Carlito');
+
+    // And lastTextOptions is now sticky for the next click — verified by
+    // creating a second annotation without specifying fontFamily.
+    await addTextAnnotation(page, 0, { x: 80, y: 160, text: 'second' });
+    const second = await page.evaluate(() => window.ueState.annotations[0][1]);
+    expect(second.fontFamily).toBe('Carlito');
   });
 });
 
