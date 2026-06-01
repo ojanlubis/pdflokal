@@ -173,14 +173,20 @@ async function ueRestorePages(pagesData) {
 // CONVENIENCE
 // ============================================================
 
-// Clear page annotations
+// WHY: Clears edits on the CURRENT page only, not the whole document.
+// UX audit (C3): previous label "Hapus Semua" was ambiguous — users feared
+// it would wipe every page. Confirm() guards against accidental clears
+// since the action is undoable but still surprising on mobile thumb taps.
 export function ueClearPageAnnotations() {
   if (ueState.selectedPage < 0) return;
   if (ueState.annotations[ueState.selectedPage].length === 0) return;
+
+  const pageNum = ueState.selectedPage + 1;
+  if (!confirm(`Hapus semua edit di Halaman ${pageNum}? Halaman lain tidak terpengaruh.`)) return;
 
   ueSaveEditUndoState();
   ueState.annotations[ueState.selectedPage] = [];
   ueState.selectedAnnotation = null;
   ueRedrawAnnotations();
-  showToast('Semua edit di halaman ini dihapus', 'success');
+  showToast(`Edit di Halaman ${pageNum} dihapus`, 'success');
 }
