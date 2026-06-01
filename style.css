@@ -1328,6 +1328,25 @@ a:hover {
   margin-top: var(--space-lg);
 }
 
+/* Paraf "apply to all pages" checkbox — sits between the canvas and action buttons
+   so power users (notaris) discover the bulk-apply before placing.
+   UX audit finding H7. */
+.paraf-apply-all-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+  font-size: 0.9375rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.paraf-apply-all-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
 /* Signature Tabs */
 .signature-tabs {
   display: flex;

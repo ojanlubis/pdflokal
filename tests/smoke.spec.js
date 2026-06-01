@@ -330,6 +330,68 @@ test.describe('signature modal', () => {
   });
 });
 
+test.describe('paraf modal', () => {
+  // UX audit H7 — "Tempel di semua halaman" checkbox in the paraf modal lets
+  // Pak Hadi paraf a 20-page deed in one click. Before, the apply-to-all
+  // button only surfaced after placing one and selecting it.
+  test('checked + place clones paraf onto every page', async ({ page }) => {
+    await page.goto('/');
+    await loadSamplePdf(page);
+
+    // Prepare a paraf image without actually drawing on the canvas
+    await page.evaluate(() => {
+      // Stub a 1×1 PNG as the paraf image to skip the SignaturePad/canvas path
+      window.state.signatureImage = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNgAAIAAAUAAeImBZsAAAAASUVORK5CYII=';
+      window.ueState.pendingSignature = true;
+      window.ueState.pendingSignatureWidth = window.ueState.pendingSignatureWidth || 80;
+      window.ueState.pendingSubtype = 'paraf';
+      window.ueState.pendingApplyToAllPages = true; // the audit-finding behavior
+      window.ueSetTool('paraf');
+    });
+
+    // Place once at page 0
+    await page.evaluate(async () => {
+      const canvas = document.querySelectorAll('.ue-page-slot canvas')[0];
+      const rect = canvas.getBoundingClientRect();
+      const opts = { bubbles: true, cancelable: true, clientX: rect.left + 60, clientY: rect.top + 60, button: 0 };
+      canvas.dispatchEvent(new MouseEvent('mousedown', opts));
+      canvas.dispatchEvent(new MouseEvent('mouseup', opts));
+      // wait for the async signature image load + place
+      await new Promise(r => setTimeout(r, 300));
+    });
+
+    await page.waitForFunction(() =>
+      (window.ueState.annotations[0] || []).some(a => a.subtype === 'paraf') &&
+      (window.ueState.annotations[1] || []).some(a => a.subtype === 'paraf')
+    );
+
+    // Both pages now have a paraf
+    const counts = await page.evaluate(() => ({
+      p0: (window.ueState.annotations[0] || []).filter(a => a.subtype === 'paraf').length,
+      p1: (window.ueState.annotations[1] || []).filter(a => a.subtype === 'paraf').length,
+      flag: window.ueState.pendingApplyToAllPages,
+    }));
+    expect(counts.p0).toBe(1);
+    expect(counts.p1).toBe(1);
+    // Flag must reset after one use so the next paraf isn't silently cloned
+    expect(counts.flag).toBe(false);
+  });
+
+  test('opening paraf modal resets the apply-all checkbox to unchecked', async ({ page }) => {
+    await page.goto('/');
+    await loadSamplePdf(page);
+
+    await page.evaluate(() => {
+      const cb = document.getElementById('paraf-apply-all');
+      if (cb) cb.checked = true; // simulate leftover state from prior open
+      window.openParafModal();
+    });
+
+    const isChecked = await page.evaluate(() => document.getElementById('paraf-apply-all')?.checked);
+    expect(isChecked).toBe(false);
+  });
+});
+
 test.describe('export pipeline', () => {
   test('regression #2: failed font fetch is NOT retried per annotation', async ({ page }) => {
     // WHY counter is local + reset before download: CSS @font-face also pulls

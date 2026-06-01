@@ -217,6 +217,12 @@ export function openParafModal() {
 
   openModal('paraf-modal');
 
+  // WHY: Reset the apply-to-all checkbox on each open. Without this, a leftover
+  // tick from a previous session would silently clone the next paraf onto every
+  // page — destructive and hard to discover. Audit finding H7.
+  const applyAllEl = document.getElementById('paraf-apply-all');
+  if (applyAllEl) applyAllEl.checked = false;
+
   setTimeout(() => {
     const canvas = document.getElementById('paraf-canvas');
     setupCanvasDPR(canvas);
@@ -247,13 +253,21 @@ export function useParaf() {
     makeWhiteTransparent(tempCanvas, 240);
     state.signatureImage = optimizeSignatureImage(tempCanvas);
 
+    // WHY: Capture "Tempel di semua halaman" intent here so the next placement
+    // can act on it without re-querying the DOM. Audit finding H7.
+    const applyAllEl = document.getElementById('paraf-apply-all');
+    ueState.pendingApplyToAllPages = !!applyAllEl?.checked;
+
     closeParafModal();
     window.ueSetTool('paraf');
     ueState.pendingSignature = true;
     ueState.signaturePreviewPos = null;
     ueState.pendingSignatureWidth = PARAF_DEFAULT_WIDTH;
     ueState.pendingSubtype = 'paraf';
-    showToast('Klik pada PDF untuk menempatkan paraf', 'success');
+    const msg = ueState.pendingApplyToAllPages
+      ? 'Klik di halaman pertama — paraf akan disalin ke semua halaman'
+      : 'Klik pada PDF untuk menempatkan paraf';
+    showToast(msg, 'success');
   } else {
     showToast('Buat paraf terlebih dahulu', 'error');
   }
