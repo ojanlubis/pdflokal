@@ -494,3 +494,44 @@ test.describe('clear page annotations confirm', () => {
     expect(page1).toBe(1);
   });
 });
+
+// Sentry JAVASCRIPT-4: production crash on iOS, "TypeError: undefined is not
+// an object (evaluating 'anno.locked')" inside ueGetResizeHandle. Root cause:
+// ueRemoveAnnotation only clears selectedAnnotation on EXACT match, and
+// rebuildAnnotationMapping never touches it — so the selected index can
+// outlive the annotation it points to. Next tap → handleSelectDown derefs
+// undefined → crash.
+test.describe('stale selectedAnnotation does not crash on tap', () => {
+  test('regression: tapping with stale selection clears it without throwing', async ({ page }) => {
+    const errors = watchForJsErrors(page);
+    await page.goto('/');
+    await loadSamplePdf(page);
+
+    // Production state: user is in 'select' mode with an annotation selected.
+    await page.evaluate(() => window.ueSetTool('select'));
+    // Seed a whiteout, point selection at it, then yank the annotation out
+    // from under the selection — mimics the "ueRemoveAnnotation cleared the
+    // wrong slot" hazard.
+    await page.evaluate(() => {
+      window.ueAddAnnotation(0, { type: 'whiteout', x: 20, y: 20, width: 60, height: 40 });
+      window.ueState.selectedAnnotation = { pageIndex: 0, index: 0 };
+      // Wipe annotations directly — bypasses ueRemoveAnnotation's exact-match
+      // clearing logic, leaving selectedAnnotation pointing at undefined.
+      window.ueState.annotations[0] = [];
+    });
+
+    // Single tap on the canvas — pre-fix, this throws inside ueGetResizeHandle.
+    await page.evaluate(() => {
+      const canvas = document.querySelector('.ue-page-slot canvas');
+      const rect = canvas.getBoundingClientRect();
+      const opts = { bubbles: true, cancelable: true, clientX: rect.left + 100, clientY: rect.top + 100, button: 0 };
+      canvas.dispatchEvent(new MouseEvent('mousedown', opts));
+      canvas.dispatchEvent(new MouseEvent('mouseup', opts));
+    });
+
+    expect(errors).toEqual([]);
+    // Stale selection must be cleared so subsequent interactions behave normally
+    const sel = await page.evaluate(() => window.ueState.selectedAnnotation);
+    expect(sel).toBeNull();
+  });
+});
