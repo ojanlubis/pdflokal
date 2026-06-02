@@ -583,3 +583,94 @@ test.describe('stale selectedAnnotation does not crash on tap', () => {
     expect(sel).toBeNull();
   });
 });
+
+// UX request (Jun 2026): tools used to stay sticky after one use. Whiteout
+// and text in particular trapped users — finishing a whiteout drag would
+// arm the next stray tap to paint another box. Signature/paraf already
+// auto-switched (signatures.js:70). This suite locks in parity.
+test.describe('auto-switch to select after tool completion', () => {
+  async function drawWhiteoutRect(page, pageIndex, x1, y1, x2, y2) {
+    await page.evaluate(({ p, ax1, ay1, ax2, ay2 }) => {
+      const canvas = document.querySelectorAll('.ue-page-slot canvas')[p];
+      const rect = canvas.getBoundingClientRect();
+      const down = { bubbles: true, cancelable: true, clientX: rect.left + ax1, clientY: rect.top + ay1, button: 0 };
+      const move = { bubbles: true, cancelable: true, clientX: rect.left + ax2, clientY: rect.top + ay2, button: 0 };
+      canvas.dispatchEvent(new MouseEvent('mousedown', down));
+      canvas.dispatchEvent(new MouseEvent('mousemove', move));
+      canvas.dispatchEvent(new MouseEvent('mouseup', move));
+    }, { p: pageIndex, ax1: x1, ay1: y1, ax2: x2, ay2: y2 });
+  }
+
+  test('whiteout: tool switches to select after a valid drag', async ({ page }) => {
+    await page.goto('/');
+    await loadSamplePdf(page);
+
+    await page.evaluate(() => window.ueSetTool('whiteout'));
+    await drawWhiteoutRect(page, 0, 50, 50, 150, 100);
+
+    const annoCount = await page.evaluate(() => window.ueState.annotations[0]?.length || 0);
+    const tool = await page.evaluate(() => window.ueState.currentTool);
+    expect(annoCount).toBe(1);
+    expect(tool).toBe('select');
+  });
+
+  test('whiteout: tiny no-op drag does NOT switch tool', async ({ page }) => {
+    // Invariant: switching only when the action actually completed. Width<=5
+    // means the user clicked but didn't really draw — keep them in whiteout.
+    await page.goto('/');
+    await loadSamplePdf(page);
+
+    await page.evaluate(() => window.ueSetTool('whiteout'));
+    await drawWhiteoutRect(page, 0, 50, 50, 52, 52);
+
+    const annoCount = await page.evaluate(() => window.ueState.annotations[0]?.length || 0);
+    const tool = await page.evaluate(() => window.ueState.currentTool);
+    expect(annoCount).toBe(0);
+    expect(tool).toBe('whiteout');
+  });
+
+  test('text: inline Escape cancel returns to select tool', async ({ page }) => {
+    await page.goto('/');
+    await loadSamplePdf(page);
+
+    await page.evaluate(() => window.ueSetTool('text'));
+    await page.evaluate(() => {
+      const canvas = document.querySelector('.ue-page-slot canvas');
+      const rect = canvas.getBoundingClientRect();
+      const opts = { bubbles: true, cancelable: true, clientX: rect.left + 100, clientY: rect.top + 100, button: 0 };
+      canvas.dispatchEvent(new MouseEvent('mousedown', opts));
+      canvas.dispatchEvent(new MouseEvent('mouseup', opts));
+    });
+    await page.waitForSelector('#inline-text-editor');
+    await page.locator('#inline-text-editor').focus();
+    await page.keyboard.press('Escape');
+    await page.waitForSelector('#inline-text-editor', { state: 'detached' });
+
+    const tool = await page.evaluate(() => window.ueState.currentTool);
+    expect(tool).toBe('select');
+  });
+
+  test('text: empty save (Enter on blank) returns to select tool', async ({ page }) => {
+    await page.goto('/');
+    await loadSamplePdf(page);
+
+    await page.evaluate(() => window.ueSetTool('text'));
+    await page.evaluate(() => {
+      const canvas = document.querySelector('.ue-page-slot canvas');
+      const rect = canvas.getBoundingClientRect();
+      const opts = { bubbles: true, cancelable: true, clientX: rect.left + 100, clientY: rect.top + 100, button: 0 };
+      canvas.dispatchEvent(new MouseEvent('mousedown', opts));
+      canvas.dispatchEvent(new MouseEvent('mouseup', opts));
+    });
+    await page.waitForSelector('#inline-text-editor');
+    await page.locator('#inline-text-editor').focus();
+    // Press Enter without typing anything
+    await page.keyboard.press('Enter');
+    await page.waitForSelector('#inline-text-editor', { state: 'detached' });
+
+    const annoCount = await page.evaluate(() => window.ueState.annotations[0]?.length || 0);
+    const tool = await page.evaluate(() => window.ueState.currentTool);
+    expect(annoCount).toBe(0);
+    expect(tool).toBe('select');
+  });
+});
