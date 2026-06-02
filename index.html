@@ -1674,7 +1674,14 @@
       ignoreErrors: [
         "undefined is not an object (evaluating 'window.__pad.performLoop')",
         "InvalidStateError: Failed to execute 'transaction' on 'IDBDatabase': The database connection is closing.",
-        /(Failed to fetch|(fetch|loading) dynamically imported module)/i,
+        // WHY each browser worded differently: Chrome says "Failed to fetch
+        // dynamically imported module", Firefox says "error loading", Safari
+        // says "Importing a module script failed." — all the same class of
+        // transient failure (network blip, ad blocker, user closed tab mid
+        // load). JAVASCRIPT-5 slipped through because the old regex only
+        // covered Chrome/Firefox wording. Without this, ~5-10% of mobile
+        // Safari users with flaky connections become Sentry noise.
+        /(Importing a module script failed|Failed to fetch|(fetch|loading) dynamically imported module)/i,
         /QuotaExceededError: (The quota has been exceeded|.*setItem.*Storage)/i,
         "Internal error opening backing store for indexedDB.open"
       ],
