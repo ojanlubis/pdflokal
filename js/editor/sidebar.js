@@ -7,6 +7,7 @@ import { ueState } from '../lib/state.js';
 import { on } from '../lib/events.js';
 import { getThumbnailSource, drawRotatedThumbnail } from './canvas-utils.js';
 import { showToast, showFullscreenLoading, hideFullscreenLoading } from '../lib/utils.js';
+import { ueSaveUndoState } from './undo-redo.js';
 
 // WHY: Subscribe to pages:changed so thumbnails auto-refresh when pages are
 // added/removed/reordered. Replaces manual ueRenderThumbnails() calls scattered
@@ -171,8 +172,7 @@ function ueSetupSidebarDragDrop() {
     const item = e.target.closest('.ue-thumbnail');
     if (!item) return;
 
-    // Use window.* to avoid circular import with undo-redo
-    window.ueSaveUndoState();
+    ueSaveUndoState();
     draggedItem = item;
     draggedIndex = Number.parseInt(item.dataset.index);
     item.classList.add('dragging');

@@ -83,10 +83,13 @@ pdflokal/
 │   └── vendor/               # Self-hosted libs (2.6 MB), zero CDN deps
 ├── fonts/              # Self-hosted fonts (268KB, Latin charset)
 ├── docs/               # Design + reference docs
-│   ├── architecture.md # SSOT patterns diagram (scattered vs centralized)
+│   ├── architecture.md       # SSOT patterns diagram (scattered vs centralized)
 │   ├── editor-redesign.md
-│   ├── patterns.md     # Code patterns and examples
-│   └── security.md     # Security headers, CSP, library details
+│   ├── future-architecture.md # PageRenderer plan + reactive state notes
+│   ├── patterns.md           # Code patterns and examples
+│   ├── security.md           # Security headers, CSP, library details
+│   ├── strengths.md          # WHY vanilla JS / WHY no framework / AI-first
+│   └── system-flow.md        # End-to-end user flow + data flow
 └── images/
 ```
 
@@ -262,12 +265,11 @@ Hero + dropzone (opens editor), PDF tool cards (Editor, Merge, Split, PDF-to-Ima
 | `ueReorderPages(fromIndex, insertAt)` | page-manager.js | **SSOT** reorder pages with annotation mapping rebuild |
 | `ueGetCurrentCanvas()` | canvas-utils.js | Get selected page's canvas |
 | `ueGetCoords(e, canvas, dpr)` | canvas-utils.js | Mouse/touch -> canvas coords |
-| `getCanvasAndCoords(e)` | canvas-events.js | Event delegation helper |
 | `makeWhiteTransparent(canvas, threshold)` | utils.js | White pixels -> transparent |
 | `setupCanvasDPR(canvas)` | utils.js | Scale canvas for devicePixelRatio |
 | `createPageRenderer()` | page-rendering.js | **SSOT** create PageRenderer singleton (called by initUnifiedEditor) |
 | `destroyPageRenderer()` | page-rendering.js | **SSOT** destroy PageRenderer + cleanup (called by ueReset) |
-| `setupFileInput(inputId, opts)` | init.js | DRY file input handler factory |
+| `setupFileInput(inputId, opts)` | init-file-handling.js (internal) | DRY file input handler factory used by `initFileInputs()` |
 | `safeLocalGet(key)` / `safeLocalSet(key, val)` | utils.js | Private browsing-safe localStorage |
 | `trapFocus(modalEl)` / `releaseFocus(modalEl)` | utils.js | Modal focus trap + restore on close |
 | `registerImage(dataUrl)` / `getRegisteredImage(id)` | state.js | Shared image registry (undo optimization) |

@@ -34,7 +34,8 @@ PDFLokal adalah tool PDF gratis untuk pengguna Indonesia. Semua proses berjalan 
 ## Fitur
 
 ### PDF Tools
-- **Editor PDF** — Unified editor with whiteout, text (5 fonts, bold/italic, color), signatures (upload with background removal, draw, auto-lock, double-click to unlock), paraf/initials, watermark, page numbers, password protection
+- **Editor PDF** — Unified editor with whiteout, text (5 fonts, bold/italic, color), signatures (upload with background removal, draw, place → Konfirmasi to lock, double-click to unlock), paraf/initials, watermark, page numbers, password protection
+- **Tema gelap / terang** — Theme toggle stored per-device
 - **Gabung PDF** — Merge multiple PDFs and images with drag-drop reordering
 - **Split PDF** — Extract selected pages as a separate PDF
 - **Kompres PDF** — Reduce file size by compressing embedded images
@@ -79,10 +80,10 @@ npx serve .
 - **[pdf-lib](https://pdf-lib.js.org/)** — PDF manipulation (self-hosted)
 - **[PDF.js](https://mozilla.github.io/pdf.js/)** — PDF rendering with Web Worker (self-hosted)
 - **[Signature Pad](https://github.com/szimek/signature_pad)** — Digital signatures (self-hosted)
-- **[fontkit](https://github.com/foliojs/fontkit)** — Custom font embedding (self-hosted)
+- **[fontkit](https://github.com/foliojs/fontkit)** — Embeds Montserrat + Carlito into exported PDFs (self-hosted)
 - **[pdf-encrypt-lite](https://github.com/nicholasohjj/pdf-encrypt-lite)** — PDF password encryption (CDN)
 - **Canvas API** — Image processing
-- **Self-hosted fonts** — Montserrat, Carlito, Plus Jakarta Sans (268KB)
+- **Self-hosted fonts** — UI font Plus Jakarta Sans + annotation fonts Montserrat / Carlito (268KB)
 
 ### Project Structure
 ```

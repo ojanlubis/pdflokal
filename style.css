@@ -1258,26 +1258,6 @@ a:hover {
   transform: scale(1.05);
 }
 
-/* Hero Download Button */
-.btn--download-hero {
-  padding: var(--space-md) var(--space-xl);
-  font-weight: 600;
-  font-size: 1rem;
-}
-
-.btn--download-hero:not(:disabled).has-signatures {
-  animation: gentle-pulse 2s infinite;
-}
-
-@keyframes gentle-pulse {
-  0%, 100% {
-    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
-  }
-  50% {
-    box-shadow: 0 0 0 8px rgba(59, 130, 246, 0);
-  }
-}
-
 /* Legacy .editor-canvas-wrapper and .editor-canvas removed — unified editor uses .ue-page-slot canvas */
 
 /* Signature Pad */
@@ -2142,11 +2122,6 @@ a:hover {
   margin-top: var(--space-lg);
 }
 
-/* Annotation Selection Handles */
-.annotation-selected {
-  outline: 2px solid var(--accent-primary);
-  outline-offset: 2px;
-}
 
 /* Canvas Cursors */
 .ue-page-canvas.tool-select { cursor: default; }
@@ -2189,13 +2164,6 @@ a:hover {
     display: none !important;
   }
 
-  /* Download button on mobile */
-  .btn--download-hero {
-    padding: var(--space-sm) var(--space-lg);
-    font-size: 0.875rem;
-    width: 100%;
-    justify-content: center;
-  }
 }
 
 /* Drop Hint Component - For file upload areas */
@@ -2646,12 +2614,6 @@ a:hover {
 .btn-sm {
   padding: var(--space-xs) var(--space-sm);
   font-size: 0.8125rem;
-}
-
-.btn-icon {
-  padding: var(--space-xs);
-  width: 28px;
-  height: 28px;
 }
 
 /* ============================================================

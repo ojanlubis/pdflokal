@@ -131,7 +131,6 @@ async function embedCustomFont(newDoc, fontCache, fontName, bold) {
     clearTimeout(timeoutId);
     const fontBytes = await fontResponse.arrayBuffer();
     fontCache[fontName] = await newDoc.embedFont(fontBytes);
-    console.log('[PDF Export] Embedded font:', fontName, `(${(fontBytes.byteLength / 1024).toFixed(1)}KB)`);
     return fontCache[fontName];
   } catch (err) {
     console.error('[PDF Export] Failed to load font:', fontName, err);

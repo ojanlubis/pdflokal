@@ -11,6 +11,7 @@ import { ueRedrawAnnotations, ueAddAnnotation } from './annotations.js';
 import { ueSaveEditUndoState } from './undo-redo.js';
 import { track } from '../lib/analytics.js';
 import { ueUpdateStatus } from './page-rendering.js';
+import { ueBuildFinalPDF } from './pdf-export.js';
 
 // Tool selection
 export function ueSetTool(tool) {
@@ -173,8 +174,7 @@ export async function applyEditorProtect() {
   }
 
   try {
-    // ueBuildFinalPDF lives in pdf-export.js; tools ↔ pdf-export is circular.
-    const pdfBytes = await window.ueBuildFinalPDF();
+    const pdfBytes = await ueBuildFinalPDF();
     const pdfDoc = await PDFLib.PDFDocument.load(pdfBytes);
 
     const protectedBytes = await pdfDoc.save({
