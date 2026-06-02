@@ -1687,8 +1687,11 @@
       ],
       beforeSend(event) {
         // Strip URL fragments — they can carry sensitive UI state.
+        // WHY split, not regex: SonarCloud S5852 flags greedy `.*$` as
+        // potentially ReDoS-prone (not exploitable here but the rule is
+        // conservative). split('#')[0] is simpler and identical in effect.
         if (event.request?.url) {
-          event.request.url = event.request.url.replace(/#.*$/, '');
+          event.request.url = event.request.url.split('#')[0];
         }
         return event;
       }
