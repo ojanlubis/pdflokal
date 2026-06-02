@@ -110,6 +110,10 @@ export function showHome(skipPushState = false) {
   state.currentTool = null;
   resetState();
 
+  if (typeof window.Sentry?.setTag === 'function') {
+    window.Sentry.setTag('app_section', 'home');
+  }
+
   // Restore site chrome and changelog badge when returning to home
   document.body.classList.remove('editor-active');
   if (window.changelogAPI) {
@@ -140,6 +144,10 @@ export function showTool(tool, skipPushState = false) {
     workspace.classList.add('active');
     state.currentTool = tool;
     track('tool_opened', { tool });
+
+    if (typeof window.Sentry?.setTag === 'function') {
+      window.Sentry.setTag('app_section', tool);
+    }
 
     // Scroll to top when opening workspace
     window.scrollTo(0, 0);

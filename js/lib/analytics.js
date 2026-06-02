@@ -21,6 +21,21 @@ const sessionId = crypto.randomUUID();
  * @param {Record<string, string|number|boolean|null>} [data] - Custom data (no nested objects)
  */
 export function track(name, data = {}) {
+  // WHY Sentry breadcrumb first: even if Vercel Analytics is blocked (ad
+  // blockers) or fails to load, we still get the breadcrumb attached to any
+  // crash that follows. JAVASCRIPT-4 would have told us "user did X then Y
+  // then crashed" instead of just "user tapped canvas then crashed".
+  // Safe to call when SDK not loaded — guard the global.
+  if (typeof window.Sentry?.addBreadcrumb === 'function') {
+    window.Sentry.addBreadcrumb({
+      category: 'app.action',
+      type: 'user',
+      level: 'info',
+      message: name,
+      data,
+    });
+  }
+
   // WHY guard: va() only exists when Vercel Analytics script is loaded.
   // In local dev (npx serve), it won't exist — fail silently.
   if (typeof window.va !== 'function') return;

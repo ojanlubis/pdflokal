@@ -495,6 +495,54 @@ test.describe('clear page annotations confirm', () => {
   });
 });
 
+// "Max Sentry" — verify the new breadcrumb pipeline. We hook addBreadcrumb
+// at init time and assert that user actions + UI toasts produce the right
+// breadcrumb categories. This protects the "every track() becomes a Sentry
+// breadcrumb" invariant from silent regressions.
+test.describe('Sentry observability', () => {
+  test('track() and showToast() both add Sentry breadcrumbs', async ({ page }) => {
+    await page.addInitScript(() => {
+      window.__breadcrumbs = [];
+      // Stub addBreadcrumb at the earliest possible moment — before the
+      // SDK is even loaded — so when init.js calls it, our spy captures.
+      Object.defineProperty(window, 'Sentry', {
+        configurable: true,
+        get() { return this._sentry; },
+        set(v) {
+          this._sentry = v;
+          const origAdd = v.addBreadcrumb?.bind(v);
+          v.addBreadcrumb = (crumb) => {
+            window.__breadcrumbs.push(crumb);
+            if (origAdd) origAdd(crumb);
+          };
+        },
+      });
+    });
+
+    await page.goto('/');
+    await loadSamplePdf(page);
+    await page.evaluate(() => window.showToast('Test error toast', 'error'));
+
+    const crumbs = await page.evaluate(() => window.__breadcrumbs);
+    const categories = crumbs.map(c => c.category);
+    // At minimum: app init breadcrumb, file_loaded action, toast breadcrumb.
+    expect(categories).toContain('app.lifecycle');
+    expect(categories).toContain('app.action');
+    expect(categories).toContain('ui.toast');
+    // Error toast must carry level=error so Sentry's UI flags it red.
+    const toastCrumb = crumbs.find(c => c.category === 'ui.toast');
+    expect(toastCrumb.level).toBe('error');
+  });
+
+  test('replay sample rate is the bumped 10% value', async ({ page }) => {
+    await page.goto('/');
+    const rate = await page.evaluate(() =>
+      window.Sentry?.getClient()?.getOptions()?.replaysSessionSampleRate
+    );
+    expect(rate).toBe(0.10);
+  });
+});
+
 // Sentry JAVASCRIPT-4: production crash on iOS, "TypeError: undefined is not
 // an object (evaluating 'anno.locked')" inside ueGetResizeHandle. Root cause:
 // ueRemoveAnnotation only clears selectedAnnotation on EXACT match, and

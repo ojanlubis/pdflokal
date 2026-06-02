@@ -125,6 +125,23 @@ export function downloadBlob(blob, filename) {
 // ============================================================
 
 export function showToast(message, type = 'info') {
+  // WHY breadcrumb: toasts narrate what the user saw — success/error/info.
+  // Attaching them to Sentry events turns post-crash triage from "what was
+  // the last DOM event" into "what was the last thing the user was told".
+  // No PII risk: replay masks all DOM text, and toast strings are static
+  // i18n keys, never user content.
+  if (typeof window.Sentry?.addBreadcrumb === 'function') {
+    let level = 'info';
+    if (type === 'error') level = 'error';
+    else if (type === 'success') level = 'info';
+    window.Sentry.addBreadcrumb({
+      category: 'ui.toast',
+      type: 'info',
+      level,
+      message,
+    });
+  }
+
   const container = document.getElementById('toast-container');
 
   const toast = document.createElement('div');
