@@ -286,6 +286,12 @@ export function resetState() {
   if (typeof window.ueReset === 'function') {
     window.ueReset();
   }
+  // WHY destroy here, not in ueReset: ueReset is shared between showHome and
+  // within-editor file replacement. The renderer must survive replacement so
+  // ueAddFiles can re-render — destroying belongs to leaving the editor.
+  if (typeof window.destroyPageRenderer === 'function') {
+    window.destroyPageRenderer();
+  }
 }
 
 // ============================================================
