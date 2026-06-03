@@ -8,7 +8,7 @@ import { on } from '../lib/events.js';
 import { showToast, showFullscreenLoading, hideFullscreenLoading, safeLocalGet, safeLocalSet } from '../lib/utils.js';
 import { initUnifiedEditorInput, ueAddFiles } from './file-loading.js';
 import { ueRenderThumbnails } from './sidebar.js';
-import { ueSetupScrollSync, ueUpdatePageCount, createPageRenderer, destroyPageRenderer } from './page-rendering.js';
+import { ueSetupScrollSync, ueUpdatePageCount, createPageRenderer } from './page-rendering.js';
 
 // WHY: Subscribe to pages:changed so page count auto-updates when pages change.
 // Replaces manual ueUpdatePageCount() calls scattered across modules.
@@ -16,12 +16,17 @@ on('pages:changed', () => ueUpdatePageCount());
 import { ueUpdateZoomDisplay } from './zoom-rotate.js';
 
 // Reset unified editor state
+// WHY no destroyPageRenderer: ueReset is called from within-editor flows
+// (Ganti File / ueReplaceFiles) that immediately add new files and need
+// the renderer alive to draw them. Destroying the singleton on every
+// reset left ueAddFiles silently no-op'ing all its render calls. The
+// renderer lifecycle is owned by showHome (entering/leaving the editor),
+// not by state reset.
 export function ueReset() {
   // Reset all value fields to defaults (SSOT — adding a field to getDefaultUeState is enough)
   Object.assign(ueState, getDefaultUeState());
 
   // Side-effect cleanup (not just value resets)
-  destroyPageRenderer();
   clearImageRegistry();
   ueState.zoomLevel = 1.0;
   ueUpdateZoomDisplay();

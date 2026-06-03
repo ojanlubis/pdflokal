@@ -674,3 +674,40 @@ test.describe('auto-switch to select after tool completion', () => {
     expect(tool).toBe('select');
   });
 });
+
+// Regression: user reported "buka PDF, edit, ganti file, file baru ga keload".
+// Root cause: ueReset destroyed the PageRenderer singleton; ueAddFiles then
+// silently no-op'd all its render calls (the optional-chaining wrappers like
+// `renderer?.createPageSlots()` swallow null). Pages were in state but never
+// drawn — container stayed display:none.
+test.describe('Ganti File preserves rendering', () => {
+  test('replacing files after edits actually renders the new pages', async ({ page }) => {
+    await page.goto('/');
+    await loadSamplePdf(page);
+
+    // Make an edit so we're past the "just-loaded" state when replace fires
+    await page.evaluate(() => {
+      window.ueAddAnnotation(0, { type: 'whiteout', x: 10, y: 10, width: 30, height: 20 });
+    });
+
+    // Simulate "Ganti File" — set new files on the hidden input and dispatch
+    // the same change event the native picker would produce.
+    await page.evaluate(() => window.ueReplaceFiles());
+    await page.setInputFiles('#ue-replace-input', 'tests/fixtures/sample-2pages.pdf');
+
+    // Wait for pages container to come back to flex and slots to exist
+    await page.waitForFunction(() => {
+      const c = document.getElementById('ue-pages-container');
+      const slots = document.querySelectorAll('.ue-page-slot canvas');
+      return c && c.style.display === 'flex' && slots.length === 2;
+    }, { timeout: 5000 });
+
+    // Pages state must be re-populated from the new file (not stale)
+    const pageCount = await page.evaluate(() => window.ueState.pages.length);
+    expect(pageCount).toBe(2);
+
+    // Annotations from the previous file must be cleared
+    const annoCount = await page.evaluate(() => window.ueState.annotations[0]?.length || 0);
+    expect(annoCount).toBe(0);
+  });
+});
