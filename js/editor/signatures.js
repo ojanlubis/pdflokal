@@ -80,10 +80,18 @@ export async function uePlaceSignature(x, y) {
 }
 
 // Draw signature preview at cursor
+// WHY canvas null guard: if the user opens the signature/paraf modal from
+// the top toolbar without having tapped a page first (selectedPage stays
+// -1), then moves the mouse over a page canvas, handleMove invokes this
+// preview with pendingSignature+signatureImage truthy but ueGetCurrentCanvas
+// returning null. The preview is a non-essential decoration — bail out
+// silently so the eventual click-to-place can still resolve the right page
+// via the event target. Closes Sentry JAVASCRIPT-6.
 export function ueDrawSignaturePreview(x, y) {
   if (!state.signatureImage) return;
 
   const canvas = ueGetCurrentCanvas();
+  if (!canvas) return;
   const ctx = canvas.getContext('2d');
 
   const img = new Image();

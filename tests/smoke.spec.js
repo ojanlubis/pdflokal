@@ -711,3 +711,37 @@ test.describe('Ganti File preserves rendering', () => {
     expect(annoCount).toBe(0);
   });
 });
+
+// Sentry JAVASCRIPT-6: TypeError: Cannot read properties of null (reading
+// 'getContext') in ueDrawSignaturePreview. Trigger: user opens paraf modal
+// before tapping a page (selectedPage stays -1), then moves the mouse over
+// a canvas while pendingSignature + signatureImage are set.
+test.describe('signature preview survives no-page-selected', () => {
+  test('regression: mousemove with pending signature and no selected page does not throw', async ({ page }) => {
+    const errors = watchForJsErrors(page);
+    await page.goto('/');
+    await loadSamplePdf(page);
+
+    // Mimic the production state: user picked paraf via top toolbar, never
+    // tapped a page first. Push signatureImage + pendingSignature directly,
+    // null out selectedPage to repro JAVASCRIPT-6's preconditions.
+    await page.evaluate(() => {
+      window.state.signatureImage = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNgAAIAAAUAAeImBZsAAAAASUVORK5CYII=';
+      window.ueState.pendingSignature = true;
+      window.ueState.pendingSubtype = 'paraf';
+      window.ueState.selectedPage = -1;
+      window.ueSetTool('paraf');
+    });
+
+    // Mousemove over the first canvas — pre-fix this throws inside
+    // ueDrawSignaturePreview because ueGetCurrentCanvas returns null.
+    await page.evaluate(() => {
+      const canvas = document.querySelector('.ue-page-slot canvas');
+      const rect = canvas.getBoundingClientRect();
+      const opts = { bubbles: true, cancelable: true, clientX: rect.left + 80, clientY: rect.top + 80, button: 0 };
+      canvas.dispatchEvent(new MouseEvent('mousemove', opts));
+    });
+
+    expect(errors).toEqual([]);
+  });
+});
