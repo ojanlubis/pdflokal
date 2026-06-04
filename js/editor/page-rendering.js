@@ -310,6 +310,28 @@ class PageRenderer {
     }
   }
 
+  // Restore a previously-rendered canvas from its CPU-side ImageData cache.
+  // WHY: Mobile browsers purge GPU canvas backing stores under memory pressure
+  // during fast scroll. The canvas element survives in DOM but paints blank.
+  // pageCaches[index] is the ImageData snapshot taken at end of renderPageCanvas
+  // — it lives in JS heap (CPU RAM), not GPU memory, so it survives the purge.
+  //
+  // Sanity checks: cache must exist AND dimensions must match the current
+  // canvas buffer (mismatch means the user zoomed or resized between render
+  // and restore; in that case we let the existing rendered=false → renderPageCanvas
+  // path handle it via renderVisiblePages/resize handler).
+  restoreCanvasFromCache(index) {
+    const pc = ueState.pageCanvases[index];
+    if (!pc) return;
+    const cached = ueState.pageCaches?.[index];
+    if (!cached) return;
+    if (cached.width !== pc.canvas.width || cached.height !== pc.canvas.height) return;
+
+    const ctx = pc.canvas.getContext('2d', { willReadFrequently: true });
+    ctx.putImageData(cached, 0, 0);
+    ueRedrawPageAnnotations(index);
+  }
+
   // Render all currently visible pages (used after zoom/resize)
   // WHY rAF: Coalesces rapid zoom/resize events into single render pass.
   // Timeout-based debounce causes mid-paint jank; rAF is paint-cycle-aware.
@@ -352,16 +374,31 @@ class PageRenderer {
         const pc = ueState.pageCanvases[index];
         if (!pc) return;
 
-        // WHY: Only render pages entering viewport. NO eviction of pages leaving.
-        // Previous eviction code (clearRect, rendered=false, cache delete) caused
-        // visible white flash flicker on mobile when scrolling back to evicted pages.
-        // Canvas memory stays allocated (GPU backing store is fixed by dimensions
-        // regardless of content). Only CPU-side ImageData cache could be freed,
-        // but the re-render cost + flicker outweighs the memory savings.
-        // For very large documents (>50 pages), memory may become an issue —
-        // address with page-at-a-time mode in the future, not eviction.
-        if (entry.isIntersecting && !pc.rendered) {
-          this.renderPageCanvas(index);
+        // WHY: Two paths on re-intersection.
+        //
+        // 1. First visit: no rendered flag → kick off PDF.js render.
+        //
+        // 2. Re-visit of an already-rendered page: do NOT re-run PDF.js (that's
+        //    the async path that caused the white flash flicker in Mar 2026,
+        //    leading us to abandon eviction). INSTEAD restore the canvas from
+        //    `ueState.pageCaches[index]` — the ImageData snapshot we already
+        //    take after every render (see renderPageCanvas line ~292).
+        //
+        // WHY this matters on mobile (June 2026 user report — Android Chrome):
+        // The browser silently purges GPU canvas backing stores under memory
+        // pressure during fast scroll. Once purged, the canvas paints blank
+        // and STAYS blank forever — `pc.rendered === true` means we never
+        // re-trigger renderPageCanvas. ImageData lives in CPU RAM, survives
+        // the GPU purge, and putImageData is synchronous + fast (~1ms for
+        // an A4 page at DPR 2). On a healthy canvas the call is a no-op
+        // overwrite of identical pixels; on a purged canvas it restores
+        // content instantly. Annotations get redrawn on top after restore.
+        if (entry.isIntersecting) {
+          if (!pc.rendered) {
+            this.renderPageCanvas(index);
+          } else {
+            this.restoreCanvasFromCache(index);
+          }
         }
       });
     }, {
