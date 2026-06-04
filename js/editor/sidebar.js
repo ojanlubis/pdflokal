@@ -90,8 +90,15 @@ export function ueRenderThumbnails() {
   ueState.pages.forEach((page, index) => {
     const item = document.createElement('div');
     const sourceCanvas = getThumbnailSource(index);
-    const canvasWidth = sourceCanvas ? sourceCanvas.width : page.canvas.width;
-    const canvasHeight = sourceCanvas ? sourceCanvas.height : page.canvas.height;
+    // WHY ?. on page.canvas: closes Sentry JAVASCRIPT-8. After a drag-reorder
+    // pages:changed fires which calls ueRenderThumbnails — but on rare cases
+    // (likely a page whose placeholder canvas object was never seeded because
+    // it came from a code path that bypassed createPageInfo) we hit a page
+    // with neither sourceCanvas nor page.canvas. Skip the thumbnail rather
+    // than crash the whole sidebar re-render.
+    const canvasWidth = sourceCanvas ? sourceCanvas.width : page.canvas?.width;
+    const canvasHeight = sourceCanvas ? sourceCanvas.height : page.canvas?.height;
+    if (!canvasWidth || !canvasHeight) return;
     const isLandscape = canvasWidth > canvasHeight;
     item.className = 'ue-thumbnail' + (index === ueState.selectedPage ? ' selected' : '') + (isLandscape ? ' landscape' : ' portrait');
     item.draggable = true;

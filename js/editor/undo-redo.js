@@ -179,7 +179,11 @@ async function ueRestorePages(pagesData) {
 // since the action is undoable but still surprising on mobile thumb taps.
 export function ueClearPageAnnotations() {
   if (ueState.selectedPage < 0) return;
-  if (ueState.annotations[ueState.selectedPage].length === 0) return;
+  // WHY ?.length: closes Sentry JAVASCRIPT-7. annotations[selectedPage] can be
+  // undefined when the index map gets out of sync (e.g. selection survives a
+  // page-reorder or delete that didn't reseat the per-page bucket). Treat the
+  // missing bucket as "nothing to clear".
+  if (!ueState.annotations[ueState.selectedPage]?.length) return;
 
   const pageNum = ueState.selectedPage + 1;
   if (!confirm(`Hapus semua edit di Halaman ${pageNum}? Halaman lain tidak terpengaruh.`)) return;
