@@ -213,6 +213,94 @@ export function createPageInfo({ pageNum, sourceIndex, sourceName, rotation = 0,
   return { pageNum, sourceIndex, sourceName, rotation, canvas, thumbCanvas, isFromImage };
 }
 
+// SINGLE SOURCE OF TRUTH — wraps any in-place mutation of `ueState.pages`
+// (reorder, delete a subset) so that every parallel map keyed by page index
+// follows the mutation atomically. Closes the bug class behind Sentry JS-4
+// (stale selectedAnnotation), JS-7 (stale annotations bucket), and JS-8
+// (parallel-map drift).
+//
+// Re-keys: annotations, pageCaches, pageScales (all keyed by index).
+// Reseats: selectedPage and selectedAnnotation.pageIndex (captured as page
+// object refs BEFORE the mutation, looked up via indexOf AFTER).
+//
+// Does NOT touch:
+//   - ueState.pageCanvases: holds live DOM elements. Each caller is
+//     responsible for splicing it in the same shape as `pages`. Page-rendering
+//     deletePage and createPageSlots own this.
+//   - ueState.sourceFiles, sourceFileBytes, etc: not page-indexed.
+//
+// Do NOT use for ueRestorePages (undo) — that builds a fresh pages array
+// from a serialized snapshot with no object overlap, so the index-based maps
+// all collapse to defaults. That path uses its own helpers.
+//
+// Usage:
+//   mutatePages(() => {
+//     const [moved] = ueState.pages.splice(from, 1);
+//     ueState.pages.splice(insertAt, 0, moved);
+//   });
+export function mutatePages(fn) {
+  const oldPages = ueState.pages.slice();
+  const oldAnnotations = { ...ueState.annotations };
+  const oldCaches = { ...ueState.pageCaches };
+  const oldScales = { ...ueState.pageScales };
+  const oldSelectedPage = ueState.selectedPage;
+  const oldSelectedAnno = ueState.selectedAnnotation;
+  // Capture references BEFORE the mutation. After the mutation, we look these
+  // up by indexOf to find their new positions (or learn they were removed).
+  const selectedPageRef = (oldSelectedPage >= 0 && oldSelectedPage < oldPages.length)
+    ? oldPages[oldSelectedPage]
+    : null;
+  const selectedAnnoPageRef = (oldSelectedAnno && oldPages[oldSelectedAnno.pageIndex]) || null;
+
+  fn();
+
+  // Re-key index-based parallel maps using page reference equality.
+  const newAnnotations = {};
+  const newCaches = {};
+  const newScales = {};
+  ueState.pages.forEach((page, newIdx) => {
+    const oldIdx = oldPages.indexOf(page);
+    newAnnotations[newIdx] = (oldIdx >= 0 ? oldAnnotations[oldIdx] : null) || [];
+    if (oldIdx >= 0) {
+      if (oldCaches[oldIdx]) newCaches[newIdx] = oldCaches[oldIdx];
+      if (oldScales[oldIdx]) newScales[newIdx] = oldScales[oldIdx];
+    }
+  });
+  ueState.annotations = newAnnotations;
+  ueState.pageCaches = newCaches;
+  ueState.pageScales = newScales;
+
+  // Reseat selectedPage by chasing the previously-selected page ref.
+  if (selectedPageRef) {
+    const newIdx = ueState.pages.indexOf(selectedPageRef);
+    if (newIdx >= 0) {
+      ueState.selectedPage = newIdx;
+    } else if (ueState.pages.length === 0) {
+      ueState.selectedPage = -1;
+    } else {
+      // Selected page was removed. Fall back to the nearest still-valid
+      // index — preserves the "stay near where you were" intuition.
+      ueState.selectedPage = Math.min(oldSelectedPage, ueState.pages.length - 1);
+    }
+  } else if (ueState.pages.length === 0) {
+    ueState.selectedPage = -1;
+  }
+
+  // Reseat selectedAnnotation by chasing its old page ref AND verifying the
+  // annotation at the recorded index still exists in the re-keyed bucket.
+  if (selectedAnnoPageRef && oldSelectedAnno) {
+    const newPageIdx = ueState.pages.indexOf(selectedAnnoPageRef);
+    if (newPageIdx >= 0 && newAnnotations[newPageIdx]?.[oldSelectedAnno.index]) {
+      ueState.selectedAnnotation = { pageIndex: newPageIdx, index: oldSelectedAnno.index };
+    } else {
+      ueState.selectedAnnotation = null;
+    }
+  } else if (oldSelectedAnno) {
+    // The annotation's page was removed entirely.
+    ueState.selectedAnnotation = null;
+  }
+}
+
 // ============================================================
 // ANNOTATION FACTORIES (SSOT for annotation shapes)
 // SINGLE SOURCE OF TRUTH — all annotation creation must use these factories.

@@ -11,7 +11,7 @@
  * delegate to the singleton `renderer` instance. No consumer changes needed.
  */
 
-import { ueState, state, OBSERVER_ROOT_MARGIN, MAX_CANVAS_DPR } from '../lib/state.js';
+import { ueState, state, OBSERVER_ROOT_MARGIN, MAX_CANVAS_DPR, mutatePages } from '../lib/state.js';
 import { emit } from '../lib/events.js';
 import { showToast, loadPdfDocument } from '../lib/utils.js';
 import { ueRedrawPageAnnotations } from './annotations.js';
@@ -508,35 +508,31 @@ class PageRenderer {
       return;
     }
 
-    // Clear selected annotation if it's on the deleted page
-    if (ueState.selectedAnnotation?.pageIndex === index) {
-      ueState.selectedAnnotation = null;
-      window.ueHideConfirmButton();
-    }
-
     // WHY window.*: page-rendering ↔ undo-redo circular import.
     // undo-redo imports ueCreatePageSlots from page-rendering.
     window.ueSaveUndoState();
-    const oldPages = [...ueState.pages];
-    ueState.pages.splice(index, 1);
 
-    // Rebuild annotations + caches using reference equality
-    window.rebuildAnnotationMapping(oldPages);
+    // mutatePages re-keys annotations / pageCaches / pageScales and reseats
+    // selectedPage + selectedAnnotation atomically. pageCanvases stays our
+    // responsibility because it owns DOM elements.
+    mutatePages(() => {
+      ueState.pages.splice(index, 1);
+    });
 
-    // Remove slot from DOM and rebuild pageCanvases
+    if (ueState.selectedAnnotation === null) {
+      window.ueHideConfirmButton();
+    }
+
+    // Remove slot from DOM and rebuild pageCanvases to match the new pages
+    // length. dataset.pageIndex must be re-stamped because mutatePages doesn't
+    // know about pageCanvases (deliberate — DOM ownership stays here).
     const removed = ueState.pageCanvases.splice(index, 1);
     if (removed[0]) removed[0].slot.remove();
     ueState.pageCanvases.forEach((pc, i) => {
       pc.slot.dataset.pageIndex = i;
     });
 
-    // Re-setup observer so its internal visiblePages set is fresh
     this.setupIntersectionObserver();
-
-    // Adjust selection
-    if (ueState.selectedPage >= ueState.pages.length) {
-      ueState.selectedPage = ueState.pages.length - 1;
-    }
 
     emit('pages:changed', { source: 'user' });
 

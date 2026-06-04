@@ -3,7 +3,7 @@
  * Gabungkan (page manager) modal: drag-drop reorder, rotate, delete, split/extract
  */
 
-import { ueState, uePmState } from '../lib/state.js';
+import { ueState, uePmState, mutatePages } from '../lib/state.js';
 import { emit } from '../lib/events.js';
 import { showToast, showFullscreenLoading, hideFullscreenLoading, downloadBlob, getDownloadFilename } from '../lib/utils.js';
 import { openModal, closeModal } from '../lib/navigation.js';
@@ -297,22 +297,21 @@ function uePmEnableDragReorder() {
   });
 }
 
-// SINGLE SOURCE OF TRUTH — performs the splice + remap + selectedPage tracking for page reorder.
-// WHY centralized: sidebar drag-drop, modal item-drop, and modal container-drop all need identical logic.
-// All must splice, rebuildAnnotationMapping, and track selectedPage — missing any step causes desync.
+// SINGLE SOURCE OF TRUTH — performs reorder atomically via mutatePages,
+// which re-keys annotations, pageCaches, pageScales, selectedPage, and
+// selectedAnnotation in one shot. Pre-mutatePages this function did the
+// re-keying piecemeal (only annotations + selectedPage), which left
+// selectedAnnotation stale on reorder — the bug class behind Sentry JS-4.
+// WHY centralized: sidebar drag-drop, modal item-drop, and modal
+// container-drop all funnel here.
 export function ueReorderPages(fromIndex, insertAt) {
-  const oldPages = [...ueState.pages];
-  const viewedPage = ueState.pages[ueState.selectedPage];
-
-  const [movedPage] = ueState.pages.splice(fromIndex, 1);
-  if (fromIndex < insertAt) insertAt--;
-  ueState.pages.splice(insertAt, 0, movedPage);
-  rebuildAnnotationMapping(oldPages);
+  mutatePages(() => {
+    const [movedPage] = ueState.pages.splice(fromIndex, 1);
+    if (fromIndex < insertAt) insertAt--;
+    ueState.pages.splice(insertAt, 0, movedPage);
+  });
   track('editor_action', { action: 'reorder' });
   emit('pages:changed', { source: 'user' });
-
-  const newViewedIndex = ueState.pages.indexOf(viewedPage);
-  if (newViewedIndex !== -1) ueState.selectedPage = newViewedIndex;
 }
 
 // SINGLE SOURCE OF TRUTH — all page reorder/delete operations must call this to remap
@@ -395,25 +394,16 @@ function uePmDeletePage(index) {
   ueSaveUndoState();
   track('editor_action', { action: 'delete_page' });
 
-  const wasViewingDeletedPage = (ueState.selectedPage === index);
-  const viewedPage = ueState.pages[ueState.selectedPage];
-  const oldPages = [...ueState.pages];
-
-  ueState.pages.splice(index, 1);
-  rebuildAnnotationMapping(oldPages);
+  // mutatePages re-keys annotations, pageCaches, pageScales, selectedPage,
+  // and selectedAnnotation atomically. Pre-mutatePages this function did the
+  // re-keying piecemeal — JS-7 / JS-8 / JS-4 all stem from that pattern.
+  mutatePages(() => {
+    ueState.pages.splice(index, 1);
+  });
   emit('pages:changed', { source: 'user' });
 
-  if (wasViewingDeletedPage) {
-    ueState.selectedPage = Math.min(index, ueState.pages.length - 1);
-  } else {
-    const newViewedIndex = ueState.pages.indexOf(viewedPage);
-    if (newViewedIndex !== -1) {
-      ueState.selectedPage = newViewedIndex;
-    } else {
-      ueState.selectedPage = Math.max(0, ueState.selectedPage - 1);
-    }
-  }
-
+  // Selection in the Gabungkan extract checklist is its own index-based map,
+  // not covered by mutatePages.
   uePmState.selectedForExtract = uePmState.selectedForExtract
     .filter(i => i !== index)
     .map(i => i > index ? i - 1 : i);
