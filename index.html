@@ -400,7 +400,7 @@
     <div id="compress-pdf-workspace" class="workspace">
       <div class="workspace-header">
         <h2>
-          <button class="back-btn" onclick="showHome()">
+          <button class="back-btn" onclick="window.showHome?.()">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M19 12H5M12 19l-7-7 7-7" />
             </svg>
@@ -434,7 +434,7 @@
         </div>
       </div>
       <div class="action-bar">
-        <button class="btn btn-primary btn-lg" id="compress-pdf-btn" disabled onclick="compressPDF()">
+        <button class="btn btn-primary btn-lg" id="compress-pdf-btn" disabled onclick="window.compressPDF?.()">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
             <polyline points="7 10 12 15 17 10" />
@@ -457,33 +457,33 @@
       <div class="editor-header" id="editor-header">
         <div class="editor-header-left">
           <div class="sidebar-file-dropdown" id="editor-file-dropdown">
-            <button class="editor-header-file-btn" onclick="toggleEditorFileMenu(event)" title="File">
+            <button class="editor-header-file-btn" onclick="window.toggleEditorFileMenu?.(event)" title="File">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
               File
               <svg class="sidebar-file-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
             </button>
             <div class="sidebar-file-menu" id="editor-header-file-menu">
-              <button class="sidebar-file-menu-item" onclick="document.getElementById('ue-file-input').click(); closeEditorFileMenu()">
+              <button class="sidebar-file-menu-item" onclick="document.getElementById('ue-file-input').click(); window.closeEditorFileMenu?.()">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
                 Tambah File
               </button>
-              <button class="sidebar-file-menu-item" onclick="ueReplaceFiles(); closeEditorFileMenu()">
+              <button class="sidebar-file-menu-item" onclick="window.ueReplaceFiles?.(); window.closeEditorFileMenu?.()">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/></svg>
                 Ganti File
               </button>
             </div>
           </div>
         </div>
-        <button type="button" class="editor-header-brand" onclick="editorGoHome(event)">
+        <button type="button" class="editor-header-brand" onclick="window.editorGoHome?.(event)">
           <div class="logo-icon" style="width:24px;height:24px;font-size:0.7rem;">P</div>
           PDFLokal
         </button>
         <div class="editor-header-right">
-          <button class="editor-header-icon-btn" onclick="themeAPI.toggle()" title="Ganti tema" type="button">
+          <button class="editor-header-icon-btn" onclick="window.themeAPI?.toggle?.()" title="Ganti tema" type="button">
             <svg class="icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
             <svg class="icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
           </button>
-          <button class="btn btn-primary btn--download-editor-header" id="ue-download-btn" disabled onclick="ueDownload()">
+          <button class="btn btn-primary btn--download-editor-header" id="ue-download-btn" disabled onclick="window.ueDownload?.()">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             <span class="ft-label">Download PDF</span>
           </button>
@@ -494,7 +494,7 @@
         <!-- Left Sidebar: Page Thumbnails -->
         <div class="unified-sidebar" id="unified-sidebar">
           <div class="unified-sidebar-header">
-            <button class="sidebar-kelola-btn" onclick="uePmOpenModal()" title="Kelola Halaman">
+            <button class="sidebar-kelola-btn" onclick="window.uePmOpenModal?.()" title="Kelola Halaman">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
               Kelola Halaman
             </button>
@@ -523,7 +523,7 @@
           <!-- Floating Toolbar -->
           <div class="floating-toolbar" id="floating-toolbar" role="toolbar" aria-label="Alat editor">
             <div class="ft-signature-wrapper">
-              <button class="ft-btn" id="ft-signature-btn" data-edit-tool="signature" onclick="ueOpenSignatureModal()" title="Tanda Tangan (S)">
+              <button class="ft-btn" id="ft-signature-btn" data-edit-tool="signature" onclick="window.ueOpenSignatureModal?.()" title="Tanda Tangan (S)">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 19.5v.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v1.5"/><path d="m16 19-3-3 8-8 3 3-8 8Z"/></svg>
                 <span class="ft-label">Tanda Tangan</span>
               </button>
@@ -532,56 +532,56 @@
                 <span class="tooltip-arrow"></span>
               </div>
             </div>
-            <button class="ft-btn" id="ft-paraf-btn" data-edit-tool="paraf" onclick="ueOpenParafModal()" title="Paraf (P)">
+            <button class="ft-btn" id="ft-paraf-btn" data-edit-tool="paraf" onclick="window.ueOpenParafModal?.()" title="Paraf (P)">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3l6 6-9 9H6v-6L15 3z"/><path d="M6 21h12"/></svg>
               <span class="ft-label">Paraf</span>
             </button>
-            <button class="ft-btn" data-edit-tool="text" onclick="ueSetTool('text')" title="Tambah Teks (T)">
+            <button class="ft-btn" data-edit-tool="text" onclick="window.ueSetTool?.('text')" title="Tambah Teks (T)">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>
               <span class="ft-label">Teks</span>
             </button>
-            <button class="ft-btn" data-edit-tool="whiteout" onclick="ueSetTool('whiteout')" title="Whiteout (W)">
+            <button class="ft-btn" data-edit-tool="whiteout" onclick="window.ueSetTool?.('whiteout')" title="Whiteout (W)">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
               <span class="ft-label">Whiteout</span>
             </button>
-            <button class="ft-btn" data-edit-tool="select" onclick="ueSetTool('select')" title="Pilih & Edit (V)">
+            <button class="ft-btn" data-edit-tool="select" onclick="window.ueSetTool?.('select')" title="Pilih & Edit (V)">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="M13 13l6 6"/></svg>
               <span class="ft-label">Pilih</span>
             </button>
             <div class="ft-divider"></div>
-            <button class="ft-btn" onclick="ueRotateCurrentPage()" title="Putar Halaman (R)">
+            <button class="ft-btn" onclick="window.ueRotateCurrentPage?.()" title="Putar Halaman (R)">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.85.83 6.72 2.24"/><path d="M21 3v6h-6"/></svg>
               <span class="ft-label">Putar</span>
             </button>
             <div class="ft-divider"></div>
             <div class="ft-more-wrapper">
-              <button class="ft-btn" id="ft-more-btn" onclick="toggleFloatingMore(event)" title="Lainnya">
+              <button class="ft-btn" id="ft-more-btn" onclick="window.toggleFloatingMore?.(event)" title="Lainnya">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
                 <span class="ft-label">Lainnya</span>
               </button>
               <div class="ft-more-dropdown" id="ft-more-dropdown" role="menu">
-                <button class="ft-more-item" role="menuitem" onclick="ueOpenWatermarkModal(); closeFloatingMore()">
+                <button class="ft-more-item" role="menuitem" onclick="window.ueOpenWatermarkModal?.(); window.closeFloatingMore?.()">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                   Watermark
                 </button>
-                <button class="ft-more-item" role="menuitem" onclick="ueOpenPageNumModal(); closeFloatingMore()">
+                <button class="ft-more-item" role="menuitem" onclick="window.ueOpenPageNumModal?.(); window.closeFloatingMore?.()">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h10"/><circle cx="18" cy="17" r="2"/></svg>
                   Nomor Halaman
                 </button>
-                <button class="ft-more-item" role="menuitem" onclick="ueOpenProtectModal(); closeFloatingMore()">
+                <button class="ft-more-item" role="menuitem" onclick="window.ueOpenProtectModal?.(); window.closeFloatingMore?.()">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                   Kunci PDF
                 </button>
                 <div class="ft-more-divider"></div>
-                <button class="ft-more-item" role="menuitem" onclick="ueUndo(); closeFloatingMore()">
+                <button class="ft-more-item" role="menuitem" onclick="window.ueUndo?.(); window.closeFloatingMore?.()">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
                   Undo
                 </button>
-                <button class="ft-more-item" role="menuitem" onclick="ueRedo(); closeFloatingMore()">
+                <button class="ft-more-item" role="menuitem" onclick="window.ueRedo?.(); window.closeFloatingMore?.()">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></svg>
                   Redo
                 </button>
-                <button class="ft-more-item ft-more-item--danger" role="menuitem" onclick="ueClearPageAnnotations(); closeFloatingMore()">
+                <button class="ft-more-item ft-more-item--danger" role="menuitem" onclick="window.ueClearPageAnnotations?.(); window.closeFloatingMore?.()">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
                   Hapus Edit Halaman Ini
                 </button>
@@ -626,13 +626,13 @@
         </div>
         <div class="editor-bottom-right">
           <div class="editor-bottom-zoom">
-            <button class="editor-bottom-btn" onclick="ueZoomOut()" title="Zoom Out (-)">
+            <button class="editor-bottom-btn" onclick="window.ueZoomOut?.()" title="Zoom Out (-)">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35M8 11h6" />
               </svg>
             </button>
             <span class="editor-bottom-zoom-level" id="ue-zoom-level-bottom">100%</span>
-            <button class="editor-bottom-btn" onclick="ueZoomIn()" title="Zoom In (+)">
+            <button class="editor-bottom-btn" onclick="window.ueZoomIn?.()" title="Zoom In (+)">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35M11 8v6M8 11h6" />
               </svg>
@@ -650,23 +650,23 @@
       <!-- Mobile Bottom Bar (visible only on mobile) -->
       <div class="mobile-bottom-bar" id="ue-mobile-bottombar">
         <div class="mobile-page-nav">
-          <button class="mobile-nav-btn" id="ue-mobile-prev" onclick="ueMobilePrevPage()" disabled
+          <button class="mobile-nav-btn" id="ue-mobile-prev" onclick="window.ueMobilePrevPage?.()" disabled
             title="Halaman sebelumnya">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M15 18l-6-6 6-6" />
             </svg>
           </button>
-          <button type="button" class="mobile-page-indicator" id="ue-mobile-page-indicator" onclick="ueMobileOpenPagePicker()">
+          <button type="button" class="mobile-page-indicator" id="ue-mobile-page-indicator" onclick="window.ueMobileOpenPagePicker?.()">
             Halaman <strong>1</strong> / 1
           </button>
-          <button class="mobile-nav-btn" id="ue-mobile-next" onclick="ueMobileNextPage()" title="Halaman berikutnya">
+          <button class="mobile-nav-btn" id="ue-mobile-next" onclick="window.ueMobileNextPage?.()" title="Halaman berikutnya">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M9 18l6-6-6-6" />
             </svg>
           </button>
         </div>
         <div class="mobile-tools-wrapper">
-          <button class="mobile-more-btn" id="ue-mobile-more-btn" onclick="toggleMobileTools()" title="Alat lainnya">
+          <button class="mobile-more-btn" id="ue-mobile-more-btn" onclick="window.toggleMobileTools?.()" title="Alat lainnya">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="12" cy="12" r="1.5" />
               <circle cx="12" cy="5" r="1.5" />
@@ -680,38 +680,38 @@
                top icon-toolbar isn't shadowed by a redundant text menu.
                UX audit finding H6. -->
           <div class="mobile-tools-dropdown" id="mobile-tools-dropdown" role="menu">
-            <button class="mobile-tool-item" role="menuitem" onclick="ueOpenWatermarkModal(); closeMobileTools()">
+            <button class="mobile-tool-item" role="menuitem" onclick="window.ueOpenWatermarkModal?.(); window.closeMobileTools?.()">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M12 2L4 6v6c0 5.5 3.5 10 8 10s8-4.5 8-10V6l-8-4z"/>
               </svg>
               Watermark
             </button>
-            <button class="mobile-tool-item" role="menuitem" onclick="ueOpenPageNumModal(); closeMobileTools()">
+            <button class="mobile-tool-item" role="menuitem" onclick="window.ueOpenPageNumModal?.(); window.closeMobileTools?.()">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
               </svg>
               Nomor Halaman
             </button>
-            <button class="mobile-tool-item" role="menuitem" onclick="ueOpenProtectModal(); closeMobileTools()">
+            <button class="mobile-tool-item" role="menuitem" onclick="window.ueOpenProtectModal?.(); window.closeMobileTools?.()">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
               </svg>
               Kunci PDF
             </button>
             <div class="mobile-tool-divider" role="separator"></div>
-            <button class="mobile-tool-item" role="menuitem" onclick="ueUndo(); closeMobileTools()">
+            <button class="mobile-tool-item" role="menuitem" onclick="window.ueUndo?.(); window.closeMobileTools?.()">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/>
               </svg>
               Undo
             </button>
-            <button class="mobile-tool-item" role="menuitem" onclick="ueRedo(); closeMobileTools()">
+            <button class="mobile-tool-item" role="menuitem" onclick="window.ueRedo?.(); window.closeMobileTools?.()">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/>
               </svg>
               Redo
             </button>
-            <button class="mobile-tool-item mobile-tool-item--danger" role="menuitem" onclick="ueClearPageAnnotations(); closeMobileTools()">
+            <button class="mobile-tool-item mobile-tool-item--danger" role="menuitem" onclick="window.ueClearPageAnnotations?.(); window.closeMobileTools?.()">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>
               </svg>
@@ -720,18 +720,18 @@
           </div>
         </div>
         <div class="mobile-zoom-controls">
-          <button class="mobile-nav-btn" onclick="ueZoomOut()" aria-label="Zoom out">
+          <button class="mobile-nav-btn" onclick="window.ueZoomOut?.()" aria-label="Zoom out">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
               <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35M8 11h6" />
             </svg>
           </button>
-          <button class="mobile-nav-btn" onclick="ueZoomIn()" aria-label="Zoom in">
+          <button class="mobile-nav-btn" onclick="window.ueZoomIn?.()" aria-label="Zoom in">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
               <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35M11 8v6M8 11h6" />
             </svg>
           </button>
         </div>
-        <button class="mobile-sign-btn" id="ue-mobile-sign-btn" onclick="ueOpenSignatureModal()">
+        <button class="mobile-sign-btn" id="ue-mobile-sign-btn" onclick="window.ueOpenSignatureModal?.()">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M20 19.5v.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v1.5" />
             <path d="m16 19-3-3 8-8 3 3-8 8Z" />
@@ -742,11 +742,11 @@
 
       <!-- Mobile Page Picker Modal -->
       <div class="mobile-page-picker" id="ue-mobile-page-picker">
-        <button type="button" class="mobile-page-picker-backdrop" onclick="ueMobileClosePagePicker()" aria-label="Tutup pemilih halaman"></button>
+        <button type="button" class="mobile-page-picker-backdrop" onclick="window.ueMobileClosePagePicker?.()" aria-label="Tutup pemilih halaman"></button>
         <div class="mobile-page-picker-content">
           <div class="mobile-page-picker-header">
             <span>Pilih Halaman</span>
-            <button class="mobile-page-picker-close" onclick="ueMobileClosePagePicker()">
+            <button class="mobile-page-picker-close" onclick="window.ueMobileClosePagePicker?.()">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M18 6L6 18M6 6l12 12" />
               </svg>
@@ -757,7 +757,7 @@
       </div>
 
       <!-- Floating Keyboard Shortcuts Help Button -->
-      <button class="shortcuts-help-btn" id="shortcuts-help-btn" onclick="openShortcutsModal()"
+      <button class="shortcuts-help-btn" id="shortcuts-help-btn" onclick="window.openShortcutsModal?.()"
         title="Pintasan Keyboard (?)">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="12" cy="12" r="10" />
@@ -771,7 +771,7 @@
     <div id="pdf-to-img-workspace" class="workspace">
       <div class="workspace-header">
         <h2>
-          <button class="back-btn" onclick="showHome()">
+          <button class="back-btn" onclick="window.showHome?.()">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M19 12H5M12 19l-7-7 7-7" />
             </svg>
@@ -809,10 +809,10 @@
             <option value="3">3x (216 DPI)</option>
           </select>
         </div>
-        <button class="btn btn-secondary" onclick="selectAllPdfImgPages()">Pilih Semua</button>
+        <button class="btn btn-secondary" onclick="window.selectAllPdfImgPages?.()">Pilih Semua</button>
       </div>
       <div class="action-bar">
-        <button class="btn btn-primary btn-lg" id="pdf-img-btn" disabled onclick="convertPDFtoImages()">
+        <button class="btn btn-primary btn-lg" id="pdf-img-btn" disabled onclick="window.convertPDFtoImages?.()">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
             <polyline points="7 10 12 15 17 10" />
@@ -833,7 +833,7 @@
     <div id="protect-workspace" class="workspace">
       <div class="workspace-header">
         <h2>
-          <button class="back-btn" onclick="showHome()">
+          <button class="back-btn" onclick="window.showHome?.()">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M19 12H5M12 19l-7-7 7-7" />
             </svg>
@@ -866,7 +866,7 @@
         </div>
       </div>
       <div class="action-bar">
-        <button class="btn btn-primary btn-lg" id="protect-btn" disabled onclick="protectPDF()">
+        <button class="btn btn-primary btn-lg" id="protect-btn" disabled onclick="window.protectPDF?.()">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
             <polyline points="7 10 12 15 17 10" />
@@ -881,7 +881,7 @@
     <div id="compress-img-workspace" class="workspace">
       <div class="workspace-header">
         <h2>
-          <button class="back-btn" onclick="showHome()">
+          <button class="back-btn" onclick="window.showHome?.()">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M19 12H5M12 19l-7-7 7-7" />
             </svg>
@@ -932,7 +932,7 @@
         </div>
       </div>
       <div class="action-bar">
-        <button class="btn btn-primary btn-lg" id="compress-img-btn" disabled onclick="downloadCompressedImage()">
+        <button class="btn btn-primary btn-lg" id="compress-img-btn" disabled onclick="window.downloadCompressedImage?.()">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
             <polyline points="7 10 12 15 17 10" />
@@ -947,7 +947,7 @@
     <div id="resize-workspace" class="workspace">
       <div class="workspace-header">
         <h2>
-          <button class="back-btn" onclick="showHome()">
+          <button class="back-btn" onclick="window.showHome?.()">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M19 12H5M12 19l-7-7 7-7" />
             </svg>
@@ -1002,7 +1002,7 @@
         </div>
       </div>
       <div class="action-bar">
-        <button class="btn btn-primary btn-lg" id="resize-btn" disabled onclick="downloadResizedImage()">
+        <button class="btn btn-primary btn-lg" id="resize-btn" disabled onclick="window.downloadResizedImage?.()">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
             <polyline points="7 10 12 15 17 10" />
@@ -1017,7 +1017,7 @@
     <div id="convert-img-workspace" class="workspace">
       <div class="workspace-header">
         <h2>
-          <button class="back-btn" onclick="showHome()">
+          <button class="back-btn" onclick="window.showHome?.()">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M19 12H5M12 19l-7-7 7-7" />
             </svg>
@@ -1061,7 +1061,7 @@
         </div>
       </div>
       <div class="action-bar">
-        <button class="btn btn-primary btn-lg" id="convert-btn" disabled onclick="convertImage()">
+        <button class="btn btn-primary btn-lg" id="convert-btn" disabled onclick="window.convertImage?.()">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
             <polyline points="7 10 12 15 17 10" />
@@ -1076,7 +1076,7 @@
     <div id="img-to-pdf-workspace" class="workspace">
       <div class="workspace-header">
         <h2>
-          <button class="back-btn" onclick="showHome()">
+          <button class="back-btn" onclick="window.showHome?.()">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M19 12H5M12 19l-7-7 7-7" />
             </svg>
@@ -1123,7 +1123,7 @@
         </div>
       </div>
       <div class="action-bar">
-        <button class="btn btn-primary btn-lg" id="img-pdf-btn" disabled onclick="imagesToPDF()">
+        <button class="btn btn-primary btn-lg" id="img-pdf-btn" disabled onclick="window.imagesToPDF?.()">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
             <polyline points="7 10 12 15 17 10" />
@@ -1144,7 +1144,7 @@
     <div id="remove-bg-workspace" class="workspace">
       <div class="workspace-header">
         <h2>
-          <button class="back-btn" onclick="showHome()">
+          <button class="back-btn" onclick="window.showHome?.()">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M19 12H5M12 19l-7-7 7-7" />
             </svg>
@@ -1201,7 +1201,7 @@
         </div>
       </div>
       <div class="action-bar">
-        <button class="btn btn-primary btn-lg" id="remove-bg-btn" disabled onclick="downloadRemovedBgImage()">
+        <button class="btn btn-primary btn-lg" id="remove-bg-btn" disabled onclick="window.downloadRemovedBgImage?.()">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
             <polyline points="7 10 12 15 17 10" />
@@ -1219,8 +1219,8 @@
     <div class="signature-box">
       <h3>Buat Tanda Tangan</h3>
       <div class="signature-tabs" role="tablist">
-        <button class="signature-tab active" role="tab" aria-selected="true" onclick="switchSignatureTab('upload')">Upload Foto</button>
-        <button class="signature-tab" role="tab" aria-selected="false" onclick="switchSignatureTab('draw')">Gambar</button>
+        <button class="signature-tab active" role="tab" aria-selected="true" onclick="window.switchSignatureTab?.('upload')">Upload Foto</button>
+        <button class="signature-tab" role="tab" aria-selected="false" onclick="window.switchSignatureTab?.('draw')">Gambar</button>
       </div>
       <div id="signature-upload-tab" class="signature-tab-content active">
         <button type="button" class="signature-upload-area" id="signature-upload-hint"
@@ -1236,15 +1236,15 @@
           <input type="file" id="signature-upload-input" accept="image/jpeg,image/png" style="display:none">
         </button>
         <div class="signature-actions">
-          <button class="btn btn-ghost" onclick="closeSignatureModal()">Batal</button>
+          <button class="btn btn-ghost" onclick="window.closeSignatureModal?.()">Batal</button>
         </div>
       </div>
       <div id="signature-draw-tab" class="signature-tab-content">
         <canvas id="signature-canvas" class="signature-canvas"></canvas>
         <div class="signature-actions">
-          <button class="btn btn-secondary" onclick="clearSignature()">Hapus</button>
-          <button class="btn btn-ghost" onclick="closeSignatureModal()">Batal</button>
-          <button class="btn btn-primary" onclick="useSignature()">Gunakan</button>
+          <button class="btn btn-secondary" onclick="window.clearSignature?.()">Hapus</button>
+          <button class="btn btn-ghost" onclick="window.closeSignatureModal?.()">Batal</button>
+          <button class="btn btn-primary" onclick="window.useSignature?.()">Gunakan</button>
         </div>
       </div>
     </div>
@@ -1280,8 +1280,8 @@
         </div>
       </div>
       <div class="edit-modal-actions">
-        <button class="btn btn-ghost" onclick="closeSignatureBgModal()">Batal</button>
-        <button class="btn btn-primary" onclick="useSignatureFromUpload()">Gunakan Tanda Tangan</button>
+        <button class="btn btn-ghost" onclick="window.closeSignatureBgModal?.()">Batal</button>
+        <button class="btn btn-primary" onclick="window.useSignatureFromUpload?.()">Gunakan Tanda Tangan</button>
       </div>
     </div>
   </dialog>
@@ -1296,9 +1296,9 @@
         <span>Tempel di semua halaman</span>
       </label>
       <div class="signature-actions">
-        <button class="btn btn-secondary" onclick="clearParaf()">Hapus</button>
-        <button class="btn btn-ghost" onclick="closeParafModal()">Batal</button>
-        <button class="btn btn-primary" onclick="useParaf()">Gunakan</button>
+        <button class="btn btn-secondary" onclick="window.clearParaf?.()">Hapus</button>
+        <button class="btn btn-ghost" onclick="window.closeParafModal?.()">Batal</button>
+        <button class="btn btn-primary" onclick="window.useParaf?.()">Gunakan</button>
       </div>
     </div>
   </dialog>
@@ -1374,8 +1374,8 @@
         </div>
       </div>
       <div class="edit-modal-actions">
-        <button class="btn btn-ghost" onclick="closeTextModal()">Batal</button>
-        <button class="btn btn-primary" onclick="confirmTextInput()">Tambah Teks</button>
+        <button class="btn btn-ghost" onclick="window.closeTextModal?.()">Batal</button>
+        <button class="btn btn-primary" onclick="window.confirmTextInput?.()">Tambah Teks</button>
       </div>
     </div>
   </dialog>
@@ -1428,8 +1428,8 @@
         </div>
       </div>
       <div class="edit-modal-actions">
-        <button class="btn btn-ghost" onclick="closeEditorWatermarkModal()">Batal</button>
-        <button class="btn btn-primary" onclick="applyEditorWatermark()">Terapkan Watermark</button>
+        <button class="btn btn-ghost" onclick="window.closeEditorWatermarkModal?.()">Batal</button>
+        <button class="btn btn-primary" onclick="window.applyEditorWatermark?.()">Terapkan Watermark</button>
       </div>
     </div>
   </dialog>
@@ -1475,8 +1475,8 @@
         </div>
       </div>
       <div class="edit-modal-actions">
-        <button class="btn btn-ghost" onclick="closeEditorPageNumModal()">Batal</button>
-        <button class="btn btn-primary" onclick="applyEditorPageNumbers()">Terapkan Nomor</button>
+        <button class="btn btn-ghost" onclick="window.closeEditorPageNumModal?.()">Batal</button>
+        <button class="btn btn-primary" onclick="window.applyEditorPageNumbers?.()">Terapkan Nomor</button>
       </div>
     </div>
   </dialog>
@@ -1497,8 +1497,8 @@
         <p class="modal-note">PDF akan di-download dengan proteksi password</p>
       </div>
       <div class="edit-modal-actions">
-        <button class="btn btn-ghost" onclick="closeEditorProtectModal()">Batal</button>
-        <button class="btn btn-primary" onclick="applyEditorProtect()">Kunci & Download</button>
+        <button class="btn btn-ghost" onclick="window.closeEditorProtectModal?.()">Batal</button>
+        <button class="btn btn-primary" onclick="window.applyEditorProtect?.()">Kunci & Download</button>
       </div>
     </div>
   </dialog>
@@ -1508,7 +1508,7 @@
     <div class="edit-modal-box ue-pm-modal-box">
       <div class="ue-pm-header">
         <h3>Gabungkan Halaman</h3>
-        <button class="ue-pm-close-btn" onclick="uePmCloseModal()" aria-label="Tutup">&times;</button>
+        <button class="ue-pm-close-btn" onclick="window.uePmCloseModal?.()" aria-label="Tutup">&times;</button>
       </div>
 
       <div class="ue-pm-toolbar">
@@ -1532,7 +1532,7 @@
         </button>
         <input type="file" id="ue-pm-image-input" multiple accept=".png,.jpg,.jpeg,.webp,image/*" style="display:none">
 
-        <button class="btn btn-secondary btn-sm" id="ue-pm-extract-mode-btn" onclick="uePmToggleExtractMode()">
+        <button class="btn btn-secondary btn-sm" id="ue-pm-extract-mode-btn" onclick="window.uePmToggleExtractMode?.()">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12 3v18" />
             <path d="M8 8H4a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h4" />
@@ -1546,8 +1546,8 @@
         </button>
 
         <div class="ue-pm-extract-actions" id="ue-pm-extract-actions" style="display:none;">
-          <button class="btn btn-secondary btn-sm" onclick="uePmSelectAll()">Pilih Semua</button>
-          <button class="btn btn-secondary btn-sm" onclick="uePmDeselectAll()">Batal Pilih</button>
+          <button class="btn btn-secondary btn-sm" onclick="window.uePmSelectAll?.()">Pilih Semua</button>
+          <button class="btn btn-secondary btn-sm" onclick="window.uePmDeselectAll?.()">Batal Pilih</button>
           <span class="ue-pm-selection-count" id="ue-pm-selection-count">0 halaman dipilih</span>
         </div>
       </div>
@@ -1558,17 +1558,17 @@
 
       <div class="edit-modal-actions">
         <span class="ue-pm-page-count" id="ue-pm-page-count">0 halaman</span>
-        <button class="btn btn-primary" id="ue-pm-extract-btn" onclick="uePmExtractSelected()" style="display:none;">
+        <button class="btn btn-primary" id="ue-pm-extract-btn" onclick="window.uePmExtractSelected?.()" style="display:none;">
           Split sebagai PDF baru
         </button>
-        <button class="btn btn-ghost" onclick="uePmCloseModal()">Selesai</button>
+        <button class="btn btn-ghost" onclick="window.uePmCloseModal?.()">Selesai</button>
       </div>
     </div>
   </dialog>
 
   <!-- Keyboard Shortcuts Modal -->
   <dialog class="shortcuts-modal" id="shortcuts-modal" aria-modal="true" aria-label="Pintasan keyboard">
-    <button type="button" class="shortcuts-modal-backdrop" onclick="closeShortcutsModal()" aria-label="Tutup pintasan keyboard"></button>
+    <button type="button" class="shortcuts-modal-backdrop" onclick="window.closeShortcutsModal?.()" aria-label="Tutup pintasan keyboard"></button>
     <div class="shortcuts-modal-box">
       <h3>Pintasan Keyboard</h3>
       <div class="shortcuts-modal-content">
@@ -1599,7 +1599,7 @@
         </div>
       </div>
       <div class="shortcuts-modal-actions">
-        <button class="btn btn-primary" onclick="closeShortcutsModal()">Tutup</button>
+        <button class="btn btn-primary" onclick="window.closeShortcutsModal?.()">Tutup</button>
       </div>
     </div>
   </dialog>
@@ -1722,7 +1722,7 @@
   <!-- Changelog Notification System -->
   <div class="changelog-notification" id="changelog-notification">
     <!-- Collapsed Badge View -->
-    <button type="button" class="changelog-badge" onclick="changelogAPI.open()">
+    <button type="button" class="changelog-badge" onclick="window.changelogAPI?.open?.()">
       <div class="changelog-badge-icon">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M3 8l3.5 3.5L13 4.5"></path>
@@ -1738,12 +1738,12 @@
       <div class="changelog-header">
         <h3>📣 Update Terbaru</h3>
         <div class="changelog-header-actions">
-          <button class="changelog-action-btn" onclick="changelogAPI.minimize()" title="Perkecil">
+          <button class="changelog-action-btn" onclick="window.changelogAPI?.minimize?.()" title="Perkecil">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="5" y1="12" x2="19" y2="12"></line>
             </svg>
           </button>
-          <button class="changelog-action-btn" onclick="changelogAPI.close()" title="Tutup">
+          <button class="changelog-action-btn" onclick="window.changelogAPI?.close?.()" title="Tutup">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="18" y1="6" x2="6" y2="18"></line>
               <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -1755,11 +1755,11 @@
         <!-- Items inserted by JS -->
       </div>
       <div class="changelog-pagination" id="changelog-pagination">
-        <button class="changelog-page-btn" id="changelog-prev-btn" onclick="changelogPrevPage()" disabled>
+        <button class="changelog-page-btn" id="changelog-prev-btn" onclick="window.changelogPrevPage?.()" disabled>
           Sebelumnya
         </button>
         <span class="changelog-page-info" id="changelog-page-info">1 / 1</span>
-        <button class="changelog-page-btn" id="changelog-next-btn" onclick="changelogNextPage()">
+        <button class="changelog-page-btn" id="changelog-next-btn" onclick="window.changelogNextPage?.()">
           Selanjutnya
         </button>
       </div>
