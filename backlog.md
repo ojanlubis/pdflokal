@@ -13,10 +13,19 @@ Running list of UI/UX findings + small fixes to pick up later. Append new items 
 
 ## Open
 
-- **[crit]** Ganti File regression: content is OLD, only page count is NEW — desktop AND mobile — [sidebar.js:22-47](js/editor/sidebar.js#L22-L47), [file-loading.js](js/editor/file-loading.js), [page-rendering.js createPageSlots](js/editor/page-rendering.js)
-  - User report (Jun 9, prod test on both): file picker opens, page count updates to the new file's count, but main canvas shows OLD content (or blank), sidebar shows BOTH old and new thumbnails. PR #64 fixed the `destroyPageRenderer` issue; this is a separate bug we missed because the Playwright test bypassed the real picker flow by calling `setInputFiles` directly on the hidden input.
-  - Investigation hypotheses (verify before coding): (1) pageCanvases array (DOM canvas references) keeps old entries across `ueReset` somehow — maybe ueReset's `pagesContainer.innerHTML = ''` race with `ueAddFiles`'s `ueCreatePageSlots`; (2) `_pdfDocCache` Map on the PageRenderer isn't cleared between files, so renderPageCanvas reads OLD doc bytes; (3) sidebar's `ueRenderThumbnails` is being called with a transient stale state; (4) `pageCaches` retain OLD ImageData indexed by 0..N — when new pages get rendered, `restoreCanvasFromCache` on IO re-intersection puts OLD pixels back (PR #66 side effect — would explain "old content showing").
-  - Best repro path: open editor with PDF A → make any edit → File menu → Ganti File → pick PDF B → observe DOM state via DevTools (which canvases are in #ue-pages-container, what's in ueState.pageCaches, ueState.sourceFiles).
+- **[crit]** Ganti File regression: PDF.js doc cache stays stale, new file partially loads — [page-rendering.js _pdfDocCache](js/editor/page-rendering.js), [sidebar.js ueReplaceFiles](js/editor/sidebar.js)
+  - User report (Jun 9, prod test on both): page count updates to new file, but main canvas shows OLD content (or blank), sidebar thumb stale. PR #64 fixed the `destroyPageRenderer` issue; this is a separate bug.
+  - **AI exploratory repro on prod (Jun 9, 12:00 WIB) — STRONG EVIDENCE for hypothesis #2** (`_pdfDocCache` stale):
+    - Loaded sample-2pages.pdf → Ganti File → uploaded distinct alt-1page.pdf (big red "ALT PDF" text + yellow rectangle, A4)
+    - **State looked correct**: `ueState.pages.length=1`, `sourceFiles=['alt-1page.pdf']`, `pageCachesKeys=['0']`, page dimensions correct (1104×1562 = A4 at 1.85x)
+    - **`page.thumbCanvas` (300×425) RENDERED CORRECTLY**: yellow rectangle pixels at y=170 (rgb 230,230,51). So PDF.js can read the new file — `handlePdfFile`'s pre-render works.
+    - **Main canvas (1104×1562) was 100% blank**: all 81 sampled regions = pure white. PDF.js never drew into it after Ganti File. IntersectionObserver fired (page slot visible) but renderPageCanvas was no-op.
+    - **Click → text tool → click on blank canvas → "Test Page 1" appeared** — that's content from the ORIGINAL sample-2pages.pdf. The render-on-interaction pulled from the STALE cached PDF.js doc, not the new one.
+    - Positive control: fresh load of alt-1page.pdf (without Ganti File) → renders perfectly. The bug is specific to the Ganti File flow.
+  - **Root cause (high confidence)**: PageRenderer's `_pdfDocCache` Map keys by source-file URL or by `pages[i]._docRef` — when Ganti File runs, `ueReset` does NOT call `clearPdfDocCache()`. Next render either skips (cache says "already have doc, no need to re-fetch") or hits the cached old doc.
+  - Verification before fixing: add `console.log` in PageRenderer's renderPageCanvas to print `pageIndex`, `pages[i].sourceFile`, and `_pdfDocCache.has(key)`. Repro Ganti File and confirm cache key collision.
+  - **Trivial fix candidate**: `clearPdfDocCache()` inside `ueReplaceFiles()` before `ueAddFiles()` runs. Plus invalidate `pageCaches` ImageData (PR #66's bitmap cache) since dimensions and content are now wrong for those keys.
+  - **Real-flow test that catches this**: a Playwright test that uses `page.click('label[for=ue-replace-input]')` or actual mouse-driven menu navigation (NOT `setInputFiles` on the hidden input). The Jun 9 prod test caught this because user used the real picker; our scripted test bypassed it.
 
 - **[high]** Mobile fast-scroll sometimes jumps the viewport to page 1 — [page-rendering.js setupScrollSync](js/editor/page-rendering.js)
   - User report (Jun 9, Android Chrome): during the brief restore-from-cache flash (PR #66), occasionally the scroll position snaps back to page 1.
