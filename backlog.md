@@ -13,6 +13,30 @@ Running list of UI/UX findings + small fixes to pick up later. Append new items 
 
 ## Open
 
+- **[crit]** Ganti File regression: content is OLD, only page count is NEW — desktop AND mobile — [sidebar.js:22-47](js/editor/sidebar.js#L22-L47), [file-loading.js](js/editor/file-loading.js), [page-rendering.js createPageSlots](js/editor/page-rendering.js)
+  - User report (Jun 9, prod test on both): file picker opens, page count updates to the new file's count, but main canvas shows OLD content (or blank), sidebar shows BOTH old and new thumbnails. PR #64 fixed the `destroyPageRenderer` issue; this is a separate bug we missed because the Playwright test bypassed the real picker flow by calling `setInputFiles` directly on the hidden input.
+  - Investigation hypotheses (verify before coding): (1) pageCanvases array (DOM canvas references) keeps old entries across `ueReset` somehow — maybe ueReset's `pagesContainer.innerHTML = ''` race with `ueAddFiles`'s `ueCreatePageSlots`; (2) `_pdfDocCache` Map on the PageRenderer isn't cleared between files, so renderPageCanvas reads OLD doc bytes; (3) sidebar's `ueRenderThumbnails` is being called with a transient stale state; (4) `pageCaches` retain OLD ImageData indexed by 0..N — when new pages get rendered, `restoreCanvasFromCache` on IO re-intersection puts OLD pixels back (PR #66 side effect — would explain "old content showing").
+  - Best repro path: open editor with PDF A → make any edit → File menu → Ganti File → pick PDF B → observe DOM state via DevTools (which canvases are in #ue-pages-container, what's in ueState.pageCaches, ueState.sourceFiles).
+
+- **[high]** Mobile fast-scroll sometimes jumps the viewport to page 1 — [page-rendering.js setupScrollSync](js/editor/page-rendering.js)
+  - User report (Jun 9, Android Chrome): during the brief restore-from-cache flash (PR #66), occasionally the scroll position snaps back to page 1.
+  - Hypothesis (NOT confirmed by code reading): during fast scroll, the scroll-sync 150ms debounce reads `getBoundingClientRect` mid-momentum, computes the wrong "closest page" (possibly index 0), updates `ueState.selectedPage`, and some downstream consumer (mobile page indicator, mobile-ui.js update, or a `selectPage` call I missed) triggers `scrollIntoView(top)`. The scroll sync handler explicitly avoids calling `selectPage` for this reason, but a chained consumer may not.
+  - Investigation: instrument the scroll-sync handler + any code that reads `selectedPage` and could scroll. Likely involves `ueMobileUpdatePageIndicator` (window bridge from mobile-ui.js) — read its behavior carefully.
+
+- **[high]** Pinch-zoom flicker is severe on mobile — [page-rendering.js renderVisiblePages](js/editor/page-rendering.js), [zoom-rotate.js](js/editor/zoom-rotate.js)
+  - User report (Jun 9, Android Chrome): pinch-to-zoom flickers very badly and uncontrollably.
+  - Diagnosis (high confidence): zoom changes canvas dimensions → `pageCaches` entries become dimension-mismatched → `restoreCanvasFromCache` early-returns on the size guard → falls back to async PDF.js re-render via `renderVisiblePages` → produces visible blank-then-content states across all visible pages simultaneously. PR #66 doesn't help here by design.
+  - Fix candidates (none cheap):
+    - **(a) CSS scale during pinch**: apply `transform: scale(zoom)` to the page slots during pinch, only re-render the canvas buffer on pinch-end (the gesture itself is preview-quality, the commit is high-quality). Lower flicker risk; intermediate frames are scaled-pixel renders.
+    - **(b) Double-buffer**: render to off-DOM canvas, swap when ready. Doubles memory during render.
+    - **(c) Defer re-render**: only re-render once pinch settles (debounce). Final state is correct; during pinch, canvas stays at old zoom level visually until release. Trade-off: misleading "stale" state mid-gesture.
+    - Author's lean: (a) — matches user expectation (pinch = preview, release = commit) and is the cheapest to ship.
+
+- **[low]** Paraf "Konfirmasi" + delete buttons hidden behind canvas on mobile — [signatures.js ueShowConfirmButton](js/editor/signatures.js), [style.css](style.css) (`--z-canvas-ui: 20`)
+  - User report (Jun 9, Android Chrome): after placing a paraf, the confirm/delete buttons render UNDER the canvas instead of on top of it.
+  - Diagnosis: z-index ordering. The `signature-btn-wrapper` sits in `#ue-canvas-wrapper` which has its own stacking context on mobile. The current `--z-canvas-ui: 20` isn't winning against something else in the mobile layout.
+  - Fix: bump `--z-canvas-ui` OR explicitly set `z-index: var(--z-canvas-ui)` on `.signature-btn-wrapper` + verify the stacking context. User noted this isn't critical to the app's function but it IS visibly broken.
+
 - **[med]** Root cause for Sentry JAVASCRIPT-7 — `ueState.annotations[selectedPage]` was undefined when "Hapus Edit Halaman Ini" fired — [undo-redo.js:182](js/editor/undo-redo.js#L182) (defensive guard shipped in PR #67)
   - Crash repro hypothesis: user selected a page, then deleted/reordered pages (Gabungkan modal or page-manager). `selectedPage` index was carried over but the per-page annotations bucket wasn't reseated to match. Same fingerprint as the existing stale-selectedAnnotation backlog item — both symptoms of "index map didn't follow page mutation."
   - True fix: ensure every page-array mutation (splice, reorder, delete) re-keys `ueState.annotations` and `ueState.selectedAnnotation` atomically. Probably wrap in a single helper `mutatePages(fn)` that handles the rebind. Same helper would close the stale selection item below.
