@@ -844,3 +844,110 @@ test.describe('mobile canvas purge survives via ImageData cache', () => {
     expect(errors).toEqual([]);
   });
 });
+
+// mutatePages() SSOT helper — wraps page-array mutations so every parallel
+// map (annotations, pageCaches, pageScales) and selection state
+// (selectedPage, selectedAnnotation) re-keys atomically by page reference.
+// Closes the root cause behind Sentry JS-4 (stale selectedAnnotation),
+// JS-7 (stale annotations bucket), JS-8 (parallel-map drift).
+test.describe('mutatePages() re-keys parallel maps atomically', () => {
+  test('reorder: annotations follow their page', async ({ page }) => {
+    await page.goto('/');
+    await loadSamplePdf(page);
+
+    // Seed page 0 with annotation "A", page 1 with annotation "B".
+    await page.evaluate(() => {
+      window.ueAddAnnotation(0, { type: 'whiteout', x: 10, y: 10, width: 30, height: 20, tag: 'A' });
+      window.ueAddAnnotation(1, { type: 'whiteout', x: 20, y: 20, width: 30, height: 20, tag: 'B' });
+    });
+
+    // Reorder: move page 0 to position 1 (so the order becomes [old-1, old-0]).
+    await page.evaluate(() => window.ueReorderPages(0, 2));
+
+    // The annotation tagged "A" was on the page that's now at index 1.
+    // The annotation tagged "B" was on the page that's now at index 0.
+    const result = await page.evaluate(() => ({
+      p0: window.ueState.annotations[0]?.map(a => a.tag),
+      p1: window.ueState.annotations[1]?.map(a => a.tag),
+    }));
+    expect(result.p0).toEqual(['B']);
+    expect(result.p1).toEqual(['A']);
+  });
+
+  test('reorder: selectedAnnotation follows its page', async ({ page }) => {
+    await page.goto('/');
+    await loadSamplePdf(page);
+
+    await page.evaluate(() => {
+      window.ueAddAnnotation(0, { type: 'whiteout', x: 10, y: 10, width: 30, height: 20 });
+      window.ueState.selectedAnnotation = { pageIndex: 0, index: 0 };
+    });
+
+    // Reorder: move page 0 to position 1.
+    await page.evaluate(() => window.ueReorderPages(0, 2));
+
+    const sel = await page.evaluate(() => window.ueState.selectedAnnotation);
+    // The page that USED to be at index 0 is now at index 1, so the
+    // selectedAnnotation.pageIndex should track to 1, not stay at 0.
+    expect(sel).toEqual({ pageIndex: 1, index: 0 });
+  });
+
+  test('mutatePages: removing an earlier sibling shifts selectedAnnotation correctly', async ({ page }) => {
+    // Closes the root cause behind JAVASCRIPT-4: when an annotation at a
+    // lower index is removed, selectedAnnotation.index used to keep its old
+    // value, pointing to a DIFFERENT annotation (or past-end → undefined).
+    //
+    // After this fix, when a sibling annotation is removed via the regular
+    // ueRemoveAnnotation, mutatePages isn't involved (it's for page-array
+    // mutations). But the parallel hazard for PAGES is: if page 0 is removed
+    // while selectedAnnotation lives on page 1, the new index for that page
+    // should be 0, AND the annotation index within the new bucket should
+    // still resolve to a real annotation.
+    await page.goto('/');
+    await loadSamplePdf(page);
+
+    await page.evaluate(() => {
+      window.ueAddAnnotation(0, { type: 'whiteout', x: 1, y: 1, width: 10, height: 10, tag: 'page0' });
+      window.ueAddAnnotation(1, { type: 'whiteout', x: 2, y: 2, width: 10, height: 10, tag: 'page1' });
+      window.ueState.selectedAnnotation = { pageIndex: 1, index: 0 };
+    });
+
+    // Use the helper directly to simulate "page 0 deleted" without going
+    // through the DOM/UI delete flow (which also splices pageCanvases etc.).
+    await page.evaluate(() => {
+      window.mutatePages(() => {
+        window.ueState.pages.splice(0, 1);
+      });
+    });
+
+    const result = await page.evaluate(() => ({
+      sel: window.ueState.selectedAnnotation,
+      page0Annos: window.ueState.annotations[0]?.map(a => a.tag),
+    }));
+    // The page formerly at index 1 is now at index 0. selectedAnnotation
+    // should track: pageIndex 1 → 0, index 0 unchanged (still 'page1').
+    expect(result.sel).toEqual({ pageIndex: 0, index: 0 });
+    expect(result.page0Annos).toEqual(['page1']);
+  });
+
+  test('mutatePages: deleting selected page falls back to nearest valid index', async ({ page }) => {
+    await page.goto('/');
+    await loadSamplePdf(page);
+
+    await page.evaluate(() => {
+      window.ueState.selectedPage = 1;
+      window.ueState.selectedAnnotation = null;
+    });
+
+    // Remove page 1 (the selected one).
+    await page.evaluate(() => {
+      window.mutatePages(() => {
+        window.ueState.pages.splice(1, 1);
+      });
+    });
+
+    const sel = await page.evaluate(() => window.ueState.selectedPage);
+    // Pages.length is now 1; the only valid index is 0.
+    expect(sel).toBe(0);
+  });
+});

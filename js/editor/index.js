@@ -93,6 +93,11 @@ window.ueFindAnnotationAt = ueFindAnnotationAt;
 window.ueAddAnnotation = ueAddAnnotation;
 window.ueRemoveAnnotation = ueRemoveAnnotation;
 
+// mutatePages bridge — needed so tests can drive page mutations directly
+// and assert the parallel maps re-key correctly.
+import { mutatePages as _mutatePages } from '../lib/state.js';
+window.mutatePages = _mutatePages;
+
 // Undo/Redo
 import { ueSaveUndoState, ueUndo, ueRedo, ueSaveEditUndoState, uePushAnnotationSnapshot, ueClearPageAnnotations } from './undo-redo.js';
 window.ueSaveUndoState = ueSaveUndoState;
