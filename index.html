@@ -19,8 +19,18 @@
     window.dataLayer = window.dataLayer || [];
     function gtag(){dataLayer.push(arguments);}
     gtag('js', new Date());
-    gtag('config', 'AW-17538923405');
-    gtag('config', 'G-0XJY0WLCZ1');
+    // WHY hostname allowlist: gtag has no automatic environment detection. Without
+    // this guard, every `npx serve` session, every Playwright test run, and every
+    // Vercel preview deploy pollutes the production GA4 property. Verified on
+    // Jun 9 2026: 1,086 of 1,621 weekly GA4 page_views came from http://localhost/
+    // (67% phantom data, mostly Playwright headless --isolated browser contexts).
+    // Vercel Analytics doesn't have this problem because its script (/_vercel/insights/
+    // script.js) only resolves on Vercel deployments; on localhost the script 404s.
+    // Allowlist > blocklist so a new dev hostname can never silently leak.
+    if (location.hostname === 'pdflokal.id' || location.hostname === 'www.pdflokal.id') {
+      gtag('config', 'AW-17538923405');
+      gtag('config', 'G-0XJY0WLCZ1');
+    }
   </script>
 
   <!-- SEO Meta Tags -->
