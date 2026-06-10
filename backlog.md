@@ -13,6 +13,14 @@ Running list of UI/UX findings + small fixes to pick up later. Append new items 
 
 ## Open
 
+- **[high]** User can't pick a font family for text annotations — [inline-editor.js](js/editor/inline-editor.js), [text-modal.js](js/pdf-tools/text-modal.js), [state.js CSS_FONT_MAP](js/lib/state.js)
+  - User report (Jun 10): font dropdown is either not visible in the inline text editor flow, or the selection doesn't actually apply to the annotation. Options exist in state (Helvetica, Times Roman, Courier, Montserrat, Carlito — confirmed in DOM during Jun 9 prod test) so this is a wiring/UI bug, not a missing feature.
+  - Investigation before fix: confirm whether the font picker is shown in BOTH the modal-first text creation AND the inline-text-on-first-click flow (PR #54). If only one path exposes it, that's the gap. Also check whether `applyEditorText` reads the font from the picker state at apply time.
+
+- **[high]** User can't bold (or italic) text annotations — [inline-editor.js](js/editor/inline-editor.js), [text-modal.js](js/pdf-tools/text-modal.js), [annotations.js drawTextAnnotation](js/editor/annotations.js)
+  - User report (Jun 10): bold/italic toggle is missing or non-functional. State factory `createTextAnnotation` supports `bold` + `italic` flags, and `buildCanvasFont` maps them to CSS, so the data model is ready — UI just isn't writing the flag, or render isn't reading it back at the right time.
+  - Investigation before fix: check whether the inline editor exposes B/I controls at all (might be modal-only), and whether `_editing` flag handling preserves bold/italic across modal→inline transitions and undo/redo cycles.
+
 - **[crit]** Ganti File regression: PDF.js doc cache stays stale, new file partially loads — [page-rendering.js _pdfDocCache](js/editor/page-rendering.js), [sidebar.js ueReplaceFiles](js/editor/sidebar.js)
   - User report (Jun 9, prod test on both): page count updates to new file, but main canvas shows OLD content (or blank), sidebar thumb stale. PR #64 fixed the `destroyPageRenderer` issue; this is a separate bug.
   - **AI exploratory repro on prod (Jun 9, 12:00 WIB) — STRONG EVIDENCE for hypothesis #2** (`_pdfDocCache` stale):
