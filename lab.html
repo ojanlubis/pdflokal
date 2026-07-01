@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="robots" content="noindex" />
+  <title>PDFLokal — Lab (render engine preview)</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; }
+    body { display: flex; flex-direction: column; font-family: system-ui, sans-serif; background: #e9ecef; color: #1c1917; }
+    #lab-bar {
+      display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+      background: #fff; border-bottom: 1px solid #dcdcdc; flex: 0 0 auto;
+    }
+    #lab-bar b { font-size: 14px; }
+    #lab-bar .spacer { flex: 1; }
+    #lab-bar button, #lab-bar label {
+      font: inherit; font-size: 13px; padding: 6px 12px; border: 1px solid #cfcfcf;
+      border-radius: 8px; background: #f7f7f7; cursor: pointer; min-height: 40px;
+    }
+    #lab-bar .z { min-width: 40px; }
+    #lab-status { font-size: 12px; color: #666; }
+    /* The scroll container — body scroll of image-backed pages. */
+    #pv-scroll { flex: 1; overflow: auto; -webkit-overflow-scrolling: touch; padding: 16px 0 40vh; }
+    #pv-stage {
+      display: flex; flex-direction: column; align-items: center; gap: 16px;
+      transform-origin: top center; will-change: transform;
+    }
+    input[type=file] { display: none; }
+  </style>
+</head>
+<body>
+  <div id="lab-bar">
+    <b>Lab</b>
+    <span id="lab-status">memuat…</span>
+    <span class="spacer"></span>
+    <button class="z" id="z-out" aria-label="Perkecil">−</button>
+    <button class="z" id="z-in" aria-label="Perbesar">+</button>
+    <label>Buka PDF<input type="file" id="lab-file" accept="application/pdf,.pdf" /></label>
+  </div>
+  <div id="pv-scroll"><div id="pv-stage"></div></div>
+
+  <script src="js/vendor/pdf.min.js"></script>
+  <script type="module" src="js/lab.js"></script>
+</body>
+</html>
