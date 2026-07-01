@@ -12,13 +12,15 @@ test.describe('render engine preview (lab)', () => {
   test('renders image-backed pages with the active annotation on top', async ({ page }) => {
     await page.goto('/lab.html');
 
-    // Core import + rasterize + render: the bundled 2-page sample auto-loads.
+    // Slots are laid out INSTANTLY (streaming: metadata first, pixels later).
     await page.waitForFunction(
       () => document.querySelectorAll('.pv-page').length === 2,
       null, { timeout: 10_000 });
 
-    // Backgrounds are real rasterized PNGs (not live canvases).
-    expect(await page.locator('.pv-bg').count()).toBe(2);
+    // Both sample pages are near the viewport → they stream in as real PNGs.
+    await page.waitForFunction(
+      () => document.querySelectorAll('.pv-bg').length === 2,
+      null, { timeout: 10_000 });
     const bgIsPng = await page.evaluate(() =>
       (document.querySelector('.pv-bg')?.src || '').startsWith('data:image/png'));
     expect(bgIsPng).toBe(true);

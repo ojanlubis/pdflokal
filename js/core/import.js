@@ -41,27 +41,44 @@ export async function importPdf(doc, { name, bytes }) {
 // this on demand. Result is stashed on `page.raster` so the DOM can show an
 // <img> that survives the mobile GPU-backing-store purge (unlike a live canvas).
 //
-// NOTE: reloads the PDF.js document per call for now — a per-source doc cache
-// is a render-layer concern (Phase 2), deliberately not baked into the adapter.
-export async function rasterizePage(doc, page, { scale = 2 } = {}) {
-  const source = getSource(doc, page.sourceId);
-  if (!source) return null;
+// One-shot convenience (reloads the PDF.js doc each call). For streaming/windowed
+// rendering use createPageRasterizer() below, which caches the doc per source.
+export async function rasterizePage(doc, page, opts = {}) {
+  const r = createPageRasterizer(doc);
+  try { return await r.rasterize(page, opts); }
+  finally { await r.destroy(); }
+}
 
-  const pdf = await window.pdfjsLib.getDocument({ data: source.bytes.slice() }).promise;
-  const pdfPage = await pdf.getPage(page.sourcePageNum + 1);
-  const vp = pdfPage.getViewport({ scale, rotation: page.rotation });
+// A rasterizer that caches the PDF.js document per source, so windowed/streaming
+// rendering (Phase 2) can rasterize many pages without reloading the whole PDF
+// each time. This is the render-layer's tool for "3-nearest" loading on any
+// document size within a bounded memory budget.
+export function createPageRasterizer(doc) {
+  const docCache = new Map(); // sourceId -> PDF.js document promise
 
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.ceil(vp.width);
-  canvas.height = Math.ceil(vp.height);
-  await pdfPage.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
-  await pdf.destroy();
+  function getPdf(sourceId) {
+    if (!docCache.has(sourceId)) {
+      const source = getSource(doc, sourceId);
+      docCache.set(sourceId, window.pdfjsLib.getDocument({ data: source.bytes.slice() }).promise);
+    }
+    return docCache.get(sourceId);
+  }
 
-  page.raster = {
-    dataUrl: canvas.toDataURL('image/png'),
-    width: canvas.width,
-    height: canvas.height,
-    scale,
+  return {
+    async rasterize(page, { scale = 2 } = {}) {
+      const pdf = await getPdf(page.sourceId);
+      const pdfPage = await pdf.getPage(page.sourcePageNum + 1);
+      const vp = pdfPage.getViewport({ scale, rotation: page.rotation });
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.ceil(vp.width);
+      canvas.height = Math.ceil(vp.height);
+      await pdfPage.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+      page.raster = { dataUrl: canvas.toDataURL('image/png'), width: canvas.width, height: canvas.height, scale };
+      return page.raster;
+    },
+    async destroy() {
+      for (const p of docCache.values()) { try { (await p).destroy(); } catch { /* already gone */ } }
+      docCache.clear();
+    },
   };
-  return page.raster;
 }
