@@ -7,14 +7,6 @@
 export { enableDragReorder } from './drag-reorder.js';
 
 export {
-  openTextModal,
-  closeTextModal,
-  updateTextPreview,
-  getTextModalSettings,
-  confirmTextInput
-} from './text-modal.js';
-
-export {
   openSignatureModal,
   closeSignatureModal,
   clearSignature,
@@ -61,13 +53,6 @@ export {
 // Drag reorder
 import { enableDragReorder } from './drag-reorder.js';
 window.enableDragReorder = enableDragReorder;
-
-// Text modal
-import { openTextModal, closeTextModal, getTextModalSettings, confirmTextInput } from './text-modal.js';
-window.openTextModal = openTextModal;
-window.closeTextModal = closeTextModal;
-window.getTextModalSettings = getTextModalSettings;
-window.confirmTextInput = confirmTextInput;
 
 // Signature modal
 import {

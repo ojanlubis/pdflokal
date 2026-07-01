@@ -338,22 +338,6 @@ export function ueReorderPages(fromIndex, insertAt) {
   emit('pages:changed', { source: 'user' });
 }
 
-// SINGLE SOURCE OF TRUTH — remap annotations/caches by page reference after a
-// reorder/delete outside mutatePages. Kept for callers that still use it.
-export function rebuildAnnotationMapping(oldPages) {
-  const oldAnnotations = { ...ueState.annotations };
-  const oldCaches = { ...ueState.pageCaches };
-  const newAnnotations = {};
-  const newCaches = {};
-  ueState.pages.forEach((page, newIdx) => {
-    const oldIdx = oldPages.indexOf(page);
-    newAnnotations[newIdx] = (oldIdx >= 0 ? oldAnnotations[oldIdx] : null) || [];
-    if (oldIdx >= 0 && oldCaches[oldIdx]) newCaches[newIdx] = oldCaches[oldIdx];
-  });
-  ueState.annotations = newAnnotations;
-  ueState.pageCaches = newCaches;
-}
-
 function uePmGetDropIndicator() {
   if (!uePmState.dropIndicator) {
     uePmState.dropIndicator = document.createElement('div');

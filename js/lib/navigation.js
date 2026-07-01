@@ -68,7 +68,7 @@ export function closeModal(id, skipHistoryBack = false) {
 // WHY: Data-driven instead of 60 lines of copy-paste. Adding a new modal = one array entry.
 // Gabungkan modal is special-cased because uePmCloseModal() has side effects (pageCanvases rebuild).
 const MODAL_IDS = [
-  'signature-modal', 'paraf-modal', 'signature-bg-modal', 'text-input-modal',
+  'signature-modal', 'paraf-modal', 'signature-bg-modal',
   'editor-watermark-modal', 'editor-pagenum-modal', 'editor-protect-modal', 'shortcuts-modal'
 ];
 

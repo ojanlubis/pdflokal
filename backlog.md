@@ -55,16 +55,10 @@ Running list of UI/UX findings + small fixes to pick up later. Append new items 
 - **[low]** Touch reorder in Kelola Halaman — HTML5 drag-and-drop doesn't fire on touch, so drag-reorder is desktop-only (pre-existing, same for the sidebar) — [page-manager.js uePmEnableDragReorder](js/editor/page-manager.js), [sidebar.js](js/editor/sidebar.js)
   - The Jul 1 redesign fixed the touch *catastrophe* (rotate/delete are now always-visible ≥40px), but reorder still relies on HTML5 DnD which mobile browsers don't dispatch. Follow-up: pointer-events-based drag (works mouse + touch) OR compact move ◀ ▶ buttons per tile. Do it once and reuse for the sidebar too.
 
-- **[low]** Visual test "gabungkan modal" doesn't actually capture the modal — [visual.spec.js:139](tests/visual.spec.js#L139)
-  - Playwright paints mask boxes LAST, so the full-page main-canvas mask (`.ue-page-slot canvas`) draws on top of the centered modal and hides it. The screenshot is just the masked editor — modal changes don't register. Fix: screenshot the `#ue-gabungkan-modal` element directly (not the whole page) so it genuinely regression-tests the modal. (Modal behavior is covered by `tests/kelola-halaman.spec.js` in the meantime.)
-
 - **[low]** Question the red outline around the active page (sidebar thumbnail + main canvas) — is it earning its keep? — [style.css](style.css) (search `.selected` / active-page rules), [sidebar.js ueHighlightThumbnail](js/editor/sidebar.js)
   - User asked (Jul 1): why is there a red outline around the active page in both the sidebar and the canvas? What does it actually do for the user? If it has no real UI/UX benefit, just remove it.
   - Investigation before touching: identify every rule/JS path that draws it — sidebar thumbnail `.selected` outline AND the main canvas red border seen in the screenshot. Note CLAUDE.md says the page-selection border is intentionally hidden on mobile (`.ue-page-slot.selected canvas` outline only at `min-width: 901px`), so this is desktop-only already. Decide whether "which page is active" is communicated well enough by the sidebar highlight + `Hal X/Y` indicator alone.
   - Likely outcome: sidebar highlight is useful (shows selection); the thick red border around the whole main canvas page is the questionable one — it's loud and may not add info the user needs. Consider softening (thinner/neutral) or removing the canvas border while keeping the sidebar highlight.
-
-- **[low]** Retire the orphaned `text-input-modal` — [text-modal.js](js/pdf-tools/text-modal.js), [index.html](index.html) (`#text-input-modal`)
-  - The old text modal is now double-dead: nothing triggered `ueOpenTextModal()` even before the format bar, and the bar fully replaces its purpose. Dead code (modal DOM + text-modal.js + `ueConfirmText`/`getTextModalSettings` + window bridges + MODAL_IDS/close-map entries). Remove in a dedicated cleanup PR (touches navigation.js, init-ui.js, index.js bridges) so a regression is easy to bisect.
 
 - **[high]** Mobile fast-scroll sometimes jumps the viewport to page 1 — [page-rendering.js setupScrollSync](js/editor/page-rendering.js)
   - User report (Jun 9, Android Chrome): during the brief restore-from-cache flash (PR #66), occasionally the scroll position snaps back to page 1.
@@ -121,6 +115,11 @@ Running list of UI/UX findings + small fixes to pick up later. Append new items 
 ---
 
 ## Done
+
+- **[low×3]** Wave 0 cleanup (Jul 1) — dead code + orphaned modal + visual-test-mask
+  - Removed dead `rebuildAnnotationMapping` (function + barrel export + window bridge; `mutatePages` long replaced it) and refreshed 3 stale comments that cited it.
+  - Retired the orphaned `text-input-modal` end-to-end: deleted `pdf-tools/text-modal.js`, the `#text-input-modal` DOM, `ueOpenTextModal`/`ueConfirmText`, all window bridges, and its `MODAL_IDS` / backdrop-close-map entries. Text creation is 100% inline (format bar) now. Lint + 50 functional green (nothing referenced it).
+  - Fixed the visual test: it now screenshots the `#ue-gabungkan-modal` element (was a full-page shot whose main-canvas mask painted over the modal). Baseline regenerated (darwin + linux) and confirmed it captures the real modal.
 
 - **[med×3]** Sentry true-fixes JS-4 / JS-7 / JS-8 (Jul 1) — [annotations.js ueRemoveAnnotation](js/editor/annotations.js#L134), [remove-annotation-selection.spec.js](tests/remove-annotation-selection.spec.js)
   - **JS-4 (true-fixed):** `ueRemoveAnnotation` now reseats `selectedAnnotation` — removing an earlier sibling on the same page shifts the selection index down by one (was left pointing one slot off → the crash in `ueGetResizeHandle`); removing the selected one nulls it; removing a later one leaves it untouched. 3 tests.

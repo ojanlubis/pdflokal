@@ -178,7 +178,6 @@ export function initModalBackdropClose() {
   const modalCloseMap = {
     'signature-modal': 'closeSignatureModal',
     'signature-bg-modal': 'closeSignatureBgModal',
-    'text-input-modal': 'closeTextModal',
     'editor-watermark-modal': 'closeEditorWatermarkModal',
     'editor-pagenum-modal': 'closeEditorPageNumModal',
     'editor-protect-modal': 'closeEditorProtectModal',

@@ -260,12 +260,11 @@ export function ueSetupCanvasEvents() {
   // WHY: Extracted from handleDown to reduce cognitive complexity (S3776).
   // Returns true if the event was fully handled (caller should return early).
   function handleSelectDown(x, y) {
-    // WHY stale-selection guard: ueState.selectedAnnotation can outlive the
-    // annotation it points to — ueRemoveAnnotation only clears selection on
-    // an EXACT (pageIndex,index) match, and rebuildAnnotationMapping doesn't
-    // touch selection at all. Without this guard the next tap crashes inside
-    // ueGetResizeHandle (Sentry JAVASCRIPT-4). Clear the stale ref so the
-    // tap can still hit whatever's actually under it via ueFindAnnotationAt.
+    // WHY stale-selection guard (belt-and-suspenders): selectedAnnotation is kept
+    // in sync by ueRemoveAnnotation (reseats on remove) and mutatePages (reseats
+    // on page reorder/delete). Should a stale ref ever slip through, the next tap
+    // would crash inside ueGetResizeHandle (Sentry JAVASCRIPT-4). Clear it here so
+    // the tap can still hit whatever's actually under it via ueFindAnnotationAt.
     if (ueState.selectedAnnotation) {
       const stale = !ueState.annotations[ueState.selectedAnnotation.pageIndex]?.[ueState.selectedAnnotation.index];
       if (stale) {
