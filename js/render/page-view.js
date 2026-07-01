@@ -19,13 +19,19 @@
 
 // Render a full page view (background + annotation overlay).
 // opts.activeId = id of the currently-active annotation → rendered on top.
-export function renderPageView(page, { activeId = null } = {}) {
+// opts.label   = placeholder caption (e.g. "Hal 42").
+export function renderPageView(page, opts = {}) {
+  const { activeId = null } = opts;
   const view = document.createElement('div');
   view.className = 'pv-page';
   view.dataset.pageId = page.id;
   view.style.cssText =
     `position:relative;flex:0 0 auto;width:${page.width}px;height:${page.height}px;` +
     'background:#fff;box-shadow:0 2px 14px rgba(0,0,0,.14);border-radius:2px';
+
+  // Intentional placeholder text (e.g. "Hal 42") so a flung-past page reads as
+  // "loading", not "broken". Stored on the view so clearPageRaster can reuse it.
+  if (opts.label) view.dataset.phLabel = opts.label;
 
   if (page.raster) attachRaster(view, page.raster);
   else attachPlaceholder(view);
@@ -53,7 +59,7 @@ function attachPlaceholder(view) {
   ph.style.cssText =
     'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;' +
     'color:#c4c4c4;font-size:13px;background:#fff';
-  ph.textContent = 'memuat…';
+  ph.textContent = view.dataset.phLabel || 'memuat…';
   view.insertBefore(ph, view.firstChild);
 }
 
