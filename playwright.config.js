@@ -10,6 +10,9 @@ const BASE_URL = `http://localhost:${PORT}`;
 
 export default defineConfig({
   testDir: './tests',
+  // tests/core/ is the HEADLESS domain core suite — it runs under `node --test`
+  // (npm run test:core), not Playwright. Keep the browser runner out of it.
+  testIgnore: 'core/**',
   timeout: 30_000,
   expect: { timeout: 5_000 },
   fullyParallel: false,
