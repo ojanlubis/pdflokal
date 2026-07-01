@@ -3,7 +3,7 @@
  * Tool cards, range sliders, signature/paraf pads, modal backdrop close
  */
 
-import { state, mobileState, uePmState } from './lib/state.js';
+import { state, mobileState } from './lib/state.js';
 import {
   showToast, showFullscreenLoading, hideFullscreenLoading,
   setupCanvasDPR
@@ -97,8 +97,13 @@ function handleEditorCardWithFilePicker(mode) {
             editor.uePmOpenModal();
 
             setTimeout(() => {
-              if (mode === 'split' && !uePmState.extractMode) {
-                editor.uePmToggleExtractMode();
+              // WHY select-all for split: the redesigned Kelola Halaman modal has
+              // no separate "Split mode" — extraction is done by selecting pages
+              // then hitting "Split jadi PDF". Selecting all surfaces that action
+              // bar so the user sees the affordance and deselects what they don't
+              // want. (Previously this called the removed uePmToggleExtractMode.)
+              if (mode === 'split') {
+                editor.uePmSelectAll();
               }
               hideFullscreenLoading();
             }, 100);
