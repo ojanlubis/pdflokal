@@ -1,4 +1,7 @@
-# Roadmap 1
+# Roadmap 1  — ARCHIVED
+
+> **Superseded by [roadmap-2.md](roadmap-2.md) (the current backlog-flush roadmap, Jul 1).**
+> Kept for June history only.
 
 _Started: 2026-06-09 — Updated: 2026-06-09 (GA4 MCP wired)_
 
