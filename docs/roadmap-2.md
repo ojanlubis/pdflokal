@@ -1,84 +1,54 @@
-# Roadmap 2 — Backlog Flush
+# Roadmap — Vision → Foundation → Flush
 
-_Started: 2026-07-01 — Supersedes [roadmap-1.md](roadmap-1.md) (archived, June history)._
+_Updated: 2026-07 — **pivoted** from a pure backlog-flush to a vision-led foundation rebuild. Supersedes [roadmap-1.md](roadmap-1.md) (archived)._
 
-The goal of this roadmap is to **drain the whole Open backlog to zero**, in waves.
-Every open `backlog.md` item has a home here — nothing is orphaned.
+**North star:** [product-definition.md](product-definition.md) — the WinRAR × Excalidraw of PDF for Indonesia; client-side is the moat; the editor is the product; mobile-first follows paid acquisition.
 
-**Execution order (decided with user, Jul 1): `0 → 1 → 5 → 2/3 → 4`.**
-Quick wins + mobile bugs first (fast, visible), then the small growth loop for
-momentum, then the measure-first audits, then the big UE consolidation last —
-risk rises gradually.
+**The spine is now the foundation rebuild** ([foundation-plan.md](foundation-plan.md)), because craft-level mobile UX is impossible on the current architecture (6 index-keyed parallel state maps + mixed DOM/canvas rendering). The old tactical "waves" still exist, but **several are absorbed by the foundation** — we don't fix them twice.
 
-**Two standing rules:**
-- **Measure-first** for Waves 2 & 3 — bring numbers before choosing a fix.
-- **Gate:** Wave 4's big piece is blocked on the 4.0 format-aware-UE decision.
-- Every fix keeps the discipline: reproduce-before → fix → verify-after → regression sweep.
+**Standing rules:**
+- Behavior-changing foundation phases (1–3) → **founder verifies on a real Android before merge.** Every mobile bug is a leak in a paid funnel.
+- Small reversible steps; each proves itself via tests. Founder judges the end-product; process guarantees correctness.
+- `backlog.md` stays the SSOT of findings; this roadmap sequences them.
 
 ---
 
-## Wave 0 — Quick wins & Sentry cleanup  ⬅ NOW
-_Low-risk, self-contained; drains ~10 items. Batchable across 1–2 sittings._
+## ★ THE SPINE — Foundation rebuild (priority) → [foundation-plan.md](foundation-plan.md)
 
-- [x] REVERT whiteout auto-switch-to-Pilih (#60) — whiteout stays sticky; tests flipped · **[high]** _(PR A)_
-- [x] Arrow-key nudge for a selected annotation (1px / Shift=10px), one undo per burst · **[high]** _(PR A)_
-- [x] Ctrl+Z inside the signature/paraf modal rewinds the pen stroke, not a doc annotation · **[high]** _(PR A)_
-- [x] Sentry true-fixes JS-4 / JS-7 / JS-8 — JS-4 reseats selection in `ueRemoveAnnotation`; JS-7/8 verified already closed by `mutatePages` + `createPageInfo` SSOT · **[med×3]** _(PR B)_ · _also surfaced: `rebuildAnnotationMapping` is now dead code → remove in PR C_
-- [ ] Paraf Konfirmasi/delete buttons z-index behind canvas on mobile · **[low]**
-- [ ] Sidebar page-number badge too large / covers thumbnail · **[med]**
-- [ ] Red-outline around active page — decide keep/soften/remove (desktop-only already) · **[low]**
-- [x] Retire the orphaned `text-input-modal` (dead since the format bar) + remove dead `rebuildAnnotationMapping` · **[low]** _(PR C)_
-- [x] Fix visual test so it actually captures the modal (screenshots the `#ue-gabungkan-modal` element now) · **[low]** _(PR C)_
+Target: 3 clean layers — **Core** (headless `js/core/`) / **Render** (image-backed pages + one annotation overlay) / **Interact** (one input path). Built *beside* the live app, swapped in incrementally. No big-bang.
 
-## Wave 1 — Mobile reliability & content-add
-_Real-user friction. Some items need a real Android device to verify._
+- [x] **Phase 0** — headless core: one `Doc` model, page owns its annotations, everything by id not index. 7 headless tests. · **#81**
+- [x] **Phase 0b** — import adapter: `importPdf` (bytes→Doc) + lazy `rasterizePage` (page→PNG). Browser-tested on a real PDF. · **#82**
+- [ ] **Phase 0c** — export adapter: `Doc → pdf-lib → bytes`, verified against the golden suite. _(optional before Phase 1 — makes the core round-trip a PDF headlessly)_
+- [ ] **Phase 1** — image-background rendering + ONE annotation overlay in the **live editor** ⬅ **NEXT**, the first VISIBLE, phone-verifiable payoff. **Kills mobile flicker + "annotation slides behind a page" + paraf z-index — structurally.**
+- [ ] **Phase 2** — viewport "3-nearest" mounting; far pages = placeholders.
+- [ ] **Phase 3** — migrate the live editor onto the core; retire the parallel state (`pageCanvases`/`pageCaches`/`pageScales`/`annotations{}`).
+- [ ] **Phase 4** — reactive subscribers, IF state-sync pain remains (tentative — verify pain first).
 
-- [ ] "Ganti File" doesn't open the picker on Android Chrome — visually-hidden input + reorder the onclick · **[high]** _(needs phone)_
-- [ ] Signature upload tab accepts Ctrl/Cmd+V (paste image from clipboard) · **[med]**
-- [ ] Drag a file onto the sidebar → APPEND pages (not reorder / not replace) · **[med]**
-- [ ] Touch reorder in Kelola Halaman (HTML5 DnD doesn't fire on touch) — pointer-drag OR move buttons; reuse for the sidebar · **[low]**
-
-## Wave 5 — Growth loop
-_Small, high-emotion. Delight + sustainability. (Runs early for momentum.)_
-
-- [ ] Micro-celebration on every successful download — hook the `downloadBlob()` chokepoint; respect `prefers-reduced-motion` · **[low]**
-- [ ] Donate-or-share prompt right after the celebration — inline QR (no page nav) + Web Share; frequency-capped, dismissible, "jangan tampilkan lagi" · **[med]**
-
-## Wave 2 — Performance & mobile-canvas  ⚑ measure-first
-_ONE root cause (no-eviction memory pressure). The audit + windowed rendering
-**subsume** the two mobile-render bugs below — same layer, one fix._
-
-- [ ] Performance audit on a real 50+ page doc on a phone — live-canvas count×bytes, scroll/pinch memory, render vs cache-restore timings. Read `memory/mobile-rendering.md` first · **[high]**
-- [ ] → Viewport-windowed "3-nearest" rendering (swap distant pages to a decoded cached bitmap, no async blank gap)
-- [ ] …closes: Pinch-zoom flicker · **[high]**
-- [ ] …closes: Mobile fast-scroll jump-to-page-1 · **[high]**
-
-## Wave 3 — Code-health audit → fix sprint  ⚑ measure-first
-_Do before the big consolidation so it lands on cleaner ground._
-
-- [ ] Measure + report: complexity, semantic drift, SSOT integrity, parallel-array liabilities, dead code (cross-check SonarCloud). Read cited code before reporting (audit false-positive rate). Then a scoped fix sprint · **[med]**
-
-## Wave 4 — Consolidate into the Unified Editor  🎯 north star · 🔒 gated
-_Biggest bet. Endgame: homepage is "drop anything → UE," every operation is an
-in-editor action. Each sub-step is independently shippable._
-
-- [ ] **4.0 DECISION with user** (blocks 4.4): does a bare image open an *image-editing context* in the UE (crop/resize/convert/remove-bg/compress, download as image OR add as page), or do image ops become per-page/export actions? UE goes format-aware either way.
-- [ ] 4.1 Protect + Compress + **mixed-page-size normalization** → Download-dialog options (smallest; Protect already half-there)
-- [ ] 4.2 PDF-to-Image → UE "Download as image(s)" action
-- [ ] 4.3 Image→PDF → merge into the add-image path
-- [ ] 4.4 Image editing (resize / convert / remove-bg / compress) → format-aware UE _(the big one)_
-- [ ] 4.5 Strip homepage tool cards + delete dead standalone modules (barrels / window bridges / changelog)
+### ⤷ Absorbed by the foundation — do NOT fix separately
+- **Wave 2 (performance / mobile-canvas / pinch-zoom flicker / fast-scroll jump-to-page-1)** → **Phase 1 + 2.** Same root cause (no-eviction memory pressure), same fix (image pages + windowed rendering).
+- **Paraf Konfirmasi/delete z-index behind canvas · annotation slides-behind** → **Phase 1** (one overlay, active object always top-most). Structural, not a CSS patch.
 
 ---
 
-## Cross-cutting / ongoing
-- Roll out the real-flow filechooser test pattern to remaining picker/dropzone flows as they're touched.
-- Keep `backlog.md` as the SSOT of findings; this roadmap sequences them.
+## Tactical — around the foundation
 
-## Done (Jul 1)
-- Kelola Halaman modal redesign (#73)
-- Text format bar + click-away commit fix (#72)
-- Mobile toolbar overlap fix · Ganti File stale-cache crit fix
-- Changelog refreshed (text formatting + Paraf)
-- Merged #69/#70/#71 → clean main; Sentry checked
-- _(older history in [roadmap-1.md](roadmap-1.md))_
+### ✅ Shipped (July)
+- Vision locked + GA4/Vercel/Ads analysis → `product-definition.md`, `foundation-plan.md`, memory.
+- Wave 0: whiteout sticky · arrow-nudge · Ctrl+Z-in-sig-modal (**#74**) · Sentry JS-4/7/8 (**#75**) · dead-code + orphaned modal + visual-test fix (**#76**) · sidebar badge shrink + red-outline removed (**#78**).
+- "Split PDF" homepage card regression fix (**#77**).
+- Wave 1: signature clipboard-paste (**#79**) · drag-file-to-append on sidebar (**#80**).
+
+### ▢ Remaining tactical (slot around the foundation)
+- **Wave 1 — Android "Ganti File" picker** doesn't open · **[high]** _(needs phone)_.
+- **Touch reorder** (Kelola Halaman + sidebar) · **[low]** — likely rides **Phase 3** interaction unification (one input path); don't hand-build twice.
+- **Wave 5 — growth loop** _(independent; slot anytime for momentum)_: micro-celebration on download (hook `downloadBlob()`) · donate/share prompt after it (inline QR + Web Share, frequency-capped, dismissible).
+- **Wave 3 — code-health audit** · **[med]** — largely **mooted** by the foundation rebuild; revisit *after* Phase 3 on the cleaner base.
+- **Wave 4 — consolidate standalone tools into the UE** · 🎯 aligned with the vision (editor is the product), but a **product effort AFTER** the foundation is solid. Keep the **4.0 format-aware-UE decision** as a future gate (bare image → image-editing context vs per-page actions).
+
+### 🎁 Free win (anytime)
+- Register GA4 custom dims (`tool` / `action` / `fileType`) so GA4 stops mis-reporting bots-as-US-desktop (Vercel is currently the only trustworthy source).
+
+---
+
+_Older history in [roadmap-1.md](roadmap-1.md)._
