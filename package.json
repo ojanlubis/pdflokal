@@ -9,6 +9,7 @@
   "scripts": {
     "lint": "eslint js/",
     "lint:fix": "eslint js/ --fix",
+    "test:core": "node --test 'tests/core/**/*.test.mjs'",
     "test": "playwright test",
     "test:headed": "playwright test --headed",
     "test:ui": "playwright test --ui",
