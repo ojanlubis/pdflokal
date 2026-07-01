@@ -145,6 +145,13 @@ Quick summary:
 
 Point your AI assistant to `CLAUDE.md` — it contains everything needed to understand the codebase: architecture, patterns, helpers, gotchas, and conventions. The issue templates are structured (YAML forms) for easy parsing.
 
+## Field Notes
+
+Some of the real bugs in this repo's history are written up as field notes: the commit, the investigation, and the lesson behind it. If you want the story behind a fix, not just the diff:
+
+- [When AI-Built Software Breaks](https://mesindev.com/notes) — field notes on cleaning up AI-generated code, drawn from this repo's git history
+- [The tool that passed every test and was quietly broken](https://mesindev.com/notes/ai-code-passed-every-test) — the Ganti File blank-render bug: the guess ([bb7470e](https://github.com/ojanlubis/pdflokal/commit/bb7470e)) logged, then confirmed weeks later ([80a5016](https://github.com/ojanlubis/pdflokal/commit/80a5016))
+
 ## Limitasi
 
 1. **Kompres PDF** — Only compresses images inside PDFs, not PDF structure itself
