@@ -626,6 +626,27 @@
         </div>
       </div>
 
+      <!-- Contextual text format toolbar (Word/Figma/Canva-style). Shown while
+           editing or selecting a text annotation; positioned via text-format-bar.js. -->
+      <div id="text-format-bar" class="text-format-bar" role="toolbar" aria-label="Format teks" hidden>
+        <select id="tfb-font" class="tfb-font" aria-label="Jenis font" title="Font">
+          <option value="Helvetica">Helvetica</option>
+          <option value="Times-Roman">Times</option>
+          <option value="Courier">Courier</option>
+          <option value="Montserrat">Montserrat</option>
+          <option value="Carlito">Carlito</option>
+        </select>
+        <span class="tfb-sep"></span>
+        <button type="button" id="tfb-bold" class="tfb-btn" title="Tebal" aria-label="Tebal" aria-pressed="false"><strong>B</strong></button>
+        <button type="button" id="tfb-italic" class="tfb-btn" title="Miring" aria-label="Miring" aria-pressed="false"><em>I</em></button>
+        <span class="tfb-sep"></span>
+        <button type="button" id="tfb-size-dec" class="tfb-btn tfb-size-btn" title="Perkecil" aria-label="Perkecil ukuran">&minus;</button>
+        <input type="number" id="tfb-size" class="tfb-size" min="6" max="120" value="16" aria-label="Ukuran font">
+        <button type="button" id="tfb-size-inc" class="tfb-btn tfb-size-btn" title="Perbesar" aria-label="Perbesar ukuran">+</button>
+        <span class="tfb-sep"></span>
+        <input type="color" id="tfb-color" class="tfb-color" value="#000000" title="Warna teks" aria-label="Warna teks">
+      </div>
+
       <!-- Editor Bottom Bar (desktop) -->
       <div class="editor-bottom-bar" id="editor-bottom-bar">
         <div class="editor-bottom-left"></div>

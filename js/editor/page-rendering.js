@@ -166,6 +166,8 @@ class PageRenderer {
     // ueHideConfirmButton lives in signatures.js; importing it here would create
     // a circular chain (page-rendering ↔ signatures via canvas-events).
     window.ueHideConfirmButton();
+    // Same reasoning — hide the text format bar via its window bridge.
+    window.hideTextFormatBar?.();
 
     ueState.selectedPage = index;
 

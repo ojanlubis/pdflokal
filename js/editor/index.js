@@ -46,6 +46,8 @@ export { ueSetupCanvasEvents } from './canvas-events.js';
 
 export { ueCreateInlineTextEditor } from './inline-editor.js';
 
+export { showTextFormatBar, hideTextFormatBar, repositionTextFormatBar } from './text-format-bar.js';
+
 export {
   ueSetTool, ueOpenSignatureModal, ueOpenParafModal, ueOpenTextModal, ueConfirmText,
   ueOpenWatermarkModal, ueOpenPageNumModal,
@@ -175,6 +177,12 @@ window.ueOpenProtectModal = ueOpenProtectModal;
 window.closeEditorProtectModal = closeEditorProtectModal;
 window.applyEditorProtect = applyEditorProtect;
 window.editorGoHome = editorGoHome;
+
+// Text format bar — window bridges let page-rendering (selectPage) and
+// annotations (ueRemoveAnnotation) hide it without a new import cycle.
+import { hideTextFormatBar, repositionTextFormatBar } from './text-format-bar.js';
+window.hideTextFormatBar = hideTextFormatBar;
+window.repositionTextFormatBar = repositionTextFormatBar;
 
 // PDF export
 import { ueBuildFinalPDF, ueDownload } from './pdf-export.js';

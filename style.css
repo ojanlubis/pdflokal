@@ -2918,6 +2918,99 @@ html[data-theme="dark"] .floating-toolbar {
   flex-shrink: 0;
 }
 
+/* ---- Contextual Text Format Bar (Word/Figma/Canva-style) ---- */
+/* WHY position:fixed + JS placement: floats above the target text annotation and
+   tracks it on scroll. z-index above the inline text editor (10000) so its
+   controls stay clickable while editing. */
+.text-format-bar {
+  position: fixed;
+  z-index: 10001;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 6px;
+  background: var(--bg, #fff);
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.14);
+}
+.text-format-bar[hidden] { display: none; }
+
+html[data-theme="dark"] .text-format-bar {
+  background: #1e1e1e;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.tfb-font {
+  height: 28px;
+  max-width: 118px;
+  padding: 0 6px;
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.tfb-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 7px;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  transition: background 0.15s, color 0.15s;
+}
+.tfb-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.tfb-btn.active { background: var(--accent-primary); color: #fff; }
+.tfb-btn strong, .tfb-btn em { font-size: 0.9rem; line-height: 1; }
+.tfb-size-btn { font-size: 1rem; font-weight: 600; }
+
+.tfb-size {
+  width: 40px;
+  height: 28px;
+  text-align: center;
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.78rem;
+}
+
+.tfb-color {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+}
+
+.tfb-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--border-light);
+  margin: 0 2px;
+  flex-shrink: 0;
+}
+
+/* Mobile: slightly tighter so the bar fits narrow viewports. */
+@media (max-width: 900px) {
+  .text-format-bar { gap: 2px; padding: 3px 4px; }
+  .tfb-font { max-width: 92px; font-size: 0.72rem; }
+  .tfb-btn { min-width: 26px; height: 26px; }
+  .tfb-size { width: 34px; height: 26px; }
+  .tfb-color { width: 26px; height: 26px; }
+}
+
 /* Signature wrapper for tooltip positioning */
 .ft-signature-wrapper {
   position: relative;

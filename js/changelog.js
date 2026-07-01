@@ -23,6 +23,16 @@
 // Changelog data - Add new updates at the beginning of the array
 const changelogData = [
   {
+    title: "Atur Gaya Teks Sesukamu! ✍️",
+    description: "Nambah teks di PDF sekarang jauh lebih fleksibel. Kamu bisa pilih jenis font, bikin tebal atau miring, atur ukuran, dan ganti warna — semua langsung kelihatan hasilnya pas kamu ngetik. Mau ubah lagi nanti? Tinggal klik teksnya, menu formatnya muncul otomatis di atasnya. PDFLokal juga inget gaya terakhir yang kamu pakai, jadi ngisi banyak kolom jadi lebih cepat.",
+    date: "1 Juli 2026"
+  },
+  {
+    title: "Alat Paraf Baru! 🖋️",
+    description: "Sekarang ada alat khusus buat paraf (inisial). Gambar parafmu sekali, terus tempel ke semua halaman cuma dengan satu klik lewat tombol \"Semua Hal.\" — pas banget buat dokumen kontrak yang butuh paraf di tiap lembar.",
+    date: "30 Mei 2026"
+  },
+  {
     title: "Hubungi Kami! 💬",
     description: "Sekarang kamu bisa langsung ngobrol sama developer PDFLokal! Mau lapor bug, minta fitur baru, atau cuma mau bilang hai — tulis aja di <a href=\"https://forms.gle/KPDWVAuc91pVjuWq6\" target=\"_blank\">sini</a>. Anonim, gak perlu login.",
     date: "11 Maret 2026"

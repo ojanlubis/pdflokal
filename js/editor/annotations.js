@@ -138,6 +138,9 @@ export function ueRemoveAnnotation(pageIndex, annoIndex) {
       ueState.selectedAnnotation.pageIndex === pageIndex &&
       ueState.selectedAnnotation.index === annoIndex) {
     ueState.selectedAnnotation = null;
+    // The removed annotation may have been the format bar's target — hide it.
+    // window.* avoids an annotations ↔ text-format-bar import cycle.
+    window.hideTextFormatBar?.();
   }
 }
 
