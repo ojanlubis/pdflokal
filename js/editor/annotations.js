@@ -134,13 +134,24 @@ export function ueAddAnnotation(pageIndex, anno) {
 export function ueRemoveAnnotation(pageIndex, annoIndex) {
   if (!ueState.annotations[pageIndex]) return;
   ueState.annotations[pageIndex].splice(annoIndex, 1);
-  if (ueState.selectedAnnotation &&
-      ueState.selectedAnnotation.pageIndex === pageIndex &&
-      ueState.selectedAnnotation.index === annoIndex) {
-    ueState.selectedAnnotation = null;
-    // The removed annotation may have been the format bar's target — hide it.
-    // window.* avoids an annotations ↔ text-format-bar import cycle.
-    window.hideTextFormatBar?.();
+
+  // WHY reindex, not just exact-match clear (true fix for Sentry JAVASCRIPT-4):
+  // the splice shifts every sibling after annoIndex down by one. If the SELECTED
+  // annotation sat after the removed one, its stored .index now points at the
+  // wrong slot (or past the end → the crash in ueGetResizeHandle). Reseat it:
+  const sel = ueState.selectedAnnotation;
+  if (sel && sel.pageIndex === pageIndex) {
+    if (sel.index === annoIndex) {
+      // The selected annotation itself was removed.
+      ueState.selectedAnnotation = null;
+      // It may have been the format bar's target — hide it. window.* avoids an
+      // annotations ↔ text-format-bar import cycle.
+      window.hideTextFormatBar?.();
+    } else if (sel.index > annoIndex) {
+      // An earlier sibling was removed — selection shifted down by one.
+      ueState.selectedAnnotation = { pageIndex, index: sel.index - 1 };
+    }
+    // sel.index < annoIndex → unaffected.
   }
 }
 
