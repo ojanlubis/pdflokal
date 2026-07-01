@@ -601,7 +601,9 @@ test.describe('auto-switch to select after tool completion', () => {
     }, { p: pageIndex, ax1: x1, ay1: y1, ax2: x2, ay2: y2 });
   }
 
-  test('whiteout: tool switches to select after a valid drag', async ({ page }) => {
+  test('whiteout: STAYS sticky after a valid drag (multi-stamp redaction)', async ({ page }) => {
+    // WHY sticky: reverted PR #60. Redacting a page means drawing box after box;
+    // auto-switching to Pilih between each is more friction than it's worth.
     await page.goto('/');
     await loadSamplePdf(page);
 
@@ -611,21 +613,20 @@ test.describe('auto-switch to select after tool completion', () => {
     const annoCount = await page.evaluate(() => window.ueState.annotations[0]?.length || 0);
     const tool = await page.evaluate(() => window.ueState.currentTool);
     expect(annoCount).toBe(1);
-    expect(tool).toBe('select');
+    expect(tool).toBe('whiteout');
   });
 
-  test('whiteout: tiny no-op drag does NOT switch tool', async ({ page }) => {
-    // Invariant: switching only when the action actually completed. Width<=5
-    // means the user clicked but didn't really draw — keep them in whiteout.
+  test('whiteout: a second drag stamps another box without re-selecting the tool', async ({ page }) => {
     await page.goto('/');
     await loadSamplePdf(page);
 
     await page.evaluate(() => window.ueSetTool('whiteout'));
-    await drawWhiteoutRect(page, 0, 50, 50, 52, 52);
+    await drawWhiteoutRect(page, 0, 50, 50, 150, 100);
+    await drawWhiteoutRect(page, 0, 60, 160, 160, 210); // no re-click of Whiteout
 
     const annoCount = await page.evaluate(() => window.ueState.annotations[0]?.length || 0);
     const tool = await page.evaluate(() => window.ueState.currentTool);
-    expect(annoCount).toBe(0);
+    expect(annoCount).toBe(2);
     expect(tool).toBe('whiteout');
   });
 

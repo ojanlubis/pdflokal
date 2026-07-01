@@ -67,6 +67,48 @@ function handleDeleteKey(e) {
   }
 }
 
+// WHY: Ctrl+Z while drawing in the signature/paraf modal must rewind the last
+// PEN STROKE — not fire the global editor undo (which rolls back a document
+// annotation the user can't even see behind the modal). SignaturePad has no
+// undo(), but supports the data-rewind pattern. Returns true if it handled the
+// key (so the caller consumes it).
+function rewindSignaturePadIfOpen(key) {
+  if (key !== 'z') return false; // only undo; the pad has no redo
+  const sigOpen = document.getElementById('signature-modal')?.classList.contains('active');
+  const parafOpen = document.getElementById('paraf-modal')?.classList.contains('active');
+  const pad = sigOpen ? state.signaturePad : (parafOpen ? state.parafPad : null);
+  if (!pad || typeof pad.toData !== 'function') return false;
+  const data = pad.toData();
+  if (data.length > 0) pad.fromData(data.slice(0, -1));
+  return true; // consume even when empty, so it never falls through to ueUndo
+}
+
+// Arrow-key nudge for a selected, non-locked annotation (Shift = 10px). Returns
+// true if it moved something. One undo snapshot per burst of taps (debounced),
+// so holding/spamming arrows is a single undo entry, not one-per-pixel.
+let nudgeUndoTimer = null;
+function nudgeSelectedAnnotation(dx, dy) {
+  const sel = ueState.selectedAnnotation;
+  if (!sel) return false;
+  const anno = ueState.annotations[sel.pageIndex]?.[sel.index];
+  if (!anno || anno.locked) return false;
+
+  if (!nudgeUndoTimer) window.ueSaveEditUndoState();
+  clearTimeout(nudgeUndoTimer);
+  nudgeUndoTimer = setTimeout(() => { nudgeUndoTimer = null; }, 500);
+
+  anno.x += dx;
+  anno.y += dy;
+  window.ueRedrawAnnotations();
+  window.ueUpdateConfirmButtonPosition?.(anno);
+  window.repositionTextFormatBar?.();
+  return true;
+}
+
+const NUDGE_VECTORS = {
+  ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1],
+};
+
 // WHY: Navigation handlers extracted from keydown listener to reduce complexity (S3776).
 // Map pattern: key → { handler, preventDefault }. Same pattern as modifier/tool handlers.
 const navigationHandlers = {
@@ -110,6 +152,12 @@ export function setupKeyboardShortcuts() {
 
     // Modifier combos (Ctrl/Cmd + key)
     if ((e.ctrlKey || e.metaKey) && inEditor && modifierHandlers[key]) {
+      if (key === 'z' || key === 'y') {
+        // Drawing modal open → rewind the pen stroke, not the document.
+        if (rewindSignaturePadIfOpen(key)) { e.preventDefault(); return; }
+        // Typing in a field / inline text editor → let native undo/redo run.
+        if (isTyping) return;
+      }
       e.preventDefault();
       modifierHandlers[key].handler();
       return;
@@ -127,6 +175,14 @@ export function setupKeyboardShortcuts() {
         handleDeleteKey(e);
         return;
       }
+    }
+
+    // Arrow keys nudge a selected annotation (Shift = 10px) instead of paging.
+    // Only when something's selected; otherwise arrows fall through to page nav.
+    if (NUDGE_VECTORS[e.key] && ueState.selectedAnnotation) {
+      const mult = e.shiftKey ? 10 : 1;
+      const [ux, uy] = NUDGE_VECTORS[e.key];
+      if (nudgeSelectedAnnotation(ux * mult, uy * mult)) { e.preventDefault(); return; }
     }
 
     const nav = navigationHandlers[e.key];

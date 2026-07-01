@@ -8,21 +8,34 @@
 
 > **Urus dokumen langsung di browser.** Cepat, gratis, file tidak pernah diupload.
 
-PDFLokal adalah tool PDF gratis untuk pengguna Indonesia. Semua proses berjalan di browser - file tidak pernah meninggalkan perangkat Anda.
+PDFLokal adalah tool PDF gratis untuk pengguna Indonesia. Semua proses berjalan di browser - file tidak pernah meninggalkan perangkatmu.
 
 **[Buka PDFLokal](https://www.pdflokal.id/)**
 
 ## Update Terbaru
 
+**Juli 2026:**
+- **Contextual text format bar** — pick font, bold/italic, size, and color while typing; select a text annotation and the format menu appears above it. Remembers your last-used style
+- **Mobile editor polish** — fixed toolbar overlap and Ganti File render bugs
+
+**Mei 2026:**
+- **Paraf (initials)** — dedicated draw-and-place tool with "Semua Hal." to stamp every page at once
+- **UX pass** — Escape closes overlays, inline text on first click, signature draw-by-default
+
+**Maret 2026:**
+- **Zero CDN dependencies** — every library self-hosted, works fully offline
+- **Reactive state layer** — pub/sub event emitter + `PageRenderer` render pipeline
+- **Quality tooling** — ESLint flat config + CI, SonarCloud analysis
+- **Mobile rendering fixes** — removed canvas eviction (persistent render, no white-flash flicker)
+
 **Februari 2026:**
 - **Editor UI redesign** — floating toolbar, compact sidebar, bottom bar, mobile-optimized layout
-- **Paraf (initials)** — draw and place initials with "Semua Hal." button to apply to all pages
 - **Lazy page rendering** — instant thumbnails on load, full rendering via IntersectionObserver
 - **Pinch-to-zoom** on mobile
 - **Inline text editing** — double-click text annotations to edit in-place
 - **SSOT architecture** — centralized helpers for annotations, modals, file types, PDF loading
 - **Accessibility** — ARIA roles, focus traps, keyboard navigation for all modals and tools
-- **Performance** — PDF.js Web Worker, image registry for undo optimization, page cache eviction
+- **Performance** — PDF.js Web Worker, image registry for undo optimization
 
 **Januari 2026:**
 - Security headers (CSP, X-Frame-Options)
@@ -77,11 +90,12 @@ npx serve .
 
 ### Tech Stack
 - **Vanilla JS** — Native ES modules, no build step, no framework
+- **Zero CDN** — every library below is self-hosted; the app runs fully offline
 - **[pdf-lib](https://pdf-lib.js.org/)** — PDF manipulation (self-hosted)
 - **[PDF.js](https://mozilla.github.io/pdf.js/)** — PDF rendering with Web Worker (self-hosted)
 - **[Signature Pad](https://github.com/szimek/signature_pad)** — Digital signatures (self-hosted)
 - **[fontkit](https://github.com/foliojs/fontkit)** — Embeds Montserrat + Carlito into exported PDFs (self-hosted)
-- **[pdf-encrypt-lite](https://github.com/nicholasohjj/pdf-encrypt-lite)** — PDF password encryption (CDN)
+- **[pdf-encrypt-lite](https://github.com/nicholasohjj/pdf-encrypt-lite)** — PDF password encryption (self-hosted)
 - **Canvas API** — Image processing
 - **Self-hosted fonts** — UI font Plus Jakarta Sans + annotation fonts Montserrat / Carlito (268KB)
 
@@ -98,7 +112,7 @@ pdflokal/
 │   │   ├── state.js        # State, constants, annotation factories
 │   │   ├── utils.js        # Helpers (toast, download, file type checks)
 │   │   └── navigation.js   # Routing, modal helpers, history
-│   ├── editor/             # Unified Editor (14 modules)
+│   ├── editor/             # Unified Editor (15 modules)
 │   │   ├── index.js        # Barrel exports + window bridges
 │   │   ├── canvas-events.js
 │   │   ├── file-loading.js
