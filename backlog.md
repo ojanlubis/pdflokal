@@ -21,20 +21,6 @@ Running list of UI/UX findings + small fixes to pick up later. Append new items 
   - User report (Jun 10): bold/italic toggle is missing or non-functional. State factory `createTextAnnotation` supports `bold` + `italic` flags, and `buildCanvasFont` maps them to CSS, so the data model is ready — UI just isn't writing the flag, or render isn't reading it back at the right time.
   - Investigation before fix: check whether the inline editor exposes B/I controls at all (might be modal-only), and whether `_editing` flag handling preserves bold/italic across modal→inline transitions and undo/redo cycles.
 
-- **[crit]** Ganti File regression: PDF.js doc cache stays stale, new file partially loads — [page-rendering.js _pdfDocCache](js/editor/page-rendering.js), [sidebar.js ueReplaceFiles](js/editor/sidebar.js)
-  - User report (Jun 9, prod test on both): page count updates to new file, but main canvas shows OLD content (or blank), sidebar thumb stale. PR #64 fixed the `destroyPageRenderer` issue; this is a separate bug.
-  - **AI exploratory repro on prod (Jun 9, 12:00 WIB) — STRONG EVIDENCE for hypothesis #2** (`_pdfDocCache` stale):
-    - Loaded sample-2pages.pdf → Ganti File → uploaded distinct alt-1page.pdf (big red "ALT PDF" text + yellow rectangle, A4)
-    - **State looked correct**: `ueState.pages.length=1`, `sourceFiles=['alt-1page.pdf']`, `pageCachesKeys=['0']`, page dimensions correct (1104×1562 = A4 at 1.85x)
-    - **`page.thumbCanvas` (300×425) RENDERED CORRECTLY**: yellow rectangle pixels at y=170 (rgb 230,230,51). So PDF.js can read the new file — `handlePdfFile`'s pre-render works.
-    - **Main canvas (1104×1562) was 100% blank**: all 81 sampled regions = pure white. PDF.js never drew into it after Ganti File. IntersectionObserver fired (page slot visible) but renderPageCanvas was no-op.
-    - **Click → text tool → click on blank canvas → "Test Page 1" appeared** — that's content from the ORIGINAL sample-2pages.pdf. The render-on-interaction pulled from the STALE cached PDF.js doc, not the new one.
-    - Positive control: fresh load of alt-1page.pdf (without Ganti File) → renders perfectly. The bug is specific to the Ganti File flow.
-  - **Root cause (high confidence)**: PageRenderer's `_pdfDocCache` Map keys by source-file URL or by `pages[i]._docRef` — when Ganti File runs, `ueReset` does NOT call `clearPdfDocCache()`. Next render either skips (cache says "already have doc, no need to re-fetch") or hits the cached old doc.
-  - Verification before fixing: add `console.log` in PageRenderer's renderPageCanvas to print `pageIndex`, `pages[i].sourceFile`, and `_pdfDocCache.has(key)`. Repro Ganti File and confirm cache key collision.
-  - **Trivial fix candidate**: `clearPdfDocCache()` inside `ueReplaceFiles()` before `ueAddFiles()` runs. Plus invalidate `pageCaches` ImageData (PR #66's bitmap cache) since dimensions and content are now wrong for those keys.
-  - **Real-flow test that catches this**: a Playwright test that uses `page.click('label[for=ue-replace-input]')` or actual mouse-driven menu navigation (NOT `setInputFiles` on the hidden input). The Jun 9 prod test caught this because user used the real picker; our scripted test bypassed it.
-
 - **[high]** Mobile fast-scroll sometimes jumps the viewport to page 1 — [page-rendering.js setupScrollSync](js/editor/page-rendering.js)
   - User report (Jun 9, Android Chrome): during the brief restore-from-cache flash (PR #66), occasionally the scroll position snaps back to page 1.
   - Hypothesis (NOT confirmed by code reading): during fast scroll, the scroll-sync 150ms debounce reads `getBoundingClientRect` mid-momentum, computes the wrong "closest page" (possibly index 0), updates `ueState.selectedPage`, and some downstream consumer (mobile page indicator, mobile-ui.js update, or a `selectPage` call I missed) triggers `scrollIntoView(top)`. The scroll sync handler explicitly avoids calling `selectPage` for this reason, but a chained consumer may not.
@@ -103,4 +89,8 @@ Running list of UI/UX findings + small fixes to pick up later. Append new items 
 
 ## Done
 
-(none yet)
+- **[crit]** Ganti File regression: stale `_pdfDocCache` → new file renders blank (Jul 1) — [lifecycle.js ueReset](js/editor/lifecycle.js), [ganti-file.spec.js](tests/ganti-file.spec.js)
+  - Root cause confirmed in code: `PageRenderer._pdfDocCache` is keyed by `sourceIndex` and is a private instance property NOT covered by `ueReset()`'s `getDefaultUeState()` wipe. `ueReset` deliberately keeps the renderer alive (Ganti File needs it to draw the new file), so the stale PDF.js doc for `sourceIndex 0` survived — `renderPageCanvas` pulled the previous file's page → blank/stale main canvas. `pageCaches`/`pageScales`/`sourceFiles` were already reset correctly, so state looked right while the render was wrong.
+  - Fix: call `clearPdfDocCache()` inside `ueReset()` (side-effect cleanup section). One line + import; no new circular dep (lifecycle already imports from page-rendering).
+  - Real-flow test added (`tests/ganti-file.spec.js`) using the genuine File ▸ Ganti File menu → `filechooser` event (NOT `setInputFiles` on the hidden input) + a solid-red 1-page fixture so **pixel sampling** distinguishes correct-render (red) from blank/stale (white). Verified FAIL before fix (`{r:255,g:255,b:255}`), PASS after. The old smoke test missed it because it re-loaded the SAME fixture and never sampled pixels.
+  - Regression sweep green: lint + 36 smoke + 2 ganti-file + 8 visual. Still needs a real-Android-Chrome phone check before it's fully closed.

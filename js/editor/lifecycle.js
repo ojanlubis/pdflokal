@@ -8,7 +8,7 @@ import { on } from '../lib/events.js';
 import { showToast, showFullscreenLoading, hideFullscreenLoading, safeLocalGet, safeLocalSet } from '../lib/utils.js';
 import { initUnifiedEditorInput, ueAddFiles } from './file-loading.js';
 import { ueRenderThumbnails } from './sidebar.js';
-import { ueSetupScrollSync, ueUpdatePageCount, createPageRenderer } from './page-rendering.js';
+import { ueSetupScrollSync, ueUpdatePageCount, createPageRenderer, clearPdfDocCache } from './page-rendering.js';
 
 // WHY: Subscribe to pages:changed so page count auto-updates when pages change.
 // Replaces manual ueUpdatePageCount() calls scattered across modules.
@@ -28,6 +28,14 @@ export function ueReset() {
 
   // Side-effect cleanup (not just value resets)
   clearImageRegistry();
+  // WHY: PageRenderer._pdfDocCache is a private instance property keyed by
+  // sourceIndex — it is NOT part of ueState, so getDefaultUeState() above does
+  // not clear it. ueReset deliberately keeps the renderer alive (see comment
+  // on this function), so we must invalidate its PDF.js doc cache explicitly.
+  // Without this, "Ganti File" (ueReplaceFiles) reloads a NEW file at the same
+  // sourceIndex 0 and renderPageCanvas pulls the STALE cached doc — the main
+  // canvas renders blank or shows the previous document. (Jun 2026 prod bug.)
+  clearPdfDocCache();
   ueState.zoomLevel = 1.0;
   ueUpdateZoomDisplay();
 
