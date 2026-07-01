@@ -84,6 +84,30 @@ test.describe('text format bar', () => {
     await expect(page.locator('#text-format-bar')).toBeHidden();
   });
 
+  // Regression: creating a new text via the Text tool, then clicking elsewhere to
+  // finish, used to place a SECOND (empty) text box — the tool stayed 'text' and
+  // the click's mouseup created another annotation. The click that ends an edit
+  // must commit-and-consume, then revert to Pilih.
+  test('click-away after creating text commits and does NOT create a second box', async ({ page }) => {
+    await loadSample(page);
+    await createTextAndOpenBar(page, 'test', 90, 90);
+
+    // Click an empty area far from the new text.
+    await page.evaluate(() => {
+      const canvas = document.querySelectorAll('.ue-page-slot canvas')[0];
+      const rect = canvas.getBoundingClientRect();
+      const opts = { bubbles: true, cancelable: true, clientX: rect.left + rect.width * 0.7, clientY: rect.top + rect.height * 0.7, button: 0 };
+      canvas.dispatchEvent(new MouseEvent('mousedown', opts));
+      canvas.dispatchEvent(new MouseEvent('mouseup', opts));
+    });
+
+    await page.waitForSelector('#inline-text-editor', { state: 'detached' });
+    expect(await page.evaluate(() => window.ueState.currentTool)).toBe('select');
+    expect(await page.evaluate(() => window.ueState.annotations[0].length)).toBe(1);
+    expect(await page.evaluate(() => window.ueState.annotations[0][0].text)).toBe('test');
+    await expect(page.locator('#text-format-bar')).toBeHidden();
+  });
+
   test('restyles an already-selected text annotation (select tool)', async ({ page }) => {
     await loadSample(page);
     await createTextAndOpenBar(page, 'Dunia');

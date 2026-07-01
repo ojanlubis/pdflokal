@@ -9,6 +9,19 @@ import { ueRedrawAnnotations, ueRemoveAnnotation } from './annotations.js';
 import { uePushAnnotationSnapshot } from './undo-redo.js';
 import { showTextFormatBar, hideTextFormatBar } from './text-format-bar.js';
 
+// The current inline editor's commit (saveEdit) closure, or null when none is
+// open. Lets other modules (canvas-events) commit the edit synchronously.
+let activeInlineCommit = null;
+
+// Commit the open inline text edit right now (if any). Returns true if there was
+// an editor to commit. WHY: a canvas pointerdown that ends an edit must commit
+// synchronously and be consumed, so it can't also trigger tool actions.
+export function commitActiveInlineTextEditor() {
+  if (!activeInlineCommit) return false;
+  activeInlineCommit();
+  return true;
+}
+
 // WHY: opts.isNew = true when the annotation was just created via canvas click
 // (inline-on-first-create flow). Differs from the dblclick-on-existing path in
 // two ways:
@@ -90,6 +103,7 @@ export function ueCreateInlineTextEditor(anno, opts = {}) {
   const saveEdit = () => {
     if (saved) return;
     saved = true;
+    activeInlineCommit = null;
     const newText = editor.innerText.trim();
     delete anno._editing;
 
@@ -134,6 +148,7 @@ export function ueCreateInlineTextEditor(anno, opts = {}) {
     // via setTimeout(blurDelay). Without this guard, Escape-cancelled edits would still
     // commit ~100-300ms later and pollute the undo stack.
     saved = true;
+    activeInlineCommit = null;
     delete anno._editing;
     // Click-to-create annotations have no "original" state to preserve — drop them.
     if (isNew) removeOrphan();
@@ -142,6 +157,11 @@ export function ueCreateInlineTextEditor(anno, opts = {}) {
     editor.remove();
     switchToSelectIfNew();
   };
+
+  // WHY: lets a canvas pointerdown commit this edit synchronously and consume the
+  // click (see commitActiveInlineTextEditor). Prevents the "click-away creates a
+  // second text box" bug — the click that ends the edit must not also place text.
+  activeInlineCommit = saveEdit;
 
   editor.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
