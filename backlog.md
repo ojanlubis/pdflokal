@@ -89,6 +89,11 @@ Running list of UI/UX findings + small fixes to pick up later. Append new items 
 
 ## Done
 
+- **[med]** Mobile: top of first page hidden under the fixed floating toolbar (Jul 1) — [style.css:3806](style.css#L3806), [mobile-toolbar-overlap.spec.js](tests/mobile-toolbar-overlap.spec.js)
+  - User report (Android Chrome): after Ganti File to a full-bleed image, top ~21px of the page sat under the toolbar. Desktop unaffected.
+  - Root cause (confirmed): desktop toolbar is `position: sticky` (reserves flow space); mobile toolbar is `position: fixed` (out of flow, overlays) and the mobile `#ue-pages-container` had no compensating `padding-top`. Measured: canvas top 52px vs toolbar bottom 73px. Only visible on content with no top margin (images) — PDFs' white margins hid the clipped strip.
+  - Fix: `padding-top: 44px` on the mobile `#ue-pages-container` rule → canvas top 80px, clears the toolbar. Mobile Playwright test asserts canvas top ≥ toolbar bottom (FAIL before, PASS after). Mobile visual baselines (darwin + linux) regenerated for the 28px shift; desktop baselines unchanged.
+
 - **[crit]** Ganti File regression: stale `_pdfDocCache` → new file renders blank (Jul 1) — [lifecycle.js ueReset](js/editor/lifecycle.js), [ganti-file.spec.js](tests/ganti-file.spec.js)
   - Root cause confirmed in code: `PageRenderer._pdfDocCache` is keyed by `sourceIndex` and is a private instance property NOT covered by `ueReset()`'s `getDefaultUeState()` wipe. `ueReset` deliberately keeps the renderer alive (Ganti File needs it to draw the new file), so the stale PDF.js doc for `sourceIndex 0` survived — `renderPageCanvas` pulled the previous file's page → blank/stale main canvas. `pageCaches`/`pageScales`/`sourceFiles` were already reset correctly, so state looked right while the render was wrong.
   - Fix: call `clearPdfDocCache()` inside `ueReset()` (side-effect cleanup section). One line + import; no new circular dep (lifecycle already imports from page-rendering).
