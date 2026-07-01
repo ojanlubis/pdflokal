@@ -23,7 +23,7 @@ _Low-risk, self-contained; drains ~10 items. Batchable across 1–2 sittings._
 - [x] REVERT whiteout auto-switch-to-Pilih (#60) — whiteout stays sticky; tests flipped · **[high]** _(PR A)_
 - [x] Arrow-key nudge for a selected annotation (1px / Shift=10px), one undo per burst · **[high]** _(PR A)_
 - [x] Ctrl+Z inside the signature/paraf modal rewinds the pen stroke, not a doc annotation · **[high]** _(PR A)_
-- [ ] Sentry true-fixes JS-4 / JS-7 / JS-8 — one atomic re-key pass (selection follows page/annotation mutations; audit off-SSOT page creation) · **[med×3]**
+- [x] Sentry true-fixes JS-4 / JS-7 / JS-8 — JS-4 reseats selection in `ueRemoveAnnotation`; JS-7/8 verified already closed by `mutatePages` + `createPageInfo` SSOT · **[med×3]** _(PR B)_ · _also surfaced: `rebuildAnnotationMapping` is now dead code → remove in PR C_
 - [ ] Paraf Konfirmasi/delete buttons z-index behind canvas on mobile · **[low]**
 - [ ] Sidebar page-number badge too large / covers thumbnail · **[med]**
 - [ ] Red-outline around active page — decide keep/soften/remove (desktop-only already) · **[low]**

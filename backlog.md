@@ -85,14 +85,6 @@ Running list of UI/UX findings + small fixes to pick up later. Append new items 
   - Diagnosis: z-index ordering. The `signature-btn-wrapper` sits in `#ue-canvas-wrapper` which has its own stacking context on mobile. The current `--z-canvas-ui: 20` isn't winning against something else in the mobile layout.
   - Fix: bump `--z-canvas-ui` OR explicitly set `z-index: var(--z-canvas-ui)` on `.signature-btn-wrapper` + verify the stacking context. User noted this isn't critical to the app's function but it IS visibly broken.
 
-- **[med]** Root cause for Sentry JAVASCRIPT-7 — `ueState.annotations[selectedPage]` was undefined when "Hapus Edit Halaman Ini" fired — [undo-redo.js:182](js/editor/undo-redo.js#L182) (defensive guard shipped in PR #67)
-  - Crash repro hypothesis: user selected a page, then deleted/reordered pages (Gabungkan modal or page-manager). `selectedPage` index was carried over but the per-page annotations bucket wasn't reseated to match. Same fingerprint as the existing stale-selectedAnnotation backlog item — both symptoms of "index map didn't follow page mutation."
-  - True fix: ensure every page-array mutation (splice, reorder, delete) re-keys `ueState.annotations` and `ueState.selectedAnnotation` atomically. Probably wrap in a single helper `mutatePages(fn)` that handles the rebind. Same helper would close the stale selection item below.
-
-- **[med]** Root cause for Sentry JAVASCRIPT-8 — a page in `ueState.pages` had no `.canvas` placeholder after drag-reorder, crashed `ueRenderThumbnails` — [sidebar.js:93](js/editor/sidebar.js#L93) (defensive guard shipped in PR #67)
-  - Crash repro hypothesis: some code path creates a page object via direct push or restore that bypasses `createPageInfo()` (the SSOT factory that seats the `canvas: {width, height}` placeholder). Suspects: undo restore (undo-redo.js `ueRestorePages`), Gabungkan modal split/extract (`uePmConfirmExtract`), or any path that builds a page after a PDF re-load.
-  - Investigation: `grep -rn "ueState.pages.push\|ueState.pages\\[" js/editor/` and check each push site — every one MUST go through `createPageInfo(...)`. Add a dev-mode invariant: in renderPageCanvas/ueRenderThumbnails, when `!page.canvas` log a Sentry breadcrumb so we can identify the offending path next time.
-
 - **[high]** "Ganti File" doesn't open the file picker on Android Chrome (mobile) — [index.html:470](index.html#L470) and [sidebar.js:22-47](js/editor/sidebar.js#L22-L47) and [index.html:503-504](index.html#L503-L504)
   - User reports: on mobile, after a file is loaded, tapping "Ganti File" does nothing. The fix that just shipped (#64) made the REPLACEMENT work — this is a separate issue, the file picker itself never opens.
   - Likely cause: combination of `style="display:none"` on `#ue-replace-input` (line 503-504) PLUS the inline `onclick="ueReplaceFiles(); closeEditorFileMenu()"` on line 470 — `closeEditorFileMenu()` runs synchronously right after `input.click()`, mutating the DOM (removing the `.open` class on the dropdown) inside the same user-gesture tick. Mobile Chrome's hardened picker policy treats `.click()` on `display:none` inputs as suspicious, especially when the surrounding DOM mutates immediately. The home dropzone's `#ue-file-input` works because its trigger button doesn't have a follow-up DOM mutation.
@@ -122,10 +114,6 @@ Running list of UI/UX findings + small fixes to pick up later. Append new items 
   - User draws a signature in the signature/paraf modal; Ctrl+Z fires the global editor undo (`ueUndo()`) and rolls back an annotation on the PDF underneath instead of erasing the last pen stroke. Worse: nothing in the signature canvas changes, so user thinks the shortcut is broken and keeps pressing it — eating multiple undos.
   - Fix: in `keyboard.js`'s modifier-combo branch, check whether `signature-modal` or `paraf-modal` has `.active`; if so, route to `state.signaturePad.fromData(state.signaturePad.toData().slice(0, -1))` (SignaturePad has no native `undo()` but supports the data-rewind pattern). Same for `state.parafPad`. Bonus: extend to `inline-text-editor` open state — Ctrl+Z there should let contentEditable's native undo run.
 
-- **[med]** `ueRemoveAnnotation` and `rebuildAnnotationMapping` leave `selectedAnnotation` stale — [annotations.js:134](js/editor/annotations.js#L134), [page-manager.js:323](js/editor/page-manager.js#L323)
-  - Root cause behind Sentry JAVASCRIPT-4. `ueRemoveAnnotation` only clears selection on EXACT `(pageIndex, index)` match — so deleting annotation 0 with selection at index 1 leaves selection pointing to a now-shifted slot. `rebuildAnnotationMapping` (page reorder/delete) never touches selection at all.
-  - Defensive guards in canvas-events.js + canvas-utils.js stop the crash (shipped). True fix: (a) `ueRemoveAnnotation` should decrement `selectedAnnotation.index` when removing an earlier sibling, and null when removing past-end; (b) `rebuildAnnotationMapping` should reindex selection through `oldPages.indexOf(pageRef)` like it does for annotations.
-
 - **[med]** Sidebar page-number badge too large and too centered, covers thumbnail content — [style.css:2536-2547](style.css#L2536-L2547) (`.ue-thumbnail-number`)
   - Big dark rounded badges (1, 2, 3…) sit mid-thumbnail on a multi-page document. Current CSS: `bottom: var(--space-sm)` + `padding: 4px 10px` + `font-size: 0.75rem`. On short landscape thumbnails the badge dominates the visible area.
   - Fix candidates: shrink badge (font 0.65rem / padding 2px 6px), move to a corner (top-right), or fade out unless thumbnail is hovered/selected.
@@ -133,6 +121,12 @@ Running list of UI/UX findings + small fixes to pick up later. Append new items 
 ---
 
 ## Done
+
+- **[med×3]** Sentry true-fixes JS-4 / JS-7 / JS-8 (Jul 1) — [annotations.js ueRemoveAnnotation](js/editor/annotations.js#L134), [remove-annotation-selection.spec.js](tests/remove-annotation-selection.spec.js)
+  - **JS-4 (true-fixed):** `ueRemoveAnnotation` now reseats `selectedAnnotation` — removing an earlier sibling on the same page shifts the selection index down by one (was left pointing one slot off → the crash in `ueGetResizeHandle`); removing the selected one nulls it; removing a later one leaves it untouched. 3 tests.
+  - **JS-7 (verified closed, no code change):** the `?.length` guard plus every page mutation now routing through `mutatePages` (which re-keys the annotations map) removes the out-of-sync-bucket root.
+  - **JS-8 (verified closed, no code change):** audited all `ueState.pages.push` sites — every one goes through `createPageInfo` (file-loading ×2, undo-redo). No off-SSOT page creation remains.
+  - Also confirmed `rebuildAnnotationMapping` is now dead code (nothing calls it; `mutatePages` replaced it) — logged for Wave 0 cleanup (PR C).
 
 - **[high]** Kelola Halaman (page-manager) modal redesign (Jul 1) — [page-manager.js](js/editor/page-manager.js), [kelola-halaman.spec.js](tests/kelola-halaman.spec.js)
   - Grounded in the **ux-heuristics** + **ui-craft** skills. Audit scored the old modal 4/10 (naming mismatch; hover-only rotate/delete = catastrophic on touch; zero reorder affordance; hidden "Split" mode; add/arrange/extract crammed together).
