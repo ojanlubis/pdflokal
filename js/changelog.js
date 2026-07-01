@@ -23,6 +23,11 @@
 // Changelog data - Add new updates at the beginning of the array
 const changelogData = [
   {
+    title: "Nambah Halaman & Tanda Tangan Makin Cepat! ⚡",
+    description: "Dua jalan pintas baru: (1) Punya gambar tanda tangan yang udah kamu copy — misalnya screenshot atau gambar dari chat? Pas jendela tanda tangan kebuka, tinggal tempel (Ctrl/Cmd+V), langsung masuk tanpa perlu simpan file dulu. (2) Mau nambah halaman ke dokumen yang lagi kamu edit? Seret file PDF atau gambar langsung ke daftar halaman di samping — otomatis nambah di belakang, bukan ganti dokumenmu.",
+    date: "1 Juli 2026"
+  },
+  {
     title: "Atur Gaya Teks Sesukamu! ✍️",
     description: "Nambah teks di PDF sekarang jauh lebih fleksibel. Kamu bisa pilih jenis font, bikin tebal atau miring, atur ukuran, dan ganti warna — semua langsung kelihatan hasilnya pas kamu ngetik. Mau ubah lagi nanti? Tinggal klik teksnya, menu formatnya muncul otomatis di atasnya. PDFLokal juga inget gaya terakhir yang kamu pakai, jadi ngisi banyak kolom jadi lebih cepat.",
     date: "1 Juli 2026"

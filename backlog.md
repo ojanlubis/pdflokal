@@ -85,14 +85,6 @@ Running list of UI/UX findings + small fixes to pick up later. Append new items 
   - PR #60 made whiteout switch back to Pilih after every drag. In practice that's wrong for whiteout — covering multiple secrets / redacting a page is a multi-stamp workflow, and forcing the user to re-click Whiteout between every box is more friction than the original "sticky" complaint. The auto-switch IS still right for text (one annotation per click → wants to move it) and signature/paraf (already auto-switched pre-#60). Whiteout is the outlier.
   - Fix: delete the `window.ueSetTool('select')` call inside the whiteout success branch added by #60. Update the two whiteout regression tests (`whiteout: tool switches to select after a valid drag` + `whiteout: tiny no-op drag does NOT switch tool`) to assert `tool === 'whiteout'` after a valid drag instead. Leave the text-inline and signature/paraf auto-switch paths untouched.
 
-- **[med]** Drag-and-drop file onto sidebar should APPEND pages to current document — [sidebar.js:193](js/editor/sidebar.js#L193) (drop currently only handles thumbnail reorder, not file drops) and [navigation.js:208-236](js/lib/navigation.js#L208-L236) (workspace-level drop replaces the file)
-  - Today the only way to add more pages is the "Tambah File" button in the sidebar dropdown. Dropping a PDF on the editor canvas REPLACES via `loadPDFForTool` (Gabung tool path), and dropping on the sidebar gets eaten by the reorder handler. User intent is obvious: drop on the page list = "add these to my doc".
-  - Fix: in `setupSidebarDragDrop` (sidebar.js:162), add a `drop` branch that detects `e.dataTransfer.files.length > 0` (file drop vs internal reorder which uses `e.dataTransfer.getData('text/plain')`). On file drop, call `ueAddFiles(Array.from(e.dataTransfer.files))` — same path as the dropzone-on-homepage flow. Also add visible drop-hover styling on `#ue-thumbnails` so users see the drop target.
-
-- **[med]** Signature upload tab should accept Ctrl/Cmd+V (paste image from clipboard) — [init-file-handling.js:319-340](js/init-file-handling.js#L319-L340) (existing paste handler doesn't branch on signature modal)
-  - Today users have to download a signature image, save it, then upload from disk — three round-trips for what's already on their clipboard (screenshot from another app, image copied from chat, etc.). The global `handlePaste` already routes images for img-tools but ignores them when the signature/paraf modal is open.
-  - Fix: in `handlePaste`, before the existing img-tool branches, check `document.getElementById('signature-modal')?.classList.contains('active')`; if so, call `loadSignatureImage(file)` (already exported from pdf-tools/index.js, same one the file-input uses at init-file-handling.js:131). Same branch for `paraf-modal` if/when paraf gets an upload tab. Bonus: auto-switch to the "Upload Foto" tab if user pastes while on the "Gambar" tab.
-
 - **[high]** Arrow keys when a text annotation is selected should nudge it 1px (Shift+arrow = 10px) for precise placement — [keyboard.js:73-74](js/keyboard.js#L73-L74)
   - Right now ArrowLeft/Right always navigate pages, even when the user has a text annotation selected and is trying to fine-tune position. Power users (and anyone filling forms) reach for arrows expecting the standard nudge behavior. Today the only way to move 1px is mouse drag with a steady hand — frustrating on trackpads, impossible on mobile.
   - Fix: in `keyboard.js` arrow handlers, if `ueState.selectedAnnotation` resolves to a non-locked annotation, nudge `anno.x` / `anno.y` by 1 (or 10 with `e.shiftKey`) and call `ueRedrawAnnotations()` + `ueUpdateConfirmButtonPosition(anno)`. Skip page navigation in that case. Save undo state once at the start of a nudge run (debounce 500ms so a burst of taps is one undo entry, not 30).
@@ -108,6 +100,10 @@ Running list of UI/UX findings + small fixes to pick up later. Append new items 
 ---
 
 ## Done
+
+- **[med×2]** Wave 1 convenience — clipboard + drag-to-append (Jul, PR #79 + #80)
+  - **#79** Paste image into the signature flow: while the signature modal is open, Ctrl/Cmd+V routes the pasted image to `loadSignatureImage` → bg-removal modal. Paraf (draw-only) excluded. `tests/signature-paste.spec.js`.
+  - **#80** Drop OS file on `#ue-thumbnails` appends pages (not replace). `stopPropagation` beats the workspace-replace dropzone; dashed `.drag-over-files` hint. `tests/sidebar-drop-append.spec.js`. Hint verified live via MCP.
 
 - **[crit]** "Split PDF" homepage card broken since #73 (Jul 2, PR #77) — [init-ui.js](js/init-ui.js), [split-card.spec.js](tests/split-card.spec.js)
   - The Kelola Halaman redesign removed `uePmToggleExtractMode()` but the split-card handler still called it → TypeError, dead card. Redesigned modal has no "Split mode"; card now opens the modal + `uePmSelectAll()` to surface the "Split jadi PDF" action bar. Removed the dead `extractMode` state field. Regression test drives the real card → filechooser → modal flow.
