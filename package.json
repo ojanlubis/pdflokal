@@ -12,7 +12,10 @@
     "test": "playwright test",
     "test:headed": "playwright test --headed",
     "test:ui": "playwright test --ui",
-    "test:golden:update": "UPDATE_BASELINES=1 playwright test tests/golden"
+    "test:golden:update": "UPDATE_BASELINES=1 playwright test tests/golden",
+    "test:visual": "playwright test tests/visual.spec.js",
+    "test:visual:update": "playwright test tests/visual.spec.js --update-snapshots",
+    "test:visual:update:linux": "docker run --rm -v \"$PWD\":/work -w /work --user $(id -u):$(id -g) mcr.microsoft.com/playwright:v1.60.0-jammy bash -c 'HOME=/tmp npx playwright test tests/visual.spec.js --update-snapshots'"
   },
   "repository": {
     "type": "git",

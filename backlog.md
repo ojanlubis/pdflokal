@@ -13,6 +13,47 @@ Running list of UI/UX findings + small fixes to pick up later. Append new items 
 
 ## Open
 
+- **[high]** User can't pick a font family for text annotations — [inline-editor.js](js/editor/inline-editor.js), [text-modal.js](js/pdf-tools/text-modal.js), [state.js CSS_FONT_MAP](js/lib/state.js)
+  - User report (Jun 10): font dropdown is either not visible in the inline text editor flow, or the selection doesn't actually apply to the annotation. Options exist in state (Helvetica, Times Roman, Courier, Montserrat, Carlito — confirmed in DOM during Jun 9 prod test) so this is a wiring/UI bug, not a missing feature.
+  - Investigation before fix: confirm whether the font picker is shown in BOTH the modal-first text creation AND the inline-text-on-first-click flow (PR #54). If only one path exposes it, that's the gap. Also check whether `applyEditorText` reads the font from the picker state at apply time.
+
+- **[high]** User can't bold (or italic) text annotations — [inline-editor.js](js/editor/inline-editor.js), [text-modal.js](js/pdf-tools/text-modal.js), [annotations.js drawTextAnnotation](js/editor/annotations.js)
+  - User report (Jun 10): bold/italic toggle is missing or non-functional. State factory `createTextAnnotation` supports `bold` + `italic` flags, and `buildCanvasFont` maps them to CSS, so the data model is ready — UI just isn't writing the flag, or render isn't reading it back at the right time.
+  - Investigation before fix: check whether the inline editor exposes B/I controls at all (might be modal-only), and whether `_editing` flag handling preserves bold/italic across modal→inline transitions and undo/redo cycles.
+
+- **[crit]** Ganti File regression: PDF.js doc cache stays stale, new file partially loads — [page-rendering.js _pdfDocCache](js/editor/page-rendering.js), [sidebar.js ueReplaceFiles](js/editor/sidebar.js)
+  - User report (Jun 9, prod test on both): page count updates to new file, but main canvas shows OLD content (or blank), sidebar thumb stale. PR #64 fixed the `destroyPageRenderer` issue; this is a separate bug.
+  - **AI exploratory repro on prod (Jun 9, 12:00 WIB) — STRONG EVIDENCE for hypothesis #2** (`_pdfDocCache` stale):
+    - Loaded sample-2pages.pdf → Ganti File → uploaded distinct alt-1page.pdf (big red "ALT PDF" text + yellow rectangle, A4)
+    - **State looked correct**: `ueState.pages.length=1`, `sourceFiles=['alt-1page.pdf']`, `pageCachesKeys=['0']`, page dimensions correct (1104×1562 = A4 at 1.85x)
+    - **`page.thumbCanvas` (300×425) RENDERED CORRECTLY**: yellow rectangle pixels at y=170 (rgb 230,230,51). So PDF.js can read the new file — `handlePdfFile`'s pre-render works.
+    - **Main canvas (1104×1562) was 100% blank**: all 81 sampled regions = pure white. PDF.js never drew into it after Ganti File. IntersectionObserver fired (page slot visible) but renderPageCanvas was no-op.
+    - **Click → text tool → click on blank canvas → "Test Page 1" appeared** — that's content from the ORIGINAL sample-2pages.pdf. The render-on-interaction pulled from the STALE cached PDF.js doc, not the new one.
+    - Positive control: fresh load of alt-1page.pdf (without Ganti File) → renders perfectly. The bug is specific to the Ganti File flow.
+  - **Root cause (high confidence)**: PageRenderer's `_pdfDocCache` Map keys by source-file URL or by `pages[i]._docRef` — when Ganti File runs, `ueReset` does NOT call `clearPdfDocCache()`. Next render either skips (cache says "already have doc, no need to re-fetch") or hits the cached old doc.
+  - Verification before fixing: add `console.log` in PageRenderer's renderPageCanvas to print `pageIndex`, `pages[i].sourceFile`, and `_pdfDocCache.has(key)`. Repro Ganti File and confirm cache key collision.
+  - **Trivial fix candidate**: `clearPdfDocCache()` inside `ueReplaceFiles()` before `ueAddFiles()` runs. Plus invalidate `pageCaches` ImageData (PR #66's bitmap cache) since dimensions and content are now wrong for those keys.
+  - **Real-flow test that catches this**: a Playwright test that uses `page.click('label[for=ue-replace-input]')` or actual mouse-driven menu navigation (NOT `setInputFiles` on the hidden input). The Jun 9 prod test caught this because user used the real picker; our scripted test bypassed it.
+
+- **[high]** Mobile fast-scroll sometimes jumps the viewport to page 1 — [page-rendering.js setupScrollSync](js/editor/page-rendering.js)
+  - User report (Jun 9, Android Chrome): during the brief restore-from-cache flash (PR #66), occasionally the scroll position snaps back to page 1.
+  - Hypothesis (NOT confirmed by code reading): during fast scroll, the scroll-sync 150ms debounce reads `getBoundingClientRect` mid-momentum, computes the wrong "closest page" (possibly index 0), updates `ueState.selectedPage`, and some downstream consumer (mobile page indicator, mobile-ui.js update, or a `selectPage` call I missed) triggers `scrollIntoView(top)`. The scroll sync handler explicitly avoids calling `selectPage` for this reason, but a chained consumer may not.
+  - Investigation: instrument the scroll-sync handler + any code that reads `selectedPage` and could scroll. Likely involves `ueMobileUpdatePageIndicator` (window bridge from mobile-ui.js) — read its behavior carefully.
+
+- **[high]** Pinch-zoom flicker is severe on mobile — [page-rendering.js renderVisiblePages](js/editor/page-rendering.js), [zoom-rotate.js](js/editor/zoom-rotate.js)
+  - User report (Jun 9, Android Chrome): pinch-to-zoom flickers very badly and uncontrollably.
+  - Diagnosis (high confidence): zoom changes canvas dimensions → `pageCaches` entries become dimension-mismatched → `restoreCanvasFromCache` early-returns on the size guard → falls back to async PDF.js re-render via `renderVisiblePages` → produces visible blank-then-content states across all visible pages simultaneously. PR #66 doesn't help here by design.
+  - Fix candidates (none cheap):
+    - **(a) CSS scale during pinch**: apply `transform: scale(zoom)` to the page slots during pinch, only re-render the canvas buffer on pinch-end (the gesture itself is preview-quality, the commit is high-quality). Lower flicker risk; intermediate frames are scaled-pixel renders.
+    - **(b) Double-buffer**: render to off-DOM canvas, swap when ready. Doubles memory during render.
+    - **(c) Defer re-render**: only re-render once pinch settles (debounce). Final state is correct; during pinch, canvas stays at old zoom level visually until release. Trade-off: misleading "stale" state mid-gesture.
+    - Author's lean: (a) — matches user expectation (pinch = preview, release = commit) and is the cheapest to ship.
+
+- **[low]** Paraf "Konfirmasi" + delete buttons hidden behind canvas on mobile — [signatures.js ueShowConfirmButton](js/editor/signatures.js), [style.css](style.css) (`--z-canvas-ui: 20`)
+  - User report (Jun 9, Android Chrome): after placing a paraf, the confirm/delete buttons render UNDER the canvas instead of on top of it.
+  - Diagnosis: z-index ordering. The `signature-btn-wrapper` sits in `#ue-canvas-wrapper` which has its own stacking context on mobile. The current `--z-canvas-ui: 20` isn't winning against something else in the mobile layout.
+  - Fix: bump `--z-canvas-ui` OR explicitly set `z-index: var(--z-canvas-ui)` on `.signature-btn-wrapper` + verify the stacking context. User noted this isn't critical to the app's function but it IS visibly broken.
+
 - **[med]** Root cause for Sentry JAVASCRIPT-7 — `ueState.annotations[selectedPage]` was undefined when "Hapus Edit Halaman Ini" fired — [undo-redo.js:182](js/editor/undo-redo.js#L182) (defensive guard shipped in PR #67)
   - Crash repro hypothesis: user selected a page, then deleted/reordered pages (Gabungkan modal or page-manager). `selectedPage` index was carried over but the per-page annotations bucket wasn't reseated to match. Same fingerprint as the existing stale-selectedAnnotation backlog item — both symptoms of "index map didn't follow page mutation."
   - True fix: ensure every page-array mutation (splice, reorder, delete) re-keys `ueState.annotations` and `ueState.selectedAnnotation` atomically. Probably wrap in a single helper `mutatePages(fn)` that handles the rebind. Same helper would close the stale selection item below.
