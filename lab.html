@@ -28,6 +28,31 @@
       transform-origin: top center; will-change: transform;
     }
     input[type=file] { display: none; }
+
+    /* Telegraph #1 — skeleton shimmer on unloaded pages. The sweep IS the word
+       "loading"; the page number rides on top so you also know WHERE you are. */
+    .pv-ph { overflow: hidden; }
+    .pv-ph::after {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(100deg, transparent 30%, rgba(0,0,0,.05) 50%, transparent 70%);
+      transform: translateX(-100%); animation: pv-shimmer 1.25s ease-in-out infinite;
+    }
+    @keyframes pv-shimmer { to { transform: translateX(100%); } }
+
+    /* Telegraph #2 — position pill. Appears while scrolling, fades when idle. */
+    #pv-pill {
+      position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%) translateY(6px);
+      background: rgba(28,25,23,.86); color: #fff; font-size: 13px; font-weight: 600;
+      font-variant-numeric: tabular-nums; padding: 7px 14px; border-radius: 999px;
+      box-shadow: 0 4px 16px rgba(0,0,0,.25); pointer-events: none;
+      opacity: 0; transition: opacity .18s ease, transform .18s ease; z-index: 50;
+    }
+    #pv-pill.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    @media (prefers-reduced-motion: reduce) {
+      .pv-ph::after { animation: none; }
+      #pv-pill { transition: opacity .18s ease; }
+    }
   </style>
 </head>
 <body>
@@ -40,6 +65,7 @@
     <label>Buka PDF<input type="file" id="lab-file" accept="application/pdf,.pdf" /></label>
   </div>
   <div id="pv-scroll"><div id="pv-stage"></div></div>
+  <div id="pv-pill" aria-hidden="true"></div>
 
   <script src="js/vendor/pdf.min.js"></script>
   <script type="module" src="js/lab.js"></script>
