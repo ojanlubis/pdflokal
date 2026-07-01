@@ -96,6 +96,16 @@ Each phase is revisited before it begins. Old and new coexist until each phase s
 - Don't build the reactive layer (Phase 4) preemptively.
 - Behavior-changing phases (1–3) do **not** merge on green CI alone — the founder verifies the mobile merge→edit→download path on a real phone first. (Every mobile bug is a leak in a paid funnel.)
 
-## 8. Status
+## 8. Status (July 2026)
 
-- **Phase 0 started July 2026.** Model + operations + headless tests: see `js/core/` and `tests/core/`.
+The rendering approach is **settled and validated on a real Android** (see `memory/render-architecture-2026-07.md`). All of the below is built **beside** the live app — isolated, zero regression risk. The live editor still runs the old canvas pipeline.
+
+- [x] **Phase 0** — headless core (`js/core/model.js` + `operations.js`), 7 headless tests (`npm run test:core`). · #81
+- [x] **Phase 0b** — import adapter (`js/core/import.js`): `importPdf` + `rasterizePage` + `createPageRasterizer` (per-source doc cache). · #82
+- [x] **Phase 1a** — image-backed render engine (`js/render/page-view.js`) + a phone-openable preview **`lab.html`** (`pdflokal.id/lab.html`, noindex/unlinked). · #83
+- [x] **Phase 2 (in the lab)** — streaming/windowed loading (instant open, ~2-screen load / ~4-screen release → bounded memory), render-on-settle (skip rasterizing during a fast fling), scroll telegraph (skeleton shimmer + position pill). · #84 #85 #86
+- [ ] **Phase 0c** — export adapter (`Doc → pdf-lib → bytes`), golden-verified. _(open)_
+- [ ] **Phase 1b / 3** — wire the engine into the **LIVE editor** behind a flag; retire the old pipeline. Real-Android verify before merge. ⬅ **NEXT (the big, risky step)**
+- [ ] **Phase 4** — reactive subscribers, only if state-sync pain remains.
+
+**The four locked render decisions** (don't relitigate): pages are images · streaming (bounded memory) · render-on-settle (slow the render, not the user) · telegraph the loading state.

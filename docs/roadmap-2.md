@@ -18,11 +18,11 @@ _Updated: 2026-07 — **pivoted** from a pure backlog-flush to a vision-led foun
 Target: 3 clean layers — **Core** (headless `js/core/`) / **Render** (image-backed pages + one annotation overlay) / **Interact** (one input path). Built *beside* the live app, swapped in incrementally. No big-bang.
 
 - [x] **Phase 0** — headless core: one `Doc` model, page owns its annotations, everything by id not index. 7 headless tests. · **#81**
-- [x] **Phase 0b** — import adapter: `importPdf` (bytes→Doc) + lazy `rasterizePage` (page→PNG). Browser-tested on a real PDF. · **#82**
-- [ ] **Phase 0c** — export adapter: `Doc → pdf-lib → bytes`, verified against the golden suite. _(optional before Phase 1 — makes the core round-trip a PDF headlessly)_
-- [ ] **Phase 1** — image-background rendering + ONE annotation overlay in the **live editor** ⬅ **NEXT**, the first VISIBLE, phone-verifiable payoff. **Kills mobile flicker + "annotation slides behind a page" + paraf z-index — structurally.**
-- [ ] **Phase 2** — viewport "3-nearest" mounting; far pages = placeholders.
-- [ ] **Phase 3** — migrate the live editor onto the core; retire the parallel state (`pageCanvases`/`pageCaches`/`pageScales`/`annotations{}`).
+- [x] **Phase 0b** — import adapter: `importPdf` (bytes→Doc) + `rasterizePage` + `createPageRasterizer` (per-source doc cache). · **#82**
+- [x] **Phase 1a** — image-backed render engine (`js/render/page-view.js`) + phone-openable preview `lab.html`. · **#83**
+- [x] **Phase 2 (in the lab)** — streaming/windowed loading (bounded memory), render-on-settle, scroll telegraph (shimmer + position pill). **Validated on real Android. Rendering approach LOCKED** (`memory/render-architecture-2026-07.md`). · **#84 #85 #86**
+- [ ] **Phase 0c** — export adapter: `Doc → pdf-lib → bytes`, golden-verified. _(open — completes the headless round-trip)_
+- [ ] **Phase 1b / 3** — wire the engine into the **LIVE editor** behind a flag; retire the old canvas pipeline. ⬅ **NEXT (the big, risky step).** Real-Android verify before merge. **Kills mobile flicker + slides-behind + paraf z-index — structurally.**
 - [ ] **Phase 4** — reactive subscribers, IF state-sync pain remains (tentative — verify pain first).
 
 ### ⤷ Absorbed by the foundation — do NOT fix separately
