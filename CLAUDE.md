@@ -9,6 +9,16 @@
 - **Tech**: Vanilla JS, native ES modules, no build step, no frameworks
 - **Libraries**: pdf-lib, PDF.js, Signature Pad, pdf-encrypt-lite, Canvas API — all self-hosted in `js/vendor/`, zero CDN deps (see [docs/security.md](docs/security.md))
 
+## ★ North Star — read [docs/product-definition.md](docs/product-definition.md) before any product/design/architecture call
+
+**Mission:** be the **WinRAR × Excalidraw of PDF, for Indonesia** — every PDF operation done in the browser, crafted so well *it doesn't make sense to use another tool.* Ubiquity **through** craft. **UX is everything.**
+
+- **The moat is the constraint.** 100% client-side isn't a limitation — it's one choice paying off four ways: **private + fast + free-forever + offline**. iLovePDF *can't copy it* without breaking their server-dependent business. Protect the moat by only doing what the browser does GREAT — **refuse server-jobs (OCR, PDF↔Word).**
+- **The editor IS the product** (75% of tool opens). The unified editor beats iLovePDF's modular tools because humans have *"fix this document,"* not "a merge task." Standalone tools fold in over time.
+- **Mobile-first** — not because current usage is (30% organic), but because **~95% of paid acquisition is mobile**, young, Java, searching "gabung pdf." We build for tomorrow's user, on a phone. **Every mobile bug is a leak in a paid funnel.**
+- **Vision and architecture are ONE bet.** "Best experience in the world" is impossible on a spaghetti foundation — so the foundation rebuild ([docs/future-architecture.md](docs/future-architecture.md) + memory `architectural-direction-2026-06-09.md`) is the vision's price of entry, not a detour.
+- **Success:** when a user offered iLovePDF thinks *"why would I upload my file and wait?"*
+
 ## Reference Projects
 
 Before making architectural decisions, check how mature open-source projects solve the same problem. Don't fly blind — learn from projects that have already solved similar challenges at scale.
