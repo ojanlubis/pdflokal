@@ -98,6 +98,24 @@ function updateWindow(velocity = 0) {
   }
 }
 
+// Telegraph #2 — position pill. Show the center-most page ("42 / 340") while
+// scrolling; fade it out when the finger rests. Tells the user where they are
+// in a big doc and that the app is tracking them.
+const pill = document.getElementById('pv-pill');
+let pillTimer = null;
+function updatePill() {
+  if (slots.length === 0) return;
+  const mid = scrollEl.getBoundingClientRect().top + scrollEl.clientHeight / 2;
+  let current = 1;
+  for (let i = 0; i < slots.length; i += 1) {
+    if (slots[i].view.getBoundingClientRect().top <= mid) current = i + 1; else break;
+  }
+  pill.textContent = `${current} / ${slots.length}`;
+  pill.classList.add('show');
+  clearTimeout(pillTimer);
+  pillTimer = setTimeout(() => pill.classList.remove('show'), 750);
+}
+
 let lastTop = 0, settleTimer = null;
 function onScroll() {
   if (!ticking) {
@@ -108,6 +126,7 @@ function onScroll() {
       const v = Math.abs(top - lastTop);
       lastTop = top;
       updateWindow(v);            // gated: skips rasterizing during a fast fling
+      updatePill();
     });
   }
   clearTimeout(settleTimer);
