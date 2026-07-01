@@ -95,13 +95,11 @@ export function drawRotatedThumbnail(sourceCanvas, rotation) {
 }
 
 // Check if (x, y) is on a resize handle of the given annotation
-// WHY !anno guard: ueState.selectedAnnotation can become stale when another
-// annotation on the same page is removed (ueRemoveAnnotation only clears
-// selection on EXACT match), or when pages get reordered/deleted via
-// rebuildAnnotationMapping which doesn't touch selectedAnnotation. Without
-// this guard, the first canvas tap after such a stale state would crash
-// with "undefined is not an object (evaluating 'anno.locked')" — Sentry
-// JAVASCRIPT-4 on iPad/iPhone production users.
+// WHY !anno guard (belt-and-suspenders): selectedAnnotation is now kept valid by
+// ueRemoveAnnotation (reseats on remove) and mutatePages (reseats on page
+// reorder/delete). This cheap guard stays so that if any future path reintroduces
+// a stale ref, the first canvas tap won't crash with "undefined is not an object
+// (evaluating 'anno.locked')" — the Sentry JAVASCRIPT-4 signature.
 export function ueGetResizeHandle(anno, x, y) {
   if (!anno || anno.locked) return null;
   const handleSize = 12;

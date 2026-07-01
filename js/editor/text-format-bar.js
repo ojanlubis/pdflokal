@@ -12,8 +12,8 @@
  * already relied on (UX audit H2).
  *
  * WHY this exists: PR #54 rerouted the Text tool to inline-on-first-click, which
- * bypassed the (now orphaned) text-input-modal — leaving NO reachable UI to pick
- * a font family or toggle bold/italic. This bar restores that, inline.
+ * bypassed the old text-input-modal (since removed) — leaving NO reachable UI to
+ * pick a font family or toggle bold/italic. This bar restores that, inline.
  */
 
 import { ueState, buildCanvasFont } from '../lib/state.js';

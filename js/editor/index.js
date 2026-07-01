@@ -49,7 +49,7 @@ export { ueCreateInlineTextEditor } from './inline-editor.js';
 export { showTextFormatBar, hideTextFormatBar, repositionTextFormatBar } from './text-format-bar.js';
 
 export {
-  ueSetTool, ueOpenSignatureModal, ueOpenParafModal, ueOpenTextModal, ueConfirmText,
+  ueSetTool, ueOpenSignatureModal, ueOpenParafModal,
   ueOpenWatermarkModal, ueOpenPageNumModal,
   toggleFloatingMore, closeFloatingMore,
   ueOpenProtectModal, closeEditorProtectModal, applyEditorProtect,
@@ -60,7 +60,7 @@ export { ueBuildFinalPDF, ueDownload } from './pdf-export.js';
 
 export {
   uePmOpenModal, uePmCloseModal, uePmRenderPages,
-  rebuildAnnotationMapping, ueReorderPages,
+  ueReorderPages,
   uePmTogglePageSelection, uePmSelectAll, uePmDeselectAll,
   uePmRotateSelected, uePmDeleteSelected, uePmExtractSelected
 } from './page-manager.js';
@@ -163,12 +163,10 @@ import { ueSetupCanvasEvents } from './canvas-events.js';
 window.ueSetupCanvasEvents = ueSetupCanvasEvents;
 
 // Tools
-import { ueSetTool, ueOpenSignatureModal, ueOpenParafModal, ueOpenTextModal, ueConfirmText, ueOpenWatermarkModal, ueOpenPageNumModal, toggleFloatingMore, closeFloatingMore, ueOpenProtectModal, closeEditorProtectModal, applyEditorProtect, editorGoHome } from './tools.js';
+import { ueSetTool, ueOpenSignatureModal, ueOpenParafModal, ueOpenWatermarkModal, ueOpenPageNumModal, toggleFloatingMore, closeFloatingMore, ueOpenProtectModal, closeEditorProtectModal, applyEditorProtect, editorGoHome } from './tools.js';
 window.ueSetTool = ueSetTool;
 window.ueOpenSignatureModal = ueOpenSignatureModal;
 window.ueOpenParafModal = ueOpenParafModal;
-window.ueOpenTextModal = ueOpenTextModal;
-window.ueConfirmText = ueConfirmText;
 window.ueOpenWatermarkModal = ueOpenWatermarkModal;
 window.ueOpenPageNumModal = ueOpenPageNumModal;
 window.toggleFloatingMore = toggleFloatingMore;
@@ -190,11 +188,10 @@ window.ueBuildFinalPDF = ueBuildFinalPDF;
 window.ueDownload = ueDownload;
 
 // Page manager
-import { uePmOpenModal, uePmCloseModal, uePmRenderPages, rebuildAnnotationMapping, ueReorderPages, uePmTogglePageSelection, uePmSelectAll, uePmDeselectAll, uePmRotateSelected, uePmDeleteSelected, uePmExtractSelected } from './page-manager.js';
+import { uePmOpenModal, uePmCloseModal, uePmRenderPages, ueReorderPages, uePmTogglePageSelection, uePmSelectAll, uePmDeselectAll, uePmRotateSelected, uePmDeleteSelected, uePmExtractSelected } from './page-manager.js';
 window.uePmOpenModal = uePmOpenModal;
 window.uePmCloseModal = uePmCloseModal;
 window.uePmRenderPages = uePmRenderPages;
-window.rebuildAnnotationMapping = rebuildAnnotationMapping;
 window.ueReorderPages = ueReorderPages;
 window.uePmTogglePageSelection = uePmTogglePageSelection;
 window.uePmSelectAll = uePmSelectAll;

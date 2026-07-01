@@ -27,8 +27,8 @@ _Low-risk, self-contained; drains ~10 items. Batchable across 1–2 sittings._
 - [ ] Paraf Konfirmasi/delete buttons z-index behind canvas on mobile · **[low]**
 - [ ] Sidebar page-number badge too large / covers thumbnail · **[med]**
 - [ ] Red-outline around active page — decide keep/soften/remove (desktop-only already) · **[low]**
-- [ ] Retire the orphaned `text-input-modal` (dead since the format bar) · **[low]**
-- [ ] Fix visual test so it actually captures the modal (screenshot the element, not the masked page) · **[low]**
+- [x] Retire the orphaned `text-input-modal` (dead since the format bar) + remove dead `rebuildAnnotationMapping` · **[low]** _(PR C)_
+- [x] Fix visual test so it actually captures the modal (screenshots the `#ue-gabungkan-modal` element now) · **[low]** _(PR C)_
 
 ## Wave 1 — Mobile reliability & content-add
 _Real-user friction. Some items need a real Android device to verify._

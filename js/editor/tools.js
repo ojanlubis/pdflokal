@@ -3,13 +3,11 @@
  * Tool selection, modal wrappers, more-tools dropdown, protect modal
  */
 
-import { ueState, createTextAnnotation } from '../lib/state.js';
+import { ueState } from '../lib/state.js';
 import { showToast, downloadBlob, getDownloadFilename } from '../lib/utils.js';
 import { openModal, closeModal, showHome } from '../lib/navigation.js';
 import { ueHideConfirmButton } from './signatures.js';
 import { hideTextFormatBar } from './text-format-bar.js';
-import { ueRedrawAnnotations, ueAddAnnotation } from './annotations.js';
-import { ueSaveEditUndoState } from './undo-redo.js';
 import { track } from '../lib/analytics.js';
 import { ueUpdateStatus } from './page-rendering.js';
 import { ueBuildFinalPDF } from './pdf-export.js';
@@ -50,7 +48,8 @@ export function ueSetTool(tool) {
   ueUpdateStatus(toolNames[tool] || 'Pilih alat untuk mengedit');
 }
 
-// openSignatureModal, openTextModal, getTextModalSettings live in js/pdf-tools/.
+// openSignatureModal / openParafModal live in js/pdf-tools/. Text has no modal
+// anymore — creation is inline (canvas-events → inline-editor + text-format-bar).
 // tools.js ↔ lifecycle.js is also circular, so ueDismissSignatureHint goes through window.*.
 export function ueOpenSignatureModal() {
   window.ueDismissSignatureHint();
@@ -60,39 +59,6 @@ export function ueOpenSignatureModal() {
 export function ueOpenParafModal() {
   window.ueDismissSignatureHint();
   window.openParafModal();
-}
-
-export function ueOpenTextModal() {
-  window.openTextModal();
-}
-
-export function ueConfirmText() {
-  if (ueState.selectedPage < 0 || ueState.selectedPage >= ueState.pages.length) return;
-
-  const settings = window.getTextModalSettings();
-
-  if (!settings.text) {
-    showToast('Masukkan teks terlebih dahulu', 'error');
-    return;
-  }
-
-  ueSaveEditUndoState();
-  track('editor_action', { action: 'text' });
-  ueAddAnnotation(ueState.selectedPage, createTextAnnotation({
-    text: settings.text,
-    x: ueState.pendingTextPosition.x,
-    y: ueState.pendingTextPosition.y,
-    fontSize: settings.fontSize,
-    color: settings.color,
-    fontFamily: settings.fontFamily,
-    bold: settings.bold,
-    italic: settings.italic
-  }));
-
-  closeModal('text-input-modal');
-  ueRedrawAnnotations();
-  ueState.pendingTextPosition = null;
-  ueSetTool('select');
 }
 
 // Watermark modal

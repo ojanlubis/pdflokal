@@ -136,7 +136,7 @@ test.describe('UI visual regression — desktop', () => {
     });
   });
 
-  test('gabungkan halaman modal open', async ({ page }) => {
+  test('kelola halaman modal open', async ({ page }) => {
     await page.goto('/');
     await hideVolatileChrome(page);
     await loadSamplePdf(page);
@@ -148,10 +148,14 @@ test.describe('UI visual regression — desktop', () => {
     // Modal contents render thumbnails asynchronously — let them settle.
     await page.waitForFunction(() => document.querySelectorAll('#ue-pm-pages .ue-pm-page-item').length > 0);
     await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
-    await expect(page).toHaveScreenshot('gabungkan-modal-desktop.png', {
+    // WHY screenshot the modal ELEMENT, not the page: a full-page shot lets the
+    // main-canvas mask (drawn last by Playwright) paint over the centered modal,
+    // so modal changes never registered. Scope the shot to the dialog itself and
+    // mask only its own (content-varying) page thumbnails.
+    const modal = page.locator('#ue-gabungkan-modal');
+    await expect(modal).toHaveScreenshot('gabungkan-modal-desktop.png', {
       ...SCREENSHOT_OPTS,
-      // Mask all canvases — main canvas + sidebar thumbnails + modal thumbnails.
-      mask: [page.locator('.ue-page-slot canvas, .ue-sidebar-thumb canvas, .ue-pm-page-item canvas')],
+      mask: [modal.locator('.ue-pm-page-item canvas')],
     });
   });
 });

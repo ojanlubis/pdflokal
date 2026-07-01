@@ -252,7 +252,8 @@ function ueSetupSidebarDragDrop() {
       insertAt = items.length;
     }
 
-    // Use SSOT helper — bundles splice + rebuildAnnotationMapping + selectedPage tracking
+    // Use SSOT helper — bundles splice + mutatePages re-key (annotations, caches,
+    // pageScales, selectedPage, selectedAnnotation) atomically.
     window.ueReorderPages(draggedIndex, insertAt);
 
     // Rebuild page slots (fixes observer stale indices) + re-render sidebar
