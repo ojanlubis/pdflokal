@@ -2492,6 +2492,14 @@ a:hover {
   animation: dropIndicatorPulse 0.8s ease-in-out infinite;
 }
 
+/* Dropping an OS file onto the thumbnail list appends pages — signal the target. */
+#ue-thumbnails.drag-over-files {
+  outline: 2px dashed var(--accent-primary);
+  outline-offset: -6px;
+  background: var(--accent-light);
+  border-radius: var(--radius-md);
+}
+
 .ue-thumbnail canvas {
   max-width: 100%;
   max-height: 120px;

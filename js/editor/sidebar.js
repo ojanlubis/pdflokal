@@ -197,10 +197,25 @@ function ueSetupSidebarDragDrop() {
     removeSidebarDropIndicator();
   });
 
+  // Clear the file-drop hint when the OS drag actually leaves the container
+  // (dragleave also fires moving between children — guard on relatedTarget).
+  container.addEventListener('dragleave', (e) => {
+    if (!container.contains(e.relatedTarget)) {
+      container.classList.remove('drag-over-files');
+    }
+  });
+
   container.addEventListener('dragover', (e) => {
     e.preventDefault();
+    if (!draggedItem) {
+      // OS file drag (no internal reorder in progress) — signal "drop to add".
+      if (e.dataTransfer.types.includes('Files')) {
+        e.dataTransfer.dropEffect = 'copy';
+        container.classList.add('drag-over-files');
+      }
+      return;
+    }
     e.dataTransfer.dropEffect = 'move';
-    if (!draggedItem) return;
 
     const item = e.target.closest('.ue-thumbnail');
     if (!item || item === draggedItem) {
@@ -232,8 +247,32 @@ function ueSetupSidebarDragDrop() {
     }
   });
 
-  container.addEventListener('drop', (e) => {
+  container.addEventListener('drop', async (e) => {
     e.preventDefault();
+
+    // FILE DROP (from OS) — APPEND pages to the current document. Distinguished
+    // from internal reorder by the presence of files (reorder carries only
+    // text/plain, no files). WHY stopPropagation: #ue-thumbnails is inside
+    // #unified-editor-workspace, whose drop handler REPLACES the file — without
+    // this, dropping to append would instead wipe the doc. WHY append (not
+    // replace): dropping on the page LIST clearly means "add these to my doc".
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      e.stopPropagation();
+      container.classList.remove('drag-over-files');
+      removeSidebarDropIndicator();
+      showFullscreenLoading('Menambahkan halaman...');
+      try {
+        await window.ueAddFiles(Array.from(files));
+      } catch (err) {
+        console.error('Error appending dropped files:', err);
+        showToast('Gagal menambahkan file', 'error');
+      } finally {
+        hideFullscreenLoading();
+      }
+      return;
+    }
+
     if (!draggedItem) return;
 
     const indicator = ueState.sidebarDropIndicator;
