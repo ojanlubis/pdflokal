@@ -325,6 +325,15 @@ async function handlePaste(e) {
     if (isImage(item)) {
       const file = item.getAsFile();
       if (file) {
+        // WHY signature modal first: pasting a copied screenshot straight into the
+        // "Upload Foto" flow saves the download→save→upload round-trip. loadSignatureImage
+        // advances to the bg-removal modal itself, so no tab switch is needed. Paraf is
+        // draw-only (no upload tab), so it's intentionally excluded.
+        if (document.getElementById('signature-modal')?.classList.contains('active')) {
+          const { loadSignatureImage } = await import('./pdf-tools/index.js');
+          await loadSignatureImage(file);
+          return; // handled — don't also route the paste to an image tool
+        }
         if (state.currentTool === 'img-to-pdf') {
           import('./image-tools.js').then(m => m.addImagesToPDF([file]));
         } else if (state.currentTool === 'compress-img' || state.currentTool === 'resize' || state.currentTool === 'convert-img' || state.currentTool === 'remove-bg') {
