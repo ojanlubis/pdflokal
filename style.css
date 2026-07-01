@@ -2501,17 +2501,24 @@ a:hover {
   object-fit: contain;
 }
 
+/* WHY corner + small: the old centered pill (bottom-center, 0.75rem, 4px 10px)
+   dominated short landscape thumbnails and covered page content. Tucked into
+   the bottom-left corner (delete btn is top-left, source badge top-right — both
+   free) at a compact size, it labels without obscuring. pointer-events:none so
+   it never intercepts a click meant for the thumbnail. */
 .ue-thumbnail-number {
   position: absolute;
-  bottom: var(--space-sm);
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.75);
+  bottom: var(--space-xs);
+  left: var(--space-xs);
+  background: rgba(0, 0, 0, 0.6);
   color: white;
-  font-size: 0.75rem;
+  font-size: 0.625rem;
   font-weight: 600;
-  padding: 4px 10px;
+  line-height: 1;
+  padding: 2px 5px;
   border-radius: var(--radius-sm);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
 }
 
 .ue-thumbnail-source {
@@ -2598,15 +2605,13 @@ a:hover {
   box-shadow: var(--shadow-lg);
 }
 
-/* WHY: Only show selected border on desktop where sidebar needs visual pairing.
-   On mobile, page indicator ("Hal 2/5") is sufficient. The outline caused
-   visible repaints during scroll sync updates, perceived as flicker. */
-@media (min-width: 901px) {
-  .ue-page-slot.selected canvas {
-    outline: 2px solid var(--accent-primary);
-    outline-offset: 2px;
-  }
-}
+/* WHY no selected-page outline on the main canvas: a loud red border around the
+   whole active page added noise without information — in a continuous vertical
+   scroll the user already sees what's in the viewport, and "which page is active"
+   is communicated by the sidebar `.ue-thumbnail.selected` highlight + the
+   "Hal X/Y" indicator. Removed Jul 2026 (was desktop-only; also caused visible
+   repaints during scroll-sync, perceived as flicker). Keep the sidebar highlight;
+   that's the one that earns its keep. */
 
 /* REMOVED: duplicate .unified-empty-state — merged into first definition above */
 
