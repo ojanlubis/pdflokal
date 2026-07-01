@@ -27,15 +27,8 @@ export function renderPageView(page, { activeId = null } = {}) {
     `position:relative;flex:0 0 auto;width:${page.width}px;height:${page.height}px;` +
     'background:#fff;box-shadow:0 2px 14px rgba(0,0,0,.14);border-radius:2px';
 
-  if (page.raster) {
-    const img = document.createElement('img');
-    img.className = 'pv-bg';
-    img.src = page.raster.dataUrl;
-    img.draggable = false;
-    img.alt = '';
-    img.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;user-select:none;pointer-events:none';
-    view.appendChild(img);
-  }
+  if (page.raster) attachRaster(view, page.raster);
+  else attachPlaceholder(view);
 
   const overlay = document.createElement('div');
   overlay.className = 'pv-overlay';
@@ -47,6 +40,49 @@ export function renderPageView(page, { activeId = null } = {}) {
   }
   view.appendChild(overlay);
   return view;
+}
+
+// ---- streaming helpers (Phase 2: swap in / release the page image) ---------
+
+// A calm "loading" placeholder — shown for pages not yet rasterized. NOT blank,
+// so fast-scroll reads as loading, not flicker.
+function attachPlaceholder(view) {
+  if (view.querySelector('.pv-ph') || view.querySelector('.pv-bg')) return;
+  const ph = document.createElement('div');
+  ph.className = 'pv-ph';
+  ph.style.cssText =
+    'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;' +
+    'color:#c4c4c4;font-size:13px;background:#fff';
+  ph.textContent = 'memuat…';
+  view.insertBefore(ph, view.firstChild);
+}
+
+function attachRaster(view, raster) {
+  const img = document.createElement('img');
+  img.className = 'pv-bg';
+  img.src = raster.dataUrl;
+  img.draggable = false;
+  img.alt = '';
+  img.style.cssText =
+    'position:absolute;inset:0;width:100%;height:100%;user-select:none;pointer-events:none;' +
+    'opacity:0;transition:opacity .12s ease';
+  view.insertBefore(img, view.firstChild);
+  requestAnimationFrame(() => { img.style.opacity = '1'; });
+  return img;
+}
+
+// Called when a page enters the window and has been rasterized.
+export function setPageRaster(view, raster) {
+  if (view.querySelector('.pv-bg')) return;
+  view.querySelector('.pv-ph')?.remove();
+  attachRaster(view, raster);
+}
+
+// Called when a page leaves the window — drop the image to free memory, restore
+// the placeholder. Scrolling back re-rasterizes it (a brief, bounded load).
+export function clearPageRaster(view) {
+  view.querySelector('.pv-bg')?.remove();
+  attachPlaceholder(view);
 }
 
 // One annotation as a positioned DOM element (page-space px).

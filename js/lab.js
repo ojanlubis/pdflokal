@@ -1,59 +1,104 @@
 /*
- * PDFLokal — js/lab.js  (Phase-1 render-engine PREVIEW, not part of the app)
+ * PDFLokal — js/lab.js  (Phase-1/2 render preview — NOT part of the app)
  * ============================================================================
- * A throwaway harness to let the founder FEEL the new image-backed rendering on
- * a real phone BEFORE we swap the live editor. It wires: PDF bytes → core Doc
- * (import + rasterize) → render/page-view. Then it drops one draggable demo
- * annotation on page 1 so you can drag it around and confirm it stays ON TOP of
- * the pages (the "slides behind" fix), and scroll/zoom without flicker.
+ * Streaming render harness so the founder can feel the real strategy on a phone
+ * BEFORE the live editor is touched. The model:
+ *   - Open INSTANTLY: read all page sizes (cheap), lay out every page slot at
+ *     the correct dimensions immediately. Scrollbar is right from t=0; nothing
+ *     reflows. Only pixels stream in.
+ *   - STREAM like GTA maps: rasterize only pages near the viewport; release the
+ *     far ones to free memory. Memory stays bounded on ANY document size — the
+ *     only thing that survives "1 juta phones" (mostly low-end Android).
+ *   - Placeholders, never blank → fast-scroll reads as loading, not flicker.
  *
- * Nothing here touches the live app. Not linked from anywhere; robots-noindex.
+ * Nothing here touches the live app (separate page, noindex, unlinked).
  */
 import { createDoc, createAnnotation } from './core/model.js';
 import { addAnnotation } from './core/operations.js';
-import { importPdf, rasterizePage } from './core/import.js';
-import { renderPageView } from './render/page-view.js';
+import { importPdf, createPageRasterizer } from './core/import.js';
+import { renderPageView, setPageRaster, clearPageRaster } from './render/page-view.js';
 
 window.pdfjsLib.GlobalWorkerOptions.workerSrc = '/js/vendor/pdf.worker.min.js';
 
+const scrollEl = document.getElementById('pv-scroll');
 const stage = document.getElementById('pv-stage');
 const statusEl = document.getElementById('lab-status');
 const setStatus = (s) => { statusEl.textContent = s; };
 
 let zoom = 1;
-function applyZoom() { stage.style.transform = `scale(${zoom})`; }
+function applyZoom() { stage.style.transform = `scale(${zoom})`; scheduleWindow(); }
 document.getElementById('z-in').onclick = () => { zoom = Math.min(zoom + 0.2, 3); applyZoom(); };
 document.getElementById('z-out').onclick = () => { zoom = Math.max(zoom - 0.2, 0.3); applyZoom(); };
 
-// Load a document from bytes, rasterize every page, render the column.
+let slots = [];          // [{ page, view }]
+let rasterizer = null;   // per-source PDF.js doc cache
+let ticking = false;
+
 async function loadDoc(name, bytes) {
-  setStatus('memuat…');
-  stage.innerHTML = '';
+  if (rasterizer) await rasterizer.destroy();
+  slots = []; stage.innerHTML = '';
+  setStatus('membuka…');
+
   const doc = createDoc();
-  const pages = await importPdf(doc, { name, bytes });
+  const pages = await importPdf(doc, { name, bytes }); // instant: metadata only
 
-  // A draggable demo annotation on page 1 — proves "active object always on top".
-  const demo = addAnnotation(doc, pages[0].id,
-    createAnnotation('text', { text: 'Seret aku ✍️  (aku selalu di atas)', x: 60, y: 140, fontSize: 22, color: '#111', bold: true }));
+  // A draggable demo annotation on page 1 — proves "active object always on top",
+  // and that it stays put even while the page image streams in/out underneath.
+  const demo = addAnnotation(doc, pages[0].id, createAnnotation('text', {
+    text: 'Seret aku ✍️ (selalu di atas)', x: 48, y: 120, fontSize: 22, color: '#111', bold: true,
+  }));
 
-  // Fit the first page to the viewport width for a sensible default zoom.
-  const fit = Math.min(1, (stage.parentElement.clientWidth - 32) / pages[0].width);
-  zoom = fit; applyZoom();
+  const fit = Math.min(1, (scrollEl.clientWidth - 32) / pages[0].width);
+  zoom = fit; stage.style.transform = `scale(${zoom})`;
 
+  // Lay out EVERY slot immediately (correct size + placeholder). Instant open.
   for (const page of pages) {
-    await rasterizePage(doc, page, { scale: 2 });
     const view = renderPageView(page, { activeId: demo.id });
     stage.appendChild(view);
-    setStatus(`${stage.children.length}/${pages.length} halaman`);
+    slots.push({ page, view });
   }
-  setStatus(`${pages.length} halaman · seret teks hijau, scroll, zoom ± — cek flicker`);
-
   wireDemoDrag(doc, demo);
+
+  rasterizer = createPageRasterizer(doc);
+  setStatus(`${pages.length} halaman — dibuka langsung, isi mengalir saat scroll`);
+  updateWindow(); // rasterize whatever's on screen now
 }
 
-// Pointer-based drag (works mouse + touch). Updates the annotation in the core
-// model, then moves its element. Screen delta is divided by zoom so it tracks
-// the finger 1:1 at any zoom.
+// The GTA-streaming core: rasterize pages within ~2 screens of the viewport,
+// release pages beyond ~4 screens. Bounded memory, any doc size.
+function updateWindow() {
+  if (!rasterizer || slots.length === 0) return;
+  const sc = scrollEl.getBoundingClientRect();
+  const loadPad = sc.height * 2;
+  const keepPad = sc.height * 4;
+
+  for (const slot of slots) {
+    const r = slot.view.getBoundingClientRect();
+    const near = r.bottom > sc.top - loadPad && r.top < sc.bottom + loadPad;
+    const far = r.bottom < sc.top - keepPad || r.top > sc.bottom + keepPad;
+
+    if (near && !slot.page.raster && !slot.loading) {
+      slot.loading = true;
+      rasterizer.rasterize(slot.page, { scale: 2 })
+        .then((raster) => { setPageRaster(slot.view, raster); slot.loading = false; })
+        .catch(() => { slot.loading = false; });
+    } else if (far && slot.page.raster) {
+      clearPageRaster(slot.view);   // free memory — scroll-back re-rasterizes
+      slot.page.raster = null;
+    }
+  }
+}
+
+function scheduleWindow() {
+  if (ticking) return;
+  ticking = true;
+  requestAnimationFrame(() => { ticking = false; updateWindow(); });
+}
+scrollEl.addEventListener('scroll', scheduleWindow, { passive: true });
+window.addEventListener('resize', scheduleWindow);
+
+// Pointer-based drag (mouse + touch). Updates the core model, moves the element.
+// Screen delta ÷ zoom so it tracks the finger 1:1 at any zoom.
 function wireDemoDrag(doc, anno) {
   const el = stage.querySelector(`[data-anno-id="${anno.id}"]`);
   if (!el) return;
@@ -79,13 +124,12 @@ function wireDemoDrag(doc, anno) {
   el.addEventListener('pointercancel', end);
 }
 
-// Wire the file picker + auto-load the bundled sample so it's alive on open.
 document.getElementById('lab-file').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
   const bytes = new Uint8Array(await file.arrayBuffer());
-  loadDoc(file.name, bytes).catch((err) => { console.error(err); setStatus('gagal memuat'); });
   e.target.value = '';
+  loadDoc(file.name, bytes).catch((err) => { console.error(err); setStatus('gagal memuat'); });
 });
 
 (async () => {
