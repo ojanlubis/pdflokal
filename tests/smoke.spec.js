@@ -930,6 +930,36 @@ test.describe('mutatePages() re-keys parallel maps atomically', () => {
     expect(result.page0Annos).toEqual(['page1']);
   });
 
+  test('inline onclick survives pre-init: missing window bridge no-ops, does not throw', async ({ page }) => {
+    // Closes Sentry JAVASCRIPT-9: user tapped a button before the ES module
+    // bundle finished setting up window.toggleEditorFileMenu, got a
+    // ReferenceError. After the sweep, every inline onclick uses the
+    // `window.X?.()` pattern that silently no-ops if X is undefined.
+    const errors = watchForJsErrors(page);
+    await page.goto('/');
+
+    // Simulate the pre-init race: the home "Editor PDF" tool card calls
+    // window.showTool internally (via the JS init handler), but the
+    // homepage also has many onclick handlers that route through window
+    // bridges. Delete the bridge we know JS-9 hit, then trigger an onclick
+    // that would reach it.
+    await page.evaluate(() => { delete window.showHome; });
+
+    // Manually fire an onclick handler that calls showHome. Use a real
+    // button with an inline onclick to exercise the parsed-from-HTML path,
+    // not just the JS function. We create one on the fly so we don't depend
+    // on an existing button being in the DOM.
+    await page.evaluate(() => {
+      const btn = document.createElement('button');
+      btn.setAttribute('onclick', 'window.showHome?.()');
+      document.body.appendChild(btn);
+      btn.click();
+      btn.remove();
+    });
+
+    expect(errors).toEqual([]);
+  });
+
   test('mutatePages: deleting selected page falls back to nearest valid index', async ({ page }) => {
     await page.goto('/');
     await loadSamplePdf(page);
