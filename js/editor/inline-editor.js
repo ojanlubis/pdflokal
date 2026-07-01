@@ -7,6 +7,7 @@ import { ueState, mobileState, buildCanvasFont } from '../lib/state.js';
 import { ueGetCurrentCanvas, getTextBounds } from './canvas-utils.js';
 import { ueRedrawAnnotations, ueRemoveAnnotation } from './annotations.js';
 import { uePushAnnotationSnapshot } from './undo-redo.js';
+import { showTextFormatBar, hideTextFormatBar } from './text-format-bar.js';
 
 // WHY: opts.isNew = true when the annotation was just created via canvas click
 // (inline-on-first-create flow). Differs from the dblclick-on-existing path in
@@ -98,6 +99,7 @@ export function ueCreateInlineTextEditor(anno, opts = {}) {
     if (isNew && !newText) {
       removeOrphan();
       ueRedrawAnnotations();
+      hideTextFormatBar();
       editor.remove();
       switchToSelectIfNew();
       return;
@@ -122,6 +124,7 @@ export function ueCreateInlineTextEditor(anno, opts = {}) {
     }
 
     ueRedrawAnnotations();
+    hideTextFormatBar();
     editor.remove();
     switchToSelectIfNew();
   };
@@ -135,6 +138,7 @@ export function ueCreateInlineTextEditor(anno, opts = {}) {
     // Click-to-create annotations have no "original" state to preserve — drop them.
     if (isNew) removeOrphan();
     ueRedrawAnnotations();
+    hideTextFormatBar();
     editor.remove();
     switchToSelectIfNew();
   };
@@ -158,11 +162,28 @@ export function ueCreateInlineTextEditor(anno, opts = {}) {
   // 300ms delay prevents premature save when user taps keyboard toolbar buttons.
   // Shorter delay causes text loss on slower devices.
   const blurDelay = mobileState.isTouch ? 300 : 100;
-  editor.addEventListener('blur', () => setTimeout(saveEdit, blurDelay));
+  let blurSaveTimer = null;
+  editor.addEventListener('blur', () => {
+    blurSaveTimer = setTimeout(() => {
+      // WHY: focusing the format bar's font/size/color controls blurs this
+      // contentEditable. Don't end the edit while the user is restyling — the
+      // bar returns focus after a discrete change (see refocus in text-format-bar).
+      const fb = document.getElementById('text-format-bar');
+      if (fb && !fb.hidden && fb.contains(document.activeElement)) return;
+      saveEdit();
+    }, blurDelay);
+  });
+  // Regaining focus (bar returned it after a font/size change) cancels the
+  // pending blur-save so editing continues seamlessly.
+  editor.addEventListener('focus', () => clearTimeout(blurSaveTimer));
 
   wrapper.style.position = 'relative';
   wrapper.appendChild(editor);
   editor.focus();
+
+  // Contextual format toolbar (font / bold / italic / size / color) anchored to
+  // this annotation while editing. Applies live and persists to lastTextOptions.
+  showTextFormatBar(anno);
 
   // On mobile, reposition editor when virtual keyboard resizes the viewport
   if (window.visualViewport && mobileState.isTouch) {

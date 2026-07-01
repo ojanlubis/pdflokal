@@ -9,6 +9,7 @@ import { ueGetCoords, ueGetResizeHandle, getTextBounds } from './canvas-utils.js
 import { ueRedrawAnnotations, ueFindAnnotationAt, ueAddAnnotation } from './annotations.js';
 import { ueSaveEditUndoState, uePushAnnotationSnapshot } from './undo-redo.js';
 import { ueCreateInlineTextEditor } from './inline-editor.js';
+import { showTextFormatBar, hideTextFormatBar, repositionTextFormatBar } from './text-format-bar.js';
 import { ueHighlightThumbnail } from './page-rendering.js';
 import { ueZoomIn, ueZoomOut } from './zoom-rotate.js';
 import { track } from '../lib/analytics.js';
@@ -318,6 +319,9 @@ export function ueSetupCanvasEvents() {
       dragOffsetY = y - (anno.type === 'text' ? anno.y - anno.fontSize : anno.y);
       ueRedrawAnnotations();
       ueShowConfirmButton(anno, clicked);
+      // Text annotations get the contextual format bar; other types don't.
+      if (anno.type === 'text') showTextFormatBar(anno, clicked.pageIndex);
+      else hideTextFormatBar();
       return true;
     }
 
@@ -325,6 +329,7 @@ export function ueSetupCanvasEvents() {
     ueState.selectedAnnotation = null;
     ueState.lastLockedToastAnnotation = null;
     ueHideConfirmButton();
+    hideTextFormatBar();
     ueRedrawAnnotations();
     return false;
   }
@@ -368,6 +373,7 @@ export function ueSetupCanvasEvents() {
       hasMovedOrResized = true;
       ueRedrawAnnotations();
       ueUpdateConfirmButtonPosition(anno);
+      repositionTextFormatBar(); // no-op unless the bar targets this text anno
       return;
     }
 
@@ -378,6 +384,7 @@ export function ueSetupCanvasEvents() {
       hasMovedOrResized = true;
       ueRedrawAnnotations();
       ueUpdateConfirmButtonPosition(anno);
+      repositionTextFormatBar(); // no-op unless the bar targets this text anno
       return;
     }
 

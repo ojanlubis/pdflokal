@@ -13,13 +13,24 @@ Running list of UI/UX findings + small fixes to pick up later. Append new items 
 
 ## Open
 
-- **[high]** User can't pick a font family for text annotations — [inline-editor.js](js/editor/inline-editor.js), [text-modal.js](js/pdf-tools/text-modal.js), [state.js CSS_FONT_MAP](js/lib/state.js)
-  - User report (Jun 10): font dropdown is either not visible in the inline text editor flow, or the selection doesn't actually apply to the annotation. Options exist in state (Helvetica, Times Roman, Courier, Montserrat, Carlito — confirmed in DOM during Jun 9 prod test) so this is a wiring/UI bug, not a missing feature.
-  - Investigation before fix: confirm whether the font picker is shown in BOTH the modal-first text creation AND the inline-text-on-first-click flow (PR #54). If only one path exposes it, that's the gap. Also check whether `applyEditorText` reads the font from the picker state at apply time.
+- **[high]** Rework the "Gabungkan Halaman" / page-manager modal — naming mismatch + the interaction can be much stronger — [page-manager.js](js/editor/page-manager.js), [index.html](index.html) (`#ue-gabungkan-modal`), [style.css](style.css) (`.ue-pm-*`)
+  - User note (Jul 1): page management should be one of PDFLokal's strongest points, and this modal underdelivers. Two separate problems:
+  - **(1) Naming is inconsistent AND wrong.** The button that opens it says **"Kelola Halaman"** (Manage Pages) but the modal title says **"Gabungkan Halaman"** (Merge Pages). The modal does far more than merge — reorder, rotate, delete, split, add PDF, add image. "Gabungkan" is a misnomer; the button's "Kelola Halaman" is the accurate label. Fix: rename the modal title (and ideally the internal `gabungkan`/`uePm` naming over time) to **"Kelola Halaman"** so button and modal agree and the term matches what it actually does. Analytics event is `gabungkan_used` — keep or migrate deliberately so history isn't broken. Low-risk, ship-anytime part.
+  - **(2) The interaction itself.** My read after reading page-manager.js:
+    - **Three mental models crammed into one surface with no separation:** *add* content (Tambah PDF / Tambah Gambar), *arrange* content (drag-reorder + per-page rotate/delete), and *extract* content (Split PDF). The top row mixes add-actions and an extract-action; the grid is arrange. Nothing groups or sequences these.
+    - **Reorder has zero affordance.** Drag-to-reorder is the primary action but nothing tells the user pages are draggable (no grab cursor hint, no "seret untuk mengurutkan" caption). New users won't discover it.
+    - **"Split" is a heavy hidden mode switch.** Toggling Split flips the whole grid into checkbox-selection mode (drag disabled, click = select) — a mode-within-a-modal. Easy to get stuck in; the only exit is "Batal Split".
+    - **Rotate/delete are hover-only buttons** → invisible/unusable on touch (this modal IS used on mobile).
+    - **Redundant with the sidebar.** The sidebar thumbnails already do drag-reorder; this modal duplicates that plus more. Worth deciding: is the modal the "power" surface and the sidebar the "quick" one, or should they converge?
+  - Before designing: per project convention, look at how Stirling-PDF's page-organizer and Excalidraw/tldraw handle multi-item arrange/select/extract surfaces — don't invent blind. Then decide scope (rename-only vs full redesign) with the user.
 
-- **[high]** User can't bold (or italic) text annotations — [inline-editor.js](js/editor/inline-editor.js), [text-modal.js](js/pdf-tools/text-modal.js), [annotations.js drawTextAnnotation](js/editor/annotations.js)
-  - User report (Jun 10): bold/italic toggle is missing or non-functional. State factory `createTextAnnotation` supports `bold` + `italic` flags, and `buildCanvasFont` maps them to CSS, so the data model is ready — UI just isn't writing the flag, or render isn't reading it back at the right time.
-  - Investigation before fix: check whether the inline editor exposes B/I controls at all (might be modal-only), and whether `_editing` flag handling preserves bold/italic across modal→inline transitions and undo/redo cycles.
+- **[low]** Question the red outline around the active page (sidebar thumbnail + main canvas) — is it earning its keep? — [style.css](style.css) (search `.selected` / active-page rules), [sidebar.js ueHighlightThumbnail](js/editor/sidebar.js)
+  - User asked (Jul 1): why is there a red outline around the active page in both the sidebar and the canvas? What does it actually do for the user? If it has no real UI/UX benefit, just remove it.
+  - Investigation before touching: identify every rule/JS path that draws it — sidebar thumbnail `.selected` outline AND the main canvas red border seen in the screenshot. Note CLAUDE.md says the page-selection border is intentionally hidden on mobile (`.ue-page-slot.selected canvas` outline only at `min-width: 901px`), so this is desktop-only already. Decide whether "which page is active" is communicated well enough by the sidebar highlight + `Hal X/Y` indicator alone.
+  - Likely outcome: sidebar highlight is useful (shows selection); the thick red border around the whole main canvas page is the questionable one — it's loud and may not add info the user needs. Consider softening (thinner/neutral) or removing the canvas border while keeping the sidebar highlight.
+
+- **[low]** Retire the orphaned `text-input-modal` — [text-modal.js](js/pdf-tools/text-modal.js), [index.html](index.html) (`#text-input-modal`)
+  - The old text modal is now double-dead: nothing triggered `ueOpenTextModal()` even before the format bar, and the bar fully replaces its purpose. Dead code (modal DOM + text-modal.js + `ueConfirmText`/`getTextModalSettings` + window bridges + MODAL_IDS/close-map entries). Remove in a dedicated cleanup PR (touches navigation.js, init-ui.js, index.js bridges) so a regression is easy to bisect.
 
 - **[high]** Mobile fast-scroll sometimes jumps the viewport to page 1 — [page-rendering.js setupScrollSync](js/editor/page-rendering.js)
   - User report (Jun 9, Android Chrome): during the brief restore-from-cache flash (PR #66), occasionally the scroll position snaps back to page 1.
@@ -88,6 +99,11 @@ Running list of UI/UX findings + small fixes to pick up later. Append new items 
 ---
 
 ## Done
+
+- **[high×2]** Text annotations: can't pick font family + can't bold/italic (Jul 1) — [text-format-bar.js](js/editor/text-format-bar.js), [text-format-bar.spec.js](tests/text-format-bar.spec.js)
+  - Root cause (confirmed): PR #54 rerouted the Text tool to inline-on-first-click, bypassing the `text-input-modal` (which held the font/B/I/size/color controls). That modal was left **orphaned** — nothing called `ueOpenTextModal()` — so there was NO reachable UI to set font/bold/italic anywhere. Data model + render + export (`createTextAnnotation`, `buildCanvasFont`, `resolveFontName`) already supported the flags.
+  - Fix: new **contextual floating format bar** (Word/Figma/Canva feel). Appears (a) while the inline editor is open and (b) when a text annotation is selected with Pilih. Controls — font family, B, I, size ±/input, color — apply LIVE (mutate + redraw), persist to `lastTextOptions`, and push one undo snapshot per change-burst. Positioned `fixed` above the annotation, tracks it on scroll/drag/resize. Blur-save made cancellable + focus-guarded so focusing the bar's inputs doesn't tear down the editor mid-format.
+  - Verified: 2 harness tests (live font/B/I/size/color + persistence; restyle already-selected + deselect hides). Export confirmed to consume `fontFamily/bold/italic` end-to-end. Lint + 39 functional + 8 visual green (bar hidden by default → no baseline shift). Follow-up logged: retire the now-double-dead `text-input-modal`.
 
 - **[med]** Mobile: top of first page hidden under the fixed floating toolbar (Jul 1) — [style.css:3806](style.css#L3806), [mobile-toolbar-overlap.spec.js](tests/mobile-toolbar-overlap.spec.js)
   - User report (Android Chrome): after Ganti File to a full-bleed image, top ~21px of the page sat under the toolbar. Desktop unaffected.

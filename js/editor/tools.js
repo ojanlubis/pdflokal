@@ -7,6 +7,7 @@ import { ueState, createTextAnnotation } from '../lib/state.js';
 import { showToast, downloadBlob, getDownloadFilename } from '../lib/utils.js';
 import { openModal, closeModal, showHome } from '../lib/navigation.js';
 import { ueHideConfirmButton } from './signatures.js';
+import { hideTextFormatBar } from './text-format-bar.js';
 import { ueRedrawAnnotations, ueAddAnnotation } from './annotations.js';
 import { ueSaveEditUndoState } from './undo-redo.js';
 import { track } from '../lib/analytics.js';
@@ -20,6 +21,7 @@ export function ueSetTool(tool) {
   if (tool !== 'select') {
     ueState.selectedAnnotation = null;
     ueHideConfirmButton();
+    hideTextFormatBar();
   }
 
   if (tool !== 'signature' && tool !== 'paraf') {
