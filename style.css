@@ -3179,14 +3179,15 @@ html[data-theme="dark"] .text-format-bar {
 .ue-pm-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--space-lg);
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
 }
 
 .ue-pm-header h3 {
   margin: 0;
   font-size: 1.125rem;
   font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 .ue-pm-close-btn {
@@ -3211,41 +3212,74 @@ html[data-theme="dark"] .text-format-bar {
   color: var(--text-primary);
 }
 
-/* Toolbar */
-.ue-pm-toolbar {
+/* Context bar — reorder/select hint by default; bulk actions when ≥1 selected */
+.ue-pm-contextbar {
   display: flex;
   align-items: center;
-  gap: var(--space-md);
-  margin-bottom: var(--space-lg);
-  flex-wrap: wrap;
+  min-height: 40px;
+  margin-bottom: var(--space-md);
 }
 
-/* Make toolbar buttons more prominent */
-.ue-pm-toolbar > .btn-secondary {
-  background: var(--bg-secondary);
-  border-color: var(--border-medium);
-  color: var(--text-primary);
-  font-weight: 600;
-  font-size: 0.9375rem;
-  padding: var(--space-sm) var(--space-lg);
-}
-
-.ue-pm-toolbar > .btn-secondary:hover {
-  background: var(--bg-tertiary);
-  border-color: var(--accent-primary);
-}
-
-.ue-pm-extract-actions {
+.ue-pm-hint {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
+  width: 100%;
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+.ue-pm-hint[hidden] { display: none; }
+.ue-pm-hint svg { flex-shrink: 0; opacity: 0.7; }
+
+.ue-pm-selectall-link {
   margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--accent-primary);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-fast);
+}
+.ue-pm-selectall-link:hover { background: var(--bg-tertiary); }
+
+.ue-pm-selection-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  width: 100%;
+  animation: uePmActionsIn 180ms var(--ease-out, ease-out);
+}
+.ue-pm-selection-actions[hidden] { display: none; }
+
+@keyframes uePmActionsIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ue-pm-selection-actions { animation: none; }
 }
 
 .ue-pm-selection-count {
   font-size: 0.8125rem;
-  color: var(--text-secondary);
-  padding: 0 var(--space-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.ue-pm-selection-btns {
+  display: flex;
+  gap: var(--space-xs);
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+
+.ue-pm-danger-btn:hover {
+  border-color: var(--danger);
+  color: var(--danger);
 }
 
 /* Pages container - scrollable area */
@@ -3355,70 +3389,88 @@ html[data-theme="dark"] .text-format-bar {
 }
 
 .ue-pm-page-action-btn {
-  width: 24px;
-  height: 24px;
+  width: 30px;
+  height: 30px;
   border: none;
-  background: var(--overlay);
+  background: rgba(0, 0, 0, 0.55);
   color: white;
-  border-radius: var(--radius-sm);
+  border-radius: 7px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all var(--transition-fast);
+  transition: background var(--transition-fast);
   padding: 0;
 }
 
 .ue-pm-page-action-btn:hover {
-  background: rgba(0, 0, 0, 0.85);
+  background: rgba(0, 0, 0, 0.82);
 }
 
 .ue-pm-page-action-btn.delete:hover {
-  background: var(--accent-primary);
+  background: var(--danger);
 }
 
 .ue-pm-page-action-btn svg {
-  width: 12px;
-  height: 12px;
+  width: 15px;
+  height: 15px;
 }
 
-/* Extract mode checkbox */
+/* Always-visible selection checkbox (top-left) */
 .ue-pm-page-checkbox {
   position: absolute;
-  top: var(--space-sm);
-  left: var(--space-sm);
-  width: 22px;
-  height: 22px;
-  background: white;
+  top: 6px;
+  left: 6px;
+  width: 28px;
+  height: 28px;
+  background: rgba(255, 255, 255, 0.92);
   border: 2px solid var(--border-medium);
-  border-radius: 4px;
+  border-radius: 7px;
   cursor: pointer;
-  display: none;
+  display: flex;
   align-items: center;
   justify-content: center;
+  padding: 0;
+  color: transparent;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
 }
-
-.ue-pm-pages.extract-mode .ue-pm-page-checkbox {
-  display: flex;
-}
-
-.ue-pm-pages.extract-mode .ue-pm-page-actions {
-  display: none;
-}
-
-.ue-pm-pages.extract-mode .ue-pm-rotation-badge {
-  left: calc(var(--space-sm) + 26px);
-}
-
-.ue-pm-pages.extract-mode .ue-pm-page-item {
-  cursor: pointer;
-}
+.ue-pm-page-checkbox svg { width: 15px; height: 15px; }
 
 .ue-pm-page-item.selected .ue-pm-page-checkbox {
   background: var(--accent-primary);
   border-color: var(--accent-primary);
   color: white;
 }
+
+/* Rotation badge moves below the checkbox (both live top-left) */
+.ue-pm-page-item .ue-pm-rotation-badge {
+  top: 42px;
+}
+
+/* Add-page tiles (＋ PDF / ＋ Gambar) at the end of the grid */
+.ue-pm-add-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 130px;
+  border: 2px dashed var(--border-medium);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), color var(--transition-fast), background var(--transition-fast);
+}
+.ue-pm-add-tile:hover {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  background: var(--bg-secondary);
+}
+.ue-pm-add-icon { display: flex; }
+.ue-pm-add-icon svg { width: 22px; height: 22px; }
 
 /* Drop indicator for drag-drop */
 .ue-pm-drop-indicator {
@@ -3435,21 +3487,14 @@ html[data-theme="dark"] .text-format-bar {
   50% { opacity: 0.5; }
 }
 
-/* Footer */
+/* Page count in header */
 .ue-pm-page-count {
   font-size: 0.8125rem;
   color: var(--text-secondary);
   margin-right: auto;
 }
 
-/* Extract mode button active state */
-#ue-pm-extract-mode-btn.active {
-  background: var(--accent-primary);
-  color: white;
-  border-color: var(--accent-primary);
-}
-
-/* Mobile responsive */
+/* Mobile responsive — bigger touch targets (≥40px) for on-tile controls */
 @media (max-width: 900px) {
   .ue-pm-modal-box {
     max-height: 90vh;
@@ -3457,30 +3502,27 @@ html[data-theme="dark"] .text-format-bar {
   }
 
   .ue-pm-pages {
-    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
     gap: var(--space-sm);
   }
 
-  .ue-pm-toolbar {
-    flex-wrap: wrap;
-    gap: var(--space-sm);
+  .ue-pm-selection-btns .btn-sm {
+    padding: var(--space-sm) var(--space-md);
   }
 
-  .ue-pm-extract-actions {
-    width: 100%;
-    margin-left: 0;
-    margin-top: var(--space-sm);
+  .ue-pm-page-checkbox {
+    width: 36px;
+    height: 36px;
   }
+  .ue-pm-page-checkbox svg { width: 18px; height: 18px; }
 
   .ue-pm-page-action-btn {
-    width: 22px;
-    height: 22px;
+    width: 38px;
+    height: 38px;
   }
+  .ue-pm-page-action-btn svg { width: 18px; height: 18px; }
 
-  .ue-pm-page-action-btn svg {
-    width: 10px;
-    height: 10px;
-  }
+  .ue-pm-page-item .ue-pm-rotation-badge { top: 50px; }
 }
 
 /* Utility Classes */
