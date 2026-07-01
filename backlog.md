@@ -55,10 +55,7 @@ Running list of UI/UX findings + small fixes to pick up later. Append new items 
 - **[low]** Touch reorder in Kelola Halaman — HTML5 drag-and-drop doesn't fire on touch, so drag-reorder is desktop-only (pre-existing, same for the sidebar) — [page-manager.js uePmEnableDragReorder](js/editor/page-manager.js), [sidebar.js](js/editor/sidebar.js)
   - The Jul 1 redesign fixed the touch *catastrophe* (rotate/delete are now always-visible ≥40px), but reorder still relies on HTML5 DnD which mobile browsers don't dispatch. Follow-up: pointer-events-based drag (works mouse + touch) OR compact move ◀ ▶ buttons per tile. Do it once and reuse for the sidebar too.
 
-- **[low]** Question the red outline around the active page (sidebar thumbnail + main canvas) — is it earning its keep? — [style.css](style.css) (search `.selected` / active-page rules), [sidebar.js ueHighlightThumbnail](js/editor/sidebar.js)
-  - User asked (Jul 1): why is there a red outline around the active page in both the sidebar and the canvas? What does it actually do for the user? If it has no real UI/UX benefit, just remove it.
-  - Investigation before touching: identify every rule/JS path that draws it — sidebar thumbnail `.selected` outline AND the main canvas red border seen in the screenshot. Note CLAUDE.md says the page-selection border is intentionally hidden on mobile (`.ue-page-slot.selected canvas` outline only at `min-width: 901px`), so this is desktop-only already. Decide whether "which page is active" is communicated well enough by the sidebar highlight + `Hal X/Y` indicator alone.
-  - Likely outcome: sidebar highlight is useful (shows selection); the thick red border around the whole main canvas page is the questionable one — it's loud and may not add info the user needs. Consider softening (thinner/neutral) or removing the canvas border while keeping the sidebar highlight.
+- **[low]** Live sidebar highlight is dead on desktop scroll — `highlightThumbnail()` queries `#ue-thumbnails .ue-thumb` but the sidebar builds `.ue-thumbnail` (see [page-rendering.js:136](js/editor/page-rendering.js#L136) vs [sidebar.js:103](js/editor/sidebar.js#L103)). The selector matches nothing, so scroll-driven live highlight relies on a full `ueRenderThumbnails()` re-render instead of the cheap per-scroll toggle. Pre-existing; found Jul 2 while removing the active-page outline. Low impact (re-render still updates it) but the toggle loop is doing nothing — fix the selector or remove the dead loop.
 
 - **[high]** Mobile fast-scroll sometimes jumps the viewport to page 1 — [page-rendering.js setupScrollSync](js/editor/page-rendering.js)
   - User report (Jun 9, Android Chrome): during the brief restore-from-cache flash (PR #66), occasionally the scroll position snaps back to page 1.
@@ -108,13 +105,18 @@ Running list of UI/UX findings + small fixes to pick up later. Append new items 
   - User draws a signature in the signature/paraf modal; Ctrl+Z fires the global editor undo (`ueUndo()`) and rolls back an annotation on the PDF underneath instead of erasing the last pen stroke. Worse: nothing in the signature canvas changes, so user thinks the shortcut is broken and keeps pressing it — eating multiple undos.
   - Fix: in `keyboard.js`'s modifier-combo branch, check whether `signature-modal` or `paraf-modal` has `.active`; if so, route to `state.signaturePad.fromData(state.signaturePad.toData().slice(0, -1))` (SignaturePad has no native `undo()` but supports the data-rewind pattern). Same for `state.parafPad`. Bonus: extend to `inline-text-editor` open state — Ctrl+Z there should let contentEditable's native undo run.
 
-- **[med]** Sidebar page-number badge too large and too centered, covers thumbnail content — [style.css:2536-2547](style.css#L2536-L2547) (`.ue-thumbnail-number`)
-  - Big dark rounded badges (1, 2, 3…) sit mid-thumbnail on a multi-page document. Current CSS: `bottom: var(--space-sm)` + `padding: 4px 10px` + `font-size: 0.75rem`. On short landscape thumbnails the badge dominates the visible area.
-  - Fix candidates: shrink badge (font 0.65rem / padding 2px 6px), move to a corner (top-right), or fade out unless thumbnail is hovered/selected.
-
 ---
 
 ## Done
+
+- **[crit]** "Split PDF" homepage card broken since #73 (Jul 2, PR #77) — [init-ui.js](js/init-ui.js), [split-card.spec.js](tests/split-card.spec.js)
+  - The Kelola Halaman redesign removed `uePmToggleExtractMode()` but the split-card handler still called it → TypeError, dead card. Redesigned modal has no "Split mode"; card now opens the modal + `uePmSelectAll()` to surface the "Split jadi PDF" action bar. Removed the dead `extractMode` state field. Regression test drives the real card → filechooser → modal flow.
+
+- **[low+med]** Visual trio, 2 of 3 (Jul 2, PR #78) — [style.css](style.css)
+  - **Red active-page outline** removed from the main canvas (`.ue-page-slot.selected canvas`) — added noise, not info; active page carried by sidebar highlight + `Hal X/Y`. Kept the sidebar `.ue-thumbnail.selected` highlight.
+  - **Sidebar page-number badge** (`.ue-thumbnail-number`) shrunk (0.625rem / 2px 5px) + moved to the bottom-left corner + `pointer-events:none`; was a big centered pill covering thumbnails.
+  - Live-verified via computed styles + MCP screenshot; 8 baselines regenerated (4 desktop × darwin+linux). Gotcha logged: Playwright `--update-snapshots` skips sub-threshold diffs — force-delete the baseline to truly regen a small cosmetic change.
+  - Third item (paraf z-index on mobile) still Open — needs a real Android device.
 
 - **[low×3]** Wave 0 cleanup (Jul 1) — dead code + orphaned modal + visual-test-mask
   - Removed dead `rebuildAnnotationMapping` (function + barrel export + window bridge; `mutatePages` long replaced it) and refreshed 3 stale comments that cited it.
