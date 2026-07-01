@@ -1535,51 +1535,39 @@
   </dialog>
 
   <!-- Gabungkan Halaman Modal for Unified Editor -->
-  <dialog id="ue-gabungkan-modal" class="edit-modal" aria-modal="true" aria-label="Kelola halaman">
+  <dialog id="ue-gabungkan-modal" class="edit-modal" aria-modal="true" aria-label="Kelola Halaman">
     <div class="edit-modal-box ue-pm-modal-box">
       <div class="ue-pm-header">
-        <h3>Gabungkan Halaman</h3>
+        <h3>Kelola Halaman</h3>
+        <span class="ue-pm-page-count" id="ue-pm-page-count">0 halaman</span>
         <button class="ue-pm-close-btn" onclick="window.uePmCloseModal?.()" aria-label="Tutup">&times;</button>
       </div>
 
-      <div class="ue-pm-toolbar">
-        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('ue-pm-file-input').click()">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 5v14M5 12h14" />
-          </svg>
-          Tambah PDF
-        </button>
-        <input type="file" id="ue-pm-file-input" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/*"
-          style="display:none">
-
-        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('ue-pm-image-input').click()">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-            <polyline points="14 2 14 8 20 8" />
-            <path d="M12 18v-6" />
-            <path d="m9 15 3-3 3 3" />
-          </svg>
-          Tambah Gambar
-        </button>
-        <input type="file" id="ue-pm-image-input" multiple accept=".png,.jpg,.jpeg,.webp,image/*" style="display:none">
-
-        <button class="btn btn-secondary btn-sm" id="ue-pm-extract-mode-btn" onclick="window.uePmToggleExtractMode?.()">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 3v18" />
-            <path d="M8 8H4a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h4" />
-            <path d="M16 8h4a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-4" />
-            <path d="M9 12H5" />
-            <path d="M7 10l-2 2 2 2" />
-            <path d="M15 12h4" />
-            <path d="M17 10l2 2-2 2" />
-          </svg>
-          Split PDF
-        </button>
-
-        <div class="ue-pm-extract-actions" id="ue-pm-extract-actions" style="display:none;">
-          <button class="btn btn-secondary btn-sm" onclick="window.uePmSelectAll?.()">Pilih Semua</button>
-          <button class="btn btn-secondary btn-sm" onclick="window.uePmDeselectAll?.()">Batal Pilih</button>
-          <span class="ue-pm-selection-count" id="ue-pm-selection-count">0 halaman dipilih</span>
+      <!-- Context bar: shows the reorder/select hint by default; swaps to bulk
+           actions when one or more pages are selected (no separate "Split mode"). -->
+      <div class="ue-pm-contextbar">
+        <p class="ue-pm-hint" id="ue-pm-hint">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>
+          <span>Seret untuk mengurutkan · ketuk kotak buat memilih</span>
+          <button type="button" class="ue-pm-selectall-link" onclick="window.uePmSelectAll?.()">Pilih semua</button>
+        </p>
+        <div class="ue-pm-selection-actions" id="ue-pm-selection-actions" hidden>
+          <span class="ue-pm-selection-count" id="ue-pm-selection-count">0 dipilih</span>
+          <div class="ue-pm-selection-btns">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="window.uePmRotateSelected?.()" title="Putar halaman terpilih">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.85.83 6.72 2.24"/><path d="M21 3v6h-6"/></svg>
+              Putar
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm ue-pm-danger-btn" onclick="window.uePmDeleteSelected?.()" title="Hapus halaman terpilih">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+              Hapus
+            </button>
+            <button type="button" class="btn btn-primary btn-sm" onclick="window.uePmExtractSelected?.()" title="Simpan halaman terpilih sebagai PDF baru">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18"/><path d="M8 8H4a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h4"/><path d="M16 8h4a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-4"/></svg>
+              Split jadi PDF
+            </button>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="window.uePmDeselectAll?.()">Batal</button>
+          </div>
         </div>
       </div>
 
@@ -1588,12 +1576,11 @@
       </div>
 
       <div class="edit-modal-actions">
-        <span class="ue-pm-page-count" id="ue-pm-page-count">0 halaman</span>
-        <button class="btn btn-primary" id="ue-pm-extract-btn" onclick="window.uePmExtractSelected?.()" style="display:none;">
-          Split sebagai PDF baru
-        </button>
         <button class="btn btn-ghost" onclick="window.uePmCloseModal?.()">Selesai</button>
       </div>
+
+      <input type="file" id="ue-pm-file-input" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/*" hidden>
+      <input type="file" id="ue-pm-image-input" multiple accept=".png,.jpg,.jpeg,.webp,image/*" hidden>
     </div>
   </dialog>
 

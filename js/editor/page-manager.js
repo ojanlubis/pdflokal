@@ -1,6 +1,13 @@
 /*
  * PDFLokal - editor/page-manager.js (ES Module)
- * Gabungkan (page manager) modal: drag-drop reorder, rotate, delete, split/extract
+ * "Kelola Halaman" modal: reorder, rotate, delete, multi-select bulk actions
+ * (rotate / delete / split), and add pages (PDF / image).
+ *
+ * SELECTION MODEL: there is no separate "Split mode". Selection is always
+ * available via each tile's checkbox and is tracked by PAGE OBJECT REFERENCE
+ * (uePmState.selectedForExtract) — so it survives reorder/delete without any
+ * index remapping. When ≥1 page is selected, the context bar swaps from the
+ * reorder hint to a bulk-action bar.
  */
 
 import { ueState, uePmState, mutatePages } from '../lib/state.js';
@@ -13,7 +20,10 @@ import { ueAddFiles } from './file-loading.js';
 import { ueSaveUndoState } from './undo-redo.js';
 import { track } from '../lib/analytics.js';
 
-// Open the page manager modal
+// ============================================================
+// OPEN / CLOSE
+// ============================================================
+
 export function uePmOpenModal() {
   if (ueState.pages.length === 0) {
     showToast('Tambahkan halaman terlebih dahulu', 'error');
@@ -21,154 +31,327 @@ export function uePmOpenModal() {
   }
 
   uePmState.isOpen = true;
-  uePmState.extractMode = false;
   uePmState.selectedForExtract = [];
+  // WHY name kept: 'gabungkan_used' preserves analytics history even though the
+  // surface is now "Kelola Halaman". Migrate deliberately, not by accident.
   track('gabungkan_used', { pageCount: ueState.pages.length });
 
-  // WHY: Observer disconnected because pageCanvases array becomes stale after
-  // reorder/delete in the modal. Observer would trigger renders with wrong page indices.
-  // Reconnected via ueCreatePageSlots() in uePmCloseModal.
+  // WHY disconnect: pageCanvases indices go stale after reorder/delete in the
+  // modal; the observer would render wrong pages. Reconnected via
+  // ueCreatePageSlots() in uePmCloseModal.
   if (ueState.pageObserver) ueState.pageObserver.disconnect();
 
   uePmRenderPages();
-  uePmUpdateUI();
-
   openModal('ue-gabungkan-modal');
 
   initUePmFileInput();
   initUePmImageInput();
 }
 
-// Close the page manager modal
 export function uePmCloseModal(skipHistoryBack = false) {
   uePmState.isOpen = false;
-
-  if (uePmState.dropIndicator?.parentNode) {
-    uePmState.dropIndicator.remove();
-  }
-
-  document.getElementById('ue-pm-extract-mode-btn').classList.remove('active');
-  document.getElementById('ue-pm-extract-actions').style.display = 'none';
-  document.getElementById('ue-pm-extract-btn').style.display = 'none';
+  uePmState.selectedForExtract = [];
+  if (uePmState.dropIndicator?.parentNode) uePmState.dropIndicator.remove();
 
   closeModal('ue-gabungkan-modal', skipHistoryBack);
 
-  // WHY rAF: Defer heavy DOM rebuild until after modal CSS transition completes.
-  // Without rAF, ueCreatePageSlots layout thrashes during close animation.
+  // WHY rAF: defer the heavy slot rebuild until the close transition is done,
+  // otherwise ueCreatePageSlots layout-thrashes mid-animation.
   requestAnimationFrame(() => {
-    // Rebuild DOM slots + pageCanvases to match reordered/deleted pages
     ueCreatePageSlots();
     emit('pages:changed', { source: 'user' });
-    if (ueState.selectedPage >= 0) {
-      ueRenderSelectedPage();
-    }
+    if (ueState.selectedPage >= 0) ueRenderSelectedPage();
   });
 }
 
-function uePmUpdateUI() {
-  document.getElementById('ue-pm-page-count').textContent = ueState.pages.length + ' halaman';
+// ============================================================
+// RENDER
+// ============================================================
+
+function uePmUpdatePageCount() {
+  const el = document.getElementById('ue-pm-page-count');
+  if (el) el.textContent = ueState.pages.length + ' halaman';
 }
 
-// Render all pages in the modal grid
+const isSelected = (page) => uePmState.selectedForExtract.includes(page);
+
+// Build the thumbnail canvas for a tile (thumbCanvas — pageCanvases is stale
+// while the modal is open because the observer is disconnected).
+function buildTileThumb(page) {
+  const src = page.thumbCanvas || null;
+  if (src && page.rotation !== 0) return drawRotatedThumbnail(src, page.rotation);
+  const canvas = document.createElement('canvas');
+  canvas.width = src ? src.width : page.canvas.width;
+  canvas.height = src ? src.height : page.canvas.height;
+  if (src) canvas.getContext('2d').drawImage(src, 0, 0);
+  return canvas;
+}
+
+const ICON = {
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>',
+  rotate: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.85.83 6.72 2.24"/><path d="M21 3v6h-6"/></svg>',
+  trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>',
+  plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>',
+};
+
+function buildPageTile(page, index) {
+  const item = document.createElement('div');
+  item.className = 'ue-pm-page-item' + (isSelected(page) ? ' selected' : '');
+  item.dataset.index = index;
+  item.draggable = true;
+
+  item.appendChild(buildTileThumb(page));
+
+  // Checkbox — always visible, select by reference.
+  const checkbox = document.createElement('button');
+  checkbox.type = 'button';
+  checkbox.className = 'ue-pm-page-checkbox';
+  checkbox.setAttribute('aria-label', 'Pilih halaman ' + (index + 1));
+  checkbox.setAttribute('aria-pressed', isSelected(page) ? 'true' : 'false');
+  checkbox.innerHTML = ICON.check;
+  checkbox.onclick = (e) => { e.stopPropagation(); uePmTogglePageSelection(page); };
+  item.appendChild(checkbox);
+
+  // Actions — always visible (NOT hover-only), ≥44px touch targets.
+  const actions = document.createElement('div');
+  actions.className = 'ue-pm-page-actions';
+
+  const rotateBtn = document.createElement('button');
+  rotateBtn.type = 'button';
+  rotateBtn.className = 'ue-pm-page-action-btn';
+  rotateBtn.title = 'Putar 90°';
+  rotateBtn.setAttribute('aria-label', 'Putar halaman ' + (index + 1));
+  rotateBtn.innerHTML = ICON.rotate;
+  rotateBtn.onclick = (e) => { e.stopPropagation(); uePmRotatePage(index); };
+  actions.appendChild(rotateBtn);
+
+  const deleteBtn = document.createElement('button');
+  deleteBtn.type = 'button';
+  deleteBtn.className = 'ue-pm-page-action-btn delete';
+  deleteBtn.title = 'Hapus';
+  deleteBtn.setAttribute('aria-label', 'Hapus halaman ' + (index + 1));
+  deleteBtn.innerHTML = ICON.trash;
+  deleteBtn.onclick = (e) => { e.stopPropagation(); uePmDeletePage(index); };
+  actions.appendChild(deleteBtn);
+
+  item.appendChild(actions);
+
+  const numBadge = document.createElement('span');
+  numBadge.className = 'ue-pm-page-number';
+  numBadge.textContent = index + 1;
+  item.appendChild(numBadge);
+
+  if (ueState.sourceFiles.length > 1) {
+    const srcBadge = document.createElement('span');
+    srcBadge.className = 'ue-pm-source-badge';
+    srcBadge.textContent = page.sourceName;
+    item.appendChild(srcBadge);
+  }
+
+  if (page.rotation !== 0) {
+    const rotBadge = document.createElement('span');
+    rotBadge.className = 'ue-pm-rotation-badge';
+    rotBadge.textContent = page.rotation + '°';
+    item.appendChild(rotBadge);
+  }
+
+  return item;
+}
+
+// A dashed "＋ PDF" / "＋ Gambar" tile at the end of the grid.
+function buildAddTile(kind) {
+  const label = kind === 'pdf' ? 'PDF' : 'Gambar';
+  const tile = document.createElement('button');
+  tile.type = 'button';
+  tile.className = 'ue-pm-add-tile';
+  tile.setAttribute('aria-label', 'Tambah ' + label);
+  tile.innerHTML = `<span class="ue-pm-add-icon">${ICON.plus}</span><span class="ue-pm-add-label">${label}</span>`;
+  tile.onclick = () => {
+    const inputId = kind === 'pdf' ? 'ue-pm-file-input' : 'ue-pm-image-input';
+    document.getElementById(inputId).click();
+  };
+  return tile;
+}
+
 export function uePmRenderPages() {
   const container = document.getElementById('ue-pm-pages');
   container.innerHTML = '';
 
-  if (uePmState.extractMode) {
-    container.classList.add('extract-mode');
-  } else {
-    container.classList.remove('extract-mode');
+  // Drop selection refs whose page no longer exists (after delete).
+  uePmState.selectedForExtract = uePmState.selectedForExtract.filter(p => ueState.pages.includes(p));
+
+  ueState.pages.forEach((page, index) => container.appendChild(buildPageTile(page, index)));
+  container.appendChild(buildAddTile('pdf'));
+  container.appendChild(buildAddTile('image'));
+
+  uePmEnableDragReorder();
+  uePmUpdatePageCount();
+  uePmUpdateSelectionUI();
+}
+
+// ============================================================
+// SELECTION + BULK ACTIONS
+// ============================================================
+
+function uePmUpdateSelectionUI() {
+  const count = uePmState.selectedForExtract.length;
+  const hint = document.getElementById('ue-pm-hint');
+  const actions = document.getElementById('ue-pm-selection-actions');
+  const countEl = document.getElementById('ue-pm-selection-count');
+  if (countEl) countEl.textContent = count + ' dipilih';
+  if (hint) hint.hidden = count > 0;
+  if (actions) actions.hidden = count === 0;
+}
+
+export function uePmTogglePageSelection(page) {
+  const i = uePmState.selectedForExtract.indexOf(page);
+  if (i === -1) uePmState.selectedForExtract.push(page);
+  else uePmState.selectedForExtract.splice(i, 1);
+
+  const idx = ueState.pages.indexOf(page);
+  const item = document.querySelector(`.ue-pm-page-item[data-index="${idx}"]`);
+  if (item) {
+    const on = isSelected(page);
+    item.classList.toggle('selected', on);
+    item.querySelector('.ue-pm-page-checkbox')?.setAttribute('aria-pressed', on ? 'true' : 'false');
   }
+  uePmUpdateSelectionUI();
+}
 
-  ueState.pages.forEach((page, index) => {
-    const item = document.createElement('div');
-    item.className = 'ue-pm-page-item';
-    item.dataset.index = index;
-    item.draggable = !uePmState.extractMode;
+export function uePmSelectAll() {
+  uePmState.selectedForExtract = [...ueState.pages];
+  uePmRenderPages();
+}
 
-    if (uePmState.selectedForExtract.includes(index)) {
-      item.classList.add('selected');
-    }
+export function uePmDeselectAll() {
+  uePmState.selectedForExtract = [];
+  uePmRenderPages();
+}
 
-    // Use thumbCanvas directly — pageCanvases is stale while modal is open
-    // (observer is disconnected, indices don't match after reorder)
-    const sourceCanvas = page.thumbCanvas || null;
-    let canvas;
-    if (sourceCanvas && page.rotation !== 0) {
-      canvas = drawRotatedThumbnail(sourceCanvas, page.rotation);
-    } else {
-      canvas = document.createElement('canvas');
-      canvas.width = sourceCanvas ? sourceCanvas.width : page.canvas.width;
-      canvas.height = sourceCanvas ? sourceCanvas.height : page.canvas.height;
-      if (sourceCanvas) {
-        canvas.getContext('2d').drawImage(sourceCanvas, 0, 0);
-      }
-    }
-    item.appendChild(canvas);
+export function uePmRotateSelected() {
+  const sel = uePmState.selectedForExtract;
+  if (sel.length === 0) return;
+  ueSaveUndoState();
+  track('editor_action', { action: 'rotate' });
+  sel.forEach(page => { page.rotation = ((page.rotation + 90) % 360 + 360) % 360; });
+  uePmRenderPages();
+  showToast(`${sel.length} halaman diputar`, 'success');
+}
 
-    const numBadge = document.createElement('span');
-    numBadge.className = 'ue-pm-page-number';
-    numBadge.textContent = index + 1;
-    item.appendChild(numBadge);
+export function uePmDeleteSelected() {
+  const sel = uePmState.selectedForExtract;
+  if (sel.length === 0) return;
+  if (sel.length >= ueState.pages.length) {
+    showToast('Tidak bisa menghapus semua halaman', 'error');
+    return;
+  }
+  if (!confirm(`Hapus ${sel.length} halaman terpilih?`)) return;
 
-    if (ueState.sourceFiles.length > 1) {
-      const srcBadge = document.createElement('span');
-      srcBadge.className = 'ue-pm-source-badge';
-      srcBadge.textContent = page.sourceName;
-      item.appendChild(srcBadge);
-    }
-
-    if (page.rotation !== 0) {
-      const rotBadge = document.createElement('span');
-      rotBadge.className = 'ue-pm-rotation-badge';
-      rotBadge.textContent = page.rotation + '°';
-      item.appendChild(rotBadge);
-    }
-
-    const actions = document.createElement('div');
-    actions.className = 'ue-pm-page-actions';
-
-    const rotateBtn = document.createElement('button');
-    rotateBtn.className = 'ue-pm-page-action-btn';
-    rotateBtn.title = 'Putar 90°';
-    rotateBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.85.83 6.72 2.24"/><path d="M21 3v6h-6"/></svg>';
-    rotateBtn.onclick = (e) => {
-      e.stopPropagation();
-      uePmRotatePage(index, 90);
-    };
-    actions.appendChild(rotateBtn);
-
-    const deleteBtn = document.createElement('button');
-    deleteBtn.className = 'ue-pm-page-action-btn delete';
-    deleteBtn.title = 'Hapus';
-    deleteBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
-    deleteBtn.onclick = (e) => {
-      e.stopPropagation();
-      uePmDeletePage(index);
-    };
-    actions.appendChild(deleteBtn);
-
-    item.appendChild(actions);
-
-    const checkbox = document.createElement('div');
-    checkbox.className = 'ue-pm-page-checkbox';
-    checkbox.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>';
-    item.appendChild(checkbox);
-
-    item.onclick = () => {
-      if (uePmState.extractMode) {
-        uePmTogglePageSelection(index);
-      }
-    };
-
-    container.appendChild(item);
+  ueSaveUndoState();
+  track('editor_action', { action: 'delete_page' });
+  const toRemove = new Set(sel);
+  // mutatePages re-keys annotations/pageCaches/pageScales/selection atomically.
+  mutatePages(() => {
+    ueState.pages = ueState.pages.filter(p => !toRemove.has(p));
   });
+  uePmState.selectedForExtract = [];
+  emit('pages:changed', { source: 'user' });
+  uePmRenderPages();
+  showToast(`${toRemove.size} halaman dihapus`, 'success');
+}
 
-  if (!uePmState.extractMode) {
-    uePmEnableDragReorder();
+export async function uePmExtractSelected() {
+  const sel = uePmState.selectedForExtract;
+  if (sel.length === 0) {
+    showToast('Pilih halaman yang ingin di-split', 'error');
+    return;
   }
 
-  uePmUpdateUI();
+  // Keep the current page order for the new document.
+  const ordered = ueState.pages.filter(p => sel.includes(p));
+
+  try {
+    const newDoc = await PDFLib.PDFDocument.create();
+    for (const pageData of ordered) {
+      const sourceFile = ueState.sourceFiles[pageData.sourceIndex];
+      const srcDoc = await PDFLib.PDFDocument.load(sourceFile.bytes);
+      const [pg] = await newDoc.copyPages(srcDoc, [pageData.pageNum]);
+      if (pageData.rotation !== 0) pg.setRotation(PDFLib.degrees(pageData.rotation));
+      newDoc.addPage(pg);
+    }
+
+    const bytes = await newDoc.save();
+    downloadBlob(new Blob([bytes], { type: 'application/pdf' }), getDownloadFilename({ originalName: ueState.sourceFiles[0]?.name, extension: 'pdf' }));
+    track('editor_action', { action: 'split' });
+    showToast(`${ordered.length} halaman berhasil di-split!`, 'success');
+    uePmDeselectAll();
+  } catch (error) {
+    console.error('Error splitting pages:', error);
+    showToast('Gagal split halaman', 'error');
+  }
+}
+
+// ============================================================
+// PER-PAGE ROTATE / DELETE
+// ============================================================
+
+function uePmRotatePage(index) {
+  ueSaveUndoState();
+  track('editor_action', { action: 'rotate' });
+  const page = ueState.pages[index];
+  page.rotation = ((page.rotation + 90) % 360 + 360) % 360;
+  uePmRenderPages();
+  showToast('Halaman diputar', 'success');
+}
+
+function uePmDeletePage(index) {
+  if (ueState.pages.length <= 1) {
+    showToast('Tidak bisa menghapus halaman terakhir', 'error');
+    return;
+  }
+  if (!confirm('Hapus halaman ini?')) return;
+
+  ueSaveUndoState();
+  track('editor_action', { action: 'delete_page' });
+  mutatePages(() => {
+    ueState.pages.splice(index, 1);
+  });
+  emit('pages:changed', { source: 'user' });
+  uePmRenderPages();
+  showToast('Halaman dihapus', 'success');
+}
+
+// ============================================================
+// REORDER (drag-and-drop) — SSOT ueReorderPages
+// ============================================================
+
+// SINGLE SOURCE OF TRUTH — reorder atomically via mutatePages (re-keys
+// annotations, pageCaches, pageScales, selectedPage, selectedAnnotation).
+// WHY centralized: sidebar drag-drop and modal drop both funnel here.
+export function ueReorderPages(fromIndex, insertAt) {
+  mutatePages(() => {
+    const [movedPage] = ueState.pages.splice(fromIndex, 1);
+    if (fromIndex < insertAt) insertAt--;
+    ueState.pages.splice(insertAt, 0, movedPage);
+  });
+  track('editor_action', { action: 'reorder' });
+  emit('pages:changed', { source: 'user' });
+}
+
+// SINGLE SOURCE OF TRUTH — remap annotations/caches by page reference after a
+// reorder/delete outside mutatePages. Kept for callers that still use it.
+export function rebuildAnnotationMapping(oldPages) {
+  const oldAnnotations = { ...ueState.annotations };
+  const oldCaches = { ...ueState.pageCaches };
+  const newAnnotations = {};
+  const newCaches = {};
+  ueState.pages.forEach((page, newIdx) => {
+    const oldIdx = oldPages.indexOf(page);
+    newAnnotations[newIdx] = (oldIdx >= 0 ? oldAnnotations[oldIdx] : null) || [];
+    if (oldIdx >= 0 && oldCaches[oldIdx]) newCaches[newIdx] = oldCaches[oldIdx];
+  });
+  ueState.annotations = newAnnotations;
+  ueState.pageCaches = newCaches;
 }
 
 function uePmGetDropIndicator() {
@@ -180,12 +363,9 @@ function uePmGetDropIndicator() {
 }
 
 function uePmRemoveDropIndicator() {
-  if (uePmState.dropIndicator?.parentNode) {
-    uePmState.dropIndicator.remove();
-  }
+  if (uePmState.dropIndicator?.parentNode) uePmState.dropIndicator.remove();
 }
 
-// Enable drag-drop reordering in page manager
 function uePmEnableDragReorder() {
   const container = document.getElementById('ue-pm-pages');
   let draggedItem = null;
@@ -193,7 +373,9 @@ function uePmEnableDragReorder() {
 
   container.querySelectorAll('.ue-pm-page-item').forEach((item) => {
     item.addEventListener('dragstart', (e) => {
-      if (uePmState.extractMode) {
+      // WHY: don't start a reorder when the press began on a control (checkbox,
+      // rotate, delete) — those are clicks, not drags.
+      if (e.target.closest('.ue-pm-page-checkbox, .ue-pm-page-action-btn')) {
         e.preventDefault();
         return;
       }
@@ -216,355 +398,87 @@ function uePmEnableDragReorder() {
     });
 
     item.addEventListener('dragover', (e) => {
-      if (uePmState.extractMode) return;
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
       if (!draggedItem || item === draggedItem) return;
-
       const rect = item.getBoundingClientRect();
       const midpoint = rect.left + rect.width / 2;
       const indicator = uePmGetDropIndicator();
-
-      if (e.clientX < midpoint) {
-        item.before(indicator);
-      } else {
-        item.after(indicator);
-      }
-    });
-
-    item.addEventListener('dragleave', () => {
-      // Keep indicator visible during drag
+      if (e.clientX < midpoint) item.before(indicator);
+      else item.after(indicator);
     });
 
     item.addEventListener('drop', (e) => {
-      if (uePmState.extractMode) return;
       e.preventDefault();
       e.stopPropagation();
       if (!draggedItem) return;
-
       const targetIndex = Number.parseInt(item.dataset.index);
       const rect = item.getBoundingClientRect();
       const midpoint = rect.left + rect.width / 2;
       const insertAt = e.clientX < midpoint ? targetIndex : targetIndex + 1;
-
       ueReorderPages(draggedIndex, insertAt);
       uePmRenderPages();
       uePmRemoveDropIndicator();
     });
   });
 
-  // Handle container-level dragover
+  // Container-level dragover: place indicator at the ends of the row.
   container.addEventListener('dragover', (e) => {
-    if (uePmState.extractMode || !draggedItem) return;
+    if (!draggedItem) return;
     e.preventDefault();
-
     const items = container.querySelectorAll('.ue-pm-page-item:not(.dragging)');
     if (items.length === 0) return;
-
     const indicator = uePmGetDropIndicator();
-    const firstItem = items[0];
-    const lastItem = items[items.length - 1];
-    const firstRect = firstItem.getBoundingClientRect();
-    const lastRect = lastItem.getBoundingClientRect();
-
-    if (e.clientX < firstRect.left) {
-      firstItem.before(indicator);
-    } else if (e.clientX > lastRect.right) {
-      lastItem.after(indicator);
-    }
+    const firstRect = items[0].getBoundingClientRect();
+    const lastRect = items[items.length - 1].getBoundingClientRect();
+    if (e.clientX < firstRect.left) items[0].before(indicator);
+    else if (e.clientX > lastRect.right) items[items.length - 1].after(indicator);
   });
 
-  // Handle container-level drop
   container.addEventListener('drop', (e) => {
-    if (uePmState.extractMode || !draggedItem) return;
+    if (!draggedItem) return;
     e.preventDefault();
-
     const indicator = uePmState.dropIndicator;
-    if (!indicator?.parentNode) {
-      uePmRemoveDropIndicator();
-      return;
-    }
-
+    if (!indicator?.parentNode) { uePmRemoveDropIndicator(); return; }
     const items = Array.from(container.querySelectorAll('.ue-pm-page-item'));
     const nextSibling = indicator.nextElementSibling;
     const insertAt = (nextSibling?.classList.contains('ue-pm-page-item'))
       ? Number.parseInt(nextSibling.dataset.index)
       : items.length;
-
     ueReorderPages(draggedIndex, insertAt);
     uePmRenderPages();
     uePmRemoveDropIndicator();
   });
 }
 
-// SINGLE SOURCE OF TRUTH — performs reorder atomically via mutatePages,
-// which re-keys annotations, pageCaches, pageScales, selectedPage, and
-// selectedAnnotation in one shot. Pre-mutatePages this function did the
-// re-keying piecemeal (only annotations + selectedPage), which left
-// selectedAnnotation stale on reorder — the bug class behind Sentry JS-4.
-// WHY centralized: sidebar drag-drop, modal item-drop, and modal
-// container-drop all funnel here.
-export function ueReorderPages(fromIndex, insertAt) {
-  mutatePages(() => {
-    const [movedPage] = ueState.pages.splice(fromIndex, 1);
-    if (fromIndex < insertAt) insertAt--;
-    ueState.pages.splice(insertAt, 0, movedPage);
-  });
-  track('editor_action', { action: 'reorder' });
-  emit('pages:changed', { source: 'user' });
-}
+// ============================================================
+// ADD PAGES (PDF / IMAGE)
+// ============================================================
 
-// SINGLE SOURCE OF TRUTH — all page reorder/delete operations must call this to remap
-// annotations and pageCaches. Uses reference equality (indexOf on page objects) to handle
-// arbitrary reorder. Without this, annotations display on wrong pages after splice.
-// WHY reference equality: page objects are unique references; indexOf finds the new position
-// of the same object even after splice. This survives any reorder pattern.
-export function rebuildAnnotationMapping(oldPages) {
-  const oldAnnotations = { ...ueState.annotations };
-  const oldCaches = { ...ueState.pageCaches };
-  const newAnnotations = {};
-  const newCaches = {};
-  ueState.pages.forEach((page, newIdx) => {
-    const oldIdx = oldPages.indexOf(page);
-    newAnnotations[newIdx] = (oldIdx >= 0 ? oldAnnotations[oldIdx] : null) || [];
-    if (oldIdx >= 0 && oldCaches[oldIdx]) newCaches[newIdx] = oldCaches[oldIdx];
-  });
-  ueState.annotations = newAnnotations;
-  ueState.pageCaches = newCaches;
-}
-
-function updateRotatedThumbnail(item, page) {
-  const oldCanvas = item.querySelector('canvas');
-  const sourceCanvas = page.thumbCanvas || null;
-  if (!oldCanvas || !sourceCanvas) return;
-
-  const newCanvas = page.rotation !== 0
-    ? drawRotatedThumbnail(sourceCanvas, page.rotation)
-    : (() => { const c = document.createElement('canvas'); c.width = sourceCanvas.width; c.height = sourceCanvas.height; c.getContext('2d').drawImage(sourceCanvas, 0, 0); return c; })();
-  oldCanvas.replaceWith(newCanvas);
-}
-
-function updateRotationBadge(item, page) {
-  let rotBadge = item.querySelector('.ue-pm-rotation-badge');
-  if (page.rotation !== 0) {
-    if (!rotBadge) {
-      rotBadge = document.createElement('span');
-      rotBadge.className = 'ue-pm-rotation-badge';
-      const actions = item.querySelector('.ue-pm-page-actions');
-      if (actions) {
-        actions.before(rotBadge);
-      } else {
-        item.appendChild(rotBadge);
-      }
-    }
-    rotBadge.textContent = page.rotation + '°';
-  } else if (rotBadge) {
-    rotBadge.remove();
-  }
-}
-
-// Rotate a page in the modal
-function uePmRotatePage(index, degrees) {
-  ueSaveUndoState();
-  track('editor_action', { action: 'rotate' });
-
-  const page = ueState.pages[index];
-  page.rotation = ((page.rotation + degrees) % 360 + 360) % 360;
-
-  const item = document.querySelector(`.ue-pm-page-item[data-index="${index}"]`);
-  if (item) {
-    updateRotatedThumbnail(item, page);
-    updateRotationBadge(item, page);
-  }
-
-  showToast('Halaman diputar', 'success');
-}
-
-// Delete a page in the modal
-function uePmDeletePage(index) {
-  if (ueState.pages.length <= 1) {
-    showToast('Tidak bisa menghapus halaman terakhir', 'error');
-    return;
-  }
-
-  if (!confirm('Hapus halaman ini?')) {
-    return;
-  }
-
-  ueSaveUndoState();
-  track('editor_action', { action: 'delete_page' });
-
-  // mutatePages re-keys annotations, pageCaches, pageScales, selectedPage,
-  // and selectedAnnotation atomically. Pre-mutatePages this function did the
-  // re-keying piecemeal — JS-7 / JS-8 / JS-4 all stem from that pattern.
-  mutatePages(() => {
-    ueState.pages.splice(index, 1);
-  });
-  emit('pages:changed', { source: 'user' });
-
-  // Selection in the Gabungkan extract checklist is its own index-based map,
-  // not covered by mutatePages.
-  uePmState.selectedForExtract = uePmState.selectedForExtract
-    .filter(i => i !== index)
-    .map(i => i > index ? i - 1 : i);
-
-  uePmRenderPages();
-  uePmUpdateSelectionCount();
-
-  showToast('Halaman dihapus', 'success');
-}
-
-// Toggle extract mode
-export function uePmToggleExtractMode() {
-  uePmState.extractMode = !uePmState.extractMode;
-  uePmState.selectedForExtract = [];
-
-  const btn = document.getElementById('ue-pm-extract-mode-btn');
-  const extractActions = document.getElementById('ue-pm-extract-actions');
-  const extractBtn = document.getElementById('ue-pm-extract-btn');
-
-  if (uePmState.extractMode) {
-    btn.classList.add('active');
-    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg> Batal Split';
-    extractActions.style.display = 'flex';
-    extractBtn.style.display = 'inline-flex';
-  } else {
-    btn.classList.remove('active');
-    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18"/><path d="M8 8H4a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h4"/><path d="M16 8h4a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-4"/><path d="M9 12H5"/><path d="M7 10l-2 2 2 2"/><path d="M15 12h4"/><path d="M17 10l2 2-2 2"/></svg> Split PDF';
-    extractActions.style.display = 'none';
-    extractBtn.style.display = 'none';
-  }
-
-  uePmRenderPages();
-  uePmUpdateSelectionCount();
-}
-
-export function uePmTogglePageSelection(index) {
-  const idx = uePmState.selectedForExtract.indexOf(index);
-  if (idx === -1) {
-    uePmState.selectedForExtract.push(index);
-  } else {
-    uePmState.selectedForExtract.splice(idx, 1);
-  }
-
-  const item = document.querySelector(`.ue-pm-page-item[data-index="${index}"]`);
-  if (item) {
-    item.classList.toggle('selected', uePmState.selectedForExtract.includes(index));
-  }
-
-  uePmUpdateSelectionCount();
-}
-
-export function uePmSelectAll() {
-  uePmState.selectedForExtract = ueState.pages.map((_, i) => i);
-  document.querySelectorAll('.ue-pm-page-item').forEach(item => {
-    item.classList.add('selected');
-  });
-  uePmUpdateSelectionCount();
-}
-
-export function uePmDeselectAll() {
-  uePmState.selectedForExtract = [];
-  document.querySelectorAll('.ue-pm-page-item').forEach(item => {
-    item.classList.remove('selected');
-  });
-  uePmUpdateSelectionCount();
-}
-
-function uePmUpdateSelectionCount() {
-  const count = uePmState.selectedForExtract.length;
-  document.getElementById('ue-pm-selection-count').textContent = count + ' halaman dipilih';
-
-  const extractBtn = document.getElementById('ue-pm-extract-btn');
-  extractBtn.disabled = count === 0;
-  extractBtn.textContent = count > 0
-    ? `Split ${count} halaman sebagai PDF baru`
-    : 'Split sebagai PDF baru';
-}
-
-export async function uePmExtractSelected() {
-  if (uePmState.selectedForExtract.length === 0) {
-    showToast('Pilih halaman yang ingin di-split', 'error');
-    return;
-  }
-
-  try {
-    const sortedIndices = [...uePmState.selectedForExtract].sort((a, b) => a - b);
-
-    const newDoc = await PDFLib.PDFDocument.create();
-
-    for (const index of sortedIndices) {
-      const pageData = ueState.pages[index];
-      const sourceFile = ueState.sourceFiles[pageData.sourceIndex];
-      const srcDoc = await PDFLib.PDFDocument.load(sourceFile.bytes);
-      const [page] = await newDoc.copyPages(srcDoc, [pageData.pageNum]);
-
-      if (pageData.rotation !== 0) {
-        page.setRotation(PDFLib.degrees(pageData.rotation));
-      }
-
-      newDoc.addPage(page);
-    }
-
-    const bytes = await newDoc.save();
-    downloadBlob(new Blob([bytes], { type: 'application/pdf' }), getDownloadFilename({ originalName: ueState.sourceFiles[0]?.name, extension: 'pdf' }));
-    track('editor_action', { action: 'split' });
-
-    showToast(`${sortedIndices.length} halaman berhasil di-split!`, 'success');
-
-    uePmToggleExtractMode();
-
-  } catch (error) {
-    console.error('Error splitting pages:', error);
-    showToast('Gagal split halaman', 'error');
-  }
-}
-
-// File input handlers for adding pages from modal
 function initUePmFileInput() {
-  const input = document.getElementById('ue-pm-file-input');
-  if (input && !input._uePmInitialized) {
-    input._uePmInitialized = true;
-    input.addEventListener('change', async (e) => {
-      if (e.target.files.length > 0) {
-        showFullscreenLoading('Menambahkan PDF...');
-        try {
-          await ueAddFiles(e.target.files);
-          if (uePmState.isOpen) {
-            uePmRenderPages();
-          }
-        } catch (error) {
-          console.error('Error adding PDF:', error);
-          showToast('Gagal menambahkan PDF', 'error');
-        } finally {
-          hideFullscreenLoading();
-          e.target.value = '';
-        }
-      }
-    });
-  }
+  wireAddInput('ue-pm-file-input', 'Menambahkan PDF...', 'Gagal menambahkan PDF');
 }
 
 function initUePmImageInput() {
-  const input = document.getElementById('ue-pm-image-input');
-  if (input && !input._uePmInitialized) {
-    input._uePmInitialized = true;
-    input.addEventListener('change', async (e) => {
-      if (e.target.files.length > 0) {
-        showFullscreenLoading('Menambahkan gambar...');
-        try {
-          await ueAddFiles(e.target.files);
-          if (uePmState.isOpen) {
-            uePmRenderPages();
-          }
-        } catch (error) {
-          console.error('Error adding images:', error);
-          showToast('Gagal menambahkan gambar', 'error');
-        } finally {
-          hideFullscreenLoading();
-          e.target.value = '';
-        }
-      }
-    });
-  }
+  wireAddInput('ue-pm-image-input', 'Menambahkan gambar...', 'Gagal menambahkan gambar');
+}
+
+function wireAddInput(inputId, loadingMsg, errorMsg) {
+  const input = document.getElementById(inputId);
+  if (!input || input._uePmInitialized) return;
+  input._uePmInitialized = true;
+  input.addEventListener('change', async (e) => {
+    if (e.target.files.length === 0) return;
+    showFullscreenLoading(loadingMsg);
+    try {
+      await ueAddFiles(e.target.files);
+      if (uePmState.isOpen) uePmRenderPages();
+    } catch (error) {
+      console.error(errorMsg + ':', error);
+      showToast(errorMsg, 'error');
+    } finally {
+      hideFullscreenLoading();
+      e.target.value = '';
+    }
+  });
 }

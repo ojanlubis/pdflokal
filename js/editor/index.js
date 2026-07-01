@@ -61,8 +61,8 @@ export { ueBuildFinalPDF, ueDownload } from './pdf-export.js';
 export {
   uePmOpenModal, uePmCloseModal, uePmRenderPages,
   rebuildAnnotationMapping, ueReorderPages,
-  uePmToggleExtractMode, uePmTogglePageSelection,
-  uePmSelectAll, uePmDeselectAll, uePmExtractSelected
+  uePmTogglePageSelection, uePmSelectAll, uePmDeselectAll,
+  uePmRotateSelected, uePmDeleteSelected, uePmExtractSelected
 } from './page-manager.js';
 
 export {
@@ -190,16 +190,17 @@ window.ueBuildFinalPDF = ueBuildFinalPDF;
 window.ueDownload = ueDownload;
 
 // Page manager
-import { uePmOpenModal, uePmCloseModal, uePmRenderPages, rebuildAnnotationMapping, ueReorderPages, uePmToggleExtractMode, uePmTogglePageSelection, uePmSelectAll, uePmDeselectAll, uePmExtractSelected } from './page-manager.js';
+import { uePmOpenModal, uePmCloseModal, uePmRenderPages, rebuildAnnotationMapping, ueReorderPages, uePmTogglePageSelection, uePmSelectAll, uePmDeselectAll, uePmRotateSelected, uePmDeleteSelected, uePmExtractSelected } from './page-manager.js';
 window.uePmOpenModal = uePmOpenModal;
 window.uePmCloseModal = uePmCloseModal;
 window.uePmRenderPages = uePmRenderPages;
 window.rebuildAnnotationMapping = rebuildAnnotationMapping;
 window.ueReorderPages = ueReorderPages;
-window.uePmToggleExtractMode = uePmToggleExtractMode;
 window.uePmTogglePageSelection = uePmTogglePageSelection;
 window.uePmSelectAll = uePmSelectAll;
 window.uePmDeselectAll = uePmDeselectAll;
+window.uePmRotateSelected = uePmRotateSelected;
+window.uePmDeleteSelected = uePmDeleteSelected;
 window.uePmExtractSelected = uePmExtractSelected;
 
 // Lifecycle
