@@ -335,9 +335,11 @@ export function createPageNumberAnnotation({ text, fontSize, color = '#000000', 
 // ============================================================
 
 export const uePmState = {
-  isOpen: false,            // Whether the Gabungkan modal is currently visible
-  extractMode: false,       // true = "Split" mode (multi-select pages for extraction)
-  selectedForExtract: [],   // Array of page indices selected for split/extraction
+  isOpen: false,            // Whether the Kelola Halaman modal is currently visible
+  // WHY no extractMode: the redesigned modal has no separate "Split mode".
+  // Selection is always available; selectedForExtract holds page OBJECT refs
+  // (not indices) so it survives reorder/delete without index remapping.
+  selectedForExtract: [],   // Array of page object references selected for bulk actions
   draggedIndex: -1,         // Index of the page currently being dragged (-1 = none)
   dropIndicator: null       // DOM element showing where dragged page will land
 };
