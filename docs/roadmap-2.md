@@ -20,9 +20,9 @@ risk rises gradually.
 ## Wave 0 — Quick wins & Sentry cleanup  ⬅ NOW
 _Low-risk, self-contained; drains ~10 items. Batchable across 1–2 sittings._
 
-- [ ] REVERT whiteout auto-switch-to-Pilih (#60) — delete one `ueSetTool('select')` + flip 2 tests · **[high]**
-- [ ] Arrow-key nudge for a selected text annotation (1px / Shift=10px), debounced undo · **[high]**
-- [ ] Ctrl+Z inside the signature/paraf modal rewinds the pen stroke, not a doc annotation · **[high]**
+- [x] REVERT whiteout auto-switch-to-Pilih (#60) — whiteout stays sticky; tests flipped · **[high]** _(PR A)_
+- [x] Arrow-key nudge for a selected annotation (1px / Shift=10px), one undo per burst · **[high]** _(PR A)_
+- [x] Ctrl+Z inside the signature/paraf modal rewinds the pen stroke, not a doc annotation · **[high]** _(PR A)_
 - [ ] Sentry true-fixes JS-4 / JS-7 / JS-8 — one atomic re-key pass (selection follows page/annotation mutations; audit off-SSOT page creation) · **[med×3]**
 - [ ] Paraf Konfirmasi/delete buttons z-index behind canvas on mobile · **[low]**
 - [ ] Sidebar page-number badge too large / covers thumbnail · **[med]**

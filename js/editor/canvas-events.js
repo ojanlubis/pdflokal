@@ -449,14 +449,12 @@ export function ueSetupCanvasEvents() {
         }));
         track('editor_action', { action: 'whiteout' });
         ueRedrawAnnotations();
-        // WHY auto-switch: After a tool's action completes, the user almost
-        // always wants to verify/move/zoom — not draw another whiteout
-        // immediately. Keeping whiteout sticky meant one stray tap on the
-        // canvas would spawn a new annotation. Text/signature/paraf already
-        // do this; whiteout was the holdout.
-        // WHY window.*: signatures.js does the same dance and we already
-        // accept the circular-import workaround there.
-        if (typeof window.ueSetTool === 'function') window.ueSetTool('select');
+        // WHY whiteout stays sticky (reverted PR #60's auto-switch): redacting a
+        // page is a MULTI-stamp workflow — covering several secrets means drawing
+        // box after box. Auto-switching to Pilih after every drag forced a re-click
+        // of Whiteout between each box, which is more friction than the original
+        // stray-tap complaint. Text (one-per-click → move it) and signature/paraf
+        // still auto-switch; whiteout is the deliberate outlier.
       }
     } else if (ueState.currentTool === 'text') {
       // WHY: Inline editing on first creation (UX audit finding H1). The modal-per-text
