@@ -29,6 +29,7 @@ import { createInteraction } from '../render/interaction.js';
 import { createFormatBar } from './format-bar.js';
 import { createPageManager } from './page-manager.js';
 import { createSignatureModal } from './signature-modal.js';
+import { createDownloadSheet } from './download-sheet.js';
 
 window.pdfjsLib.GlobalWorkerOptions.workerSrc = '/js/vendor/pdf.worker.min.js';
 
@@ -368,6 +369,7 @@ const pageManager = createPageManager({
   sheet: document.getElementById('pm-sheet'),
   grid: document.getElementById('pm-grid'),
   bulkBar: document.getElementById('pm-bulk'),
+  pickBar: document.getElementById('pm-pickbar'),
   getDoc: () => doc,
   history,
   getRasterizer: () => rasterizer,
@@ -695,24 +697,20 @@ document.addEventListener('drop', (e) => {
   if (e.dataTransfer?.files?.length) loadFiles(e.dataTransfer.files);
 });
 
-// ---- download ---------------------------------------------------------------------------
-async function doDownload() {
+// ---- download: the Unduh sheet (output pipeline) ------------------------------------------
+// Opening it starts building the REAL PDF in the background — by the time the
+// 90% user taps the big button, the bytes are already there.
+const downloadSheet = createDownloadSheet({
+  modal: document.getElementById('dl-sheet'),
+  getDoc: () => doc,
+  getBaseName: () => baseName,
+  pickPages: (preselected) => pageManager.openPick(preselected),
+  download,
+  toast,
+});
+function doDownload() {
   if (doc.pages.length === 0) return;
-  const btn = document.getElementById('btn-download');
-  btn.disabled = true;
-  btn.textContent = 'Menyiapkan…';
-  try {
-    const { buildPdfBytes } = await import('../core/export.js');
-    const bytes = await buildPdfBytes(doc, { PDFLib: window.PDFLib, fontkit: window.fontkit });
-    download(new Blob([bytes], { type: 'application/pdf' }), `${baseName}-pdflokal.pdf`);
-    toast('PDF berhasil dibuat ✓');
-  } catch (err) {
-    console.error(err);
-    toast('Gagal membuat PDF — coba lagi ya');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Unduh';
-  }
+  downloadSheet.open();
 }
 document.getElementById('btn-download').addEventListener('click', doDownload);
 

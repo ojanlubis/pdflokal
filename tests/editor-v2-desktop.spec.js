@@ -37,9 +37,11 @@ test.describe('editor v2 — desktop', () => {
     const after = await page.evaluate(() => window.v2.getDoc().pages[0].annotations[0].x);
     expect(after).toBeGreaterThan(before);
 
-    // Download produces a real PDF.
-    const dl = page.waitForEvent('download');
+    // Download goes through the Unduh sheet: open → big button → real PDF.
     await page.click('#btn-download');
+    await expect(page.locator('#dl-sheet')).toBeVisible();
+    const dl = page.waitForEvent('download');
+    await page.click('#ds-cta');
     const download = await dl;
     expect(download.suggestedFilename()).toMatch(/pdflokal\.pdf$/);
   });
