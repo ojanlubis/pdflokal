@@ -19,6 +19,7 @@
 
 import { removePage, reorderPage, rotatePage } from '../core/operations.js';
 import { record } from '../core/history.js';
+import { track } from '../lib/analytics.js';
 
 const LONG_PRESS_MS = 280;
 const DRAG_SLOP = 8; // px of movement that cancels a pending long-press
@@ -46,6 +47,8 @@ export function createPageManager(deps) {
     selected.clear();
     render();
     sheet.showModal();
+    // Same event name as the old modal — dashboard continuity across the swap.
+    track('gabungkan_used', { pageCount: deps.getDoc().pages.length });
   }
   function close() { sheet.close(); }
   sheet.addEventListener('click', (e) => { if (e.target === sheet) close(); });
@@ -333,6 +336,7 @@ export function createPageManager(deps) {
           if (toIndex !== -1 && toIndex !== fromIndex) {
             record(deps.history, doc);
             reorderPage(doc, page.id, toIndex);
+            track('editor_action', { action: 'reorder' });
             deps.onDocChanged();
           }
           render(); // rebuild clears all inline drag styles
@@ -372,6 +376,7 @@ export function createPageManager(deps) {
         p.raster = null;             // raster is now the wrong orientation
         thumbs.delete(p.id);         // thumb too
       }
+      track('editor_action', { action: 'rotate' });
       render();
       deps.onDocChanged();
     } else if (act === 'delete') {
@@ -379,10 +384,12 @@ export function createPageManager(deps) {
       record(deps.history, doc);
       for (const p of pages) removePage(doc, p.id);
       selected.clear();
+      track('editor_action', { action: 'delete_page' });
       render();
       deps.onDocChanged();
       deps.toast(`${pages.length} halaman dihapus`);
     } else if (act === 'extract') {
+      track('editor_action', { action: 'split' }); // old name kept: extract IS split
       deps.onExtract(pages);
     } else if (act === 'clear') {
       selected.clear();

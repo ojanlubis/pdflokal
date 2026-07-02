@@ -15,6 +15,7 @@
  */
 
 import { buildPdfBytes } from '../core/export.js';
+import { track } from '../lib/analytics.js';
 
 const COMPRESS_QUALITY = 0.72; // the ONE preset (founder call: no levels until data asks)
 const COMPRESS_MAXDIM = 1600;
@@ -258,6 +259,13 @@ export function createDownloadSheet(deps) {
           deps.toast(`${n} gambar dibungkus ZIP ✓`);
         }
       }
+      // Richer than the old event: the CHOICES are the product signal now.
+      track('download', {
+        tool: 'editor-v2',
+        format: state.format === 'pdf' ? 'pdf' : state.imgfmt,
+        size: state.size,
+        pages: state.picked ? 'some' : 'all',
+      });
       modal.close();
     } catch (err) {
       console.error(err);
