@@ -196,18 +196,88 @@
     #zoom-ctl button { width: 44px; height: 44px; font-size: 20px; color: var(--muted); border-radius: 0; }
     #zoom-ctl button:first-child { border-bottom: 1px solid var(--line); }
 
-    /* empty state */
+    /* ---- the landing (= the editor's empty state; design: draf 3b) ---- */
+    /* Editor chrome yields while the landing is up; it has its own header. */
+    body.is-empty header, body.is-empty #toolbar, body.is-empty #zoom-ctl { display: none; }
     #empty {
-      position: absolute; inset: 0; display: flex; flex-direction: column;
-      align-items: center; justify-content: center; gap: 14px; padding: 24px; text-align: center;
+      position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain;
+      background: #faf9f7; -webkit-overflow-scrolling: touch;
     }
-    #empty h1 { font-size: 19px; font-weight: 700; }
-    #empty p { color: var(--muted); font-size: 13.5px; max-width: 300px; }
-    #btn-open {
-      background: var(--accent); color: #fff; font-weight: 600; font-size: 15px;
-      padding: 13px 26px; border-radius: 12px;
+    .ld { max-width: 620px; margin: 0 auto; padding: 0 22px 8px; }
+    .ld-hd {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 15px 0 10px;
+      border-bottom: 3px double var(--ink); /* kop surat: the letterhead double rule */
     }
-    #empty .privacy { font-size: 11.5px; color: var(--muted); opacity: .8; }
+    .ld-mark { font-weight: 700; font-size: 17px; letter-spacing: -.02em; }
+    .ld-mark em { font-style: normal; color: var(--accent); }
+    .ld-hd a { font-size: 13px; color: var(--muted); text-decoration: none; font-weight: 500; min-height: 44px; display: inline-flex; align-items: center; }
+    .ld h1 {
+      font-size: clamp(28px, 7.5vw, 38px); line-height: 1.12; letter-spacing: -.035em;
+      font-weight: 700; margin: 30px 0 0; max-width: 14ch; text-wrap: balance;
+    }
+    .ld-sub { font-size: 15px; color: var(--muted); margin: 12px 0 22px; max-width: 34ch; }
+    .dropzone {
+      display: block; width: 100%; cursor: pointer; text-align: center;
+      border: 2px dashed #d8d0c4; border-radius: 16px; background: var(--surface);
+      padding: 30px 20px 26px; font: inherit; color: inherit;
+      transition: border-color .15s ease, background .15s ease;
+    }
+    .dropzone.over { border-color: var(--accent); background: rgba(220,38,38,.05); }
+    .dropzone:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+    .dz-icon { width: 38px; height: 38px; color: #b3a99b; margin: 0 auto 8px; display: block; }
+    .dz-title { display: block; font-size: 15.5px; font-weight: 700; margin: 0 0 14px; letter-spacing: -.01em; }
+    .dz-buka {
+      display: inline-flex; align-items: center; pointer-events: none;
+      background: var(--accent); color: #fff; font-weight: 700; font-size: 15px;
+      padding: 13px 28px; border-radius: 12px; box-shadow: 0 2px 0 var(--accent-down);
+    }
+    .dropzone:active .dz-buka { transform: translateY(1px); box-shadow: 0 1px 0 var(--accent-down); }
+    .dz-hint { display: block; font-size: 12.5px; color: var(--muted); margin: 12px 0 0; }
+    .ld-label { font-size: 13px; color: var(--muted); margin: 26px 0 10px; font-weight: 500; }
+    .ld-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .ld-grid.more, #ld-more { margin-top: 10px; }
+    #ld-more[hidden] { display: none; }
+    .ld-card {
+      display: flex; flex-direction: column; gap: 7px; cursor: pointer; text-decoration: none;
+      background: #faf9f7; border: 1px solid #e3dcd1; border-radius: 12px;
+      padding: 13px 14px; text-align: left; font: inherit; color: var(--ink);
+      box-shadow: 0 1px 2px rgba(63,49,35,.04); transition: transform .1s ease;
+    }
+    .ld-card:active { transform: scale(.98); }
+    .ld-card:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    .ld-card svg { width: 20px; height: 20px; color: var(--ink); }
+    .ld-card b { font-size: 14px; font-weight: 700; letter-spacing: -.01em; }
+    .ld-card span { font-size: 11.5px; color: var(--muted); line-height: 1.45; margin-top: -3px; }
+    .ld-lihat {
+      display: flex; align-items: center; justify-content: center; gap: 7px; width: 100%;
+      margin-top: 12px; padding: 12px; font-weight: 700; font-size: 13.5px;
+      color: #7f1d1d; border-radius: 10px;
+    }
+    .ld-lihat svg { width: 16px; height: 16px; transition: transform .18s ease; }
+    .ld-lihat[aria-expanded="true"] svg { transform: rotate(180deg); }
+    .ld-janji {
+      margin: 34px 0 0; padding: 18px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+      display: flex; gap: 13px; align-items: flex-start;
+    }
+    .ld-janji svg { width: 22px; height: 22px; color: var(--accent); margin-top: 2px; flex: none; }
+    .ld-janji b { font-size: 15px; display: block; letter-spacing: -.01em; }
+    .ld-janji p { font-size: 13.5px; color: var(--muted); margin: 3px 0 0; max-width: 46ch; }
+    .ld-janji a { color: #7f1d1d; font-weight: 500; }
+    .ld-faq { padding: 32px 0 0; }
+    .ld-faq h2 { font-size: 19px; letter-spacing: -.02em; margin: 0 0 6px; }
+    .ld-faq details { border-bottom: 1px solid var(--line); }
+    .ld-faq summary {
+      cursor: pointer; list-style: none; font-weight: 700; font-size: 14.5px;
+      padding: 14px 0; display: flex; justify-content: space-between; align-items: center;
+    }
+    .ld-faq summary::-webkit-details-marker { display: none; }
+    .ld-faq summary::after { content: "+"; color: var(--muted); font-weight: 400; font-size: 18px; }
+    .ld-faq details[open] summary::after { content: "–"; }
+    .ld-faq details p { font-size: 13.5px; color: #57504a; margin: 0 0 14px; max-width: 52ch; }
+    .ld-foot { padding: 30px 0 40px; display: flex; gap: 18px; align-items: baseline; flex-wrap: wrap; }
+    .ld-foot a { font-size: 13px; color: var(--muted); text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
+    .ld-foot span { margin-left: auto; font-size: 12px; color: var(--muted); }
 
     /* inline text editor overlay */
     .v2-text-edit {
@@ -462,7 +532,7 @@
     #toast.show { opacity: 1; }
   </style>
 </head>
-<body>
+<body class="is-empty">
   <header>
     <span class="brand">PDFLokal <span class="beta">v2 beta</span></span>
     <div class="file-menu-wrap">
@@ -527,11 +597,116 @@
 
   <main id="v2-scroll">
     <div id="v2-sizer"><div id="v2-stage"></div></div>
+    <!-- The landing IS the editor's empty state (design: draf 3b, Jul 2026).
+         Real content in static HTML on purpose: Google reads a normal content
+         page; humans get a tool that's ready before they finish the headline. -->
     <div id="empty">
-      <h1>Edit PDF langsung di HP-mu</h1>
-      <p>Gabung, tanda tangan, tulis, tutup teks. Semuanya diproses di HP-mu sendiri, nggak ada yang di-upload.</p>
-      <button id="btn-open">Buka PDF</button>
-      <span class="privacy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;vertical-align:-2px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> 100% privat, file kamu nggak pernah ninggalin perangkat</span>
+      <div class="ld">
+        <div class="ld-hd">
+          <span class="ld-mark">PDF<em>Lokal</em></span>
+          <a href="dukung.html">Dukung Kami</a>
+        </div>
+        <h1>Urus PDF langsung di HP-mu.</h1>
+        <p class="ld-sub">Gabung, tanda tangan, kompres. Gratis, tanpa upload, tanpa akun.</p>
+        <button class="dropzone" id="btn-open">
+          <svg class="dz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <span class="dz-title">Seret file ke sini, atau</span>
+          <span class="dz-buka">Buka File</span>
+          <span class="dz-hint">PDF atau foto, boleh banyak sekaligus</span>
+        </button>
+        <p class="ld-label">Mau ngapain hari ini?</p>
+        <div class="ld-grid">
+          <button class="ld-card" data-intent="gabung">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>
+            <b>Gabung PDF</b><span>Beberapa file jadi satu</span>
+          </button>
+          <button class="ld-card" data-intent="ttd">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+            <b>Tanda Tangan</b><span>Gambar atau foto ttd-mu</span>
+          </button>
+          <button class="ld-card" data-intent="kompres">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+            <b>Kompres PDF</b><span>Biar lolos batas upload</span>
+          </button>
+          <button class="ld-card" data-intent="foto">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+            <b>Foto jadi PDF</b><span>Hasil scan rapi jadi satu file</span>
+          </button>
+        </div>
+        <div class="ld-grid" id="ld-more" hidden>
+          <button class="ld-card" data-intent="split">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/><circle cx="6" cy="18" r="3"/><path d="M14.8 14.8 20 20"/></svg>
+            <b>Split PDF</b><span>Ambil halaman yang perlu aja</span>
+          </button>
+          <button class="ld-card" data-intent="gambar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+            <b>PDF jadi Gambar</b><span>Tiap halaman jadi JPG/PNG</span>
+          </button>
+          <button class="ld-card" data-intent="teks">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+            <b>Tambah Teks</b><span>Isi formulir atau beri catatan</span>
+          </button>
+          <button class="ld-card" data-intent="paraf">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16c2-4 4-6 6-3s3 1 5-4"/><path d="M4 20h16"/></svg>
+            <b>Paraf</b><span>Inisial cepat di tiap halaman</span>
+          </button>
+          <button class="ld-card" data-intent="tipex">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="8" rx="2"/></svg>
+            <b>Tip-Ex</b><span>Tutup bagian yang nggak perlu</span>
+          </button>
+          <button class="ld-card" data-intent="halaman">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+            <b>Atur Halaman</b><span>Urutkan, putar, hapus halaman</span>
+          </button>
+          <a class="ld-card" href="/">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m14 10 4-4"/><path d="M18 10V6h-4"/><path d="m10 14-4 4"/><path d="M6 14v4h4"/></svg>
+            <b>Kompres Gambar</b><span>Foto jadi ringan dikirim</span>
+          </a>
+          <a class="ld-card" href="/">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 3 9 15"/><path d="M21 8V3h-5"/><path d="M3 21l6-6"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+            <b>Ubah Ukuran Gambar</b><span>Pas buat syarat unggahan</span>
+          </a>
+          <a class="ld-card" href="/">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>
+            <b>Konversi Gambar</b><span>JPG, PNG, atau WebP</span>
+          </a>
+          <a class="ld-card" href="/">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/></svg>
+            <b>Hapus Background</b><span>Foto ttd atau produk jadi bersih</span>
+          </a>
+        </div>
+        <button class="ld-lihat" id="ld-lihat" aria-expanded="false" aria-controls="ld-more">Lihat semua alat
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="ld-janji">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+          <div>
+            <b>Filemu nggak pernah ninggalin HP-mu.</b>
+            <p>Ijazah, KTP, kontrak. Semua diproses di browser-mu sendiri, bukan di server orang. <a href="privasi.html">Baca janji privasi kami</a></p>
+          </div>
+        </div>
+        <section class="ld-faq">
+          <h2>Sering ditanya</h2>
+          <details>
+            <summary>Beneran gratis? Batasnya apa?</summary>
+            <p>Gratis. Nggak ada batas jumlah file, nggak ada watermark, nggak perlu bikin akun. PDFLokal hidup dari dukungan pengguna, bukan dari data kamu.</p>
+          </details>
+          <details>
+            <summary>Filenya diupload ke mana?</summary>
+            <p>Nggak ke mana-mana. Semua diproses di HP atau laptopmu. Setelah halamannya kebuka, internetmu dimatikan pun tetap jalan.</p>
+          </details>
+          <details>
+            <summary>HP-ku kentang, kuat nggak?</summary>
+            <p>Kuat. PDFLokal memang dibuat supaya tetap lancar di HP murah dan internet lambat.</p>
+          </details>
+        </section>
+        <footer class="ld-foot">
+          <a href="dukung.html">Dukung Kami</a>
+          <a href="privasi.html">Privasi</a>
+          <a href="https://github.com/ojanlubis/pdflokal" rel="noopener">GitHub</a>
+          <span>Dibuat di Indonesia</span>
+        </footer>
+      </div>
     </div>
   </main>
 

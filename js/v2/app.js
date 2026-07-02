@@ -642,6 +642,7 @@ async function loadFilesInner(files) {
   }
   if (!rasterizer) rasterizer = createPageRasterizer(doc);
   emptyEl.style.display = 'none';
+  document.body.classList.remove('is-empty'); // landing yields, editor chrome returns
 
   if (firstLoad) {
     zoom = Math.min(1, (scrollEl.clientWidth - 16) / doc.pages[0].width);
@@ -650,10 +651,70 @@ async function loadFilesInner(files) {
   if (!firstLoad) toast(`Dijepit jadi satu, sekarang ${doc.pages.length} halaman`);
   // If the Halaman sheet triggered this add, refresh its grid in place.
   if (document.getElementById('pm-sheet').open) pageManager.render();
+
+  // The intent hook: a landing card (or a future /gabung-pdf page via ?buat=)
+  // told us what the user came to do — configure the editor for it, once.
+  if (firstLoad && pendingIntent) {
+    const intent = pendingIntent;
+    pendingIntent = null;
+    applyIntent(intent);
+  }
+}
+
+// ---- the landing: dropzone, tool cards, intent hook -------------------------------
+// WHY ?buat= exists now: SEO intent pages (/gabung-pdf etc, strategy bet 5.3)
+// boot the editor pre-configured. Planned = one line; retrofitted = a refactor.
+let pendingIntent = new URLSearchParams(window.location.search).get('buat');
+
+function applyIntent(intent) {
+  if (intent === 'ttd' || intent === 'paraf') {
+    // Same semantics as the toolbar button: no stored signature → the modal
+    // opens to make one; otherwise arm placement.
+    if (!storedSignature) { signatureModal.open(); return; }
+    setTool('signature');
+    toast('Ketuk halaman untuk menempatkan tanda tangan');
+  } else if (intent === 'teks') {
+    setTool('text');
+    toast('Ketuk halaman untuk menulis');
+  } else if (intent === 'tipex') {
+    setTool('whiteout');
+    toast('Seret di halaman untuk menutup teks');
+  } else if (intent === 'kompres') downloadSheet.open({ size: 'kompres' });
+  else if (intent === 'gambar') downloadSheet.open({ format: 'img' });
+  else if (intent === 'split' || intent === 'halaman') pageManager.open();
+  else if (intent === 'gabung') toast('Tambah file lainnya lewat menu File di kiri atas');
 }
 
 const fileInput = document.getElementById('file-input');
+const DEFAULT_ACCEPT = fileInput.getAttribute('accept');
 document.getElementById('btn-open').addEventListener('click', () => fileInput.click());
+
+for (const card of document.querySelectorAll('.ld-card[data-intent]')) {
+  card.addEventListener('click', () => {
+    pendingIntent = card.dataset.intent;
+    // Foto jadi PDF narrows the picker to images; everything else keeps both.
+    fileInput.setAttribute('accept', pendingIntent === 'foto' ? 'image/*' : DEFAULT_ACCEPT);
+    fileInput.click();
+  });
+}
+
+const lihatBtn = document.getElementById('ld-lihat');
+const moreGrid = document.getElementById('ld-more');
+lihatBtn.addEventListener('click', () => {
+  const open = moreGrid.hidden;
+  moreGrid.hidden = !open;
+  lihatBtn.setAttribute('aria-expanded', String(open));
+  lihatBtn.firstChild.textContent = open ? 'Sembunyikan' : 'Lihat semua alat';
+});
+
+// The dropzone welcomes an incoming drag (border + tint via .over).
+const dropzoneEl = document.getElementById('btn-open');
+for (const ev of ['dragenter', 'dragover']) {
+  dropzoneEl.addEventListener(ev, (e) => { e.preventDefault(); dropzoneEl.classList.add('over'); });
+}
+for (const ev of ['dragleave', 'drop']) {
+  dropzoneEl.addEventListener(ev, () => dropzoneEl.classList.remove('over'));
+}
 
 // ---- File menu: add more files or start over WITHOUT a page refresh ----------------
 const fileMenu = document.getElementById('file-menu');
@@ -698,6 +759,7 @@ fileInput.addEventListener('change', async (e) => {
   }
   pendingReplace = false; // picker cancelled → nothing was destroyed
   fileInput.value = '';
+  fileInput.setAttribute('accept', DEFAULT_ACCEPT); // undo any intent narrowing (Foto jadi PDF)
 });
 
 // Drag & drop anywhere (desktop).
