@@ -90,7 +90,11 @@ test.describe('editor v2 — mobile', () => {
       return { x: a.x, y: a.y };
     });
 
-    // Touch-drag via dispatched pointer events (the unified input path).
+    // Camera-first touch model: tap SELECTS (commits at release)…
+    await page.tap('.pv-anno-text');
+    expect(await page.evaluate(() => window.v2.getDoc().selection.annotationId)).toBeTruthy();
+
+    // …then a drag on the SELECTED object moves it.
     const box = await anno.boundingBox();
     const cx = box.x + box.width / 2;
     const cy = box.y + box.height / 2;

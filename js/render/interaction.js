@@ -24,6 +24,7 @@ import { decorateSelected, undecorateSelected } from './page-view.js';
 
 const DOUBLE_TAP_MS = 300;
 const DOUBLE_TAP_DIST = 30;
+const TAP_SLOP = 12; // px of finger movement beyond which a press is not a tap
 
 // ctx = {
 //   stage:      container holding .pv-page views
@@ -38,6 +39,7 @@ const DOUBLE_TAP_DIST = 30;
 export function createInteraction(ctx) {
   const { stage } = ctx;
   let gesture = null;        // the active pointer gesture (one at a time)
+  let tapCandidate = null;   // touch press waiting to become a tap at RELEASE
   let selectedEl = null;     // decorated element (kept in sync with doc.selection)
   let lastTap = { t: 0, x: 0, y: 0, annoId: null };
 
@@ -128,11 +130,22 @@ export function createInteraction(ctx) {
     pageView.setPointerCapture(e.pointerId);
   }
 
+  // Was this tap the second of a double-tap? Also records it as the new "last".
+  function registerTap(annoId, x, y) {
+    const now = Date.now();
+    const isDouble = annoId && annoId === lastTap.annoId &&
+      now - lastTap.t < DOUBLE_TAP_MS &&
+      Math.hypot(x - lastTap.x, y - lastTap.y) < DOUBLE_TAP_DIST;
+    lastTap = { t: now, x, y, annoId };
+    return isDouble;
+  }
+
   function onPointerDown(e) {
-    if (gesture) return;                    // one gesture at a time
+    if (gesture || tapCandidate) return;    // one gesture at a time
     if (e.button !== undefined && e.button !== 0 && e.pointerType === 'mouse') return;
     const doc = ctx.getDoc();
     const tool = ctx.getTool();
+    const isTouch = e.pointerType !== 'mouse';
 
     const handleEl = e.target.closest?.('.pv-handle');
     const annoEl = e.target.closest?.('.pv-anno');
@@ -142,7 +155,7 @@ export function createInteraction(ctx) {
     const page = doc.pages.find((pg) => pg.id === pageId);
     if (!page) return;
 
-    // 1) Resize handle beats everything.
+    // 1) Resize handle beats everything (explicit chrome, unambiguous).
     if (handleEl && selectedEl && selectedEl.contains(handleEl)) {
       const found = findAnno(doc, selectedEl.dataset.annoId);
       if (found) {
@@ -152,41 +165,15 @@ export function createInteraction(ctx) {
       }
     }
 
-    // 2) Annotation hit → select + maybe drag (any tool: touching wins).
-    if (annoEl) {
-      const anno = page.annotations.find((a) => a.id === annoEl.dataset.annoId);
-      if (anno) {
-        e.preventDefault();                 // annotation hit: block scroll, we drag
-
-        // Delete tool armed: tapping an object removes it (founder ask — the
-        // reverse order of "select then Hapus" must also work).
-        if (tool === 'delete') {
-          ctx.onDeleteTap?.(anno.id, page.id);
-          return;
-        }
-
-        // Double-tap on text → edit (works for touch AND mouse double-click).
-        const now = Date.now();
-        const isDouble = anno.id === lastTap.annoId &&
-          now - lastTap.t < DOUBLE_TAP_MS &&
-          Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < DOUBLE_TAP_DIST;
-        lastTap = { t: now, x: e.clientX, y: e.clientY, annoId: anno.id };
-
-        setSelected(annoEl, anno);
-        if (isDouble && anno.type === 'text') {
-          ctx.onEditText?.(anno.id);
-          return;
-        }
-        startDrag(e, annoEl, page, anno);
-        return;
-      }
-    }
-
-    // 3) Empty page space: tool decides.
+    // 2) An ARMED tool beats annotation hits — so Tip-Ex can cover a spot and
+    //    Teks can then write ON TOP of that cover (founder use case). Arming a
+    //    tool is explicit intent; every tool returns home after its verb.
     if (tool === 'whiteout') {
       e.preventDefault();
       startDraw(e, pageView, page);
-    } else if (tool === 'text' || tool === 'signature' || tool === 'paraf') {
+      return;
+    }
+    if (tool === 'text' || tool === 'signature' || tool === 'paraf') {
       // WHY preventDefault: onPlace may create + focus an inline editor NOW.
       // Canceling pointerdown suppresses the compatibility mousedown that
       // would otherwise fire right after and BLUR it (mouse only — touch
@@ -194,9 +181,52 @@ export function createInteraction(ctx) {
       e.preventDefault();
       const p = toPage(e, pageView);
       ctx.onPlace?.(tool, { pageId: page.id, x: p.x, y: p.y });
-    } else {
-      setSelected(null, null);              // select tool: tap empty = deselect
+      return;
     }
+
+    // 3) Annotation hit.
+    if (annoEl) {
+      const anno = page.annotations.find((a) => a.id === annoEl.dataset.annoId);
+      if (anno) {
+        if (tool === 'delete') {
+          e.preventDefault();
+          ctx.onDeleteTap?.(anno.id, page.id);
+          return;
+        }
+
+        if (!isTouch) {
+          // Mouse: select + drag immediately (no camera gesture to conflict with).
+          e.preventDefault();
+          const isDouble = registerTap(anno.id, e.clientX, e.clientY);
+          setSelected(annoEl, anno);
+          if (isDouble && anno.type === 'text') { ctx.onEditText?.(anno.id); return; }
+          startDrag(e, annoEl, page, anno);
+          return;
+        }
+
+        if (doc.selection.annotationId === anno.id) {
+          // Touch on the ALREADY-selected object: that's a deliberate grab —
+          // drag it. (decorateSelected set touch-action:none on it, so the
+          // browser won't steal the gesture for scrolling.)
+          e.preventDefault();
+          startDrag(e, annoEl, page, anno);
+          return;
+        }
+
+        // Touch on an UNSELECTED object: selection commits at RELEASE, never
+        // at press (founder's model). No preventDefault, no capture — if the
+        // finger moves, the browser takes it as CAMERA (scroll) and fires
+        // pointercancel, which clears the candidate. A clean press+release
+        // within the slop is a tap → select.
+        tapCandidate = { pointerId: e.pointerId, annoId: anno.id, annoEl, x: e.clientX, y: e.clientY };
+        return;
+      }
+    }
+
+    // 4) Empty page, Pilih tool: same release-commit rule — a tap deselects,
+    //    a drag is the camera. (Mouse deselects on press, as ever.)
+    if (!isTouch) setSelected(null, null);
+    else tapCandidate = { pointerId: e.pointerId, annoId: null, annoEl: null, x: e.clientX, y: e.clientY };
   }
 
   function onPointerMove(e) {
@@ -272,12 +302,73 @@ export function createInteraction(ctx) {
   }
 
   function onPointerEnd(e) {
+    // Release-commit for touch taps (founder's model: selection at UNPRESS).
+    // A scroll-take-over fires pointercancel → the candidate dies silently.
+    if (tapCandidate && e.pointerId === tapCandidate.pointerId) {
+      const tc = tapCandidate;
+      tapCandidate = null;
+      const isTap = e.type === 'pointerup' &&
+        Math.hypot(e.clientX - tc.x, e.clientY - tc.y) < TAP_SLOP;
+      if (!isTap) return;
+      if (tc.annoId) {
+        const doc = ctx.getDoc();
+        const found = findAnno(doc, tc.annoId);
+        if (found) {
+          const isDouble = registerTap(tc.annoId, e.clientX, e.clientY);
+          setSelected(tc.annoEl, found.anno);
+          if (isDouble && found.anno.type === 'text') ctx.onEditText?.(tc.annoId);
+        }
+      } else {
+        setSelected(null, null);
+      }
+      return;
+    }
+
     if (!gesture || e.pointerId !== gesture.pointerId) return;
     const g = gesture;
     gesture = null;
-    if (!g.moved) return;                    // taps already handled on down
+    if (!g.moved) {
+      // Touch tap on an already-selected text: second tap of a double → edit.
+      if (g.kind === 'move' && e.type === 'pointerup') {
+        const isDouble = registerTap(g.anno.id, e.clientX, e.clientY);
+        if (isDouble && g.anno.type === 'text') ctx.onEditText?.(g.anno.id);
+      }
+      return;
+    }
     const kind = g.kind === 'draw' ? 'draw' : g.kind;
     ctx.onChange?.(kind, { annotation: g.anno });
+  }
+
+  // Abort the in-flight gesture and put the object back — called by the app
+  // when a second finger lands (pinch): a finger that happened to start on a
+  // selected object must not fling it across the page.
+  function cancelGesture() {
+    tapCandidate = null;
+    if (!gesture) return;
+    const g = gesture;
+    gesture = null;
+    if (!g.moved) return;
+    const doc = ctx.getDoc();
+    if (g.kind === 'move') {
+      const a = moveAnnotation(doc, g.anno.id,
+        g.baseX - (g.anno.x || 0), g.baseY - (g.anno.y || 0));
+      if (a) { g.annoEl.style.left = a.x + 'px'; g.annoEl.style.top = a.y + 'px'; }
+    } else if (g.kind === 'resize') {
+      if (g.anno.type === 'text') {
+        updateAnnotation(doc, g.anno.id, { fontSize: g.baseFontSize });
+        g.annoEl.style.fontSize = g.baseFontSize + 'px';
+      } else {
+        const a = resizeAnnotation(doc, g.anno.id, { width: g.baseW, height: g.baseH });
+        if (a) {
+          g.annoEl.style.width = a.width + 'px';
+          if (g.anno.type === 'whiteout') g.annoEl.style.height = a.height + 'px';
+          const img = g.annoEl.querySelector('img');
+          if (img) img.style.width = a.width + 'px';
+        }
+      }
+    }
+    // A draw in progress is left as-is (undo removes it) — restoring a half-
+    // drawn whiteout mid-pinch would surprise more than it helps.
   }
 
   stage.addEventListener('pointerdown', onPointerDown);
@@ -292,5 +383,5 @@ export function createInteraction(ctx) {
     stage.removeEventListener('pointercancel', onPointerEnd);
   }
 
-  return { destroy, setSelected, refreshSelection };
+  return { destroy, setSelected, refreshSelection, cancelGesture };
 }

@@ -108,6 +108,9 @@ let pinchRaf = false;
 scrollEl.addEventListener('touchstart', (e) => {
   if (e.touches.length === 2) {
     e.preventDefault(); // ours, not the browser's
+    // A finger that landed on a selected object may have started a drag —
+    // abort it and put the object back. Pinching must never fling things.
+    interaction.cancelGesture();
     const [a, b] = e.touches;
     pinch = { d0: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) || 1, z0: zoom };
   }
@@ -264,13 +267,14 @@ document.getElementById('btn-delete-anno').addEventListener('click', () => {
 });
 
 // ---- Tip-Ex color matching -------------------------------------------------------
-// Zero-UI "colour matching tool": when a whiteout stroke finishes, sample the
-// page raster in a thin ring OUTSIDE the drawn rect and take the per-channel
-// median — on a cream/gray scan the cover-up matches the paper instead of
-// glowing white. Plain white documents stay white (median of white is white).
-async function matchWhiteoutColor(anno, pageId) {
+// Zero-UI "colour matching tool", decided AT STROKE START (founder: the user
+// should see the matched color WHILE drawing, not a white→color jump at the
+// end). Sample two rings around the press point from the page raster and take
+// the per-channel median — thin ink strokes lose the vote to the surrounding
+// paper, so covering text on a cream scan yields cream. White stays white.
+async function matchWhiteoutColor(anno, pageId, ox, oy) {
   const page = doc.pages.find((p) => p.id === pageId);
-  if (!page?.raster) return; // page released mid-gesture — keep default white
+  if (!page?.raster) return; // page not rasterized — keep default white
   try {
     const img = new Image();
     await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = page.raster.dataUrl; });
@@ -281,25 +285,27 @@ async function matchWhiteoutColor(anno, pageId) {
     const rotated = (page.rotation || 0) % 180 !== 0;
     const frameW = rotated ? page.height : page.width;
     const s = img.width / frameW;              // raster px per page point
-    const ring = 6 * s;                        // sample 6pt outside the rect
     const samples = { r: [], g: [], b: [] };
     const take = (x, y) => {
       if (x < 0 || y < 0 || x >= c.width || y >= c.height) return;
       const px = cx.getImageData(Math.round(x), Math.round(y), 1, 1).data;
       samples.r.push(px[0]); samples.g.push(px[1]); samples.b.push(px[2]);
     };
-    for (let i = 0; i <= 8; i += 1) {
-      const fx = (anno.x + (anno.width * i) / 8) * s;
-      const fy = (anno.y + (anno.height * i) / 8) * s;
-      take(fx, anno.y * s - ring); take(fx, (anno.y + anno.height) * s + ring); // above + below
-      take(anno.x * s - ring, fy); take((anno.x + anno.width) * s + ring, fy);  // left + right
+    for (const radius of [6 * s, 12 * s]) {
+      for (let i = 0; i < 10; i += 1) {
+        const ang = (Math.PI * 2 * i) / 10;
+        take(ox * s + radius * Math.cos(ang), oy * s + radius * Math.sin(ang));
+      }
     }
     if (samples.r.length < 8) return;
     const med = (arr) => arr.sort((a, b) => a - b)[Math.floor(arr.length / 2)];
     const hex = (n) => n.toString(16).padStart(2, '0');
     const color = `#${hex(med(samples.r))}${hex(med(samples.g))}${hex(med(samples.b))}`;
     updateAnnotation(doc, anno.id, { color });
-    syncPage(pageId);
+    // Mid-gesture: update the LIVE element directly — rebuilding the overlay
+    // here would destroy the element holding the pointer capture.
+    const el = stage.querySelector(`[data-anno-id="${anno.id}"]`);
+    if (el) el.style.background = color;
   } catch { /* sampling is best-effort; white stays */ }
 }
 
@@ -310,14 +316,10 @@ const interaction = createInteraction({
   getZoom: () => zoom,
   getTool: () => tool,
   history,
-  onChange: (kind, payload) => {
-    if (kind === 'draw' && payload?.annotation) {
-      // Tip-Ex stroke finished: color-match against the paper, then return
-      // home to Pilih (founder: whiteout should NOT stay sticky).
-      const pg = doc.pages.find((p) => p.annotations.some((a) => a.id === payload.annotation.id));
-      if (pg) matchWhiteoutColor(payload.annotation, pg.id);
-      setTool('select');
-    }
+  onChange: (kind) => {
+    // Tip-Ex stroke finished (color was already matched at stroke START):
+    // return home to Pilih (founder: whiteout should NOT stay sticky).
+    if (kind === 'draw') setTool('select');
     refreshChrome();
   },
   onDeleteTap: (annoId, pageId) => {
@@ -349,7 +351,8 @@ const interaction = createInteraction({
       x, y, width: 8, height: 8,
     }));
     syncPage(pageId);
-    return anno; // onChange('draw') color-matches + returns to Pilih at stroke end
+    matchWhiteoutColor(anno, pageId, x, y); // async; colors the rect while drawing
+    return anno;
   },
   onEditText: (annoId) => {
     for (const page of doc.pages) {
