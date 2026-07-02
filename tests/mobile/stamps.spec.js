@@ -13,7 +13,7 @@ const FIXTURE = path.join(__dirname, '..', 'fixtures', 'sample-2pages.pdf');
 
 test.describe('stamp moments — mobile', () => {
   test('TAMPILAN BARU shows once per device, then never again', async ({ page }) => {
-    await page.goto('/editor-v2.html');
+    await page.goto('/');
     await expect(page.locator('.v2-stamp', { hasText: 'Tampilan baru' }))
       .toBeAttached({ timeout: 3000 });
     // Same device (storage persists): a reload stays quiet.
@@ -23,7 +23,7 @@ test.describe('stamp moments — mobile', () => {
   });
 
   test('TETAP JALAN when the connection drops mid-session — once', async ({ page }) => {
-    await page.goto('/editor-v2.html');
+    await page.goto('/');
     await page.setInputFiles('#file-input', FIXTURE);
     await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
     await page.waitForTimeout(2600); // let the welcome stamp come and go
@@ -38,7 +38,7 @@ test.describe('stamp moments — mobile', () => {
   });
 
   test('SUDAH OPTIMAL when compress finds nothing to save — stamped over the sheet', async ({ page }) => {
-    await page.goto('/editor-v2.html');
+    await page.goto('/');
     await page.setInputFiles('#file-input', FIXTURE);
     await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
     await page.tap('#btn-download');

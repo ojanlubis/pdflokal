@@ -25,7 +25,7 @@ test.describe('mobile floating-toolbar overlap', () => {
   test.use({ viewport: MOBILE });
 
   test('first page top is not hidden under the fixed toolbar', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await page.setInputFiles('#file-input', ALT_RED_PDF);
     await page.waitForFunction(() => document.body.classList.contains('editor-active'));
     await page.waitForFunction(() => window.ueState?.pages?.length === 1);

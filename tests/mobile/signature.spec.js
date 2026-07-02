@@ -17,7 +17,7 @@ const RED_PIXEL = Buffer.from(
 );
 
 async function openDoc(page) {
-  await page.goto('/editor-v2.html');
+  await page.goto('/');
   await page.setInputFiles('#file-input', FIXTURE);
   await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
 }

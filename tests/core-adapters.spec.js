@@ -11,7 +11,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('core import adapter', () => {
   test('importPdf builds a Doc; rasterizePage produces a real image', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await page.waitForFunction(() => !!window.pdfjsLib);
 
     const r = await page.evaluate(async () => {

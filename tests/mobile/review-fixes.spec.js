@@ -14,7 +14,7 @@ const BIGDOC = path.join(__dirname, '..', 'fixtures', 'bigdoc-120.pdf');
 test.describe('review fixes', () => {
   test('H1: re-pick WHILE compressing (superseded run) — Compress recovers, download works', async ({ page }) => {
     test.setTimeout(90000);
-    await page.goto('/editor-v2.html');
+    await page.goto('/');
     await page.setInputFiles('#file-input', BIGDOC); // big → compression takes seconds
     await expect(page.locator('.pv-page').first()).toBeVisible();
     await page.tap('#btn-download');
@@ -36,7 +36,7 @@ test.describe('review fixes', () => {
   });
 
   test('H2: selection chrome survives rebuildStage (Semua Hal. + undo keep it draggable)', async ({ page }) => {
-    await page.goto('/editor-v2.html');
+    await page.goto('/');
     await page.setInputFiles('#file-input', FIXTURE);
     await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
 

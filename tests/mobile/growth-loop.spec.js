@@ -17,7 +17,7 @@ async function downloadOnce(page) {
 }
 
 async function openDoc(page) {
-  await page.goto('/editor-v2.html');
+  await page.goto('/');
   await page.setInputFiles('#file-input', FIXTURE);
   await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
 }
@@ -58,7 +58,7 @@ test.describe('growth loop — mobile', () => {
     await expect(page.locator('#support-card')).toBeVisible({ timeout: 4000 });
     await page.tap('#sc-donate');
     await expect(page.locator('.sc-qr img[src*="qris"]')).toBeVisible();
-    expect(page.url()).toContain('editor-v2'); // still in the editor
+    expect(new URL(page.url()).pathname).toBe('/'); // still in the editor, no navigation
   });
 
   test('"jangan tampilkan lagi" is permanent (survives reload)', async ({ page }) => {

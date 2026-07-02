@@ -13,7 +13,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE = path.join(__dirname, '..', 'fixtures', 'sample-2pages.pdf');
 
 async function openWithFixture(page) {
-  await page.goto('/editor-v2.html');
+  await page.goto('/');
   await page.setInputFiles('#file-input', FIXTURE);
   // Both pages get slots instantly; near pages rasterize to <img>.
   await expect(page.locator('.pv-page')).toHaveCount(2);

@@ -23,6 +23,11 @@
 // Changelog data - Add new updates at the beginning of the array
 const changelogData = [
   {
+    title: "PDFLokal Baru!",
+    description: "Tampilan baru, mesin baru, rasa baru. PDFLokal dirombak total supaya makin ngebut di HP: buka file langsung dari beranda, semua alat (gabung, split, kompres, tanda tangan, ekspor gambar) sekarang jadi satu di editor, dan ada tombol Unduh baru yang bisa langsung kompres atau ubah PDF jadi gambar. Halaman juga bisa kamu susun kayak megang kertas beneran. Coba deh, terus kabari kami rasanya!",
+    date: "3 Juli 2026"
+  },
+  {
     title: "Nambah Halaman & Tanda Tangan Makin Cepat! ⚡",
     description: "Dua jalan pintas baru: (1) Punya gambar tanda tangan yang udah kamu copy — misalnya screenshot atau gambar dari chat? Pas jendela tanda tangan kebuka, tinggal tempel (Ctrl/Cmd+V), langsung masuk tanpa perlu simpan file dulu. (2) Mau nambah halaman ke dokumen yang lagi kamu edit? Seret file PDF atau gambar langsung ke daftar halaman di samping — otomatis nambah di belakang, bukan ganti dokumenmu.",
     date: "1 Juli 2026"

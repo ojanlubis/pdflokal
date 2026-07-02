@@ -24,7 +24,7 @@ async function makeColoredPdf(page, colors, w = 400, h = 600) {
 
 test.describe('core export-images adapter', () => {
   test('renderPdfToImages: jpg at maxDim, correct names/dims/colors', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await page.waitForFunction(() => !!window.pdfjsLib && !!window.PDFLib);
     // page 0 red, page 1 blue.
     const pdfBytes = await makeColoredPdf(page, [[1, 0, 0], [0, 0, 1]]);
@@ -63,7 +63,7 @@ test.describe('core export-images adapter', () => {
   });
 
   test('renderPdfToImages: pageNumbers selects a subset', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await page.waitForFunction(() => !!window.pdfjsLib && !!window.PDFLib);
     const pdfBytes = await makeColoredPdf(page, [[1, 0, 0], [0, 0, 1]]);
 
@@ -77,7 +77,7 @@ test.describe('core export-images adapter', () => {
   });
 
   test('zipFiles: PK header + round-trips via fflate.unzipSync', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await page.waitForFunction(() => !!window.pdfjsLib && !!window.PDFLib);
     await page.addScriptTag({ path: 'js/vendor/fflate.min.js' });
     await page.waitForFunction(() => !!window.fflate);
@@ -103,7 +103,7 @@ test.describe('core export-images adapter', () => {
   });
 
   test('renderPdfToImages: png format produces valid PNG magic bytes', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await page.waitForFunction(() => !!window.pdfjsLib && !!window.PDFLib);
     const pdfBytes = await makeColoredPdf(page, [[1, 0, 0]]);
 

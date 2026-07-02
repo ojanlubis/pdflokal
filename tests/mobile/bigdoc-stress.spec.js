@@ -62,7 +62,7 @@ test.describe('editor v2 — big-doc streaming (memory stays bounded)', () => {
     test.setTimeout(90_000);
 
     // ---- (a) slots exist quickly, scrollbar reflects the full document --------
-    await page.goto('/editor-v2.html');
+    await page.goto('/');
     const t0 = Date.now();
     await page.setInputFiles('#file-input', FIXTURE);
     await expect(page.locator('.pv-page')).toHaveCount(PAGE_COUNT, { timeout: 10_000 });
