@@ -89,10 +89,14 @@ export function createPageManager(deps) {
 
     const rotated = (page.rotation || 0) % 180 !== 0;
     const ratio = rotated ? page.width / page.height : page.height / page.width;
+    // The TILE carries the aspect ratio (deterministic grid row sizing); the
+    // thumb just fills it. A width-dependent child height (aspect-ratio on the
+    // thumb) hit a grid auto-row cyclic-sizing quirk: rows collapsed under
+    // multi-row layouts while single rows measured fine.
+    tile.style.aspectRatio = String(1 / ratio);
 
     const im = document.createElement('div');
     im.className = 'pm-thumb';
-    im.style.aspectRatio = String(1 / ratio);
     const cached = thumbs.get(page.id);
     if (cached) im.style.backgroundImage = `url(${cached})`;
     else queueThumb(page, im);
@@ -159,10 +163,16 @@ export function createPageManager(deps) {
     }
   }
 
+  // Long-press on a tile must never pop the browser context menu mid-drag.
+  grid.addEventListener('contextmenu', (e) => e.preventDefault());
+
+  const SCROLL_EDGE = 56;   // px from the grid's top/bottom that auto-scrolls
+  const SCROLL_MAX = 14;    // px per frame at the deepest edge
+
   function wireTile(tile, page) {
     let pressTimer = null;
     let start = null;
-    let drag = null; // { placeholder, rect, lastX, lastY, raf }
+    let drag = null; // { placeholder, rect, lastX, lastY, slots, pIndex }
 
     tile.addEventListener('pointerdown', (e) => {
       if (e.target.closest('.pm-add')) return;
@@ -173,6 +183,19 @@ export function createPageManager(deps) {
         pressTimer = setTimeout(() => { armDrag(e); }, LONG_PRESS_MS); // touch: long-press
       }
     });
+
+    // Slot geometry cache — offsetLeft/Top are LAYOUT coordinates: immune to
+    // both in-flight FLIP transforms and grid scrolling. This is what makes
+    // the insertion decision stable (no arguing with our own animation) and
+    // auto-scroll free (content coords don't move when the grid scrolls).
+    function recacheSlots() {
+      const kids = [...grid.children].filter((c) =>
+        c !== tile && c.classList.contains('pm-tile') && !c.classList.contains('pm-add'));
+      drag.pIndex = kids.indexOf(drag.placeholder);
+      drag.slots = kids
+        .filter((c) => c !== drag.placeholder)
+        .map((el) => ({ el, left: el.offsetLeft, top: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight }));
+    }
 
     function armDrag(e) {
       const rect = tile.getBoundingClientRect();
@@ -188,12 +211,50 @@ export function createPageManager(deps) {
       tile.style.top = rect.top + 'px';
       tile.style.width = rect.width + 'px';
       tile.style.zIndex = '50';
-      tile.style.pointerEvents = 'none'; // elementFromPoint must see through it
+      tile.style.pointerEvents = 'none';
 
-      drag = { placeholder, rect, lastX: e.clientX ?? start.x, lastY: e.clientY ?? start.y, raf: false };
+      drag = { placeholder, rect, lastX: e.clientX ?? start.x, lastY: e.clientY ?? start.y };
+      recacheSlots();
       // The pointer may be gone by the time the long-press timer fires.
       try { tile.setPointerCapture(e.pointerId ?? start.id); } catch { /* keep dragging uncaptured */ }
       if (navigator.vibrate) navigator.vibrate(10);
+      requestAnimationFrame(dragLoop);
+    }
+
+    // One continuous loop per drag (not per pointermove): the ghost follows the
+    // finger, the grid auto-scrolls near its edges — including while the finger
+    // rests there — and the insertion index is re-derived from cached layout.
+    function dragLoop() {
+      if (!drag) return;
+      tile.style.transform =
+        `translate(${drag.lastX - start.x}px, ${drag.lastY - start.y}px) scale(1.04)`;
+
+      // Auto-scroll: proportional to how deep the finger is in the edge zone.
+      const gr = grid.getBoundingClientRect();
+      if (grid.scrollHeight > grid.clientHeight) {
+        if (drag.lastY < gr.top + SCROLL_EDGE) {
+          grid.scrollTop -= SCROLL_MAX * ((gr.top + SCROLL_EDGE - drag.lastY) / SCROLL_EDGE);
+        } else if (drag.lastY > gr.bottom - SCROLL_EDGE) {
+          grid.scrollTop += SCROLL_MAX * ((drag.lastY - (gr.bottom - SCROLL_EDGE)) / SCROLL_EDGE);
+        }
+      }
+
+      // Insertion index from CONTENT coordinates (scroll- and animation-proof):
+      // a slot counts as "before the finger" if its row is fully above, or it's
+      // on the finger's row with its center to the left.
+      const px = drag.lastX - gr.left + grid.scrollLeft;
+      const py = drag.lastY - gr.top + grid.scrollTop;
+      let D = 0;
+      for (const s of drag.slots) {
+        if (s.top + s.h <= py) D += 1;
+        else if (py >= s.top && px > s.left + s.w / 2) D += 1;
+      }
+      if (D !== drag.pIndex) {
+        const target = drag.slots[D]?.el ?? grid.querySelector('.pm-add');
+        flipTiles(() => grid.insertBefore(drag.placeholder, target));
+        recacheSlots(); // layout changed → new truth
+      }
+      requestAnimationFrame(dragLoop);
     }
 
     tile.addEventListener('pointermove', (e) => {
@@ -207,40 +268,22 @@ export function createPageManager(deps) {
       e.preventDefault();
       drag.lastX = e.clientX;
       drag.lastY = e.clientY;
-      if (drag.raf) return;
-      drag.raf = true;
-      requestAnimationFrame(() => {
-        if (!drag) return;
-        drag.raf = false;
-        // The page rides the finger.
-        tile.style.transform =
-          `translate(${drag.lastX - start.x}px, ${drag.lastY - start.y}px) scale(1.04)`;
-        // Crossing a neighbor opens its slot: placeholder moves, tiles glide.
-        const over = document.elementFromPoint(drag.lastX, drag.lastY)
-          ?.closest('.pm-tile:not(.pm-add):not(.pm-placeholder)');
-        if (over) {
-          const r = over.getBoundingClientRect();
-          const after = drag.lastX > r.left + r.width / 2; // grid flows left→right
-          const target = after ? over.nextSibling : over;
-          if (target !== drag.placeholder) {
-            flipTiles(() => grid.insertBefore(drag.placeholder, target));
-          }
-        }
-      });
     });
 
     const end = (e) => {
       clearTimeout(pressTimer);
       if (drag) {
         const d = drag;
-        drag = null;
-        // Settle the page into the open slot (fixed → slot rect)…
-        const slotRect = d.placeholder.getBoundingClientRect();
+        drag = null; // stops the loop
+        // Settle target from LAYOUT coords (a mid-glide placeholder's gBCR lies).
+        const gr = grid.getBoundingClientRect();
+        const slotLeft = gr.left + d.placeholder.offsetLeft - grid.scrollLeft;
+        const slotTop = gr.top + d.placeholder.offsetTop - grid.scrollTop;
         let settled = false;
         const settle = () => {
           if (settled) return;
           settled = true;
-          // …then commit: the model index = placeholder's position in the grid.
+          // Commit: the model index = placeholder's position in the grid.
           const tiles = [...grid.querySelectorAll('.pm-tile:not(.pm-add):not(.pm-drag-ghost)')];
           const toIndex = tiles.indexOf(d.placeholder);
           const doc = deps.getDoc();
@@ -255,7 +298,7 @@ export function createPageManager(deps) {
         if (REDUCED_MOTION) { settle(); return; }
         tile.style.transition = 'transform .18s cubic-bezier(.2,.8,.2,1)';
         tile.style.transform =
-          `translate(${slotRect.left - d.rect.left}px, ${slotRect.top - d.rect.top}px)`;
+          `translate(${slotLeft - d.rect.left}px, ${slotTop - d.rect.top}px)`;
         tile.addEventListener('transitionend', settle, { once: true });
         setTimeout(settle, 260); // safety: transitionend can be swallowed
       } else if (start && pressTimer !== null && e.type === 'pointerup') {
