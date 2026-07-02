@@ -67,6 +67,7 @@
       display: flex; flex-direction: column;
     }
     #file-menu button {
+      display: flex; align-items: center; gap: 10px;
       text-align: left; padding: 10px 12px; font-size: 13.5px; border-radius: 8px;
       min-height: 44px;
     }
@@ -77,6 +78,10 @@
       font: inherit; border: none; background: none; cursor: pointer; color: var(--ink);
       border-radius: 8px; min-height: 36px;
     }
+    /* WHY: inline SVGs with only a viewBox default to 100% width — one missed
+       size rule turns an icon into a billboard. This is the safety net; specific
+       components (.icon-btn, .tool) override it. */
+    button svg { width: 18px; height: 18px; flex: none; }
     .icon-btn {
       width: 40px; display: inline-flex; align-items: center; justify-content: center;
       color: var(--muted);
@@ -410,16 +415,22 @@
     @media (prefers-reduced-motion: reduce) { #support-card { transition: none; } }
     #sc-close {
       position: absolute; top: 6px; right: 6px; width: 34px; height: 34px;
-      color: var(--muted); font-size: 14px; border-radius: 8px;
+      display: inline-flex; align-items: center; justify-content: center;
+      color: var(--muted); border-radius: 8px;
     }
+    #sc-close svg { width: 16px; height: 16px; }
     .sc-head { font-weight: 700; font-size: 15px; color: var(--ink); margin-bottom: 4px; }
     .sc-sub { font-size: 12.5px; color: var(--muted); line-height: 1.5; margin-bottom: 10px; }
     .sc-actions { display: flex; gap: 8px; }
     .sc-actions button {
-      flex: 1; min-height: 42px; border-radius: 10px; font-size: 13.5px; font-weight: 600;
+      flex: 1; min-height: 44px; border-radius: 10px; font-size: 13.5px; font-weight: 600;
+      display: flex; align-items: center; justify-content: center; gap: 7px;
       border: 1.5px solid var(--line); background: var(--bg); color: var(--ink);
     }
-    #sc-share { border-color: var(--accent); color: var(--accent); background: rgba(79,142,247,.07); }
+    .sc-actions button svg { width: 17px; height: 17px; }
+    /* WHY share is the filled primary: sharing costs the user nothing, donating
+       costs money — the free ask earns the bigger button (growth-loop guardrail). */
+    #sc-share { border-color: var(--accent); background: var(--accent); color: #fff; }
     .sc-qr { display: none; text-align: center; padding-top: 12px; }
     #support-card.qr-open .sc-qr { display: block; }
     #support-card.qr-open .sc-actions #sc-donate { border-color: var(--accent); color: var(--accent); }

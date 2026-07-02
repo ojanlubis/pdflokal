@@ -54,7 +54,6 @@ const pill = document.getElementById('v2-pill');
 const toastEl = document.getElementById('toast');
 
 // ---- small helpers -----------------------------------------------------------
-let celebration; // assigned below (needs toast, which needs the DOM refs above)
 let toastTimer = null;
 function toast(msg) {
   toastEl.textContent = msg;
@@ -73,7 +72,7 @@ function download(blob, filename) {
   // the save was triggered. (Wave 5: reward the "I got my file" moment.)
   celebration.onDownloadSuccess();
 }
-celebration = createCelebration({ toast });
+const celebration = createCelebration({ toast });
 
 // ---- zoom ---------------------------------------------------------------------
 // transform:scale + a sizer that carries the scaled layout size. NOT CSS zoom:
