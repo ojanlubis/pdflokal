@@ -91,6 +91,23 @@ export function clearPageRaster(view) {
   attachPlaceholder(view);
 }
 
+// Render-side font map. Canonical names match core annotations AND the export
+// adapter's PDF font resolution — same keys as the old CSS_FONT_MAP, duplicated
+// here on purpose: the render layer must not import old-editor modules.
+export const FONT_CSS = {
+  'Helvetica': 'Helvetica, Arial, sans-serif',
+  'Times-Roman': '"Times New Roman", Times, serif',
+  'Courier': '"Courier New", Courier, monospace',
+  'Montserrat': 'Montserrat, sans-serif',
+  'Carlito': 'Carlito, Calibri, sans-serif',
+};
+
+// SSOT for a text annotation's CSS font string (page-view + inline editor).
+export function textFontCss(anno) {
+  const family = FONT_CSS[anno.fontFamily] || FONT_CSS['Helvetica'];
+  return `${anno.italic ? 'italic ' : ''}${anno.bold ? '700 ' : '400 '}${anno.fontSize || 24}px ${family}`;
+}
+
 // One annotation as a positioned DOM element (page-space px).
 export function renderAnnotationEl(anno) {
   const el = document.createElement('div');
@@ -106,9 +123,7 @@ export function renderAnnotationEl(anno) {
 
   if (anno.type === 'text') {
     el.textContent = anno.text || '';
-    el.style.font =
-      `${anno.italic ? 'italic ' : ''}${anno.bold ? '700 ' : '400 '}` +
-      `${anno.fontSize || 24}px ${anno.fontFamily || 'Helvetica, Arial, sans-serif'}`;
+    el.style.font = textFontCss(anno);
     el.style.color = anno.color || '#000';
     el.style.whiteSpace = 'pre';
     el.style.lineHeight = '1.2';

@@ -17,6 +17,16 @@
       --accent: #4f8ef7; --line: rgba(0,0,0,.08);
       --header-h: 44px; --toolbar-h: 52px;
     }
+    /* Self-hosted fonts (preview parity with the PDF export) */
+    @font-face { font-family: 'Montserrat'; src: url('fonts/montserrat-regular.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+    @font-face { font-family: 'Montserrat'; src: url('fonts/montserrat-bold.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
+    @font-face { font-family: 'Montserrat'; src: url('fonts/montserrat-italic.woff2') format('woff2'); font-weight: 400; font-style: italic; font-display: swap; }
+    @font-face { font-family: 'Montserrat'; src: url('fonts/montserrat-bolditalic.woff2') format('woff2'); font-weight: 700; font-style: italic; font-display: swap; }
+    @font-face { font-family: 'Carlito'; src: url('fonts/carlito-regular.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+    @font-face { font-family: 'Carlito'; src: url('fonts/carlito-bold.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
+    @font-face { font-family: 'Carlito'; src: url('fonts/carlito-italic.woff2') format('woff2'); font-weight: 400; font-style: italic; font-display: swap; }
+    @font-face { font-family: 'Carlito'; src: url('fonts/carlito-bolditalic.woff2') format('woff2'); font-weight: 700; font-style: italic; font-display: swap; }
+
     * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     html, body { height: 100%; overflow: hidden; }
     body {
@@ -64,6 +74,32 @@
     }
     .tool svg { width: 19px; height: 19px; }
     .tool.active { background: rgba(79,142,247,.12); color: var(--accent); }
+
+    /* ---- format bar: contextual, only when text is in play ---- */
+    #format-bar {
+      display: none; align-items: center; gap: 6px;
+      height: 46px; flex: 0 0 auto; padding: 0 10px;
+      background: var(--surface); border-bottom: 1px solid var(--line);
+      overflow-x: auto; scrollbar-width: none;
+    }
+    #format-bar.show { display: flex; }
+    #format-bar select {
+      font: inherit; font-size: 13px; min-height: 34px; border-radius: 8px;
+      border: 1px solid var(--line); background: var(--bg); padding: 0 6px; color: var(--ink);
+    }
+    .fb-font { max-width: 118px; }
+    .fb-toggle {
+      min-width: 34px; min-height: 34px; border: 1px solid var(--line); border-radius: 8px;
+      font-size: 14px; color: var(--muted); background: var(--bg);
+    }
+    .fb-bold { font-weight: 800; }
+    .fb-italic { font-style: italic; font-family: Georgia, serif; }
+    .fb-toggle.on { background: rgba(79,142,247,.14); color: var(--accent); border-color: var(--accent); }
+    .fb-color {
+      width: 26px; height: 26px; min-height: 26px; border-radius: 50%;
+      border: 1.5px solid var(--line); flex: 0 0 auto;
+    }
+    .fb-color.on { box-shadow: 0 0 0 2.5px var(--accent); }
 
     /* ---- document area: CONTAINER scroll (kills edge-overscroll flicker) ---- */
     #v2-scroll {
@@ -197,6 +233,8 @@
       Hapus
     </button>
   </div>
+
+  <div id="format-bar" role="toolbar" aria-label="Format teks"></div>
 
   <main id="v2-scroll">
     <div id="v2-stage"></div>

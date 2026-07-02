@@ -18,13 +18,14 @@
 
 import { createDoc, createAnnotation } from '../core/model.js';
 import {
-  addAnnotation, removeAnnotation, updateAnnotation, clearSelection,
+  addAnnotation, removeAnnotation, updateAnnotation, clearSelection, selectAnnotation,
 } from '../core/operations.js';
 import { createHistory, record, undo, redo, canUndo, canRedo } from '../core/history.js';
 import { importPdf, createPageRasterizer } from '../core/import.js';
-import { createPageSlot, syncOverlay } from '../render/page-view.js';
+import { createPageSlot, syncOverlay, textFontCss } from '../render/page-view.js';
 import { createViewportStream } from '../render/viewport.js';
 import { createInteraction } from '../render/interaction.js';
+import { createFormatBar } from './format-bar.js';
 
 window.pdfjsLib.GlobalWorkerOptions.workerSrc = '/js/vendor/pdf.worker.min.js';
 
@@ -37,6 +38,8 @@ let zoom = 1;
 let tool = 'select';
 let storedSignature = null;   // { dataUrl, width, height } from the sig modal
 let baseName = 'dokumen';
+let editingAnno = null;       // text annotation currently in the inline editor
+let editingEl = null;         // its contenteditable (format bar restyles it live)
 
 const scrollEl = document.getElementById('v2-scroll');
 const stage = document.getElementById('v2-stage');
@@ -119,6 +122,48 @@ function refreshChrome() {
   document.getElementById('btn-redo').disabled = !canRedo(history);
   document.getElementById('btn-download').disabled = doc.pages.length === 0;
   document.getElementById('btn-delete-anno').disabled = !doc.selection.annotationId;
+  syncFormatBar();
+}
+
+// ---- format bar ----------------------------------------------------------------
+// Visible whenever text is in play: selected text anno, inline editing, or the
+// Teks tool armed. Sticky defaults feed new annotations.
+function selectedTextAnno() {
+  const id = doc.selection.annotationId;
+  if (!id) return null;
+  for (const page of doc.pages) {
+    const a = page.annotations.find((x) => x.id === id);
+    if (a) return a.type === 'text' ? a : null;
+  }
+  return null;
+}
+
+const formatBar = createFormatBar({
+  el: document.getElementById('format-bar'),
+  getDoc: () => doc,
+  history,
+  getTarget: () => editingAnno || selectedTextAnno(),
+  onStyled: (anno) => {
+    // Restyle the open inline editor live; re-render the committed element.
+    if (editingEl && editingAnno && anno.id === editingAnno.id) {
+      editingEl.style.font = textFontCss(anno);
+      editingEl.style.color = anno.color || '#000';
+    }
+    for (const page of doc.pages) {
+      if (page.annotations.some((a) => a.id === anno.id)) { syncPage(page.id); break; }
+    }
+  },
+  onDefaults: (d) => {
+    // Un-committed draft (new text, no annotation yet): restyle the editor live.
+    if (editingEl && !editingAnno) {
+      editingEl.style.font = textFontCss(d);
+      editingEl.style.color = d.color || '#000';
+    }
+  },
+});
+
+function syncFormatBar() {
+  formatBar.sync(!!(editingAnno || editingEl || selectedTextAnno() || tool === 'text'));
 }
 
 // ---- tools ----------------------------------------------------------------------
@@ -131,6 +176,7 @@ function setTool(next) {
   }
   // While a placement tool is active the page must not pan under the finger.
   stage.style.touchAction = next === 'select' ? '' : 'none';
+  syncFormatBar();
 }
 for (const btn of document.querySelectorAll('#toolbar .tool[data-tool]')) {
   btn.addEventListener('click', () => {
@@ -192,20 +238,25 @@ function openTextEditor({ pageId, x, y, anno }) {
   const slot = slots.find((s) => s.page.id === pageId);
   if (!slot) return;
   const overlay = slot.view.querySelector('.pv-overlay');
-  const fontSize = anno?.fontSize || 18;
+  // New text starts from the format bar's sticky defaults (Canva behavior).
+  const style = anno || formatBar.getDefaults();
 
   const ed = document.createElement('div');
   ed.className = 'v2-text-edit';
   ed.contentEditable = 'true';
   ed.style.left = (anno ? anno.x : x) + 'px';
   ed.style.top = (anno ? anno.y : y) + 'px';
-  ed.style.font = `${anno?.italic ? 'italic ' : ''}${anno?.bold ? '700 ' : '400 '}${fontSize}px Helvetica, Arial, sans-serif`;
-  ed.style.color = anno?.color || '#000';
+  ed.style.font = textFontCss(style);
+  ed.style.color = style.color || '#000';
   ed.textContent = anno?.text || '';
 
   // Hide the original while editing (the editor visually replaces it).
   const origEl = anno ? overlay.querySelector(`[data-anno-id="${anno.id}"]`) : null;
   if (origEl) origEl.style.visibility = 'hidden';
+
+  editingAnno = anno || null;
+  editingEl = ed;
+  syncFormatBar();
 
   let committed = false; // guard: blur fires after Enter-commit too
   const commit = () => {
@@ -213,6 +264,8 @@ function openTextEditor({ pageId, x, y, anno }) {
     committed = true;
     const text = ed.textContent.trim();
     ed.remove();
+    editingAnno = null;
+    editingEl = null;
     if (anno) {
       if (text && text !== anno.text) {
         record(history, doc);
@@ -223,9 +276,15 @@ function openTextEditor({ pageId, x, y, anno }) {
       }
     } else if (text) {
       record(history, doc);
-      addAnnotation(doc, pageId, createAnnotation('text', {
-        text, x, y, fontSize, color: '#000',
+      const d = formatBar.getDefaults();
+      const created = addAnnotation(doc, pageId, createAnnotation('text', {
+        text, x, y,
+        fontSize: d.fontSize, fontFamily: d.fontFamily,
+        bold: d.bold, italic: d.italic, color: d.color,
       }));
+      // Keep the fresh text SELECTED: the user sees it's an object, and a
+      // format-bar dropdown change right after the blur-commit still lands.
+      selectAnnotation(doc, created.id);
     }
     syncPage(pageId);
     setTool('select');
