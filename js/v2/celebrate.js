@@ -38,14 +38,14 @@ function burst() {
   const ring = document.createElement('div');
   ring.style.cssText =
     'position:absolute;left:-28px;top:-28px;width:56px;height:56px;border-radius:50%;' +
-    'border:2.5px solid rgba(79,142,247,.55)';
+    'border:2.5px solid rgba(220,38,38,.5)';
   wrap.appendChild(ring);
   ring.animate(
     [{ transform: 'scale(.3)', opacity: 1 }, { transform: 'scale(1.9)', opacity: 0 }],
     { duration: 520, easing: 'cubic-bezier(.2,.8,.2,1)' },
   );
 
-  const COLORS = ['#4f8ef7', '#7db1ff', '#1d8a44', '#f7b84f'];
+  const COLORS = ['#dc2626', '#f87171', '#1d8a44', '#f7b84f'];
   for (let i = 0; i < 12; i += 1) {
     const dot = document.createElement('div');
     const s = 5 + (i % 3) * 3;
