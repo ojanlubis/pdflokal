@@ -32,17 +32,6 @@ Running list of UI/UX findings + small fixes to pick up later. Append new items 
   - Sequencing suggestion (each shippable): (1) Protect + Compress → Download dialog options (smallest, mostly done). (2) PDF-to-Image → UE "Download as image" action. (3) Image→PDF → merge into add-image path. (4) Image editing (resize/convert/remove-bg/compress) → the big one, needs the format-aware-UE decision above. Then (5) strip homepage cards + delete dead standalone modules, updating barrels/window bridges/changelog.
   - Cross-links: reduces surface area for the code-health audit; homepage simplification pairs with retiring cards; check `docs/future-architecture.md` + `memory/architectural-direction-2026-06-09.md` before starting — this is a foundation-level change, decide the format-aware-UE question WITH the user first.
 
-- **[low]** Micro-celebration on successful download — reward the "I got my file" moment — [pdf-export.js ueDownload](js/editor/pdf-export.js), [utils.js downloadBlob/showToast](js/lib/utils.js), [image-tools.js](js/image-tools.js), [img-to-pdf.js](js/img-to-pdf.js)
-  - User note (Jul 1): wants a little celebration every time a user successfully does something and downloads the file. The download moment is the emotional peak — right now it's a plain success toast. A small delight (confetti burst, checkmark animation, subtle "Berhasil! 🎉" flourish) makes the tool feel rewarding and memorable.
-  - Scope: fire on EVERY successful export path, not just the editor — `ueDownload` (editor PDF), image-tools downloads, img-to-pdf generate, PDF-to-image batch, split/extract in the page manager. Best to hook it where downloads funnel: `downloadBlob()` in utils.js is the shared chokepoint, but confirm every path actually routes through it before assuming.
-  - Constraints: keep it client-side + lightweight (no new heavy deps — a tiny canvas/CSS confetti or an existing-asset animation; we're zero-CDN so self-host anything). Respect `prefers-reduced-motion` (skip/soften the animation). Indonesian, casual "kamu" tone if any copy. Don't let it block or delay the actual file save. Good natural pairing with the donate/share prompt item below (celebrate → then gently ask).
-
-- **[med]** A donate-or-share prompt — surface "support PDFLokal" at the right moment — [dukung.html](dukung.html), [pdf-export.js ueDownload](js/editor/pdf-export.js), [changelog.js](js/changelog.js) (existing bottom-right widget pattern)
-  - User note (Jul 1): wants a dialog somewhere that asks the user to either donate OR share PDFLokal. Two asks, one moment — let the user pick the low-friction one (share) if they're not ready to donate. This is the growth/sustainability loop for a free, privacy-first tool with no server revenue.
-  - Timing is everything — ask AFTER value is delivered, never before. Best trigger: right after a successful download (pairs with the celebration item above — celebrate first, then "Suka PDFLokal? Bantu kami: [Donasi] atau [Bagikan]"). Consider frequency-capping so it's not shown on every single download — e.g. show once per session, or every Nth download, tracked via `safeLocalGet/safeLocalSet` (private-browsing safe).
-  - Share side: Web Share API (`navigator.share`) on mobile for native share sheet, fallback to copy-link + social buttons on desktop. **Donate side: do NOT navigate away to `dukung.html`** — user wants to keep them in the flow. If they tap "Donasi", reveal the QR code (QRIS/whatever `dukung.html` already uses) inline in the same dialog. Reuse the existing QR asset/markup from `dukung.html` so there's one source for it. Keep both actions one tap away and the whole thing self-contained (no page change).
-  - Constraints: Indonesian, casual "kamu" tone. Dismissible and non-nagging (respect a "jangan tampilkan lagi" opt-out stored in localStorage). Must not feel like it's holding the file hostage — the download already happened. Reuse the existing modal SSOT (`openModal`/`closeModal`) or the changelog widget's non-modal bottom-right pattern; decide which is less intrusive.
-
 - **[med]** Codebase health audit — complexity, semantic drift, SSOT integrity — make the code simpler to work on — [whole `js/` tree], SonarCloud (`ojanlubis_pdflokal`), CLAUDE.md "Maintainability" section
   - User note (Jul 1): wants a deliberate pass to make the code simpler to work on and better overall — not chasing a specific bug, improving the foundation. This is the "can a future Claude with zero memory work on any file safely?" test from CLAUDE.md, run as an audit.
   - Dimensions to check:
@@ -108,6 +97,8 @@ Running list of UI/UX findings + small fixes to pick up later. Append new items 
 ---
 
 ## Done
+
+- **Growth loop (Wave 5)** — SHIPPED for v2 (#96, Jul 3): confetti on every download (canvas, reduced-motion-aware) + support card ("Bagikan" via Web Share / copy-link, "Traktir Kopi" reveals the dukung.html QRIS inline). Once per session, permanent opt-out, fires at the shared download chokepoint. 4 touch tests.
 
 - **[med×2]** Wave 1 convenience — clipboard + drag-to-append (Jul, PR #79 + #80)
   - **#79** Paste image into the signature flow: while the signature modal is open, Ctrl/Cmd+V routes the pasted image to `loadSignatureImage` → bg-removal modal. Paraf (draw-only) excluded. `tests/signature-paste.spec.js`.
