@@ -23,21 +23,33 @@ async function openDoc(page) {
 }
 
 test.describe('growth loop — mobile', () => {
-  test('download celebrates (confetti) and then invites — once per session', async ({ page }) => {
+  test('download celebrates (burst) and then invites — once per day', async ({ page }) => {
     await openDoc(page);
     await downloadOnce(page);
-    // Confetti canvas exists briefly (fixed, pointer-events none), then self-removes.
+    // Burst wrap exists briefly (fixed, pointer-events none), then self-removes.
     await expect(page.locator('.v2-burst')).toBeAttached();
     // The card arrives after the sheet closes.
     await expect(page.locator('#support-card')).toBeVisible({ timeout: 4000 });
     await expect(page.locator('.sc-head')).toContainText('filemu udah jadi');
 
-    // Dismiss, download again: same session → no second ask.
+    // Dismiss, download again: same day → no second ask.
     await page.tap('#sc-close');
     await expect(page.locator('#support-card')).toBeHidden();
     await downloadOnce(page);
     await page.waitForTimeout(1600);
     await expect(page.locator('#support-card')).toBeHidden();
+
+    // Even across a reload (fresh session, same calendar day) → still quiet.
+    await openDoc(page);
+    await downloadOnce(page);
+    await page.waitForTimeout(1600);
+    await expect(page.locator('#support-card')).toBeHidden();
+
+    // A NEW day → the card asks again (stub the day key to yesterday).
+    await page.evaluate(() => localStorage.setItem('pdflokal-support-last', 'yesterday'));
+    await openDoc(page);
+    await downloadOnce(page);
+    await expect(page.locator('#support-card')).toBeVisible({ timeout: 4000 });
   });
 
   test('Traktir Kopi reveals the QRIS inline — no navigation away', async ({ page }) => {
@@ -56,6 +68,8 @@ test.describe('growth loop — mobile', () => {
     await page.tap('#sc-never');
     await expect(page.locator('#support-card')).toBeHidden();
 
+    // Clear the once-a-day key so ONLY the opt-out can be keeping it hidden.
+    await page.evaluate(() => localStorage.removeItem('pdflokal-support-last'));
     await openDoc(page); // fresh page load, same storage
     await downloadOnce(page);
     await page.waitForTimeout(1600);
