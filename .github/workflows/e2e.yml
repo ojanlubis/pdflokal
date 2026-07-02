@@ -21,6 +21,8 @@ jobs:
           filters: |
             runnable:
               - 'index.html'
+              - 'editor-v2.html'
+              - 'lab.html'
               - 'dukung.html'
               - 'privasi.html'
               - 'style.css'

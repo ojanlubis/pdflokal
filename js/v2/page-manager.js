@@ -69,6 +69,22 @@ export function createPageManager(deps) {
     const tile = document.createElement('div');
     tile.className = 'pm-tile';
     tile.dataset.pageId = page.id;
+    // Keyboard path: tiles are toggle buttons (drag-reorder stays pointer-only;
+    // bulk actions cover the same jobs for keyboard users).
+    tile.setAttribute('role', 'button');
+    tile.setAttribute('tabindex', '0');
+    tile.setAttribute('aria-label', `Halaman ${index + 1}`);
+    tile.setAttribute('aria-pressed', String(selected.has(page.id)));
+    tile.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        if (selected.has(page.id)) selected.delete(page.id);
+        else selected.add(page.id);
+        tile.classList.toggle('sel', selected.has(page.id));
+        tile.setAttribute('aria-pressed', String(selected.has(page.id)));
+        renderBulkBar();
+      }
+    });
     if (selected.has(page.id)) tile.classList.add('sel');
 
     const rotated = (page.rotation || 0) % 180 !== 0;
@@ -175,6 +191,7 @@ export function createPageManager(deps) {
         if (selected.has(page.id)) selected.delete(page.id);
         else selected.add(page.id);
         tile.classList.toggle('sel', selected.has(page.id));
+        tile.setAttribute('aria-pressed', String(selected.has(page.id)));
         renderBulkBar();
       }
       start = null;
