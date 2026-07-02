@@ -32,6 +32,16 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+      // tests/mobile/ runs under the mobile-chrome project only
+      testIgnore: ['mobile/**'],
+    },
+    {
+      // Real touch events + mobile viewport + DPR ~2.6. Catches the
+      // layout/touch-logic bug class without a physical phone. The GPU/
+      // compositor class still needs the Android emulator or a real device.
+      name: 'mobile-chrome',
+      use: { ...devices['Pixel 7'] },
+      testMatch: 'mobile/**/*.spec.js',
     },
   ],
 

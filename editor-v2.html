@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="robots" content="noindex, nofollow">
+  <title>PDFLokal — Editor v2 (beta)</title>
+  <!--
+    Editor v2 — the clean rebuild on js/core + js/render (decision: Jul 2 2026,
+    decisions.md "clean rebuild & swap"). Lives BESIDE the live app: unlinked,
+    noindex, zero impact on index.html until the swap. Self-contained CSS on
+    purpose — style.css belongs to the old editor and dies with it.
+  -->
+  <style>
+    :root {
+      --bg: #f2f4f7; --surface: #ffffff; --ink: #1a1d21; --muted: #6b7280;
+      --accent: #4f8ef7; --line: rgba(0,0,0,.08);
+      --header-h: 44px; --toolbar-h: 52px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg); color: var(--ink);
+      display: flex; flex-direction: column;
+    }
+
+    /* ---- header ---- */
+    header {
+      height: var(--header-h); flex: 0 0 auto;
+      display: flex; align-items: center; gap: 8px; padding: 0 10px;
+      background: var(--surface); border-bottom: 1px solid var(--line);
+    }
+    .brand { font-weight: 700; font-size: 15px; }
+    .brand .beta { font-size: 10px; color: var(--accent); vertical-align: super; font-weight: 600; }
+    .spacer { flex: 1; }
+    button {
+      font: inherit; border: none; background: none; cursor: pointer; color: var(--ink);
+      border-radius: 8px; min-height: 36px;
+    }
+    .icon-btn {
+      width: 40px; display: inline-flex; align-items: center; justify-content: center;
+      color: var(--muted);
+    }
+    .icon-btn:disabled { opacity: .3; cursor: default; }
+    .icon-btn svg { width: 20px; height: 20px; }
+    #btn-download {
+      background: var(--accent); color: #fff; font-weight: 600; font-size: 13.5px;
+      padding: 0 14px; border-radius: 8px;
+    }
+    #btn-download:disabled { opacity: .4; }
+
+    /* ---- toolbar: tools are verbs; ≥44px targets; nothing hover-only ---- */
+    #toolbar {
+      height: var(--toolbar-h); flex: 0 0 auto;
+      display: flex; align-items: center; justify-content: center; gap: 4px;
+      background: var(--surface); border-bottom: 1px solid var(--line);
+      padding: 0 8px; overflow-x: auto;
+    }
+    .tool {
+      display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 1px; min-width: 56px; height: 44px; border-radius: 10px;
+      font-size: 10.5px; color: var(--muted);
+    }
+    .tool svg { width: 19px; height: 19px; }
+    .tool.active { background: rgba(79,142,247,.12); color: var(--accent); }
+
+    /* ---- document area: CONTAINER scroll (kills edge-overscroll flicker) ---- */
+    #v2-scroll {
+      flex: 1; overflow-y: auto; overflow-x: hidden;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+      position: relative;
+    }
+    #v2-stage {
+      display: flex; flex-direction: column; align-items: center; gap: 16px;
+      padding: 16px 8px 90px;
+      transform-origin: top center;
+    }
+
+    /* placeholder shimmer (telegraph: "loading", not "broken") */
+    .pv-ph { overflow: hidden; }
+    .pv-ph::after {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(100deg, transparent 30%, rgba(0,0,0,.045) 50%, transparent 70%);
+      animation: pv-shimmer 1.1s infinite;
+    }
+    @keyframes pv-shimmer {
+      from { transform: translateX(-100%); } to { transform: translateX(100%); }
+    }
+
+    /* position pill */
+    #v2-pill {
+      position: fixed; left: 50%; transform: translateX(-50%);
+      bottom: 76px; z-index: 30;
+      background: rgba(26,29,33,.82); color: #fff; font-size: 12.5px; font-weight: 600;
+      padding: 6px 14px; border-radius: 999px; pointer-events: none;
+      opacity: 0; transition: opacity .25s ease;
+    }
+    #v2-pill.show { opacity: 1; }
+    @media (prefers-reduced-motion: reduce) {
+      .pv-ph::after { animation: none; }
+      #v2-pill { transition: none; }
+    }
+
+    /* zoom (floating, bottom-right, thumb-reachable) */
+    #zoom-ctl {
+      position: fixed; right: 10px; bottom: 14px; z-index: 30;
+      display: flex; flex-direction: column; border-radius: 12px; overflow: hidden;
+      background: var(--surface); box-shadow: 0 3px 14px rgba(0,0,0,.16);
+    }
+    #zoom-ctl button { width: 44px; height: 44px; font-size: 20px; color: var(--muted); border-radius: 0; }
+    #zoom-ctl button:first-child { border-bottom: 1px solid var(--line); }
+
+    /* empty state */
+    #empty {
+      position: absolute; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 14px; padding: 24px; text-align: center;
+    }
+    #empty h1 { font-size: 19px; font-weight: 700; }
+    #empty p { color: var(--muted); font-size: 13.5px; max-width: 300px; }
+    #btn-open {
+      background: var(--accent); color: #fff; font-weight: 600; font-size: 15px;
+      padding: 13px 26px; border-radius: 12px;
+    }
+    #empty .privacy { font-size: 11.5px; color: var(--muted); opacity: .8; }
+
+    /* inline text editor overlay */
+    .v2-text-edit {
+      position: absolute; z-index: 2000; min-width: 40px;
+      outline: 1.5px dashed var(--accent); outline-offset: 3px;
+      white-space: pre; line-height: 1.2; background: rgba(255,255,255,.6);
+    }
+    .v2-text-edit:focus { outline-style: solid; }
+
+    /* signature dialog */
+    dialog {
+      width: 100%; height: 100%; max-width: none; max-height: none;
+      background: rgba(0,0,0,.45); border: none;
+      display: none; align-items: center; justify-content: center; padding: 16px;
+    }
+    dialog[open] { display: flex; }
+    .sheet {
+      background: var(--surface); border-radius: 16px; padding: 16px;
+      width: 100%; max-width: 460px; display: flex; flex-direction: column; gap: 12px;
+    }
+    .sheet h2 { font-size: 15.5px; }
+    #sig-canvas {
+      width: 100%; height: 180px; border: 1.5px dashed var(--line);
+      border-radius: 10px; touch-action: none; background: #fff;
+    }
+    .sheet-actions { display: flex; gap: 8px; justify-content: flex-end; }
+    .btn-ghost { color: var(--muted); padding: 0 14px; }
+    .btn-primary { background: var(--accent); color: #fff; font-weight: 600; padding: 0 16px; border-radius: 8px; min-height: 40px; }
+
+    #toast {
+      position: fixed; left: 50%; transform: translateX(-50%); bottom: 130px; z-index: 40;
+      background: rgba(26,29,33,.9); color: #fff; font-size: 13px;
+      padding: 9px 16px; border-radius: 10px; opacity: 0; transition: opacity .2s;
+      pointer-events: none; max-width: 88vw; text-align: center;
+    }
+    #toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+  <header>
+    <span class="brand">PDFLokal <span class="beta">v2 beta</span></span>
+    <span class="spacer"></span>
+    <button class="icon-btn" id="btn-undo" disabled aria-label="Urungkan" title="Urungkan (Ctrl+Z)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+    </button>
+    <button class="icon-btn" id="btn-redo" disabled aria-label="Ulangi" title="Ulangi (Ctrl+Y)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></svg>
+    </button>
+    <button id="btn-download" disabled>Unduh</button>
+  </header>
+
+  <div id="toolbar" role="toolbar" aria-label="Alat">
+    <button class="tool active" data-tool="select" aria-pressed="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 3 7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/></svg>
+      Pilih
+    </button>
+    <button class="tool" data-tool="text" aria-pressed="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+      Teks
+    </button>
+    <button class="tool" data-tool="whiteout" aria-pressed="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="8" rx="1"/></svg>
+      Tip-Ex
+    </button>
+    <button class="tool" data-tool="signature" aria-pressed="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17c3-6 5-8 6-6s-1 7 1 7 3-9 5-9 0 9 2 9 2-3 4-3"/></svg>
+      TTD
+    </button>
+    <button class="tool" id="btn-delete-anno" disabled aria-label="Hapus objek terpilih">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+      Hapus
+    </button>
+  </div>
+
+  <main id="v2-scroll">
+    <div id="v2-stage"></div>
+    <div id="empty">
+      <h1>Edit PDF langsung di HP-mu</h1>
+      <p>Gabung, tanda tangan, tulis, dan tutup teks — semua diproses di perangkatmu, nggak ada yang di-upload.</p>
+      <button id="btn-open">Buka PDF</button>
+      <span class="privacy">🔒 100% privat — file kamu nggak pernah ninggalin perangkat</span>
+    </div>
+  </main>
+
+  <div id="v2-pill" aria-hidden="true"></div>
+  <div id="zoom-ctl">
+    <button id="z-in" aria-label="Perbesar">+</button>
+    <button id="z-out" aria-label="Perkecil">−</button>
+  </div>
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <dialog id="sig-modal" aria-label="Buat tanda tangan">
+    <div class="sheet">
+      <h2>Gambar tanda tanganmu</h2>
+      <canvas id="sig-canvas"></canvas>
+      <div class="sheet-actions">
+        <button class="btn-ghost" id="sig-clear">Ulangi</button>
+        <button class="btn-ghost" id="sig-cancel">Batal</button>
+        <button class="btn-primary" id="sig-use">Pakai</button>
+      </div>
+    </div>
+  </dialog>
+
+  <input type="file" id="file-input" accept="application/pdf" multiple hidden>
+
+  <script src="js/vendor/pdf.min.js"></script>
+  <script src="js/vendor/pdf-lib.min.js"></script>
+  <script src="js/vendor/fontkit.umd.min.js"></script>
+  <script src="js/vendor/signature_pad.umd.min.js"></script>
+  <script type="module" src="js/v2/app.js"></script>
+</body>
+</html>
