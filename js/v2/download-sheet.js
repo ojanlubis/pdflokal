@@ -16,6 +16,7 @@
 
 import { buildPdfBytes } from '../core/export.js';
 import { track } from '../lib/analytics.js';
+import { showStamp } from './celebrate.js';
 
 const COMPRESS_QUALITY = 0.72; // the ONE preset (founder call: no levels until data asks)
 const COMPRESS_MAXDIM = 1600;
@@ -95,6 +96,12 @@ export function createDownloadSheet(deps) {
       });
       if (seq !== state.seq) return;
       state.compressed = { bytes: out.bytes, size: out.size, unchanged: out.unchanged };
+      // SUDAH OPTIMAL: the honesty guard gets a face. The file was already as
+      // small as it honestly gets — we say so with a stamp instead of faking
+      // savings. Stamped INTO the dialog (top layer covers body-fixed elements).
+      if (out.unchanged && modal.open) {
+        showStamp('Sudah optimal', { duration: 1300, host: modal });
+      }
     } catch (err) {
       console.error(err);
       if (seq === state.seq) { state.size = 'asli'; deps.toast('Kompres gagal, kami pakai ukuran asli ya'); }
@@ -254,8 +261,8 @@ export function createDownloadSheet(deps) {
       if (state.format === 'pdf') {
         const src = state.size === 'kompres' ? state.compressed : state.base;
         if (!src) throw new Error('build missing');
+        // No success toast: the BERES stamp (download chokepoint) is the one voice.
         deps.download(new Blob([src.bytes], { type: 'application/pdf' }), `${baseName}-pdflokal.pdf`);
-        deps.toast(`Selesai! PDF-mu udah diunduh (${fmtMB(src.size)})`);
       } else {
         if (!state.base) throw new Error('build missing');
         const { renderPdfToImages, zipFiles } = await import('../core/export-images.js');
@@ -265,7 +272,6 @@ export function createDownloadSheet(deps) {
         if (files.length === 1) {
           const mime = state.imgfmt === 'png' ? 'image/png' : 'image/jpeg';
           deps.download(new Blob([files[0].bytes], { type: mime }), files[0].name);
-          deps.toast('Selesai! Gambarmu udah diunduh');
         } else {
           const zip = zipFiles(files);
           deps.download(new Blob([zip], { type: 'application/zip' }), `${baseName}-gambar.zip`);

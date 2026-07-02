@@ -23,11 +23,11 @@ async function openDoc(page) {
 }
 
 test.describe('growth loop — mobile', () => {
-  test('download celebrates (burst) and then invites — once per day', async ({ page }) => {
+  test('download celebrates (BERES stamp) and then invites — once per day', async ({ page }) => {
     await openDoc(page);
     await downloadOnce(page);
-    // Burst wrap exists briefly (fixed, pointer-events none), then self-removes.
-    await expect(page.locator('.v2-burst')).toBeAttached();
+    // The stamp exists briefly (fixed, pointer-events none), then self-removes.
+    await expect(page.locator('.v2-stamp', { hasText: 'Beres' })).toBeAttached();
     // The card arrives after the sheet closes.
     await expect(page.locator('#support-card')).toBeVisible({ timeout: 4000 });
     await expect(page.locator('.sc-head')).toContainText('filemu udah jadi');

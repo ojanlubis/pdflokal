@@ -32,7 +32,7 @@ export function renderPageView(page, opts = {}) {
   const h = rotated ? page.width : page.height;
   view.style.cssText =
     `position:relative;flex:0 0 auto;width:${w}px;height:${h}px;` +
-    'background:#fff;box-shadow:0 2px 14px rgba(0,0,0,.14);border-radius:2px';
+    'background:#fff;box-shadow:0 2px 12px rgba(63,49,35,.16);border-radius:2px';
 
   // Intentional placeholder text (e.g. "Hal 42") so a flung-past page reads as
   // "loading", not "broken". Stored on the view so clearPageRaster can reuse it.

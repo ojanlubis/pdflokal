@@ -647,7 +647,7 @@ async function loadFilesInner(files) {
     zoom = Math.min(1, (scrollEl.clientWidth - 16) / doc.pages[0].width);
   }
   rebuildStage(); // applies zoom + sizer at the end
-  if (!firstLoad) toast(`${usable.length} file ditambahkan`);
+  if (!firstLoad) toast(`Dijepit jadi satu, sekarang ${doc.pages.length} halaman`);
   // If the Halaman sheet triggered this add, refresh its grid in place.
   if (document.getElementById('pm-sheet').open) pageManager.render();
 }

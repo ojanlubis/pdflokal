@@ -272,7 +272,7 @@ export function createPageManager(deps) {
     function dragLoop() {
       if (!drag) return;
       tile.style.transform =
-        `translate(${drag.lastX - start.x}px, ${drag.lastY - start.y}px) scale(1.04)`;
+        `translate(${drag.lastX - start.x}px, ${drag.lastY - start.y}px) scale(1.045) rotate(1.5deg)`;
 
       // Auto-scroll: proportional to how deep the finger is in the edge zone.
       const gr = grid.getBoundingClientRect();
