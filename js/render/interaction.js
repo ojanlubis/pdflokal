@@ -172,6 +172,11 @@ export function createInteraction(ctx) {
       e.preventDefault();
       startDraw(e, pageView, page);
     } else if (tool === 'text' || tool === 'signature' || tool === 'paraf') {
+      // WHY preventDefault: onPlace may create + focus an inline editor NOW.
+      // Canceling pointerdown suppresses the compatibility mousedown that
+      // would otherwise fire right after and BLUR it (mouse only — touch
+      // orders compat events after pointerup, which is why only desktop broke).
+      e.preventDefault();
       const p = toPage(e, pageView);
       ctx.onPlace?.(tool, { pageId: page.id, x: p.x, y: p.y });
     } else {
