@@ -190,7 +190,7 @@ export function syncOverlay(page, view, opts = {}) {
 // overlay mid-gesture would destroy the element holding the pointer capture.
 export function decorateSelected(el, anno) {
   el.classList.add('pv-selected');
-  el.style.outline = '1.5px solid #4f8ef7';
+  el.style.outline = '1.5px solid #dc2626';
   el.style.outlineOffset = '2px';
   // Selected = grabbable: the browser must NOT take a drag on it as scroll.
   // (touch-action must be set BEFORE the gesture starts — this is that moment.)
@@ -206,7 +206,7 @@ export function decorateSelected(el, anno) {
     'display:flex;align-items:center;justify-content:center;cursor:nwse-resize;touch-action:none';
   const dot = document.createElement('div');
   dot.style.cssText =
-    'width:12px;height:12px;border-radius:50%;background:#4f8ef7;border:2px solid #fff;' +
+    'width:12px;height:12px;border-radius:50%;background:#dc2626;border:2px solid #fff;' +
     'box-shadow:0 1px 4px rgba(0,0,0,.35)';
   h.appendChild(dot);
   el.appendChild(h);

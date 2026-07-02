@@ -26,8 +26,10 @@
   -->
   <style>
     :root {
-      --bg: #f2f4f7; --surface: #ffffff; --ink: #1a1d21; --muted: #6b7280;
-      --accent: #4f8ef7; --line: rgba(0,0,0,.08);
+      /* Brand tokens (redesign Jul 2026): PDFLokal red on warm stone, matching
+         the site identity the blue-on-cool skeleton never inherited. */
+      --bg: #f1ede7; --surface: #ffffff; --ink: #211d1a; --muted: #79716b;
+      --accent: #dc2626; --accent-down: #b91c1c; --line: rgba(63,49,35,.12);
       --header-h: 44px; --toolbar-h: 52px;
     }
     /* Self-hosted fonts (preview parity with the PDF export) */
@@ -39,11 +41,16 @@
     @font-face { font-family: 'Carlito'; src: url('fonts/carlito-bold.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
     @font-face { font-family: 'Carlito'; src: url('fonts/carlito-italic.woff2') format('woff2'); font-weight: 400; font-style: italic; font-display: swap; }
     @font-face { font-family: 'Carlito'; src: url('fonts/carlito-bolditalic.woff2') format('woff2'); font-weight: 700; font-style: italic; font-display: swap; }
+    /* UI face: Plus Jakarta Sans, the brand font (Indonesian-designed, already self-hosted) */
+    @font-face { font-family: 'Plus Jakarta Sans'; src: url('fonts/plusjakartasans-regular.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+    @font-face { font-family: 'Plus Jakarta Sans'; src: url('fonts/plusjakartasans-500.woff2') format('woff2'); font-weight: 500; font-style: normal; font-display: swap; }
+    @font-face { font-family: 'Plus Jakarta Sans'; src: url('fonts/plusjakartasans-600.woff2') format('woff2'); font-weight: 600; font-style: normal; font-display: swap; }
+    @font-face { font-family: 'Plus Jakarta Sans'; src: url('fonts/plusjakartasans-700.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
 
     * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     html, body { height: 100%; overflow: hidden; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background: var(--bg); color: var(--ink);
       display: flex; flex-direction: column;
     }
@@ -107,7 +114,7 @@
       font-size: 10.5px; color: var(--muted);
     }
     .tool svg { width: 19px; height: 19px; }
-    .tool.active { background: rgba(79,142,247,.12); color: var(--accent); }
+    .tool.active { background: rgba(220,38,38,.08); color: var(--accent); }
 
     /* ---- format bar: contextual, only when text is in play ---- */
     #format-bar {
@@ -128,7 +135,7 @@
     }
     .fb-bold { font-weight: 800; }
     .fb-italic { font-style: italic; font-family: Georgia, serif; }
-    .fb-toggle.on { background: rgba(79,142,247,.14); color: var(--accent); border-color: var(--accent); }
+    .fb-toggle.on { background: rgba(220,38,38,.1); color: var(--accent); border-color: var(--accent); }
     .fb-color {
       width: 26px; height: 26px; min-height: 26px; border-radius: 50%;
       border: 1.5px solid var(--line); flex: 0 0 auto;
@@ -258,7 +265,7 @@
     }
     .pm-placeholder {
       border-style: dashed; border-color: var(--accent);
-      background: rgba(79,142,247,.06);
+      background: rgba(220,38,38,.04);
     }
     .pm-thumb { position: absolute; inset: 0; background-size: cover; background-position: top center; background-color: #fafafa; }
     .pm-num {
@@ -351,12 +358,12 @@
       font-variant-numeric: tabular-nums;
     }
     .ds-seg button small { font-size: 10.5px; color: var(--muted); font-weight: 400; }
-    .ds-seg button.on { border-color: var(--accent); background: rgba(79,142,247,.09); color: var(--accent); }
+    .ds-seg button.on { border-color: var(--accent); background: rgba(220,38,38,.07); color: var(--accent); }
     .ds-seg button.on small { color: var(--accent); opacity: .75; }
     .ds-hemat { color: #1d8a44; font-weight: 600; }
     .ds-spin {
       display: inline-block; width: 11px; height: 11px; border-radius: 50%;
-      border: 2px solid rgba(79,142,247,.3); border-top-color: var(--accent);
+      border: 2px solid rgba(220,38,38,.25); border-top-color: var(--accent);
       animation: ds-rot .7s linear infinite; vertical-align: -1px;
     }
     .ds-spin-lite { border-color: rgba(255,255,255,.4); border-top-color: #fff; }
@@ -385,12 +392,12 @@
       dialog.bottomsheet { align-items: center; padding: 16px; }
       .ds-body { border-radius: 16px; }
       .tool { min-width: 66px; }
-      .tool:hover { background: rgba(79,142,247,.07); }
+      .tool:hover { background: rgba(220,38,38,.05); }
       .icon-btn:hover:not(:disabled) { color: var(--ink); }
       #btn-file:hover:not(:disabled) { color: var(--ink); }
       #file-menu button:hover { background: var(--bg); }
-      .ds-seg button:hover:not(.on) { border-color: rgba(79,142,247,.4); }
-      .pm-tile:hover:not(.pm-placeholder) { border-color: rgba(79,142,247,.45); }
+      .ds-seg button:hover:not(.on) { border-color: rgba(220,38,38,.4); }
+      .pm-tile:hover:not(.pm-placeholder) { border-color: rgba(220,38,38,.45); }
       .pm-bulk button:hover, .pm-pickbar button:hover { border-color: var(--accent); color: var(--accent); }
       #v2-stage { padding-bottom: 40px; }
       .pv-anno { cursor: grab; }
