@@ -69,6 +69,12 @@ export function createDownloadSheet(deps) {
     } finally {
       if (seq === state.seq) { state.building = false; render(); }
     }
+    // Rebuilding invalidated any compressed bytes. If Compress is STILL the
+    // selected size, re-run it now — otherwise the CTA would reach for bytes
+    // that no longer exist (founder-caught: compress → re-pick pages → stuck).
+    if (seq === state.seq && state.base && state.format === 'pdf' && state.size === 'kompres') {
+      buildCompressed();
+    }
   }
 
   async function buildCompressed() {
@@ -218,8 +224,13 @@ export function createDownloadSheet(deps) {
     render();
     const seq = state.seq;
     try {
+      // Belt-and-braces: if Compress is selected but its bytes are missing and
+      // nothing is computing them (any invalidation path), start it here.
+      if (state.format === 'pdf' && state.size === 'kompres' && !state.compressed && !state.compressing) {
+        buildCompressed();
+      }
       // Any in-flight build: the tap means "when it's ready".
-      while ((state.building || (state.format === 'pdf' && state.size === 'kompres' && state.compressing)) && seq === state.seq) {
+      while ((state.building || (state.format === 'pdf' && state.size === 'kompres' && (state.compressing || !state.compressed))) && seq === state.seq) {
         await new Promise((r) => setTimeout(r, 120));
       }
       if (seq !== state.seq) return;

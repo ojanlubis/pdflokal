@@ -82,6 +82,25 @@ test.describe('unduh sheet — mobile', () => {
     expect(download.suggestedFilename()).toMatch(/hal-1\.jpg$/);
   });
 
+  test('compress then RE-PICK pages: compression re-runs, download still works', async ({ page }) => {
+    await openSheet(page);
+    // 1. Compress first…
+    await page.tap('#ds-size [data-v="kompres"]');
+    await expect(page.locator('#ds-size [data-v="kompres"]')).toContainText(/hemat|optimal/, { timeout: 20000 });
+    // 2. …then change the page selection (this invalidates the built bytes).
+    await page.tap('#ds-pages [data-v="some"]');
+    await page.tap('.pm-tile >> nth=0');
+    await page.tap('#pm-pick-ok');
+    await expect(page.locator('#ds-cta-main')).toContainText('(1 hal.)');
+    // 3. Compression must have re-run for the new subset…
+    await expect(page.locator('#ds-size [data-v="kompres"]')).toContainText(/hemat|optimal/, { timeout: 20000 });
+    // 4. …and the download must not be stuck.
+    const dl = page.waitForEvent('download');
+    await page.tap('#ds-cta');
+    const download = await dl;
+    expect(download.suggestedFilename()).toMatch(/\.pdf$/);
+  });
+
   test('cancelling the picker keeps Semua', async ({ page }) => {
     await openSheet(page);
     await page.tap('#ds-pages [data-v="some"]');
