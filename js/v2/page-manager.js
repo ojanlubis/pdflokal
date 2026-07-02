@@ -382,7 +382,7 @@ export function createPageManager(deps) {
     } else if (act === 'delete') {
       if (pages.length >= doc.pages.length) return; // guarded in UI as well
       record(deps.history, doc);
-      for (const p of pages) removePage(doc, p.id);
+      for (const p of pages) { removePage(doc, p.id); thumbs.delete(p.id); }
       selected.clear();
       track('editor_action', { action: 'delete_page' });
       render();
@@ -397,5 +397,9 @@ export function createPageManager(deps) {
     }
   });
 
-  return { open, openPick, close, render };
+  // Undo/redo can revert rotations the thumb cache baked in (review M4) — the
+  // caller flushes us wholesale; thumbs regenerate lazily on next open.
+  function invalidateThumbs() { thumbs.clear(); }
+
+  return { open, openPick, close, render, invalidateThumbs };
 }

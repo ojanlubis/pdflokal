@@ -37,6 +37,10 @@ export function createSignatureModal({ modal, onReady, toast }) {
 
   // ---- draw pane ---------------------------------------------------------------
   function initPad() {
+    // Detach the previous pad's pointer listeners first (review M3): each
+    // SignaturePad constructor adds its own set to the SAME canvas — without
+    // off(), N modal opens = N pads all drawing every stroke N× thick.
+    pad?.off();
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     canvas.width = canvas.offsetWidth * dpr;
     canvas.height = canvas.offsetHeight * dpr;
@@ -52,10 +56,11 @@ export function createSignatureModal({ modal, onReady, toast }) {
     if (!f || !f.type.startsWith('image/')) { toast('Pilih file gambar ya'); return; }
     const img = new Image();
     img.onload = () => {
+      URL.revokeObjectURL(img.src); // decoded — the blob URL has done its job
       uploadedImg = img;
       renderUploadPreview();
     };
-    img.onerror = () => toast('Gagal membaca gambar');
+    img.onerror = () => { URL.revokeObjectURL(img.src); toast('Gagal membaca gambar'); };
     img.src = URL.createObjectURL(f);
   });
   removeBgCheck.addEventListener('change', renderUploadPreview);

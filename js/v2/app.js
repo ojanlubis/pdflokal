@@ -545,8 +545,8 @@ function deleteSelected() {
   if (pageId) syncPage(pageId);
 }
 
-function doUndo() { if (undo(history, doc)) rebuildStage(); }
-function doRedo() { if (redo(history, doc)) rebuildStage(); }
+function doUndo() { if (undo(history, doc)) { pageManager.invalidateThumbs(); rebuildStage(); } }
+function doRedo() { if (redo(history, doc)) { pageManager.invalidateThumbs(); rebuildStage(); } }
 document.getElementById('btn-undo').addEventListener('click', doUndo);
 document.getElementById('btn-redo').addEventListener('click', doRedo);
 
@@ -734,6 +734,7 @@ document.getElementById('btn-download').addEventListener('click', doDownload);
   for (const dlg of dialogs) {
     const nativeShow = dlg.showModal.bind(dlg);
     dlg.showModal = () => {
+      if (dlg.open) return; // double-tap/double-Ctrl+S: showModal throws on open dialogs
       nativeShow();
       window.history.pushState({ v2dlg: dlg.id }, '');
       stack.push(dlg);
