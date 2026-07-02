@@ -83,6 +83,60 @@ function applyZoom() {
 document.getElementById('z-in').onclick = () => { zoom = Math.min(zoom + 0.25, 3); applyZoom(); };
 document.getElementById('z-out').onclick = () => { zoom = Math.max(zoom - 0.25, 0.3); applyZoom(); };
 
+// ---- camera: pinch-zoom + pan (the Google-Maps feel, founder ask) ----------------
+// One-finger pan = NATIVE container scroll (overflow auto on both axes — free,
+// smooth, momentum included). Two fingers = our pinch: preventDefault on the
+// 2-touch touchstart keeps the browser from claiming the gesture, zoom anchors
+// on the pinch midpoint so the paper under your fingers stays put.
+function setZoomAnchored(next, midX, midY) {
+  const clamped = Math.min(3, Math.max(0.3, next));
+  if (clamped === zoom) return;
+  const rect = scrollEl.getBoundingClientRect();
+  const mx = midX - rect.left;
+  const my = midY - rect.top;
+  // Content point under the midpoint, rescaled to the new zoom.
+  const cx = (scrollEl.scrollLeft + mx) * (clamped / zoom);
+  const cy = (scrollEl.scrollTop + my) * (clamped / zoom);
+  zoom = clamped;
+  applyZoom();
+  scrollEl.scrollLeft = cx - mx;
+  scrollEl.scrollTop = cy - my;
+}
+
+let pinch = null;
+let pinchRaf = false;
+scrollEl.addEventListener('touchstart', (e) => {
+  if (e.touches.length === 2) {
+    e.preventDefault(); // ours, not the browser's
+    const [a, b] = e.touches;
+    pinch = { d0: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) || 1, z0: zoom };
+  }
+}, { passive: false });
+scrollEl.addEventListener('touchmove', (e) => {
+  if (!pinch || e.touches.length !== 2) return;
+  e.preventDefault();
+  if (pinchRaf) return; // rAF-throttle: refresh loops slots, keep it 1×/frame
+  pinchRaf = true;
+  const [a, b] = e.touches;
+  const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+  const midX = (a.clientX + b.clientX) / 2;
+  const midY = (a.clientY + b.clientY) / 2;
+  requestAnimationFrame(() => {
+    pinchRaf = false;
+    if (pinch) setZoomAnchored(pinch.z0 * (d / pinch.d0), midX, midY);
+  });
+}, { passive: false });
+const endPinch = (e) => { if (e.touches.length < 2) pinch = null; };
+scrollEl.addEventListener('touchend', endPinch);
+scrollEl.addEventListener('touchcancel', endPinch);
+
+// Desktop: trackpad pinch arrives as ctrl+wheel; cmd+wheel for mouse users.
+scrollEl.addEventListener('wheel', (e) => {
+  if (!(e.ctrlKey || e.metaKey)) return;
+  e.preventDefault();
+  setZoomAnchored(zoom * (e.deltaY < 0 ? 1.1 : 0.9), e.clientX, e.clientY);
+}, { passive: false });
+
 // ---- streaming viewport --------------------------------------------------------
 let pillTimer = null;
 const stream = createViewportStream({
@@ -130,7 +184,8 @@ function refreshChrome() {
   document.getElementById('btn-redo').disabled = !canRedo(history);
   document.getElementById('btn-download').disabled = doc.pages.length === 0;
   document.getElementById('btn-pages').disabled = doc.pages.length === 0;
-  document.getElementById('btn-delete-anno').disabled = !doc.selection.annotationId;
+  // Hapus stays enabled with pages: no selection = arms delete-mode.
+  document.getElementById('btn-delete-anno').disabled = doc.pages.length === 0;
   syncFormatBar();
   syncSigBar();
 }
@@ -187,6 +242,7 @@ function setTool(next) {
   // While a placement tool is active the page must not pan under the finger.
   stage.style.touchAction = next === 'select' ? '' : 'none';
   syncFormatBar();
+  syncSigBar();
 }
 for (const btn of document.querySelectorAll('#toolbar .tool[data-tool]')) {
   btn.addEventListener('click', () => {
@@ -199,6 +255,54 @@ for (const btn of document.querySelectorAll('#toolbar .tool[data-tool]')) {
   });
 }
 
+// Hapus works BOTH ways (founder ask): with a selection it deletes now; with
+// nothing selected it arms delete-mode — the next tapped object is removed.
+document.getElementById('btn-delete-anno').addEventListener('click', () => {
+  if (doc.selection.annotationId) { deleteSelected(); return; }
+  setTool('delete');
+  toast('Ketuk objek yang mau dihapus');
+});
+
+// ---- Tip-Ex color matching -------------------------------------------------------
+// Zero-UI "colour matching tool": when a whiteout stroke finishes, sample the
+// page raster in a thin ring OUTSIDE the drawn rect and take the per-channel
+// median — on a cream/gray scan the cover-up matches the paper instead of
+// glowing white. Plain white documents stay white (median of white is white).
+async function matchWhiteoutColor(anno, pageId) {
+  const page = doc.pages.find((p) => p.id === pageId);
+  if (!page?.raster) return; // page released mid-gesture — keep default white
+  try {
+    const img = new Image();
+    await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = page.raster.dataUrl; });
+    const c = document.createElement('canvas');
+    c.width = img.width; c.height = img.height;
+    const cx = c.getContext('2d', { willReadFrequently: true });
+    cx.drawImage(img, 0, 0);
+    const rotated = (page.rotation || 0) % 180 !== 0;
+    const frameW = rotated ? page.height : page.width;
+    const s = img.width / frameW;              // raster px per page point
+    const ring = 6 * s;                        // sample 6pt outside the rect
+    const samples = { r: [], g: [], b: [] };
+    const take = (x, y) => {
+      if (x < 0 || y < 0 || x >= c.width || y >= c.height) return;
+      const px = cx.getImageData(Math.round(x), Math.round(y), 1, 1).data;
+      samples.r.push(px[0]); samples.g.push(px[1]); samples.b.push(px[2]);
+    };
+    for (let i = 0; i <= 8; i += 1) {
+      const fx = (anno.x + (anno.width * i) / 8) * s;
+      const fy = (anno.y + (anno.height * i) / 8) * s;
+      take(fx, anno.y * s - ring); take(fx, (anno.y + anno.height) * s + ring); // above + below
+      take(anno.x * s - ring, fy); take((anno.x + anno.width) * s + ring, fy);  // left + right
+    }
+    if (samples.r.length < 8) return;
+    const med = (arr) => arr.sort((a, b) => a - b)[Math.floor(arr.length / 2)];
+    const hex = (n) => n.toString(16).padStart(2, '0');
+    const color = `#${hex(med(samples.r))}${hex(med(samples.g))}${hex(med(samples.b))}`;
+    updateAnnotation(doc, anno.id, { color });
+    syncPage(pageId);
+  } catch { /* sampling is best-effort; white stays */ }
+}
+
 // ---- interaction wiring ------------------------------------------------------------
 const interaction = createInteraction({
   stage,
@@ -206,9 +310,21 @@ const interaction = createInteraction({
   getZoom: () => zoom,
   getTool: () => tool,
   history,
-  onChange: (kind) => {
-    if (kind === 'select') refreshChrome();
-    else refreshChrome(); // move/resize/draw: chrome only; DOM was updated surgically
+  onChange: (kind, payload) => {
+    if (kind === 'draw' && payload?.annotation) {
+      // Tip-Ex stroke finished: color-match against the paper, then return
+      // home to Pilih (founder: whiteout should NOT stay sticky).
+      const pg = doc.pages.find((p) => p.annotations.some((a) => a.id === payload.annotation.id));
+      if (pg) matchWhiteoutColor(payload.annotation, pg.id);
+      setTool('select');
+    }
+    refreshChrome();
+  },
+  onDeleteTap: (annoId, pageId) => {
+    record(history, doc);
+    removeAnnotation(doc, annoId);
+    syncPage(pageId);
+    setTool('select'); // one delete per arming; undo covers mistakes
   },
   onPlace: (t, { pageId, x, y }) => {
     if (t === 'text') {
@@ -233,7 +349,7 @@ const interaction = createInteraction({
       x, y, width: 8, height: 8,
     }));
     syncPage(pageId);
-    return anno; // whiteout stays sticky (multi-stamp exception)
+    return anno; // onChange('draw') color-matches + returns to Pilih at stroke end
   },
   onEditText: (annoId) => {
     for (const page of doc.pages) {
@@ -371,15 +487,22 @@ function selectedSignatureAnno() {
   return null;
 }
 
+// The strip serves two moments: a selected signature (→ Semua Hal.) and the
+// armed TTD tool (→ Gambar Ulang, so the saved signature is never a trap).
 function syncSigBar() {
   const found = selectedSignatureAnno();
+  const armed = tool === 'signature' && !!storedSignature;
   const bar = document.getElementById('sig-bar');
-  bar.classList.toggle('show', !!found && doc.pages.length > 1);
-  if (found) {
-    document.getElementById('sig-bar-label').textContent =
-      found.anno.subtype === 'paraf' ? 'Paraf terpilih' : 'Tanda tangan terpilih';
-  }
+  const allBtn = document.getElementById('btn-all-pages');
+  const redrawBtn = document.getElementById('btn-redraw-sig');
+  bar.classList.toggle('show', (!!found && doc.pages.length > 1) || armed);
+  allBtn.style.display = found && doc.pages.length > 1 ? '' : 'none';
+  redrawBtn.style.display = armed ? '' : 'none';
+  document.getElementById('sig-bar-label').textContent = found
+    ? (found.anno.subtype === 'paraf' ? 'Paraf terpilih' : 'Tanda tangan terpilih')
+    : (armed ? 'Ketuk halaman untuk menempatkan' : '');
 }
+document.getElementById('btn-redraw-sig').addEventListener('click', () => signatureModal.open());
 
 document.getElementById('btn-all-pages').addEventListener('click', () => {
   const found = selectedSignatureAnno();
@@ -411,7 +534,6 @@ function deleteSelected() {
   removeAnnotation(doc, id);
   if (pageId) syncPage(pageId);
 }
-document.getElementById('btn-delete-anno').addEventListener('click', deleteSelected);
 
 function doUndo() { if (undo(history, doc)) rebuildStage(); }
 function doRedo() { if (redo(history, doc)) rebuildStage(); }

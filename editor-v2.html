@@ -103,7 +103,7 @@
 
     /* ---- document area: CONTAINER scroll (kills edge-overscroll flicker) ---- */
     #v2-scroll {
-      flex: 1; overflow-y: auto; overflow-x: hidden;
+      flex: 1; overflow: auto; /* both axes: zoomed-in doc pans like a map */
       overscroll-behavior: contain;
       -webkit-overflow-scrolling: touch;
       position: relative;
@@ -333,6 +333,7 @@
   <div id="sig-bar" role="toolbar" aria-label="Aksi tanda tangan">
     <span id="sig-bar-label"></span>
     <button id="btn-all-pages">Terapkan ke Semua Hal.</button>
+    <button id="btn-redraw-sig">Gambar Ulang ✍️</button>
   </div>
 
   <main id="v2-scroll">
