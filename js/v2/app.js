@@ -31,6 +31,7 @@ import { createPageManager } from './page-manager.js';
 import { createSignatureModal } from './signature-modal.js';
 import { createDownloadSheet } from './download-sheet.js';
 import { track } from '../lib/analytics.js';
+import { createCelebration } from './celebrate.js';
 
 window.pdfjsLib.GlobalWorkerOptions.workerSrc = '/js/vendor/pdf.worker.min.js';
 
@@ -53,6 +54,7 @@ const pill = document.getElementById('v2-pill');
 const toastEl = document.getElementById('toast');
 
 // ---- small helpers -----------------------------------------------------------
+let celebration; // assigned below (needs toast, which needs the DOM refs above)
 let toastTimer = null;
 function toast(msg) {
   toastEl.textContent = msg;
@@ -67,7 +69,11 @@ function download(blob, filename) {
   a.download = filename;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  // The chokepoint every export path funnels through — celebrate here, AFTER
+  // the save was triggered. (Wave 5: reward the "I got my file" moment.)
+  celebration.onDownloadSuccess();
 }
+celebration = createCelebration({ toast });
 
 // ---- zoom ---------------------------------------------------------------------
 // transform:scale + a sizer that carries the scaled layout size. NOT CSS zoom:
