@@ -83,6 +83,41 @@ export function removeAnnotation(doc, annotationId) {
   return found.annotation;
 }
 
+// Minimum annotation edge in page points — small enough for a tight whiteout,
+// large enough that a resize handle can't collapse the object to untouchable.
+const MIN_ANNO_SIZE = 8;
+
+// Move by delta in PAGE space (the UI converts screen→page first). The anchor
+// clamps inside the page so an annotation can never be dragged unrecoverably
+// off-canvas — the failure mode behind several old "invisible annotation" bugs.
+export function moveAnnotation(doc, annotationId, dx, dy) {
+  const found = findAnnotation(doc, annotationId);
+  if (!found) return null;
+  const { page, annotation } = found;
+  // Annotations live in the ROTATED view frame — the clamp box swaps at 90/270.
+  const rotated = (page.rotation || 0) % 180 !== 0;
+  const frameW = rotated ? page.height : page.width;
+  const frameH = rotated ? page.width : page.height;
+  const w = annotation.width || 0;
+  const h = annotation.height || 0;
+  annotation.x = clamp((annotation.x || 0) + dx, 0, Math.max(0, frameW - w));
+  annotation.y = clamp((annotation.y || 0) + dy, 0, Math.max(0, frameH - h));
+  return annotation;
+}
+
+// Set bounds atomically (any subset of x/y/width/height). Sizes are floored at
+// MIN_ANNO_SIZE so resize handles can't produce a zero-size object.
+export function resizeAnnotation(doc, annotationId, bounds = {}) {
+  const found = findAnnotation(doc, annotationId);
+  if (!found) return null;
+  const a = found.annotation;
+  if (bounds.x !== undefined) a.x = bounds.x;
+  if (bounds.y !== undefined) a.y = bounds.y;
+  if (bounds.width !== undefined) a.width = Math.max(MIN_ANNO_SIZE, bounds.width);
+  if (bounds.height !== undefined) a.height = Math.max(MIN_ANNO_SIZE, bounds.height);
+  return a;
+}
+
 // ---- selection (by id — cannot go stale) -----------------------------------
 
 export function selectPage(doc, pageId) {
