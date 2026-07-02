@@ -76,27 +76,67 @@ test.describe('page manager — mobile', () => {
         }));
     });
 
-    const first = page.locator('.pm-tile >> nth=0');
-    const second = page.locator('.pm-tile >> nth=1');
+    // Pin the ELEMENT (not a locator): once the placeholder joins the grid it
+    // also matches .pm-tile, and a re-resolving locator would start dispatching
+    // events at it instead of the grabbed tile.
+    const first = await page.locator('.pm-tile >> nth=0').elementHandle();
     const a = await first.boundingBox();
-    const b = await second.boundingBox();
+    const b = await page.locator('.pm-tile >> nth=1').boundingBox();
 
-    // Long-press (280ms) then drag onto the second tile — the touch path.
+    // Long-press (280ms) arms the FLIP drag; the tile lifts (position:fixed)
+    // and rides the finger; crossing tile 2 moves the placeholder past it.
     await first.dispatchEvent('pointerdown', {
       pointerId: 7, pointerType: 'touch', clientX: a.x + 40, clientY: a.y + 40, bubbles: true, isPrimary: true,
     });
     await page.waitForTimeout(380);
-    await first.dispatchEvent('pointermove', {
-      pointerId: 7, pointerType: 'touch', clientX: b.x + 40, clientY: b.y + 40, bubbles: true,
-    });
+    // The drag ghost lifted out of the grid.
+    await expect(page.locator('.pm-drag-ghost')).toHaveCount(1);
+    await expect(page.locator('.pm-placeholder')).toHaveCount(1);
+    // Two move steps with a frame between (the drag loop is rAF-throttled).
+    for (const fx of [0.5, 1]) {
+      await first.dispatchEvent('pointermove', {
+        pointerId: 7,
+        pointerType: 'touch',
+        clientX: a.x + 40 + (b.x - a.x + 30) * fx,
+        clientY: b.y + 40,
+        bubbles: true,
+      });
+      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    }
     await first.dispatchEvent('pointerup', {
-      pointerId: 7, pointerType: 'touch', clientX: b.x + 40, clientY: b.y + 40, bubbles: true,
+      pointerId: 7, pointerType: 'touch', clientX: b.x + 70, clientY: b.y + 40, bubbles: true,
     });
 
-    const order = await page.evaluate(() => window.v2.getDoc().pages.map((p) => p.id));
-    expect(order[1]).toBe(p1id); // page 1 moved to position 2
+    // The drop settles with an animation, then commits the model.
+    await expect.poll(async () => page.evaluate(
+      () => window.v2.getDoc().pages.map((p) => p.id)[1],
+    ), { timeout: 3000 }).toBe(p1id); // page 1 moved to position 2
     const travelled = await page.evaluate(() => window.v2.getDoc().pages[1].annotations[0]?.text);
     expect(travelled).toBe('aku ikut'); // its annotation came along — no re-keying
+  });
+
+  test('File menu: Tambah appends, Buka Baru replaces (no refresh)', async ({ page }) => {
+    await openSheet(page);
+    await page.tap('#pm-close');
+
+    // Tambah File → merge (4 pages, 2 sources).
+    await page.tap('#btn-file');
+    await page.tap('#fm-add');
+    await page.setInputFiles('#file-input', FIXTURE);
+    await expect(page.locator('.pv-page')).toHaveCount(4);
+    expect(await page.evaluate(() => window.v2.getDoc().sources.length)).toBe(2);
+
+    // Buka Baru → fresh doc (2 pages, 1 source, empty undo).
+    await page.tap('#btn-file');
+    await page.tap('#fm-new');
+    await page.setInputFiles('#file-input', FIXTURE);
+    await expect(page.locator('.pv-page')).toHaveCount(2);
+    const state = await page.evaluate(() => ({
+      sources: window.v2.getDoc().sources.length,
+      undo: window.v2.history.undoStack.length,
+    }));
+    expect(state.sources).toBe(1);
+    expect(state.undo).toBe(0);
   });
 
   test('extract downloads the selected pages as a PDF', async ({ page }) => {

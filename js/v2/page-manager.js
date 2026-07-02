@@ -131,62 +131,134 @@ export function createPageManager(deps) {
     bulkBar.querySelector('[data-act="delete"]').disabled = n >= deps.getDoc().pages.length;
   }
 
-  // ---- tile interaction: tap = select, long-press (touch) / drag (mouse) = reorder
+  // ---- FLIP reorder: grab a REAL page and move it -----------------------------------
+  // The grabbed tile goes position:fixed and rides the finger 1:1; an invisible
+  // placeholder holds its slot; crossing another tile moves the placeholder and
+  // every displaced tile GLIDES to its new spot (FLIP: transform-only, GPU-
+  // composited — no per-frame layout beyond the one grid reflow on slot change).
+  const REDUCED_MOTION = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+  function flipTiles(mutate) {
+    const tiles = [...grid.querySelectorAll('.pm-tile:not(.pm-drag-ghost)')];
+    const before = new Map(tiles.map((t) => [t, t.getBoundingClientRect()]));
+    mutate();
+    if (REDUCED_MOTION) return;
+    for (const t of tiles) {
+      const a = before.get(t);
+      const b = t.getBoundingClientRect();
+      const dx = a.left - b.left;
+      const dy = a.top - b.top;
+      if (!dx && !dy) continue;
+      t.style.transition = 'none';
+      t.style.transform = `translate(${dx}px, ${dy}px)`;
+      requestAnimationFrame(() => {
+        t.style.transition = 'transform .22s cubic-bezier(.2,.8,.2,1)';
+        t.style.transform = '';
+        t.addEventListener('transitionend', () => { t.style.transition = ''; }, { once: true });
+      });
+    }
+  }
+
   function wireTile(tile, page) {
     let pressTimer = null;
     let start = null;
-    let dragging = false;
+    let drag = null; // { placeholder, rect, lastX, lastY, raf }
 
     tile.addEventListener('pointerdown', (e) => {
       if (e.target.closest('.pm-add')) return;
       start = { x: e.clientX, y: e.clientY, id: e.pointerId };
       if (e.pointerType === 'mouse') {
-        // Mouse: drag arms immediately on movement; click stays a click.
-        pressTimer = 0;
+        pressTimer = 0;           // mouse: drag arms on first movement
       } else {
-        // Touch: long-press arms the drag (instant drag would fight scroll).
-        pressTimer = setTimeout(() => { armDrag(e); }, LONG_PRESS_MS);
+        pressTimer = setTimeout(() => { armDrag(e); }, LONG_PRESS_MS); // touch: long-press
       }
     });
 
     function armDrag(e) {
-      dragging = true;
-      tile.classList.add('dragging');
-      tile.setPointerCapture(e.pointerId ?? start.id);
+      const rect = tile.getBoundingClientRect();
+      const placeholder = document.createElement('div');
+      placeholder.className = 'pm-tile pm-placeholder';
+      placeholder.style.height = rect.height + 'px';
+      grid.insertBefore(placeholder, tile);
+
+      // Lift the real tile out of the grid, exactly where it was.
+      tile.classList.add('pm-drag-ghost');
+      tile.style.position = 'fixed';
+      tile.style.left = rect.left + 'px';
+      tile.style.top = rect.top + 'px';
+      tile.style.width = rect.width + 'px';
+      tile.style.zIndex = '50';
+      tile.style.pointerEvents = 'none'; // elementFromPoint must see through it
+
+      drag = { placeholder, rect, lastX: e.clientX ?? start.x, lastY: e.clientY ?? start.y, raf: false };
+      // The pointer may be gone by the time the long-press timer fires.
+      try { tile.setPointerCapture(e.pointerId ?? start.id); } catch { /* keep dragging uncaptured */ }
       if (navigator.vibrate) navigator.vibrate(10);
     }
 
     tile.addEventListener('pointermove', (e) => {
       if (!start) return;
-      const moved = Math.hypot(e.clientX - start.x, e.clientY - start.y);
-      if (!dragging) {
+      if (!drag) {
+        const moved = Math.hypot(e.clientX - start.x, e.clientY - start.y);
         if (pressTimer === 0 && moved > DRAG_SLOP) armDrag(e);          // mouse
-        else if (moved > DRAG_SLOP) { clearTimeout(pressTimer); pressTimer = null; } // touch: became a scroll
+        else if (moved > DRAG_SLOP) { clearTimeout(pressTimer); pressTimer = null; } // touch → scroll
         return;
       }
       e.preventDefault();
-      // Live insertion hint: mark the tile currently under the pointer.
-      const over = document.elementFromPoint(e.clientX, e.clientY)?.closest('.pm-tile:not(.pm-add)');
-      for (const t of grid.querySelectorAll('.pm-tile.drop-hint')) t.classList.remove('drop-hint');
-      if (over && over !== tile) over.classList.add('drop-hint');
+      drag.lastX = e.clientX;
+      drag.lastY = e.clientY;
+      if (drag.raf) return;
+      drag.raf = true;
+      requestAnimationFrame(() => {
+        if (!drag) return;
+        drag.raf = false;
+        // The page rides the finger.
+        tile.style.transform =
+          `translate(${drag.lastX - start.x}px, ${drag.lastY - start.y}px) scale(1.04)`;
+        // Crossing a neighbor opens its slot: placeholder moves, tiles glide.
+        const over = document.elementFromPoint(drag.lastX, drag.lastY)
+          ?.closest('.pm-tile:not(.pm-add):not(.pm-placeholder)');
+        if (over) {
+          const r = over.getBoundingClientRect();
+          const after = drag.lastX > r.left + r.width / 2; // grid flows left→right
+          const target = after ? over.nextSibling : over;
+          if (target !== drag.placeholder) {
+            flipTiles(() => grid.insertBefore(drag.placeholder, target));
+          }
+        }
+      });
     });
 
     const end = (e) => {
       clearTimeout(pressTimer);
-      if (dragging) {
-        dragging = false;
-        tile.classList.remove('dragging');
-        const over = document.elementFromPoint(e.clientX, e.clientY)?.closest('.pm-tile:not(.pm-add)');
-        for (const t of grid.querySelectorAll('.pm-tile.drop-hint')) t.classList.remove('drop-hint');
-        if (over && over !== tile) {
+      if (drag) {
+        const d = drag;
+        drag = null;
+        // Settle the page into the open slot (fixed → slot rect)…
+        const slotRect = d.placeholder.getBoundingClientRect();
+        let settled = false;
+        const settle = () => {
+          if (settled) return;
+          settled = true;
+          // …then commit: the model index = placeholder's position in the grid.
+          const tiles = [...grid.querySelectorAll('.pm-tile:not(.pm-add):not(.pm-drag-ghost)')];
+          const toIndex = tiles.indexOf(d.placeholder);
           const doc = deps.getDoc();
-          const toIndex = doc.pages.findIndex((p) => p.id === over.dataset.pageId);
-          record(deps.history, doc);
-          reorderPage(doc, page.id, toIndex);
-          render();
-          deps.onDocChanged();
-        }
-      } else if (start && pressTimer !== null) {
+          const fromIndex = doc.pages.findIndex((p) => p.id === page.id);
+          if (toIndex !== -1 && toIndex !== fromIndex) {
+            record(deps.history, doc);
+            reorderPage(doc, page.id, toIndex);
+            deps.onDocChanged();
+          }
+          render(); // rebuild clears all inline drag styles
+        };
+        if (REDUCED_MOTION) { settle(); return; }
+        tile.style.transition = 'transform .18s cubic-bezier(.2,.8,.2,1)';
+        tile.style.transform =
+          `translate(${slotRect.left - d.rect.left}px, ${slotRect.top - d.rect.top}px)`;
+        tile.addEventListener('transitionend', settle, { once: true });
+        setTimeout(settle, 260); // safety: transitionend can be swallowed
+      } else if (start && pressTimer !== null && e.type === 'pointerup') {
         // It was a tap → toggle selection.
         if (selected.has(page.id)) selected.delete(page.id);
         else selected.add(page.id);
@@ -198,12 +270,7 @@ export function createPageManager(deps) {
       pressTimer = null;
     };
     tile.addEventListener('pointerup', end);
-    tile.addEventListener('pointercancel', () => {
-      clearTimeout(pressTimer);
-      dragging = false;
-      tile.classList.remove('dragging');
-      start = null; pressTimer = null;
-    });
+    tile.addEventListener('pointercancel', end);
   }
 
   // ---- bulk actions ---------------------------------------------------------------

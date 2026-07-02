@@ -33,7 +33,7 @@ import { createSignatureModal } from './signature-modal.js';
 window.pdfjsLib.GlobalWorkerOptions.workerSrc = '/js/vendor/pdf.worker.min.js';
 
 // ---- state (ONE doc, ONE history — everything else is DOM or derived) -------
-const doc = createDoc();
+let doc = createDoc(); // replaced wholesale by "Buka Baru" (File menu)
 const history = createHistory();
 let slots = [];
 let rasterizer = null;
@@ -187,6 +187,7 @@ function refreshChrome() {
   document.getElementById('btn-redo').disabled = !canRedo(history);
   document.getElementById('btn-download').disabled = doc.pages.length === 0;
   document.getElementById('btn-pages').disabled = doc.pages.length === 0;
+  document.getElementById('btn-file').disabled = doc.pages.length === 0;
   // Hapus stays enabled with pages: no selection = arms delete-mode.
   document.getElementById('btn-delete-anno').disabled = doc.pages.length === 0;
   syncFormatBar();
@@ -629,9 +630,49 @@ async function loadFiles(files) {
 
 const fileInput = document.getElementById('file-input');
 document.getElementById('btn-open').addEventListener('click', () => fileInput.click());
+
+// ---- File menu: add more files or start over WITHOUT a page refresh ----------------
+const fileMenu = document.getElementById('file-menu');
+const fileBtn = document.getElementById('btn-file');
+let pendingReplace = false; // next file selection replaces the doc instead of appending
+
+function toggleFileMenu(show) {
+  fileMenu.hidden = !show;
+  fileBtn.setAttribute('aria-expanded', String(show));
+}
+fileBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleFileMenu(fileMenu.hidden); });
+document.addEventListener('pointerdown', (e) => {
+  if (!fileMenu.hidden && !e.target.closest('.file-menu-wrap')) toggleFileMenu(false);
+});
+document.getElementById('fm-add').addEventListener('click', () => {
+  toggleFileMenu(false);
+  fileInput.click(); // appends → merge, the default loadFiles path
+});
+document.getElementById('fm-new').addEventListener('click', () => {
+  toggleFileMenu(false);
+  pendingReplace = true; // applied when the picker actually returns files
+  fileInput.click();
+});
+
+// Start over: a FRESH doc + history. The signature stays (it's the user's,
+// not the document's). Cancelling the picker leaves everything untouched.
+async function resetDoc() {
+  doc = createDoc();
+  history.undoStack.length = 0;
+  history.redoStack.length = 0;
+  if (rasterizer) { await rasterizer.destroy(); rasterizer = null; }
+  slots = [];
+  stage.innerHTML = '';
+  baseName = 'dokumen';
+  setTool('select');
+}
 fileInput.addEventListener('change', async (e) => {
   const files = e.target.files;
-  if (files?.length) await loadFiles(files).catch((err) => { console.error(err); toast('Gagal membuka file'); });
+  if (files?.length) {
+    if (pendingReplace) await resetDoc();
+    await loadFiles(files).catch((err) => { console.error(err); toast('Gagal membuka file'); });
+  }
+  pendingReplace = false; // picker cancelled → nothing was destroyed
   fileInput.value = '';
 });
 

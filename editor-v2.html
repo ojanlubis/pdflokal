@@ -43,6 +43,22 @@
     }
     .brand { font-weight: 700; font-size: 15px; }
     .brand .beta { font-size: 10px; color: var(--accent); vertical-align: super; font-weight: 600; }
+    .file-menu-wrap { position: relative; }
+    #btn-file { font-size: 13px; color: var(--muted); padding: 0 8px; }
+    #btn-file:disabled { opacity: .35; }
+    #file-menu[hidden] { display: none; } /* our display:flex would beat [hidden] */
+    #file-menu {
+      position: absolute; top: 38px; left: 0; z-index: 60; min-width: 210px;
+      background: var(--surface); border-radius: 12px; padding: 6px;
+      box-shadow: 0 6px 24px rgba(0,0,0,.16); border: 1px solid var(--line);
+      display: flex; flex-direction: column;
+    }
+    #file-menu button {
+      text-align: left; padding: 10px 12px; font-size: 13.5px; border-radius: 8px;
+      min-height: 44px;
+    }
+    #file-menu button:active { background: var(--bg); }
+    .fm-note { font-size: 10.5px; color: var(--muted); margin-left: 4px; }
     .spacer { flex: 1; }
     button {
       font: inherit; border: none; background: none; cursor: pointer; color: var(--ink);
@@ -210,8 +226,15 @@
       min-height: 44px;
     }
     .pm-tile.sel { border-color: var(--accent); }
-    .pm-tile.dragging { opacity: .55; transform: scale(.95); z-index: 10; }
-    .pm-tile.drop-hint { border-color: var(--accent); border-style: dashed; }
+    /* The lifted page (FLIP drag): reads as a physical sheet in your hand. */
+    .pm-drag-ghost {
+      box-shadow: 0 10px 28px rgba(0,0,0,.28), 0 2px 8px rgba(0,0,0,.18);
+      opacity: .95; cursor: grabbing;
+    }
+    .pm-placeholder {
+      border-style: dashed; border-color: var(--accent);
+      background: rgba(79,142,247,.06);
+    }
     .pm-thumb { width: 100%; background-size: cover; background-position: top center; background-color: #fafafa; }
     .pm-num {
       position: absolute; left: 4px; bottom: 4px;
@@ -292,6 +315,13 @@
 <body>
   <header>
     <span class="brand">PDFLokal <span class="beta">v2 beta</span></span>
+    <div class="file-menu-wrap">
+      <button id="btn-file" disabled aria-haspopup="menu" aria-expanded="false">File ▾</button>
+      <div id="file-menu" role="menu" hidden>
+        <button role="menuitem" id="fm-add">➕ Tambah File (gabung)</button>
+        <button role="menuitem" id="fm-new">📄 Buka Baru <span class="fm-note">ganti semua</span></button>
+      </div>
+    </div>
     <span class="spacer"></span>
     <button class="icon-btn" id="btn-undo" disabled aria-label="Urungkan" title="Urungkan (Ctrl+Z)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
