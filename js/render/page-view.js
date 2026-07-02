@@ -140,7 +140,7 @@ export function renderAnnotationEl(anno) {
   } else if (anno.type === 'whiteout') {
     el.style.width = (anno.width || 0) + 'px';
     el.style.height = (anno.height || 0) + 'px';
-    el.style.background = '#fff';
+    el.style.background = anno.color || '#fff';
   } else if (anno.type === 'signature' && anno.image) {
     const im = document.createElement('img');
     im.src = anno.image;
@@ -194,7 +194,8 @@ export function decorateSelected(el, anno) {
   el.classList.add('pv-selected');
   el.style.outline = '1.5px solid #4f8ef7';
   el.style.outlineOffset = '2px';
-  const resizable = anno.type === 'whiteout' || anno.type === 'signature';
+  // Text is resizable too: dragging its handle scales fontSize (founder ask).
+  const resizable = anno.type === 'whiteout' || anno.type === 'signature' || anno.type === 'text';
   if (!resizable) return;
   const h = document.createElement('div');
   h.className = 'pv-handle';

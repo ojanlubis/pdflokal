@@ -183,7 +183,10 @@ const TEXT_LINE_HEIGHT = 1.2; // must match page-view.js CSS line-height
 
 function drawWhiteout(pdfPage, anno, frame, env) {
   const r = whiteoutCornerAndDims(frame.rotation, anno, frame.wU, frame.hU);
-  pdfPage.drawRectangle({ x: r.x, y: r.y, width: r.width, height: r.height, color: env.PDFLib.rgb(1, 1, 1) });
+  // Color-matched Tip-Ex: anno.color is sampled from the page background at
+  // draw time (app layer). White stays the default for plain documents.
+  const color = anno.color ? parseHexColor(env.PDFLib, anno.color) : env.PDFLib.rgb(1, 1, 1);
+  pdfPage.drawRectangle({ x: r.x, y: r.y, width: r.width, height: r.height, color });
 }
 
 async function drawText(pdfPage, anno, frame, env) {

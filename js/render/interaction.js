@@ -18,7 +18,7 @@
  * in place; structural re-syncs happen on gesture end via onChange.
  */
 
-import { selectAnnotation, clearSelection, moveAnnotation, resizeAnnotation } from '../core/operations.js';
+import { selectAnnotation, clearSelection, moveAnnotation, resizeAnnotation, updateAnnotation } from '../core/operations.js';
 import { record } from '../core/history.js';
 import { decorateSelected, undecorateSelected } from './page-view.js';
 
@@ -98,13 +98,16 @@ export function createInteraction(ctx) {
 
   function startResize(e, annoEl, page, anno) {
     const zoom = ctx.getZoom();
-    // Signatures resize aspect-locked (image); whiteouts resize freely.
+    // Signatures resize aspect-locked (image); whiteouts resize freely; text
+    // resizes by SCALING fontSize (same handle gesture as TTD — founder ask).
     const aspect = anno.type === 'signature' && anno.width && anno.height
       ? anno.width / anno.height : null;
     gesture = {
       kind: 'resize', pointerId: e.pointerId, annoEl, page, anno, zoom, aspect,
       startX: e.clientX, startY: e.clientY,
       baseW: anno.width || 0, baseH: anno.height || 0,
+      baseFontSize: anno.fontSize || 24,
+      baseElW: annoEl.offsetWidth || 1, // layout px, unaffected by transform
       moved: false,
     };
     annoEl.setPointerCapture(e.pointerId);
@@ -154,6 +157,13 @@ export function createInteraction(ctx) {
       const anno = page.annotations.find((a) => a.id === annoEl.dataset.annoId);
       if (anno) {
         e.preventDefault();                 // annotation hit: block scroll, we drag
+
+        // Delete tool armed: tapping an object removes it (founder ask — the
+        // reverse order of "select then Hapus" must also work).
+        if (tool === 'delete') {
+          ctx.onDeleteTap?.(anno.id, page.id);
+          return;
+        }
 
         // Double-tap on text → edit (works for touch AND mouse double-click).
         const now = Date.now();
@@ -215,14 +225,22 @@ export function createInteraction(ctx) {
         if (ctx.history) record(ctx.history, doc);
       }
       if (!gesture.moved) return;
-      const w = gesture.baseW + dx;
-      const h = gesture.aspect ? w / gesture.aspect : gesture.baseH + dy;
-      const a = resizeAnnotation(doc, gesture.anno.id, { width: w, height: h });
-      if (a) {
-        gesture.annoEl.style.width = a.width + 'px';
-        if (gesture.anno.type === 'whiteout') gesture.annoEl.style.height = a.height + 'px';
-        const img = gesture.annoEl.querySelector('img');
-        if (img) img.style.width = a.width + 'px';
+      if (gesture.anno.type === 'text') {
+        // Text resize = fontSize scaling (no width/height on text annos).
+        const factor = Math.max(0.2, (gesture.baseElW + dx) / gesture.baseElW);
+        const fontSize = Math.min(120, Math.max(6, Math.round(gesture.baseFontSize * factor)));
+        updateAnnotation(doc, gesture.anno.id, { fontSize });
+        gesture.annoEl.style.fontSize = fontSize + 'px'; // longhand beats the shorthand
+      } else {
+        const w = gesture.baseW + dx;
+        const h = gesture.aspect ? w / gesture.aspect : gesture.baseH + dy;
+        const a = resizeAnnotation(doc, gesture.anno.id, { width: w, height: h });
+        if (a) {
+          gesture.annoEl.style.width = a.width + 'px';
+          if (gesture.anno.type === 'whiteout') gesture.annoEl.style.height = a.height + 'px';
+          const img = gesture.annoEl.querySelector('img');
+          if (img) img.style.width = a.width + 'px';
+        }
       }
     } else if (gesture.kind === 'draw') {
       // Whiteout draw: create lazily on first movement (a stray tap draws nothing).
