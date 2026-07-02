@@ -189,6 +189,57 @@
     .btn-ghost { color: var(--muted); padding: 0 14px; }
     .btn-primary { background: var(--accent); color: #fff; font-weight: 600; padding: 0 16px; border-radius: 8px; min-height: 40px; }
 
+    /* ---- page manager sheet ---- */
+    .pm-sheet-body { max-width: 560px; max-height: 86vh; display: flex; flex-direction: column; }
+    .pm-head { display: flex; align-items: center; gap: 10px; }
+    .pm-head h2 { flex: 0 0 auto; }
+    .pm-hint { flex: 1; font-size: 10.5px; color: var(--muted); line-height: 1.3; }
+    .pm-grid {
+      flex: 1; overflow-y: auto; overscroll-behavior: contain;
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+      gap: 10px; padding: 4px 2px 8px;
+    }
+    .pm-tile {
+      position: relative; border-radius: 10px; border: 2px solid var(--line);
+      overflow: hidden; cursor: pointer; touch-action: pan-y; background: #fff;
+      min-height: 44px;
+    }
+    .pm-tile.sel { border-color: var(--accent); }
+    .pm-tile.dragging { opacity: .55; transform: scale(.95); z-index: 10; }
+    .pm-tile.drop-hint { border-color: var(--accent); border-style: dashed; }
+    .pm-thumb { width: 100%; background-size: cover; background-position: top center; background-color: #fafafa; }
+    .pm-num {
+      position: absolute; left: 4px; bottom: 4px;
+      background: rgba(26,29,33,.72); color: #fff; font-size: 10px; font-weight: 600;
+      padding: 1px 6px; border-radius: 6px; pointer-events: none;
+    }
+    .pm-check {
+      position: absolute; top: 4px; right: 4px; width: 22px; height: 22px;
+      display: none; align-items: center; justify-content: center;
+      background: var(--accent); color: #fff; font-size: 12px; border-radius: 50%;
+      pointer-events: none;
+    }
+    .pm-tile.sel .pm-check { display: flex; }
+    .pm-add {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 2px; color: var(--muted); font-size: 11px; border-style: dashed;
+      background: var(--bg); min-height: 110px; font-family: inherit;
+    }
+    .pm-add span { font-size: 22px; line-height: 1; }
+    .pm-bulk {
+      display: none; align-items: center; gap: 6px; padding-top: 10px;
+      border-top: 1px solid var(--line); flex-wrap: wrap;
+    }
+    .pm-bulk.show { display: flex; }
+    .pm-count { font-size: 12.5px; color: var(--muted); flex: 1; }
+    .pm-bulk button {
+      min-height: 38px; padding: 0 13px; border-radius: 8px;
+      border: 1px solid var(--line); background: var(--bg); font-size: 13px;
+    }
+    .pm-bulk button.danger { color: #d33131; border-color: rgba(211,49,49,.35); }
+    .pm-bulk button:disabled { opacity: .35; }
+    .pm-bulk .btn-ghost { border: none; background: none; }
+
     #toast {
       position: fixed; left: 50%; transform: translateX(-50%); bottom: 130px; z-index: 40;
       background: rgba(26,29,33,.9); color: #fff; font-size: 13px;
@@ -207,6 +258,9 @@
     </button>
     <button class="icon-btn" id="btn-redo" disabled aria-label="Ulangi" title="Ulangi (Ctrl+Y)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></svg>
+    </button>
+    <button class="icon-btn" id="btn-pages" disabled aria-label="Kelola halaman" title="Kelola halaman">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
     </button>
     <button id="btn-download" disabled>Unduh</button>
   </header>
@@ -252,6 +306,24 @@
     <button id="z-out" aria-label="Perkecil">−</button>
   </div>
   <div id="toast" role="status" aria-live="polite"></div>
+
+  <dialog id="pm-sheet" aria-label="Kelola halaman">
+    <div class="sheet pm-sheet-body">
+      <div class="pm-head">
+        <h2>Kelola Halaman</h2>
+        <span class="pm-hint">Ketuk untuk memilih · tahan lalu geser untuk mengurutkan</span>
+        <button class="btn-ghost" id="pm-close" aria-label="Tutup">✕</button>
+      </div>
+      <div id="pm-grid" class="pm-grid"></div>
+      <div id="pm-bulk" class="pm-bulk">
+        <span class="pm-count"></span>
+        <button data-act="rotate">Putar</button>
+        <button data-act="extract">Ekstrak</button>
+        <button data-act="delete" class="danger">Hapus</button>
+        <button data-act="clear" class="btn-ghost">Batal</button>
+      </div>
+    </div>
+  </dialog>
 
   <dialog id="sig-modal" aria-label="Buat tanda tangan">
     <div class="sheet">

@@ -26,6 +26,7 @@ import { createPageSlot, syncOverlay, textFontCss } from '../render/page-view.js
 import { createViewportStream } from '../render/viewport.js';
 import { createInteraction } from '../render/interaction.js';
 import { createFormatBar } from './format-bar.js';
+import { createPageManager } from './page-manager.js';
 
 window.pdfjsLib.GlobalWorkerOptions.workerSrc = '/js/vendor/pdf.worker.min.js';
 
@@ -121,6 +122,7 @@ function refreshChrome() {
   document.getElementById('btn-undo').disabled = !canUndo(history);
   document.getElementById('btn-redo').disabled = !canRedo(history);
   document.getElementById('btn-download').disabled = doc.pages.length === 0;
+  document.getElementById('btn-pages').disabled = doc.pages.length === 0;
   document.getElementById('btn-delete-anno').disabled = !doc.selection.annotationId;
   syncFormatBar();
 }
@@ -230,6 +232,35 @@ const interaction = createInteraction({
     }
   },
 });
+
+// ---- page manager (Halaman sheet) -----------------------------------------------
+const pageManager = createPageManager({
+  sheet: document.getElementById('pm-sheet'),
+  grid: document.getElementById('pm-grid'),
+  bulkBar: document.getElementById('pm-bulk'),
+  getDoc: () => doc,
+  history,
+  getRasterizer: () => rasterizer,
+  onDocChanged: rebuildStage,
+  onAddFiles: () => document.getElementById('file-input').click(),
+  onExtract: async (pages) => {
+    // Export ONLY the selected pages: a shallow Doc sharing the same sources.
+    try {
+      toast('Menyiapkan PDF…');
+      const { buildPdfBytes } = await import('../core/export.js');
+      const subset = { sources: doc.sources, pages, selection: { pageId: null, annotationId: null } };
+      const bytes = await buildPdfBytes(subset, { PDFLib: window.PDFLib, fontkit: window.fontkit });
+      download(new Blob([bytes], { type: 'application/pdf' }), `${baseName}-halaman-${pages.length}.pdf`);
+      toast(`${pages.length} halaman diekstrak ✓`);
+    } catch (err) {
+      console.error(err);
+      toast('Gagal mengekstrak — coba lagi ya');
+    }
+  },
+  toast,
+});
+document.getElementById('btn-pages').addEventListener('click', () => pageManager.open());
+document.getElementById('pm-close').addEventListener('click', () => pageManager.close());
 
 // ---- inline text editing ------------------------------------------------------------
 // One code path for "place new text" and "edit existing text": a contenteditable
@@ -383,6 +414,8 @@ async function loadFiles(files) {
   }
   rebuildStage();
   if (!firstLoad) toast(`${pdfs.length} file ditambahkan`);
+  // If the Halaman sheet triggered this add, refresh its grid in place.
+  if (document.getElementById('pm-sheet').open) pageManager.render();
 }
 
 const fileInput = document.getElementById('file-input');

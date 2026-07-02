@@ -94,10 +94,14 @@ export function moveAnnotation(doc, annotationId, dx, dy) {
   const found = findAnnotation(doc, annotationId);
   if (!found) return null;
   const { page, annotation } = found;
+  // Annotations live in the ROTATED view frame — the clamp box swaps at 90/270.
+  const rotated = (page.rotation || 0) % 180 !== 0;
+  const frameW = rotated ? page.height : page.width;
+  const frameH = rotated ? page.width : page.height;
   const w = annotation.width || 0;
   const h = annotation.height || 0;
-  annotation.x = clamp((annotation.x || 0) + dx, 0, Math.max(0, page.width - w));
-  annotation.y = clamp((annotation.y || 0) + dy, 0, Math.max(0, page.height - h));
+  annotation.x = clamp((annotation.x || 0) + dx, 0, Math.max(0, frameW - w));
+  annotation.y = clamp((annotation.y || 0) + dy, 0, Math.max(0, frameH - h));
   return annotation;
 }
 

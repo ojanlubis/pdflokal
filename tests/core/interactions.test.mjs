@@ -53,6 +53,15 @@ test('resizeAnnotation can set bounds (x, y, width, height) atomically', () => {
   assert.deepEqual({ x: anno.x, y: anno.y, width: anno.width, height: anno.height }, { x: 20, y: 30, width: 100, height: 40 });
 });
 
+test('moveAnnotation clamps against the ROTATED frame on 90/270 pages', () => {
+  const doc = docWithPage(); // 600 x 800
+  const anno = addAnnotation(doc, doc.pages[0].id, createAnnotation('whiteout', { x: 0, y: 0, width: 50, height: 20 }));
+  doc.pages[0].rotation = 90; // view frame becomes 800 x 600
+  moveAnnotation(doc, anno.id, 5000, 5000);
+  assert.equal(anno.x, 750, 'clamps to rotated width (800) - anno width');
+  assert.equal(anno.y, 580, 'clamps to rotated height (600) - anno height');
+});
+
 test('move/resize on unknown id are safe no-ops returning null', () => {
   const doc = docWithPage();
   assert.equal(moveAnnotation(doc, 'anno_nope', 1, 1), null);

@@ -23,14 +23,19 @@ export async function importPdf(doc, { name, bytes }) {
   const pages = [];
   for (let n = 1; n <= pdf.numPages; n += 1) {
     const pdfPage = await pdf.getPage(n);
-    const vp = pdfPage.getViewport({ scale: 1 }); // intrinsic, unrotated size
-    pages.push(createPage({
+    const vp = pdfPage.getViewport({ scale: 1 }); // honors the PDF's intrinsic /Rotate
+    const page = createPage({
       source,
       sourcePageNum: n - 1,
       width: vp.width,
       height: vp.height,
       rotation: 0,
-    }));
+    });
+    // WHY: scanned/landscape PDFs carry an intrinsic /Rotate. PDF.js's explicit
+    // `rotation:` param OVERRIDES it (not additive), so rasterize must pass
+    // intrinsic + user rotation or pre-rotated documents render sideways.
+    page.baseRotation = pdfPage.rotate || 0;
+    pages.push(page);
   }
   addPages(doc, pages);
   await pdf.destroy();
@@ -64,17 +69,32 @@ export function createPageRasterizer(doc) {
     return docCache.get(sourceId);
   }
 
+  async function renderToCanvas(page, scale) {
+    const pdf = await getPdf(page.sourceId);
+    const pdfPage = await pdf.getPage(page.sourcePageNum + 1);
+    // Intrinsic /Rotate + the user's rotation (PDF.js `rotation:` is absolute).
+    const rotation = ((page.baseRotation || 0) + (page.rotation || 0)) % 360;
+    const vp = pdfPage.getViewport({ scale, rotation });
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.ceil(vp.width);
+    canvas.height = Math.ceil(vp.height);
+    await pdfPage.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+    return canvas;
+  }
+
   return {
     async rasterize(page, { scale = 2 } = {}) {
-      const pdf = await getPdf(page.sourceId);
-      const pdfPage = await pdf.getPage(page.sourcePageNum + 1);
-      const vp = pdfPage.getViewport({ scale, rotation: page.rotation });
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.ceil(vp.width);
-      canvas.height = Math.ceil(vp.height);
-      await pdfPage.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+      const canvas = await renderToCanvas(page, scale);
       page.raster = { dataUrl: canvas.toDataURL('image/png'), width: canvas.width, height: canvas.height, scale };
       return page.raster;
+    },
+    // Small render for page-manager tiles. Does NOT touch page.raster (the main
+    // view's streaming state) — callers cache the result themselves by page.id.
+    async rasterizeThumb(page, { width = 150 } = {}) {
+      const rotated = (page.rotation || 0) % 180 !== 0;
+      const pageW = rotated ? page.height : page.width;
+      const canvas = await renderToCanvas(page, width / pageW);
+      return { dataUrl: canvas.toDataURL('image/png'), width: canvas.width, height: canvas.height };
     },
     async destroy() {
       for (const p of docCache.values()) { try { (await p).destroy(); } catch { /* already gone */ } }

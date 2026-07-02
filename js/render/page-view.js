@@ -25,8 +25,13 @@ export function renderPageView(page, opts = {}) {
   const view = document.createElement('div');
   view.className = 'pv-page';
   view.dataset.pageId = page.id;
+  // Displayed size swaps for 90/270 — the raster is rendered pre-rotated, so
+  // the view (and every annotation coordinate) lives in the ROTATED frame.
+  const rotated = (page.rotation || 0) % 180 !== 0;
+  const w = rotated ? page.height : page.width;
+  const h = rotated ? page.width : page.height;
   view.style.cssText =
-    `position:relative;flex:0 0 auto;width:${page.width}px;height:${page.height}px;` +
+    `position:relative;flex:0 0 auto;width:${w}px;height:${h}px;` +
     'background:#fff;box-shadow:0 2px 14px rgba(0,0,0,.14);border-radius:2px';
 
   // Intentional placeholder text (e.g. "Hal 42") so a flung-past page reads as
