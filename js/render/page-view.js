@@ -119,12 +119,10 @@ export function renderAnnotationEl(anno) {
   el.className = 'pv-anno pv-anno-' + anno.type;
   el.dataset.annoId = anno.id;
   el.style.cssText = `position:absolute;left:${anno.x || 0}px;top:${anno.y || 0}px`;
-  // WHY: on touch, preventDefault in pointerdown does NOT stop the browser
-  // hijacking the gesture for scroll — only touch-action does. Without this,
-  // dragging an annotation on a phone scrolls the page instead (old bug class).
-  if (anno.type === 'text' || anno.type === 'whiteout' || anno.type === 'signature') {
-    el.style.touchAction = 'none';
-  }
+  // NOTE: no touch-action here on purpose. An UNSELECTED annotation must let
+  // the browser take the gesture as camera (scroll) — selection commits at
+  // release (interaction.js tap-candidate). decorateSelected() sets
+  // touch-action:none so the SELECTED object drags instead of scrolling.
 
   if (anno.type === 'text') {
     el.textContent = anno.text || '';
@@ -194,6 +192,9 @@ export function decorateSelected(el, anno) {
   el.classList.add('pv-selected');
   el.style.outline = '1.5px solid #4f8ef7';
   el.style.outlineOffset = '2px';
+  // Selected = grabbable: the browser must NOT take a drag on it as scroll.
+  // (touch-action must be set BEFORE the gesture starts — this is that moment.)
+  el.style.touchAction = 'none';
   // Text is resizable too: dragging its handle scales fontSize (founder ask).
   const resizable = anno.type === 'whiteout' || anno.type === 'signature' || anno.type === 'text';
   if (!resizable) return;
@@ -216,6 +217,7 @@ export function undecorateSelected(el) {
   el.style.outline = '';
   el.style.outlineOffset = '';
   el.style.zIndex = '1';
+  el.style.touchAction = ''; // back to camera-first (see decorateSelected)
   el.querySelector('.pv-handle')?.remove();
 }
 
