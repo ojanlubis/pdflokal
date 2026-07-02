@@ -27,10 +27,10 @@ test.describe('growth loop — mobile', () => {
     await openDoc(page);
     await downloadOnce(page);
     // Confetti canvas exists briefly (fixed, pointer-events none), then self-removes.
-    await expect(page.locator('canvas[style*="pointer-events"]').last()).toBeAttached();
+    await expect(page.locator('.v2-burst')).toBeAttached();
     // The card arrives after the sheet closes.
     await expect(page.locator('#support-card')).toBeVisible({ timeout: 4000 });
-    await expect(page.locator('.sc-head')).toContainText('Berkas kamu jadi');
+    await expect(page.locator('.sc-head')).toContainText('filemu udah jadi');
 
     // Dismiss, download again: same session → no second ask.
     await page.tap('#sc-close');
