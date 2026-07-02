@@ -12,7 +12,7 @@ const FIXTURE = path.join(__dirname, '..', 'fixtures', 'sample-2pages.pdf');
 
 test.describe('landing — mobile', () => {
   test('shows landing content, hides editor chrome until a file loads', async ({ page }) => {
-    await page.goto('/editor-v2.html');
+    await page.goto('/');
     await expect(page.locator('.ld h1')).toContainText('Urus PDF langsung');
     await expect(page.locator('#toolbar')).toBeHidden();
     await expect(page.locator('.ld-card')).toHaveCount(14);
@@ -25,7 +25,7 @@ test.describe('landing — mobile', () => {
   });
 
   test('"Lihat semua alat" expands the full vocabulary', async ({ page }) => {
-    await page.goto('/editor-v2.html');
+    await page.goto('/');
     await page.tap('#ld-lihat');
     await expect(page.locator('#ld-more')).toBeVisible();
     await expect(page.locator('.ld-card', { hasText: 'Hapus Background' })).toBeVisible();
@@ -35,7 +35,7 @@ test.describe('landing — mobile', () => {
   });
 
   test('Tanda Tangan card boots the signature flow after the file loads', async ({ page }) => {
-    await page.goto('/editor-v2.html');
+    await page.goto('/');
     const chooser = page.waitForEvent('filechooser');
     await page.tap('.ld-card[data-intent="ttd"]');
     await (await chooser).setFiles(FIXTURE);
@@ -47,7 +47,7 @@ test.describe('landing — mobile', () => {
   test('?buat=kompres pre-configures the Unduh sheet (intent hook for SEO pages)', async ({ page }) => {
     // extensionless on purpose: the dev server's cleanUrls redirect on
     // .html URLs strips query strings (Vercel prod serves .html directly)
-    await page.goto('/editor-v2?buat=kompres');
+    await page.goto('/?buat=kompres');
     await page.setInputFiles('#file-input', FIXTURE);
     await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
     await expect(page.locator('#dl-sheet')).toBeVisible();
@@ -55,7 +55,7 @@ test.describe('landing — mobile', () => {
   });
 
   test('Kelola Halaman card opens the sheet ready for splitting', async ({ page }) => {
-    await page.goto('/editor-v2.html');
+    await page.goto('/');
     await page.tap('#ld-lihat'); // Split lives behind the accordion
     const chooser = page.waitForEvent('filechooser');
     await page.tap('.ld-card[data-intent="split"]');

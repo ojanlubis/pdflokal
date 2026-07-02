@@ -66,7 +66,7 @@ function makeHalfRedHalfBluePng() {
 
 test.describe('core image import', () => {
   test('importImage: one isFromImage page at pixel dims; rasterize produces matching pixels', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await page.waitForFunction(() => !!window.pdfjsLib);
 
     const r = await page.evaluate(`(async () => {
@@ -123,7 +123,7 @@ test.describe('core image import', () => {
   });
 
   test('importImage → buildPdfBytes: image becomes a full-bleed page in the output PDF', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await page.waitForFunction(() => !!window.pdfjsLib && !!window.PDFLib);
 
     const r = await page.evaluate(`(async () => {
@@ -159,7 +159,7 @@ test.describe('core image import', () => {
   });
 
   test('importImage with rotation:90: rasterize and export honor the rotated frame', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await page.waitForFunction(() => !!window.pdfjsLib && !!window.PDFLib);
 
     const r = await page.evaluate(`(async () => {
@@ -215,7 +215,7 @@ test.describe('core image import', () => {
   });
 
   test('importImage transcodes non-PNG/JPEG (WEBP) to PNG bytes so export can embed it', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await page.waitForFunction(() => !!window.pdfjsLib && !!window.PDFLib);
 
     const r = await page.evaluate(`(async () => {

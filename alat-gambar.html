@@ -1,0 +1,1716 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+
+  <!-- CRITICAL: Prevent flash of wrong theme -->
+  <script>
+    (function() {
+      const theme = localStorage.getItem('pdflokal_theme') || 'light';
+      document.documentElement.dataset.theme = theme;
+    })();
+  </script>
+
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=AW-17538923405"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    // WHY hostname allowlist: gtag has no automatic environment detection. Without
+    // this guard, every `npx serve` session, every Playwright test run, and every
+    // Vercel preview deploy pollutes the production GA4 property. Verified on
+    // Jun 9 2026: 1,086 of 1,621 weekly GA4 page_views came from http://localhost/
+    // (67% phantom data, mostly Playwright headless --isolated browser contexts).
+    // Vercel Analytics doesn't have this problem because its script (/_vercel/insights/
+    // script.js) only resolves on Vercel deployments; on localhost the script 404s.
+    // Allowlist > blocklist so a new dev hostname can never silently leak.
+    if (location.hostname === 'pdflokal.id' || location.hostname === 'www.pdflokal.id') {
+      gtag('config', 'AW-17538923405');
+      gtag('config', 'G-0XJY0WLCZ1');
+    }
+  </script>
+
+  <!-- SEO Meta Tags -->
+  <title>PDFLokal - Gabung PDF, Kompres, Edit | Gratis & Cepat</title>
+  <meta name="description"
+    content="Tool PDF & gambar gratis. Gabung, pisah, kompres, edit PDF langsung di browser. File tidak pernah diupload. Cepat & aman.">
+  <meta name="keywords"
+    content="gabung pdf, merge pdf, kompres pdf, edit pdf, kompres gambar, convert pdf, gratis, indonesia, tanpa upload">
+
+  <!-- Canonical URL -->
+  <meta name="robots" content="noindex, follow">
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="PDFLokal - PDF Tools Gratis & Cepat">
+  <meta property="og:description" content="Urus dokumen langsung di browser. Gratis, cepat, aman.">
+  <meta property="og:image" content="https://www.pdflokal.id/images/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:url" content="https://www.pdflokal.id/">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="id_ID">
+  <meta property="og:site_name" content="PDFLokal">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="PDFLokal - PDF Tools Gratis & Cepat">
+  <meta name="twitter:description" content="Urus dokumen langsung di browser. Gratis, cepat, aman.">
+  <meta name="twitter:image" content="https://www.pdflokal.id/images/og-image.png">
+
+  <!-- Schema Markup -->
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "PDFLokal",
+  "url": "https://www.pdflokal.id/",
+  "logo": {
+    "@type": "ImageObject",
+    "url": "https://www.pdflokal.id/images/logo.png",
+    "width": 512,
+    "height": 512,
+    "caption": "PDFLokal Logo"
+  }, 
+  "description": "Aplikasi PDF gratis buatan Indonesia. Kompres, edit, gabung, dan tanda tangan PDF langsung di browser. Aman, file tidak di-upload ke server (offline processing).",
+  "applicationCategory": "UtilitiesApplication",
+  "operatingSystem": "All modern web browsers (Chrome, Firefox, Safari, Edge)",
+  "browserRequirements": "Requires JavaScript",
+  "softwareVersion": "1.0",
+  "inLanguage": "id-ID",
+  "isAccessibleForFree": true,
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "IDR",
+    "description": "Gratis selamanya tanpa batasan harian"
+  },
+  "featureList": [
+  "Gabung/Merge PDF",
+  "Editor PDF Browser-based",
+  "PDF ke Gambar (JPG/PNG)",
+  "Kompres PDF",
+  "Proteksi PDF (Password)",
+  "Watermark PDF",
+  "Nomor Halaman PDF",
+  "Tanda Tangan Digital",
+  "Kompres Gambar",
+  "Ubah Ukuran Gambar",
+  "Convert Format Gambar",
+  "Gambar ke PDF",
+  "Hapus Latar Belakang Gambar"
+],
+  "author": {
+    "@type": "Organization",
+    "name": "PDFLokal Indonesia",
+    "url": "https://www.pdflokal.id/"
+  },
+  "screenshot": "https://www.pdflokal.id/images/screenshot-preview.jpg"
+}
+</script>
+
+
+
+  <!-- Mobile -->
+  <meta name="theme-color" content="#ffffff">
+
+  <!-- Fonts (self-hosted in style.css via @font-face) -->
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="style.css?v=5">
+
+  <!-- Favicon -->
+  <link rel="icon" href="/images/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/images/apple-touch-icon.png">
+
+  <!-- Vercel Web Analytics -->
+  <script>
+    window.va = window.va || function () { if (!window.vaq) window.vaq = []; window.vaq.push(arguments); };
+  </script>
+  <script defer src="/_vercel/insights/script.js"></script>
+</head>
+
+<body>
+  <!-- Header -->
+  <header class="header">
+    <div class="container header-inner">
+      <a href="index.html" class="logo">
+        <div class="logo-icon">P</div>
+        <span>PDFLokal</span>
+      </a>
+      <div class="header-actions">
+        <label class="theme-toggle" for="theme-toggle-checkbox" aria-label="Ganti tema" title="Ganti tema">
+          <input type="checkbox" id="theme-toggle-checkbox" class="theme-toggle-checkbox" />
+          <div class="theme-toggle-slider">
+            <svg class="theme-toggle-icon theme-toggle-icon-sun" width="14" height="14" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="5" />
+              <line x1="12" y1="1" x2="12" y2="3" />
+              <line x1="12" y1="21" x2="12" y2="23" />
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+              <line x1="1" y1="12" x2="3" y2="12" />
+              <line x1="21" y1="12" x2="23" y2="12" />
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+            </svg>
+            <svg class="theme-toggle-icon theme-toggle-icon-moon" width="14" height="14" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+            </svg>
+            <div class="theme-toggle-thumb"></div>
+          </div>
+        </label>
+        <a href="dukung.html" class="btn btn-primary">
+          ☕ <span class="btn-text">Dukung Kami</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="container">
+
+    <!-- Home View -->
+    <div id="home-view">
+      <!-- Hero -->
+      <section class="hero">
+        <h1>Urus dokumen langsung di browser</h1>
+        <p>Cepat, gratis, secure</p>
+        <p class="hero-hint">Tambahkan tanda tangan, edit, merge — semua offline</p>
+      </section>
+
+      <!-- Drop Zone -->
+      <div class="dropzone-container">
+        <button class="dropzone" id="main-dropzone" type="button" aria-label="Upload file PDF atau gambar">
+          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="17 8 12 3 7 8" />
+            <line x1="12" y1="3" x2="12" y2="15" />
+          </svg>
+          <h3>Seret file ke sini atau klik untuk pilih</h3>
+          <p>PDF atau Gambar</p>
+          <input type="file" id="file-input" multiple accept=".pdf,image/*,application/pdf">
+        </button>
+      </div>
+      <!-- WHY: Inline script so dropzone is clickable BEFORE ES modules load.
+           Module scripts are deferred — initDropZone() only runs after all static imports
+           resolve. This inline handler works immediately on render. The file picker dialog
+           gives modules time to load before the user selects a file. -->
+      <script>
+        (function() {
+          var dz = document.getElementById('main-dropzone');
+          var fi = document.getElementById('file-input');
+          dz.addEventListener('click', function() { fi.click(); });
+          dz.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fi.click(); }
+          });
+        })();
+      </script>
+
+      <!-- Privacy Badge -->
+      <div class="privacy-badge">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+          stroke-linejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+        </svg>
+        <p>File tidak pernah meninggalkan perangkat kamu</p>
+      </div>
+
+      <!-- Tools Section -->
+      <section class="tools-section">
+        <!-- Main Tools Row: PDF and Image side by side -->
+        <div class="tools-row">
+          <!-- PDF Tools -->
+          <div class="tools-category">
+            <h2>PDF</h2>
+            <div class="tools-grid">
+              <div class="tool-card" data-tool="unified-editor" style="border: 2px solid var(--accent-primary);">
+                <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                  <path d="M16 13H8" />
+                  <path d="M16 17H8" />
+                  <path d="M10 9H8" />
+                </svg>
+                <h3>Editor PDF</h3>
+                <p>edit, merge, kelola</p>
+              </div>
+              <div class="tool-card" data-tool="merge-pdf">
+                <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3" />
+                  <path d="M16 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3" />
+                  <path d="M12 3v18" />
+                  <path d="M4 12h5" />
+                  <path d="M7 9l3 3-3 3" />
+                  <path d="M20 12h-5" />
+                  <path d="M17 9l-3 3 3 3" />
+                </svg>
+                <h3>Merge PDF</h3>
+                <p>Gabungkan PDF dan gambar</p>
+              </div>
+              <div class="tool-card" data-tool="split-pdf">
+                <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3" />
+                  <path d="M16 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3" />
+                  <path d="M12 3v18" />
+                  <path d="M9 12H4" />
+                  <path d="M6 9l-3 3 3 3" />
+                  <path d="M15 12h5" />
+                  <path d="M18 9l3 3-3 3" />
+                </svg>
+                <h3>Split PDF</h3>
+                <p>Pisahkan PDF dan gambar</p>
+              </div>
+              <div class="tool-card" data-tool="pdf-to-img">
+                <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <polyline points="21 15 16 10 5 21" />
+                </svg>
+                <h3>PDF ke Gambar</h3>
+              </div>
+              <div class="tool-card" data-tool="compress-pdf">
+                <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 3v12" />
+                  <path d="m8 11 4 4 4-4" />
+                  <path d="M8 5H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-4" />
+                </svg>
+                <h3>Kompres PDF</h3>
+                <p>Struktur saja</p>
+              </div>
+              <div class="tool-card" data-tool="protect">
+                <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+                <h3>Proteksi</h3>
+              </div>
+            </div>
+          </div>
+
+          <!-- Image Tools -->
+          <div class="tools-category">
+            <h2>Gambar</h2>
+            <div class="tools-grid">
+              <div class="tool-card" data-tool="remove-bg">
+                <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                  <path d="M9 3v18" />
+                  <path d="M15 3v18" />
+                  <path d="M3 9h18" />
+                  <path d="M3 15h18" />
+                </svg>
+                <h3>Hapus Latar</h3>
+                <p>putih → transparan</p>
+              </div>
+              <div class="tool-card" data-tool="compress-img">
+                <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                <h3>Kompres Gambar</h3>
+              </div>
+              <div class="tool-card" data-tool="resize">
+                <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="15 3 21 3 21 9" />
+                  <polyline points="9 21 3 21 3 15" />
+                  <line x1="21" y1="3" x2="14" y2="10" />
+                  <line x1="3" y1="21" x2="10" y2="14" />
+                </svg>
+                <h3>Ubah Ukuran</h3>
+              </div>
+              <div class="tool-card" data-tool="convert-img">
+                <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="17 1 21 5 17 9" />
+                  <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+                  <polyline points="7 23 3 19 7 15" />
+                  <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+                </svg>
+                <h3>Convert Format</h3>
+              </div>
+              <div class="tool-card" data-tool="img-to-pdf">
+                <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                  <path d="M12 18v-6" />
+                  <path d="m9 15 3-3 3 3" />
+                </svg>
+                <h3>Gambar ke PDF</h3>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Coming Soon -->
+        <div class="tools-category">
+          <h2>Segera Hadir</h2>
+          <div class="tools-grid">
+            <div class="tool-card disabled" title="Rencana Development" aria-disabled="true">
+              <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
+                <polyline points="10 9 9 9 8 9" />
+              </svg>
+              <h3>PDF → Word</h3>
+              <p>Butuh server</p>
+            </div>
+            <div class="tool-card disabled" title="Rencana Development" aria-disabled="true">
+              <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                <line x1="3" y1="9" x2="21" y2="9" />
+                <line x1="3" y1="15" x2="21" y2="15" />
+                <line x1="9" y1="3" x2="9" y2="21" />
+                <line x1="15" y1="3" x2="15" y2="21" />
+              </svg>
+              <h3>PDF → Excel</h3>
+              <p>Butuh server</p>
+            </div>
+            <div class="tool-card disabled" title="Rencana Development" aria-disabled="true">
+              <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
+              </svg>
+              <h3>Word → PDF</h3>
+              <p>Butuh server</p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- ================================================================
+         WORKSPACE VIEWS - Each tool has its own workspace
+         ================================================================ -->
+
+    <!-- Compress PDF Workspace -->
+    <div id="compress-pdf-workspace" class="workspace">
+      <div class="workspace-header">
+        <h2>
+          <button class="back-btn" onclick="window.showHome?.()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+            Kembali
+          </button>
+          Kompres PDF
+        </h2>
+      </div>
+      <p class="mb-lg" style="color: var(--text-secondary);">⚠️ Catatan: Fitur ini mengoptimasi struktur PDF. Kompresi
+        gambar memerlukan server dan belum tersedia. Hasil bervariasi.</p>
+      <div class="preview-area" id="compress-pdf-preview">
+        <button class="dropzone" type="button" onclick="document.getElementById('compress-pdf-input').click()">
+          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="17 8 12 3 7 8" />
+            <line x1="12" y1="3" x2="12" y2="15" />
+          </svg>
+          <h3>Seret file ke sini atau klik untuk pilih</h3>
+          <p>PDF</p>
+          <input type="file" id="compress-pdf-input" accept=".pdf" style="display:none">
+        </button>
+      </div>
+      <div class="controls">
+        <div class="control-group">
+          <label for="pdf-quality">Kualitas Gambar:</label>
+        </div>
+        <div class="range-slider">
+          <input type="range" id="pdf-quality" min="10" max="100" value="60">
+          <span class="range-value">60%</span>
+        </div>
+      </div>
+      <div class="action-bar">
+        <button class="btn btn-primary btn-lg" id="compress-pdf-btn" disabled onclick="window.compressPDF?.()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          Kompres & Download
+        </button>
+      </div>
+      <div class="progress-container hidden" id="compress-pdf-progress">
+        <div class="progress-bar">
+          <div class="progress-fill" style="width: 0%"></div>
+        </div>
+        <p class="progress-text">Memproses...</p>
+      </div>
+    </div>
+
+    <!-- Unified Editor Workspace (combines Page Manager + Edit PDF) -->
+    <div id="unified-editor-workspace" class="workspace">
+      <!-- Editor Header Bar (replaces site header in editor mode) -->
+      <div class="editor-header" id="editor-header">
+        <div class="editor-header-left">
+          <div class="sidebar-file-dropdown" id="editor-file-dropdown">
+            <button class="editor-header-file-btn" onclick="window.toggleEditorFileMenu?.(event)" title="File">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+              File
+              <svg class="sidebar-file-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="sidebar-file-menu" id="editor-header-file-menu">
+              <button class="sidebar-file-menu-item" onclick="document.getElementById('ue-file-input').click(); window.closeEditorFileMenu?.()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                Tambah File
+              </button>
+              <button class="sidebar-file-menu-item" onclick="window.ueReplaceFiles?.(); window.closeEditorFileMenu?.()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/></svg>
+                Ganti File
+              </button>
+            </div>
+          </div>
+        </div>
+        <button type="button" class="editor-header-brand" onclick="window.editorGoHome?.(event)">
+          <div class="logo-icon" style="width:24px;height:24px;font-size:0.7rem;">P</div>
+          PDFLokal
+        </button>
+        <div class="editor-header-right">
+          <button class="editor-header-icon-btn" onclick="window.themeAPI?.toggle?.()" title="Ganti tema" type="button">
+            <svg class="icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+            <svg class="icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          </button>
+          <button class="btn btn-primary btn--download-editor-header" id="ue-download-btn" disabled onclick="window.ueDownload?.()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span class="ft-label">Download PDF</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="unified-editor-layout">
+        <!-- Left Sidebar: Page Thumbnails -->
+        <div class="unified-sidebar" id="unified-sidebar">
+          <div class="unified-sidebar-header">
+            <button class="sidebar-kelola-btn" onclick="window.uePmOpenModal?.()" title="Kelola Halaman">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+              Kelola Halaman
+            </button>
+            <input type="file" id="ue-file-input" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/*"
+              style="display:none">
+            <input type="file" id="ue-replace-input" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/*"
+              style="display:none">
+          </div>
+          <div class="unified-thumbnails" id="ue-thumbnails">
+            <button class="drop-hint" type="button" onclick="document.getElementById('ue-file-input').click()">
+              <svg class="drop-hint-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                style="width: 32px; height: 32px;">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="17 8 12 3 7 8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
+              </svg>
+              <span class="drop-hint-text" style="font-size: 0.8125rem;">Upload PDF atau Gambar</span>
+            </button>
+          </div>
+          <div class="unified-sidebar-footer" id="unified-sidebar-footer">
+          </div>
+        </div>
+
+        <!-- Main Content: Floating Toolbar + Canvas -->
+        <div class="unified-main">
+          <!-- Floating Toolbar -->
+          <div class="floating-toolbar" id="floating-toolbar" role="toolbar" aria-label="Alat editor">
+            <div class="ft-signature-wrapper">
+              <button class="ft-btn" id="ft-signature-btn" data-edit-tool="signature" onclick="window.ueOpenSignatureModal?.()" title="Tanda Tangan (S)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 19.5v.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v1.5"/><path d="m16 19-3-3 8-8 3 3-8 8Z"/></svg>
+                <span class="ft-label">Tanda Tangan</span>
+              </button>
+              <div class="signature-hint-tooltip" id="signature-hint-tooltip">
+                Klik untuk menandatangani dokumen
+                <span class="tooltip-arrow"></span>
+              </div>
+            </div>
+            <button class="ft-btn" id="ft-paraf-btn" data-edit-tool="paraf" onclick="window.ueOpenParafModal?.()" title="Paraf (P)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3l6 6-9 9H6v-6L15 3z"/><path d="M6 21h12"/></svg>
+              <span class="ft-label">Paraf</span>
+            </button>
+            <button class="ft-btn" data-edit-tool="text" onclick="window.ueSetTool?.('text')" title="Tambah Teks (T)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>
+              <span class="ft-label">Teks</span>
+            </button>
+            <button class="ft-btn" data-edit-tool="whiteout" onclick="window.ueSetTool?.('whiteout')" title="Whiteout (W)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+              <span class="ft-label">Whiteout</span>
+            </button>
+            <button class="ft-btn" data-edit-tool="select" onclick="window.ueSetTool?.('select')" title="Pilih & Edit (V)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="M13 13l6 6"/></svg>
+              <span class="ft-label">Pilih</span>
+            </button>
+            <div class="ft-divider"></div>
+            <button class="ft-btn" onclick="window.ueRotateCurrentPage?.()" title="Putar Halaman (R)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.85.83 6.72 2.24"/><path d="M21 3v6h-6"/></svg>
+              <span class="ft-label">Putar</span>
+            </button>
+            <div class="ft-divider"></div>
+            <div class="ft-more-wrapper">
+              <button class="ft-btn" id="ft-more-btn" onclick="window.toggleFloatingMore?.(event)" title="Lainnya">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
+                <span class="ft-label">Lainnya</span>
+              </button>
+              <div class="ft-more-dropdown" id="ft-more-dropdown" role="menu">
+                <button class="ft-more-item" role="menuitem" onclick="window.ueOpenWatermarkModal?.(); window.closeFloatingMore?.()">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                  Watermark
+                </button>
+                <button class="ft-more-item" role="menuitem" onclick="window.ueOpenPageNumModal?.(); window.closeFloatingMore?.()">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h10"/><circle cx="18" cy="17" r="2"/></svg>
+                  Nomor Halaman
+                </button>
+                <button class="ft-more-item" role="menuitem" onclick="window.ueOpenProtectModal?.(); window.closeFloatingMore?.()">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  Kunci PDF
+                </button>
+                <div class="ft-more-divider"></div>
+                <button class="ft-more-item" role="menuitem" onclick="window.ueUndo?.(); window.closeFloatingMore?.()">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+                  Undo
+                </button>
+                <button class="ft-more-item" role="menuitem" onclick="window.ueRedo?.(); window.closeFloatingMore?.()">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></svg>
+                  Redo
+                </button>
+                <button class="ft-more-item ft-more-item--danger" role="menuitem" onclick="window.ueClearPageAnnotations?.(); window.closeFloatingMore?.()">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+                  Hapus Edit Halaman Ini
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Canvas Wrapper -->
+          <div class="unified-canvas-wrapper" id="ue-canvas-wrapper">
+            <div class="signature-btn-wrapper" id="signature-btn-wrapper" style="display: none;">
+              <!-- Signature confirm button (positioned dynamically) -->
+              <button class="signature-confirm-btn" id="signature-confirm-btn">Konfirmasi</button>
+              <button class="signature-confirm-btn" id="signature-allpages-btn" style="display: none;">Semua Hal.</button>
+              <button class="signature-delete-btn" id="signature-delete-btn">✕</button>
+            </div>
+            <div class="unified-empty-state" id="ue-empty-state">
+              <button class="dropzone" type="button" onclick="document.getElementById('ue-file-input').click()">
+                <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+                <h3>Seret file ke sini atau klik untuk pilih</h3>
+                <p>PDF</p>
+              </button>
+            </div>
+            <div id="ue-pages-container" style="display: none;">
+              <!-- Per-page canvases generated by ueCreatePageSlots() -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Contextual text format toolbar (Word/Figma/Canva-style). Shown while
+           editing or selecting a text annotation; positioned via text-format-bar.js. -->
+      <div id="text-format-bar" class="text-format-bar" role="toolbar" aria-label="Format teks" hidden>
+        <select id="tfb-font" class="tfb-font" aria-label="Jenis font" title="Font">
+          <option value="Helvetica">Helvetica</option>
+          <option value="Times-Roman">Times</option>
+          <option value="Courier">Courier</option>
+          <option value="Montserrat">Montserrat</option>
+          <option value="Carlito">Carlito</option>
+        </select>
+        <span class="tfb-sep"></span>
+        <button type="button" id="tfb-bold" class="tfb-btn" title="Tebal" aria-label="Tebal" aria-pressed="false"><strong>B</strong></button>
+        <button type="button" id="tfb-italic" class="tfb-btn" title="Miring" aria-label="Miring" aria-pressed="false"><em>I</em></button>
+        <span class="tfb-sep"></span>
+        <button type="button" id="tfb-size-dec" class="tfb-btn tfb-size-btn" title="Perkecil" aria-label="Perkecil ukuran">&minus;</button>
+        <input type="number" id="tfb-size" class="tfb-size" min="6" max="120" value="16" aria-label="Ukuran font">
+        <button type="button" id="tfb-size-inc" class="tfb-btn tfb-size-btn" title="Perbesar" aria-label="Perbesar ukuran">+</button>
+        <span class="tfb-sep"></span>
+        <input type="color" id="tfb-color" class="tfb-color" value="#000000" title="Warna teks" aria-label="Warna teks">
+      </div>
+
+      <!-- Editor Bottom Bar (desktop) -->
+      <div class="editor-bottom-bar" id="editor-bottom-bar">
+        <div class="editor-bottom-left"></div>
+        <div class="editor-bottom-center">
+          <a href="https://forms.gle/KPDWVAuc91pVjuWq6" target="_blank" class="editor-bottom-support">Hubungi Kami</a>
+          <span class="editor-bottom-separator">•</span>
+          <a href="dukung.html" target="_blank" class="editor-bottom-support">Dukung Kami</a>
+        </div>
+        <div class="editor-bottom-right">
+          <div class="editor-bottom-zoom">
+            <button class="editor-bottom-btn" onclick="window.ueZoomOut?.()" title="Zoom Out (-)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35M8 11h6" />
+              </svg>
+            </button>
+            <span class="editor-bottom-zoom-level" id="ue-zoom-level-bottom">100%</span>
+            <button class="editor-bottom-btn" onclick="window.ueZoomIn?.()" title="Zoom In (+)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35M11 8v6M8 11h6" />
+              </svg>
+            </button>
+          </div>
+          <span class="editor-bottom-page-indicator" id="ue-page-indicator">Hal 1/1</span>
+          <button class="editor-bottom-btn" onclick="document.getElementById('shortcuts-modal').classList.add('active')" title="Pintasan keyboard (?)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Mobile Bottom Bar (visible only on mobile) -->
+      <div class="mobile-bottom-bar" id="ue-mobile-bottombar">
+        <div class="mobile-page-nav">
+          <button class="mobile-nav-btn" id="ue-mobile-prev" onclick="window.ueMobilePrevPage?.()" disabled
+            title="Halaman sebelumnya">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M15 18l-6-6 6-6" />
+            </svg>
+          </button>
+          <button type="button" class="mobile-page-indicator" id="ue-mobile-page-indicator" onclick="window.ueMobileOpenPagePicker?.()">
+            Halaman <strong>1</strong> / 1
+          </button>
+          <button class="mobile-nav-btn" id="ue-mobile-next" onclick="window.ueMobileNextPage?.()" title="Halaman berikutnya">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 18l6-6-6-6" />
+            </svg>
+          </button>
+        </div>
+        <div class="mobile-tools-wrapper">
+          <button class="mobile-more-btn" id="ue-mobile-more-btn" onclick="window.toggleMobileTools?.()" title="Alat lainnya">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="1.5" />
+              <circle cx="12" cy="5" r="1.5" />
+              <circle cx="12" cy="19" r="1.5" />
+            </svg>
+          </button>
+          <!-- WHY: Mirrors the desktop "Lainnya" menu — Watermark, Nomor Halaman,
+               Kunci PDF, Undo, Redo, Hapus. Previously this dropdown duplicated
+               Pilih/Whiteout/Teks/Paraf which are already in the top toolbar.
+               Now Lainnya items get a thumb-reach entry point on mobile and the
+               top icon-toolbar isn't shadowed by a redundant text menu.
+               UX audit finding H6. -->
+          <div class="mobile-tools-dropdown" id="mobile-tools-dropdown" role="menu">
+            <button class="mobile-tool-item" role="menuitem" onclick="window.ueOpenWatermarkModal?.(); window.closeMobileTools?.()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2L4 6v6c0 5.5 3.5 10 8 10s8-4.5 8-10V6l-8-4z"/>
+              </svg>
+              Watermark
+            </button>
+            <button class="mobile-tool-item" role="menuitem" onclick="window.ueOpenPageNumModal?.(); window.closeMobileTools?.()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+              </svg>
+              Nomor Halaman
+            </button>
+            <button class="mobile-tool-item" role="menuitem" onclick="window.ueOpenProtectModal?.(); window.closeMobileTools?.()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+              Kunci PDF
+            </button>
+            <div class="mobile-tool-divider" role="separator"></div>
+            <button class="mobile-tool-item" role="menuitem" onclick="window.ueUndo?.(); window.closeMobileTools?.()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/>
+              </svg>
+              Undo
+            </button>
+            <button class="mobile-tool-item" role="menuitem" onclick="window.ueRedo?.(); window.closeMobileTools?.()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/>
+              </svg>
+              Redo
+            </button>
+            <button class="mobile-tool-item mobile-tool-item--danger" role="menuitem" onclick="window.ueClearPageAnnotations?.(); window.closeMobileTools?.()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>
+              </svg>
+              Hapus Edit Halaman Ini
+            </button>
+          </div>
+        </div>
+        <div class="mobile-zoom-controls">
+          <button class="mobile-nav-btn" onclick="window.ueZoomOut?.()" aria-label="Zoom out">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35M8 11h6" />
+            </svg>
+          </button>
+          <button class="mobile-nav-btn" onclick="window.ueZoomIn?.()" aria-label="Zoom in">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35M11 8v6M8 11h6" />
+            </svg>
+          </button>
+        </div>
+        <button class="mobile-sign-btn" id="ue-mobile-sign-btn" onclick="window.ueOpenSignatureModal?.()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20 19.5v.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v1.5" />
+            <path d="m16 19-3-3 8-8 3 3-8 8Z" />
+          </svg>
+          <span>Tanda Tangan</span>
+        </button>
+      </div>
+
+      <!-- Mobile Page Picker Modal -->
+      <div class="mobile-page-picker" id="ue-mobile-page-picker">
+        <button type="button" class="mobile-page-picker-backdrop" onclick="window.ueMobileClosePagePicker?.()" aria-label="Tutup pemilih halaman"></button>
+        <div class="mobile-page-picker-content">
+          <div class="mobile-page-picker-header">
+            <span>Pilih Halaman</span>
+            <button class="mobile-page-picker-close" onclick="window.ueMobileClosePagePicker?.()">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 6L6 18M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <div class="mobile-page-picker-grid" id="ue-mobile-page-grid"></div>
+        </div>
+      </div>
+
+      <!-- Floating Keyboard Shortcuts Help Button -->
+      <button class="shortcuts-help-btn" id="shortcuts-help-btn" onclick="window.openShortcutsModal?.()"
+        title="Pintasan Keyboard (?)">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10" />
+          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+          <line x1="12" y1="17" x2="12.01" y2="17" />
+        </svg>
+      </button>
+    </div>
+
+    <!-- PDF to Image Workspace -->
+    <div id="pdf-to-img-workspace" class="workspace">
+      <div class="workspace-header">
+        <h2>
+          <button class="back-btn" onclick="window.showHome?.()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+            Kembali
+          </button>
+          PDF ke Gambar
+        </h2>
+      </div>
+      <div class="page-grid empty" id="pdf-img-pages">
+        <button class="dropzone" type="button" onclick="document.getElementById('pdf-img-input').click()">
+          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="17 8 12 3 7 8" />
+            <line x1="12" y1="3" x2="12" y2="15" />
+          </svg>
+          <h3>Seret file ke sini atau klik untuk pilih</h3>
+          <p>PDF</p>
+          <input type="file" id="pdf-img-input" accept=".pdf" style="display:none">
+        </button>
+      </div>
+      <div class="controls">
+        <div class="control-group">
+          <label for="img-format">Format:</label>
+          <select id="img-format">
+            <option value="png">PNG</option>
+            <option value="jpeg">JPG</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <label for="img-scale">Skala:</label>
+          <select id="img-scale">
+            <option value="1">1x (72 DPI)</option>
+            <option value="2" selected>2x (144 DPI)</option>
+            <option value="3">3x (216 DPI)</option>
+          </select>
+        </div>
+        <button class="btn btn-secondary" onclick="window.selectAllPdfImgPages?.()">Pilih Semua</button>
+      </div>
+      <div class="action-bar">
+        <button class="btn btn-primary btn-lg" id="pdf-img-btn" disabled onclick="window.convertPDFtoImages?.()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          Download Gambar
+        </button>
+      </div>
+      <div class="progress-container hidden" id="pdf-img-progress">
+        <div class="progress-bar">
+          <div class="progress-fill" style="width: 0%"></div>
+        </div>
+        <p class="progress-text">Memproses...</p>
+      </div>
+    </div>
+
+    <!-- Protect PDF Workspace -->
+    <div id="protect-workspace" class="workspace">
+      <div class="workspace-header">
+        <h2>
+          <button class="back-btn" onclick="window.showHome?.()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+            Kembali
+          </button>
+          Proteksi PDF
+        </h2>
+      </div>
+      <div class="preview-area" id="protect-preview">
+        <button class="dropzone" type="button" onclick="document.getElementById('protect-input').click()">
+          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="17 8 12 3 7 8" />
+            <line x1="12" y1="3" x2="12" y2="15" />
+          </svg>
+          <h3>Seret file ke sini atau klik untuk pilih</h3>
+          <p>PDF</p>
+          <input type="file" id="protect-input" accept=".pdf" style="display:none">
+        </button>
+      </div>
+      <div class="controls">
+        <div class="control-group">
+          <label for="protect-password">Password:</label>
+          <input type="password" id="protect-password" placeholder="Masukkan password">
+        </div>
+        <div class="control-group">
+          <label for="protect-password-confirm">Konfirmasi:</label>
+          <input type="password" id="protect-password-confirm" placeholder="Konfirmasi password">
+        </div>
+      </div>
+      <div class="action-bar">
+        <button class="btn btn-primary btn-lg" id="protect-btn" disabled onclick="window.protectPDF?.()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          Proteksi & Download
+        </button>
+      </div>
+    </div>
+
+    <!-- Compress Image Workspace -->
+    <div id="compress-img-workspace" class="workspace">
+      <div class="workspace-header">
+        <h2>
+          <button class="back-btn" onclick="window.showHome?.()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+            Kembali
+          </button>
+          Kompres Gambar
+        </h2>
+      </div>
+      <div class="preview-area" id="compress-img-area">
+        <button class="dropzone" id="compress-img-hint" type="button" onclick="document.getElementById('compress-img-input').click()">
+          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="17 8 12 3 7 8" />
+            <line x1="12" y1="3" x2="12" y2="15" />
+          </svg>
+          <h3>Seret file ke sini atau klik untuk pilih</h3>
+          <p>JPG, PNG, WebP</p>
+          <input type="file" id="compress-img-input" accept="image/*" style="display:none">
+        </button>
+        <div class="preview-comparison hidden" id="compress-img-comparison">
+          <div class="preview-box">
+            <img id="compress-original" src="" alt="Original">
+            <p id="compress-original-size">Original: -</p>
+          </div>
+          <div class="preview-arrow">→</div>
+          <div class="preview-box">
+            <img id="compress-preview" src="" alt="Preview">
+            <p id="compress-preview-size">Hasil: -</p>
+          </div>
+        </div>
+      </div>
+      <div class="controls">
+        <div class="control-group">
+          <label for="compress-quality">Kualitas:</label>
+        </div>
+        <div class="range-slider">
+          <input type="range" id="compress-quality" min="10" max="100" value="80" oninput="updateCompressPreview()">
+          <span class="range-value">80%</span>
+        </div>
+        <div class="control-group">
+          <label for="compress-format">Format output:</label>
+          <select id="compress-format" onchange="updateCompressPreview()">
+            <option value="jpeg">JPG</option>
+            <option value="png">PNG</option>
+            <option value="webp">WebP</option>
+          </select>
+        </div>
+      </div>
+      <div class="action-bar">
+        <button class="btn btn-primary btn-lg" id="compress-img-btn" disabled onclick="window.downloadCompressedImage?.()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          Download
+        </button>
+      </div>
+    </div>
+
+    <!-- Resize Image Workspace -->
+    <div id="resize-workspace" class="workspace">
+      <div class="workspace-header">
+        <h2>
+          <button class="back-btn" onclick="window.showHome?.()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+            Kembali
+          </button>
+          Ubah Ukuran Gambar
+        </h2>
+      </div>
+      <div class="preview-area" id="resize-area">
+        <button class="dropzone" id="resize-hint" type="button" onclick="document.getElementById('resize-input').click()">
+          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="17 8 12 3 7 8" />
+            <line x1="12" y1="3" x2="12" y2="15" />
+          </svg>
+          <h3>Seret file ke sini atau klik untuk pilih</h3>
+          <p>JPG, PNG, WebP</p>
+          <input type="file" id="resize-input" accept="image/*" style="display:none">
+        </button>
+        <div class="preview-box hidden" id="resize-preview-box">
+          <img id="resize-preview" src="" alt="Preview">
+          <p id="resize-dimensions">Dimensi: -</p>
+        </div>
+      </div>
+      <div class="controls">
+        <div class="control-group">
+          <label for="resize-width">Lebar:</label>
+          <input type="number" id="resize-width" min="1" oninput="onResizeChange('width')">
+          <span>px</span>
+        </div>
+        <div class="control-group">
+          <label for="resize-height">Tinggi:</label>
+          <input type="number" id="resize-height" min="1" oninput="onResizeChange('height')">
+          <span>px</span>
+        </div>
+        <div class="control-group">
+          <label>
+            <input type="checkbox" id="resize-lock" checked> Kunci rasio aspek
+          </label>
+        </div>
+        <div class="control-group">
+          <label for="resize-percent">Atau persentase:</label>
+          <select id="resize-percent" onchange="applyResizePercent()">
+            <option value="">Pilih...</option>
+            <option value="25">25%</option>
+            <option value="50">50%</option>
+            <option value="75">75%</option>
+            <option value="150">150%</option>
+            <option value="200">200%</option>
+          </select>
+        </div>
+      </div>
+      <div class="action-bar">
+        <button class="btn btn-primary btn-lg" id="resize-btn" disabled onclick="window.downloadResizedImage?.()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          Download
+        </button>
+      </div>
+    </div>
+
+    <!-- Convert Image Workspace -->
+    <div id="convert-img-workspace" class="workspace">
+      <div class="workspace-header">
+        <h2>
+          <button class="back-btn" onclick="window.showHome?.()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+            Kembali
+          </button>
+          Convert Format Gambar
+        </h2>
+      </div>
+      <div class="preview-area" id="convert-area">
+        <button class="dropzone" id="convert-hint" type="button" onclick="document.getElementById('convert-input').click()">
+          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="17 8 12 3 7 8" />
+            <line x1="12" y1="3" x2="12" y2="15" />
+          </svg>
+          <h3>Seret file ke sini atau klik untuk pilih</h3>
+          <p>JPG, PNG, WebP</p>
+          <input type="file" id="convert-input" accept="image/*" style="display:none">
+        </button>
+        <div class="preview-box hidden" id="convert-preview-box">
+          <img id="convert-preview" src="" alt="Preview">
+          <p id="convert-info">-</p>
+        </div>
+      </div>
+      <div class="controls">
+        <div class="control-group">
+          <label for="convert-format">Convert ke:</label>
+          <select id="convert-format">
+            <option value="jpeg">JPG</option>
+            <option value="png">PNG</option>
+            <option value="webp">WebP</option>
+          </select>
+        </div>
+        <div class="control-group" id="convert-quality-group">
+          <label for="convert-quality">Kualitas:</label>
+        </div>
+        <div class="range-slider" id="convert-quality-slider" style="max-width: 200px;">
+          <input type="range" id="convert-quality" min="10" max="100" value="90">
+          <span class="range-value">90%</span>
+        </div>
+      </div>
+      <div class="action-bar">
+        <button class="btn btn-primary btn-lg" id="convert-btn" disabled onclick="window.convertImage?.()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          Download
+        </button>
+      </div>
+    </div>
+
+    <!-- Image to PDF Workspace -->
+    <div id="img-to-pdf-workspace" class="workspace">
+      <div class="workspace-header">
+        <h2>
+          <button class="back-btn" onclick="window.showHome?.()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+            Kembali
+          </button>
+          Gambar ke PDF
+        </h2>
+      </div>
+      <div class="file-list empty" id="img-pdf-file-list">
+        <button class="dropzone" type="button" onclick="document.getElementById('img-pdf-input').click()">
+          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="17 8 12 3 7 8" />
+            <line x1="12" y1="3" x2="12" y2="15" />
+          </svg>
+          <h3>Seret file ke sini atau klik untuk pilih</h3>
+          <p>JPG, PNG, WebP</p>
+        </button>
+      </div>
+      <div class="controls">
+        <button class="btn btn-secondary" onclick="document.getElementById('img-pdf-input').click()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+          Tambah Gambar
+        </button>
+        <input type="file" id="img-pdf-input" multiple accept="image/*" style="display:none">
+        <div class="control-group">
+          <label for="img-pdf-size">Ukuran halaman:</label>
+          <select id="img-pdf-size">
+            <option value="a4">A4</option>
+            <option value="letter">Letter</option>
+            <option value="fit">Sesuai gambar</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <label for="img-pdf-orientation">Orientasi:</label>
+          <select id="img-pdf-orientation">
+            <option value="portrait">Portrait</option>
+            <option value="landscape">Landscape</option>
+            <option value="auto">Otomatis</option>
+          </select>
+        </div>
+      </div>
+      <div class="action-bar">
+        <button class="btn btn-primary btn-lg" id="img-pdf-btn" disabled onclick="window.imagesToPDF?.()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          Convert ke PDF
+        </button>
+      </div>
+      <div class="progress-container hidden" id="img-pdf-progress">
+        <div class="progress-bar">
+          <div class="progress-fill" style="width: 0%"></div>
+        </div>
+        <p class="progress-text">Memproses...</p>
+      </div>
+    </div>
+
+    <!-- Remove Background Workspace -->
+    <div id="remove-bg-workspace" class="workspace">
+      <div class="workspace-header">
+        <h2>
+          <button class="back-btn" onclick="window.showHome?.()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+            Kembali
+          </button>
+          Hapus Latar Belakang
+        </h2>
+      </div>
+      <p class="mb-lg" style="color: var(--text-secondary);">Upload gambar dan atur threshold untuk mengubah warna
+        putih/terang menjadi transparan.</p>
+      <div class="preview-area" id="remove-bg-area">
+        <button class="dropzone" id="remove-bg-hint" type="button" onclick="document.getElementById('remove-bg-input').click()">
+          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="17 8 12 3 7 8" />
+            <line x1="12" y1="3" x2="12" y2="15" />
+          </svg>
+          <h3>Seret file ke sini atau klik untuk pilih</h3>
+          <p>JPG, PNG</p>
+          <input type="file" id="remove-bg-input" accept="image/jpeg,image/png" style="display:none">
+        </button>
+        <div class="preview-comparison hidden" id="remove-bg-comparison">
+          <div class="preview-box">
+            <img id="remove-bg-original" src="" alt="Original">
+            <p>Original</p>
+          </div>
+          <div class="preview-arrow">→</div>
+          <div class="preview-box"
+            style="background: repeating-conic-gradient(#ddd 0% 25%, #fff 0% 50%) 50% / 16px 16px; border-radius: var(--radius-md);">
+            <canvas id="remove-bg-preview" style="max-width: 100%; max-height: 300px;"></canvas>
+            <p id="remove-bg-result-info">Hasil (transparan)</p>
+          </div>
+        </div>
+      </div>
+      <div class="controls">
+        <div class="control-group">
+          <label for="remove-bg-threshold">Threshold Putih:</label>
+        </div>
+        <div class="range-slider">
+          <input type="range" id="remove-bg-threshold" min="200" max="255" value="240"
+            oninput="updateRemoveBgPreview()">
+          <span class="range-value" id="remove-bg-threshold-value">240</span>
+        </div>
+        <div class="control-group">
+          <p class="control-hint" title="Semakin tinggi, semakin banyak warna terang yang dihapus">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              style="vertical-align: middle; margin-right: 4px;">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 16v-4M12 8h.01" />
+            </svg>
+            Tips: 255 = hanya putih murni, 200 = termasuk warna keabu-abuan
+          </p>
+        </div>
+      </div>
+      <div class="action-bar">
+        <button class="btn btn-primary btn-lg" id="remove-bg-btn" disabled onclick="window.downloadRemovedBgImage?.()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          Download PNG
+        </button>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Signature Modal -->
+  <dialog id="signature-modal" class="signature-modal" aria-modal="true" aria-label="Buat tanda tangan">
+    <div class="signature-box">
+      <h3>Buat Tanda Tangan</h3>
+      <div class="signature-tabs" role="tablist">
+        <button class="signature-tab active" role="tab" aria-selected="true" onclick="window.switchSignatureTab?.('upload')">Upload Foto</button>
+        <button class="signature-tab" role="tab" aria-selected="false" onclick="window.switchSignatureTab?.('draw')">Gambar</button>
+      </div>
+      <div id="signature-upload-tab" class="signature-tab-content active">
+        <button type="button" class="signature-upload-area" id="signature-upload-hint"
+          onclick="document.getElementById('signature-upload-input').click()">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="17 8 12 3 7 8" />
+            <line x1="12" y1="3" x2="12" y2="15" />
+          </svg>
+          <p>Klik untuk upload foto tanda tangan</p>
+          <span class="upload-hint-secondary">Bisa juga digunakan untuk stempel</span>
+          <span>JPG • PNG</span>
+          <input type="file" id="signature-upload-input" accept="image/jpeg,image/png" style="display:none">
+        </button>
+        <div class="signature-actions">
+          <button class="btn btn-ghost" onclick="window.closeSignatureModal?.()">Batal</button>
+        </div>
+      </div>
+      <div id="signature-draw-tab" class="signature-tab-content">
+        <canvas id="signature-canvas" class="signature-canvas"></canvas>
+        <div class="signature-actions">
+          <button class="btn btn-secondary" onclick="window.clearSignature?.()">Hapus</button>
+          <button class="btn btn-ghost" onclick="window.closeSignatureModal?.()">Batal</button>
+          <button class="btn btn-primary" onclick="window.useSignature?.()">Gunakan</button>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Signature Background Removal Modal -->
+  <dialog id="signature-bg-modal" class="edit-modal" aria-modal="true" aria-label="Hapus latar tanda tangan">
+    <div class="edit-modal-box" style="max-width: 700px;">
+      <h3>Hapus Latar Belakang Tanda Tangan</h3>
+      <div class="edit-modal-content">
+        <p class="mb-md" style="color: var(--text-secondary);">Atur threshold untuk mengubah warna putih/terang menjadi
+          transparan.</p>
+        <div class="signature-bg-preview">
+          <div class="preview-box">
+            <img id="sig-bg-original" src="" alt="Original">
+            <p>Original</p>
+          </div>
+          <div class="preview-arrow">↓</div>
+          <div class="preview-box">
+            <canvas id="sig-bg-preview" class="transparent-bg"></canvas>
+            <p>Hasil</p>
+          </div>
+        </div>
+        <div class="controls" style="justify-content: center; margin-top: var(--space-lg);">
+          <div class="control-group">
+            <label for="sig-bg-threshold">Threshold:</label>
+          </div>
+          <div class="range-slider" style="max-width: 250px;">
+            <input type="range" id="sig-bg-threshold" min="180" max="255" value="230"
+              oninput="updateSignatureBgPreview()">
+            <span class="range-value" id="sig-bg-threshold-value">230</span>
+          </div>
+        </div>
+      </div>
+      <div class="edit-modal-actions">
+        <button class="btn btn-ghost" onclick="window.closeSignatureBgModal?.()">Batal</button>
+        <button class="btn btn-primary" onclick="window.useSignatureFromUpload?.()">Gunakan Tanda Tangan</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Paraf (Initials) Modal -->
+  <dialog id="paraf-modal" class="signature-modal" aria-modal="true" aria-label="Buat Paraf">
+    <div class="signature-box">
+      <h3>Buat Paraf</h3>
+      <canvas id="paraf-canvas" class="signature-canvas"></canvas>
+      <label class="paraf-apply-all-label" for="paraf-apply-all">
+        <input type="checkbox" id="paraf-apply-all">
+        <span>Tempel di semua halaman</span>
+      </label>
+      <div class="signature-actions">
+        <button class="btn btn-secondary" onclick="window.clearParaf?.()">Hapus</button>
+        <button class="btn btn-ghost" onclick="window.closeParafModal?.()">Batal</button>
+        <button class="btn btn-primary" onclick="window.useParaf?.()">Gunakan</button>
+      </div>
+    </div>
+  </dialog>
+
+
+  <!-- Editor Watermark Modal -->
+  <dialog id="editor-watermark-modal" class="edit-modal" aria-modal="true" aria-label="Watermark">
+    <div class="edit-modal-box">
+      <h3>Tambah Watermark</h3>
+      <div class="edit-modal-content">
+        <div class="edit-option-group">
+          <label for="editor-wm-text">Teks Watermark</label>
+          <input type="text" id="editor-wm-text" class="edit-text-input" value="CONFIDENTIAL" style="min-height: auto;">
+        </div>
+        <div class="edit-text-options">
+          <div class="edit-option-group">
+            <label for="editor-wm-size">Ukuran Font</label>
+            <select id="editor-wm-size">
+              <option value="24">24pt</option>
+              <option value="36">36pt</option>
+              <option value="48" selected>48pt</option>
+              <option value="60">60pt</option>
+              <option value="72">72pt</option>
+            </select>
+          </div>
+          <div class="edit-option-group">
+            <label for="editor-wm-color">Warna</label>
+            <input type="color" id="editor-wm-color" value="#888888">
+          </div>
+          <div class="edit-option-group">
+            <label for="editor-wm-opacity">Opacity</label>
+            <input type="range" id="editor-wm-opacity" min="10" max="100" value="30">
+          </div>
+          <div class="edit-option-group">
+            <label for="editor-wm-rotation">Rotasi</label>
+            <select id="editor-wm-rotation">
+              <option value="-45" selected>-45°</option>
+              <option value="-30">-30°</option>
+              <option value="0">0°</option>
+              <option value="30">30°</option>
+              <option value="45">45°</option>
+            </select>
+          </div>
+        </div>
+        <div class="edit-option-group">
+          <label for="editor-wm-pages">Terapkan ke</label>
+          <select id="editor-wm-pages">
+            <option value="all">Semua halaman</option>
+            <option value="current">Halaman ini saja</option>
+          </select>
+        </div>
+      </div>
+      <div class="edit-modal-actions">
+        <button class="btn btn-ghost" onclick="window.closeEditorWatermarkModal?.()">Batal</button>
+        <button class="btn btn-primary" onclick="window.applyEditorWatermark?.()">Terapkan Watermark</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Editor Page Number Modal -->
+  <dialog id="editor-pagenum-modal" class="edit-modal" aria-modal="true" aria-label="Nomor halaman">
+    <div class="edit-modal-box">
+      <h3>Tambah Nomor Halaman</h3>
+      <div class="edit-modal-content">
+        <div class="edit-text-options">
+          <div class="edit-option-group">
+            <label for="editor-pn-position">Posisi</label>
+            <select id="editor-pn-position">
+              <option value="bottom-center" selected>Bawah Tengah</option>
+              <option value="bottom-left">Bawah Kiri</option>
+              <option value="bottom-right">Bawah Kanan</option>
+              <option value="top-center">Atas Tengah</option>
+              <option value="top-left">Atas Kiri</option>
+              <option value="top-right">Atas Kanan</option>
+            </select>
+          </div>
+          <div class="edit-option-group">
+            <label for="editor-pn-format">Format</label>
+            <select id="editor-pn-format">
+              <option value="number" selected>1, 2, 3...</option>
+              <option value="page-of">Halaman 1 dari N</option>
+              <option value="dash">- 1 -</option>
+            </select>
+          </div>
+          <div class="edit-option-group">
+            <label for="editor-pn-size">Ukuran Font</label>
+            <select id="editor-pn-size">
+              <option value="10">10pt</option>
+              <option value="12" selected>12pt</option>
+              <option value="14">14pt</option>
+              <option value="16">16pt</option>
+            </select>
+          </div>
+          <div class="edit-option-group">
+            <label for="editor-pn-start">Mulai dari</label>
+            <input type="number" id="editor-pn-start" value="1" min="1" style="width: 60px;">
+          </div>
+        </div>
+      </div>
+      <div class="edit-modal-actions">
+        <button class="btn btn-ghost" onclick="window.closeEditorPageNumModal?.()">Batal</button>
+        <button class="btn btn-primary" onclick="window.applyEditorPageNumbers?.()">Terapkan Nomor</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Kunci PDF Modal for Unified Editor -->
+  <dialog id="editor-protect-modal" class="edit-modal" aria-modal="true" aria-label="Proteksi PDF">
+    <div class="edit-modal-box">
+      <h3>Kunci PDF</h3>
+      <div class="edit-modal-content">
+        <div class="edit-option-group" style="width: 100%;">
+          <label for="editor-protect-password">Password</label>
+          <input type="password" id="editor-protect-password" class="edit-text-input" placeholder="Masukkan password">
+        </div>
+        <div class="edit-option-group" style="width: 100%;">
+          <label for="editor-protect-confirm">Konfirmasi Password</label>
+          <input type="password" id="editor-protect-confirm" class="edit-text-input" placeholder="Konfirmasi password">
+        </div>
+        <p class="modal-note">PDF akan di-download dengan proteksi password</p>
+      </div>
+      <div class="edit-modal-actions">
+        <button class="btn btn-ghost" onclick="window.closeEditorProtectModal?.()">Batal</button>
+        <button class="btn btn-primary" onclick="window.applyEditorProtect?.()">Kunci & Download</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Gabungkan Halaman Modal for Unified Editor -->
+  <dialog id="ue-gabungkan-modal" class="edit-modal" aria-modal="true" aria-label="Kelola Halaman">
+    <div class="edit-modal-box ue-pm-modal-box">
+      <div class="ue-pm-header">
+        <h3>Kelola Halaman</h3>
+        <span class="ue-pm-page-count" id="ue-pm-page-count">0 halaman</span>
+        <button class="ue-pm-close-btn" onclick="window.uePmCloseModal?.()" aria-label="Tutup">&times;</button>
+      </div>
+
+      <!-- Context bar: shows the reorder/select hint by default; swaps to bulk
+           actions when one or more pages are selected (no separate "Split mode"). -->
+      <div class="ue-pm-contextbar">
+        <p class="ue-pm-hint" id="ue-pm-hint">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>
+          <span>Seret untuk mengurutkan · ketuk kotak buat memilih</span>
+          <button type="button" class="ue-pm-selectall-link" onclick="window.uePmSelectAll?.()">Pilih semua</button>
+        </p>
+        <div class="ue-pm-selection-actions" id="ue-pm-selection-actions" hidden>
+          <span class="ue-pm-selection-count" id="ue-pm-selection-count">0 dipilih</span>
+          <div class="ue-pm-selection-btns">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="window.uePmRotateSelected?.()" title="Putar halaman terpilih">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.85.83 6.72 2.24"/><path d="M21 3v6h-6"/></svg>
+              Putar
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm ue-pm-danger-btn" onclick="window.uePmDeleteSelected?.()" title="Hapus halaman terpilih">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+              Hapus
+            </button>
+            <button type="button" class="btn btn-primary btn-sm" onclick="window.uePmExtractSelected?.()" title="Simpan halaman terpilih sebagai PDF baru">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18"/><path d="M8 8H4a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h4"/><path d="M16 8h4a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-4"/></svg>
+              Split jadi PDF
+            </button>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="window.uePmDeselectAll?.()">Batal</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="ue-pm-pages-container">
+        <div class="ue-pm-pages" id="ue-pm-pages"></div>
+      </div>
+
+      <div class="edit-modal-actions">
+        <button class="btn btn-ghost" onclick="window.uePmCloseModal?.()">Selesai</button>
+      </div>
+
+      <input type="file" id="ue-pm-file-input" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/*" hidden>
+      <input type="file" id="ue-pm-image-input" multiple accept=".png,.jpg,.jpeg,.webp,image/*" hidden>
+    </div>
+  </dialog>
+
+  <!-- Keyboard Shortcuts Modal -->
+  <dialog class="shortcuts-modal" id="shortcuts-modal" aria-modal="true" aria-label="Pintasan keyboard">
+    <button type="button" class="shortcuts-modal-backdrop" onclick="window.closeShortcutsModal?.()" aria-label="Tutup pintasan keyboard"></button>
+    <div class="shortcuts-modal-box">
+      <h3>Pintasan Keyboard</h3>
+      <div class="shortcuts-modal-content">
+        <div class="shortcut-group">
+          <h4>Tools</h4>
+          <div class="shortcut-item"><kbd>V</kbd> <span>Pilih & Edit</span></div>
+          <div class="shortcut-item"><kbd>W</kbd> <span>Whiteout</span></div>
+          <div class="shortcut-item"><kbd>T</kbd> <span>Tambah Teks</span></div>
+          <div class="shortcut-item"><kbd>S</kbd> <span>Tanda Tangan</span></div>
+          <div class="shortcut-item"><kbd>P</kbd> <span>Paraf</span></div>
+          <div class="shortcut-item"><kbd>R</kbd> <span>Putar Halaman</span></div>
+        </div>
+        <div class="shortcut-group">
+          <h4>Navigasi</h4>
+          <div class="shortcut-item"><kbd>&larr;</kbd> <span>Halaman sebelumnya</span></div>
+          <div class="shortcut-item"><kbd>&rarr;</kbd> <span>Halaman berikutnya</span></div>
+          <div class="shortcut-item"><kbd>Esc</kbd> <span>Kembali ke beranda</span></div>
+        </div>
+        <div class="shortcut-group">
+          <h4>Aksi</h4>
+          <div class="shortcut-item"><kbd>Ctrl</kbd><kbd>S</kbd> <span>Download PDF</span></div>
+          <div class="shortcut-item"><kbd>Ctrl</kbd><kbd>Z</kbd> <span>Undo</span></div>
+          <div class="shortcut-item"><kbd>Ctrl</kbd><kbd>Y</kbd> <span>Redo</span></div>
+          <div class="shortcut-item"><kbd>Del</kbd> <span>Hapus anotasi</span></div>
+          <div class="shortcut-item"><kbd>+ / =</kbd> <span>Perbesar</span></div>
+          <div class="shortcut-item"><kbd>-</kbd> <span>Perkecil</span></div>
+          <div class="shortcut-item"><kbd>0</kbd> <span>Reset Zoom</span></div>
+        </div>
+      </div>
+      <div class="shortcuts-modal-actions">
+        <button class="btn btn-primary" onclick="window.closeShortcutsModal?.()">Tutup</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Toast Container -->
+  <output class="toast-container" id="toast-container" aria-live="polite"></output>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <a href="index.html" class="logo">
+            <div class="logo-icon">P</div>
+            <span>PDFLokal</span>
+          </a>
+          <p class="footer-tagline">Urus dokumen langsung di browser. Gratis, offline, dan file kamu nggak kemana-mana.</p>
+        </div>
+        <div class="footer-links">
+          <a href="https://forms.gle/KPDWVAuc91pVjuWq6" target="_blank">Hubungi Kami</a>
+          <a href="dukung.html">Dukung Kami</a>
+          <a href="privasi.html">Kebijakan Privasi</a>
+          <a href="https://github.com/ojanlubis/pdflokal" target="_blank">Repository GitHub</a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>100% gratis · Open source · Made with ❤️ in Indonesia</p>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Libraries (Self-hosted for offline support and firewall compatibility) -->
+  <!-- Sentry browser SDK (self-hosted, with session replay).
+       WHY first among vendor scripts: errors thrown during pdf-lib / PDF.js
+       init must reach Sentry. Replay masks all DOM text + blocks canvas to
+       prevent leaking user PDF content (privacy-first commitment). -->
+  <script>window.APP_VERSION = '2026.06.02.1';</script>
+  <script src="js/vendor/sentry.min.js"></script>
+  <script>
+    Sentry.init({
+      dsn: 'https://0913dcff45e0045c49dfe1b14f34c65f@o4511472486580224.ingest.us.sentry.io/4511472494313472',
+      // WHY tunnel: ad blockers (uBlock, AdGuard, Brave Shields, etc.) block
+      // *.ingest.sentry.io by default. For a privacy-first product, that's
+      // ~40-50% of users losing observability. Routing through our own domain
+      // recovers those events. See /api/sentry-tunnel.js for the proxy.
+      tunnel: '/api/sentry-tunnel',
+      // Only enable on production. Localhost dev + Vercel previews stay silent.
+      // WHY both hostnames: pdflokal.id 301-redirects to www.pdflokal.id —
+      // matching only the apex form leaves Sentry silently disabled in prod.
+      enabled: location.hostname === 'pdflokal.id' || location.hostname === 'www.pdflokal.id',
+      release: window.APP_VERSION,
+      sampleRate: 1.0,
+      // WHY 10%: replays are sampled on session START. At 1% we caught about
+      // 5 navigational replays per month — useful for UX research but thin.
+      // Bumped to 10% because privacy risk is zero (maskAllText + canvas
+      // blocked), free tier covers 50/mo, and 10x more sessions means we
+      // can review typical user journeys, not just the rare ones.
+      replaysSessionSampleRate: 0.10,
+      replaysOnErrorSampleRate: 1.0,
+      integrations: [
+        Sentry.replayIntegration({
+          // Privacy-first: mask everything user-visible so replays are
+          // navigational only, never content-revealing.
+          maskAllText: true,
+          maskAllInputs: true,
+          blockAllMedia: true,
+          // Canvas holds user PDF pages — never record.
+          block: ['canvas']
+        })
+      ],
+      // Battle-tested ignore list adapted from Excalidraw's sentry.ts.
+      ignoreErrors: [
+        "undefined is not an object (evaluating 'window.__pad.performLoop')",
+        "InvalidStateError: Failed to execute 'transaction' on 'IDBDatabase': The database connection is closing.",
+        // WHY each browser worded differently: Chrome says "Failed to fetch
+        // dynamically imported module", Firefox says "error loading", Safari
+        // says "Importing a module script failed." — all the same class of
+        // transient failure (network blip, ad blocker, user closed tab mid
+        // load). JAVASCRIPT-5 slipped through because the old regex only
+        // covered Chrome/Firefox wording. Without this, ~5-10% of mobile
+        // Safari users with flaky connections become Sentry noise.
+        /(Importing a module script failed|Failed to fetch|(fetch|loading) dynamically imported module)/i,
+        /QuotaExceededError: (The quota has been exceeded|.*setItem.*Storage)/i,
+        "Internal error opening backing store for indexedDB.open"
+      ],
+      beforeSend(event) {
+        // Strip URL fragments — they can carry sensitive UI state.
+        // WHY split, not regex: SonarCloud S5852 flags greedy `.*$` as
+        // potentially ReDoS-prone (not exploitable here but the rule is
+        // conservative). split('#')[0] is simpler and identical in effect.
+        if (event.request?.url) {
+          event.request.url = event.request.url.split('#')[0];
+        }
+        return event;
+      }
+    });
+  </script>
+
+  <script src="js/vendor/pdf-lib.min.js"></script>
+  <script src="js/vendor/fontkit.umd.min.js"></script>
+  <script src="js/vendor/pdf.min.js"></script>
+  <script>
+    // WHY: workerSrc tells PDF.js to load the worker file as a real Web Worker
+    // (PDF parsing runs off main thread → scroll stays smooth during page render).
+    // Previously, pdf.worker.min.js was also loaded as a <script> tag for offline
+    // fallback, but that caused PDF.js to detect the worker code in global scope
+    // and SKIP creating a real Worker ("Setting up fake worker" in console).
+    // PDF.js has built-in fallback: if Worker creation fails (offline, CSP block),
+    // it automatically falls back to fake worker without the <script> tag.
+    pdfjsLib.GlobalWorkerOptions.workerSrc = '/js/vendor/pdf.worker.min.js';
+  </script>
+  <script src="js/vendor/signature_pad.umd.min.js"></script>
+
+  <!-- PDF Encryption Library (self-hosted, patched to use global PDFLib) -->
+  <script type="module">
+    import { encryptPDF } from './js/vendor/pdf-encrypt-lite.min.js';
+    window.encryptPDF = encryptPDF;
+  </script>
+
+  <!-- Changelog Notification System -->
+  <div class="changelog-notification" id="changelog-notification">
+    <!-- Collapsed Badge View -->
+    <button type="button" class="changelog-badge" onclick="window.changelogAPI?.open?.()">
+      <div class="changelog-badge-icon">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 8l3.5 3.5L13 4.5"></path>
+        </svg>
+      </div>
+      <div class="changelog-badge-text">
+        <span class="changelog-badge-title">Update Terbaru!</span>
+      </div>
+    </button>
+
+    <!-- Expanded Content View -->
+    <div class="changelog-content-wrapper">
+      <div class="changelog-header">
+        <h3>📣 Update Terbaru</h3>
+        <div class="changelog-header-actions">
+          <button class="changelog-action-btn" onclick="window.changelogAPI?.minimize?.()" title="Perkecil">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+          </button>
+          <button class="changelog-action-btn" onclick="window.changelogAPI?.close?.()" title="Tutup">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div class="changelog-items" id="changelog-content">
+        <!-- Items inserted by JS -->
+      </div>
+      <div class="changelog-pagination" id="changelog-pagination">
+        <button class="changelog-page-btn" id="changelog-prev-btn" onclick="window.changelogPrevPage?.()" disabled>
+          Sebelumnya
+        </button>
+        <span class="changelog-page-info" id="changelog-page-info">1 / 1</span>
+        <button class="changelog-page-btn" id="changelog-next-btn" onclick="window.changelogNextPage?.()">
+          Selanjutnya
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- App entry point (imports all modules) -->
+  <script type="module" src="js/init.js"></script>
+
+</body>
+
+</html>

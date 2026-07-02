@@ -91,14 +91,14 @@ test.describe('UI visual regression — desktop', () => {
   test.use({ viewport: DESKTOP });
 
   test('homepage empty state', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await page.waitForLoadState('domcontentloaded');
     await hideVolatileChrome(page);
     await expect(page).toHaveScreenshot('homepage-empty-desktop.png', SCREENSHOT_OPTS);
   });
 
   test('editor with sample PDF loaded', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await hideVolatileChrome(page);
     await loadSamplePdf(page);
     // WHY mask canvases: PDF.js render produces subpixel AA noise that
@@ -113,7 +113,7 @@ test.describe('UI visual regression — desktop', () => {
   });
 
   test('editor file menu open', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await hideVolatileChrome(page);
     await loadSamplePdf(page);
     await page.evaluate(() => window.toggleEditorFileMenu?.(new Event('click')));
@@ -125,7 +125,7 @@ test.describe('UI visual regression — desktop', () => {
   });
 
   test('floating toolbar more-tools dropdown open', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await hideVolatileChrome(page);
     await loadSamplePdf(page);
     await page.evaluate(() => window.toggleFloatingMore?.(new Event('click')));
@@ -137,7 +137,7 @@ test.describe('UI visual regression — desktop', () => {
   });
 
   test('kelola halaman modal open', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await hideVolatileChrome(page);
     await loadSamplePdf(page);
     await page.evaluate(() => window.uePmOpenModal?.());
@@ -164,14 +164,14 @@ test.describe('UI visual regression — mobile', () => {
   test.use({ viewport: MOBILE });
 
   test('homepage empty state', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await page.waitForLoadState('domcontentloaded');
     await hideVolatileChrome(page);
     await expect(page).toHaveScreenshot('homepage-empty-mobile.png', SCREENSHOT_OPTS);
   });
 
   test('editor with sample PDF loaded', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await hideVolatileChrome(page);
     await loadSamplePdf(page);
     await expect(page).toHaveScreenshot('editor-loaded-mobile.png', {
@@ -181,7 +181,7 @@ test.describe('UI visual regression — mobile', () => {
   });
 
   test('mobile tools dropdown open', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await hideVolatileChrome(page);
     await loadSamplePdf(page);
     await page.evaluate(() => window.toggleMobileTools?.());

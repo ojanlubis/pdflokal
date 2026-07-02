@@ -13,7 +13,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SAMPLE_PDF = path.join(__dirname, 'fixtures', 'sample-2pages.pdf');
 
 async function loadSampleAndOpen(page) {
-  await page.goto('/');
+  await page.goto('/alat-gambar.html');
   await page.setInputFiles('#file-input', SAMPLE_PDF);
   await page.waitForFunction(() => window.ueState?.pages?.length === 2);
   await page.evaluate(() => window.uePmOpenModal());

@@ -20,7 +20,7 @@ test.describe('Split PDF card', () => {
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
 
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
 
     // Clicking the card lazily creates #split-pdf-input and calls input.click(),
     // which Playwright surfaces as a 'filechooser' event.

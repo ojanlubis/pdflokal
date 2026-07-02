@@ -12,7 +12,7 @@ const FIXTURE = path.join(__dirname, 'fixtures', 'sample-2pages.pdf');
 
 test.describe('editor v2 — desktop', () => {
   test('full flow: open → type → style → drag → download a valid PDF', async ({ page }) => {
-    await page.goto('/editor-v2.html');
+    await page.goto('/');
     await page.setInputFiles('#file-input', FIXTURE);
     await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
 
@@ -47,7 +47,7 @@ test.describe('editor v2 — desktop', () => {
   });
 
   test('page manager works with a mouse (click select, bulk rotate)', async ({ page }) => {
-    await page.goto('/editor-v2.html');
+    await page.goto('/');
     await page.setInputFiles('#file-input', FIXTURE);
     await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
     await page.click('#btn-pages');

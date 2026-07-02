@@ -11,7 +11,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE = path.join(__dirname, '..', 'fixtures', 'sample-2pages.pdf');
 
 async function openAndPlaceText(page, text) {
-  await page.goto('/editor-v2.html');
+  await page.goto('/');
   await page.setInputFiles('#file-input', FIXTURE);
   await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
   await page.tap('[data-tool="text"]');
@@ -22,7 +22,7 @@ async function openAndPlaceText(page, text) {
 
 test.describe('format bar — mobile', () => {
   test('hidden by default; appears when the Teks tool is armed', async ({ page }) => {
-    await page.goto('/editor-v2.html');
+    await page.goto('/');
     await page.setInputFiles('#file-input', FIXTURE);
     await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
     await expect(page.locator('#format-bar')).toBeHidden();

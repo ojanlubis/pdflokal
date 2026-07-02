@@ -16,7 +16,7 @@ const FIXTURE = path.join(__dirname, '..', 'fixtures', 'sample-2pages.pdf');
 const RED_FIXTURE = path.join(__dirname, '..', 'fixtures', 'alt-red-1page.pdf');
 
 async function openDoc(page, fixture = FIXTURE) {
-  await page.goto('/editor-v2.html');
+  await page.goto('/');
   await page.setInputFiles('#file-input', fixture);
   await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
 }

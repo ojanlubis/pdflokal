@@ -65,7 +65,7 @@ test.describe('Ganti File (real-flow file picker)', () => {
   // Positive control: proves the red fixture renders red on a plain fresh load,
   // isolating any failure below to the Ganti File flow (not the fixture).
   test('positive control: fresh load of the red PDF renders red', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await loadViaHomepage(page, ALT_RED_PDF, 1);
     const px = await centerPixel(page, 0);
     expect(isRed(px), `expected red center pixel on fresh load, got ${JSON.stringify(px)}`).toBe(true);
@@ -75,7 +75,7 @@ test.describe('Ganti File (real-flow file picker)', () => {
   // File ▸ Ganti File menu → native picker → red 1-page PDF. The main canvas
   // MUST show the new (red) document, not blank/stale.
   test('regression: replacing via Ganti File renders the NEW document', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await loadViaHomepage(page, SAMPLE_PDF, 2);
 
     // Sanity: the sample's first page is NOT red (white bg) — so a red result

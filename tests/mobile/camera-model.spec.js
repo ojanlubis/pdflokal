@@ -12,7 +12,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE = path.join(__dirname, '..', 'fixtures', 'sample-2pages.pdf');
 
 async function openWithText(page) {
-  await page.goto('/editor-v2.html');
+  await page.goto('/');
   await page.setInputFiles('#file-input', FIXTURE);
   await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
   await page.tap('[data-tool="text"]');
@@ -80,7 +80,7 @@ test.describe('camera-first touch model', () => {
   });
 
   test('armed Teks writes ON TOP of an existing whiteout', async ({ page }) => {
-    await page.goto('/editor-v2.html');
+    await page.goto('/');
     await page.setInputFiles('#file-input', FIXTURE);
     await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
 

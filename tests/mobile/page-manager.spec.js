@@ -11,7 +11,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE = path.join(__dirname, '..', 'fixtures', 'sample-2pages.pdf');
 
 async function openSheet(page) {
-  await page.goto('/editor-v2.html');
+  await page.goto('/');
   await page.setInputFiles('#file-input', FIXTURE);
   await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
   await page.tap('#btn-pages');
@@ -140,7 +140,7 @@ test.describe('page manager — mobile', () => {
   });
 
   test('drag near the grid edge AUTO-SCROLLS a big document (30+ page reality)', async ({ page }) => {
-    await page.goto('/editor-v2.html');
+    await page.goto('/');
     // 16 pages: fixture + 7 merges — enough to overflow the sheet's grid.
     // (Serialized: loadFiles guards against concurrent picks by design.)
     await page.setInputFiles('#file-input', FIXTURE);

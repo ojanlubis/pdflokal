@@ -11,7 +11,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE = path.join(__dirname, '..', 'fixtures', 'sample-2pages.pdf');
 
 async function openDoc(page) {
-  await page.goto('/editor-v2.html');
+  await page.goto('/');
   await page.setInputFiles('#file-input', FIXTURE);
   await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
 }
@@ -23,7 +23,7 @@ test.describe('back button — mobile', () => {
     await expect(page.locator('#pm-sheet')).toBeVisible();
     await page.goBack();
     await expect(page.locator('#pm-sheet')).toBeHidden();
-    expect(page.url()).toContain('editor-v2'); // still here
+    expect(new URL(page.url()).pathname).toBe('/'); // still here, not navigated away
     await expect(page.locator('.pv-page').first()).toBeVisible();
   });
 
@@ -41,7 +41,7 @@ test.describe('back button — mobile', () => {
 
     await page.goBack();
     await expect(page.locator('#dl-sheet')).toBeHidden();
-    expect(page.url()).toContain('editor-v2');
+    expect(new URL(page.url()).pathname).toBe('/');
   });
 
   test('RAPID double-back (coalesced traversal) still closes everything, stays on page', async ({ page }) => {
@@ -55,7 +55,7 @@ test.describe('back button — mobile', () => {
     await Promise.all([page.goBack(), page.goBack()]).catch(() => {});
     await expect(page.locator('#pm-sheet')).toBeHidden();
     await expect(page.locator('#dl-sheet')).toBeHidden();
-    expect(page.url()).toContain('editor-v2');
+    expect(new URL(page.url()).pathname).toBe('/');
     await expect(page.locator('.pv-page').first()).toBeVisible();
   });
 

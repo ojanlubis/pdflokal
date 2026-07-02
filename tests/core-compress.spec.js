@@ -72,7 +72,7 @@ async function renderPage(pdfBytes, pageNum, scale) {
 
 test.describe('core compress adapter', () => {
   test('image-heavy PDF: shrinks, stays 3 pages at the same point dims, keeps pixels', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await page.waitForFunction(() => !!window.pdfjsLib && !!window.PDFLib);
 
     const r = await page.evaluate(`(async () => {
@@ -109,7 +109,7 @@ test.describe('core compress adapter', () => {
   });
 
   test('tiny text PDF: cannot win, returns input untouched with unchanged=true', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await page.waitForFunction(() => !!window.pdfjsLib && !!window.PDFLib);
 
     const r = await page.evaluate(`(async () => {
@@ -140,7 +140,7 @@ test.describe('core compress adapter', () => {
   });
 
   test('onProgress fires exactly once per page, in order', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await page.waitForFunction(() => !!window.pdfjsLib && !!window.PDFLib);
 
     const r = await page.evaluate(`(async () => {

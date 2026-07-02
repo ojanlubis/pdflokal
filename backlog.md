@@ -13,6 +13,14 @@ Running list of UI/UX findings + small fixes to pick up later. Append new items 
 
 ## Open
 
+- **[high, founder phone pass Jul 3 — v2 launch punch list, tackle first]** Five interaction findings from the pre-ship gauntlet (none blocked the swap):
+  1. **TTD after Hapus keeps the old signature** — mobile: draw ttd, delete it (drew wrong), tap TTD tool again → places the SAME old signature, and the "Gambar Ulang" option is missing from the top bar in that state. Expected: deleting your only placed signature should surface Gambar Ulang (or reopen the modal path). [js/v2/app.js signature flow, signature-modal.js]
+  2. **BERES stamp gets eaten by the browser's own download telegraph** — Android Chrome after Unduh shows its own confirmation dialog + success notification ON TOP of our celebration; by the time the user sees the canvas, the stamp is gone. Founder: make it bigger, more celebrative, and fire AFTER Chrome's download UI settles (delay/retrigger, or hook the download completing rather than starting). [js/v2/celebrate.js onDownloadSuccess timing]
+  3. **Tapping "PDFLokal" in the header should go home** — wordmark tap → back to the landing (Buka Baru semantics with an unsaved-changes guard, or just scroll-to-top landing when empty). [editor-v2 header]
+  4. **Kelola Halaman hides its powers** — users can be clueless about what the sheet can do (reorder/split/rotate/delete). Founder idea: explicit verb buttons (Tambah, Split, ...) or a mini tutorial — BUT deliberately wait ~2 days (from Jul 3) and check analytics whether gabungkan_used/split/reorder happen organically before adding UI. Decide with data. [js/v2/page-manager.js]
+  5. **No loading indicator on heavy exports** — downloading PNGs from a multi-page PDF churns silently; user can't tell working vs hung. Add progress telegraph to the export path (per-page progress on the CTA, e.g. "Menyiapkan gambar 3/12"), reuse compress's onProgress pattern. [js/v2/download-sheet.js doExport, js/core/export-images.js]
+
+
 - **[decided Jul 2]** Watermark + page-number + Kunci PDF UI: NOT built in v2 (3-month analytics: <0.5% each — 7/3/3 visitors). Engine + export support stays tested, so reintroduction = one button. Revisit only if users ask.
 - **[decided Jul 2]** Desktop sidebar: NOT rebuilt in v2. One assemble surface (Kelola Halaman) on all devices; the desktop ergonomics pass may dock the SAME sheet as a side panel on wide screens — one component, two positions, never two implementations.
 - **[decided Jul 3]** v2 launch sequencing (founder): **redesign → swap → demolition.** The swap ships wearing the new face so users see ONE big change. Redesign includes a one-time "we modernized" welcome signal (founder idea — a hover/toast on first visit post-swap; design it during the redesign pass). Editor-as-homepage direction proposed (empty state = landing content), founder reviewing.

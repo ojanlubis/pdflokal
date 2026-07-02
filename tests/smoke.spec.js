@@ -115,7 +115,7 @@ function watchForJsErrors(page) {
 test.describe('smoke', () => {
   test('homepage loads with no JS errors', async ({ page }) => {
     const errors = watchForJsErrors(page);
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await expect(page.locator('#main-dropzone')).toBeVisible();
     await expect(page).toHaveTitle(/PDFLokal/);
     expect(errors).toEqual([]);
@@ -132,7 +132,7 @@ test.describe('smoke', () => {
         });
       });
     });
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await page.waitForLoadState('networkidle');
 
     const info = await page.evaluate(() => ({
@@ -157,7 +157,7 @@ test.describe('smoke', () => {
   });
 
   test('dropping a PDF opens editor and renders all pages', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await loadSamplePdf(page);
     await expect(page.locator('#ue-pages-container')).toBeVisible();
     const canvases = await page.locator('.ue-page-slot canvas').count();
@@ -165,7 +165,7 @@ test.describe('smoke', () => {
   });
 
   test('export download produces a non-empty PDF', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await loadSamplePdf(page);
 
     const downloadPromise = page.waitForEvent('download');
@@ -195,7 +195,7 @@ async function reopenAnnotationAndType(page, replacement, exitKey) {
 
 test.describe('inline text editor', () => {
   test('regression #1: Escape cancels edit without kicking user home', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await loadSamplePdf(page);
     await addTextAnnotation(page, 0, { x: 100, y: 100, text: 'original' });
     await reopenAnnotationAndType(page, 'changed', 'Escape');
@@ -208,7 +208,7 @@ test.describe('inline text editor', () => {
   });
 
   test('Enter saves edit and updates annotation text', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await loadSamplePdf(page);
     await addTextAnnotation(page, 0, { x: 100, y: 100, text: 'before' });
     await reopenAnnotationAndType(page, 'after', 'Enter');
@@ -224,7 +224,7 @@ test.describe('escape cascade', () => {
   // through to showHome() and wiped the user's annotations. Documented in
   // memory/ux-audit-2026-05-30.md (finding C1).
   test('regression: Escape from signature modal closes only the modal', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await loadSamplePdf(page);
     await addTextAnnotation(page, 0, { x: 100, y: 100, text: 'do-not-lose' });
 
@@ -240,7 +240,7 @@ test.describe('escape cascade', () => {
   });
 
   test('regression: Escape from Lainnya dropdown closes only the dropdown', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await loadSamplePdf(page);
     await addTextAnnotation(page, 0, { x: 100, y: 100, text: 'still-here' });
 
@@ -256,7 +256,7 @@ test.describe('escape cascade', () => {
   });
 
   test('Escape with no overlay open still exits editor', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await loadSamplePdf(page);
 
     await page.keyboard.press('Escape');
@@ -269,7 +269,7 @@ test.describe('inline text on first creation', () => {
   // UX audit H1/H2 — first creation goes straight into the inline editor with
   // last-used formatting, no modal in between.
   test('Escape on empty new annotation removes the orphan', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await loadSamplePdf(page);
 
     await page.evaluate(() => window.ueSetTool('text'));
@@ -295,7 +295,7 @@ test.describe('inline text on first creation', () => {
   });
 
   test('successful save updates lastTextOptions for the next annotation', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await loadSamplePdf(page);
     await page.evaluate(() => { window.ueState.lastTextOptions.fontFamily = 'Carlito'; });
     await addTextAnnotation(page, 0, { x: 80, y: 80, text: 'first' });
@@ -317,7 +317,7 @@ test.describe('signature modal', () => {
   // the signature modal on mobile (where finger-draw is the primary intent)
   // showed Upload Foto first and added an extra tap for the common case.
   test('opens with Gambar (draw) tab active', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await loadSamplePdf(page);
     await page.evaluate(() => window.ueOpenSignatureModal());
     await page.waitForFunction(() => document.getElementById('signature-modal')?.classList.contains('active'));
@@ -335,7 +335,7 @@ test.describe('paraf modal', () => {
   // Pak Hadi paraf a 20-page deed in one click. Before, the apply-to-all
   // button only surfaced after placing one and selecting it.
   test('checked + place clones paraf onto every page', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await loadSamplePdf(page);
 
     // Prepare a paraf image without actually drawing on the canvas
@@ -378,7 +378,7 @@ test.describe('paraf modal', () => {
   });
 
   test('opening paraf modal resets the apply-all checkbox to unchecked', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await loadSamplePdf(page);
 
     await page.evaluate(() => {
@@ -404,7 +404,7 @@ test.describe('export pipeline', () => {
       return route.fulfill({ status: 500, body: 'forced failure' });
     });
 
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await loadSamplePdf(page);
 
     for (let i = 0; i < 4; i += 1) {
@@ -428,7 +428,7 @@ test.describe('export pipeline', () => {
 
   test('regression #3: rotated page export succeeds without JS errors', async ({ page }) => {
     const errors = watchForJsErrors(page);
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await loadSamplePdf(page);
 
     // Rotate page 0 to 90° via R shortcut
@@ -464,7 +464,7 @@ test.describe('clear page annotations confirm', () => {
   }
 
   test('cancel preserves annotations', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await loadSamplePdf(page);
     await seedWhiteoutAnnotation(page, 0);
 
@@ -476,7 +476,7 @@ test.describe('clear page annotations confirm', () => {
   });
 
   test('accept clears current page only', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await loadSamplePdf(page);
     await seedWhiteoutAnnotation(page, 0);
     // Seed page 1 to prove it's untouched
@@ -519,7 +519,7 @@ test.describe('Sentry observability', () => {
       });
     });
 
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await loadSamplePdf(page);
     await page.evaluate(() => window.showToast('Test error toast', 'error'));
 
@@ -535,7 +535,7 @@ test.describe('Sentry observability', () => {
   });
 
   test('replay sample rate is the bumped 10% value', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     const rate = await page.evaluate(() =>
       window.Sentry?.getClient()?.getOptions()?.replaysSessionSampleRate
     );
@@ -552,7 +552,7 @@ test.describe('Sentry observability', () => {
 test.describe('stale selectedAnnotation does not crash on tap', () => {
   test('regression: tapping with stale selection clears it without throwing', async ({ page }) => {
     const errors = watchForJsErrors(page);
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await loadSamplePdf(page);
 
     // Production state: user is in 'select' mode with an annotation selected.
@@ -604,7 +604,7 @@ test.describe('auto-switch to select after tool completion', () => {
   test('whiteout: STAYS sticky after a valid drag (multi-stamp redaction)', async ({ page }) => {
     // WHY sticky: reverted PR #60. Redacting a page means drawing box after box;
     // auto-switching to Pilih between each is more friction than it's worth.
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await loadSamplePdf(page);
 
     await page.evaluate(() => window.ueSetTool('whiteout'));
@@ -617,7 +617,7 @@ test.describe('auto-switch to select after tool completion', () => {
   });
 
   test('whiteout: a second drag stamps another box without re-selecting the tool', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await loadSamplePdf(page);
 
     await page.evaluate(() => window.ueSetTool('whiteout'));
@@ -631,7 +631,7 @@ test.describe('auto-switch to select after tool completion', () => {
   });
 
   test('text: inline Escape cancel returns to select tool', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await loadSamplePdf(page);
 
     await page.evaluate(() => window.ueSetTool('text'));
@@ -652,7 +652,7 @@ test.describe('auto-switch to select after tool completion', () => {
   });
 
   test('text: empty save (Enter on blank) returns to select tool', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await loadSamplePdf(page);
 
     await page.evaluate(() => window.ueSetTool('text'));
@@ -683,7 +683,7 @@ test.describe('auto-switch to select after tool completion', () => {
 // drawn — container stayed display:none.
 test.describe('Ganti File preserves rendering', () => {
   test('replacing files after edits actually renders the new pages', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await loadSamplePdf(page);
 
     // Make an edit so we're past the "just-loaded" state when replace fires
@@ -720,7 +720,7 @@ test.describe('Ganti File preserves rendering', () => {
 test.describe('signature preview survives no-page-selected', () => {
   test('regression: mousemove with pending signature and no selected page does not throw', async ({ page }) => {
     const errors = watchForJsErrors(page);
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await loadSamplePdf(page);
 
     // Mimic the production state: user picked paraf via top toolbar, never
@@ -759,7 +759,7 @@ test.describe('signature preview survives no-page-selected', () => {
 // purged canvas. Annotations get redrawn after.
 test.describe('mobile canvas purge survives via ImageData cache', () => {
   test('restoreCanvasFromCache repaints a blanked canvas from pageCaches', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await loadSamplePdf(page);
 
     // Trigger a real render so pageCaches[0] gets populated. The first page is
@@ -821,7 +821,7 @@ test.describe('mobile canvas purge survives via ImageData cache', () => {
 
   test('restoreCanvasFromCache no-ops cleanly when cache is missing', async ({ page }) => {
     const errors = watchForJsErrors(page);
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await loadSamplePdf(page);
     await page.waitForFunction(() => !!window.ueState.pageCaches?.[0]);
 
@@ -853,7 +853,7 @@ test.describe('mobile canvas purge survives via ImageData cache', () => {
 // JS-7 (stale annotations bucket), JS-8 (parallel-map drift).
 test.describe('mutatePages() re-keys parallel maps atomically', () => {
   test('reorder: annotations follow their page', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await loadSamplePdf(page);
 
     // Seed page 0 with annotation "A", page 1 with annotation "B".
@@ -876,7 +876,7 @@ test.describe('mutatePages() re-keys parallel maps atomically', () => {
   });
 
   test('reorder: selectedAnnotation follows its page', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await loadSamplePdf(page);
 
     await page.evaluate(() => {
@@ -904,7 +904,7 @@ test.describe('mutatePages() re-keys parallel maps atomically', () => {
     // while selectedAnnotation lives on page 1, the new index for that page
     // should be 0, AND the annotation index within the new bucket should
     // still resolve to a real annotation.
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await loadSamplePdf(page);
 
     await page.evaluate(() => {
@@ -937,7 +937,7 @@ test.describe('mutatePages() re-keys parallel maps atomically', () => {
     // ReferenceError. After the sweep, every inline onclick uses the
     // `window.X?.()` pattern that silently no-ops if X is undefined.
     const errors = watchForJsErrors(page);
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
 
     // Simulate the pre-init race: the home "Editor PDF" tool card calls
     // window.showTool internally (via the JS init handler), but the
@@ -962,7 +962,7 @@ test.describe('mutatePages() re-keys parallel maps atomically', () => {
   });
 
   test('mutatePages: deleting selected page falls back to nearest valid index', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await loadSamplePdf(page);
 
     await page.evaluate(() => {

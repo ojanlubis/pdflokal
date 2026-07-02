@@ -79,7 +79,7 @@ async function renderPage(pdfBytes, pageNum, scale) {
 
 test.describe('core export adapter', () => {
   test('buildPdfBytes: whiteout, text, signature land at the right pixels', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await page.waitForFunction(() => !!window.pdfjsLib && !!window.PDFLib);
 
     const r = await page.evaluate(`(async () => {
@@ -137,7 +137,7 @@ test.describe('core export adapter', () => {
   });
 
   test('rotated page: /Rotate lands in output and annotations follow the rotated frame', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await page.waitForFunction(() => !!window.pdfjsLib && !!window.PDFLib);
 
     const r = await page.evaluate(`(async () => {
@@ -180,7 +180,7 @@ test.describe('core export adapter', () => {
   });
 
   test('custom fonts: Montserrat + Carlito-Bold embed from /fonts and render ink', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await page.waitForFunction(() => !!window.pdfjsLib && !!window.PDFLib && !!window.fontkit);
 
     const r = await page.evaluate(`(async () => {
@@ -219,7 +219,7 @@ test.describe('core export adapter', () => {
   });
 
   test('watermark: tilted text renders semi-transparent ink near page centre', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await page.waitForFunction(() => !!window.pdfjsLib && !!window.PDFLib);
 
     const r = await page.evaluate(`(async () => {
@@ -250,7 +250,7 @@ test.describe('core export adapter', () => {
   });
 
   test('pageNumber: label renders ink at its position (old exporter dropped this)', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await page.waitForFunction(() => !!window.pdfjsLib && !!window.PDFLib);
 
     const r = await page.evaluate(`(async () => {
@@ -281,7 +281,7 @@ test.describe('core export adapter', () => {
   });
 
   test('rotated page: text annotation lands in the correct region of the rotated view', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await page.waitForFunction(() => !!window.pdfjsLib && !!window.PDFLib);
 
     const r = await page.evaluate(`(async () => {
@@ -323,7 +323,7 @@ test.describe('core export adapter', () => {
   });
 
   test('isFromImage page: raw image source becomes a full-page image', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/alat-gambar.html');
     await page.waitForFunction(() => !!window.pdfjsLib && !!window.PDFLib);
 
     const r = await page.evaluate(`(async () => {
