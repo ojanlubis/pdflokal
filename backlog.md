@@ -13,6 +13,11 @@ Running list of UI/UX findings + small fixes to pick up later. Append new items 
 
 ## Open
 
+- **[med]** v2 "Unduh sheet" — the output pipeline (Fable proposal, Jul 2; founder reviewing)
+  - Conversions/compression are OUTPUT FORMATS, not editing verbs → they live on the Unduh button, not the toolbar. Tapping Unduh opens a small sheet: **PDF** (primary) · **Gambar per halaman** (PNG/JPG — absorbs PDF-to-Image) · **PDF diperkecil** (quality choice — absorbs Compress PDF) · later **+ Kunci** (absorbs Protect, currently retired for low usage). Image→PDF is already absorbed by v2 (importImage). Keeps the toolbar pure verbs; absorbs 3 standalone tools with one surface.
+- **[decided Jul 2]** Watermark + page-number + Kunci PDF UI: NOT built in v2 (3-month analytics: <0.5% each — 7/3/3 visitors). Engine + export support stays tested, so reintroduction = one button. Revisit only if users ask.
+- **[decided Jul 2]** Desktop sidebar: NOT rebuilt in v2. One assemble surface (Kelola Halaman) on all devices; the desktop ergonomics pass may dock the SAME sheet as a side panel on wide screens — one component, two positions, never two implementations.
+
 - **[low]** Telegraph what each TOOL is doing — "chef's kiss" micro-feedback across four moments (founder idea, Jul 2, deferred to post-foundation)
   - There are four distinct moments a tool can telegraph its action, each a different feel: **BEFORE** (live ghost preview that follows the finger — Figma/Canva feel; fits the new overlay engine), **DURING** (operation storytelling — pages sliding together on gabung/split/export instead of a blank spinner), **AFTER** (subtle pulse + tiny label: "2 halaman digabung ✓"), **INTENT** (tool cue + cursor + one calm line: "Ketuk halaman untuk tanda tangan"). Founder: good principle, implement going forward once the foundation + live tools are on the new engine. Grounds in Nielsen "visibility of system status" + direct manipulation.
 
