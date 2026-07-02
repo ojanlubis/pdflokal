@@ -22,7 +22,7 @@ import {
   moveAnnotation,
 } from '../core/operations.js';
 import { createHistory, record, undo, redo, canUndo, canRedo } from '../core/history.js';
-import { importPdf, createPageRasterizer } from '../core/import.js';
+import { importPdf, importImage, createPageRasterizer } from '../core/import.js';
 import { createPageSlot, syncOverlay, textFontCss } from '../render/page-view.js';
 import { createViewportStream } from '../render/viewport.js';
 import { createInteraction } from '../render/interaction.js';
@@ -469,17 +469,21 @@ const SIZE_WARN = 20 * 1024 * 1024;
 const SIZE_BLOCK = 100 * 1024 * 1024;
 
 async function loadFiles(files) {
-  const pdfs = [...files].filter((f) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name));
-  if (pdfs.length === 0) { toast('Pilih file PDF ya'); return; }
-  const oversize = pdfs.find((f) => f.size > SIZE_BLOCK);
+  const isPdf = (f) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
+  const isImg = (f) => f.type.startsWith('image/');
+  // In picker order: PDFs append their pages, images become one page each.
+  const usable = [...files].filter((f) => isPdf(f) || isImg(f));
+  if (usable.length === 0) { toast('Pilih file PDF atau gambar ya'); return; }
+  const oversize = usable.find((f) => f.size > SIZE_BLOCK);
   if (oversize) { toast(`"${oversize.name}" terlalu besar (maks 100MB)`); return; }
-  if (pdfs.some((f) => f.size > SIZE_WARN)) toast('File besar — proses bisa agak lama ya');
+  if (usable.some((f) => f.size > SIZE_WARN)) toast('File besar — proses bisa agak lama ya');
   const firstLoad = doc.pages.length === 0;
-  if (firstLoad) baseName = pdfs[0].name.replace(/\.pdf$/i, '');
+  if (firstLoad) baseName = usable[0].name.replace(/\.[^.]+$/, '');
 
-  for (const f of pdfs) {
+  for (const f of usable) {
     const bytes = new Uint8Array(await f.arrayBuffer());
-    await importPdf(doc, { name: f.name, bytes }); // appends pages → merge
+    if (isPdf(f)) await importPdf(doc, { name: f.name, bytes });
+    else await importImage(doc, { name: f.name, bytes, mimeType: f.type });
   }
   if (!rasterizer) rasterizer = createPageRasterizer(doc);
   emptyEl.style.display = 'none';
@@ -489,7 +493,7 @@ async function loadFiles(files) {
     stage.style.zoom = zoom;
   }
   rebuildStage();
-  if (!firstLoad) toast(`${pdfs.length} file ditambahkan`);
+  if (!firstLoad) toast(`${usable.length} file ditambahkan`);
   // If the Halaman sheet triggered this add, refresh its grid in place.
   if (document.getElementById('pm-sheet').open) pageManager.render();
 }

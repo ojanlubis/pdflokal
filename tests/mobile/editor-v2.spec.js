@@ -113,4 +113,22 @@ test.describe('editor v2 — mobile', () => {
     const sources = await page.evaluate(() => window.v2.getDoc().sources.length);
     expect(sources).toBe(2);
   });
+
+  test('adding an image appends it as one page (isFromImage)', async ({ page }) => {
+    await openWithFixture(page);
+    // 1×1 red PNG — the smallest possible image-as-page.
+    const redPixel = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+      'base64',
+    );
+    await page.setInputFiles('#file-input', { name: 'foto.png', mimeType: 'image/png', buffer: redPixel });
+    await expect(page.locator('.pv-page')).toHaveCount(3);
+    const last = await page.evaluate(() => {
+      const p = window.v2.getDoc().pages.at(-1);
+      return { isFromImage: p.isFromImage, w: p.width, h: p.height };
+    });
+    expect(last.isFromImage).toBe(true);
+    expect(last.w).toBe(1);
+    expect(last.h).toBe(1);
+  });
 });

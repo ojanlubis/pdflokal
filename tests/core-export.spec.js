@@ -179,6 +179,149 @@ test.describe('core export adapter', () => {
     expect(r.bluePx[0]).toBeLessThan(80);
   });
 
+  test('custom fonts: Montserrat + Carlito-Bold embed from /fonts and render ink', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForFunction(() => !!window.pdfjsLib && !!window.PDFLib && !!window.fontkit);
+
+    const r = await page.evaluate(`(async () => {
+      ${buildSourceDoc}
+      ${renderPage}
+      const { model, ops, exp, doc } = await buildSourceDoc();
+      const p0 = doc.pages[0];
+
+      // Montserrat regular on the white area below the dark block.
+      ops.addAnnotation(doc, p0.id, model.createAnnotation('text', {
+        text: 'MMMMM', x: 300, y: 400, fontSize: 36,
+        color: '#000000', fontFamily: 'Montserrat', bold: false, italic: false,
+      }));
+      // Carlito bold, lower down on the same white area.
+      ops.addAnnotation(doc, p0.id, model.createAnnotation('text', {
+        text: 'CCCCC', x: 300, y: 500, fontSize: 36,
+        color: '#000000', fontFamily: 'Carlito', bold: true, italic: false,
+      }));
+
+      const outBytes = await exp.buildPdfBytes(doc); // deps default to window globals
+      const s = await renderPage(outBytes, 1, 2);
+      return {
+        montserratMinLuma: s.regionMinLuma(295, 398, 460, 445), // Montserrat text bbox
+        carlitoMinLuma: s.regionMinLuma(295, 498, 460, 545),    // Carlito-Bold text bbox
+        betweenMinLuma: s.regionMinLuma(295, 452, 460, 490),    // gap between lines stays blank
+      };
+    })()`);
+
+    // Both custom-font lines put real glyph ink on the page (fonts fetched and
+    // embedded via fontkit — not the Helvetica fallback, which would still be
+    // ink; this asserts embedding didn't throw and text rendered).
+    expect(r.montserratMinLuma).toBeLessThan(100);
+    expect(r.carlitoMinLuma).toBeLessThan(100);
+    // The gap between the two lines is untouched white.
+    expect(r.betweenMinLuma).toBeGreaterThan(240);
+  });
+
+  test('watermark: tilted text renders semi-transparent ink near page centre', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForFunction(() => !!window.pdfjsLib && !!window.PDFLib);
+
+    const r = await page.evaluate(`(async () => {
+      ${buildSourceDoc}
+      ${renderPage}
+      const { model, ops, exp, doc } = await buildSourceDoc();
+      const p0 = doc.pages[0];
+
+      // Watermark centred at (300, 400) — well below the dark block (y 100..200).
+      ops.addAnnotation(doc, p0.id, model.createAnnotation('watermark', {
+        text: 'RAHASIA', x: 300, y: 400, fontSize: 48,
+        color: '#000000', opacity: 0.5, rotation: 45,
+      }));
+
+      const outBytes = await exp.buildPdfBytes(doc);
+      const s = await renderPage(outBytes, 1, 2);
+      return {
+        centreMinLuma: s.regionMinLuma(150, 300, 450, 500), // generous box around centre
+        cornerMinLuma: s.regionMinLuma(40, 640, 240, 760),  // far corner stays blank
+      };
+    })()`);
+
+    // Some ink landed near the centre. opacity 0.5 over white → mid-grey, so the
+    // threshold is generous (not near-black like solid text).
+    expect(r.centreMinLuma).toBeLessThan(220);
+    // A corner far from the watermark stays white.
+    expect(r.cornerMinLuma).toBeGreaterThan(240);
+  });
+
+  test('pageNumber: label renders ink at its position (old exporter dropped this)', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForFunction(() => !!window.pdfjsLib && !!window.PDFLib);
+
+    const r = await page.evaluate(`(async () => {
+      ${buildSourceDoc}
+      ${renderPage}
+      const { model, ops, exp, doc } = await buildSourceDoc();
+      const p0 = doc.pages[0];
+
+      // Page-number label on the white area. Larger than the 12pt default so the
+      // thin '1' glyph is reliably sampled at scale 2.
+      ops.addAnnotation(doc, p0.id, model.createAnnotation('pageNumber', {
+        text: '1', x: 300, y: 400, fontSize: 24, color: '#000000',
+      }));
+
+      const outBytes = await exp.buildPdfBytes(doc);
+      const s = await renderPage(outBytes, 1, 2);
+      return {
+        labelMinLuma: s.regionMinLuma(296, 398, 330, 430), // '1' glyph bbox
+        besideMinLuma: s.regionMinLuma(360, 398, 460, 430), // to the right stays blank
+      };
+    })()`);
+
+    // The label put ink on the page — guards the fix for the old exporter, which
+    // had no pageNumber branch and silently dropped these.
+    expect(r.labelMinLuma).toBeLessThan(120);
+    // Space beside the single digit stays white.
+    expect(r.besideMinLuma).toBeGreaterThan(240);
+  });
+
+  test('rotated page: text annotation lands in the correct region of the rotated view', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForFunction(() => !!window.pdfjsLib && !!window.PDFLib);
+
+    const r = await page.evaluate(`(async () => {
+      ${buildSourceDoc}
+      ${renderPage}
+      const { model, ops, exp, doc } = await buildSourceDoc();
+      const p1 = doc.pages[1];
+      ops.rotatePage(doc, p1.id, 90);
+
+      // In the rotated (90° cw) view the page is 800 wide × 600 tall. Place text
+      // at view coords (300, 300) — clear of the blue square (view x 100..200,
+      // y 100..200). It must render there in the rotated output view.
+      ops.addAnnotation(doc, p1.id, model.createAnnotation('text', {
+        text: 'ROT', x: 300, y: 300, fontSize: 40,
+        color: '#000000', fontFamily: 'Helvetica', bold: true, italic: false,
+      }));
+
+      const outBytes = await exp.buildPdfBytes(doc);
+      // PDF.js applies /Rotate in its default viewport → samples are in the
+      // ROTATED view frame, exactly where the user placed the text.
+      const s = await renderPage(outBytes, 2, 2);
+      return {
+        rotate: s.rotate,
+        vpWidth: s.vpWidth,
+        vpHeight: s.vpHeight,
+        textMinLuma: s.regionMinLuma(295, 300, 420, 350), // text bbox in rotated view
+        aboveMinLuma: s.regionMinLuma(295, 240, 420, 285), // above the text stays blank
+      };
+    })()`);
+
+    // Rotation is real metadata and the viewport swaps dims.
+    expect(r.rotate).toBe(90);
+    expect(r.vpWidth).toBe(800);
+    expect(r.vpHeight).toBe(600);
+
+    // Text ink landed in the rotated-view region; the area above it stays blank.
+    expect(r.textMinLuma).toBeLessThan(100);
+    expect(r.aboveMinLuma).toBeGreaterThan(240);
+  });
+
   test('isFromImage page: raw image source becomes a full-page image', async ({ page }) => {
     await page.goto('/');
     await page.waitForFunction(() => !!window.pdfjsLib && !!window.PDFLib);
