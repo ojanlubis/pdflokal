@@ -132,6 +132,11 @@ export function renderAnnotationEl(anno) {
     el.style.color = anno.color || '#000';
     el.style.whiteSpace = 'pre';
     el.style.lineHeight = '1.2';
+    // Finger-sized hit area without moving the visual position: small text at
+    // page zoom ~0.6 is a <20px target — padding grows the hit box, the
+    // negative margin cancels the layout shift. (≥44px rule, product def §6.5.)
+    el.style.padding = '10px';
+    el.style.margin = '-10px';
   } else if (anno.type === 'whiteout') {
     el.style.width = (anno.width || 0) + 'px';
     el.style.height = (anno.height || 0) + 'px';

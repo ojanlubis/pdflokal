@@ -114,6 +114,11 @@ export function createInteraction(ctx) {
     const p = toPage(e, pageView);
     gesture = {
       kind: 'draw', pointerId: e.pointerId, pageView, page,
+      // zoom/startX/startY MUST be here like every gesture: onPointerMove's
+      // shared delta math reads them. Their absence made dx NaN and silently
+      // killed whiteout-draw entirely (caught by the founder, Jul 2).
+      zoom: ctx.getZoom(),
+      startX: e.clientX, startY: e.clientY,
       originX: p.x, originY: p.y,
       el: null, anno: null, moved: false,
     };

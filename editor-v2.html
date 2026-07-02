@@ -108,10 +108,15 @@
       -webkit-overflow-scrolling: touch;
       position: relative;
     }
+    /* Zoom = transform:scale on the stage; the sizer carries the SCALED layout
+       size so the scroll container is always correct. transform (not CSS zoom):
+       zoom's coordinate reporting was quirky before Chrome 128 — a real
+       old-Android problem for this market. transform is standardized everywhere. */
+    #v2-sizer { position: relative; margin: 0 auto; padding: 16px 0 90px; }
     #v2-stage {
+      position: absolute; top: 16px; left: 0;
       display: flex; flex-direction: column; align-items: center; gap: 16px;
-      padding: 16px 8px 90px;
-      transform-origin: top center;
+      transform-origin: top left;
     }
 
     /* placeholder shimmer (telegraph: "loading", not "broken") */
@@ -294,9 +299,6 @@
     <button class="icon-btn" id="btn-redo" disabled aria-label="Ulangi" title="Ulangi (Ctrl+Y)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></svg>
     </button>
-    <button class="icon-btn" id="btn-pages" disabled aria-label="Kelola halaman" title="Kelola halaman">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-    </button>
     <button id="btn-download" disabled>Unduh</button>
   </header>
 
@@ -321,6 +323,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
       Hapus
     </button>
+    <button class="tool" id="btn-pages" disabled aria-label="Kelola halaman — urutkan, putar, hapus, ekstrak">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Halaman
+    </button>
   </div>
 
   <div id="format-bar" role="toolbar" aria-label="Format teks"></div>
@@ -330,7 +336,7 @@
   </div>
 
   <main id="v2-scroll">
-    <div id="v2-stage"></div>
+    <div id="v2-sizer"><div id="v2-stage"></div></div>
     <div id="empty">
       <h1>Edit PDF langsung di HP-mu</h1>
       <p>Gabung, tanda tangan, tulis, dan tutup teks — semua diproses di perangkatmu, nggak ada yang di-upload.</p>

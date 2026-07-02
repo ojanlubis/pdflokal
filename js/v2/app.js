@@ -68,11 +68,16 @@ function download(blob, filename) {
 }
 
 // ---- zoom ---------------------------------------------------------------------
-// CSS `zoom` (standardized 2024), NOT transform: it participates in layout, so
-// the scroll container sizes correctly at any zoom — no sizer-div math. gBCR
-// returns zoomed values, which is exactly what interaction.js divides out.
+// transform:scale + a sizer that carries the scaled layout size. NOT CSS zoom:
+// zoom's coordinate reporting was quirky pre-Chrome-128, and old Androids are
+// exactly who we build for. gBCR under transform returns visual coords on every
+// engine ever — which is what interaction.js divides by zoom.
+const sizer = document.getElementById('v2-sizer');
 function applyZoom() {
-  stage.style.zoom = zoom;
+  stage.style.transform = `scale(${zoom})`;
+  // offsetWidth/Height are layout (pre-transform) sizes — scale them ourselves.
+  sizer.style.width = Math.ceil(stage.offsetWidth * zoom) + 'px';
+  sizer.style.height = Math.ceil(stage.offsetHeight * zoom) + 'px';
   stream.refresh(0);
 }
 document.getElementById('z-in').onclick = () => { zoom = Math.min(zoom + 0.25, 3); applyZoom(); };
@@ -109,7 +114,7 @@ function rebuildStage() {
   });
   interaction.refreshSelection();
   refreshChrome();
-  stream.refresh(0);
+  applyZoom(); // stage layout size changed → re-size the sizer (also refreshes)
 }
 
 // Re-render one page's overlay after a structural annotation change.
@@ -490,9 +495,8 @@ async function loadFiles(files) {
 
   if (firstLoad) {
     zoom = Math.min(1, (scrollEl.clientWidth - 16) / doc.pages[0].width);
-    stage.style.zoom = zoom;
   }
-  rebuildStage();
+  rebuildStage(); // applies zoom + sizer at the end
   if (!firstLoad) toast(`${usable.length} file ditambahkan`);
   // If the Halaman sheet triggered this add, refresh its grid in place.
   if (document.getElementById('pm-sheet').open) pageManager.render();
