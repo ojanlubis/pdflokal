@@ -27,6 +27,7 @@ import { createViewportStream } from '../render/viewport.js';
 import { createInteraction } from '../render/interaction.js';
 import { createFormatBar } from './format-bar.js';
 import { createPageManager } from './page-manager.js';
+import { createSignatureModal } from './signature-modal.js';
 
 window.pdfjsLib.GlobalWorkerOptions.workerSrc = '/js/vendor/pdf.worker.min.js';
 
@@ -125,6 +126,7 @@ function refreshChrome() {
   document.getElementById('btn-pages').disabled = doc.pages.length === 0;
   document.getElementById('btn-delete-anno').disabled = !doc.selection.annotationId;
   syncFormatBar();
+  syncSigBar();
 }
 
 // ---- format bar ----------------------------------------------------------------
@@ -183,7 +185,7 @@ function setTool(next) {
 for (const btn of document.querySelectorAll('#toolbar .tool[data-tool]')) {
   btn.addEventListener('click', () => {
     const t = btn.dataset.tool;
-    if (t === 'signature' && !storedSignature) { openSigModal(); return; }
+    if (t === 'signature' && !storedSignature) { signatureModal.open(); return; }
     setTool(t);
     if (t === 'text') toast('Ketuk halaman untuk menulis');
     if (t === 'whiteout') toast('Seret di halaman untuk menutup teks');
@@ -207,12 +209,14 @@ const interaction = createInteraction({
       openTextEditor({ pageId, x, y, anno: null });
     } else if (t === 'signature' && storedSignature) {
       record(history, doc);
-      const w = 150;
+      // Paraf places small (initials), signature at document scale.
+      const w = storedSignature.subtype === 'paraf' ? 80 : 150;
       const h = w * (storedSignature.height / storedSignature.width);
-      addAnnotation(doc, pageId, createAnnotation('signature', {
-        image: storedSignature.dataUrl,
+      const created = addAnnotation(doc, pageId, createAnnotation('signature', {
+        image: storedSignature.dataUrl, subtype: storedSignature.subtype,
         x: Math.max(0, x - w / 2), y: Math.max(0, y - h / 2), width: w, height: h,
       }));
+      selectAnnotation(doc, created.id); // selected → "Semua Hal." is one tap away
       syncPage(pageId);
       setTool('select'); // tools are verbs; back home
     }
@@ -337,29 +341,57 @@ function openTextEditor({ pageId, x, y, anno }) {
   sel.collapseToEnd();
 }
 
-// ---- signature modal ------------------------------------------------------------------
-const sigModal = document.getElementById('sig-modal');
-let sigPad = null;
-function openSigModal() {
-  sigModal.showModal();
-  const canvas = document.getElementById('sig-canvas');
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  canvas.width = canvas.offsetWidth * dpr;
-  canvas.height = canvas.offsetHeight * dpr;
-  canvas.getContext('2d').scale(dpr, dpr);
-  sigPad = new window.SignaturePad(canvas, { minWidth: 1, maxWidth: 2.4 });
+// ---- signature modal (draw / upload / paraf) --------------------------------------------
+const signatureModal = createSignatureModal({
+  modal: document.getElementById('sig-modal'),
+  toast,
+  onReady: (sig) => {
+    storedSignature = sig; // { dataUrl, width, height, subtype }
+    setTool('signature');
+    toast(sig.subtype === 'paraf'
+      ? 'Ketuk halaman untuk menempatkan paraf'
+      : 'Ketuk halaman untuk menempatkan tanda tangan');
+  },
+});
+
+// ---- "Semua Hal." — copy the selected signature/paraf to every page ----------------------
+function selectedSignatureAnno() {
+  const id = doc.selection.annotationId;
+  if (!id) return null;
+  for (const page of doc.pages) {
+    const a = page.annotations.find((x) => x.id === id);
+    if (a) return a.type === 'signature' ? { page, anno: a } : null;
+  }
+  return null;
 }
-document.getElementById('sig-clear').onclick = () => sigPad?.clear();
-document.getElementById('sig-cancel').onclick = () => sigModal.close();
-document.getElementById('sig-use').onclick = () => {
-  if (!sigPad || sigPad.isEmpty()) { toast('Gambar tanda tanganmu dulu ya'); return; }
-  const canvas = document.getElementById('sig-canvas');
-  storedSignature = { dataUrl: canvas.toDataURL('image/png'), width: canvas.width, height: canvas.height };
-  sigModal.close();
-  setTool('signature');
-  toast('Ketuk halaman untuk menempatkan tanda tangan');
-};
-sigModal.addEventListener('click', (e) => { if (e.target === sigModal) sigModal.close(); });
+
+function syncSigBar() {
+  const found = selectedSignatureAnno();
+  const bar = document.getElementById('sig-bar');
+  bar.classList.toggle('show', !!found && doc.pages.length > 1);
+  if (found) {
+    document.getElementById('sig-bar-label').textContent =
+      found.anno.subtype === 'paraf' ? 'Paraf terpilih' : 'Tanda tangan terpilih';
+  }
+}
+
+document.getElementById('btn-all-pages').addEventListener('click', () => {
+  const found = selectedSignatureAnno();
+  if (!found) return;
+  const { page: home, anno } = found;
+  record(history, doc);
+  for (const page of doc.pages) {
+    if (page.id === home.id) continue;
+    // Same position on every page; each copy is its OWN object (new id) so it
+    // moves/deletes independently afterwards.
+    addAnnotation(doc, page.id, createAnnotation('signature', {
+      image: anno.image, subtype: anno.subtype,
+      x: anno.x, y: anno.y, width: anno.width, height: anno.height,
+    }));
+  }
+  rebuildStage();
+  toast(`Diterapkan ke ${doc.pages.length - 1} halaman lain ✓`);
+});
 
 // ---- delete / undo / redo ------------------------------------------------------------
 function deleteSelected() {

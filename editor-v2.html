@@ -240,6 +240,41 @@
     .pm-bulk button:disabled { opacity: .35; }
     .pm-bulk .btn-ghost { border: none; background: none; }
 
+    /* ---- signature modal extras ---- */
+    .sig-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
+    .sig-tab {
+      padding: 8px 14px; font-size: 13.5px; color: var(--muted);
+      border-bottom: 2px solid transparent; border-radius: 0; min-height: 40px;
+    }
+    .sig-tab.on { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+    .sig-inline { align-self: flex-start; font-size: 13px; }
+    .sig-pane-draw { display: flex; flex-direction: column; gap: 6px; }
+    .sig-pane-upload { display: flex; flex-direction: column; gap: 10px; }
+    .sig-upload-drop {
+      display: flex; align-items: center; justify-content: center; min-height: 64px;
+      border: 1.5px dashed var(--line); border-radius: 10px; cursor: pointer;
+      color: var(--muted); font-size: 14px;
+    }
+    .sig-check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink); min-height: 32px; }
+    .sig-check input { width: 17px; height: 17px; accent-color: var(--accent); }
+    .sig-preview { display: flex; justify-content: center; }
+    .sig-preview canvas {
+      max-width: 100%; max-height: 140px; border-radius: 8px;
+      background: repeating-conic-gradient(#eee 0% 25%, #fff 0% 50%) 0 0/14px 14px;
+    }
+
+    /* signature context strip ("Semua Hal.") */
+    #sig-bar {
+      display: none; align-items: center; gap: 8px; height: 46px; flex: 0 0 auto;
+      padding: 0 10px; background: var(--surface); border-bottom: 1px solid var(--line);
+      font-size: 12.5px; color: var(--muted);
+    }
+    #sig-bar.show { display: flex; }
+    #sig-bar button {
+      min-height: 34px; padding: 0 13px; border-radius: 8px;
+      border: 1px solid var(--line); background: var(--bg); font-size: 13px;
+    }
+
     #toast {
       position: fixed; left: 50%; transform: translateX(-50%); bottom: 130px; z-index: 40;
       background: rgba(26,29,33,.9); color: #fff; font-size: 13px;
@@ -289,6 +324,10 @@
   </div>
 
   <div id="format-bar" role="toolbar" aria-label="Format teks"></div>
+  <div id="sig-bar" role="toolbar" aria-label="Aksi tanda tangan">
+    <span id="sig-bar-label"></span>
+    <button id="btn-all-pages">Terapkan ke Semua Hal.</button>
+  </div>
 
   <main id="v2-scroll">
     <div id="v2-stage"></div>
@@ -327,10 +366,24 @@
 
   <dialog id="sig-modal" aria-label="Buat tanda tangan">
     <div class="sheet">
-      <h2>Gambar tanda tanganmu</h2>
-      <canvas id="sig-canvas"></canvas>
+      <div class="sig-tabs" role="tablist">
+        <button class="sig-tab on" data-tab="draw" role="tab" aria-selected="true">Gambar</button>
+        <button class="sig-tab" data-tab="upload" role="tab" aria-selected="false">Upload</button>
+      </div>
+      <div class="sig-pane-draw">
+        <canvas id="sig-canvas"></canvas>
+        <button class="btn-ghost sig-inline" id="sig-clear">Ulangi</button>
+      </div>
+      <div class="sig-pane-upload" style="display:none">
+        <label class="sig-upload-drop">
+          <input type="file" id="sig-file" accept="image/*" hidden>
+          <span>Pilih foto tanda tangan 📷</span>
+        </label>
+        <label class="sig-check"><input type="checkbox" id="sig-removebg" checked> Hapus latar putih</label>
+        <div id="sig-preview" class="sig-preview"></div>
+      </div>
+      <label class="sig-check"><input type="checkbox" id="sig-paraf"> Jadikan paraf (inisial, lebih kecil)</label>
       <div class="sheet-actions">
-        <button class="btn-ghost" id="sig-clear">Ulangi</button>
         <button class="btn-ghost" id="sig-cancel">Batal</button>
         <button class="btn-primary" id="sig-use">Pakai</button>
       </div>
