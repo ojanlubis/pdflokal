@@ -2,12 +2,14 @@
  * PDFLokal — v2/celebrate.js  (the download moment: reward, then invite)
  * ============================================================================
  * The download is the emotional peak. Two beats, in the founder's order:
- *   1. CELEBRATE: a modern micro-burst (soft ring pulse + floating dots with
- *      spring easing, Web Animations API). Quick, quiet, gone in ~0.7s.
- *      Founder killed the 1990s rectangle confetti, rightly.
+ *   1. CELEBRATE: the BERES stamp (stempel language — "cap = pernyataan
+ *      status", see memory/design-language-2026-07.md). Thunk, gone in ~1.5s.
  *   2. INVITE: one dismissible card (share PDFLokal or tip via QRIS inline).
- *      Swipe-down dismisses it like any sheet. Once per session, permanent
- *      opt-out. The file is already saved; nothing is ever held hostage.
+ *      Swipe-down dismisses it like any sheet. Once per calendar day,
+ *      permanent opt-out. The file is already saved; never held hostage.
+ * This module also owns the other stamp moments: TAMPILAN BARU (once per
+ * device) and TETAP JALAN (offline mid-session). SUDAH OPTIMAL lives in
+ * download-sheet.js, BARU in the future changelog.
  */
 
 const OPTOUT_KEY = 'pdflokal-support-optout';
@@ -24,49 +26,43 @@ function safeSet(key, val) {
   try { localStorage.setItem(key, val); } catch { /* private mode, session-only */ }
 }
 
-// ---- beat 1: the burst ------------------------------------------------------------
-// One expanding ring + a dozen soft dots that spring up and drift out, all
-// GPU-composited transforms/opacity via WAAPI. Reads as "success", not "party".
-function burst() {
-  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
-  const wrap = document.createElement('div');
-  wrap.className = 'v2-burst';
-  wrap.style.cssText =
-    'position:fixed;left:50%;bottom:96px;width:0;height:0;pointer-events:none;z-index:120';
-  document.body.appendChild(wrap);
+// ---- the stamp language -----------------------------------------------------------
+// "Cap = pernyataan status": a stamp asserts the document's status, exactly like
+// a real stempel, and is never decoration. Exactly five moments earn one (see
+// memory/design-language-2026-07.md). Distressed texture is a CSS feTurbulence
+// mask — zero assets, cheap on 1-juta phones.
+const STAMP_MASK = 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'120\' height=\'120\'><filter id=\'n\'><feTurbulence baseFrequency=\'.75\'/></filter><rect width=\'120\' height=\'120\' filter=\'url(%23n)\' opacity=\'.9\'/></svg>")';
 
-  const ring = document.createElement('div');
-  ring.style.cssText =
-    'position:absolute;left:-28px;top:-28px;width:56px;height:56px;border-radius:50%;' +
-    'border:2.5px solid rgba(220,38,38,.5)';
-  wrap.appendChild(ring);
-  ring.animate(
-    [{ transform: 'scale(.3)', opacity: 1 }, { transform: 'scale(1.9)', opacity: 0 }],
-    { duration: 520, easing: 'cubic-bezier(.2,.8,.2,1)' },
-  );
-
-  const COLORS = ['#dc2626', '#f87171', '#1d8a44', '#f7b84f'];
-  for (let i = 0; i < 12; i += 1) {
-    const dot = document.createElement('div');
-    const s = 5 + (i % 3) * 3;
-    dot.style.cssText =
-      `position:absolute;left:${-s / 2}px;top:${-s / 2}px;width:${s}px;height:${s}px;` +
-      `border-radius:50%;background:${COLORS[i % COLORS.length]};opacity:0`;
-    wrap.appendChild(dot);
-    const ang = (Math.PI * (i + 0.5)) / 12 + Math.PI; // upward fan
-    const dist = 60 + (i % 4) * 22;
-    const dx = Math.cos(ang) * dist * ((i % 2) ? 1 : -1) * 0.6;
-    const dy = -Math.abs(Math.sin(ang)) * dist - 30;
-    dot.animate(
+// opts.anchor: 'center' | 'bottom'. opts.host: element to append into — pass the
+// open <dialog> when stamping over one (fixed children of a top-layer dialog
+// paint above it; a body-appended stamp would be hidden underneath).
+export function showStamp(text, { anchor = 'center', duration = 1500, host = document.body } = {}) {
+  const el = document.createElement('div');
+  el.className = 'v2-stamp';
+  el.textContent = text;
+  const pos = anchor === 'bottom' ? 'bottom:110px' : 'top:34%';
+  el.style.cssText =
+    `position:fixed;left:50%;${pos};z-index:130;pointer-events:none;` +
+    'padding:8px 18px;border:3.5px solid #dc2626;border-radius:8px;color:#dc2626;' +
+    'font-weight:700;font-size:21px;letter-spacing:.08em;text-transform:uppercase;' +
+    'background:rgba(250,248,244,.72);white-space:nowrap;' +
+    `-webkit-mask-image:${STAMP_MASK};mask-image:${STAMP_MASK};` +
+    'transform:translateX(-50%) rotate(-6deg);';
+  host.appendChild(el);
+  if (!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+    el.animate(
       [
-        { transform: 'translate(0,0) scale(.4)', opacity: 0 },
-        { transform: `translate(${dx * 0.5}px,${dy * 0.6}px) scale(1)`, opacity: 1, offset: 0.35 },
-        { transform: `translate(${dx}px,${dy}px) scale(.5)`, opacity: 0 },
+        { transform: 'translateX(-50%) rotate(-14deg) scale(2.1)', opacity: 0 },
+        { transform: 'translateX(-50%) rotate(-6deg) scale(.96)', opacity: 1, offset: 0.55 },
+        { transform: 'translateX(-50%) rotate(-6deg) scale(1)', opacity: 1 },
       ],
-      { duration: 620 + (i % 5) * 40, delay: i * 14, easing: 'cubic-bezier(.16,.84,.3,1)' },
+      { duration: 420, easing: 'cubic-bezier(.34,1.45,.44,1)' },
     );
+    el.animate([{ opacity: 1 }, { opacity: 0 }], {
+      duration: 280, delay: duration - 280, fill: 'forwards',
+    });
   }
-  setTimeout(() => wrap.remove(), 950);
+  setTimeout(() => el.remove(), duration);
 }
 
 // ---- beat 2: the support card --------------------------------------------------------
@@ -74,6 +70,23 @@ function burst() {
 export function createCelebration(deps) {
   let shownThisSession = false;
   const card = document.getElementById('support-card');
+
+  // TAMPILAN BARU: once per device, the revamp announces itself. A stamp, not
+  // a tour — one thunk and it's gone.
+  if (safeGet('pdflokal-seen-revamp') !== '1') {
+    safeSet('pdflokal-seen-revamp', '1');
+    setTimeout(() => showStamp('Tampilan baru'), 900);
+  }
+
+  // TETAP JALAN: connection dies, PDFLokal doesn't (no server in the loop).
+  // The moat made visible — once per session, only while a page is open.
+  let offlineShown = false;
+  window.addEventListener('offline', () => {
+    if (offlineShown) return;
+    offlineShown = true;
+    showStamp('Tetap jalan', { duration: 1800 });
+    deps.toast('Internet putus. Tenang, semuanya jalan di HP-mu, bukan di server.');
+  });
 
   function hide() {
     card.classList.remove('show');
@@ -131,7 +144,7 @@ export function createCelebration(deps) {
   return {
     // The one hook: called by the app's shared download chokepoint.
     onDownloadSuccess() {
-      burst(); // instant, independent of the card logic
+      showStamp('Beres ✓'); // stamped on the document (center); the card owns the bottom
       // Once per CALENDAR DAY (founder call, Jul 3): heavy users get a gentle
       // daily reminder that free has a sponsor, never a toll booth per file.
       // shownThisSession stays as the fallback where localStorage is unwritable
