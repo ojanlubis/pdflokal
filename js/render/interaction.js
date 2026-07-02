@@ -68,13 +68,23 @@ export function createInteraction(ctx) {
   }
 
   // Re-apply selection chrome after an external overlay rebuild (undo, add…).
+  // MUST actually decorate (review H2): renderPageView sets only z-index, so a
+  // rebuildStage that keeps a selection (undo/redo, Semua Hal.) would leave the
+  // selected object without outline/handle AND without touch-action:none —
+  // invisible selection that scrolls instead of dragging on a phone.
   function refreshSelection() {
     selectedEl = null;
     const doc = ctx.getDoc();
     const id = doc.selection.annotationId;
     if (!id) return;
     const el = stage.querySelector(`[data-anno-id="${id}"]`);
-    if (el) selectedEl = el;
+    if (!el) return;
+    selectedEl = el;
+    const found = findAnno(doc, id);
+    if (found && !el.classList.contains('pv-selected')) {
+      el.style.zIndex = '1000';
+      decorateSelected(el, found.anno);
+    }
   }
 
   function findAnno(doc, annoId) {

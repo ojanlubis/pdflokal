@@ -99,7 +99,20 @@ export function createDownloadSheet(deps) {
       console.error(err);
       if (seq === state.seq) { state.size = 'asli'; deps.toast('Gagal mengompres — pakai ukuran asli ya'); }
     } finally {
-      if (seq === state.seq) { state.compressing = false; render(); }
+      // Clear the flag UNCONDITIONALLY (review H1): a run superseded by ++seq
+      // must not leave `compressing` wedged true — that blocked every future
+      // buildCompressed via its own re-entry guard, and doExport's wait loop
+      // never exited (Compress dead for the whole session). Single-flight
+      // makes the unconditional clear safe: the guard prevents a second run
+      // while this one is alive.
+      state.compressing = false;
+      if (seq === state.seq) {
+        render();
+      } else if (state.format === 'pdf' && state.size === 'kompres' && !state.compressed) {
+        // Superseded while Compress is still what the user wants → restart
+        // for the NEW selection (this run's result was for stale pages).
+        buildCompressed();
+      }
     }
   }
 
@@ -278,11 +291,13 @@ export function createDownloadSheet(deps) {
 
   return {
     open() {
+      if (modal.open) return; // double Ctrl+S / double-tap: showModal throws on open dialogs
       state.format = 'pdf';
       state.imgfmt = 'jpg';
       state.size = 'asli';
       state.picked = null;
       state.compressed = null;
+      state.compressing = false; // belt-and-braces vs any historic flag leak
       state.exporting = false;
       modal.showModal();
       buildBase(); // truth on the button + pre-warmed bytes for the 90% path
