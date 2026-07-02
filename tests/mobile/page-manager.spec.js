@@ -139,6 +139,50 @@ test.describe('page manager — mobile', () => {
     expect(state.undo).toBe(0);
   });
 
+  test('drag near the grid edge AUTO-SCROLLS a big document (30+ page reality)', async ({ page }) => {
+    await page.goto('/editor-v2.html');
+    // 16 pages: fixture + 7 merges — enough to overflow the sheet's grid.
+    // (Serialized: loadFiles guards against concurrent picks by design.)
+    await page.setInputFiles('#file-input', FIXTURE);
+    await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
+    for (let i = 0; i < 7; i += 1) {
+      await page.setInputFiles('#file-input', FIXTURE);
+      await expect(page.locator('.pv-page')).toHaveCount(2 * (i + 2));
+    }
+    await page.tap('#btn-pages');
+    await expect(page.locator('.pm-tile:not(.pm-add)')).toHaveCount(16);
+
+    const scrollable = await page.evaluate(() => {
+      const g = document.getElementById('pm-grid');
+      return g.scrollHeight > g.clientHeight;
+    });
+    expect(scrollable).toBe(true);
+
+    // Arm a drag on the first tile, then HOLD the pointer in the bottom edge
+    // zone — the grid must keep scrolling while the finger rests there.
+    const first = await page.locator('.pm-tile >> nth=0').elementHandle();
+    const a = await first.boundingBox();
+    const gr = await page.locator('#pm-grid').boundingBox();
+    await first.dispatchEvent('pointerdown', {
+      pointerId: 9, pointerType: 'touch', clientX: a.x + 40, clientY: a.y + 40, bubbles: true, isPrimary: true,
+    });
+    await page.waitForTimeout(380); // long-press arms
+    await first.dispatchEvent('pointermove', {
+      pointerId: 9, pointerType: 'touch',
+      clientX: gr.x + gr.width / 2, clientY: gr.y + gr.height - 12, bubbles: true,
+    });
+    await page.waitForTimeout(500); // the drag LOOP scrolls even with no new moves
+    const scrolled = await page.evaluate(() => document.getElementById('pm-grid').scrollTop);
+    expect(scrolled).toBeGreaterThan(50);
+
+    await first.dispatchEvent('pointerup', {
+      pointerId: 9, pointerType: 'touch',
+      clientX: gr.x + gr.width / 2, clientY: gr.y + gr.height - 12, bubbles: true,
+    });
+    // Drop somewhere valid — the doc must still have 16 coherent pages.
+    await expect.poll(async () => page.evaluate(() => window.v2.getDoc().pages.length)).toBe(16);
+  });
+
   test('extract downloads the selected pages as a PDF', async ({ page }) => {
     await openSheet(page);
     await page.tap('.pm-tile >> nth=0');

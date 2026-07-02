@@ -599,7 +599,19 @@ document.addEventListener('keydown', (e) => {
 const SIZE_WARN = 20 * 1024 * 1024;
 const SIZE_BLOCK = 100 * 1024 * 1024;
 
+let loadingFiles = false; // re-entry guard: double-taps and rapid picks interleave imports
+
 async function loadFiles(files) {
+  if (loadingFiles) { toast('Sabar ya, file sebelumnya masih dimuat…'); return; }
+  loadingFiles = true;
+  try {
+    await loadFilesInner(files);
+  } finally {
+    loadingFiles = false;
+  }
+}
+
+async function loadFilesInner(files) {
   const isPdf = (f) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
   const isImg = (f) => f.type.startsWith('image/');
   // In picker order: PDFs append their pages, images become one page each.
