@@ -11,6 +11,7 @@
  */
 
 const OPTOUT_KEY = 'pdflokal-support-optout';
+const LAST_SHOWN_KEY = 'pdflokal-support-last';
 const SHARE_URL = 'https://www.pdflokal.id';
 // Written the way a friend would actually send it, not like a brochure.
 const SHARE_TEXT = 'Eh coba deh pdflokal.id, bisa edit + tanda tangan PDF langsung di HP. Gratis, dan filenya nggak diupload ke mana-mana.';
@@ -131,8 +132,14 @@ export function createCelebration(deps) {
     // The one hook: called by the app's shared download chokepoint.
     onDownloadSuccess() {
       burst(); // instant, independent of the card logic
+      // Once per CALENDAR DAY (founder call, Jul 3): heavy users get a gentle
+      // daily reminder that free has a sponsor, never a toll booth per file.
+      // shownThisSession stays as the fallback where localStorage is unwritable
+      // (private mode) so it degrades to once-per-session, not every download.
       if (shownThisSession || safeGet(OPTOUT_KEY) === '1') return;
+      if (safeGet(LAST_SHOWN_KEY) === new Date().toDateString()) return;
       shownThisSession = true;
+      safeSet(LAST_SHOWN_KEY, new Date().toDateString());
       setTimeout(() => {
         card.classList.remove('qr-open');
         card.classList.add('show');
