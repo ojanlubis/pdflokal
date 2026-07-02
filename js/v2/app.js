@@ -19,6 +19,7 @@
 import { createDoc, createAnnotation } from '../core/model.js';
 import {
   addAnnotation, removeAnnotation, updateAnnotation, clearSelection, selectAnnotation,
+  moveAnnotation,
 } from '../core/operations.js';
 import { createHistory, record, undo, redo, canUndo, canRedo } from '../core/history.js';
 import { importPdf, createPageRasterizer } from '../core/import.js';
@@ -413,6 +414,8 @@ document.getElementById('btn-undo').addEventListener('click', doUndo);
 document.getElementById('btn-redo').addEventListener('click', doRedo);
 
 document.addEventListener('keydown', (e) => {
+  // Never hijack typing surfaces (the inline editor stops propagation itself).
+  if (e.target.matches?.('input, select, textarea, [contenteditable="true"]')) return;
   const mod = e.ctrlKey || e.metaKey;
   if (mod && e.key === 'z') { e.preventDefault(); e.shiftKey ? doRedo() : doUndo(); }
   else if (mod && e.key === 'y') { e.preventDefault(); doRedo(); }
@@ -420,16 +423,57 @@ document.addEventListener('keydown', (e) => {
   else if ((e.key === 'Delete' || e.key === 'Backspace') && doc.selection.annotationId) {
     e.preventDefault(); deleteSelected();
   } else if (e.key === 'Escape') {
+    // Native <dialog> closes itself on Escape; this handles the editor surface.
     clearSelection(doc);
     interaction.setSelected(null, null);
     setTool('select');
+  } else if (!mod && doc.pages.length > 0) {
+    // Tool verbs — same keys as the old editor (muscle memory carries over).
+    const k = e.key.toLowerCase();
+    if (k === 'v') setTool('select');
+    else if (k === 't') setTool('text');
+    else if (k === 'w') setTool('whiteout');
+    else if (k === 's' || k === 'p') {
+      if (storedSignature) setTool('signature');
+      else signatureModal.open();
+    }
+  }
+});
+
+// Arrow-key nudge for the selected annotation (1px, Shift = 10px) — parity
+// with the live editor's #74. Separate listener: it must also work while a
+// tool other than Pilih is active.
+let nudgeLast = 0;
+document.addEventListener('keydown', (e) => {
+  if (!doc.selection.annotationId) return;
+  if (e.target.matches?.('input, select, textarea, [contenteditable="true"]')) return;
+  const dir = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+  if (!dir) return;
+  e.preventDefault();
+  const step = e.shiftKey ? 10 : 1;
+  // One undo step per nudge burst: only record when the previous keydown was >600ms ago.
+  const now = Date.now();
+  if (!nudgeLast || now - nudgeLast > 600) record(history, doc);
+  nudgeLast = now;
+  const a = moveAnnotation(doc, doc.selection.annotationId, dir[0] * step, dir[1] * step);
+  if (a) {
+    const el = stage.querySelector(`[data-anno-id="${a.id}"]`);
+    if (el) { el.style.left = a.x + 'px'; el.style.top = a.y + 'px'; }
   }
 });
 
 // ---- file loading (multi-file = merge, by construction) --------------------------------
+// Size guards (carried from the live app): heads-up above 20MB, block at 100MB
+// — a 100MB+ file will OOM the weak phones we build for before it ever renders.
+const SIZE_WARN = 20 * 1024 * 1024;
+const SIZE_BLOCK = 100 * 1024 * 1024;
+
 async function loadFiles(files) {
   const pdfs = [...files].filter((f) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name));
   if (pdfs.length === 0) { toast('Pilih file PDF ya'); return; }
+  const oversize = pdfs.find((f) => f.size > SIZE_BLOCK);
+  if (oversize) { toast(`"${oversize.name}" terlalu besar (maks 100MB)`); return; }
+  if (pdfs.some((f) => f.size > SIZE_WARN)) toast('File besar — proses bisa agak lama ya');
   const firstLoad = doc.pages.length === 0;
   if (firstLoad) baseName = pdfs[0].name.replace(/\.pdf$/i, '');
 
