@@ -387,7 +387,7 @@ export function createPageManager(deps) {
       track('editor_action', { action: 'delete_page' });
       render();
       deps.onDocChanged();
-      deps.toast(`${pages.length} halaman dihapus`);
+      deps.toast(`${pages.length} halaman dihapus. Salah? Tinggal Undo`);
     } else if (act === 'extract') {
       track('editor_action', { action: 'split' }); // old name kept: extract IS split
       deps.onExtract(pages);

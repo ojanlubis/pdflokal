@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="robots" content="noindex, nofollow">
-  <title>PDFLokal — Editor v2 (beta)</title>
+  <title>PDFLokal Editor</title>
 
   <!-- Google tag (gtag.js) — same allowlist discipline as index.html -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=AW-17538923405"></script>
@@ -445,8 +445,14 @@
     <div class="file-menu-wrap">
       <button id="btn-file" disabled aria-haspopup="menu" aria-expanded="false">File ▾</button>
       <div id="file-menu" role="menu" hidden>
-        <button role="menuitem" id="fm-add">➕ Tambah File (gabung)</button>
-        <button role="menuitem" id="fm-new">📄 Buka Baru <span class="fm-note">ganti semua</span></button>
+        <button role="menuitem" id="fm-add">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M15 2v5h5"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+          Tambah File <span class="fm-note">gabung</span>
+        </button>
+        <button role="menuitem" id="fm-new">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M15 2v5h5"/></svg>
+          Buka Baru <span class="fm-note">ganti semua</span>
+        </button>
       </div>
     </div>
     <span class="spacer"></span>
@@ -480,7 +486,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
       Hapus
     </button>
-    <button class="tool" id="btn-pages" disabled aria-label="Kelola halaman — urutkan, putar, hapus, ekstrak">
+    <button class="tool" id="btn-pages" disabled aria-label="Kelola halaman: urutkan, putar, hapus, ekstrak">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
       Halaman
     </button>
@@ -490,16 +496,19 @@
   <div id="sig-bar" role="toolbar" aria-label="Aksi tanda tangan">
     <span id="sig-bar-label"></span>
     <button id="btn-all-pages">Terapkan ke Semua Hal.</button>
-    <button id="btn-redraw-sig">Gambar Ulang ✍️</button>
+    <button id="btn-redraw-sig">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;vertical-align:-2px"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+      Gambar Ulang
+    </button>
   </div>
 
   <main id="v2-scroll">
     <div id="v2-sizer"><div id="v2-stage"></div></div>
     <div id="empty">
       <h1>Edit PDF langsung di HP-mu</h1>
-      <p>Gabung, tanda tangan, tulis, dan tutup teks — semua diproses di perangkatmu, nggak ada yang di-upload.</p>
+      <p>Gabung, tanda tangan, tulis, tutup teks. Semuanya diproses di HP-mu sendiri, nggak ada yang di-upload.</p>
       <button id="btn-open">Buka PDF</button>
-      <span class="privacy">🔒 100% privat — file kamu nggak pernah ninggalin perangkat</span>
+      <span class="privacy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;vertical-align:-2px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> 100% privat, file kamu nggak pernah ninggalin perangkat</span>
     </div>
   </main>
 
@@ -511,16 +520,24 @@
   <div id="toast" role="status" aria-live="polite"></div>
 
   <div id="support-card" role="dialog" aria-label="Dukung PDFLokal">
-    <button id="sc-close" aria-label="Tutup">✕</button>
-    <div class="sc-head">Berkas kamu jadi! 🎉</div>
-    <p class="sc-sub">PDFLokal gratis &amp; tanpa server — file kamu nggak pernah ke mana-mana. Suka? Bantu kami:</p>
+    <button id="sc-close" aria-label="Tutup">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <div class="sc-head">Selesai, filemu udah jadi!</div>
+    <p class="sc-sub">PDFLokal gratis dan bakal terus gratis. Kalau kepakai, bantu kami sedikit ya:</p>
     <div class="sc-actions">
-      <button id="sc-share">🔗 Bagikan</button>
-      <button id="sc-donate">☕ Traktir Kopi</button>
+      <button id="sc-share">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></svg>
+        Bagikan ke teman
+      </button>
+      <button id="sc-donate">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/><line x1="14" y1="2" x2="14" y2="4"/></svg>
+        Traktir kopi
+      </button>
     </div>
     <div class="sc-qr">
-      <img src="images/qris.png" alt="QRIS — scan untuk traktir kopi" loading="lazy">
-      <p>Scan pakai e-wallet atau m-banking kamu 🙏</p>
+      <img src="images/qris.png" alt="QRIS untuk traktir kopi" loading="lazy">
+      <p>Scan pakai e-wallet atau m-banking kamu. Makasih banyak!</p>
     </div>
     <button id="sc-never">jangan tampilkan lagi</button>
   </div>
@@ -530,7 +547,7 @@
       <div class="pm-head">
         <h2>Kelola Halaman</h2>
         <span class="pm-hint">Ketuk untuk memilih · tahan lalu geser untuk mengurutkan</span>
-        <button class="btn-ghost" id="pm-close" aria-label="Tutup">✕</button>
+        <button class="btn-ghost" id="pm-close" aria-label="Tutup"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:14px;height:14px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
       </div>
       <div id="pm-grid" class="pm-grid"></div>
       <div id="pm-bulk" class="pm-bulk">
@@ -554,7 +571,7 @@
       <div class="ds-title">
         <h2>Unduh</h2>
         <span class="ds-meta" id="ds-meta"></span>
-        <button class="btn-ghost" id="ds-close" aria-label="Tutup">✕</button>
+        <button class="btn-ghost" id="ds-close" aria-label="Tutup"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:14px;height:14px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
       </div>
 
       <div class="ds-row">
@@ -603,7 +620,7 @@
       <div class="sig-pane-upload" style="display:none">
         <label class="sig-upload-drop">
           <input type="file" id="sig-file" accept="image/*" hidden>
-          <span>Pilih foto tanda tangan 📷</span>
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;vertical-align:-3px"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg> Pilih foto tanda tanganmu</span>
         </label>
         <label class="sig-check"><input type="checkbox" id="sig-removebg" checked> Hapus latar putih</label>
         <div id="sig-preview" class="sig-preview"></div>

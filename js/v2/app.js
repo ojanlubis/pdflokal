@@ -386,15 +386,15 @@ const pageManager = createPageManager({
   onExtract: async (pages) => {
     // Export ONLY the selected pages: a shallow Doc sharing the same sources.
     try {
-      toast('Menyiapkan PDF…');
+      toast('Sebentar, lagi disiapkan');
       const { buildPdfBytes } = await import('../core/export.js');
       const subset = { sources: doc.sources, pages, selection: { pageId: null, annotationId: null } };
       const bytes = await buildPdfBytes(subset, { PDFLib: window.PDFLib, fontkit: window.fontkit });
       download(new Blob([bytes], { type: 'application/pdf' }), `${baseName}-halaman-${pages.length}.pdf`);
-      toast(`${pages.length} halaman diekstrak ✓`);
+      toast(`Selesai! ${pages.length} halaman diekstrak jadi PDF baru`);
     } catch (err) {
       console.error(err);
-      toast('Gagal mengekstrak — coba lagi ya');
+      toast('Waduh, gagal mengekstrak. Coba sekali lagi ya');
     }
   },
   toast,
@@ -535,7 +535,7 @@ document.getElementById('btn-all-pages').addEventListener('click', () => {
     }));
   }
   rebuildStage();
-  toast(`Diterapkan ke ${doc.pages.length - 1} halaman lain ✓`);
+  toast(`Oke, ditaruh di ${doc.pages.length - 1} halaman lainnya juga`);
 });
 
 // ---- delete / undo / redo ------------------------------------------------------------
@@ -614,7 +614,7 @@ const SIZE_BLOCK = 100 * 1024 * 1024;
 let loadingFiles = false; // re-entry guard: double-taps and rapid picks interleave imports
 
 async function loadFiles(files) {
-  if (loadingFiles) { toast('Sabar ya, file sebelumnya masih dimuat…'); return; }
+  if (loadingFiles) { toast('Sebentar ya, file sebelumnya masih dimuat'); return; }
   loadingFiles = true;
   try {
     await loadFilesInner(files);
@@ -631,7 +631,7 @@ async function loadFilesInner(files) {
   if (usable.length === 0) { toast('Pilih file PDF atau gambar ya'); return; }
   const oversize = usable.find((f) => f.size > SIZE_BLOCK);
   if (oversize) { toast(`"${oversize.name}" terlalu besar (maks 100MB)`); return; }
-  if (usable.some((f) => f.size > SIZE_WARN)) toast('File besar — proses bisa agak lama ya');
+  if (usable.some((f) => f.size > SIZE_WARN)) toast('Filenya lumayan besar, sabar sebentar ya');
   const firstLoad = doc.pages.length === 0;
   if (firstLoad) baseName = usable[0].name.replace(/\.[^.]+$/, '');
 

@@ -66,7 +66,7 @@ export function createDownloadSheet(deps) {
       state.base = { bytes, size: bytes.length };
     } catch (err) {
       console.error(err);
-      if (seq === state.seq) deps.toast('Gagal menyiapkan PDF — coba lagi ya');
+      if (seq === state.seq) deps.toast('Waduh, gagal menyiapkan PDF. Coba lagi ya');
     } finally {
       if (seq === state.seq) { state.building = false; render(); }
     }
@@ -97,7 +97,7 @@ export function createDownloadSheet(deps) {
       state.compressed = { bytes: out.bytes, size: out.size, unchanged: out.unchanged };
     } catch (err) {
       console.error(err);
-      if (seq === state.seq) { state.size = 'asli'; deps.toast('Gagal mengompres — pakai ukuran asli ya'); }
+      if (seq === state.seq) { state.size = 'asli'; deps.toast('Kompres gagal, kami pakai ukuran asli ya'); }
     } finally {
       // Clear the flag UNCONDITIONALLY (review H1): a run superseded by ++seq
       // must not leave `compressing` wedged true — that blocked every future
@@ -185,7 +185,7 @@ export function createDownloadSheet(deps) {
         sub.textContent = `hemat ${Math.round((1 - state.compressed.size / state.base.size) * 100)}% dari ${fmtMB(state.base.size)}`;
         sub.hidden = false;
       } else if (state.size === 'kompres' && state.compressed?.unchanged) {
-        sub.textContent = 'sudah optimal — nggak bisa lebih kecil tanpa merusak';
+        sub.textContent = 'udah paling kecil, nggak bisa dikompres lagi tanpa merusak';
         sub.hidden = false;
       } else {
         sub.hidden = true;
@@ -255,7 +255,7 @@ export function createDownloadSheet(deps) {
         const src = state.size === 'kompres' ? state.compressed : state.base;
         if (!src) throw new Error('build missing');
         deps.download(new Blob([src.bytes], { type: 'application/pdf' }), `${baseName}-pdflokal.pdf`);
-        deps.toast(`PDF berhasil dibuat ✓ (${fmtMB(src.size)})`);
+        deps.toast(`Selesai! PDF-mu udah diunduh (${fmtMB(src.size)})`);
       } else {
         if (!state.base) throw new Error('build missing');
         const { renderPdfToImages, zipFiles } = await import('../core/export-images.js');
@@ -265,11 +265,11 @@ export function createDownloadSheet(deps) {
         if (files.length === 1) {
           const mime = state.imgfmt === 'png' ? 'image/png' : 'image/jpeg';
           deps.download(new Blob([files[0].bytes], { type: mime }), files[0].name);
-          deps.toast('Gambar berhasil dibuat ✓');
+          deps.toast('Selesai! Gambarmu udah diunduh');
         } else {
           const zip = zipFiles(files);
           deps.download(new Blob([zip], { type: 'application/zip' }), `${baseName}-gambar.zip`);
-          deps.toast(`${n} gambar dibungkus ZIP ✓`);
+          deps.toast(`Selesai! ${n} gambar dibungkus jadi satu ZIP`);
         }
       }
       // Richer than the old event: the CHOICES are the product signal now.
@@ -282,7 +282,7 @@ export function createDownloadSheet(deps) {
       modal.close();
     } catch (err) {
       console.error(err);
-      deps.toast('Gagal membuat file — coba lagi ya');
+      deps.toast('Waduh, gagal membuat file. Coba sekali lagi ya');
     } finally {
       state.exporting = false;
       render();
