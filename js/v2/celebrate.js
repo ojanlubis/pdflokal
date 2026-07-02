@@ -40,7 +40,7 @@ export function showStamp(text, { anchor = 'center', duration = 1500, host = doc
   const el = document.createElement('div');
   el.className = 'v2-stamp';
   el.textContent = text;
-  const pos = anchor === 'bottom' ? 'bottom:110px' : 'top:34%';
+  const pos = { bottom: 'bottom:110px', top: 'top:15%' }[anchor] || 'top:34%';
   el.style.cssText =
     `position:fixed;left:50%;${pos};z-index:130;pointer-events:none;` +
     'padding:8px 18px;border:3.5px solid #dc2626;border-radius:8px;color:#dc2626;' +
@@ -75,7 +75,7 @@ export function createCelebration(deps) {
   // a tour — one thunk and it's gone.
   if (safeGet('pdflokal-seen-revamp') !== '1') {
     safeSet('pdflokal-seen-revamp', '1');
-    setTimeout(() => showStamp('Tampilan baru'), 900);
+    setTimeout(() => showStamp('Tampilan baru', { anchor: 'top', duration: 2200 }), 900);
   }
 
   // TETAP JALAN: connection dies, PDFLokal doesn't (no server in the loop).

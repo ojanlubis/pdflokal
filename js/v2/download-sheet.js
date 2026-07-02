@@ -296,17 +296,20 @@ export function createDownloadSheet(deps) {
   }
 
   return {
-    open() {
+    // preset: optional starting configuration from the intent hook (?buat=) —
+    // e.g. { size: 'kompres' } for Kompres PDF, { format: 'img' } for PDF→Gambar.
+    open(preset = {}) {
       if (modal.open) return; // double Ctrl+S / double-tap: showModal throws on open dialogs
-      state.format = 'pdf';
+      state.format = preset.format === 'img' ? 'img' : 'pdf';
       state.imgfmt = 'jpg';
-      state.size = 'asli';
+      state.size = preset.size === 'kompres' && state.format === 'pdf' ? 'kompres' : 'asli';
       state.picked = null;
       state.compressed = null;
       state.compressing = false; // belt-and-braces vs any historic flag leak
       state.exporting = false;
       modal.showModal();
       buildBase(); // truth on the button + pre-warmed bytes for the 90% path
+      // buildBase's tail re-runs buildCompressed when size is already 'kompres'.
     },
   };
 }
