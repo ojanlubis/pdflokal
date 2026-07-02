@@ -13,17 +13,28 @@ _Updated: 2026-07 — **pivoted** from a pure backlog-flush to a vision-led foun
 
 ---
 
-## ★ THE SPINE — Foundation rebuild (priority) → [foundation-plan.md](foundation-plan.md)
+## ★ THE SPINE — Editor v2: clean rebuild & swap → [foundation-plan.md](foundation-plan.md)
 
-Target: 3 clean layers — **Core** (headless `js/core/`) / **Render** (image-backed pages + one annotation overlay) / **Interact** (one input path). Built *beside* the live app, swapped in incrementally. No big-bang.
+> **Strategy revised Jul 2 2026** (decisions.md): the old "wire the engine into the live
+> editor behind a flag" plan is retired. Audit verdict: only ~800 of the live editor's
+> 4,200 LOC are salvageable math; incremental wiring needs throwaway index↔id shims.
+> Instead: **build Editor v2 clean on `js/core` + `js/render`, BESIDE the live app
+> (`editor-v2.html`, noindex/unlinked), reach parity on merge→edit→download, then swap
+> `index.html` to it and delete the old editor.** Founder approved.
 
-- [x] **Phase 0** — headless core: one `Doc` model, page owns its annotations, everything by id not index. 7 headless tests. · **#81**
-- [x] **Phase 0b** — import adapter: `importPdf` (bytes→Doc) + `rasterizePage` + `createPageRasterizer` (per-source doc cache). · **#82**
-- [x] **Phase 1a** — image-backed render engine (`js/render/page-view.js`) + phone-openable preview `lab.html`. · **#83**
-- [x] **Phase 2 (in the lab)** — streaming/windowed loading (bounded memory), render-on-settle, scroll telegraph (shimmer + position pill). **Validated on real Android. Rendering approach LOCKED** (`memory/render-architecture-2026-07.md`). · **#84 #85 #86**
-- [ ] **Phase 0c** — export adapter: `Doc → pdf-lib → bytes`, golden-verified. _(open — completes the headless round-trip)_
-- [ ] **Phase 1b / 3** — wire the engine into the **LIVE editor** behind a flag; retire the old canvas pipeline. ⬅ **NEXT (the big, risky step).** Real-Android verify before merge. **Kills mobile flicker + slides-behind + paraf z-index — structurally.**
-- [ ] **Phase 4** — reactive subscribers, IF state-sync pain remains (tentative — verify pain first).
+- [x] **Phase 0** — headless core (`Doc` model, id-based). · **#81**
+- [x] **Phase 0b** — import adapter (bytes→Doc, lazy rasterize). · **#82**
+- [x] **Phase 1a + 2** — image-backed render + streaming + settle + telegraph, validated on real Android; **approach LOCKED**. · **#83–86**
+- [x] **Engine completion (Jul 2)** — `core/history.js` (ONE unified undo/redo), move/resize ops, `core/export.js` (Doc→pdf-lib, pixel-verified — found 2 live bugs in the old exporter), `render/viewport.js` (streaming extracted from lab), `render/interaction.js` (one pointer path, DOM hit-testing, gesture-level undo).
+- [x] **v2 skeleton (Jul 2)** — `editor-v2.html` + `js/v2/app.js`: load/merge → text (tap-to-type) → whiteout (drag) → signature (draw+place) → undo/redo → download. Container scroll. First mobile touch tests green; verified on real Android Chrome (emulator).
+- [ ] **v2 parity** — text format bar (font/B/I/size/color) · paraf + semua-hal · page management (reorder/delete/rotate + sidebar/picker) · image-as-page import · Ganti File · keyboard shortcuts · file-size guards · a11y pass. ⬅ **NEXT**
+- [ ] **The swap** — full test suite + founder's real-phone gate on merge→edit→download → `index.html` points at v2 → cleanup agent deletes the old editor (~3,400 LOC) + its CSS.
+- [ ] **Phase 4** — reactive subscribers, IF state-sync pain remains (tentative).
+
+### Mobile verification (the gap, closed Jul 2 — [android-verification.md](android-verification.md))
+- **Tier 1:** Playwright `mobile-chrome` project (Pixel 7 touch emulation) — `npm run test:mobile`, runs in CI.
+- **Tier 2:** Android emulator (Pixel 7 AVD, boots ~15s) + real Chrome driven via adb+CDP — `node scripts/android-verify.mjs`.
+- **Final gate only:** founder's physical phone.
 
 ### ⤷ Absorbed by the foundation — do NOT fix separately
 - **Wave 2 (performance / mobile-canvas / pinch-zoom flicker / fast-scroll jump-to-page-1)** → **Phase 1 + 2.** Same root cause (no-eviction memory pressure), same fix (image pages + windowed rendering).
