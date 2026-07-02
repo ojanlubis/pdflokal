@@ -30,6 +30,7 @@ import { createFormatBar } from './format-bar.js';
 import { createPageManager } from './page-manager.js';
 import { createSignatureModal } from './signature-modal.js';
 import { createDownloadSheet } from './download-sheet.js';
+import { track } from '../lib/analytics.js';
 
 window.pdfjsLib.GlobalWorkerOptions.workerSrc = '/js/vendor/pdf.worker.min.js';
 
@@ -321,7 +322,7 @@ const interaction = createInteraction({
   onChange: (kind) => {
     // Tip-Ex stroke finished (color was already matched at stroke START):
     // return home to Pilih (founder: whiteout should NOT stay sticky).
-    if (kind === 'draw') setTool('select');
+    if (kind === 'draw') { track('editor_action', { action: 'whiteout' }); setTool('select'); }
     refreshChrome();
   },
   onDeleteTap: (annoId, pageId) => {
@@ -342,6 +343,7 @@ const interaction = createInteraction({
         image: storedSignature.dataUrl, subtype: storedSignature.subtype,
         x: Math.max(0, x - w / 2), y: Math.max(0, y - h / 2), width: w, height: h,
       }));
+      track('editor_action', { action: storedSignature.subtype === 'paraf' ? 'paraf' : 'signature' });
       selectAnnotation(doc, created.id); // selected → "Semua Hal." is one tap away
       syncPage(pageId);
       setTool('select'); // tools are verbs; back home
@@ -433,6 +435,7 @@ function openTextEditor({ pageId, x, y, anno }) {
       if (text && text !== anno.text) {
         record(history, doc);
         updateAnnotation(doc, anno.id, { text });
+        track('editor_action', { action: 'text_inline' });
       } else if (!text) {
         record(history, doc);
         removeAnnotation(doc, anno.id);
@@ -448,6 +451,7 @@ function openTextEditor({ pageId, x, y, anno }) {
       // Keep the fresh text SELECTED: the user sees it's an object, and a
       // format-bar dropdown change right after the blur-commit still lands.
       selectAnnotation(doc, created.id);
+      track('editor_action', { action: 'text' });
     }
     syncPage(pageId);
     setTool('select');
@@ -629,6 +633,7 @@ async function loadFilesInner(files) {
     const bytes = new Uint8Array(await f.arrayBuffer());
     if (isPdf(f)) await importPdf(doc, { name: f.name, bytes });
     else await importImage(doc, { name: f.name, bytes, mimeType: f.type });
+    track('file_loaded', { tool: 'editor-v2', fileType: isPdf(f) ? 'pdf' : 'image' });
   }
   if (!rasterizer) rasterizer = createPageRasterizer(doc);
   emptyEl.style.display = 'none';
@@ -713,6 +718,49 @@ function doDownload() {
   downloadSheet.open();
 }
 document.getElementById('btn-download').addEventListener('click', doDownload);
+
+// ---- Android back button: closes the open sheet, never leaves the app -----------------
+// Every dialog open pushes one history entry; the hardware/gesture back pops it
+// and we close the dialog. UI-initiated closes (✕, backdrop, Escape, success)
+// consume their entry with history.back() — guarded so our own back() doesn't
+// cascade into closing the next dialog underneath (nested pm-over-download case).
+(function wireDialogHistory() {
+  // NOTE: window.history everywhere — plain `history` is SHADOWED in this
+  // module by the undo history (const history = createHistory()).
+  const dialogs = ['pm-sheet', 'sig-modal', 'dl-sheet'].map((id) => document.getElementById(id));
+  const stack = []; // open dialogs in STACKING order (array order lies for nesting)
+  let expectPop = false;
+
+  for (const dlg of dialogs) {
+    const nativeShow = dlg.showModal.bind(dlg);
+    dlg.showModal = () => {
+      nativeShow();
+      window.history.pushState({ v2dlg: dlg.id }, '');
+      stack.push(dlg);
+    };
+    dlg.addEventListener('close', () => {
+      const i = stack.lastIndexOf(dlg);
+      if (i !== -1) stack.splice(i, 1);
+      // Closed by UI code → its history entry is stale; consume it silently.
+      if (window.history.state?.v2dlg === dlg.id) {
+        expectPop = true;
+        window.history.back();
+      }
+    });
+  }
+
+  window.addEventListener('popstate', () => {
+    if (expectPop) { expectPop = false; return; }
+    // Hardware back: close every dialog stacked ABOVE the entry we landed on.
+    // Rapid double-back COALESCES two traversals into one popstate — closing
+    // only the top layer would strand the lower sheet open with no history
+    // entry left (the next back would exit the app with a sheet showing).
+    const cur = window.history.state?.v2dlg || null;
+    const keepIdx = cur ? stack.findIndex((d) => d.id === cur) : -1;
+    const toClose = stack.slice(keepIdx + 1).reverse();
+    for (const d of toClose) if (d.open) d.close();
+  });
+}());
 
 // ---- test hooks (same pattern the old suite relies on) ----------------------------------
 window.v2 = {
