@@ -310,6 +310,58 @@
       border: 1px solid var(--line); background: var(--bg); font-size: 13px;
     }
 
+    /* ---- Unduh sheet (bottom sheet) ---- */
+    dialog.bottomsheet { align-items: flex-end; padding: 0; }
+    .ds-body {
+      max-width: 480px; margin: 0 auto; border-radius: 18px 18px 0 0;
+      padding: 10px 16px 16px; gap: 0;
+    }
+    .ds-grab { width: 36px; height: 4px; border-radius: 2px; background: #d8dbe2; margin: 0 auto 12px; }
+    .ds-title { display: flex; align-items: baseline; gap: 10px; margin-bottom: 14px; }
+    .ds-title h2 { font-size: 16.5px; }
+    .ds-meta { flex: 1; font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; }
+    .ds-row { margin-bottom: 13px; }
+    .ds-label {
+      font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
+      color: var(--muted); font-weight: 600; margin-bottom: 7px;
+    }
+    .ds-seg { display: flex; gap: 6px; }
+    .ds-seg button {
+      flex: 1; font: inherit; font-size: 13px; min-height: 42px; border-radius: 10px;
+      border: 1.5px solid var(--line); background: var(--bg); color: var(--ink);
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+      font-variant-numeric: tabular-nums;
+    }
+    .ds-seg button small { font-size: 10.5px; color: var(--muted); font-weight: 400; }
+    .ds-seg button.on { border-color: var(--accent); background: rgba(79,142,247,.09); color: var(--accent); }
+    .ds-seg button.on small { color: var(--accent); opacity: .75; }
+    .ds-hemat { color: #1d8a44; font-weight: 600; }
+    .ds-spin {
+      display: inline-block; width: 11px; height: 11px; border-radius: 50%;
+      border: 2px solid rgba(79,142,247,.3); border-top-color: var(--accent);
+      animation: ds-rot .7s linear infinite; vertical-align: -1px;
+    }
+    .ds-spin-lite { border-color: rgba(255,255,255,.4); border-top-color: #fff; }
+    @keyframes ds-rot { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { .ds-spin { animation: none; } }
+    .ds-cta {
+      width: 100%; min-height: 50px; border: none; border-radius: 12px;
+      background: var(--accent); color: #fff; font: inherit; font-weight: 700; font-size: 15px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+      margin-top: 4px; font-variant-numeric: tabular-nums;
+    }
+    .ds-cta small { font-weight: 500; font-size: 11px; opacity: .85; }
+    .ds-cta:disabled { opacity: .6; }
+
+    /* pick-mode bar inside Kelola Halaman */
+    .pm-pickbar {
+      display: none; align-items: center; gap: 8px; padding-top: 10px;
+      border-top: 1px solid var(--line);
+    }
+    .pm-pickbar.show { display: flex; }
+    .pm-pickbar .note { flex: 1; font-size: 12px; color: var(--muted); }
+    .pm-pickbar .btn-primary { flex: 0 0 auto; }
+
     #toast {
       position: fixed; left: 50%; transform: translateX(-50%); bottom: 130px; z-index: 40;
       background: rgba(26,29,33,.9); color: #fff; font-size: 13px;
@@ -405,6 +457,53 @@
         <button data-act="delete" class="danger">Hapus</button>
         <button data-act="clear" class="btn-ghost">Batal</button>
       </div>
+      <div id="pm-pickbar" class="pm-pickbar">
+        <span class="note">Ketuk halaman yang mau diunduh</span>
+        <button class="btn-ghost" id="pm-pick-cancel">Batal</button>
+        <button class="btn-primary" id="pm-pick-ok">Pakai (0)</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="dl-sheet" class="bottomsheet" aria-label="Pilihan unduhan">
+    <div class="sheet ds-body">
+      <div class="ds-grab"></div>
+      <div class="ds-title">
+        <h2>Unduh</h2>
+        <span class="ds-meta" id="ds-meta"></span>
+        <button class="btn-ghost" id="ds-close" aria-label="Tutup">✕</button>
+      </div>
+
+      <div class="ds-row">
+        <div class="ds-label">Format</div>
+        <div class="ds-seg" id="ds-format">
+          <button type="button" data-v="pdf" class="on">PDF</button>
+          <button type="button" data-v="img">Gambar<small>JPG / PNG</small></button>
+        </div>
+      </div>
+
+      <div class="ds-row" id="ds-row-imgfmt" hidden>
+        <div class="ds-label">Jenis gambar</div>
+        <div class="ds-seg" id="ds-imgfmt">
+          <button type="button" data-v="jpg" class="on">JPG<small>paling kompatibel</small></button>
+          <button type="button" data-v="png">PNG<small>tanpa kompresi</small></button>
+        </div>
+      </div>
+
+      <div class="ds-row">
+        <div class="ds-label">Ukuran</div>
+        <div class="ds-seg" id="ds-size"></div>
+      </div>
+
+      <div class="ds-row">
+        <div class="ds-label">Halaman</div>
+        <div class="ds-seg" id="ds-pages">
+          <button type="button" data-v="all" class="on">Semua<small id="ds-all-sub"></small></button>
+          <button type="button" data-v="some">Pilih…<small id="ds-some-sub">&nbsp;</small></button>
+        </div>
+      </div>
+
+      <button class="ds-cta" id="ds-cta"><span id="ds-cta-main"></span><small id="ds-cta-sub" hidden></small></button>
     </div>
   </dialog>
 
@@ -440,6 +539,7 @@
   <script src="js/vendor/pdf-lib.min.js"></script>
   <script src="js/vendor/fontkit.umd.min.js"></script>
   <script src="js/vendor/signature_pad.umd.min.js"></script>
+  <script src="js/vendor/fflate.min.js"></script>
   <script type="module" src="js/v2/app.js"></script>
 </body>
 </html>

@@ -39,6 +39,7 @@ export function createPageManager(deps) {
   const selected = new Set();          // page ids (UI-transient, not core state)
   const thumbs = new Map();            // page.id -> dataUrl (invalidated on rotate)
   let thumbQueue = Promise.resolve();  // serialize thumb renders (keep UI smooth)
+  let pickResolve = null;              // non-null = PICK MODE (Unduh sheet asked)
 
   // ---- open / close -----------------------------------------------------------
   function open() {
@@ -49,18 +50,49 @@ export function createPageManager(deps) {
   function close() { sheet.close(); }
   sheet.addEventListener('click', (e) => { if (e.target === sheet) close(); });
 
+  // ---- pick mode: the SAME surface, borrowed by the Unduh sheet ---------------
+  // One place to select pages in the whole app (founder-locked). Resolves with
+  // the chosen page ids in document order, or null on cancel.
+  function openPick(preselected = []) {
+    return new Promise((resolve) => {
+      pickResolve = resolve;
+      selected.clear();
+      for (const id of preselected) selected.add(id);
+      render();
+      sheet.showModal();
+    });
+  }
+  function finishPick(ids) {
+    const resolve = pickResolve;
+    pickResolve = null;
+    sheet.close();
+    resolve?.(ids);
+  }
+  sheet.addEventListener('close', () => {
+    // Escape / backdrop while picking = cancel, never a dangling promise.
+    if (pickResolve) { const r = pickResolve; pickResolve = null; r(null); }
+  });
+  deps.pickBar.querySelector('#pm-pick-cancel').addEventListener('click', () => finishPick(null));
+  deps.pickBar.querySelector('#pm-pick-ok').addEventListener('click', () => {
+    const ordered = deps.getDoc().pages.filter((p) => selected.has(p.id)).map((p) => p.id);
+    finishPick(ordered.length ? ordered : null);
+  });
+
   // ---- rendering ----------------------------------------------------------------
   function render() {
     const doc = deps.getDoc();
     grid.innerHTML = '';
     doc.pages.forEach((page, i) => grid.appendChild(renderTile(page, i)));
 
-    // [+] add tile — merge more files without leaving the sheet.
-    const add = document.createElement('button');
-    add.className = 'pm-tile pm-add';
-    add.innerHTML = '<span>+</span>Tambah PDF';
-    add.addEventListener('click', () => deps.onAddFiles());
-    grid.appendChild(add);
+    // [+] add tile — merge more files without leaving the sheet. (Not while
+    // picking pages for a download — that's a selection moment, not editing.)
+    if (!pickResolve) {
+      const add = document.createElement('button');
+      add.className = 'pm-tile pm-add';
+      add.innerHTML = '<span>+</span>Tambah PDF';
+      add.addEventListener('click', () => deps.onAddFiles());
+      grid.appendChild(add);
+    }
 
     renderBulkBar();
   }
@@ -129,6 +161,15 @@ export function createPageManager(deps) {
 
   function renderBulkBar() {
     const n = selected.size;
+    if (pickResolve) {
+      // Pick mode: bulk actions hidden; the pick bar is the only exit.
+      bulkBar.classList.remove('show');
+      deps.pickBar.classList.add('show');
+      deps.pickBar.querySelector('#pm-pick-ok').textContent = `Pakai (${n})`;
+      deps.pickBar.querySelector('#pm-pick-ok').disabled = n === 0;
+      return;
+    }
+    deps.pickBar.classList.remove('show');
     bulkBar.classList.toggle('show', n > 0);
     bulkBar.querySelector('.pm-count').textContent = `${n} dipilih`;
     // Deleting every page is blocked (an empty doc is a dead end, not a state).
@@ -198,6 +239,7 @@ export function createPageManager(deps) {
     }
 
     function armDrag(e) {
+      if (pickResolve) return; // pick mode is selection-only — no reordering
       const rect = tile.getBoundingClientRect();
       const placeholder = document.createElement('div');
       placeholder.className = 'pm-tile pm-placeholder';
@@ -348,5 +390,5 @@ export function createPageManager(deps) {
     }
   });
 
-  return { open, close, render };
+  return { open, openPick, close, render };
 }

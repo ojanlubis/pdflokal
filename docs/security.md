@@ -70,6 +70,7 @@ Core libraries are self-hosted in `/js/vendor/` for offline support, firewall co
 | **PDF.js Worker** | 3.11.174 | 1.1 MB | PDF processing (loaded before pdf.min.js for offline fake worker) |
 | **Signature Pad** | 4.1.7 | 12 KB | Digital signature capture |
 | **pdf-encrypt-lite** | 1.0.1 | ~12 KB | PDF password encryption (self-hosted, patched to use `window.PDFLib`) |
+| **fflate** | 0.8.3 | 33 KB | ZIP bundling for pages→images export (Editor v2 Unduh sheet) |
 
 **Library Loading Order** (in index.html):
 ```html
