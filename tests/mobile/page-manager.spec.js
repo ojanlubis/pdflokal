@@ -115,6 +115,40 @@ test.describe('page manager — mobile', () => {
     expect(travelled).toBe('aku ikut'); // its annotation came along — no re-keying
   });
 
+  test('armed drag consumes touchmove so native scroll cannot steal it', async ({ page }) => {
+    // Mobile prod bug (founder, Jul 5): tiles have touch-action: pan-y, and
+    // pointermove.preventDefault() does NOT revoke the browser's pan claim —
+    // any vertical finger movement after the long-press lift made Chrome fire
+    // pointercancel (drag dies, grid scrolls). The fix consumes touchmove at
+    // the window with a non-passive listener while — and only while — a drag
+    // is armed. This asserts that contract at all three stages.
+    await openSheet(page);
+    const probe = () => page.evaluate(() => {
+      const ev = new TouchEvent('touchmove', { bubbles: true, cancelable: true });
+      window.dispatchEvent(ev);
+      return ev.defaultPrevented;
+    });
+
+    expect(await probe()).toBe(false); // before: scrolling the sheet stays native
+
+    const first = await page.locator('.pm-tile >> nth=0').elementHandle();
+    const a = await first.boundingBox();
+    await first.dispatchEvent('pointerdown', {
+      pointerId: 9, pointerType: 'touch', clientX: a.x + 40, clientY: a.y + 40, bubbles: true, isPrimary: true,
+    });
+    await page.waitForTimeout(380); // long-press arms
+    await expect(page.locator('.pm-drag-ghost')).toHaveCount(1);
+
+    expect(await probe()).toBe(true); // during: the pan is ours, not the browser's
+
+    await first.dispatchEvent('pointerup', {
+      pointerId: 9, pointerType: 'touch', clientX: a.x + 40, clientY: a.y + 40, bubbles: true,
+    });
+    await expect(page.locator('.pm-drag-ghost')).toHaveCount(0);
+
+    expect(await probe()).toBe(false); // after: listener removed, scroll native again
+  });
+
   test('File menu: Tambah appends, Buka Baru replaces (no refresh)', async ({ page }) => {
     await openSheet(page);
     await page.tap('#pm-close');

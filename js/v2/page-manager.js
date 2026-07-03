@@ -283,9 +283,17 @@ export function createPageManager(deps) {
         drag.lastY = ev.clientY;
       };
       drag.winEnd = (ev) => end(ev);
+      // WHY touchmove too: tiles carry touch-action: pan-y, and
+      // pointermove.preventDefault() does NOT revoke the browser's pan claim —
+      // vertical finger movement after the lift made Chrome fire pointercancel
+      // (drag dies, grid scrolls; founder, Jul 5, mobile prod). Consuming
+      // touchmove non-passively while armed is the only mid-gesture veto;
+      // touch-action changes after touchstart are ignored. Removed in end().
+      drag.winTouchMove = (ev) => { if (ev.cancelable) ev.preventDefault(); };
       window.addEventListener('pointermove', drag.winMove);
       window.addEventListener('pointerup', drag.winEnd);
       window.addEventListener('pointercancel', drag.winEnd);
+      window.addEventListener('touchmove', drag.winTouchMove, { passive: false });
       if (navigator.vibrate) navigator.vibrate(10);
       requestAnimationFrame(dragLoop);
     }
@@ -351,6 +359,7 @@ export function createPageManager(deps) {
         window.removeEventListener('pointermove', d.winMove);
         window.removeEventListener('pointerup', d.winEnd);
         window.removeEventListener('pointercancel', d.winEnd);
+        window.removeEventListener('touchmove', d.winTouchMove);
         // Settle target from LAYOUT coords (a mid-glide placeholder's gBCR lies).
         const gr = grid.getBoundingClientRect();
         const slotLeft = gr.left + d.placeholder.offsetLeft - grid.scrollLeft;
