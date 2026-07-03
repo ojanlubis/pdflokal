@@ -390,18 +390,13 @@
     .ld-foot { padding: 30px 0 40px; display: flex; gap: 18px; align-items: baseline; flex-wrap: wrap; }
     .ld-foot a { font-size: 13px; color: var(--muted); text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
     .ld-foot span { margin-left: auto; font-size: 12px; color: var(--muted); }
-    /* desktop composition (founder, Jul 5 rd4: fill the width with CONTENT).
-       The toolbox IS the content — all 14 tools visible, no accordion (that's
-       a mobile pattern; hiding 10 tools on a 1440px screen was what made the
-       sides feel empty). Paper-on-desk stays: the wide sheet rests on the
-       same warm-stone desk the editor pages sit on. Flow stays top down. */
+    /* desktop composition (founder, Jul 5 rd4+rd5: fill the width with CONTENT,
+       on a flat page). The toolbox IS the content — all 14 tools visible, no
+       accordion (that's a mobile pattern; hiding 10 tools on a 1440px screen
+       was what made the sides feel empty). Paper-on-desk was tried live and
+       CUT by the founder — one continuous surface, no floating sheet. */
     @media (min-width: 900px) {
-      #empty { background: var(--bg); }
-      .ld {
-        max-width: 1140px; margin: 40px auto 56px; padding: 0 56px 8px;
-        background: #faf9f7; border-radius: 3px; /* paper corner, not a card */
-        box-shadow: 0 1px 2px rgba(63,49,35,.08), 0 18px 44px rgba(63,49,35,.13);
-      }
+      .ld { max-width: 1140px; padding: 0 56px 8px; }
       .ld-hero-copy { padding-top: 40px; }
       .ld h1 { font-size: 40px; }
       .ld-sub { font-size: 16px; }
@@ -413,7 +408,7 @@
          (slightly narrower cards than the top-4 = quiet hierarchy) */
       #ld-more[hidden] { display: grid; grid-template-columns: repeat(5, 1fr); }
       .ld-lihat { display: none; }
-      .ld-card { background: var(--surface); } /* lifts off the paper */
+      .ld-card { background: var(--surface); } /* lifts off the page bg */
       .ld-card:hover { border-color: rgba(220,38,38,.45); }
       .dropzone:hover { border-color: var(--accent); background: rgba(220,38,38,.04); }
       .ld-janji p { max-width: 72ch; }
