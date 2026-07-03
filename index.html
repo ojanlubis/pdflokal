@@ -133,15 +133,10 @@
     }
     .brand { font-weight: 700; font-size: 15px; letter-spacing: -.01em; }
     .brand-red { color: var(--accent); }
-    /* home confirm: a small centered card, not a full-screen overlay */
-    #home-confirm {
-      margin: auto; border: none; border-radius: 16px; padding: 20px 20px 16px;
-      max-width: min(88vw, 340px); box-shadow: 0 12px 40px rgba(33,29,26,.3);
-      font: inherit; color: var(--ink);
-    }
-    #home-confirm::backdrop { background: rgba(33,29,26,.45); }
-    #home-confirm b { font-size: 15.5px; letter-spacing: -.01em; }
-    #home-confirm p { font-size: 13px; color: var(--muted); margin: 5px 0 14px; }
+    /* home confirm: rides the standard dialog/.sheet system (the global
+       dialog rule IS the dark overlay — a bespoke dialog fights it and loses) */
+    .hc-sheet { max-width: 340px; }
+    .hc-sheet p { font-size: 13px; color: var(--muted); margin: -6px 0 2px; }
     .hc-row { display: flex; gap: 8px; }
     .hc-row button {
       flex: 1; min-height: 44px; border-radius: 10px; font-weight: 700; font-size: 13.5px;
@@ -857,11 +852,13 @@
   <div id="toast" role="status" aria-live="polite"></div>
 
   <dialog id="home-confirm" aria-label="Kembali ke beranda">
-    <b>Kembali ke beranda?</b>
-    <p>Editanmu bakal hilang kalau belum kamu unduh.</p>
-    <div class="hc-row">
-      <button id="hc-cancel">Batal</button>
-      <button id="hc-go">Ke Beranda</button>
+    <div class="sheet hc-sheet">
+      <h2>Kembali ke beranda?</h2>
+      <p>Editanmu bakal hilang kalau belum kamu unduh.</p>
+      <div class="hc-row">
+        <button id="hc-cancel">Batal</button>
+        <button id="hc-go">Ke Beranda</button>
+      </div>
     </div>
   </dialog>
 

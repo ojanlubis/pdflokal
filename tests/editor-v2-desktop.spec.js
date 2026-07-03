@@ -114,3 +114,31 @@ test.describe('select-then-edit model — desktop', () => {
     await expect(page.locator('.pv-anno-text')).toHaveCSS('color', 'rgb(139, 92, 246)');
   });
 });
+
+// Founder-caught (Jul 4, desktop): if pointer capture fails mid-drag, the
+// lifted tile (pointerEvents:none) never hears pointerup — the ghost hung in
+// the air with its placeholder until later reorders. Window-level listeners
+// now own the drag lifetime; this test forces the capture failure.
+test('Kelola drag settles even when pointer capture fails', async ({ page }) => {
+  await page.goto('/');
+  await page.setInputFiles('#file-input', FIXTURE);
+  await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
+  await page.click('#btn-pages');
+  await expect(page.locator('#pm-sheet')).toBeVisible();
+  await page.evaluate(() => {
+    Element.prototype.setPointerCapture = () => { throw new Error('capture denied'); };
+  });
+
+  const tile = await page.locator('.pm-tile:not(.pm-add)').first().elementHandle();
+  const box = await tile.boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  // Past DRAG_SLOP arms the mouse drag, then wander and release elsewhere.
+  await page.mouse.move(box.x + box.width / 2 + 40, box.y + 20, { steps: 4 });
+  await page.mouse.move(box.x + box.width + 120, box.y + box.height / 2, { steps: 6 });
+  await page.mouse.up();
+
+  await page.waitForTimeout(500); // glide + settle window
+  await expect(page.locator('.pm-drag-ghost')).toHaveCount(0);
+  await expect(page.locator('.pm-placeholder')).toHaveCount(0);
+});

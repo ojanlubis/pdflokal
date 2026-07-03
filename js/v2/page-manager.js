@@ -262,6 +262,21 @@ export function createPageManager(deps) {
       recacheSlots();
       // The pointer may be gone by the time the long-press timer fires.
       try { tile.setPointerCapture(e.pointerId ?? start.id); } catch { /* keep dragging uncaptured */ }
+      // WHY window listeners: the lifted tile has pointerEvents:none, so if
+      // pointer capture fails or is lost mid-drag, its own pointerup never
+      // fires and the ghost hangs in the air with its placeholder (founder-
+      // caught, Jul 4, desktop). The window hears the release no matter where
+      // it lands — even outside the dialog. Removed in end().
+      drag.winMove = (ev) => {
+        if (!drag) return;
+        ev.preventDefault();
+        drag.lastX = ev.clientX;
+        drag.lastY = ev.clientY;
+      };
+      drag.winEnd = (ev) => end(ev);
+      window.addEventListener('pointermove', drag.winMove);
+      window.addEventListener('pointerup', drag.winEnd);
+      window.addEventListener('pointercancel', drag.winEnd);
       if (navigator.vibrate) navigator.vibrate(10);
       requestAnimationFrame(dragLoop);
     }
@@ -320,6 +335,9 @@ export function createPageManager(deps) {
       if (drag) {
         const d = drag;
         drag = null; // stops the loop
+        window.removeEventListener('pointermove', d.winMove);
+        window.removeEventListener('pointerup', d.winEnd);
+        window.removeEventListener('pointercancel', d.winEnd);
         // Settle target from LAYOUT coords (a mid-glide placeholder's gBCR lies).
         const gr = grid.getBoundingClientRect();
         const slotLeft = gr.left + d.placeholder.offsetLeft - grid.scrollLeft;
