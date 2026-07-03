@@ -13,7 +13,7 @@ const FIXTURE = path.join(__dirname, '..', 'fixtures', 'sample-2pages.pdf');
 test.describe('landing — mobile', () => {
   test('shows landing content, hides editor chrome until a file loads', async ({ page }) => {
     await page.goto('/');
-    await expect(page.locator('.ld h1')).toContainText('Urus PDF langsung');
+    await expect(page.locator('.ld h1')).toContainText('PDF beres dalam hitungan detik');
     await expect(page.locator('#toolbar')).toBeHidden();
     await expect(page.locator('.ld-card')).toHaveCount(14);
     await expect(page.locator('#ld-more')).toBeHidden(); // 10 behind the accordion

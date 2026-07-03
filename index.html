@@ -309,12 +309,9 @@
     .ld-hero-copy { position: relative; text-align: center; padding-top: 34px; }
     .ld h1 {
       font-size: clamp(28px, 7.5vw, 38px); line-height: 1.12; letter-spacing: -.035em;
-      font-weight: 700; margin: 0 auto; max-width: 14ch; text-wrap: balance;
+      font-weight: 700; margin: 0 auto; max-width: 19ch; text-wrap: balance;
     }
-    .ld-sub { font-size: 15px; color: var(--muted); margin: 12px auto 22px; max-width: 34ch; }
-    /* device-aware copy: HP on phones, laptop on wide screens */
-    .only-d { display: none; }
-    @media (min-width: 900px) { .only-m { display: none; } .only-d { display: inline; } }
+    .ld-sub { font-size: 15px; color: var(--muted); margin: 12px auto 22px; max-width: 44ch; }
     /* the permanent revamp stamp — thunks once per page view, then just IS.
        Pressed on the title block's top-right corner, tilted left (founder, Jul 5). */
     .ld-stamp {
@@ -751,9 +748,11 @@
         </div>
         <div class="ld-hero">
           <div class="ld-hero-copy">
-            <!-- Device-aware: "HP" on phones, "laptop" on wide screens (founder, Jul 4) -->
-            <h1>Urus PDF langsung di <span class="only-m">HP-mu</span><span class="only-d">laptopmu</span>.</h1>
-            <p class="ld-sub">Gabung, tanda tangan, kompres. Gratis, tanpa upload, tanpa akun.</p>
+            <!-- One h1 both form factors (founder, Jul 5): value prop = fast + gratis,
+                 both consequences of no-upload. The sub says WHY it's believable —
+                 a sentence server-dependent competitors can't write. -->
+            <h1>PDF beres dalam hitungan detik. Gratis.</h1>
+            <p class="ld-sub">Gabung, tanda tangan, kompres — tanpa upload, tanpa akun. Filemu nggak pernah pergi ke server. Makanya cepat, makanya gratis.</p>
             <!-- PERMANENT for the revamp era (founder call, Jul 4): the stamp
                  marks the new look on every visit, mobile and desktop. -->
             <div class="ld-stamp" aria-hidden="true">Tampilan baru</div>
