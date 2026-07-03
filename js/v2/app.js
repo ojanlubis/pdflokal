@@ -245,6 +245,10 @@ function syncFormatBar() {
 // ---- tools ----------------------------------------------------------------------
 function setTool(next) {
   tool = next;
+  if (next !== 'signature') {
+    const g = document.getElementById('sig-ghost');
+    if (g) g.style.display = 'none';
+  }
   for (const btn of document.querySelectorAll('#toolbar .tool[data-tool]')) {
     const active = btn.dataset.tool === next;
     btn.classList.toggle('active', active);
@@ -260,18 +264,49 @@ for (const btn of document.querySelectorAll('#toolbar .tool[data-tool]')) {
     const t = btn.dataset.tool;
     if (t === 'signature' && !storedSignature) { signatureModal.open(); return; }
     setTool(t);
-    if (t === 'text') toast('Ketuk halaman untuk menulis');
+    if (t === 'text') toast('Pilih tempat untuk menulis');
     if (t === 'whiteout') toast('Seret di halaman untuk menutup teks');
-    if (t === 'signature') toast('Ketuk halaman untuk menempatkan tanda tangan');
+    if (t === 'signature') toast('Pilih tempat untuk menempatkan tanda tangan');
   });
 }
+
+// ---- carried-signature ghost (desktop telegraph, founder Jul 3) -------------------
+// After drawing a TTD, the "place it" state must be visible: on fine pointers
+// the signature itself rides the cursor, translucent, until the click drops
+// it. Touch has no cursor — there the persistent sig-bar hint does this job.
+const sigGhost = document.createElement('img');
+sigGhost.id = 'sig-ghost';
+sigGhost.alt = '';
+sigGhost.style.cssText =
+  'position:fixed;z-index:70;pointer-events:none;opacity:.55;display:none;' +
+  'filter:drop-shadow(0 4px 10px rgba(63,49,35,.25))';
+document.body.appendChild(sigGhost);
+const FINE_POINTER = window.matchMedia('(pointer: fine)').matches;
+
+document.addEventListener('pointermove', (e) => {
+  if (FINE_POINTER && tool === 'signature' && storedSignature) {
+    const w = (storedSignature.subtype === 'paraf' ? 80 : 150) * zoom;
+    const h = w * (storedSignature.height / storedSignature.width);
+    if (sigGhost.dataset.sig !== storedSignature.dataUrl.slice(-40)) {
+      sigGhost.src = storedSignature.dataUrl;
+      sigGhost.dataset.sig = storedSignature.dataUrl.slice(-40);
+    }
+    sigGhost.style.width = w + 'px';
+    sigGhost.style.height = h + 'px';
+    sigGhost.style.left = (e.clientX - w / 2) + 'px';
+    sigGhost.style.top = (e.clientY - h / 2) + 'px';
+    sigGhost.style.display = '';
+  } else if (sigGhost.style.display !== 'none') {
+    sigGhost.style.display = 'none';
+  }
+});
 
 // Hapus works BOTH ways (founder ask): with a selection it deletes now; with
 // nothing selected it arms delete-mode — the next tapped object is removed.
 document.getElementById('btn-delete-anno').addEventListener('click', () => {
   if (doc.selection.annotationId) { deleteSelected(); return; }
   setTool('delete');
-  toast('Ketuk objek yang mau dihapus');
+  toast('Pilih objek yang mau dihapus');
 });
 
 // ---- Tip-Ex color matching -------------------------------------------------------
@@ -498,8 +533,8 @@ const signatureModal = createSignatureModal({
     }
     setTool('signature');
     toast(sig.subtype === 'paraf'
-      ? 'Ketuk halaman untuk menempatkan paraf'
-      : 'Ketuk halaman untuk menempatkan tanda tangan');
+      ? 'Pilih tempat untuk menempatkan paraf'
+      : 'Pilih tempat untuk menempatkan tanda tangan');
   },
 });
 
@@ -529,7 +564,7 @@ function syncSigBar() {
   redrawBtn.style.display = (armed || found) ? '' : 'none';
   document.getElementById('sig-bar-label').textContent = found
     ? (found.anno.subtype === 'paraf' ? 'Paraf terpilih' : 'Tanda tangan terpilih')
-    : (armed ? 'Ketuk halaman untuk menempatkan' : '');
+    : (armed ? 'Pilih tempat untuk menempatkan' : '');
 }
 document.getElementById('btn-redraw-sig').addEventListener('click', () => signatureModal.open());
 
@@ -686,10 +721,10 @@ function applyIntent(intent) {
     // opens to make one; otherwise arm placement.
     if (!storedSignature) { signatureModal.open(); return; }
     setTool('signature');
-    toast('Ketuk halaman untuk menempatkan tanda tangan');
+    toast('Pilih tempat untuk menempatkan tanda tangan');
   } else if (intent === 'teks') {
     setTool('text');
-    toast('Ketuk halaman untuk menulis');
+    toast('Pilih tempat untuk menulis');
   } else if (intent === 'tipex') {
     setTool('whiteout');
     toast('Seret di halaman untuk menutup teks');

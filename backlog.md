@@ -13,14 +13,15 @@ Running list of UI/UX findings + small fixes to pick up later. Append new items 
 
 ## Open
 
+- **[high — investigate FIRST, no fix yet: root cause unknown]** Production `client_error` events firing on the editor surface — [js/lib/errors.js](js/lib/errors.js), GA4 property 528550405, Sentry
+  - Signal (GA4, Jun 25–Jul 3, ID-only): **18 client_errors in 9 days (~2/day), all on `/`** (the editor). Breakdown: 8 desktop Win/Chrome · 7 desktop Mac/Chrome · 2 mobile Android/Chrome · 1 Mac `/index.html`. So overwhelmingly **desktop Chrome**, NOT a mobile-specific crash.
+  - **Why there's no fix here yet — we're blind on the message:** the error hook sends `kind/message/source/line/col/stack` (errors.js:37,50) but (a) Sentry needs OAuth (couldn't read it in the session that logged this), and (b) **GA4 has ZERO custom dimensions registered**, so the message/stack params are discarded at the reporting layer — only the event count survives. Can't propose a code change without the message.
+  - **Fastest path to root cause (do one):** (1) read the Sentry notification/issue directly (founder has it), OR (2) check the Vercel Analytics custom-event dashboard — `track()` bridges there and may show `message` as a column, OR (3) reproduce on desktop Chrome on `/` with DevTools console open.
+  - **Enabler fix (do regardless — makes ALL future errors self-diagnosing without Sentry):** register the client_error params as **GA4 custom dimensions** (`message`, `source`, `line`, `kind` at minimum) in GA4 Admin → Custom definitions. 5-min admin task, no code change. This is the long-outstanding "instrument GA4 custom dimensions" TODO from `docs/product-definition.md` §11. Once registered, this same query returns the actual error text and the fix becomes obvious.
+  - Pre-ads relevance: worth closing before the ads spend so the mobile ad cohort isn't hitting a silent break — though current data says the errors are desktop, not the mobile flow the ads target.
+
 - **[med, WAIT until ~Jul 5-6, decide with data]** Kelola Halaman hides its powers — users can be clueless about what the sheet can do (reorder/split/rotate/delete). Founder idea: explicit verb buttons (Tambah, Split, ...) or a mini tutorial — BUT deliberately wait ~2 days from Jul 3 launch and check analytics whether editor_action reorder/split/gabungkan_used happen organically before adding UI. [js/v2/page-manager.js]
 
-
-- **[founder desktop pass Jul 3 — v2 signature (tandatangan) punch list]** Two findings from the same session:
-  1. **[high]** Placement state needs a "carried object" telegraph. After the user draws a TTD and the flow enters the "tap a spot to place it" state, nothing signals what to do. Desktop: the signature should **stick transparently to the cursor** (ghost preview following the pointer) until they click to drop it. Mobile (no cursor): the **"Ketuk halaman untuk menempatkan tanda tangan" hint should PERSIST for the whole placement state** (not flash once) so the user always knows they're mid-placement. This is the INTENT/BEFORE telegraph from the "chef's kiss" item applied to signatures — treat as high because without it the placement state is a dead end users get stuck in. [js/v2/signature-modal.js + js/v2/app.js placement state]
-  2. **[low]** Signature/TTD toolbar (format/action bar for the signature tool) should be center-aligned too — same fix as the text format bar item 1. [js/v2 signature bar layout]
-
-- **[low]** Global copy sweep: change every user-facing instance of **"ketuk" → "pilih"** — founder feels "pilih" reads more natural. Covers hint strings like "Ketuk halaman untuk menempatkan tanda tangan" → "Pilih halaman..." and the "Ketuk halaman untuk tanda tangan" example in the telegraph item above. Grep all v2 + shared user-facing strings for "etuk" (catches Ketuk/ketuk); do NOT touch code identifiers, only display copy. [js/v2/*, index.html, any Indonesian UI strings]
 
 - **[decided Jul 2]** Watermark + page-number + Kunci PDF UI: NOT built in v2 (3-month analytics: <0.5% each — 7/3/3 visitors). Engine + export support stays tested, so reintroduction = one button. Revisit only if users ask.
 - **[decided Jul 2]** Desktop sidebar: NOT rebuilt in v2. One assemble surface (Kelola Halaman) on all devices; the desktop ergonomics pass may dock the SAME sheet as a side panel on wide screens — one component, two positions, never two implementations.
@@ -108,6 +109,8 @@ Running list of UI/UX findings + small fixes to pick up later. Append new items 
 ---
 
 ## Done
+
+- **Signature punch list + copy sweep (founder findings Jul 3-4)** — SHIPPED (Jul 4): carried-signature ghost on desktop (the drawn TTD rides the cursor at placement size × zoom, translucent, until click drops it; touch keeps the persistent sig-bar hint); sig-bar centering landed with #105; ketuk→pilih sweep across all display copy ("Pilih tempat untuk menempatkan tanda tangan", "Pilih halaman · tahan lalu geser...", zero "ketuk" remaining). Also fixed same-day: Kelola drag ghost hanging mid-air (window-owned drag lifetime, capture-failure regression test) + home-confirm dialog joining the .sheet system.
 
 - **Desktop text-tool punch list (founder findings Jul 3)** — SHIPPED (Jul 4): (1+2) format bar + sig bar now FLOAT over the canvas (frosted, zero document jump — verified 0px) and center on desktop; (3) select-then-edit interaction model: first click selects (drag-enabled), click on already-selected (or double-click) edits — root cause was a phantom double-click (pointerdown+pointerup both registered as taps 50ms apart), the double-tap timing machinery is GONE, replaced by release-without-drag-on-selected; (4) full color picker (native color input in swatch costume, live preview while dragging). 4 new desktop specs.
 
