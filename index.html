@@ -122,7 +122,7 @@
     body {
       font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background: var(--bg); color: var(--ink);
-      display: flex; flex-direction: column;
+      display: flex; flex-direction: column; position: relative;
     }
 
     /* ---- header ---- */
@@ -206,10 +206,14 @@
     .tool.active { background: rgba(220,38,38,.08); color: var(--accent); }
 
     /* ---- format bar: contextual, only when text is in play ---- */
+    /* Contextual bars OVERLAY the canvas (founder: the document must never
+       jump when a bar appears/disappears) — frosted so the page shows through. */
     #format-bar {
       display: none; align-items: center; gap: 6px;
-      height: 46px; flex: 0 0 auto; padding: 0 10px;
-      background: var(--surface); border-bottom: 1px solid var(--line);
+      position: absolute; top: calc(var(--header-h) + var(--toolbar-h)); left: 0; right: 0;
+      z-index: 45; height: 46px; padding: 0 10px;
+      background: rgba(255,255,255,.93); backdrop-filter: blur(6px);
+      border-bottom: 1px solid var(--line); box-shadow: 0 4px 14px rgba(63,49,35,.07);
       overflow-x: auto; scrollbar-width: none;
     }
     #format-bar.show { display: flex; }
@@ -230,6 +234,10 @@
       border: 1.5px solid var(--line); flex: 0 0 auto;
     }
     .fb-color.on { box-shadow: 0 0 0 2.5px var(--accent); }
+    /* the "any color" swatch: a native color input in swatch costume */
+    .fb-color-custom { padding: 0; cursor: pointer; background: conic-gradient(red, yellow, lime, cyan, blue, magenta, red); }
+    .fb-color-custom::-webkit-color-swatch-wrapper { padding: 3px; }
+    .fb-color-custom::-webkit-color-swatch { border: 1px solid rgba(0,0,0,.15); border-radius: 50%; }
 
     /* ---- document area: CONTAINER scroll (kills edge-overscroll flicker) ---- */
     #v2-scroll {
@@ -398,6 +406,7 @@
       .ld-card:hover { border-color: rgba(220,38,38,.45); }
       .dropzone:hover { border-color: var(--accent); background: rgba(220,38,38,.04); }
       .ld-faq, .ld-janji { max-width: 720px; }
+      #format-bar, #sig-bar { justify-content: center; }
     }
 
     /* inline text editor overlay */
@@ -519,8 +528,11 @@
 
     /* signature context strip ("Semua Hal.") */
     #sig-bar {
-      display: none; align-items: center; gap: 8px; height: 46px; flex: 0 0 auto;
-      padding: 0 10px; background: var(--surface); border-bottom: 1px solid var(--line);
+      display: none; align-items: center; gap: 8px; height: 46px;
+      position: absolute; top: calc(var(--header-h) + var(--toolbar-h)); left: 0; right: 0;
+      z-index: 45; padding: 0 10px;
+      background: rgba(255,255,255,.93); backdrop-filter: blur(6px);
+      border-bottom: 1px solid var(--line); box-shadow: 0 4px 14px rgba(63,49,35,.07);
       font-size: 12.5px; color: var(--muted);
     }
     #sig-bar.show { display: flex; }

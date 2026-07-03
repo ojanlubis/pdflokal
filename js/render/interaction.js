@@ -22,8 +22,6 @@ import { selectAnnotation, clearSelection, moveAnnotation, resizeAnnotation, upd
 import { record } from '../core/history.js';
 import { decorateSelected, undecorateSelected } from './page-view.js';
 
-const DOUBLE_TAP_MS = 300;
-const DOUBLE_TAP_DIST = 30;
 const TAP_SLOP = 12; // px of finger movement beyond which a press is not a tap
 
 // ctx = {
@@ -34,14 +32,13 @@ const TAP_SLOP = 12; // px of finger movement beyond which a press is not a tap
 //   history:    core history (or null to disable undo recording)
 //   onChange:   (kind, payload) => void   — 'select' | 'move' | 'resize' | 'draw'
 //   onPlace:    (tool, {pageId, x, y}) => void — tap-to-place for text/signature
-//   onEditText: (annotationId) => void — double-tap on a text annotation
+//   onEditText: (annotationId) => void — click/tap on an already-selected text
 // }
 export function createInteraction(ctx) {
   const { stage } = ctx;
   let gesture = null;        // the active pointer gesture (one at a time)
   let tapCandidate = null;   // touch press waiting to become a tap at RELEASE
   let selectedEl = null;     // decorated element (kept in sync with doc.selection)
-  let lastTap = { t: 0, x: 0, y: 0, annoId: null };
 
   // ---- coordinate mapping (screen → page-space points) ----------------------
   function toPage(e, pageView) {
@@ -97,13 +94,13 @@ export function createInteraction(ctx) {
 
   // ---- gestures --------------------------------------------------------------
 
-  function startDrag(e, annoEl, page, anno) {
+  function startDrag(e, annoEl, page, anno, wasSelected = false) {
     const zoom = ctx.getZoom();
     gesture = {
       kind: 'move', pointerId: e.pointerId, annoEl, page, anno, zoom,
       startX: e.clientX, startY: e.clientY,
       baseX: anno.x || 0, baseY: anno.y || 0,
-      moved: false,
+      moved: false, wasSelected,
     };
     annoEl.setPointerCapture(e.pointerId);
   }
@@ -138,16 +135,6 @@ export function createInteraction(ctx) {
       el: null, anno: null, moved: false,
     };
     pageView.setPointerCapture(e.pointerId);
-  }
-
-  // Was this tap the second of a double-tap? Also records it as the new "last".
-  function registerTap(annoId, x, y) {
-    const now = Date.now();
-    const isDouble = annoId && annoId === lastTap.annoId &&
-      now - lastTap.t < DOUBLE_TAP_MS &&
-      Math.hypot(x - lastTap.x, y - lastTap.y) < DOUBLE_TAP_DIST;
-    lastTap = { t: now, x, y, annoId };
-    return isDouble;
   }
 
   function onPointerDown(e) {
@@ -205,12 +192,13 @@ export function createInteraction(ctx) {
         }
 
         if (!isTouch) {
-          // Mouse: select + drag immediately (no camera gesture to conflict with).
+          // Mouse: select + drag immediately (no camera gesture to conflict
+          // with). Whether this click can become "edit" is decided at RELEASE
+          // (no-move + was already selected) — see onPointerEnd.
           e.preventDefault();
-          const isDouble = registerTap(anno.id, e.clientX, e.clientY);
+          const wasSelected = doc.selection.annotationId === anno.id;
           setSelected(annoEl, anno);
-          if (isDouble && anno.type === 'text') { ctx.onEditText?.(anno.id); return; }
-          startDrag(e, annoEl, page, anno);
+          startDrag(e, annoEl, page, anno, wasSelected);
           return;
         }
 
@@ -219,7 +207,7 @@ export function createInteraction(ctx) {
           // drag it. (decorateSelected set touch-action:none on it, so the
           // browser won't steal the gesture for scrolling.)
           e.preventDefault();
-          startDrag(e, annoEl, page, anno);
+          startDrag(e, annoEl, page, anno, true);
           return;
         }
 
@@ -323,11 +311,7 @@ export function createInteraction(ctx) {
       if (tc.annoId) {
         const doc = ctx.getDoc();
         const found = findAnno(doc, tc.annoId);
-        if (found) {
-          const isDouble = registerTap(tc.annoId, e.clientX, e.clientY);
-          setSelected(tc.annoEl, found.anno);
-          if (isDouble && found.anno.type === 'text') ctx.onEditText?.(tc.annoId);
-        }
+        if (found) setSelected(tc.annoEl, found.anno);
       } else {
         setSelected(null, null);
       }
@@ -338,10 +322,12 @@ export function createInteraction(ctx) {
     const g = gesture;
     gesture = null;
     if (!g.moved) {
-      // Touch tap on an already-selected text: second tap of a double → edit.
-      if (g.kind === 'move' && e.type === 'pointerup') {
-        const isDouble = registerTap(g.anno.id, e.clientX, e.clientY);
-        if (isDouble && g.anno.type === 'text') ctx.onEditText?.(g.anno.id);
+      // Release-without-drag on an ALREADY-selected text enters editing — the
+      // Figma/PowerPoint model (founder, Jul 3): first click/tap selects, the
+      // next one edits; a double-click from unselected composes the same two
+      // steps, so no double-tap timing window is needed at all.
+      if (g.kind === 'move' && e.type === 'pointerup' && g.wasSelected && g.anno.type === 'text') {
+        ctx.onEditText?.(g.anno.id);
       }
       return;
     }

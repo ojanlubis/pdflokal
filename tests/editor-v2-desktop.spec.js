@@ -56,3 +56,61 @@ test.describe('editor v2 — desktop', () => {
     expect(await page.evaluate(() => window.v2.getDoc().pages[0].rotation)).toBe(90);
   });
 });
+
+// Founder desktop punch list (Jul 3): the Figma/PowerPoint model — first
+// click SELECTS (drag-enabled), the NEXT click (or a double-click from
+// unselected) enters text editing. Single click must never jump to editing.
+test.describe('select-then-edit model — desktop', () => {
+  async function placeText(page) {
+    await page.goto('/');
+    await page.setInputFiles('#file-input', FIXTURE);
+    await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
+    await page.keyboard.press('t');
+    await page.click('.pv-page >> nth=0', { position: { x: 200, y: 200 } });
+    await page.keyboard.type('Klik aku');
+    await page.keyboard.press('Enter');
+    await expect(page.locator('.pv-anno-text')).toHaveText('Klik aku');
+    // Deselect: click empty page area far from the text.
+    await page.click('.pv-page >> nth=0', { position: { x: 60, y: 480 } });
+    await page.waitForTimeout(50);
+    expect(await page.evaluate(() => window.v2.getDoc().selection.annotationId)).toBeNull();
+  }
+
+  test('single click on unselected text SELECTS, never edits', async ({ page }) => {
+    await placeText(page);
+    await page.locator('.pv-anno-text').click();
+    await page.waitForTimeout(120);
+    expect(await page.evaluate(() => window.v2.getDoc().selection.annotationId)).not.toBeNull();
+    await expect(page.locator('.v2-text-edit')).toHaveCount(0); // no inline editor
+  });
+
+  test('click on the ALREADY-selected text enters editing', async ({ page }) => {
+    await placeText(page);
+    await page.locator('.pv-anno-text').click();       // select
+    await page.waitForTimeout(400);                    // well past any double-click window
+    await page.locator('.pv-anno-text').click();       // second click → edit
+    await expect(page.locator('.v2-text-edit')).toHaveCount(1);
+  });
+
+  test('drag of a selected text moves it without entering editing', async ({ page }) => {
+    await placeText(page);
+    await page.locator('.pv-anno-text').click();       // select
+    const before = await page.evaluate(() => window.v2.getDoc().pages[0].annotations[0].x);
+    const box = await page.locator('.pv-anno-text').boundingBox();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + 60, box.y + box.height / 2, { steps: 5 });
+    await page.mouse.up();
+    const after = await page.evaluate(() => window.v2.getDoc().pages[0].annotations[0].x);
+    expect(after).toBeGreaterThan(before);
+    await expect(page.locator('.v2-text-edit')).toHaveCount(0);
+  });
+
+  test('custom color input applies any color to the selected text', async ({ page }) => {
+    await placeText(page);
+    await page.locator('.pv-anno-text').click(); // select → format bar shows
+    await expect(page.locator('#format-bar')).toBeVisible();
+    await page.locator('.fb-color-custom').fill('#8b5cf6');
+    await expect(page.locator('.pv-anno-text')).toHaveCSS('color', 'rgb(139, 92, 246)');
+  });
+});

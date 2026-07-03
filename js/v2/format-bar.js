@@ -79,6 +79,14 @@ export function createFormatBar(deps) {
     el.appendChild(b);
     swatches.push(b);
   }
+  // Beyond the presets: the full palette (founder ask). A native color input
+  // wearing a swatch costume — free UI, works everywhere, no popover to build.
+  const customColor = document.createElement('input');
+  customColor.type = 'color';
+  customColor.className = 'fb-color fb-color-custom';
+  customColor.setAttribute('aria-label', 'Warna lainnya');
+  customColor.title = 'Warna lainnya';
+  el.appendChild(customColor);
 
   // ---- state sync ---------------------------------------------------------------
   function reflect(style) {
@@ -88,7 +96,11 @@ export function createFormatBar(deps) {
     boldBtn.setAttribute('aria-pressed', String(!!style.bold));
     italicBtn.classList.toggle('on', !!style.italic);
     italicBtn.setAttribute('aria-pressed', String(!!style.italic));
-    for (const s of swatches) s.classList.toggle('on', s.dataset.color === (style.color || '#000000'));
+    const cur = style.color || '#000000';
+    const isPreset = COLORS.includes(cur);
+    for (const s of swatches) s.classList.toggle('on', s.dataset.color === cur);
+    customColor.classList.toggle('on', !isPreset);
+    customColor.value = cur;
   }
 
   function apply(patch) {
@@ -109,6 +121,8 @@ export function createFormatBar(deps) {
   boldBtn.addEventListener('click', () => apply({ bold: !(deps.getTarget() || defaults).bold }));
   italicBtn.addEventListener('click', () => apply({ italic: !(deps.getTarget() || defaults).italic }));
   for (const s of swatches) s.addEventListener('click', () => apply({ color: s.dataset.color }));
+  // 'input' fires while dragging inside the OS picker → live preview on the text.
+  customColor.addEventListener('input', () => apply({ color: customColor.value }));
 
   // Keep taps inside the bar from bubbling into the stage (deselecting), and
   // keep BUTTON taps from stealing focus (which would blur-commit an open
