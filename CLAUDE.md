@@ -1,5 +1,17 @@
 # CLAUDE.MD - PDFLokal Project Guide
 
+## ⚡ STATUS (July 3, 2026): V2 SHIPPED — pdflokal.id IS the clean rebuild
+
+**Read this section first; much of the rest of this file describes the OLD wing and awaits the demolition-phase rewrite.**
+
+- **`index.html` is Editor v2**: the landing page IS the editor's empty state (kop-surat header, dropzone, tool cards with `?buat=` intent hook, FAQ). Architecture: headless core (`js/core/` — model, operations, history, import, export, compress, export-images), render layer (`js/render/` — page-view, viewport, interaction; pages are `<img>`, one overlay, one pointer path), app shell (`js/v2/` — app, download-sheet, page-manager, signature-modal, format-bar, celebrate). Self-contained CSS inside index.html — style.css belongs to the old wing.
+- **The old app lives at `alat-gambar.html`** (renamed old index.html, noindexed) solely to keep the image tools alive until absorption. It still uses `js/editor/`, `js/pdf-tools/`, `style.css`, the old init files. **All of that dies at demolition** (after the post-launch bake) along with most of this file's "Core Architecture" section.
+- **Design language is LAW**: memory `design-language-2026-07.md` — red #dc2626 on warm stone, Plus Jakarta Sans, red-chrome-never-prints, paper-on-desk shadows, stempel-press buttons, the 5-stamp language ("cap = pernyataan status"). Design skills installed in `.agents/skills/` — load before UI work.
+- **Interaction model**: camera-first touch (selection commits at release); select-then-edit for text (first click/tap selects, the next one edits — no double-tap timing windows). Both founder-ratified.
+- **Tests**: `tests/mobile/**` (mobile-chrome project, the deep suite) + `tests/editor-v2-desktop.spec.js` target v2 at `/`. Old suites were repointed at `/alat-gambar.html` and die with the old wing. `tests/core/` runs headless via `npm run test:core`. Full sweep: `npm run lint` + `npx playwright test`.
+- **Working rhythm**: branch → failing test → green → full sweep → PR → `gh pr merge --squash --admin --delete-branch` (authorized) → verify Vercel deploy via commit status → update backlog.md + memory STATE.md. Screenshot every new UI surface (a broken dialog once passed all functional tests).
+- **Gotchas (v2)**: `npx serve` cleanUrls 301 strips query strings (tests use extensionless URLs); the global `dialog` CSS rule IS the overlay — new dialogs must use a `.sheet` child; `history` is shadowed in app.js by the undo history (use `window.history`); no grid rebuilds mid-drag in page-manager (render parks on `dragActive`).
+
 ## Project Overview
 
 **PDFLokal** is a 100% client-side PDF and image manipulation tool for Indonesian users. All processing happens in the browser - no files are ever uploaded to a server.
