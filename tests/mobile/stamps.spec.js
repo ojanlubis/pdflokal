@@ -12,21 +12,20 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE = path.join(__dirname, '..', 'fixtures', 'sample-2pages.pdf');
 
 test.describe('stamp moments — mobile', () => {
-  test('TAMPILAN BARU shows once per device, then never again', async ({ page }) => {
+  test('TAMPILAN BARU is a PERMANENT landing element (founder call Jul 4)', async ({ page }) => {
     await page.goto('/');
-    await expect(page.locator('.v2-stamp', { hasText: 'Tampilan baru' }))
-      .toBeAttached({ timeout: 3000 });
-    // Same device (storage persists): a reload stays quiet.
+    await expect(page.locator('.ld-stamp')).toBeVisible();
+    await expect(page.locator('.ld-stamp')).toContainText('Tampilan baru');
+    // Permanent means permanent: still there after a reload.
     await page.reload();
-    await page.waitForTimeout(1800);
-    await expect(page.locator('.v2-stamp')).toHaveCount(0);
+    await page.waitForTimeout(1200);
+    await expect(page.locator('.ld-stamp')).toBeVisible();
   });
 
   test('TETAP JALAN when the connection drops mid-session — once', async ({ page }) => {
     await page.goto('/');
     await page.setInputFiles('#file-input', FIXTURE);
     await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
-    await page.waitForTimeout(2600); // let the welcome stamp come and go
     await page.evaluate(() => window.dispatchEvent(new Event('offline')));
     await expect(page.locator('.v2-stamp', { hasText: 'Tetap jalan' })).toBeAttached();
     await expect(page.locator('#toast')).toContainText('jalan di HP-mu');

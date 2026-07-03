@@ -131,8 +131,24 @@
       display: flex; align-items: center; gap: 8px; padding: 0 10px;
       background: var(--surface); border-bottom: 1px solid var(--line);
     }
-    .brand { font-weight: 700; font-size: 15px; }
+    .brand { font-weight: 700; font-size: 15px; letter-spacing: -.01em; }
     .brand-red { color: var(--accent); }
+    /* home confirm: a small centered card, not a full-screen overlay */
+    #home-confirm {
+      margin: auto; border: none; border-radius: 16px; padding: 20px 20px 16px;
+      max-width: min(88vw, 340px); box-shadow: 0 12px 40px rgba(33,29,26,.3);
+      font: inherit; color: var(--ink);
+    }
+    #home-confirm::backdrop { background: rgba(33,29,26,.45); }
+    #home-confirm b { font-size: 15.5px; letter-spacing: -.01em; }
+    #home-confirm p { font-size: 13px; color: var(--muted); margin: 5px 0 14px; }
+    .hc-row { display: flex; gap: 8px; }
+    .hc-row button {
+      flex: 1; min-height: 44px; border-radius: 10px; font-weight: 700; font-size: 13.5px;
+      border: 1.5px solid var(--line); background: var(--bg);
+    }
+    #hc-go { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 2px 0 var(--accent-down); }
+    #hc-go:active { transform: translateY(1px); box-shadow: 0 1px 0 var(--accent-down); }
     .brand .beta { font-size: 10px; color: var(--accent); vertical-align: super; font-weight: 600; }
     .file-menu-wrap { position: relative; }
     #btn-file { font-size: 13px; color: var(--muted); padding: 0 8px; }
@@ -288,6 +304,25 @@
       font-weight: 700; margin: 30px 0 0; max-width: 14ch; text-wrap: balance;
     }
     .ld-sub { font-size: 15px; color: var(--muted); margin: 12px 0 22px; max-width: 34ch; }
+    /* device-aware copy: HP on phones, laptop on wide screens */
+    .only-d { display: none; }
+    @media (min-width: 900px) { .only-m { display: none; } .only-d { display: inline; } }
+    /* the permanent revamp stamp — thunks once per page view, then just IS */
+    .ld-stamp {
+      display: inline-block; padding: 7px 14px; margin: 0 0 20px;
+      border: 3.5px solid var(--accent); border-radius: 8px; color: var(--accent);
+      font-weight: 700; font-size: 15px; letter-spacing: .09em; text-transform: uppercase;
+      transform: rotate(-5deg);
+      -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence baseFrequency='.75'/></filter><rect width='120' height='120' filter='url(%23n)' opacity='.9'/></svg>");
+      mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence baseFrequency='.75'/></filter><rect width='120' height='120' filter='url(%23n)' opacity='.9'/></svg>");
+      animation: ld-thunk .45s cubic-bezier(.34,1.45,.44,1) .5s both;
+    }
+    @keyframes ld-thunk {
+      0% { transform: rotate(-13deg) scale(2); opacity: 0; }
+      60% { transform: rotate(-5deg) scale(.97); opacity: 1; }
+      100% { transform: rotate(-5deg) scale(1); opacity: 1; }
+    }
+    @media (prefers-reduced-motion: reduce) { .ld-stamp { animation: none; } }
     .dropzone {
       display: block; width: 100%; cursor: pointer; text-align: center;
       border: 2px dashed #d8d0c4; border-radius: 16px; background: var(--surface);
@@ -349,6 +384,21 @@
     .ld-foot { padding: 30px 0 40px; display: flex; gap: 18px; align-items: baseline; flex-wrap: wrap; }
     .ld-foot a { font-size: 13px; color: var(--muted); text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
     .ld-foot span { margin-left: auto; font-size: 12px; color: var(--muted); }
+    /* desktop composition (founder, Jul 4: the 620px column drowned in margin) */
+    @media (min-width: 900px) {
+      .ld { max-width: 1020px; padding: 0 40px 8px; }
+      .ld-hero {
+        display: grid; grid-template-columns: 1.05fr 1fr; gap: 48px;
+        align-items: center; padding: 22px 0 0;
+      }
+      .ld h1 { font-size: 44px; margin-top: 18px; }
+      .ld-sub { font-size: 16px; }
+      .dropzone { padding: 44px 24px 38px; }
+      .ld-grid { grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); }
+      .ld-card:hover { border-color: rgba(220,38,38,.45); }
+      .dropzone:hover { border-color: var(--accent); background: rgba(220,38,38,.04); }
+      .ld-faq, .ld-janji { max-width: 720px; }
+    }
 
     /* inline text editor overlay */
     .v2-text-edit {
@@ -605,7 +655,7 @@
 </head>
 <body class="is-empty">
   <header>
-    <span class="brand">PDF<span class="brand-red">Lokal</span></span>
+    <button class="brand" id="btn-home" aria-label="Kembali ke beranda">PDF<span class="brand-red">Lokal</span></button>
     <div class="file-menu-wrap">
       <button id="btn-file" disabled aria-haspopup="menu" aria-expanded="false">File ▾</button>
       <div id="file-menu" role="menu" hidden>
@@ -677,14 +727,22 @@
           <span class="ld-mark">PDF<em>Lokal</em></span>
           <a href="dukung.html">Dukung Kami</a>
         </div>
-        <h1>Urus PDF langsung di HP-mu.</h1>
-        <p class="ld-sub">Gabung, tanda tangan, kompres. Gratis, tanpa upload, tanpa akun.</p>
+        <div class="ld-hero">
+          <div class="ld-hero-copy">
+            <!-- Device-aware: "HP" on phones, "laptop" on wide screens (founder, Jul 4) -->
+            <h1>Urus PDF langsung di <span class="only-m">HP-mu</span><span class="only-d">laptopmu</span>.</h1>
+            <p class="ld-sub">Gabung, tanda tangan, kompres. Gratis, tanpa upload, tanpa akun.</p>
+            <!-- PERMANENT for the revamp era (founder call, Jul 4): the stamp
+                 marks the new look on every visit, mobile and desktop. -->
+            <div class="ld-stamp" aria-hidden="true">Tampilan baru</div>
+          </div>
         <button class="dropzone" id="btn-open">
           <svg class="dz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
           <span class="dz-title">Seret file ke sini, atau</span>
           <span class="dz-buka">Buka File</span>
           <span class="dz-hint">PDF atau foto, boleh banyak sekaligus</span>
         </button>
+        </div>
         <p class="ld-label">Mau ngapain hari ini?</p>
         <div class="ld-grid">
           <button class="ld-card" data-intent="gabung">
@@ -787,6 +845,15 @@
     <button id="z-out" aria-label="Perkecil">−</button>
   </div>
   <div id="toast" role="status" aria-live="polite"></div>
+
+  <dialog id="home-confirm" aria-label="Kembali ke beranda">
+    <b>Kembali ke beranda?</b>
+    <p>Editanmu bakal hilang kalau belum kamu unduh.</p>
+    <div class="hc-row">
+      <button id="hc-cancel">Batal</button>
+      <button id="hc-go">Ke Beranda</button>
+    </div>
+  </dialog>
 
   <div id="support-card" role="dialog" aria-label="Dukung PDFLokal">
     <button id="sc-close" aria-label="Tutup">
