@@ -105,6 +105,8 @@ Running list of UI/UX findings + small fixes to pick up later. Append new items 
 
 ## Done
 
+- **Desktop landing rd4+rd5 (founder, Jul 5)** — SHIPPED (#114 flat via #115): the sides get filled with CONTENT, not framing — all 14 tool cards visible on desktop (accordion is mobile-only; top-4 featured row + 10 in two 5-across rows), container 1140px, FAQ two-column, janji device-neutral ("perangkatmu"). Paper-on-desk on the landing was tried live and CUT — one continuous flat surface. Root lesson logged: the emptiness complaint was hidden inventory (10 tools behind a mobile accordion on 1440px), not missing decoration.
+
 - **Kelola drag stolen by native scroll on mobile (founder, Jul 5)** — FIXED (#113): tiles have `touch-action: pan-y` and `pointermove.preventDefault()` does NOT revoke the browser's pan claim — vertical finger movement after the long-press lift made Chrome fire pointercancel (drag died, grid scrolled). Fix: window-level non-passive `touchmove` consumed while a drag is armed, released in `end()` (same pattern SortableJS uses). Regression test asserts touchmove defaultPrevented before/during/after a drag; failed on pre-fix code. Note: the render layer never had this bug — selected annotations set `touch-action: none` at selection time, before the gesture starts.
 
 - **H1 = value prop (founder-picked, Jul 5)** — SHIPPED (#112): "PDF beres dalam hitungan detik. Gratis." — one h1 both form factors (device-aware only-m/only-d spans retired). Sub carries the moat as proof: "Filemu nggak pernah pergi ke server. Makanya cepat, makanya gratis."
