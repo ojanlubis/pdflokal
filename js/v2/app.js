@@ -484,6 +484,18 @@ const signatureModal = createSignatureModal({
   toast,
   onReady: (sig) => {
     storedSignature = sig; // { dataUrl, width, height, subtype }
+    // Founder punch list #1: if a placed signature is SELECTED when the user
+    // redraws, they're fixing THAT one — swap its image in place instead of
+    // making them delete + re-place. Otherwise arm placement as before.
+    const found = selectedSignatureAnno();
+    if (found) {
+      record(history, doc);
+      found.anno.image = sig.dataUrl;
+      found.anno.height = found.anno.width * (sig.height / sig.width);
+      rebuildStage();
+      toast('Tanda tangan diganti');
+      return;
+    }
     setTool('signature');
     toast(sig.subtype === 'paraf'
       ? 'Ketuk halaman untuk menempatkan paraf'
@@ -510,9 +522,11 @@ function syncSigBar() {
   const bar = document.getElementById('sig-bar');
   const allBtn = document.getElementById('btn-all-pages');
   const redrawBtn = document.getElementById('btn-redraw-sig');
-  bar.classList.toggle('show', (!!found && doc.pages.length > 1) || armed);
+  // Punch list #1: a SELECTED signature also offers Gambar Ulang — "it placed
+  // the old ttd" must be fixable right where the user is looking.
+  bar.classList.toggle('show', !!found || armed);
   allBtn.style.display = found && doc.pages.length > 1 ? '' : 'none';
-  redrawBtn.style.display = armed ? '' : 'none';
+  redrawBtn.style.display = (armed || found) ? '' : 'none';
   document.getElementById('sig-bar-label').textContent = found
     ? (found.anno.subtype === 'paraf' ? 'Paraf terpilih' : 'Tanda tangan terpilih')
     : (armed ? 'Ketuk halaman untuk menempatkan' : '');
@@ -786,6 +800,20 @@ function doDownload() {
 }
 document.getElementById('btn-download').addEventListener('click', doDownload);
 
+// ---- wordmark → home (punch list #3) --------------------------------------------
+// On the landing the wordmark is already home; with a doc open it asks first —
+// a reload throws away un-downloaded edits.
+document.getElementById('btn-home').addEventListener('click', () => {
+  if (document.body.classList.contains('is-empty')) return;
+  document.getElementById('home-confirm').showModal();
+});
+document.getElementById('hc-cancel').addEventListener('click', () => {
+  document.getElementById('home-confirm').close();
+});
+document.getElementById('hc-go').addEventListener('click', () => {
+  window.location.assign('/');
+});
+
 // ---- Android back button: closes the open sheet, never leaves the app -----------------
 // Every dialog open pushes one history entry; the hardware/gesture back pops it
 // and we close the dialog. UI-initiated closes (✕, backdrop, Escape, success)
@@ -794,7 +822,7 @@ document.getElementById('btn-download').addEventListener('click', doDownload);
 (function wireDialogHistory() {
   // NOTE: window.history everywhere — plain `history` is SHADOWED in this
   // module by the undo history (const history = createHistory()).
-  const dialogs = ['pm-sheet', 'sig-modal', 'dl-sheet'].map((id) => document.getElementById(id));
+  const dialogs = ['pm-sheet', 'sig-modal', 'dl-sheet', 'home-confirm'].map((id) => document.getElementById(id));
   const stack = []; // open dialogs in STACKING order (array order lies for nesting)
   let expectPop = false;
 

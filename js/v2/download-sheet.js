@@ -266,13 +266,23 @@ export function createDownloadSheet(deps) {
       } else {
         if (!state.base) throw new Error('build missing');
         const { renderPdfToImages, zipFiles } = await import('../core/export-images.js');
+        // Punch list #5: rendering N pages to images is real work — narrate it
+        // on the CTA so "working" never looks like "hung". Surgical text update,
+        // never a full render() mid-export.
+        const main = el('#ds-cta-main');
         const files = await renderPdfToImages(state.base.bytes, {
           format: state.imgfmt, maxDim: IMG_DIMS[state.size], baseName: `${baseName}-hal`,
+          onProgress: ({ done, total }) => {
+            main.textContent = `Menyiapkan gambar ${done}/${total}…`;
+          },
         });
+        if (seq !== state.seq) return;
         if (files.length === 1) {
           const mime = state.imgfmt === 'png' ? 'image/png' : 'image/jpeg';
           deps.download(new Blob([files[0].bytes], { type: mime }), files[0].name);
         } else {
+          main.textContent = 'Membungkus jadi ZIP…';
+          await new Promise((r) => setTimeout(r, 30)); // let the label paint before the sync zip
           const zip = zipFiles(files);
           deps.download(new Blob([zip], { type: 'application/zip' }), `${baseName}-gambar.zip`);
           deps.toast(`Selesai! ${n} gambar dibungkus jadi satu ZIP`);
