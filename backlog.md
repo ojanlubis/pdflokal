@@ -13,12 +13,7 @@ Running list of UI/UX findings + small fixes to pick up later. Append new items 
 
 ## Open
 
-- **[high — investigate FIRST, no fix yet: root cause unknown]** Production `client_error` events firing on the editor surface — [js/lib/errors.js](js/lib/errors.js), GA4 property 528550405, Sentry
-  - Signal (GA4, Jun 25–Jul 3, ID-only): **18 client_errors in 9 days (~2/day), all on `/`** (the editor). Breakdown: 8 desktop Win/Chrome · 7 desktop Mac/Chrome · 2 mobile Android/Chrome · 1 Mac `/index.html`. So overwhelmingly **desktop Chrome**, NOT a mobile-specific crash.
-  - **Why there's no fix here yet — we're blind on the message:** the error hook sends `kind/message/source/line/col/stack` (errors.js:37,50) but (a) Sentry needs OAuth (couldn't read it in the session that logged this), and (b) **GA4 has ZERO custom dimensions registered**, so the message/stack params are discarded at the reporting layer — only the event count survives. Can't propose a code change without the message.
-  - **Fastest path to root cause (do one):** (1) read the Sentry notification/issue directly (founder has it), OR (2) check the Vercel Analytics custom-event dashboard — `track()` bridges there and may show `message` as a column, OR (3) reproduce on desktop Chrome on `/` with DevTools console open.
-  - **Enabler fix (do regardless — makes ALL future errors self-diagnosing without Sentry):** register the client_error params as **GA4 custom dimensions** (`message`, `source`, `line`, `kind` at minimum) in GA4 Admin → Custom definitions. 5-min admin task, no code change. This is the long-outstanding "instrument GA4 custom dimensions" TODO from `docs/product-definition.md` §11. Once registered, this same query returns the actual error text and the fix becomes obvious.
-  - Pre-ads relevance: worth closing before the ads spend so the mobile ad cohort isn't hitting a silent break — though current data says the errors are desktop, not the mobile flow the ads target.
+- **[low, founder 5-min no-code task]** Register `client_error` params (`message`, `source`, `line`, `kind`) as GA4 custom dimensions (Admin → Custom definitions) — unblocks error triage without Sentry; the analytics MCP is read-only so this needs the founder's clicks. (Was a sub-task of the insertBefore crash, now fixed.) [js/lib/errors.js:37, docs/product-definition.md §11]
 
 - **[med, WAIT until ~Jul 5-6, decide with data]** Kelola Halaman hides its powers — users can be clueless about what the sheet can do (reorder/split/rotate/delete). Founder idea: explicit verb buttons (Tambah, Split, ...) or a mini tutorial — BUT deliberately wait ~2 days from Jul 3 launch and check analytics whether editor_action reorder/split/gabungkan_used happen organically before adding UI. [js/v2/page-manager.js]
 
@@ -109,6 +104,8 @@ Running list of UI/UX findings + small fixes to pick up later. Append new items 
 ---
 
 ## Done
+
+- **Sentry fee8a76e: NotFoundError insertBefore in Kelola drag-reorder** — FIXED (Jul 4): root cause exactly as diagnosed — an external grid re-render mid-drag (thumbnail upgrade / late settle timer) detached the cached slot refs; dragLoop's next insertBefore threw. Both prescribed layers shipped: (1) render() is parked while a drag is active (settle always renders, superseding it); (2) dragLoop validates placeholder + target parentage before inserting, aborting cleanly on a foreign grid. Regression test re-renders mid-drag on a 4-page doc: reproduces the exact NotFoundError on pre-fix code, passes post-fix. 18 users hit this in 9 days; watch the issue close in Sentry.
 
 - **Signature punch list + copy sweep (founder findings Jul 3-4)** — SHIPPED (Jul 4): carried-signature ghost on desktop (the drawn TTD rides the cursor at placement size × zoom, translucent, until click drops it; touch keeps the persistent sig-bar hint); sig-bar centering landed with #105; ketuk→pilih sweep across all display copy ("Pilih tempat untuk menempatkan tanda tangan", "Pilih halaman · tahan lalu geser...", zero "ketuk" remaining). Also fixed same-day: Kelola drag ghost hanging mid-air (window-owned drag lifetime, capture-failure regression test) + home-confirm dialog joining the .sheet system.
 
