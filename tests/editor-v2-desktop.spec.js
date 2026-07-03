@@ -142,3 +142,32 @@ test('Kelola drag settles even when pointer capture fails', async ({ page }) => 
   await expect(page.locator('.pm-drag-ghost')).toHaveCount(0);
   await expect(page.locator('.pm-placeholder')).toHaveCount(0);
 });
+
+// Founder telegraph (Jul 3): after drawing a TTD, the signature rides the
+// cursor translucently until the click drops it — the placement state is
+// never a dead end on desktop.
+test('carried-signature ghost follows the cursor, drops on click', async ({ page }) => {
+  await page.goto('/');
+  await page.setInputFiles('#file-input', FIXTURE);
+  await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
+  await page.click('[data-tool="signature"]');
+  await expect(page.locator('#sig-modal')).toBeVisible();
+  const box = await page.locator('#sig-canvas').boundingBox();
+  await page.mouse.move(box.x + 40, box.y + 60);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 180, box.y + 90, { steps: 6 });
+  await page.mouse.up();
+  await page.click('#sig-use');
+
+  // Armed: the ghost appears at the cursor over the page.
+  const pg = await page.locator('.pv-page').first().boundingBox();
+  await page.mouse.move(pg.x + 200, pg.y + 260);
+  await expect(page.locator('#sig-ghost')).toBeVisible();
+
+  // Click drops it: annotation lands, tool returns home, ghost gone.
+  await page.mouse.down();
+  await page.mouse.up();
+  expect(await page.evaluate(() => window.v2.getDoc().pages[0].annotations.length)).toBe(1);
+  await page.mouse.move(pg.x + 300, pg.y + 300);
+  await expect(page.locator('#sig-ghost')).toBeHidden();
+});
