@@ -390,15 +390,15 @@
     .ld-foot { padding: 30px 0 40px; display: flex; gap: 18px; align-items: baseline; flex-wrap: wrap; }
     .ld-foot a { font-size: 13px; color: var(--muted); text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
     .ld-foot span { margin-left: auto; font-size: 12px; color: var(--muted); }
-    /* desktop composition (founder, Jul 4 rd2: single tool-first column —
-       "tooly, not marketingy"; Jul 5: paper-on-desk). The .ld column becomes
-       a sheet of paper resting on the same warm-stone desk the editor pages
-       sit on — the side margins read as desk, not emptiness, and loading a
-       file keeps you on the same surface. Flow stays top down. */
+    /* desktop composition (founder, Jul 5 rd4: fill the width with CONTENT).
+       The toolbox IS the content — all 14 tools visible, no accordion (that's
+       a mobile pattern; hiding 10 tools on a 1440px screen was what made the
+       sides feel empty). Paper-on-desk stays: the wide sheet rests on the
+       same warm-stone desk the editor pages sit on. Flow stays top down. */
     @media (min-width: 900px) {
       #empty { background: var(--bg); }
       .ld {
-        max-width: 840px; margin: 40px auto 56px; padding: 0 56px 8px;
+        max-width: 1140px; margin: 40px auto 56px; padding: 0 56px 8px;
         background: #faf9f7; border-radius: 3px; /* paper corner, not a card */
         box-shadow: 0 1px 2px rgba(63,49,35,.08), 0 18px 44px rgba(63,49,35,.13);
       }
@@ -407,12 +407,19 @@
       .ld-sub { font-size: 16px; }
       /* wide h1 leaves clear corner space — stamp hovers beside line 1 */
       .ld-stamp { font-size: 14px; padding: 6px 13px; border-width: 3.5px; top: 46px; }
-      .dropzone { padding: 42px 24px 36px; }
-      .ld-grid { grid-template-columns: repeat(4, 1fr); } /* top-4 = one clean row */
+      .dropzone { padding: 46px 24px 40px; }
+      .ld-grid { grid-template-columns: repeat(4, 1fr); } /* top-4 = one featured row */
+      /* the full toolbox, always open: 10 more tools in two 5-across rows
+         (slightly narrower cards than the top-4 = quiet hierarchy) */
+      #ld-more[hidden] { display: grid; grid-template-columns: repeat(5, 1fr); }
+      .ld-lihat { display: none; }
       .ld-card { background: var(--surface); } /* lifts off the paper */
       .ld-card:hover { border-color: rgba(220,38,38,.45); }
       .dropzone:hover { border-color: var(--accent); background: rgba(220,38,38,.04); }
-      .ld-faq, .ld-janji { max-width: 720px; }
+      .ld-janji p { max-width: 72ch; }
+      /* FAQ reads as a broadsheet: two columns under one heading */
+      .ld-faq { display: grid; grid-template-columns: 1fr 1fr; gap: 0 44px; align-items: start; }
+      .ld-faq h2 { grid-column: 1 / -1; }
       #format-bar, #sig-bar { justify-content: center; }
     }
 
@@ -831,7 +838,7 @@
         <div class="ld-janji">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
           <div>
-            <b>Filemu nggak pernah ninggalin HP-mu.</b>
+            <b>Filemu nggak pernah ninggalin perangkatmu.</b>
             <p>Ijazah, KTP, kontrak. Semua diproses di browser-mu sendiri, bukan di server orang. <a href="privasi.html">Baca janji privasi kami</a></p>
           </div>
         </div>
@@ -1012,6 +1019,31 @@
       enabled: location.hostname === 'pdflokal.id' || location.hostname === 'www.pdflokal.id',
       release: window.APP_VERSION,
       sampleRate: 1.0,
+      // Third-party noise, not our code: ad blockers / privacy extensions hook
+      // window.fetch and cancel Google's analytics + ads requests (gtag →
+      // doubleclick), which surface as unhandled "Failed to fetch" rejections.
+      // Filter by SOURCE so genuine first-party errors still report. (Sentry
+      // JAVASCRIPT-C / -A were pure extension noise. We make zero first-party
+      // fetches for file work — 100% client-side — so these are never actionable.)
+      denyUrls: [
+        /chrome-extension:\/\//i,
+        /moz-extension:\/\//i,
+        /safari-(web-)?extension:\/\//i,
+        /^chrome:\/\//i,
+        /doubleclick\.net/i,
+        /googletagmanager\.com/i,
+        /google-analytics\.com/i,
+        /googlesyndication\.com/i,
+        /google-adservices\.com/i,
+        /\/gtag\//i,
+      ],
+      ignoreErrors: [
+        // Stackless variants of the above — a bare rejection with no frames
+        // can't be matched by denyUrls, so match the message too.
+        'Failed to fetch',
+        'Load failed',                                    // Safari's phrasing
+        'NetworkError when attempting to fetch resource', // Firefox's phrasing
+      ],
       replaysSessionSampleRate: 0.10,
       replaysOnErrorSampleRate: 1.0,
       integrations: [
