@@ -901,4 +901,5 @@ window.v2 = {
   setTool,
   getTool: () => tool,
   history,
+  pageManager, // tests: force a grid re-render mid-drag (Sentry fee8a76e repro)
 };

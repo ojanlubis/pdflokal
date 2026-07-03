@@ -82,7 +82,15 @@ export function createPageManager(deps) {
   });
 
   // ---- rendering ----------------------------------------------------------------
+  // Sentry fee8a76e: a grid rebuild while a drag is mid-flight detaches the
+  // placeholder + cached slot elements that dragLoop's insertBefore relies on
+  // (NotFoundError, 18 users in 9 days). No rebuild during a drag — the
+  // request parks here and end()/settle() flushes it.
+  let dragActive = false;
   function render() {
+    // Parked, not queued: every drag ends in settle(), which always renders —
+    // the fresh rebuild supersedes whatever asked mid-drag.
+    if (dragActive) return;
     const doc = deps.getDoc();
     grid.innerHTML = '';
     doc.pages.forEach((page, i) => grid.appendChild(renderTile(page, i)));
@@ -259,6 +267,7 @@ export function createPageManager(deps) {
       tile.style.pointerEvents = 'none';
 
       drag = { placeholder, rect, lastX: e.clientX ?? start.x, lastY: e.clientY ?? start.y };
+      dragActive = true;
       recacheSlots();
       // The pointer may be gone by the time the long-press timer fires.
       try { tile.setPointerCapture(e.pointerId ?? start.id); } catch { /* keep dragging uncaptured */ }
@@ -310,7 +319,11 @@ export function createPageManager(deps) {
         else if (py >= s.top && px > s.left + s.w / 2) D += 1;
       }
       if (D !== drag.pIndex) {
-        const target = drag.slots[D]?.el ?? grid.querySelector('.pm-add');
+        // Defensive (Sentry fee8a76e): if anything rebuilt the grid under us,
+        // the cached refs are detached — inserting against them throws.
+        if (drag.placeholder.parentNode !== grid) { end({ type: 'pointercancel' }); return; }
+        let target = drag.slots[D]?.el ?? grid.querySelector('.pm-add');
+        if (target && target.parentNode !== grid) { recacheSlots(); target = null; }
         flipTiles(() => grid.insertBefore(drag.placeholder, target));
         recacheSlots(); // layout changed → new truth
       }
@@ -357,7 +370,8 @@ export function createPageManager(deps) {
             track('editor_action', { action: 'reorder' });
             deps.onDocChanged();
           }
-          render(); // rebuild clears all inline drag styles
+          dragActive = false;
+          render(); // rebuild clears all inline drag styles + flushes any parked render
         };
         if (REDUCED_MOTION) { settle(); return; }
         tile.style.transition = 'transform .18s cubic-bezier(.2,.8,.2,1)';

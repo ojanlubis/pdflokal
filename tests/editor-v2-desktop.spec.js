@@ -171,3 +171,41 @@ test('carried-signature ghost follows the cursor, drops on click', async ({ page
   await page.mouse.move(pg.x + 300, pg.y + 300);
   await expect(page.locator('#sig-ghost')).toBeHidden();
 });
+
+// Sentry fee8a76e (18 users, 9 days): a grid re-render while a drag is
+// mid-flight detached the cached slot refs; dragLoop's insertBefore then threw
+// NotFoundError on the next rAF. Render is now deferred until the drag
+// settles, and dragLoop validates its refs. This test re-renders mid-drag.
+test('Kelola grid re-render mid-drag neither throws nor kills the drop', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto('/');
+  // 4 pages: the crash needs a MIDDLE slot as insert target (a detached
+  // reference node) — with 2 pages the .pm-add fallback always saved it.
+  await page.setInputFiles('#file-input', FIXTURE);
+  await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
+  await page.setInputFiles('#file-input', FIXTURE);
+  await page.click('#btn-pages');
+  await expect(page.locator('#pm-sheet')).toBeVisible();
+  await expect(page.locator('.pm-tile:not(.pm-add)')).toHaveCount(4);
+
+  const tile = await page.locator('.pm-tile:not(.pm-add)').first().elementHandle();
+  const box = await tile.boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 40, box.y + 20, { steps: 3 }); // arm the drag
+  // The killer: an external re-render while the drag is live (thumbnail
+  // upgrade / late settle timer in the wild).
+  await page.evaluate(() => window.v2.pageManager.render());
+  // Wander across the middle slots, then drop between tiles 2 and 3.
+  await page.mouse.move(box.x + box.width * 2.6, box.y + box.height / 2, { steps: 8 });
+  await page.mouse.move(box.x + box.width * 1.7, box.y + box.height / 2, { steps: 6 });
+  await page.mouse.up();
+  await page.waitForTimeout(500);
+
+  expect(errors.filter((m) => m.includes('NotFoundError') || m.includes('insertBefore'))).toEqual([]);
+  await expect(page.locator('.pm-drag-ghost')).toHaveCount(0);
+  await expect(page.locator('.pm-placeholder')).toHaveCount(0);
+  // The deferred render flushed: all four pages are back in the grid.
+  await expect(page.locator('.pm-tile:not(.pm-add)')).toHaveCount(4);
+});
