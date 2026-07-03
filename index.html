@@ -302,28 +302,34 @@
     .ld-mark { font-weight: 700; font-size: 17px; letter-spacing: -.02em; }
     .ld-mark em { font-style: normal; color: var(--accent); }
     .ld-hd a { font-size: 13px; color: var(--muted); text-decoration: none; font-weight: 500; min-height: 44px; display: inline-flex; align-items: center; }
+    /* Centered hero (founder, Jul 5) — the document opens like a letter's
+       title block, with the stamp pressed on its top-right corner. */
+    /* padding-top (not h1 margin): a margin would collapse through the wrapper
+       and drag the absolute stamp down onto the headline text */
+    .ld-hero-copy { position: relative; text-align: center; padding-top: 34px; }
     .ld h1 {
       font-size: clamp(28px, 7.5vw, 38px); line-height: 1.12; letter-spacing: -.035em;
-      font-weight: 700; margin: 30px 0 0; max-width: 14ch; text-wrap: balance;
+      font-weight: 700; margin: 0 auto; max-width: 14ch; text-wrap: balance;
     }
-    .ld-sub { font-size: 15px; color: var(--muted); margin: 12px 0 22px; max-width: 34ch; }
+    .ld-sub { font-size: 15px; color: var(--muted); margin: 12px auto 22px; max-width: 34ch; }
     /* device-aware copy: HP on phones, laptop on wide screens */
     .only-d { display: none; }
     @media (min-width: 900px) { .only-m { display: none; } .only-d { display: inline; } }
-    /* the permanent revamp stamp — thunks once per page view, then just IS */
+    /* the permanent revamp stamp — thunks once per page view, then just IS.
+       Pressed on the title block's top-right corner, tilted left (founder, Jul 5). */
     .ld-stamp {
-      display: inline-block; padding: 7px 14px; margin: 0 0 20px;
-      border: 3.5px solid var(--accent); border-radius: 8px; color: var(--accent);
-      font-weight: 700; font-size: 15px; letter-spacing: .09em; text-transform: uppercase;
-      transform: rotate(-5deg);
+      position: absolute; top: 3px; right: 0; padding: 5px 11px;
+      border: 3px solid var(--accent); border-radius: 7px; color: var(--accent);
+      font-weight: 700; font-size: 12.5px; letter-spacing: .09em; text-transform: uppercase;
+      transform: rotate(-8deg);
       -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence baseFrequency='.75'/></filter><rect width='120' height='120' filter='url(%23n)' opacity='.9'/></svg>");
       mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence baseFrequency='.75'/></filter><rect width='120' height='120' filter='url(%23n)' opacity='.9'/></svg>");
       animation: ld-thunk .45s cubic-bezier(.34,1.45,.44,1) .5s both;
     }
     @keyframes ld-thunk {
-      0% { transform: rotate(-13deg) scale(2); opacity: 0; }
-      60% { transform: rotate(-5deg) scale(.97); opacity: 1; }
-      100% { transform: rotate(-5deg) scale(1); opacity: 1; }
+      0% { transform: rotate(-16deg) scale(2); opacity: 0; }
+      60% { transform: rotate(-8deg) scale(.97); opacity: 1; }
+      100% { transform: rotate(-8deg) scale(1); opacity: 1; }
     }
     @media (prefers-reduced-motion: reduce) { .ld-stamp { animation: none; } }
     .dropzone {
@@ -388,14 +394,25 @@
     .ld-foot a { font-size: 13px; color: var(--muted); text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
     .ld-foot span { margin-left: auto; font-size: 12px; color: var(--muted); }
     /* desktop composition (founder, Jul 4 rd2: single tool-first column —
-       "tooly, not marketingy". Wider than mobile so it doesn't drown in
-       margin, but the flow stays headline -> dropzone -> cards, top down. */
+       "tooly, not marketingy"; Jul 5: paper-on-desk). The .ld column becomes
+       a sheet of paper resting on the same warm-stone desk the editor pages
+       sit on — the side margins read as desk, not emptiness, and loading a
+       file keeps you on the same surface. Flow stays top down. */
     @media (min-width: 900px) {
-      .ld { max-width: 840px; padding: 0 32px 8px; }
-      .ld h1 { font-size: 40px; margin-top: 26px; }
+      #empty { background: var(--bg); }
+      .ld {
+        max-width: 840px; margin: 40px auto 56px; padding: 0 56px 8px;
+        background: #faf9f7; border-radius: 3px; /* paper corner, not a card */
+        box-shadow: 0 1px 2px rgba(63,49,35,.08), 0 18px 44px rgba(63,49,35,.13);
+      }
+      .ld-hero-copy { padding-top: 40px; }
+      .ld h1 { font-size: 40px; }
       .ld-sub { font-size: 16px; }
+      /* wide h1 leaves clear corner space — stamp hovers beside line 1 */
+      .ld-stamp { font-size: 14px; padding: 6px 13px; border-width: 3.5px; top: 46px; }
       .dropzone { padding: 42px 24px 36px; }
       .ld-grid { grid-template-columns: repeat(4, 1fr); } /* top-4 = one clean row */
+      .ld-card { background: var(--surface); } /* lifts off the paper */
       .ld-card:hover { border-color: rgba(220,38,38,.45); }
       .dropzone:hover { border-color: var(--accent); background: rgba(220,38,38,.04); }
       .ld-faq, .ld-janji { max-width: 720px; }
