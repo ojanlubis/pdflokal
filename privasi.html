@@ -18,8 +18,10 @@
     window.dataLayer = window.dataLayer || [];
     function gtag(){dataLayer.push(arguments);}
     gtag('js', new Date());
-    gtag('config', 'AW-17538923405');
-    gtag('config', 'G-0XJY0WLCZ1');
+    if (location.hostname === 'pdflokal.id' || location.hostname === 'www.pdflokal.id') {
+      gtag('config', 'AW-17538923405');
+      gtag('config', 'G-0XJY0WLCZ1');
+    }
   </script>
 
   <title>Kebijakan Privasi - PDFLokal</title>
