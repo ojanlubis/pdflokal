@@ -135,4 +135,31 @@ test.describe('editor v2 — mobile', () => {
     expect(last.w).toBe(1);
     expect(last.h).toBe(1);
   });
+
+  test('text tool survives a rangeless selection (iOS WebKit caret guard)', async ({ page }) => {
+    // Sentry JAVASCRIPT-D (Chrome iOS, Jul 6): after selectAllChildren, iOS
+    // WebKit can leave the selection with zero ranges; collapseToEnd() on a
+    // rangeless selection throws InvalidStateError and kills tap-to-type.
+    // Simulate the rangeless selection: caret-at-start is an acceptable
+    // fallback, a dead text tool is not.
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    await openWithFixture(page);
+    await page.evaluate(() => {
+      window.getSelection = () => ({
+        rangeCount: 0,
+        selectAllChildren() {},
+        collapseToEnd() { throw new DOMException('The object is in an invalid state.', 'InvalidStateError'); },
+      });
+    });
+    await page.tap('[data-tool="text"]');
+    await page.tap('.pv-page >> nth=0', { position: { x: 150, y: 200 } });
+    await expect(page.locator('.v2-text-edit')).toBeVisible();
+    await page.keyboard.type('tetap hidup');
+    await page.keyboard.press('Enter');
+
+    expect(errors.filter((m) => m.includes('invalid state'))).toEqual([]);
+    const annos = await page.evaluate(() => window.v2.getDoc().pages[0].annotations);
+    expect(annos[0]?.text).toBe('tetap hidup');
+  });
 });

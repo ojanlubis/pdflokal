@@ -508,9 +508,12 @@ function openTextEditor({ pageId, x, y, anno }) {
   overlay.appendChild(ed);
   ed.focus();
   // Place the caret at the end (mobile keyboards otherwise start at 0).
+  // Guarded (Sentry JAVASCRIPT-D): iOS WebKit can leave the selection
+  // rangeless after selectAllChildren — collapseToEnd() then throws
+  // InvalidStateError. Caret-at-start beats a dead text tool.
   const sel = window.getSelection();
   sel.selectAllChildren(ed);
-  sel.collapseToEnd();
+  if (sel.rangeCount > 0) sel.collapseToEnd();
 }
 
 // ---- signature modal (draw / upload / paraf) --------------------------------------------

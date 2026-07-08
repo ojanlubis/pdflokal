@@ -225,4 +225,31 @@ test.describe('page manager — mobile', () => {
     const download = await dl;
     expect(download.suggestedFilename()).toMatch(/halaman-1\.pdf$/);
   });
+
+  test('grid re-render during the long-press wait does not crash armDrag', async ({ page }) => {
+    // Sentry JAVASCRIPT-E (Android Chrome, Jul 7): render() only parks while a
+    // drag is ACTIVE — during the 280ms long-press wait dragActive is still
+    // false, so a thumbnail upgrade can rebuild the grid and detach the
+    // pressed tile. The timer then fires armDrag on the orphan and
+    // grid.insertBefore(placeholder, tile) throws NotFoundError. A stale tile
+    // must simply not arm (the rebuilt tile carries fresh listeners).
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    await openSheet(page);
+    const first = await page.locator('.pm-tile >> nth=0').elementHandle();
+    const a = await first.boundingBox();
+    await first.dispatchEvent('pointerdown', {
+      pointerId: 11, pointerType: 'touch', clientX: a.x + 40, clientY: a.y + 40, bubbles: true, isPrimary: true,
+    });
+    // The killer: a re-render inside the wait window (thumbnail upgrade in the wild).
+    await page.evaluate(() => window.v2.pageManager.render());
+    await page.waitForTimeout(380); // long-press timer fires on the detached tile
+
+    expect(errors.filter((m) => m.includes('NotFoundError') || m.includes('insertBefore'))).toEqual([]);
+    await expect(page.locator('.pm-drag-ghost')).toHaveCount(0);
+    await expect(page.locator('.pm-placeholder')).toHaveCount(0);
+    // The sheet is still alive: tapping a (rebuilt) tile selects it.
+    await page.tap('.pm-tile >> nth=0');
+    await expect(page.locator('#pm-bulk')).toBeVisible();
+  });
 });
