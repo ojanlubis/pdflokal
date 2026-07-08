@@ -251,6 +251,11 @@ export function createPageManager(deps) {
 
     function armDrag(e) {
       if (pickResolve) return; // pick mode is selection-only — no reordering
+      // Defensive (Sentry JAVASCRIPT-E): render() only parks while a drag is
+      // ACTIVE — a rebuild during the long-press wait (thumbnail upgrade)
+      // detaches this tile, and insertBefore against an orphan throws.
+      // Stale tile → don't arm; the rebuilt tile carries fresh listeners.
+      if (tile.parentNode !== grid) { start = null; pressTimer = null; return; }
       const rect = tile.getBoundingClientRect();
       const placeholder = document.createElement('div');
       placeholder.className = 'pm-tile pm-placeholder';
