@@ -13,6 +13,10 @@ Running list of UI/UX findings + small fixes to pick up later. Append new items 
 
 ## Open
 
+- **[med]** Golden-master suite broken since the v2 swap — `tests/golden/golden.spec.js` — all 3 scenarios time out
+  - The suite still does `page.goto('/')` and waits for old-wing globals (`ueState`, `.ue-page-slot`) — `/` is v2 now, so `waitForFunction` times out. Missed when the other old suites were repointed to `/alat-gambar.html` (confirmed failing on main, found during #116's full sweep).
+  - Fix: repoint to `/alat-gambar.html` until demolition, OR (better) rewrite the golden masters against the v2 export path — export-regression coverage currently doesn't exist for v2.
+
 - **[low, founder 5-min no-code task]** Register `client_error` params (`message`, `source`, `line`, `kind`) as GA4 custom dimensions (Admin → Custom definitions) — unblocks error triage without Sentry; the analytics MCP is read-only so this needs the founder's clicks. (Was a sub-task of the insertBefore crash, now fixed.) [js/lib/errors.js:37, docs/product-definition.md §11]
 
 - **[med, WAIT until ~Jul 5-6, decide with data]** Kelola Halaman hides its powers — users can be clueless about what the sheet can do (reorder/split/rotate/delete). Founder idea: explicit verb buttons (Tambah, Split, ...) or a mini tutorial — BUT deliberately wait ~2 days from Jul 3 launch and check analytics whether editor_action reorder/split/gabungkan_used happen organically before adding UI. [js/v2/page-manager.js]
@@ -104,6 +108,8 @@ Running list of UI/UX findings + small fixes to pick up later. Append new items 
 ---
 
 ## Done
+
+- **Two mobile Sentry crashes (Jul 6-7)** — FIXED (#116): (1) JAVASCRIPT-E — `armDrag` insertBefore NotFoundError: `render()` only parks while a drag is ACTIVE, so a grid rebuild during the 280ms long-press wait detached the pressed tile and the timer fired `armDrag` on the orphan (same family as fee8a76e/#109, which guarded `dragLoop` but not the arm). Fix: refuse to arm a tile no longer in the grid. (2) JAVASCRIPT-D — `openTextEditor` InvalidStateError on Chrome iOS: WebKit can leave the selection rangeless after `selectAllChildren`; `collapseToEnd()` threw and killed tap-to-type. Fix: `sel.rangeCount` guard. Both regression tests reproduced the exact Sentry errors pre-fix. JAVASCRIPT-B (the fee8a76e event) resolved in Sentry — fixed since Jul 3, no recurrence.
 
 - **Desktop landing rd4+rd5 (founder, Jul 5)** — SHIPPED (#114 flat via #115): the sides get filled with CONTENT, not framing — all 14 tool cards visible on desktop (accordion is mobile-only; top-4 featured row + 10 in two 5-across rows), container 1140px, FAQ two-column, janji device-neutral ("perangkatmu"). Paper-on-desk on the landing was tried live and CUT — one continuous flat surface. Root lesson logged: the emptiness complaint was hidden inventory (10 tools behind a mobile accordion on 1440px), not missing decoration.
 
