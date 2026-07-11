@@ -14,6 +14,11 @@
   </script>
 
   <!-- Google tag (gtag.js) -->
+  <!-- WHY two containers: GA4 (G-0XJY0WLCZ1) is a destination of pdflokal's OWN tag GT-5MRGDJVG;
+       Ads (AW-17538923405) is a separate standalone tag SHARED with mesindev. A gtag('config', X) only
+       fires if X is a destination of a container the page actually LOADS. Loading the Ads tag alone and
+       configuring GA4 anyway is what took analytics dark Jul 7-11 2026. See index.html for the full note. -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=GT-5MRGDJVG"></script>
   <script async src="https://www.googletagmanager.com/gtag/js?id=AW-17538923405"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
