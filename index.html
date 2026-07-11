@@ -77,14 +77,21 @@
   <link rel="apple-touch-icon" href="/images/apple-touch-icon.png">
 
   <!-- Google tag (gtag.js) -->
-  <!-- WHY two containers: GA4 (G-0XJY0WLCZ1) is a destination of pdflokal's OWN tag GT-5MRGDJVG;
-       Ads (AW-17538923405) is a separate standalone tag SHARED with mesindev. A gtag('config', X)
-       only fires if X is a destination of a container the page actually LOADS. From Jul 7-11 2026 we
-       loaded the Ads tag alone and configured GA4 anyway -> G-0XJY0WLCZ1 resolved to null and
-       analytics went dark for 4 days (the Ads pixel kept firing, so the page looked instrumented).
-       Never config an ID whose container this page does not load. Verify with
-       google_tag_data.tidr.destinationArray on the live page - it must list BOTH ids. -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=GT-5MRGDJVG"></script>
+  <!-- WHY G-7J8JF8XZ1Q and not the old G-0XJY0WLCZ1: the old measurement ID went into a state Google
+       would not serve - googletagmanager.com/gtag/js?id=G-0XJY0WLCZ1 returned HTTP 404 (while ANY
+       unknown-but-well-formed ID returns a 200 generic container, so the 404 meant "recognized and
+       REFUSED"). gtag could not fetch the destination's container, GA4 never initialised, and
+       analytics were ~97% dead Jul 7-11 2026. Admin looked healthy the whole time and the Ads pixel
+       kept firing 200, so the page looked instrumented. Re-saving the tag settings did not clear it;
+       the stream was recreated (new stream 15240395115 -> this ID), whose container DOES serve.
+       Verify a measurement ID is alive with:
+         curl -o /dev/null -w "%{http_code} %{size_download}" ".../gtag/js?id=<ID>&cx=c"
+       A real container is ~549KB. ~413KB is the GENERIC decoy Google serves for unknown IDs - a 200
+       alone proves NOTHING. 404 = broken.
+       Ads (AW-17538923405) is a standalone tag SHARED with mesindev. NEVER attach a GA4 destination
+       to it (GA4's "use the tag found on your website" dialog offers exactly this by default) - both
+       sites load it, so that rebuilds the bidirectional property leak fixed in Jul 2026. -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-7J8JF8XZ1Q"></script>
   <script async src="https://www.googletagmanager.com/gtag/js?id=AW-17538923405"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -92,7 +99,7 @@
     gtag('js', new Date());
     if (location.hostname === 'pdflokal.id' || location.hostname === 'www.pdflokal.id') {
       gtag('config', 'AW-17538923405');
-      gtag('config', 'G-0XJY0WLCZ1');
+      gtag('config', 'G-7J8JF8XZ1Q');
     }
   </script>
   <script defer src="/_vercel/insights/script.js"></script>

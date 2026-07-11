@@ -14,11 +14,12 @@
   </script>
 
   <!-- Google tag (gtag.js) -->
-  <!-- WHY two containers: GA4 (G-0XJY0WLCZ1) is a destination of pdflokal's OWN tag GT-5MRGDJVG;
-       Ads (AW-17538923405) is a separate standalone tag SHARED with mesindev. A gtag('config', X) only
-       fires if X is a destination of a container the page actually LOADS. Loading the Ads tag alone and
-       configuring GA4 anyway is what took analytics dark Jul 7-11 2026. See index.html for the full note. -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=GT-5MRGDJVG"></script>
+  <!-- WHY G-7J8JF8XZ1Q: the old ID G-7J8JF8XZ1Q entered a state Google would not serve
+       (gtag/js?id=... -> HTTP 404), so GA4 never initialised and analytics were ~97% dead
+       Jul 7-11 2026. Stream recreated; this ID's container serves. See index.html for the
+       full note + the "is this ID alive?" curl check. NEVER attach a GA4 destination to the
+       shared Ads tag AW-17538923405 (mesindev loads it too -> rebuilds the property leak). -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-7J8JF8XZ1Q"></script>
   <script async src="https://www.googletagmanager.com/gtag/js?id=AW-17538923405"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -34,7 +35,7 @@
     // Allowlist > blocklist so a new dev hostname can never silently leak.
     if (location.hostname === 'pdflokal.id' || location.hostname === 'www.pdflokal.id') {
       gtag('config', 'AW-17538923405');
-      gtag('config', 'G-0XJY0WLCZ1');
+      gtag('config', 'G-7J8JF8XZ1Q');
     }
   </script>
 
