@@ -13,6 +13,8 @@ Running list of UI/UX findings + small fixes to pick up later. Append new items 
 
 ## Open
 
+- **[low, flaky]** `tests/mobile/back-button.spec.js:47` ("RAPID double-back") fails intermittently under FULL-suite parallel load, but passes 3/3 in isolation. First seen Jul 12 during the SEO sweep. Not caused by the intent-copy change (that spec runs on `/`, where no intent is declared, so `applyIntentCopy()` is a strict no-op). Likely a history-traversal timing race that only shows when the machine is loaded. Worth a `test.slow()` or an explicit wait rather than a retry.
+
 ### ⏳ SEO — the two manual steps only the founder can do
 
 - **[high, founder — 2 min, unblocks the alarm]** Add repo secret **`GA4_SA_JSON`** = contents of `~/.config/gcloud/pdflokal-ga4-reader.json` (Settings → Secrets and variables → Actions). Without it, `.github/workflows/traffic-floor.yml` fails loudly on its first nightly run. That IS the correct behaviour for a monitor — but it means the alarm isn't armed until the secret exists.

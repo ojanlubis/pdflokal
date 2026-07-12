@@ -32,6 +32,7 @@ import { createSignatureModal } from './signature-modal.js';
 import { createDownloadSheet } from './download-sheet.js';
 import { track } from '../lib/analytics.js';
 import { createCelebration } from './celebrate.js';
+import { applyIntentCopy } from './intent-copy.js';
 import { ensurePdfLib } from '../core/vendor.js';
 
 // WHY there is no `window.pdfjsLib.…workerSrc = …` line here any more: pdf.js is
@@ -764,6 +765,10 @@ document.getElementById('btn-open').addEventListener('click', () => fileInput.cl
 function armIntent(intent) {
   pendingIntent = intent;
   fileInput.setAttribute('accept', intent === 'foto' ? 'image/*' : DEFAULT_ACCEPT);
+  // Re-word the editor around the job while we're at it. Arming the right TOOL but
+  // then describing it in generic words threw the intent away — someone who came
+  // to /pisah-pdf was shown a button labelled "Ekstrak" and no mention of "pisah".
+  applyIntentCopy(intent);
 }
 if (pendingIntent) armIntent(pendingIntent); // an SEO page / ?buat= landing
 
