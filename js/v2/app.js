@@ -721,9 +721,15 @@ async function loadFilesInner(files) {
 }
 
 // ---- the landing: dropzone, tool cards, intent hook -------------------------------
-// WHY ?buat= exists now: SEO intent pages (/gabung-pdf etc, strategy bet 5.3)
-// boot the editor pre-configured. Planned = one line; retrofitted = a refactor.
-let pendingIntent = new URLSearchParams(window.location.search).get('buat');
+// Three ways an intent reaches us, in priority order:
+//   1. ?buat=gabung          — a link from anywhere (the original hook, bet 5.3)
+//   2. <body data-intent>    — an SEO tool page (/gabung-pdf) declaring what it IS
+//   3. a tool-card click     — set below, on the way to the file picker
+// (2) is what makes the generated landing pages more than brochures: land on
+// /kompres-pdf, drop a file, and the compress sheet is already open.
+let pendingIntent = new URLSearchParams(window.location.search).get('buat')
+  || document.body.dataset.intent
+  || null;
 
 function applyIntent(intent) {
   if (intent === 'ttd' || intent === 'paraf') {
@@ -748,11 +754,23 @@ const fileInput = document.getElementById('file-input');
 const DEFAULT_ACCEPT = fileInput.getAttribute('accept');
 document.getElementById('btn-open').addEventListener('click', () => fileInput.click());
 
+// Foto jadi PDF narrows the picker to images; everything else keeps both.
+function armIntent(intent) {
+  pendingIntent = intent;
+  fileInput.setAttribute('accept', intent === 'foto' ? 'image/*' : DEFAULT_ACCEPT);
+}
+if (pendingIntent) armIntent(pendingIntent); // an SEO page / ?buat= landing
+
+// The tool cards are real <a href="/gabung-pdf"> links so Googlebot can crawl
+// INTO each tool — as <button>s they were a dead end and the site had exactly one
+// indexable URL. preventDefault keeps the human behaviour identical: click a card,
+// the file picker opens immediately, no page load in between. Crawlers (and
+// middle-click / cmd-click, which we must not steal) follow the href instead.
 for (const card of document.querySelectorAll('.ld-card[data-intent]')) {
-  card.addEventListener('click', () => {
-    pendingIntent = card.dataset.intent;
-    // Foto jadi PDF narrows the picker to images; everything else keeps both.
-    fileInput.setAttribute('accept', pendingIntent === 'foto' ? 'image/*' : DEFAULT_ACCEPT);
+  card.addEventListener('click', (e) => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return; // let the browser open it
+    e.preventDefault();
+    armIntent(card.dataset.intent);
     fileInput.click();
   });
 }

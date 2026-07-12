@@ -1,0 +1,780 @@
+{
+  "_readme": [
+    "The SOURCE OF TRUTH for the SEO tool pages. Edit here, then run `npm run seo` —",
+    "NEVER hand-edit the generated *.html at the repo root; the CI check will fail and",
+    "your edit will be overwritten on the next run.",
+    "",
+    "THE RULE THAT BOUNDS THIS FILE (decided Jul 12 2026): a page earns its existence",
+    "only if it changes what the TOOL DOES. Every entry below arms a distinct intent in",
+    "the editor. A page that is the same tool with different words in the <h1> is a",
+    "doorway page — 'scaled content abuse' in Google's own words — and will hurt us.",
+    "If you cannot name the tool behaviour a new page changes, it is not a page.",
+    "",
+    "Body copy is written by an Indonesian, deliberately. Every competitor's Indonesian",
+    "is machine-translated (Smallpdf's merge page promises 'tanpa iklan cat air' —",
+    "'no watercolor ads'). Real copy in real Indonesian is a moat they are not defending."
+  ],
+  "site": {
+    "origin": "https://www.pdflokal.id",
+    "brand": "PDFLokal"
+  },
+  "pages": [
+    {
+      "slug": "gabung-pdf",
+      "intent": "gabung",
+      "title": "Gabung PDF Online Gratis - Satukan File PDF Tanpa Upload | PDFLokal",
+      "description": "Gabungkan beberapa file PDF jadi satu, langsung di browser. Gratis, tanpa akun, tanpa watermark. Filemu tidak pernah diupload ke server mana pun.",
+      "h1": "Gabungkan PDF jadi satu file",
+      "sub": "Seret semua filemu ke sini. Urutkan, lalu unduh. Tanpa upload, tanpa akun, tanpa watermark.",
+      "intro": "Gabung PDF itu pekerjaan lima detik yang sering jadi lima menit — karena kebanyakan situs menyuruh kamu upload dulu, nunggu antre, lalu unduh lagi. PDFLokal tidak. Semua penggabungan terjadi di dalam browser kamu sendiri: filemu tidak pernah dikirim ke server siapa pun, jadi prosesnya secepat perangkatmu, bukan secepat internetmu.",
+      "howto": "Cara menggabungkan PDF",
+      "steps": [
+        "Seret semua PDF yang mau digabung ke kotak di atas — atau ketuk <strong>Buka File</strong> dan pilih beberapa sekaligus.",
+        "Buka <strong>Kelola Halaman</strong> kalau urutannya perlu diatur. Seret halaman ke posisi yang kamu mau, buang yang tidak perlu.",
+        "Ketuk <strong>Unduh</strong>. Satu file PDF rapi, langsung tersimpan di perangkatmu."
+      ],
+      "sections": [
+        {
+          "h2": "Biasanya dipakai buat apa",
+          "p": [
+            "Berkas lamaran kerja yang mintanya \"satu file PDF\": CV, ijazah, transkrip, KTP, sertifikat — semuanya harus jadi satu. Berkas CPNS dan pendaftaran kampus juga hampir selalu begitu.",
+            "Laporan yang bagiannya dikerjakan orang berbeda, lalu digabung jadi satu dokumen. Atau hasil scan yang keluar satu file per halaman dan perlu disatukan sebelum dikirim."
+          ]
+        },
+        {
+          "h2": "Kenapa lewat browser lebih aman",
+          "p": [
+            "Ijazah, KTP, kontrak — dokumen yang kamu gabung biasanya bukan dokumen sembarangan. Situs lain memintamu mengunggahnya ke server mereka dan berjanji \"aman\". Kamu tidak punya cara membuktikannya.",
+            "PDFLokal tidak bisa membocorkan filemu karena PDFLokal tidak pernah menerimanya. Setelah halaman ini terbuka, kamu bahkan bisa mematikan internet dan penggabungan tetap jalan. Kodenya terbuka di GitHub — silakan periksa sendiri, jangan percaya begitu saja."
+          ]
+        },
+        {
+          "h2": "Berapa banyak file yang boleh?",
+          "p": [
+            "Sebanyak yang kuat ditangani perangkatmu, dan itu biasanya jauh lebih banyak dari yang kamu butuhkan. Tidak ada batas harian, tidak ada \"maksimal 3 file gratis\", tidak ada watermark yang muncul kalau kamu tidak bayar."
+          ]
+        },
+        {
+          "h2": "Gabung PDF langsung dari HP",
+          "p": [
+            "Sebagian besar orang yang menggabungkan PDF di Indonesia melakukannya dari HP, bukan laptop — biasanya sambil terburu-buru mengejar tenggat pendaftaran. Karena itu PDFLokal dibuat untuk layar kecil lebih dulu, bukan sebagai versi ciut dari tampilan desktop.",
+            "Seret file dari aplikasi Files, atau ketuk Buka File dan pilih beberapa sekaligus. Halaman digulir dengan jari seperti biasa, dan urutannya diatur dengan menyeret kartu halaman. Tidak ada satu pun langkah yang butuh mouse."
+          ]
+        },
+        {
+          "h2": "Kenapa gratis, dan apa jebakannya",
+          "p": [
+            "Tidak ada jebakannya, dan alasannya sederhana: menggabungkan PDF di browser kamu tidak memakan biaya server kami sama sekali. Situs lain harus membayar server untuk menerima, memproses, dan menyimpan file-mu — jadi mereka butuh iklan, langganan, atau data kamu untuk menutupinya.",
+            "PDFLokal tidak menanggung biaya itu, jadi tidak perlu menagihnya kepadamu. Tidak ada batas harian, tidak ada watermark, tidak ada \"gratis untuk 3 file pertama\". Yang ada cuma tombol dukungan sukarela, yang boleh kamu abaikan sepenuhnya."
+          ]
+        },
+        {
+          "h2": "Tetap jalan waktu internet mati",
+          "p": [
+            "Coba ini: buka halaman ini, matikan data seluler, lalu gabungkan filemu. Tetap jalan. Karena tidak ada yang perlu dikirim ke mana pun, satu-satunya internet yang PDFLokal butuhkan adalah untuk memuat halamannya sendiri.",
+            "Ini bukan trik. Ini konsekuensi langsung dari cara kerjanya — dan sesuatu yang secara struktural tidak bisa ditiru situs yang menggantungkan hidupnya pada server."
+          ]
+        },
+        {
+          "h2": "Gabung PDF dan Word?",
+          "p": [
+            "Ini pertanyaan yang sering muncul, dan jawabannya jujur: file Word harus kamu ubah dulu jadi PDF, dan itu paling gampang dilakukan dari Word sendiri — pilih Simpan Sebagai, lalu format PDF. Setelah jadi PDF, seret ke sini bersama file lainnya.",
+            "Kami tidak menyediakan konversi Word ke PDF karena mengerjakannya dengan benar butuh server, dan server berarti dokumenmu harus diunggah. Itu membatalkan satu-satunya alasan orang memilih PDFLokal, jadi kami memilih menolaknya dan mengatakan alasannya."
+          ]
+        }
+      ],
+      "faq": [
+        {
+          "q": "Urutan filenya bisa diatur?",
+          "a": "Bisa. Buka Kelola Halaman, lalu seret halaman mana pun ke posisi yang kamu mau. Halaman yang tidak perlu bisa langsung dibuang di situ juga."
+        },
+        {
+          "q": "Ada watermark-nya nggak?",
+          "a": "Tidak ada. Tidak sekarang, tidak nanti. Hasilnya PDF bersih persis seperti yang kamu susun."
+        },
+        {
+          "q": "File-ku diupload ke server?",
+          "a": "Tidak. Penggabungan terjadi di browser kamu. Filemu tidak pernah meninggalkan perangkatmu — itu sebabnya prosesnya cepat dan gratis."
+        },
+        {
+          "q": "Bisa gabung PDF dan foto sekaligus?",
+          "a": "Bisa. Seret PDF dan foto bersamaan; fotonya otomatis jadi halaman PDF, lalu semuanya digabung jadi satu file."
+        },
+        {
+          "q": "Harus bikin akun dulu?",
+          "a": "Tidak perlu. Tidak ada login, tidak ada email, tidak ada langganan."
+        },
+        {
+          "q": "Bisa dipakai di HP?",
+          "a": "Bisa, dan memang dirancang untuk itu. Seret, urutkan, dan unduh semuanya bisa dilakukan dengan jari."
+        },
+        {
+          "q": "Kenapa gratis? Datanya dijual ya?",
+          "a": "Tidak. Filemu tidak pernah sampai ke kami, jadi tidak ada yang bisa dijual. Gratis karena penggabungan terjadi di perangkatmu, jadi kami tidak menanggung biaya server."
+        }
+      ]
+    },
+    {
+      "slug": "kompres-pdf",
+      "intent": "kompres",
+      "title": "Kompres PDF Online Gratis - Perkecil Ukuran File PDF | PDFLokal",
+      "description": "Perkecil ukuran PDF supaya lolos batas upload. Gratis, tanpa watermark, tanpa akun. Diproses di browser — filemu tidak pernah diupload.",
+      "h1": "Kompres PDF biar lolos batas upload",
+      "sub": "Perkecil ukuran file tanpa bikin tulisannya jadi buram. Gratis, tanpa akun, tanpa watermark.",
+      "intro": "Hampir semua orang yang mencari cara mengompres PDF sebenarnya sedang mengejar satu angka: batas unggah. \"Maksimal 500KB.\" \"Tidak lebih dari 1MB.\" PDFLokal mengecilkan file PDF-mu langsung di browser, tanpa mengunggahnya ke mana pun, lalu menunjukkan ukuran akhirnya sebelum kamu mengunduh — jadi kamu tahu file-nya lolos sebelum kamu coba.",
+      "howto": "Cara mengompres PDF",
+      "steps": [
+        "Seret PDF-mu ke kotak di atas.",
+        "Ketuk <strong>Unduh</strong>, lalu pilih ukuran <strong>Kompres</strong>. PDFLokal akan menunjukkan ukuran hasilnya.",
+        "Kalau ukurannya sudah pas, unduh. Kalau file-mu memang sudah optimal, PDFLokal akan bilang apa adanya, bukan diam-diam mengembalikan file yang sama."
+      ],
+      "sections": [
+        {
+          "h2": "Kenapa selalu soal batas unggah",
+          "p": [
+            "Pendaftaran CPNS, SNBP, SNBT, beasiswa, e-filing pajak, portal kepegawaian — hampir semuanya menetapkan batas ukuran berkas yang ketat, dan hampir semuanya menolak file-mu tanpa penjelasan kalau kelewat.",
+            "Alat kompres buatan luar negeri melayani \"perkecil filenya\". Yang sebenarnya kamu butuhkan adalah \"muat dalam batas ini\". Itu masalah yang berbeda, dan itu masalah yang kami pedulikan."
+          ]
+        },
+        {
+          "h2": "Apa yang sebenarnya dikecilkan",
+          "p": [
+            "Yang bikin PDF gemuk hampir selalu gambarnya — hasil scan, foto ijazah, tanda tangan yang difoto pakai kamera 48MP. PDFLokal menyusun ulang gambar-gambar itu pada resolusi yang masih tajam dibaca, lalu membangun ulang PDF-nya.",
+            "Teks tetap teks: tidak diubah jadi gambar, tetap bisa dicari dan diseleksi. Kalau dokumenmu isinya teks saja, kompresi tidak akan banyak berpengaruh — dan PDFLokal akan mengatakannya, bukan pura-pura bekerja."
+          ]
+        },
+        {
+          "h2": "Kualitasnya turun nggak?",
+          "p": [
+            "Sedikit, dan itu memang tujuannya — file yang lebih kecil berarti data yang lebih sedikit. Yang kami jaga: dokumen tetap terbaca jelas di layar dan tetap rapi saat dicetak. Kalau hasilnya kurang pas, kamu bisa unduh versi aslinya tanpa kompresi."
+          ]
+        },
+        {
+          "h2": "Berapa KB yang realistis",
+          "p": [
+            "Kalau PDF-mu isinya hasil scan atau foto, penyusutannya biasanya besar — file 5MB sering turun ke ratusan KB tanpa membuat tulisannya susah dibaca. Ini kasus yang paling umum, karena berkas persyaratan hampir selalu berupa hasil foto atau scan.",
+            "Kalau PDF-mu isinya teks murni (misalnya dokumen yang diekspor dari Word), file-nya kemungkinan besar sudah kecil, dan kompresi tidak akan banyak mengubahnya. PDFLokal akan mengatakannya terus terang alih-alih pura-pura bekerja lalu memberimu file dengan ukuran yang sama."
+          ]
+        },
+        {
+          "h2": "Kalau masih kelewat batas juga",
+          "p": [
+            "Buang halaman yang tidak diminta. Berkas persyaratan sering ikut membawa halaman kosong dari hasil scan, atau lampiran yang sebenarnya tidak dipinta. Buka Kelola Halaman, buang halamannya, lalu kompres lagi — ini sering menyelesaikan masalah lebih cepat daripada kompresi apa pun.",
+            "Kalau dokumenmu hasil foto, potret ulang di ruangan yang terang. Foto gelap memaksa kamera menaikkan ISO, dan bintik-bintik kecil hasil ISO tinggi justru membuat file makin sulit dikompres — sedikit cahaya sering lebih ampuh daripada alat mana pun."
+          ]
+        },
+        {
+          "h2": "Aman buat dokumen penting?",
+          "p": [
+            "Berkas yang kamu kompres biasanya ijazah, KTP, kartu keluarga, atau transkrip — dokumen yang identitasmu melekat padanya. Situs lain memintamu mengunggahnya ke server mereka, lalu berjanji akan menghapusnya dalam satu jam. Kamu tidak punya cara untuk memeriksanya.",
+            "Di PDFLokal tidak ada yang perlu dihapus, karena tidak ada yang pernah dikirim. Buka tab Network di browser-mu kalau kamu paham teknis — kamu tidak akan melihat satu pun unggahan file. Dan kalau kamu tidak paham teknis: matikan internetmu, dan lihat kompresinya tetap jalan."
+          ]
+        },
+        {
+          "h2": "Kompres PDF di HP",
+          "p": [
+            "Kompresi PDF adalah pekerjaan berat: setiap gambar di dalam dokumen harus digambar ulang. Situs lain memindahkan beban itu ke server mereka — yang berarti kamu harus mengunggah dokumen puluhan megabita lewat sinyal seluler, lalu mengunduhnya lagi.",
+            "PDFLokal mengerjakannya di HP-mu. Di sinyal yang buruk, ini bukan cuma lebih aman, tapi juga jauh lebih cepat: tidak ada yang perlu naik dan turun lewat jaringan. Dan kami menahan diri untuk tidak menggambar terlalu banyak halaman sekaligus, supaya HP kelas menengah tidak kehabisan memori di tengah jalan."
+          ]
+        }
+      ],
+      "faq": [
+        {
+          "q": "Bisa kompres sampai ukuran tertentu, misalnya 500KB?",
+          "a": "Saat ini PDFLokal menampilkan ukuran hasil kompresi sebelum kamu mengunduh, jadi kamu bisa langsung tahu file-nya lolos batas atau belum. Target ukuran yang bisa kamu tentukan sendiri sedang kami kerjakan."
+        },
+        {
+          "q": "Tulisannya jadi buram nggak?",
+          "a": "Tidak. Teks tetap teks, bukan gambar — tetap tajam dan tetap bisa diseleksi. Yang dikecilkan adalah gambar dan hasil scan di dalamnya."
+        },
+        {
+          "q": "Kalau file-ku sudah kecil, apa yang terjadi?",
+          "a": "PDFLokal akan bilang file-mu sudah optimal, bukan diam-diam memberimu file yang sama sambil mengaku sudah mengompres."
+        },
+        {
+          "q": "Ada batas ukuran file yang boleh dikompres?",
+          "a": "Tidak ada batas dari kami. Batasnya cuma memori perangkatmu sendiri."
+        },
+        {
+          "q": "File-ku diupload ke server?",
+          "a": "Tidak. Kompresi berjalan di browser kamu. Filemu tidak pernah pergi ke mana-mana."
+        },
+        {
+          "q": "Kompres berkas CPNS atau SNBP aman?",
+          "a": "Aman, dan justru inilah alasan PDFLokal dibuat. Ijazah dan KTP-mu tidak pernah dikirim ke server siapa pun — semuanya diproses di HP atau laptopmu sendiri."
+        },
+        {
+          "q": "Bisa dikompres berkali-kali?",
+          "a": "Bisa, tapi jangan. Setiap kompresi membuang data, dan mengompres file yang sudah dikompres cuma membuat gambarnya makin rusak tanpa banyak mengurangi ukuran."
+        }
+      ]
+    },
+    {
+      "slug": "pisah-pdf",
+      "intent": "split",
+      "title": "Pisah PDF Online Gratis - Ambil Halaman yang Perlu Saja | PDFLokal",
+      "description": "Pisahkan PDF atau ambil halaman tertentu jadi file baru. Gratis, tanpa akun, tanpa upload. Semua diproses di browser kamu.",
+      "h1": "Pisah PDF, ambil yang perlu saja",
+      "sub": "Pilih halaman yang kamu butuhkan, jadikan file PDF baru. Sisanya tidak ikut.",
+      "intro": "Kadang kamu cuma butuh halaman 3 sampai 7 dari dokumen 80 halaman. Atau cuma lembar tanda tangannya. PDFLokal memperlihatkan semua halaman sebagai kartu — pilih yang kamu mau, dan hanya itu yang jadi file baru. Tidak ada yang diunggah, jadi dokumen 200 halaman pun tidak perlu menunggu antrean server siapa pun.",
+      "howto": "Cara memisahkan halaman PDF",
+      "steps": [
+        "Seret PDF-mu ke kotak di atas.",
+        "Buka <strong>Kelola Halaman</strong>. Semua halaman tampil sebagai kartu kecil.",
+        "Centang halaman yang kamu butuhkan, lalu ekstrak jadi PDF baru. Yang tidak dicentang tidak ikut."
+      ],
+      "sections": [
+        {
+          "h2": "Biasanya dipakai buat apa",
+          "p": [
+            "Mengambil satu bab dari buku digital, satu lampiran dari kontrak, atau satu lembar dari berkas gabungan yang dikirim orang lain.",
+            "Membuang halaman kosong hasil scan, atau memisahkan berkas yang terlanjur digabung padahal harus diunggah terpisah."
+          ]
+        },
+        {
+          "h2": "Bedanya dengan hapus halaman",
+          "p": [
+            "Pisah PDF membuat file <strong>baru</strong> berisi halaman pilihanmu; dokumen aslinya tidak berubah. Hapus halaman membuang halaman dari dokumen yang sedang kamu kerjakan. Keduanya ada di layar yang sama — pakai yang cocok dengan yang kamu maksud."
+          ]
+        },
+        {
+          "h2": "Dokumen tebal aman?",
+          "p": [
+            "Aman. PDFLokal dirancang supaya tetap lancar di HP murah: halaman dimuat sedikit demi sedikit sesuai yang sedang kamu lihat, bukan sekaligus. Dokumen ratusan halaman tetap bisa digulir tanpa bikin browser-mu tersendat."
+          ]
+        },
+        {
+          "h2": "Ambil satu halaman saja",
+          "p": [
+            "Kasus paling sering: kamu cuma butuh satu lembar — halaman tanda tangan, halaman identitas, satu bukti transfer dari rekening koran 40 halaman. Centang satu kartu halaman, ekstrak, selesai.",
+            "File barunya cuma berisi halaman itu. Tidak ada sisa halaman lain yang diam-diam ikut terbawa — hal yang perlu kamu pastikan kalau dokumen aslinya berisi informasi yang tidak untuk dibagikan."
+          ]
+        },
+        {
+          "h2": "Kenapa tidak perlu upload",
+          "p": [
+            "Memisahkan PDF berarti menyalin sebagian halaman ke dokumen baru. Ini pekerjaan ringan yang sudah lama bisa dilakukan browser sendiri. Tidak ada alasan teknis untuk mengirim rekening koran atau kontrakmu ke server orang lain hanya untuk mengambil satu lembar.",
+            "Situs lain melakukannya karena bisnis mereka memang dibangun di atas server, bukan karena pekerjaannya menuntut server. Perbedaan itu yang kami manfaatkan."
+          ]
+        },
+        {
+          "h2": "Jalan di HP murah",
+          "p": [
+            "Dokumen tebal biasanya bikin browser HP tersendat karena semua halaman digambar sekaligus. PDFLokal cuma menggambar halaman yang sedang kamu lihat, lalu melepasnya lagi saat kamu menggulir jauh.",
+            "Hasilnya, dokumen ratusan halaman tetap bisa digulir dengan lancar di HP kelas menengah — kondisi yang justru paling umum di Indonesia, dan yang paling jarang diuji alat buatan luar."
+          ]
+        },
+        {
+          "h2": "Pisah PDF jadi beberapa file",
+          "p": [
+            "Kalau kamu perlu memecah satu dokumen jadi beberapa file terpisah — misalnya satu berkas per lampiran — lakukan ekstraksi beberapa kali: centang kelompok halaman pertama, unduh, lalu centang kelompok berikutnya, unduh lagi.",
+            "Dokumen aslinya tetap terbuka dan tidak berubah di antara pengambilan, jadi kamu tidak perlu memuat ulang file-mu setiap kali. Ini yang membuat memecah dokumen jadi banyak berkas tetap terasa ringan."
+          ]
+        },
+        {
+          "h2": "Kenapa gratis",
+          "p": [
+            "Karena memisahkan halaman di browser kamu tidak memakan biaya server kami. Situs lain harus membayar untuk menerima, menyimpan, dan memproses file-mu, jadi mereka butuh langganan atau iklan untuk menutupinya.",
+            "Kami tidak menanggung biaya itu. Tidak ada batas harian, tidak ada watermark, tidak ada akun. Yang ada cuma tombol dukungan sukarela yang boleh kamu abaikan."
+          ]
+        }
+      ],
+      "faq": [
+        {
+          "q": "Bisa ambil halaman yang tidak berurutan?",
+          "a": "Bisa. Centang halaman mana pun — misalnya 1, 4, dan 9 — dan ketiganya jadi satu PDF baru sesuai urutan aslinya."
+        },
+        {
+          "q": "Dokumen aslinya berubah nggak?",
+          "a": "Tidak. File aslinya di perangkatmu tidak disentuh. PDFLokal membuat file baru."
+        },
+        {
+          "q": "Ada batas jumlah halaman?",
+          "a": "Tidak ada batas dari kami. Kami menguji sampai dokumen ratusan halaman di HP kelas menengah."
+        },
+        {
+          "q": "Hasilnya ada watermark?",
+          "a": "Tidak ada. Tidak pernah."
+        },
+        {
+          "q": "Halaman yang tidak dipilih ikut terbawa?",
+          "a": "Tidak. File barunya hanya berisi halaman yang kamu centang."
+        },
+        {
+          "q": "Dokumen 300 halaman kuat?",
+          "a": "Kuat. Halaman dimuat sedikit demi sedikit sesuai yang sedang kamu lihat, jadi HP-mu tidak dipaksa menggambar semuanya sekaligus."
+        }
+      ]
+    },
+    {
+      "slug": "tanda-tangan-pdf",
+      "intent": "ttd",
+      "title": "Tanda Tangan PDF Online Gratis - Tanpa Print, Tanpa Scan | PDFLokal",
+      "description": "Tanda tangani PDF langsung di browser. Gambar pakai jari, atau pakai foto tanda tanganmu. Gratis, tanpa akun, tanpa upload.",
+      "h1": "Tanda tangani PDF tanpa print",
+      "sub": "Gambar pakai jari, atau pakai foto tanda tangan yang sudah ada. Taruh di tempatnya, unduh, selesai.",
+      "intro": "Alur lama: print, tanda tangan, scan, kirim. Tiga langkah yang butuh printer dan scanner yang biasanya tidak ada di rumah. PDFLokal memotongnya jadi satu langkah — tanda tangani langsung di layar, di browser, tanpa dokumenmu pernah diunggah ke server siapa pun.",
+      "howto": "Cara menandatangani PDF",
+      "steps": [
+        "Seret PDF yang mau ditandatangani ke kotak di atas.",
+        "Ketuk <strong>Tanda Tangan</strong>. Gambar tanda tanganmu pakai jari atau mouse — atau ketuk tab <strong>Upload</strong> dan pilih foto tanda tangan yang sudah kamu punya.",
+        "Ketuk tempat di halaman untuk menaruhnya. Geser dan ubah ukurannya sampai pas, lalu unduh."
+      ],
+      "sections": [
+        {
+          "h2": "Pakai foto tanda tangan yang sudah ada",
+          "p": [
+            "Kebanyakan orang punya foto tanda tangan di atas kertas putih, difoto pakai HP. PDFLokal otomatis membersihkan latar putihnya jadi transparan, jadi tanda tanganmu duduk rapi di atas dokumen, bukan sebagai kotak putih yang menutupi teks.",
+            "Warna tinta tanda tanganmu dibiarkan persis seperti aslinya. Kalau kamu menandatangani dengan pena hitam, hasilnya hitam."
+          ]
+        },
+        {
+          "h2": "Paraf juga bisa",
+          "p": [
+            "Dokumen resmi di Indonesia sering minta paraf di setiap halaman, bukan cuma tanda tangan di halaman terakhir. PDFLokal punya alat paraf tersendiri — ukurannya lebih kecil, dan ada tombol <strong>Semua Halaman</strong> yang menyalin parafmu ke posisi yang sama di seluruh halaman sekaligus."
+          ]
+        },
+        {
+          "h2": "Ini sah nggak?",
+          "p": [
+            "PDFLokal menempelkan gambar tanda tanganmu ke dalam dokumen — sama seperti menandatangani hasil print lalu men-scan-nya, dan diterima di sebagian besar keperluan sehari-hari: surat pernyataan, formulir, kontrak kerja.",
+            "Yang PDFLokal <strong>tidak</strong> lakukan adalah tanda tangan digital bersertifikat (yang terikat identitas digital resmi). Kalau instansimu memintanya secara khusus, kamu butuh penyedia tersertifikasi. Kami lebih baik jujur soal ini daripada membiarkanmu salah kira."
+          ]
+        },
+        {
+          "h2": "Tanda tangan pakai jari di HP",
+          "p": [
+            "Menggambar tanda tangan dengan jari di layar HP hasilnya sering terlihat kaku dan gemetar. PDFLokal menghaluskan goresanmu dan menyesuaikan ketebalannya dengan kecepatan gerakan — sama seperti pena betulan, yang menipis saat digerakkan cepat.",
+            "Kalau hasilnya tetap kurang mirip, pakai saja tab Upload dan foto tanda tanganmu di atas kertas putih. Buat kebanyakan orang, hasilnya jauh lebih rapi dan lebih menyerupai tanda tangan asli."
+          ]
+        },
+        {
+          "h2": "Soal materai",
+          "p": [
+            "Beberapa dokumen di Indonesia meminta e-meterai. PDFLokal tidak menerbitkan e-meterai — itu diterbitkan lewat kanal resmi Peruri, dan siapa pun yang menawarkannya secara gratis lewat situs biasa patut kamu curigai.",
+            "Yang bisa kamu lakukan di sini: tempelkan gambar meterai yang sudah sah kamu peroleh, lalu tanda tangani di atasnya, persis seperti di kertas. Kami lebih memilih menjelaskan batasannya daripada membiarkanmu mengira sudah beres padahal belum."
+          ]
+        },
+        {
+          "h2": "Tanda tanganmu tidak kami simpan",
+          "p": [
+            "Tanda tangan adalah data yang paling sensitif di dokumenmu, dan situs lain memintamu mengunggahnya. Beberapa bahkan menyimpannya di akunmu \"supaya praktis dipakai lagi\" — artinya, tanda tanganmu duduk di server orang.",
+            "Di PDFLokal, tanda tanganmu ada di dalam browser selama kamu mengerjakan dokumen, dan lenyap saat kamu menutup tab. Tidak ada akun, jadi tidak ada tempat untuk menyimpannya."
+          ]
+        }
+      ],
+      "faq": [
+        {
+          "q": "Tanda tangannya bisa dipindah setelah ditaruh?",
+          "a": "Bisa. Geser, ubah ukurannya, atau hapus. Setelah pas, tanda tangan otomatis terkunci supaya tidak tergeser tak sengaja — ketuk dua kali untuk membukanya lagi."
+        },
+        {
+          "q": "Latar putih di foto tanda tanganku hilang?",
+          "a": "Ya, otomatis dibersihkan jadi transparan. Kalau hasilnya kurang pas, opsinya bisa kamu matikan."
+        },
+        {
+          "q": "Bisa tanda tangan di beberapa halaman sekaligus?",
+          "a": "Bisa lewat alat Paraf — ada tombol Semua Halaman yang menyalinnya ke posisi yang sama di setiap halaman."
+        },
+        {
+          "q": "Tanda tanganku disimpan di server kalian?",
+          "a": "Tidak. Tidak ada yang dikirim ke mana pun. Tanda tanganmu ada di browser-mu selama kamu mengerjakan dokumen, dan hilang saat kamu menutup halaman."
+        },
+        {
+          "q": "Harus bikin akun?",
+          "a": "Tidak perlu."
+        },
+        {
+          "q": "Bisa tanda tangan pakai jari di HP?",
+          "a": "Bisa. Goresannya dihaluskan otomatis, dan ketebalannya mengikuti kecepatan gerakan supaya tidak terlihat kaku."
+        },
+        {
+          "q": "Bisa sekalian pasang e-meterai?",
+          "a": "PDFLokal tidak menerbitkan e-meterai — itu hanya sah lewat kanal resmi Peruri. Tapi kalau kamu sudah punya gambar meterai yang sah, kamu bisa menempelkannya lewat menu Upload lalu menandatangani di atasnya."
+        }
+      ]
+    },
+    {
+      "slug": "pdf-ke-jpg",
+      "intent": "gambar",
+      "title": "PDF ke JPG Online Gratis - Ubah Halaman PDF Jadi Gambar | PDFLokal",
+      "description": "Ubah halaman PDF jadi gambar JPG atau PNG. Gratis, tanpa akun, tanpa upload. Semua halaman sekaligus, langsung di browser.",
+      "h1": "Ubah PDF jadi gambar",
+      "sub": "Setiap halaman jadi satu file JPG atau PNG. Semua sekaligus, langsung diunduh.",
+      "intro": "Kadang PDF bukan format yang kamu butuhkan. Formulir yang harus diunggah sebagai foto, materi yang mau dikirim lewat WhatsApp, atau slide yang mau ditempel ke dokumen lain. PDFLokal mengubah setiap halaman PDF-mu jadi gambar tajam, langsung di browser — tanpa mengunggah dokumenmu ke server siapa pun.",
+      "howto": "Cara mengubah PDF jadi JPG",
+      "steps": [
+        "Seret PDF-mu ke kotak di atas.",
+        "Ketuk <strong>Unduh</strong>, lalu ganti format dari PDF ke <strong>Gambar</strong>. Pilih JPG atau PNG.",
+        "Unduh. Kalau halamannya lebih dari satu, semuanya dibungkus rapi jadi satu file ZIP."
+      ],
+      "sections": [
+        {
+          "h2": "JPG atau PNG?",
+          "p": [
+            "Pilih <strong>JPG</strong> untuk hampir semua keperluan — ukurannya jauh lebih kecil, dan itu yang biasanya diminta formulir unggahan.",
+            "Pilih <strong>PNG</strong> kalau halamanmu berisi teks tajam, garis tipis, atau diagram yang tidak boleh sedikit pun buram, dan ukuran file bukan masalah."
+          ]
+        },
+        {
+          "h2": "Ukurannya bisa diatur",
+          "p": [
+            "Kamu bisa memilih seberapa besar gambar hasilnya. Lebih besar berarti lebih tajam tapi lebih berat — berguna kalau mau dicetak. Lebih kecil kalau tujuannya cuma dikirim lewat chat atau memenuhi batas unggah."
+          ]
+        },
+        {
+          "h2": "Kenapa tidak perlu upload",
+          "p": [
+            "Mengubah PDF jadi gambar itu pekerjaan menggambar ulang halaman — sesuatu yang browser modern justru sangat jago melakukannya. Tidak ada alasan teknis untuk mengirim dokumenmu ke server orang lain hanya untuk ini. Situs lain melakukannya karena model bisnis mereka butuh server, bukan karena pekerjaannya butuh server."
+          ]
+        },
+        {
+          "h2": "Buat dikirim lewat WhatsApp",
+          "p": [
+            "WhatsApp mengompres gambar dengan agresif, tapi memperlakukan PDF sebagai dokumen yang harus diunduh dulu sebelum bisa dilihat. Kalau kamu cuma ingin orang lain langsung melihat isinya tanpa repot, mengubahnya jadi JPG hampir selalu pilihan yang benar.",
+            "Untuk keperluan ini, pilih ukuran gambar yang kecil. Tulisan tetap terbaca jelas di layar HP, dan file-nya cukup ringan untuk terkirim di sinyal yang buruk."
+          ]
+        },
+        {
+          "h2": "Buat syarat unggahan yang minta foto",
+          "p": [
+            "Banyak formulir pendaftaran meminta \"foto ijazah\" atau \"scan KTP\" dalam format JPG, padahal yang kamu punya PDF. Ubah dulu di sini, lalu unggah hasilnya.",
+            "Kalau ada batas ukuran, pilih ukuran gambar yang lebih kecil sampai file-nya masuk. Ukuran hasilnya bisa kamu lihat sebelum mengunduh, jadi kamu tidak perlu menebak."
+          ]
+        },
+        {
+          "h2": "Kualitasnya sesuai yang kamu pilih",
+          "p": [
+            "Halaman digambar ulang pada resolusi yang kamu tentukan, bukan sekadar potongan layar. Artinya, kalau kamu memilih ukuran besar, tulisan halus dan garis tipis tetap tajam — cukup tajam untuk dicetak.",
+            "Kalau tujuannya cuma dilihat di HP, ukuran kecil sudah lebih dari cukup dan file-nya jauh lebih ringan. Pilih sesuai keperluan, jangan otomatis mengambil yang paling besar."
+          ]
+        },
+        {
+          "h2": "Semua halaman sekaligus",
+          "p": [
+            "Dokumen 20 halaman menghasilkan 20 gambar, dan semuanya dibungkus jadi satu file ZIP supaya kamu tidak diserbu dua puluh unduhan terpisah — sesuatu yang di HP akan jadi mimpi buruk.",
+            "Kalau kamu cuma butuh beberapa halaman, buang dulu sisanya lewat Kelola Halaman. Yang tersisa itulah yang dikonversi, dan kalau tinggal satu halaman, gambarnya langsung diunduh tanpa ZIP."
+          ]
+        },
+        {
+          "h2": "Kenapa tidak perlu diupload",
+          "p": [
+            "Menggambar ulang halaman PDF jadi gambar adalah persis pekerjaan yang browser lakukan setiap kali kamu membuka PDF di layar. Kemampuannya sudah ada di perangkatmu — tidak ada yang perlu dikirim ke server siapa pun untuk itu.",
+            "Karena itu dokumenmu tidak pernah meninggalkan HP atau laptopmu, dan konversinya tetap jalan bahkan saat internetmu mati."
+          ]
+        }
+      ],
+      "faq": [
+        {
+          "q": "Semua halaman ikut dikonversi?",
+          "a": "Ya. Kalau kamu cuma butuh sebagian, buang dulu halaman yang tidak perlu lewat Kelola Halaman, baru unduh sebagai gambar."
+        },
+        {
+          "q": "Hasilnya berupa ZIP?",
+          "a": "Kalau halamannya lebih dari satu, ya — supaya kamu tidak diserbu puluhan unduhan terpisah. Kalau cuma satu halaman, gambarnya langsung diunduh."
+        },
+        {
+          "q": "Ada watermark di gambarnya?",
+          "a": "Tidak ada."
+        },
+        {
+          "q": "Kualitas gambarnya bagus?",
+          "a": "Bisa kamu atur. Untuk dicetak pilih ukuran besar; untuk dikirim lewat chat, ukuran kecil sudah lebih dari cukup."
+        },
+        {
+          "q": "Bisa pilih halaman tertentu saja?",
+          "a": "Bisa. Buang dulu halaman yang tidak perlu lewat Kelola Halaman, baru unduh sebagai gambar."
+        },
+        {
+          "q": "Cocok buat dicetak?",
+          "a": "Cocok, asal kamu memilih ukuran gambar yang besar. Untuk sekadar dikirim lewat chat, ukuran kecil sudah cukup."
+        }
+      ]
+    },
+    {
+      "slug": "jpg-ke-pdf",
+      "intent": "foto",
+      "title": "JPG ke PDF Online Gratis - Foto Jadi Satu File PDF | PDFLokal",
+      "description": "Ubah foto atau hasil scan jadi satu file PDF rapi. Gratis, tanpa akun, tanpa upload. Diproses langsung di browser kamu.",
+      "h1": "Foto jadi PDF",
+      "sub": "Hasil scan atau foto dokumen, disatukan jadi satu PDF rapi. Urutannya kamu yang atur.",
+      "intro": "Kamu memotret dokumen pakai HP, dan sekarang punya delapan file JPG — padahal yang diminta satu file PDF. PDFLokal menyatukannya jadi satu dokumen, dalam urutan yang kamu tentukan, langsung di browser. Fotomu tidak pernah diunggah ke mana pun.",
+      "howto": "Cara mengubah foto jadi PDF",
+      "steps": [
+        "Seret semua fotomu ke kotak di atas — boleh banyak sekaligus.",
+        "Buka <strong>Kelola Halaman</strong> untuk mengatur urutannya, atau memutar foto yang miring.",
+        "Ketuk <strong>Unduh</strong>. Satu file PDF, siap diunggah ke mana pun."
+      ],
+      "sections": [
+        {
+          "h2": "Biasanya dipakai buat apa",
+          "p": [
+            "Berkas lamaran dan pendaftaran: KTP, KK, ijazah, sertifikat — difoto pakai HP, lalu harus dikumpulkan sebagai satu PDF.",
+            "Bukti transaksi, nota, atau surat yang difoto dan perlu dikirim rapi ke kantor atau klien."
+          ]
+        },
+        {
+          "h2": "Fotonya kebalik atau miring?",
+          "p": [
+            "Buka Kelola Halaman dan putar halamannya sampai benar. Perputarannya ikut tersimpan ke PDF akhir — bukan sekadar terlihat lurus di layar lalu kembali miring saat dibuka orang lain."
+          ]
+        },
+        {
+          "h2": "Fotonya besar-besar, PDF-nya jadi berat",
+          "p": [
+            "Wajar — foto dari kamera HP sekarang bisa beberapa megabita per lembar. Setelah jadi PDF, pilih ukuran <strong>Kompres</strong> di layar unduh, dan file-nya akan dikecilkan sampai masuk batas unggah tanpa bikin tulisannya susah dibaca."
+          ]
+        },
+        {
+          "h2": "Scan pakai HP tanpa aplikasi scanner",
+          "p": [
+            "Kamu tidak butuh aplikasi scanner untuk membuat berkas yang layak dikirim. Foto dokumenmu di permukaan datar, di bawah cahaya yang rata, dari atas — lalu satukan di sini.",
+            "Hindari bayangan tanganmu sendiri jatuh ke kertas, dan usahakan seluruh dokumen masuk frame. Dua hal sederhana itu memisahkan berkas yang diterima dari berkas yang disuruh diunggah ulang."
+          ]
+        },
+        {
+          "h2": "Urutan itu penting",
+          "p": [
+            "Galeri HP mengurutkan foto berdasarkan waktu pengambilan, dan itu sering bukan urutan yang diminta. Berkas yang halamannya kebalik-balik adalah alasan umum sebuah pendaftaran ditolak.",
+            "Buka Kelola Halaman dan seret kartu halaman sampai urutannya benar sebelum kamu mengunduh. Butuh sepuluh detik, dan menghindarkanmu dari mengulang seluruh proses."
+          ]
+        },
+        {
+          "h2": "Foto besar jadi PDF berat",
+          "p": [
+            "Satu foto dari kamera HP masa kini bisa 3–8MB. Delapan lembar berarti PDF puluhan megabita — hampir pasti ditolak oleh formulir mana pun.",
+            "Setelah fotomu jadi PDF, pilih ukuran Kompres di layar unduh. Ukuran akhirnya ditampilkan sebelum kamu mengunduh, jadi kamu tahu berkasmu lolos sebelum mencoba mengunggahnya."
+          ]
+        },
+        {
+          "h2": "Kenapa harus jadi PDF",
+          "p": [
+            "Hampir semua portal pendaftaran di Indonesia meminta satu file PDF, bukan setumpuk foto. Alasannya sederhana: PDF menjaga urutan halaman dan tidak berubah tampilannya di perangkat orang lain, sedangkan kumpulan JPG bisa tampil acak.",
+            "Menyatukannya jadi PDF juga membuat berkasmu terlihat rapi dan disiapkan dengan sungguh-sungguh — hal kecil yang tidak dinilai secara resmi, tapi tetap terlihat oleh orang yang memeriksanya."
+          ]
+        },
+        {
+          "h2": "Fotomu tidak diupload",
+          "p": [
+            "Foto KTP, kartu keluarga, dan ijazah adalah data yang paling sering disalahgunakan kalau bocor. Situs lain memintamu mengunggahnya lebih dulu, lalu berjanji menghapusnya nanti.",
+            "Di PDFLokal tidak ada yang perlu dihapus, karena tidak ada yang pernah dikirim. Penyusunan PDF terjadi di dalam browser-mu, dan kamu bisa membuktikannya dengan mematikan internet sebelum menyeret fotomu ke sini."
+          ]
+        },
+        {
+          "h2": "Hasil scan yang rapi tanpa scanner",
+          "p": [
+            "Kalau fotomu agak miring, putar halamannya lewat Kelola Halaman sampai lurus. Perputarannya benar-benar ditulis ke dalam PDF, jadi dokumenmu tetap tegak saat dibuka orang lain — bukan cuma terlihat lurus di layarmu sendiri.",
+            "Kalau warnanya kusam karena difoto di bawah lampu kuning, itu tidak jadi soal untuk sebagian besar keperluan administrasi: yang dinilai adalah keterbacaannya, bukan keindahannya. Pastikan seluruh tepi dokumen masuk ke dalam frame dan tidak ada bagian yang terpotong — itu yang paling sering membuat berkas disuruh diunggah ulang."
+          ]
+        }
+      ],
+      "faq": [
+        {
+          "q": "Format foto apa saja yang bisa?",
+          "a": "JPG, PNG, dan WebP — praktisnya semua yang keluar dari kamera HP atau aplikasi scan."
+        },
+        {
+          "q": "Urutan fotonya bisa diatur?",
+          "a": "Bisa. Buka Kelola Halaman dan seret halaman ke posisi yang kamu mau."
+        },
+        {
+          "q": "Bisa campur foto dan PDF?",
+          "a": "Bisa. Seret keduanya bersamaan; fotonya jadi halaman baru, lalu semuanya digabung jadi satu file."
+        },
+        {
+          "q": "Ada batas jumlah foto?",
+          "a": "Tidak ada batas dari kami."
+        },
+        {
+          "q": "Perlu aplikasi scanner dulu?",
+          "a": "Tidak. Foto biasa dari kamera HP sudah cukup, asal dokumennya rata, terang, dan masuk seluruhnya ke dalam frame."
+        },
+        {
+          "q": "PDF-nya jadi besar sekali, gimana?",
+          "a": "Wajar — foto HP memang berat. Setelah jadi PDF, pilih ukuran Kompres di layar unduh untuk mengecilkannya sampai masuk batas unggah."
+        }
+      ]
+    },
+    {
+      "slug": "edit-pdf",
+      "intent": "teks",
+      "title": "Edit PDF Online Gratis - Tambah Teks & Tutup Tulisan | PDFLokal",
+      "description": "Tambahkan teks, tutup tulisan yang salah, tanda tangani PDF — langsung di browser. Gratis, tanpa akun, tanpa upload.",
+      "h1": "Edit PDF langsung di browser",
+      "sub": "Tambah teks, tutup tulisan yang salah, isi formulir. Tanpa aplikasi, tanpa akun.",
+      "intro": "Kebanyakan orang tidak mau \"mengedit PDF\" secara utuh. Mereka mau memperbaiki satu hal: mengisi kolom nama, menutup angka yang keliru, menambahkan tanggal. PDFLokal memberimu alat untuk itu — langsung di browser, tanpa memasang aplikasi, dan tanpa dokumenmu pernah dikirim ke server siapa pun.",
+      "howto": "Cara mengedit PDF",
+      "steps": [
+        "Seret PDF-mu ke kotak di atas.",
+        "Ketuk <strong>Teks</strong>, lalu ketuk tempat di halaman untuk mulai menulis. Ukuran, tebal, dan warna huruf bisa diatur.",
+        "Perlu menutup tulisan yang salah? Ketuk <strong>Tipe-X</strong>, lalu seret di atas bagian yang mau ditutup. Setelah beres, ketuk Unduh."
+      ],
+      "sections": [
+        {
+          "h2": "Mengisi formulir PDF",
+          "p": [
+            "Banyak formulir di Indonesia dibagikan sebagai PDF hasil scan — tidak ada kolom isian yang bisa diklik, cuma gambar kertas. Alat Teks menyelesaikan ini: ketuk di mana pun, ketik, geser sampai pas di garisnya."
+          ]
+        },
+        {
+          "h2": "Menutup tulisan yang salah",
+          "p": [
+            "Tipe-X menutup bagian yang kamu seret dengan blok putih, persis seperti tip-ex di atas kertas. Berguna untuk membetulkan salah ketik, atau menutup informasi yang tidak perlu dilihat penerima.",
+            "Perlu diketahui secara jujur: ini menutupi tulisannya secara visual pada hasil akhir. Untuk menyensor data yang benar-benar rahasia dari orang yang paham teknis, jangan mengandalkan penutup visual dari alat mana pun — hapus halamannya."
+          ]
+        },
+        {
+          "h2": "Yang tidak bisa (dan kami akan bilang terus terang)",
+          "p": [
+            "PDFLokal tidak mengubah teks asli yang sudah tercetak di dalam PDF — kamu menambahkan teks baru di atasnya, bukan mengedit paragraf yang sudah ada seolah-olah ini Word. Untuk 9 dari 10 keperluan sehari-hari, itu justru yang kamu butuhkan.",
+            "Kami juga tidak menyediakan konversi PDF ke Word maupun OCR. Keduanya butuh server, dan server berarti file-mu harus diunggah — yang berarti janji privasi kami jadi bohong. Kami memilih menolak fiturnya daripada mengingkari janjinya."
+          ]
+        },
+        {
+          "h2": "Edit PDF tanpa install aplikasi",
+          "p": [
+            "Aplikasi editor PDF di HP biasanya meminta akun, menyisipkan iklan, dan menaruh watermark di hasilnya kecuali kamu berlangganan. Padahal yang kamu butuhkan cuma menambahkan satu baris teks.",
+            "PDFLokal berjalan di dalam browser yang sudah ada di HP-mu. Tidak ada yang perlu dipasang, tidak ada akun, tidak ada watermark, dan tidak ada yang meminta izin akses ke galeri atau kontakmu."
+          ]
+        },
+        {
+          "h2": "Semua bisa dibatalkan",
+          "p": [
+            "Menyunting dokumen penting itu bikin waswas — sekali salah taruh, kamu takut merusak berkasnya. Di sini, setiap tindakan bisa dibatalkan dengan Ctrl+Z (Cmd+Z di Mac), sebanyak yang kamu perlukan.",
+            "Dan file asli di perangkatmu tidak pernah ditimpa. PDFLokal selalu menghasilkan file baru saat kamu mengunduh, jadi yang asli tetap utuh apa pun yang terjadi."
+          ]
+        },
+        {
+          "h2": "Kenapa kami menolak PDF ke Word",
+          "p": [
+            "Ini fitur yang paling sering diminta, dan kami sengaja tidak membuatnya. Mengubah PDF jadi Word yang rapi butuh pemrosesan berat di server — artinya dokumenmu harus diunggah.",
+            "Begitu kami membangun satu fitur yang butuh unggahan, janji \"filemu tidak pernah pergi ke server\" jadi omong kosong, dan satu-satunya alasan memilih PDFLokal ikut hilang. Kami lebih baik kehilangan fiturnya daripada kehilangan alasannya."
+          ]
+        }
+      ],
+      "faq": [
+        {
+          "q": "Bisa mengubah tulisan yang sudah ada di PDF?",
+          "a": "Tidak secara langsung. Kamu menutupnya dengan Tipe-X lalu menulis ulang di atasnya dengan alat Teks. Untuk kebanyakan koreksi, hasilnya sama saja."
+        },
+        {
+          "q": "Jenis hurufnya bisa dipilih?",
+          "a": "Bisa — beberapa pilihan huruf, ukuran 6 sampai 120, tebal, miring, dan warna."
+        },
+        {
+          "q": "Salah? Bisa dibatalkan?",
+          "a": "Bisa. Ctrl+Z (atau Cmd+Z) untuk membatalkan, Ctrl+Y untuk mengulangi."
+        },
+        {
+          "q": "File-ku diupload?",
+          "a": "Tidak. Semua penyuntingan terjadi di browser kamu."
+        },
+        {
+          "q": "Perlu install aplikasi?",
+          "a": "Tidak. Berjalan di browser yang sudah ada di HP atau laptopmu. Tidak ada akun, tidak ada izin akses apa pun."
+        },
+        {
+          "q": "Bisa convert PDF ke Word di sini?",
+          "a": "Tidak, dan itu keputusan yang kami ambil sadar-sadar. Fitur itu butuh server, dan server berarti dokumenmu harus diunggah — yang membatalkan satu-satunya alasan memakai PDFLokal."
+        }
+      ]
+    },
+    {
+      "slug": "hapus-halaman-pdf",
+      "intent": "halaman",
+      "title": "Hapus Halaman PDF Online Gratis - Buang & Urutkan Halaman | PDFLokal",
+      "description": "Hapus halaman PDF yang tidak perlu, urutkan ulang, atau putar halaman. Gratis, tanpa akun, tanpa upload.",
+      "h1": "Hapus & urutkan halaman PDF",
+      "sub": "Buang halaman yang tidak perlu, ubah urutannya, putar yang miring. Semua di satu layar.",
+      "intro": "Halaman kosong dari hasil scan. Lampiran yang tidak perlu dikirim. Halaman yang urutannya kebalik. PDFLokal menampilkan seluruh dokumenmu sebagai kartu-kartu halaman — buang, seret, dan putar sesukamu, lalu unduh hasilnya. Tidak ada yang diunggah ke server mana pun.",
+      "howto": "Cara menghapus halaman PDF",
+      "steps": [
+        "Seret PDF-mu ke kotak di atas.",
+        "Buka <strong>Kelola Halaman</strong>. Seluruh halaman tampil sebagai kartu.",
+        "Buang halaman yang tidak perlu, seret untuk mengubah urutan, putar yang miring. Ketuk <strong>Unduh</strong> kalau sudah beres."
+      ],
+      "sections": [
+        {
+          "h2": "Semua di satu layar",
+          "p": [
+            "Menghapus, mengurutkan, memutar, dan memisahkan halaman itu pekerjaan yang saling berkaitan — orang jarang cuma melakukan satu. Situs lain memecahnya jadi empat alat terpisah, dan kamu harus mengunggah ulang filemu di setiap langkah.",
+            "Di PDFLokal semuanya ada di layar yang sama, pada dokumen yang sama, tanpa unggah ulang apa pun."
+          ]
+        },
+        {
+          "h2": "Perputaran ikut tersimpan",
+          "p": [
+            "Kalau kamu memutar halaman yang miring, perputarannya benar-benar tersimpan ke dalam PDF akhir — bukan cuma terlihat lurus di layarmu lalu kembali miring saat file-nya dibuka orang lain. Ini kesalahan yang sering terjadi pada alat lain."
+          ]
+        },
+        {
+          "h2": "Salah buang?",
+          "p": [
+            "Tekan Ctrl+Z (atau Cmd+Z di Mac). Semua tindakan bisa dibatalkan, dan file aslinya di perangkatmu tetap utuh — PDFLokal tidak pernah menimpa file yang kamu buka."
+          ]
+        },
+        {
+          "h2": "Buang halaman kosong hasil scan",
+          "p": [
+            "Mesin scan sering menghasilkan halaman kosong dari sisi belakang kertas, dan halaman-halaman itu ikut membengkakkan ukuran file sekaligus membuat berkasmu terlihat berantakan.",
+            "Di Kelola Halaman, halaman kosong langsung kelihatan sebagai kartu putih. Buang, lalu unduh. Ukuran file-nya ikut turun sebagai bonus."
+          ]
+        },
+        {
+          "h2": "Hapus halaman di HP",
+          "p": [
+            "Halaman ditampilkan sebagai kartu yang cukup besar untuk disentuh jari, bukan daftar kecil yang harus diperbesar dulu. Menghapus, mengurutkan, dan memutar semuanya bisa dilakukan dengan jempol.",
+            "Ini yang paling sering perlu dilakukan orang saat sedang buru-buru mengejar tenggat pendaftaran, dan hampir selalu dari HP — jadi di situlah kami menghabiskan waktu terbanyak untuk mengujinya."
+          ]
+        },
+        {
+          "h2": "Yang dibuang benar-benar hilang dari hasilnya",
+          "p": [
+            "Halaman yang kamu hapus tidak ikut ke file yang kamu unduh — bukan sekadar disembunyikan dari tampilan. Ini penting kalau alasanmu menghapusnya adalah karena halaman itu memuat informasi yang tidak boleh dilihat penerima.",
+            "Perlu diingat juga: yang kamu unduh adalah file baru. File asli di perangkatmu tetap lengkap, jadi kamu tidak kehilangan apa pun kalau ternyata salah buang."
+          ]
+        },
+        {
+          "h2": "Urutkan ulang halaman",
+          "p": [
+            "Hasil scan sering keluar dengan urutan yang kacau, apalagi kalau kertasnya dimasukkan bolak-balik. Seret kartu halaman ke posisi yang benar; urutan barunya ikut tersimpan ke file yang kamu unduh.",
+            "Menghapus dan mengurutkan bisa kamu lakukan bergantian di layar yang sama, pada dokumen yang sama, tanpa perlu mengunggah ulang apa pun di antaranya — sesuatu yang tidak bisa dilakukan kalau setiap alat adalah situs yang berbeda."
+          ]
+        },
+        {
+          "h2": "Kenapa gratis dan tanpa akun",
+          "p": [
+            "Karena semuanya terjadi di perangkatmu, kami tidak menanggung biaya server, jadi tidak ada yang perlu kami tagih. Tidak ada batas harian, tidak ada watermark, dan tidak ada halaman pendaftaran yang menghalangi tombol unduh.",
+            "Kodenya juga terbuka di GitHub. Kalau kamu tidak percaya bahwa filemu benar-benar tidak dikirim ke mana pun, jangan percaya — periksa sendiri. Itulah gunanya kami membuka kodenya."
+          ]
+        }
+      ],
+      "faq": [
+        {
+          "q": "File aslinya ikut berubah?",
+          "a": "Tidak. File asli di perangkatmu tidak disentuh. PDFLokal menghasilkan file baru saat kamu mengunduh."
+        },
+        {
+          "q": "Bisa hapus banyak halaman sekaligus?",
+          "a": "Bisa. Pilih beberapa halaman di Kelola Halaman, lalu buang sekaligus."
+        },
+        {
+          "q": "Bisa dibatalkan kalau salah hapus?",
+          "a": "Bisa, dengan Ctrl+Z atau Cmd+Z."
+        },
+        {
+          "q": "Halaman yang diputar tetap lurus di HP orang lain?",
+          "a": "Ya. Perputarannya ditulis ke dalam PDF-nya, bukan sekadar tampilan di layarmu."
+        },
+        {
+          "q": "Halaman yang dihapus benar-benar hilang dari file?",
+          "a": "Ya. Halaman itu tidak ikut ke file yang kamu unduh, bukan cuma disembunyikan dari layar."
+        },
+        {
+          "q": "Bisa dipakai di HP?",
+          "a": "Bisa. Halaman tampil sebagai kartu besar yang gampang disentuh — menghapus, mengurutkan, dan memutar semuanya bisa dengan jempol."
+        }
+      ]
+    }
+  ]
+}
