@@ -32,8 +32,12 @@ import { createSignatureModal } from './signature-modal.js';
 import { createDownloadSheet } from './download-sheet.js';
 import { track } from '../lib/analytics.js';
 import { createCelebration } from './celebrate.js';
+import { ensurePdfLib } from '../core/vendor.js';
 
-window.pdfjsLib.GlobalWorkerOptions.workerSrc = '/js/vendor/pdf.worker.min.js';
+// WHY there is no `window.pdfjsLib.…workerSrc = …` line here any more: pdf.js is
+// loaded on demand now (core/vendor.js), so touching it at module top-level
+// would resurrect the very boot-time dependency we removed. The worker path is
+// set inside ensurePdfJs(), the instant the lib lands.
 
 // ---- state (ONE doc, ONE history — everything else is DOM or derived) -------
 let doc = createDoc(); // replaced wholesale by "Buka Baru" (File menu)
@@ -421,9 +425,12 @@ const pageManager = createPageManager({
     // Export ONLY the selected pages: a shallow Doc sharing the same sources.
     try {
       toast('Sebentar, lagi disiapkan');
-      const { buildPdfBytes } = await import('../core/export.js');
+      const [{ buildPdfBytes }, { PDFLib, fontkit }] = await Promise.all([
+        import('../core/export.js'),
+        ensurePdfLib(), // pdf-lib + fontkit: export-only, fetched at the moment of intent
+      ]);
       const subset = { sources: doc.sources, pages, selection: { pageId: null, annotationId: null } };
-      const bytes = await buildPdfBytes(subset, { PDFLib: window.PDFLib, fontkit: window.fontkit });
+      const bytes = await buildPdfBytes(subset, { PDFLib, fontkit });
       download(new Blob([bytes], { type: 'application/pdf' }), `${baseName}-halaman-${pages.length}.pdf`);
       toast(`Selesai! ${pages.length} halaman diekstrak jadi PDF baru`);
     } catch (err) {

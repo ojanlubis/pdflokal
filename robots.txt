@@ -1,0 +1,13 @@
+# PDFLokal — https://www.pdflokal.id
+#
+# WHY there is no Disallow for /alat-gambar.html or /lab.html even though we do
+# NOT want them indexed: both carry a `noindex` meta tag, and a crawler must be
+# ALLOWED to fetch a page in order to SEE that tag. Disallowing them here would
+# block the crawl, Google would never read the noindex, and the URLs could still
+# surface in results from external links — the exact opposite of the intent.
+# Blocking is for crawl budget; noindex is for exclusion. Don't confuse them.
+
+User-agent: *
+Allow: /
+
+Sitemap: https://www.pdflokal.id/sitemap.xml

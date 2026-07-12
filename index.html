@@ -1011,61 +1011,21 @@
 
   <input type="file" id="file-input" accept="application/pdf,image/*" multiple hidden>
 
-  <script src="js/vendor/pdf.min.js"></script>
-  <script src="js/vendor/pdf-lib.min.js"></script>
-  <script src="js/vendor/fontkit.umd.min.js"></script>
-  <script src="js/vendor/signature_pad.umd.min.js"></script>
-  <script src="js/vendor/fflate.min.js"></script>
+  <!-- WHY there are no vendor <script> tags here any more (Jul 2026, SEO pass):
+       pdf.js + pdf-lib + fontkit + SignaturePad + fflate = ~1.6 MB that EVERY
+       visitor (and Googlebot) used to download, parse and execute before the app
+       became interactive — for a landing page that needs none of them. They are
+       fetched on demand now by js/core/vendor.js, at the moment of intent:
+       pdf.js on the first PDF import, pdf-lib + fontkit at export, SignaturePad
+       when the TTD sheet opens, fflate on the images-ZIP path.
+       DO NOT re-add them here "to be safe" — that silently undoes the fix and
+       nothing will fail loudly to tell you. -->
   <script>window.APP_VERSION = 'v2';</script>
-  <script src="js/vendor/sentry.min.js"></script>
-  <script>
-    // Same config as index.html (tunnel beats ad blockers; prod-only) with ONE
-    // v2 adaptation: pages are <img> now, not <canvas> — the replay block list
-    // must cover .pv-bg (page images) and signature images or replays would
-    // record user documents. Privacy first, always.
-    if (window.Sentry) Sentry.init({
-      dsn: 'https://0913dcff45e0045c49dfe1b14f34c65f@o4511472486580224.ingest.us.sentry.io/4511472494313472',
-      tunnel: '/api/sentry-tunnel',
-      enabled: location.hostname === 'pdflokal.id' || location.hostname === 'www.pdflokal.id',
-      release: window.APP_VERSION,
-      sampleRate: 1.0,
-      // Third-party noise, not our code: ad blockers / privacy extensions hook
-      // window.fetch and cancel Google's analytics + ads requests (gtag →
-      // doubleclick), which surface as unhandled "Failed to fetch" rejections.
-      // Filter by SOURCE so genuine first-party errors still report. (Sentry
-      // JAVASCRIPT-C / -A were pure extension noise. We make zero first-party
-      // fetches for file work — 100% client-side — so these are never actionable.)
-      denyUrls: [
-        /chrome-extension:\/\//i,
-        /moz-extension:\/\//i,
-        /safari-(web-)?extension:\/\//i,
-        /^chrome:\/\//i,
-        /doubleclick\.net/i,
-        /googletagmanager\.com/i,
-        /google-analytics\.com/i,
-        /googlesyndication\.com/i,
-        /google-adservices\.com/i,
-        /\/gtag\//i,
-      ],
-      ignoreErrors: [
-        // Stackless variants of the above — a bare rejection with no frames
-        // can't be matched by denyUrls, so match the message too.
-        'Failed to fetch',
-        'Load failed',                                    // Safari's phrasing
-        'NetworkError when attempting to fetch resource', // Firefox's phrasing
-      ],
-      replaysSessionSampleRate: 0.10,
-      replaysOnErrorSampleRate: 1.0,
-      integrations: [
-        Sentry.replayIntegration({
-          maskAllText: true,
-          maskAllInputs: true,
-          blockAllMedia: true,
-          block: ['canvas', '.pv-bg', '.pv-anno img', '.pm-thumb', '#sig-preview'],
-        }),
-      ],
-    });
-  </script>
+  <!-- defer (not sync): Sentry is 209 KB. Its init lives in a deferred FILE, not
+       an inline block, so it runs AFTER sentry.min.js lands but BEFORE app.js —
+       see js/sentry-init.js. -->
+  <script defer src="js/vendor/sentry.min.js"></script>
+  <script defer src="js/sentry-init.js"></script>
   <script type="module" src="js/v2/app.js"></script>
 </body>
 </html>

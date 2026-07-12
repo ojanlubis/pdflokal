@@ -11,6 +11,8 @@
  * placement width — zero extra branches downstream (render/export/undo).
  */
 
+import { ensureSignaturePad } from '../core/vendor.js';
+
 const WHITE_THRESHOLD = 235; // r,g,b all above this → transparent
 
 export function createSignatureModal({ modal, onReady, toast }) {
@@ -36,7 +38,10 @@ export function createSignatureModal({ modal, onReady, toast }) {
   for (const t of tabs) t.addEventListener('click', () => showTab(t.dataset.tab));
 
   // ---- draw pane ---------------------------------------------------------------
-  function initPad() {
+  // async now: SignaturePad (11 KB) is fetched when the sheet opens, not at page
+  // load. Sizing the canvas stays synchronous so the pad is never constructed
+  // against a zero-size canvas if the fetch is slow.
+  async function initPad() {
     // Detach the previous pad's pointer listeners first (review M3): each
     // SignaturePad constructor adds its own set to the SAME canvas — without
     // off(), N modal opens = N pads all drawing every stroke N× thick.
@@ -45,7 +50,8 @@ export function createSignatureModal({ modal, onReady, toast }) {
     canvas.width = canvas.offsetWidth * dpr;
     canvas.height = canvas.offsetHeight * dpr;
     canvas.getContext('2d').scale(dpr, dpr);
-    pad = new window.SignaturePad(canvas, { minWidth: 1, maxWidth: 2.4 });
+    const SignaturePad = await ensureSignaturePad();
+    pad = new SignaturePad(canvas, { minWidth: 1, maxWidth: 2.4 });
   }
   modal.querySelector('#sig-clear').addEventListener('click', () => pad?.clear());
 

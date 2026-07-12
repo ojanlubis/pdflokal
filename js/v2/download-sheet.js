@@ -15,6 +15,7 @@
  */
 
 import { buildPdfBytes } from '../core/export.js';
+import { ensurePdfJs, ensurePdfLib, ensureFflate } from '../core/vendor.js';
 import { track } from '../lib/analytics.js';
 import { showStamp } from './celebrate.js';
 
@@ -62,7 +63,10 @@ export function createDownloadSheet(deps) {
     try {
       const doc = deps.getDoc();
       const subset = { sources: doc.sources, pages: selectedPages(), selection: { pageId: null, annotationId: null } };
-      const bytes = await buildPdfBytes(subset, { PDFLib: window.PDFLib, fontkit: window.fontkit });
+      // pdf-lib + fontkit are export-only, so they're fetched here rather than at
+      // page load. Opening the sheet is what signals the intent to download.
+      const { PDFLib, fontkit } = await ensurePdfLib();
+      const bytes = await buildPdfBytes(subset, { PDFLib, fontkit });
       if (seq !== state.seq) return; // selection changed mid-build
       state.base = { bytes, size: bytes.length };
     } catch (err) {
@@ -90,7 +94,13 @@ export function createDownloadSheet(deps) {
         await new Promise((r) => setTimeout(r, 120));
       }
       if (seq !== state.seq || !state.base) return;
-      const { compressPdfBytes } = await import('../core/compress.js');
+      // compress.js rasterizes with pdf.js and rebuilds with pdf-lib, taking both
+      // off globalThis. pdf-lib is already up (buildBase needed it), but pdf.js
+      // may NOT be — a doc built from images alone never imported a PDF. Ensure
+      // both; the already-loaded one resolves instantly.
+      const [{ compressPdfBytes }] = await Promise.all([
+        import('../core/compress.js'), ensurePdfJs(), ensurePdfLib(),
+      ]);
       const out = await compressPdfBytes(state.base.bytes, {
         quality: COMPRESS_QUALITY, maxDim: COMPRESS_MAXDIM,
       });
@@ -265,7 +275,11 @@ export function createDownloadSheet(deps) {
         deps.download(new Blob([src.bytes], { type: 'application/pdf' }), `${baseName}-pdflokal.pdf`);
       } else {
         if (!state.base) throw new Error('build missing');
-        const { renderPdfToImages, zipFiles } = await import('../core/export-images.js');
+        // renderPdfToImages rasterizes with pdf.js; zipFiles zips with fflate.
+        // Both come off globalThis, so both must be up before we call in.
+        const [{ renderPdfToImages, zipFiles }] = await Promise.all([
+          import('../core/export-images.js'), ensurePdfJs(), ensureFflate(),
+        ]);
         // Punch list #5: rendering N pages to images is real work — narrate it
         // on the CTA so "working" never looks like "hung". Surgical text update,
         // never a full render() mid-export.
