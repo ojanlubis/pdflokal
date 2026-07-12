@@ -698,7 +698,15 @@ async function loadFilesInner(files) {
     const bytes = new Uint8Array(await f.arrayBuffer());
     if (isPdf(f)) await importPdf(doc, { name: f.name, bytes });
     else await importImage(doc, { name: f.name, bytes, mimeType: f.type });
-    track('file_loaded', { tool: 'editor-v2', fileType: isPdf(f) ? 'pdf' : 'image' });
+    // Carry the intent so the funnel actually joins up: intent_armed → file_loaded
+    // → download. Without it we'd know people PRESSED "Pisah PDF" but not whether
+    // any of them ever brought a file — which is the half that matters.
+    // pendingIntent is still set here; applyIntent() clears it further down.
+    track('file_loaded', {
+      tool: 'editor-v2',
+      fileType: isPdf(f) ? 'pdf' : 'image',
+      intent: pendingIntent || 'none',
+    });
   }
   if (!rasterizer) rasterizer = createPageRasterizer(doc);
   emptyEl.style.display = 'none';
@@ -762,15 +770,33 @@ const DEFAULT_ACCEPT = fileInput.getAttribute('accept');
 document.getElementById('btn-open').addEventListener('click', () => fileInput.click());
 
 // Foto jadi PDF narrows the picker to images; everything else keeps both.
-function armIntent(intent) {
+//
+// `source` answers a question we could NOT answer before: which tool cards do
+// people actually press, and do the SEO pages send anyone? Card clicks emitted
+// NOTHING — track() fired on file_loaded and editor_action, but the intent itself
+// was never recorded. That's why "is Kelola Halaman discoverable?" has been parked
+// in the backlog waiting for data that was never going to arrive: nothing was
+// sending it. Three sources, one event:
+//   card      — pressed a tool card (on the homepage or on a tool page)
+//   seo_page  — landed on /gabung-pdf etc, which declares <body data-intent>
+//   query     — arrived via ?buat=… (a link from anywhere)
+// The funnel then reads: intent_armed → file_loaded → download.
+function armIntent(intent, source) {
   pendingIntent = intent;
   fileInput.setAttribute('accept', intent === 'foto' ? 'image/*' : DEFAULT_ACCEPT);
   // Re-word the editor around the job while we're at it. Arming the right TOOL but
   // then describing it in generic words threw the intent away — someone who came
   // to /pisah-pdf was shown a button labelled "Ekstrak" and no mention of "pisah".
   applyIntentCopy(intent);
+  track('intent_armed', { intent, source });
 }
-if (pendingIntent) armIntent(pendingIntent); // an SEO page / ?buat= landing
+
+if (pendingIntent) {
+  // ?buat= wins over <body data-intent> in the pendingIntent lookup above, so the
+  // source has to be resolved the same way round or the attribution lies.
+  const fromQuery = Boolean(new URLSearchParams(window.location.search).get('buat'));
+  armIntent(pendingIntent, fromQuery ? 'query' : 'seo_page');
+}
 
 // The tool cards are real <a href="/gabung-pdf"> links so Googlebot can crawl
 // INTO each tool — as <button>s they were a dead end and the site had exactly one
@@ -781,7 +807,7 @@ for (const card of document.querySelectorAll('.ld-card[data-intent]')) {
   card.addEventListener('click', (e) => {
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return; // let the browser open it
     e.preventDefault();
-    armIntent(card.dataset.intent);
+    armIntent(card.dataset.intent, 'card');
     fileInput.click();
   });
 }

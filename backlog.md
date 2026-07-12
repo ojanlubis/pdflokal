@@ -13,6 +13,8 @@ Running list of UI/UX findings + small fixes to pick up later. Append new items 
 
 ## Open
 
+- **[med, founder — 5-min no-code, GA4 Admin]** Register **`intent`** and **`source`** as GA4 **custom dimensions** (Admin → Custom definitions → event-scoped). Without it the params are *sent* but not *queryable* — same trap as the `client_error` params below. Vercel Analytics shows the custom data natively, so that half works either way. Once registered, these two questions become answerable for the first time: **which tool cards do people actually press**, and **do the SEO landing pages send anyone who brings a file**. Funnel: `intent_armed` → `file_loaded` (now carries `intent`) → `download`.
+
 - **[low, flaky]** `tests/mobile/back-button.spec.js:47` ("RAPID double-back") fails intermittently under FULL-suite parallel load, but passes 3/3 in isolation. First seen Jul 12 during the SEO sweep. Not caused by the intent-copy change (that spec runs on `/`, where no intent is declared, so `applyIntentCopy()` is a strict no-op). Likely a history-traversal timing race that only shows when the machine is loaded. Worth a `test.slow()` or an explicit wait rather than a retry.
 
 ### ⏳ SEO — the two manual steps only the founder can do
@@ -35,7 +37,7 @@ Running list of UI/UX findings + small fixes to pick up later. Append new items 
 
 - **[low, founder 5-min no-code task]** Register `client_error` params (`message`, `source`, `line`, `kind`) as GA4 custom dimensions (Admin → Custom definitions) — unblocks error triage without Sentry; the analytics MCP is read-only so this needs the founder's clicks. (Was a sub-task of the insertBefore crash, now fixed.) [js/lib/errors.js:37, docs/product-definition.md §11]
 
-- **[med, WAIT until ~Jul 5-6, decide with data]** Kelola Halaman hides its powers — users can be clueless about what the sheet can do (reorder/split/rotate/delete). Founder idea: explicit verb buttons (Tambah, Split, ...) or a mini tutorial — BUT deliberately wait ~2 days from Jul 3 launch and check analytics whether editor_action reorder/split/gabungkan_used happen organically before adding UI. [js/v2/page-manager.js]
+- **[med, UNBLOCKED Jul 12 — the data now exists]** Kelola Halaman hides its powers — users can be clueless about what the sheet can do (reorder/split/rotate/delete). Founder idea: explicit verb buttons (Tambah, Split, ...) or a mini tutorial — BUT deliberately wait and check analytics first. **Jul 12: the reason this stalled is now clear — tool-card clicks emitted NOTHING, so the data it was waiting for was never going to arrive.** `intent_armed` now fires (with `source` = card | seo_page | query) and `file_loaded` carries the `intent`, so "does anyone reach for Pisah / Kelola?" is finally answerable. Give it ~2 weeks of traffic, then decide. [js/v2/page-manager.js]
 
 
 - **[decided Jul 2]** Watermark + page-number + Kunci PDF UI: NOT built in v2 (3-month analytics: <0.5% each — 7/3/3 visitors). Engine + export support stays tested, so reintroduction = one button. Revisit only if users ask.
