@@ -334,8 +334,13 @@
       border: 3px solid var(--accent); border-radius: 7px; color: var(--accent);
       font-weight: 700; font-size: 12.5px; letter-spacing: .09em; text-transform: uppercase;
       transform: rotate(-8deg);
-      -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence baseFrequency='.75'/></filter><rect width='120' height='120' filter='url(%23n)' opacity='.9'/></svg>");
-      mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence baseFrequency='.75'/></filter><rect width='120' height='120' filter='url(%23n)' opacity='.9'/></svg>");
+      /* Distinct filter ids (nw / ns) on purpose. They are identical grain masks,
+         but both SVGs used id='n', and a linter scanning the HTML text sees two
+         id="n" and calls it a duplicate DOM id. It is NOT one — each id lives
+         inside its own SVG data-URI, not in this document. Renaming costs nothing
+         and removes a permanent false CRITICAL from every future report. */
+      -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='nw'><feTurbulence baseFrequency='.75'/></filter><rect width='120' height='120' filter='url(%23nw)' opacity='.9'/></svg>");
+      mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='ns'><feTurbulence baseFrequency='.75'/></filter><rect width='120' height='120' filter='url(%23ns)' opacity='.9'/></svg>");
       animation: ld-thunk .45s cubic-bezier(.34,1.45,.44,1) .5s both;
     }
     @keyframes ld-thunk {
@@ -1107,7 +1112,9 @@
     </div>
   </dialog>
 
-  <input type="file" id="file-input" accept="application/pdf,image/*" multiple hidden>
+  <!-- aria-label: the input is `hidden` and driven by the dropzone button, so it has
+       no visible <label>. Screen readers still announce it when it takes focus. -->
+  <input type="file" id="file-input" accept="application/pdf,image/*" multiple hidden aria-label="Pilih file PDF atau foto">
 
   <!-- WHY there are no vendor <script> tags here any more (Jul 2026, SEO pass):
        pdf.js + pdf-lib + fontkit + SignaturePad + fflate = ~1.6 MB that EVERY
