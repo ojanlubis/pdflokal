@@ -1,0 +1,72 @@
+# THE ALARM.
+#
+# On Jul 7 2026 pdflokal.id lost ~97% of its analytics and nobody noticed for
+# FIVE DAYS. Sessions went 59-85/day -> 1-6/day -> 0. Every dashboard stayed
+# green: the Ads pixel kept returning 200, and GA4 Admin said "Data collection is
+# active" while its own diagnostics, one panel deeper, said "your tag has never
+# been detected."
+#
+# The bug was a 404. THE FAILURE WAS THE SILENCE. An "active collection" banner
+# structurally cannot detect a 97% loss - only VOLUME can. This workflow is the
+# volume check that should have existed.
+#
+# SETUP (one manual step, needs the founder):
+#   Settings -> Secrets and variables -> Actions -> New repository secret
+#     name:  GA4_SA_JSON
+#     value: the contents of ~/.config/gcloud/pdflokal-ga4-reader.json
+#   Without that secret this workflow fails loudly on its first run - which is the
+#   correct behaviour for a monitor. A monitor that quietly does nothing is the
+#   exact failure it exists to prevent.
+name: Traffic floor
+
+on:
+  schedule:
+    # 02:00 UTC = 09:00 WIB - after GA4 has settled the previous day, and early
+    # enough in Jakarta that a breach is seen at the start of the working day.
+    - cron: '0 2 * * *'
+  workflow_dispatch: # so it can be run by hand during an incident
+
+jobs:
+  floor:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write # to raise an issue when the floor breaks
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Check the traffic floor
+        env:
+          GA4_SA_JSON: ${{ secrets.GA4_SA_JSON }}
+        run: |
+          set -o pipefail
+          node scripts/traffic-floor.mjs 2>&1 | tee floor.log
+
+      # A failed scheduled run emails the owner, but email is easy to skim past.
+      # An issue sits there until someone closes it. Reuse ONE issue instead of
+      # opening a new one every morning of a multi-day outage - that is how an
+      # alarm becomes noise and gets muted.
+      - name: Raise the alarm
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          EXISTING=$(gh issue list --label traffic-floor --state open --json number --jq '.[0].number' 2>/dev/null || true)
+          {
+            echo "The daily traffic-floor check failed."
+            echo
+            echo '```'
+            cat floor.log 2>/dev/null || echo "(no log - the script itself failed to run)"
+            echo '```'
+            echo
+            echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          } > body.md
+
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --body-file body.md
+          else
+            gh label create traffic-floor --color B60205 --description "Daily traffic floor breach" 2>/dev/null || true
+            gh issue create --title "Traffic floor breached" --label traffic-floor --body-file body.md
+          fi
