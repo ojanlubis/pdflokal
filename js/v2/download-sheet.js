@@ -15,17 +15,36 @@
  */
 
 import { buildPdfBytes } from '../core/export.js';
+import { ensurePdfJs, ensurePdfLib, ensureFflate } from '../core/vendor.js';
 import { track } from '../lib/analytics.js';
 import { showStamp } from './celebrate.js';
 
-const COMPRESS_QUALITY = 0.72; // the ONE preset (founder call: no levels until data asks)
-const COMPRESS_MAXDIM = 1600;
+const COMPRESS_QUALITY = 0.72; // the "Otomatis" preset — one sane default, still
+const COMPRESS_MAXDIM = 1600;  // the right answer when the user has no hard cap.
+
+// The founder call used to be "the ONE preset, no levels until data asks."
+// The data asked. Every long-tail query under "kompres pdf" in Indonesia is a
+// SIZE: "kompres pdf 500kb", "kompres pdf 1mb", "kompres pdf 100kb" — because
+// CPNS, SNBP and e-filing portals reject a berkas over a hard cap. These are the
+// caps people actually type. See compressToTargetBytes() in js/core/compress.js.
+const TARGETS = [
+  { v: null, label: 'Otomatis' },
+  { v: 2 * 1024 * 1024, label: '2 MB' },
+  { v: 1024 * 1024, label: '1 MB' },
+  { v: 500 * 1024, label: '500 KB' },
+  { v: 200 * 1024, label: '200 KB' },
+  { v: 100 * 1024, label: '100 KB' },
+];
 const IMG_DIMS = { asli: null, sedang: 1500, kecil: 800 };
 
+// Show KB right up to 1 MB, not just below 0.1 MB. The upload caps people fight
+// with are quoted in KB ("maksimal 500KB"), so a result rendered "0,33 MB" makes
+// the user do the conversion themselves at exactly the moment they're anxious
+// about whether it fits. "335 KB" answers the question they actually have.
 function fmtMB(bytes) {
   const mb = bytes / (1024 * 1024);
-  if (mb < 0.1) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
-  return `${(mb < 1 ? mb.toFixed(2) : mb.toFixed(1)).replace('.', ',')} MB`;
+  if (mb < 1) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${mb.toFixed(1).replace('.', ',')} MB`;
 }
 
 // deps = {
@@ -39,7 +58,7 @@ export function createDownloadSheet(deps) {
   const el = (id) => modal.querySelector(id);
 
   const state = {
-    format: 'pdf', imgfmt: 'jpg', size: 'asli', picked: null, // null = semua
+    format: 'pdf', imgfmt: 'jpg', size: 'asli', target: null, picked: null, // null = semua / no cap
     base: null,        // { bytes, size } — the real built PDF for current selection
     compressed: null,  // { bytes, size, unchanged }
     building: false, compressing: false, exporting: false,
@@ -62,7 +81,10 @@ export function createDownloadSheet(deps) {
     try {
       const doc = deps.getDoc();
       const subset = { sources: doc.sources, pages: selectedPages(), selection: { pageId: null, annotationId: null } };
-      const bytes = await buildPdfBytes(subset, { PDFLib: window.PDFLib, fontkit: window.fontkit });
+      // pdf-lib + fontkit are export-only, so they're fetched here rather than at
+      // page load. Opening the sheet is what signals the intent to download.
+      const { PDFLib, fontkit } = await ensurePdfLib();
+      const bytes = await buildPdfBytes(subset, { PDFLib, fontkit });
       if (seq !== state.seq) return; // selection changed mid-build
       state.base = { bytes, size: bytes.length };
     } catch (err) {
@@ -90,12 +112,37 @@ export function createDownloadSheet(deps) {
         await new Promise((r) => setTimeout(r, 120));
       }
       if (seq !== state.seq || !state.base) return;
-      const { compressPdfBytes } = await import('../core/compress.js');
-      const out = await compressPdfBytes(state.base.bytes, {
-        quality: COMPRESS_QUALITY, maxDim: COMPRESS_MAXDIM,
-      });
+      // compress.js rasterizes with pdf.js and rebuilds with pdf-lib, taking both
+      // off globalThis. pdf-lib is already up (buildBase needed it), but pdf.js
+      // may NOT be — a doc built from images alone never imported a PDF. Ensure
+      // both; the already-loaded one resolves instantly.
+      const [{ compressPdfBytes, compressToTargetBytes }] = await Promise.all([
+        import('../core/compress.js'), ensurePdfJs(), ensurePdfLib(),
+      ]);
+      const target = state.target;
+      const out = target
+        // Hunt for the highest quality that fits under the user's hard cap. Costs
+        // ~3 rebuild passes (binary search over the ladder), so narrate it.
+        ? await compressToTargetBytes(state.base.bytes, {
+          targetBytes: target,
+          onProgress: ({ pass }) => {
+            if (seq !== state.seq) return;
+            const m = el('#ds-cta-main');
+            if (m) m.textContent = `Mencari ukuran yang pas… (percobaan ${pass})`;
+          },
+        })
+        : await compressPdfBytes(state.base.bytes, {
+          quality: COMPRESS_QUALITY, maxDim: COMPRESS_MAXDIM,
+        });
       if (seq !== state.seq) return;
-      state.compressed = { bytes: out.bytes, size: out.size, unchanged: out.unchanged };
+      // reachedTarget is carried through so the UI can be HONEST when we couldn't
+      // make the cap. A berkas the user believes is 500 KB but isn't gets silently
+      // rejected by the portal — worse than one they know is too big. It is
+      // `true` for the no-target path (there was no cap to miss).
+      state.compressed = {
+        bytes: out.bytes, size: out.size, unchanged: out.unchanged,
+        target, reachedTarget: out.reachedTarget ?? true,
+      };
       // SUDAH OPTIMAL: the honesty guard gets a face. The file was already as
       // small as it honestly gets — we say so with a stamp instead of faking
       // savings. Stamped INTO the dialog (top layer covers body-fixed elements).
@@ -170,10 +217,33 @@ export function createDownloadSheet(deps) {
       }
       mkBtn('kompres', 'Compress', sub);
     } else {
+      state.target = null; // image export has its own size row; no PDF cap applies
       if (!['asli', 'sedang', 'kecil'].includes(state.size)) state.size = 'sedang';
       mkBtn('asli', 'Asli', '100%');
       mkBtn('sedang', 'Sedang', '1500px');
       mkBtn('kecil', 'Kecil', '800px');
+    }
+
+    // Target row: only meaningful when compressing a PDF.
+    const showTarget = state.format === 'pdf' && state.size === 'kompres';
+    el('#ds-row-target').hidden = !showTarget;
+    if (showTarget) {
+      const row = el('#ds-target');
+      row.innerHTML = '';
+      for (const t of TARGETS) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.textContent = t.label;
+        if (state.target === t.v) b.classList.add('on');
+        b.addEventListener('click', () => {
+          if (state.target === t.v) return;
+          state.target = t.v;
+          state.compressed = null; // the old result was for a different cap
+          buildCompressed();
+          render();
+        });
+        row.appendChild(b);
+      }
     }
 
     segSync('#ds-pages', state.picked ? 'some' : 'all');
@@ -188,10 +258,22 @@ export function createDownloadSheet(deps) {
       const src = state.size === 'kompres' ? state.compressed : state.base;
       const busy = state.size === 'kompres' ? (state.compressing || state.building) : state.building;
       main.innerHTML = `Unduh PDF${halTxt}${busy ? ' · <span class="ds-spin ds-spin-lite"></span>' : (src ? ` · ${fmtMB(src.size)}` : '')}`;
-      if (state.size === 'kompres' && state.compressed && !state.compressed.unchanged) {
-        sub.textContent = `hemat ${Math.round((1 - state.compressed.size / state.base.size) * 100)}% dari ${fmtMB(state.base.size)}`;
+      const c = state.compressed;
+      if (state.size === 'kompres' && c && c.target && !c.reachedTarget) {
+        // THE HONEST MISS. We could not get under the cap. Say so plainly and give
+        // the user the one lever that actually works next (fewer pages) — never
+        // imply the berkas will pass when it won't.
+        const cap = TARGETS.find((t) => t.v === c.target)?.label ?? fmtMB(c.target);
+        sub.textContent = `paling kecil yang bisa: ${fmtMB(c.size)} — belum masuk ${cap}. Coba buang halaman yang nggak perlu.`;
         sub.hidden = false;
-      } else if (state.size === 'kompres' && state.compressed?.unchanged) {
+      } else if (state.size === 'kompres' && c && c.target && c.reachedTarget) {
+        const cap = TARGETS.find((t) => t.v === c.target)?.label ?? fmtMB(c.target);
+        sub.textContent = `${fmtMB(c.size)} — muat di bawah ${cap}`;
+        sub.hidden = false;
+      } else if (state.size === 'kompres' && c && !c.unchanged) {
+        sub.textContent = `hemat ${Math.round((1 - c.size / state.base.size) * 100)}% dari ${fmtMB(state.base.size)}`;
+        sub.hidden = false;
+      } else if (state.size === 'kompres' && c?.unchanged) {
         sub.textContent = 'udah paling kecil, nggak bisa dikompres lagi tanpa merusak';
         sub.hidden = false;
       } else {
@@ -265,7 +347,11 @@ export function createDownloadSheet(deps) {
         deps.download(new Blob([src.bytes], { type: 'application/pdf' }), `${baseName}-pdflokal.pdf`);
       } else {
         if (!state.base) throw new Error('build missing');
-        const { renderPdfToImages, zipFiles } = await import('../core/export-images.js');
+        // renderPdfToImages rasterizes with pdf.js; zipFiles zips with fflate.
+        // Both come off globalThis, so both must be up before we call in.
+        const [{ renderPdfToImages, zipFiles }] = await Promise.all([
+          import('../core/export-images.js'), ensurePdfJs(), ensureFflate(),
+        ]);
         // Punch list #5: rendering N pages to images is real work — narrate it
         // on the CTA so "working" never looks like "hung". Surgical text update,
         // never a full render() mid-export.
@@ -313,6 +399,11 @@ export function createDownloadSheet(deps) {
       state.format = preset.format === 'img' ? 'img' : 'pdf';
       state.imgfmt = 'jpg';
       state.size = preset.size === 'kompres' && state.format === 'pdf' ? 'kompres' : 'asli';
+      // A target cap arrives from /kompres-pdf-500kb and friends. Only honour one
+      // we actually offer — never trust a number straight off a URL/attribute.
+      state.target = state.size === 'kompres' && TARGETS.some((t) => t.v === preset.target)
+        ? preset.target
+        : null;
       state.picked = null;
       state.compressed = null;
       state.compressing = false; // belt-and-braces vs any historic flag leak

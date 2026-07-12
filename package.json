@@ -18,7 +18,9 @@
     "test:golden:update": "UPDATE_BASELINES=1 playwright test tests/golden",
     "test:visual": "playwright test tests/visual.spec.js",
     "test:visual:update": "playwright test tests/visual.spec.js --update-snapshots",
-    "test:visual:update:linux": "docker run --rm -v \"$PWD\":/work -w /work --user $(id -u):$(id -g) mcr.microsoft.com/playwright:v1.60.0-jammy bash -c 'HOME=/tmp npx playwright test tests/visual.spec.js --update-snapshots'"
+    "test:visual:update:linux": "docker run --rm -v \"$PWD\":/work -w /work --user $(id -u):$(id -g) mcr.microsoft.com/playwright:v1.60.0-jammy bash -c 'HOME=/tmp npx playwright test tests/visual.spec.js --update-snapshots'",
+    "seo": "node scripts/gen-seo-pages.js",
+    "seo:check": "node scripts/gen-seo-pages.js --check"
   },
   "repository": {
     "type": "git",

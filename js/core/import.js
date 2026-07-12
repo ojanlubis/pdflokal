@@ -13,11 +13,16 @@
 
 import { createSource, createPage, getSource } from './model.js';
 import { addSource, addPages } from './operations.js';
+import { ensurePdfJs } from './vendor.js';
 
 // bytes → append a Source + its Pages (metadata only) to `doc`. Returns the pages.
 export async function importPdf(doc, { name, bytes }) {
+  // WHY the ensure: pdf.js is no longer a <script> tag in index.html — it is
+  // fetched on demand (core/vendor.js). This is the first moment it's genuinely
+  // needed, and it's already async, so the load costs the user nothing extra.
+  const pdfjsLib = await ensurePdfJs();
   // Defensive .slice(): PDF.js may detach the ArrayBuffer it's handed.
-  const pdf = await window.pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+  const pdf = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
   const source = addSource(doc, createSource({ name, bytes, numPages: pdf.numPages }));
 
   const pages = [];
@@ -114,7 +119,15 @@ export function createPageRasterizer(doc) {
   function getPdf(sourceId) {
     if (!docCache.has(sourceId)) {
       const source = getSource(doc, sourceId);
-      docCache.set(sourceId, window.pdfjsLib.getDocument({ data: source.bytes.slice() }).promise);
+      // Chained off ensurePdfJs() rather than reading window.pdfjsLib directly:
+      // in practice importPdf() has already loaded it (you cannot rasterize a
+      // page you never imported), but rasterizing is the hot path and must not
+      // depend on that ordering holding forever. The cached promise makes the
+      // already-loaded case free.
+      docCache.set(
+        sourceId,
+        ensurePdfJs().then((lib) => lib.getDocument({ data: source.bytes.slice() }).promise),
+      );
     }
     return docCache.get(sourceId);
   }

@@ -98,6 +98,13 @@ export async function compressPdfBytes(bytes, deps = {}) {
 
   const input = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
   const originalSize = input.length;
+  return compressOnce(input, { PDFLib, pdfjsLib, quality, maxDim, onProgress, originalSize });
+}
+
+// The single-pass rebuild. Split out of compressPdfBytes so the target-size search
+// below can call it repeatedly at different settings without duplicating the
+// pipeline. Behaviour is byte-identical to what compressPdfBytes always did.
+async function compressOnce(input, { PDFLib, pdfjsLib, quality, maxDim, onProgress, originalSize }) {
 
   // WHY .slice(): PDF.js detaches the ArrayBuffer it's handed. We MUST keep
   // `input` intact — the honesty guard returns it verbatim when compression
@@ -152,4 +159,104 @@ export async function compressPdfBytes(bytes, deps = {}) {
     return { bytes: input, originalSize, size: originalSize, unchanged: true };
   }
   return { bytes: rebuilt, originalSize, size: rebuilt.length, unchanged: false };
+}
+
+// ---- TARGET-SIZE COMPRESSION ------------------------------------------------
+//
+// WHY THIS EXISTS (Jul 2026 — the SEO/keyword research is the product research):
+//   Indonesians do not search for "compress PDF". They search for "kompres pdf
+//   500kb", "kompres pdf 1mb", "kompres pdf 100kb". Google's own Keyword Planner
+//   clusters these into a concept group it names "Jumlah: 1mb, 500kb, 100kb…".
+//   The reason is CPNS, SNBP, SNBT, beasiswa and e-filing portals, which reject a
+//   berkas over a hard cap — usually without saying why.
+//
+//   So the job is not "make it smaller". The job is "MAKE IT FIT". Every global
+//   competitor serves the first. Nobody serves the second. This function is the
+//   difference, and it is the reason /kompres-pdf-500kb is allowed to exist as a
+//   page at all (a page must change what the tool DOES, or it's a doorway page).
+//
+//   This also supersedes the old "the ONE preset, no levels until data asks"
+//   call in download-sheet.js. The data asked.
+//
+// THE LADDER: quality and resolution fall together. Dropping only one of them
+// looks worse at the same file size — a sharp-but-blocky page (low quality, high
+// res) and a smooth-but-mushy page (high quality, low res) are both worse than
+// stepping both down in concert.
+export const COMPRESS_LADDER = [
+  { quality: 0.82, maxDim: 2000 },
+  { quality: 0.72, maxDim: 1600 }, // the old fixed preset — still the sane default
+  { quality: 0.62, maxDim: 1400 },
+  { quality: 0.55, maxDim: 1200 },
+  { quality: 0.46, maxDim: 1000 },
+  { quality: 0.38, maxDim: 850 },
+  { quality: 0.30, maxDim: 700 },
+  { quality: 0.24, maxDim: 560 },
+];
+
+// Compress until the output fits `targetBytes`, at the HIGHEST quality that fits.
+//   { targetBytes, PDFLib, pdfjsLib, onProgress }
+// Returns { bytes, originalSize, size, unchanged, reachedTarget, rung, attempts }.
+//   reachedTarget === false → we could not get under the cap; `bytes` is the
+//   smallest we managed. TELL THE USER THAT. Never round a 620 KB result down to
+//   "500 KB ✓" — a berkas that silently fails the portal's check is worse than one
+//   the user knows is too big.
+export async function compressToTargetBytes(bytes, deps = {}) {
+  const PDFLib = deps.PDFLib || globalThis.PDFLib;
+  const pdfjsLib = deps.pdfjsLib || globalThis.pdfjsLib;
+  if (!PDFLib) throw new Error('compressToTargetBytes: PDFLib is required');
+  if (!pdfjsLib) throw new Error('compressToTargetBytes: pdfjsLib is required');
+  const targetBytes = deps.targetBytes;
+  if (!targetBytes || targetBytes <= 0) throw new Error('compressToTargetBytes: targetBytes is required');
+  const onProgress = deps.onProgress ?? null;
+
+  const input = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  const originalSize = input.length;
+
+  // Already fits. Never re-encode a file that is already compliant — that only
+  // degrades it for nothing. (The honesty guard's sibling.)
+  if (originalSize <= targetBytes) {
+    return { bytes: input, originalSize, size: originalSize, unchanged: true, reachedTarget: true, rung: null, attempts: 0 };
+  }
+
+  // BINARY SEARCH, not a linear walk. Output size falls monotonically as the rung
+  // index rises, so we can find the highest-quality rung that fits in ~3 passes
+  // instead of up to 8. Each pass re-rasterizes every page — on a 1-juta phone
+  // with a 20-page scan, 3 passes vs 8 is the difference between "slow" and
+  // "the tab died".
+  let lo = 0;
+  let hi = COMPRESS_LADDER.length - 1;
+  let fit = null;      // best (highest-quality) result that fits
+  let smallest = null; // fallback if nothing fits
+  let attempts = 0;
+
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    const rung = COMPRESS_LADDER[mid];
+    attempts += 1;
+    const pass = attempts;
+    const out = await compressOnce(input, {
+      PDFLib, pdfjsLib, ...rung, originalSize,
+      onProgress: onProgress ? (done, total) => onProgress({ done, total, pass }) : null,
+    });
+
+    if (!smallest || out.size < smallest.size) smallest = { ...out, rung };
+
+    if (out.size <= targetBytes) {
+      fit = { ...out, rung };
+      hi = mid - 1; // try for better quality
+    } else {
+      lo = mid + 1; // need more compression
+    }
+  }
+
+  const win = fit || smallest;
+  return {
+    bytes: win.bytes,
+    originalSize,
+    size: win.size,
+    unchanged: win.unchanged,
+    reachedTarget: Boolean(fit),
+    rung: win.rung,
+    attempts,
+  };
 }

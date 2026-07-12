@@ -32,8 +32,13 @@ import { createSignatureModal } from './signature-modal.js';
 import { createDownloadSheet } from './download-sheet.js';
 import { track } from '../lib/analytics.js';
 import { createCelebration } from './celebrate.js';
+import { applyIntentCopy } from './intent-copy.js';
+import { ensurePdfLib } from '../core/vendor.js';
 
-window.pdfjsLib.GlobalWorkerOptions.workerSrc = '/js/vendor/pdf.worker.min.js';
+// WHY there is no `window.pdfjsLib.…workerSrc = …` line here any more: pdf.js is
+// loaded on demand now (core/vendor.js), so touching it at module top-level
+// would resurrect the very boot-time dependency we removed. The worker path is
+// set inside ensurePdfJs(), the instant the lib lands.
 
 // ---- state (ONE doc, ONE history — everything else is DOM or derived) -------
 let doc = createDoc(); // replaced wholesale by "Buka Baru" (File menu)
@@ -421,9 +426,12 @@ const pageManager = createPageManager({
     // Export ONLY the selected pages: a shallow Doc sharing the same sources.
     try {
       toast('Sebentar, lagi disiapkan');
-      const { buildPdfBytes } = await import('../core/export.js');
+      const [{ buildPdfBytes }, { PDFLib, fontkit }] = await Promise.all([
+        import('../core/export.js'),
+        ensurePdfLib(), // pdf-lib + fontkit: export-only, fetched at the moment of intent
+      ]);
       const subset = { sources: doc.sources, pages, selection: { pageId: null, annotationId: null } };
-      const bytes = await buildPdfBytes(subset, { PDFLib: window.PDFLib, fontkit: window.fontkit });
+      const bytes = await buildPdfBytes(subset, { PDFLib, fontkit });
       download(new Blob([bytes], { type: 'application/pdf' }), `${baseName}-halaman-${pages.length}.pdf`);
       toast(`Selesai! ${pages.length} halaman diekstrak jadi PDF baru`);
     } catch (err) {
@@ -690,7 +698,15 @@ async function loadFilesInner(files) {
     const bytes = new Uint8Array(await f.arrayBuffer());
     if (isPdf(f)) await importPdf(doc, { name: f.name, bytes });
     else await importImage(doc, { name: f.name, bytes, mimeType: f.type });
-    track('file_loaded', { tool: 'editor-v2', fileType: isPdf(f) ? 'pdf' : 'image' });
+    // Carry the intent so the funnel actually joins up: intent_armed → file_loaded
+    // → download. Without it we'd know people PRESSED "Pisah PDF" but not whether
+    // any of them ever brought a file — which is the half that matters.
+    // pendingIntent is still set here; applyIntent() clears it further down.
+    track('file_loaded', {
+      tool: 'editor-v2',
+      fileType: isPdf(f) ? 'pdf' : 'image',
+      intent: pendingIntent || 'none',
+    });
   }
   if (!rasterizer) rasterizer = createPageRasterizer(doc);
   emptyEl.style.display = 'none';
@@ -714,9 +730,15 @@ async function loadFilesInner(files) {
 }
 
 // ---- the landing: dropzone, tool cards, intent hook -------------------------------
-// WHY ?buat= exists now: SEO intent pages (/gabung-pdf etc, strategy bet 5.3)
-// boot the editor pre-configured. Planned = one line; retrofitted = a refactor.
-let pendingIntent = new URLSearchParams(window.location.search).get('buat');
+// Three ways an intent reaches us, in priority order:
+//   1. ?buat=gabung          — a link from anywhere (the original hook, bet 5.3)
+//   2. <body data-intent>    — an SEO tool page (/gabung-pdf) declaring what it IS
+//   3. a tool-card click     — set below, on the way to the file picker
+// (2) is what makes the generated landing pages more than brochures: land on
+// /kompres-pdf, drop a file, and the compress sheet is already open.
+let pendingIntent = new URLSearchParams(window.location.search).get('buat')
+  || document.body.dataset.intent
+  || null;
 
 function applyIntent(intent) {
   if (intent === 'ttd' || intent === 'paraf') {
@@ -731,7 +753,13 @@ function applyIntent(intent) {
   } else if (intent === 'tipex') {
     setTool('whiteout');
     toast('Seret di halaman untuk menutup teks');
-  } else if (intent === 'kompres') downloadSheet.open({ size: 'kompres' });
+  } else if (intent === 'kompres') {
+    // /kompres-pdf-500kb declares <body data-intent="kompres" data-target="512000">.
+    // The sheet validates it against its own TARGETS list, so a junk value just
+    // falls back to Otomatis rather than becoming a bogus cap.
+    const target = Number(document.body.dataset.target) || null;
+    downloadSheet.open({ size: 'kompres', target });
+  }
   else if (intent === 'gambar') downloadSheet.open({ format: 'img' });
   else if (intent === 'split' || intent === 'halaman') pageManager.open();
   else if (intent === 'gabung') toast('Tambah file lainnya lewat menu File di kiri atas');
@@ -741,11 +769,45 @@ const fileInput = document.getElementById('file-input');
 const DEFAULT_ACCEPT = fileInput.getAttribute('accept');
 document.getElementById('btn-open').addEventListener('click', () => fileInput.click());
 
+// Foto jadi PDF narrows the picker to images; everything else keeps both.
+//
+// `source` answers a question we could NOT answer before: which tool cards do
+// people actually press, and do the SEO pages send anyone? Card clicks emitted
+// NOTHING — track() fired on file_loaded and editor_action, but the intent itself
+// was never recorded. That's why "is Kelola Halaman discoverable?" has been parked
+// in the backlog waiting for data that was never going to arrive: nothing was
+// sending it. Three sources, one event:
+//   card      — pressed a tool card (on the homepage or on a tool page)
+//   seo_page  — landed on /gabung-pdf etc, which declares <body data-intent>
+//   query     — arrived via ?buat=… (a link from anywhere)
+// The funnel then reads: intent_armed → file_loaded → download.
+function armIntent(intent, source) {
+  pendingIntent = intent;
+  fileInput.setAttribute('accept', intent === 'foto' ? 'image/*' : DEFAULT_ACCEPT);
+  // Re-word the editor around the job while we're at it. Arming the right TOOL but
+  // then describing it in generic words threw the intent away — someone who came
+  // to /pisah-pdf was shown a button labelled "Ekstrak" and no mention of "pisah".
+  applyIntentCopy(intent);
+  track('intent_armed', { intent, source });
+}
+
+if (pendingIntent) {
+  // ?buat= wins over <body data-intent> in the pendingIntent lookup above, so the
+  // source has to be resolved the same way round or the attribution lies.
+  const fromQuery = Boolean(new URLSearchParams(window.location.search).get('buat'));
+  armIntent(pendingIntent, fromQuery ? 'query' : 'seo_page');
+}
+
+// The tool cards are real <a href="/gabung-pdf"> links so Googlebot can crawl
+// INTO each tool — as <button>s they were a dead end and the site had exactly one
+// indexable URL. preventDefault keeps the human behaviour identical: click a card,
+// the file picker opens immediately, no page load in between. Crawlers (and
+// middle-click / cmd-click, which we must not steal) follow the href instead.
 for (const card of document.querySelectorAll('.ld-card[data-intent]')) {
-  card.addEventListener('click', () => {
-    pendingIntent = card.dataset.intent;
-    // Foto jadi PDF narrows the picker to images; everything else keeps both.
-    fileInput.setAttribute('accept', pendingIntent === 'foto' ? 'image/*' : DEFAULT_ACCEPT);
+  card.addEventListener('click', (e) => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return; // let the browser open it
+    e.preventDefault();
+    armIntent(card.dataset.intent, 'card');
     fileInput.click();
   });
 }

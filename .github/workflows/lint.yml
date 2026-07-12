@@ -17,3 +17,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run lint
+      # The SEO tool pages are GENERATED from seo/pages.json + index.html. Without
+      # this, editing index.html and forgetting `npm run seo` silently leaves the
+      # 12 tool pages on a stale copy of the app shell — and nothing would fail.
+      - run: npm run seo:check
