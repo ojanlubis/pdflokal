@@ -598,6 +598,10 @@
       color: var(--muted); font-weight: 600; margin-bottom: 7px;
     }
     .ds-seg { display: flex; gap: 6px; }
+    /* Six target chips don't fit one row on a 360px phone — wrap them, and let
+       each shrink to its content instead of splitting the row into equal thirds. */
+    .ds-seg-wrap { flex-wrap: wrap; }
+    .ds-seg-wrap button { flex: 0 1 auto; padding-left: 12px; padding-right: 12px; }
     .ds-seg button {
       flex: 1; font: inherit; font-size: 13px; min-height: 42px; border-radius: 10px;
       border: 1.5px solid var(--line); background: var(--bg); color: var(--ink);
@@ -869,7 +873,7 @@
           </div>
         </div>
         <div class="ld-copy">
-          <p>Hampir semua orang yang mencari cara mengompres PDF sebenarnya sedang mengejar satu angka: batas unggah. "Maksimal 500KB." "Tidak lebih dari 1MB." PDFLokal mengecilkan file PDF-mu langsung di browser, tanpa mengunggahnya ke mana pun, lalu menunjukkan ukuran akhirnya sebelum kamu mengunduh — jadi kamu tahu file-nya lolos sebelum kamu coba.</p>
+          <p>Hampir semua orang yang mencari cara mengompres PDF sebenarnya sedang mengejar satu angka: batas unggah. "Maksimal 500KB." "Tidak lebih dari 1MB." Karena itu PDFLokal tidak cuma mengecilkan file — kamu bisa menyebutkan target ukurannya, dan kami akan mencari kualitas terbaik yang masih muat di bawah batas itu. Semuanya di dalam browser, tanpa file-mu pernah diunggah ke mana pun.</p>
           <h2>Cara mengompres PDF</h2>
           <ol>
           <li>Seret PDF-mu ke kotak di atas.</li>
@@ -880,8 +884,9 @@
           <p>Pendaftaran CPNS, SNBP, SNBT, beasiswa, e-filing pajak, portal kepegawaian — hampir semuanya menetapkan batas ukuran berkas yang ketat, dan hampir semuanya menolak file-mu tanpa penjelasan kalau kelewat.</p>
           <p>Alat kompres buatan luar negeri melayani "perkecil filenya". Yang sebenarnya kamu butuhkan adalah "muat dalam batas ini". Itu masalah yang berbeda, dan itu masalah yang kami pedulikan.</p>
           <h2>Apa yang sebenarnya dikecilkan</h2>
-          <p>Yang bikin PDF gemuk hampir selalu gambarnya — hasil scan, foto ijazah, tanda tangan yang difoto pakai kamera 48MP. PDFLokal menyusun ulang gambar-gambar itu pada resolusi yang masih tajam dibaca, lalu membangun ulang PDF-nya.</p>
-          <p>Teks tetap teks: tidak diubah jadi gambar, tetap bisa dicari dan diseleksi. Kalau dokumenmu isinya teks saja, kompresi tidak akan banyak berpengaruh — dan PDFLokal akan mengatakannya, bukan pura-pura bekerja.</p>
+          <p>Yang bikin PDF gemuk hampir selalu gambarnya — hasil scan, foto ijazah, tanda tangan yang difoto pakai kamera 48MP. PDFLokal menggambar ulang setiap halaman pada resolusi tertinggi yang masih muat di batas ukuranmu, lalu menyusunnya jadi PDF baru.</p>
+          <p>Terus terang soal konsekuensinya: halaman hasil kompresi menjadi gambar, jadi teksnya tidak lagi bisa diseleksi atau dicari. Ini trade-off yang diambil semua alat kompres untuk dokumen hasil scan — dan untuk berkas yang memang berasal dari foto atau scan, tidak ada yang hilang, karena teksnya sejak awal sudah berupa gambar.</p>
+          <p>Kalau file-mu isinya teks murni (misalnya hasil ekspor dari Word), kompresi semacam ini justru merugikan — hasilnya bisa lebih besar dari aslinya. PDFLokal mendeteksinya dan mengembalikan file aslimu utuh, bukan memaksakan hasil yang lebih buruk sambil mengaku sudah mengompres.</p>
           <h2>Kualitasnya turun nggak?</h2>
           <p>Sedikit, dan itu memang tujuannya — file yang lebih kecil berarti data yang lebih sedikit. Yang kami jaga: dokumen tetap terbaca jelas di layar dan tetap rapi saat dicetak. Kalau hasilnya kurang pas, kamu bisa unduh versi aslinya tanpa kompresi.</p>
           <h2>Berapa KB yang realistis</h2>
@@ -901,11 +906,11 @@
           <h2>Sering ditanya</h2>
           <details>
             <summary>Bisa kompres sampai ukuran tertentu, misalnya 500KB?</summary>
-            <p>Saat ini PDFLokal menampilkan ukuran hasil kompresi sebelum kamu mengunduh, jadi kamu bisa langsung tahu file-nya lolos batas atau belum. Target ukuran yang bisa kamu tentukan sendiri sedang kami kerjakan.</p>
+            <p>Bisa. Pilih target — 2MB, 1MB, 500KB, 200KB, atau 100KB — dan PDFLokal akan mencari kualitas tertinggi yang masih muat di bawah batas itu. Kalau ternyata tidak tercapai, kami bilang terus terang berapa ukuran terkecil yang bisa kami dapat, bukan diam-diam memberimu file yang kelewat batas.</p>
           </details>
           <details>
             <summary>Tulisannya jadi buram nggak?</summary>
-            <p>Tidak. Teks tetap teks, bukan gambar — tetap tajam dan tetap bisa diseleksi. Yang dikecilkan adalah gambar dan hasil scan di dalamnya.</p>
+            <p>Tetap terbaca — kami selalu memilih kualitas tertinggi yang masih muat di batas ukuranmu. Tapi jujur: halaman hasil kompresi menjadi gambar, jadi teksnya tidak bisa lagi diseleksi atau dicari. Untuk berkas hasil scan atau foto, ini tidak mengubah apa pun, karena teksnya memang sudah berupa gambar sejak awal.</p>
           </details>
           <details>
             <summary>Kalau file-ku sudah kecil, apa yang terjadi?</summary>
@@ -939,6 +944,16 @@
             <a href="/hapus-halaman-pdf">Hapus Halaman PDF</a>
             <a href="/pdf-ke-jpg">PDF ke JPG</a>
             <a href="/jpg-ke-pdf">JPG ke PDF</a>
+          </nav>
+          <!-- Separate group on purpose: these are the same compressor with a hard
+               cap pre-set, not different tools. Listing them as "alat" would be a
+               lie to the user; hiding them would be a dead end for the crawler. -->
+          <h2 style="margin-top:18px">Kompres ke ukuran tertentu</h2>
+          <nav aria-label="Kompres ke ukuran tertentu">
+            <a href="/kompres-pdf-1mb">Kompres PDF 1MB</a>
+            <a href="/kompres-pdf-500kb">Kompres PDF 500KB</a>
+            <a href="/kompres-pdf-200kb">Kompres PDF 200KB</a>
+            <a href="/kompres-pdf-100kb">Kompres PDF 100KB</a>
           </nav>
         </div>
         <footer class="ld-foot">
@@ -1043,6 +1058,15 @@
       <div class="ds-row">
         <div class="ds-label">Ukuran</div>
         <div class="ds-seg" id="ds-size"></div>
+      </div>
+
+      <!-- Target ukuran. Only shown when Compress is picked. The whole reason it
+           exists: Indonesians don't want "smaller", they want "under 500KB" —
+           CPNS/SNBP/e-filing all reject a berkas over a hard cap. See the WHY
+           block on compressToTargetBytes() in js/core/compress.js. -->
+      <div class="ds-row" id="ds-row-target" hidden>
+        <div class="ds-label">Target</div>
+        <div class="ds-seg ds-seg-wrap" id="ds-target"></div>
       </div>
 
       <div class="ds-row">

@@ -744,7 +744,13 @@ function applyIntent(intent) {
   } else if (intent === 'tipex') {
     setTool('whiteout');
     toast('Seret di halaman untuk menutup teks');
-  } else if (intent === 'kompres') downloadSheet.open({ size: 'kompres' });
+  } else if (intent === 'kompres') {
+    // /kompres-pdf-500kb declares <body data-intent="kompres" data-target="512000">.
+    // The sheet validates it against its own TARGETS list, so a junk value just
+    // falls back to Otomatis rather than becoming a bogus cap.
+    const target = Number(document.body.dataset.target) || null;
+    downloadSheet.open({ size: 'kompres', target });
+  }
   else if (intent === 'gambar') downloadSheet.open({ format: 'img' });
   else if (intent === 'split' || intent === 'halaman') pageManager.open();
   else if (intent === 'gabung') toast('Tambah file lainnya lewat menu File di kiri atas');

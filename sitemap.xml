@@ -48,6 +48,26 @@
     <priority>0.9</priority>
   </url>
   <url>
+    <loc>https://www.pdflokal.id/kompres-pdf-500kb</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://www.pdflokal.id/kompres-pdf-1mb</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://www.pdflokal.id/kompres-pdf-200kb</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://www.pdflokal.id/kompres-pdf-100kb</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
     <loc>https://www.pdflokal.id/privasi.html</loc>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>

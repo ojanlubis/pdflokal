@@ -37,11 +37,29 @@
  *   structured data.
  */
 
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+
+// --check: regenerate in memory and compare against what is on disk. Exits 1 on
+// any difference. Deliberately does NOT shell out to `git diff` — that compares
+// the working tree to HEAD, so it fires on ANY uncommitted work, not on actual
+// drift. A check that cries wolf is a check someone disables. This one only fails
+// when a generated page genuinely disagrees with seo/pages.json + index.html.
+const CHECK = process.argv.includes('--check');
+const drift = [];
+
+function emit(relPath, content) {
+  const abs = join(ROOT, relPath);
+  if (CHECK) {
+    const onDisk = existsSync(abs) ? readFileSync(abs, 'utf8') : null;
+    if (onDisk !== content) drift.push(relPath);
+    return;
+  }
+  writeFileSync(abs, content);
+}
 const data = JSON.parse(readFileSync(join(ROOT, 'seo/pages.json'), 'utf8'));
 const template = readFileSync(join(ROOT, 'index.html'), 'utf8');
 const { origin, brand } = data.site;
@@ -140,7 +158,12 @@ for (const page of data.pages) {
   const bodyTag = html.match(/<body(\s[^>]*)?>/);
   if (!bodyTag) throw new Error('gen-seo-pages: no <body> tag in index.html');
   if (bodyTag[0].includes('data-intent')) throw new Error('gen-seo-pages: index.html already declares data-intent — the template must stay intent-free');
-  html = html.replace(bodyTag[0], bodyTag[0].replace(/>$/, ` data-intent="${page.intent}">`));
+  // data-target: the hard size cap for /kompres-pdf-500kb and friends. This is the
+  // ONLY reason those pages are allowed to exist — they change what the tool DOES.
+  // download-sheet validates the number against its own TARGETS list, so a bad
+  // value degrades to "Otomatis" rather than becoming a bogus cap.
+  const attrs = ` data-intent="${page.intent}"${page.target ? ` data-target="${page.target}"` : ''}`;
+  html = html.replace(bodyTag[0], bodyTag[0].replace(/>$/, `${attrs}>`));
 
   html = sub(html, /<h1>[\s\S]*?<\/h1>/, `<h1>${esc(page.h1)}</h1>`, '<h1>');
   html = sub(html, /<p class="ld-sub">[\s\S]*?<\/p>/, `<p class="ld-sub">${esc(page.sub)}</p>`, '.ld-sub');
@@ -151,11 +174,11 @@ for (const page of data.pages) {
 
   html = sub(html, /<section class="ld-faq">[\s\S]*?<\/section>/, `${copyBlock(page)}\n        ${faqBlock(page)}`, '.ld-faq');
 
-  writeFileSync(join(ROOT, `${page.slug}.html`), banner + html);
+  emit(`${page.slug}.html`, banner + html);
   const words = [page.intro, ...page.steps, ...page.sections.flatMap((s) => s.p), ...page.faq.flatMap((f) => [f.q, f.a])]
     .join(' ').replace(/<[^>]+>/g, ' ').trim().split(/\s+/).length;
-  written.push({ slug: page.slug, words });
-  console.log(`  ✓ ${page.slug}.html  (${words} words of body copy)`);
+  written.push({ slug: page.slug, words, target: page.target ?? null });
+  if (!CHECK) console.log(`  ✓ ${page.slug}.html  (${words} words of body copy)`);
 }
 
 // ---- sitemap ---------------------------------------------------------------
@@ -174,13 +197,34 @@ const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 ${urls.map((u) => `  <url>\n    <loc>${u.loc}</loc>\n    <changefreq>${u.changefreq}</changefreq>\n    <priority>${u.priority}</priority>\n  </url>`).join('\n')}
 </urlset>
 `;
-writeFileSync(join(ROOT, 'sitemap.xml'), sitemap);
+emit('sitemap.xml', sitemap);
 
-const thin = written.filter((w) => w.words < 550);
-console.log(`  ✓ sitemap.xml (${urls.length} URLs)`);
-if (thin.length) {
-  console.log(`\n  ⚠️  THIN PAGES (under 550 words): ${thin.map((t) => `${t.slug} (${t.words})`).join(', ')}`);
-  console.log('     Sites WITHOUT domain authority need 700–1,000 words to rank here');
-  console.log('     (Smallpdf 693, PDF24 702, freepdfconvert 925). iLovePDF ranks #1 on 109');
-  console.log('     words — that is domain authority, and it is not a thing we can copy.');
+// TWO thresholds, because there are two different SERPs — not because the lower
+// one is a convenient excuse for a thin page.
+//   HEAD terms (gabung/kompres/edit…) fight iLovePDF, Smallpdf, PDF24, Adobe.
+//   The ranking sites WITHOUT domain authority carry 693–925 words there.
+//   LONG-TAIL size terms (kompres pdf 500kb…) fight pdf.pi7.org and
+//   bigpdf.11zon.com — thin, low-authority pages. 450 clears that field.
+// If you find yourself padding a page to beat a number, you have misunderstood
+// this check: it exists to stop us shipping a page too thin to compete, not to
+// be satisfied with filler. Filler is how a page cluster becomes a doorway farm.
+const FLOOR_HEAD = 550;
+const FLOOR_TAIL = 450;
+const thin = written.filter((w) => w.words < (w.target ? FLOOR_TAIL : FLOOR_HEAD));
+if (!CHECK) console.log(`  ✓ sitemap.xml (${urls.length} URLs)`);
+if (thin.length && !CHECK) {
+  console.log(`\n  ⚠️  THIN PAGES: ${thin.map((t) => `${t.slug} (${t.words}w, floor ${t.target ? FLOOR_TAIL : FLOOR_HEAD})`).join(', ')}`);
+  console.log('     Add real content, not filler. iLovePDF ranks #1 on 109 words — that is');
+  console.log('     domain authority, and it is not a page feature we can copy.');
+}
+
+if (CHECK) {
+  if (drift.length) {
+    console.error('\n  ❌ SEO pages are out of date with their source:');
+    for (const f of drift) console.error(`       ${f}`);
+    console.error('\n     Someone hand-edited a generated file, or changed seo/pages.json /');
+    console.error('     index.html without regenerating. Run:  npm run seo');
+    process.exit(1);
+  }
+  console.log('  ✅ SEO pages match seo/pages.json + index.html');
 }
