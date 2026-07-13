@@ -13,7 +13,33 @@ Running list of UI/UX findings + small fixes to pick up later. Append new items 
 
 ## Open
 
-- **[med, founder — 5-min no-code, GA4 Admin]** Register **`intent`** and **`source`** as GA4 **custom dimensions** (Admin → Custom definitions → event-scoped). Without it the params are *sent* but not *queryable* — same trap as the `client_error` params below. Vercel Analytics shows the custom data natively, so that half works either way. Once registered, these two questions become answerable for the first time: **which tool cards do people actually press**, and **do the SEO landing pages send anyone who brings a file**. Funnel: `intent_armed` → `file_loaded` (now carries `intent`) → `download`.
+### 🔴 ADS — the Jul-13 audit of "PDFLokal Ads 2" (Rp100k, Jul 3–17)
+
+- **[crit] The retention experiment is DEAD — do not read a result off it.** The campaign existed to produce ONE number: week-1 return rate of the paid cohort (vs April's ~0%). **70% of it ran blind:** Jul 7–11 (the GA4 blackout) took **291 of 416 clicks and IDR 33,206 of IDR 47,313.** The Jul 5–6 cohort (48 users) had its entire week-1 window fall across Jul 7–13, and 5 of those 7 days recorded nothing. On the 2 visible days, 0 of 48 returned — but that is a **lower bound from 2/7 of the window, not a finding.** Directionally consistent with April; it CANNOT confirm it. **Do not update beliefs on it. Re-run clean.**
+  - Verified user identity survived the Jul-12 stream swap (sitewide returners exist on Jul 12: 4, Jul 13: 6), so the 0-of-48 is a real reading — just a badly truncated one.
+
+- **[crit] The ads buy the right INTENT and show the WRONG AD.** Every keyword sits in one ad group ("Gabung PDF"), so people searching for compress/convert get a **merge** ad. From the search-terms report (Jul 7–11):
+  | search term | match | clicks | impr | CTR |
+  |---|---|---|---|---|
+  | `png to pdf` | Broad | **0** | 365 | **0.00%** |
+  | `kompres pdf 1 mb` | Broad | 1 | 209 | **0.48%** |
+  | `jpg to pdf` | Exact | **0** | 164 | **0.00%** |
+  | `kompres file pdf` | Broad | **0** | 155 | **0.00%** |
+  | `gabung pdf dan foto` | Phrase | 7 | 167 | 4.19% |
+  | `cara menggabungkan file pdf` | Exact | 7 | 163 | 4.29% |
+  - Those 4 mismatched terms alone = **893 impressions, 1 click.** That is what drags mobile CTR to 1.20% (desktop 6.02%).
+  - **We ALREADY have the pages for every one of them** — `/kompres-pdf-1mb`, `/jpg-ke-pdf`, `/kompres-pdf`. `kompres pdf 1 mb` is *literally* the SEO wedge (compress-to-fit-a-cap) and we're answering it with a merge ad.
+  - Fix: **ad groups per tool, each pointed at its own SEO page.** Merge → `/gabung-pdf`, compress → `/kompres-pdf`, cap queries → `/kompres-pdf-1mb`, image → `/jpg-ke-pdf`. Negative-keyword the generic `gabungkan file` / `gabung file` (broad, ~1.2% CTR, no PDF intent).
+  - Campaign matched **3,372 distinct queries.** Google's own status: *"Eligible (Limited) — Bid setting limited, Missing enough relevant keywords."*
+
+- **[high] `Conversions: 0.00` — conversion tracking was never set up.** Google has zero goal signal; "Maximize clicks" is buying clicks blind. This was already written down (scale-run plan: "set the conversion up NOW so it logs history in the background") and never done. **Do not re-run any campaign until `download` is a key event imported as an Ads conversion action.**
+  - ⚠️ Do NOT click "Apply" on the Ads *recommendations* panel. That mobile-prompt path is how junk keywords got approved before.
+
+- **[med] The "~95% of paid is mobile" premise is stale.** That's Ads 1 (April: 461 mobile vs 6 desktop new users). **Ads 2 is 58% mobile by clicks** (mobile 243 / desktop 131 / tablet 42). Mobile-first still holds directionally, but CLAUDE.md + `product-definition.md` quote 95% as if current. Mobile also takes **64% of spend (IDR 30,319) at 1/5 the desktop CTR**.
+
+- **[med, still open]** Google Ads "Balance exhausted" warning. Campaign is nonetheless **still serving** (green, Eligible-Limited) with ~Rp53k left and 4 days to run. Decide: let it coast as a CPC/CTR learning run, or pause until conversion tracking + per-tool ad groups exist. **Recommendation: don't re-run until both are fixed.**
+
+---
 
 - **[low, flaky]** `tests/mobile/back-button.spec.js:47` ("RAPID double-back") fails intermittently under FULL-suite parallel load, but passes 3/3 in isolation. First seen Jul 12 during the SEO sweep. Not caused by the intent-copy change (that spec runs on `/`, where no intent is declared, so `applyIntentCopy()` is a strict no-op). Likely a history-traversal timing race that only shows when the machine is loaded. Worth a `test.slow()` or an explicit wait rather than a retry.
 
@@ -26,8 +52,7 @@ Running list of UI/UX findings + small fixes to pick up later. Append new items 
 
 - **[high, founder — 2 min, unblocks the alarm]** Add repo secret **`GA4_SA_JSON`** = contents of `~/.config/gcloud/pdflokal-ga4-reader.json` (Settings → Secrets and variables → Actions). Without it, `.github/workflows/traffic-floor.yml` fails loudly on its first nightly run. That IS the correct behaviour for a monitor — but it means the alarm isn't armed until the secret exists.
 - **[med, founder — 2 min]** Grant `pdflokal-ga4-reader@pdflokal-mcp.iam.gserviceaccount.com` read access to `sc-domain:pdflokal.id` in **Search Console → Settings → Users and permissions**. Arms the *impressions* half of the alarm (the SEO channel). Until then that half skips with a notice; the GA4 half still runs.
-- **[high, founder — after deploy]** In GSC, **submit `https://www.pdflokal.id/sitemap.xml`** (Sitemaps) and **Request Indexing** on `/gabung-pdf` + `/kompres-pdf`. Google will find them eventually via robots.txt, but a manual nudge on the two 1M–10M/mo terms is worth the click.
-- **[med]** Google Ads: the account is flashing **"Balance exhausted — campaign ending soon"** while running ads on `gabung pdf` — i.e. renting, at the edge of budget, the click we're now built to own. Decide whether to top up or let organic take it. (Not touched.)
+- **[low, remaining half]** In GSC, **Request Indexing** on `/gabung-pdf` + `/kompres-pdf`. (The sitemap half is DONE — see below.) A manual nudge on the two 1M–10M/mo terms is worth the click.
 - **[low]** Apex `pdflokal.id` → `www` is a **307** (temporary). A 301/308 is marginally better for SEO. Vercel domain setting, not vercel.json.
 
 ### 🔭 SEO — next moves (data-gated, do NOT front-run)
@@ -131,6 +156,12 @@ Running list of UI/UX findings + small fixes to pick up later. Append new items 
 ---
 
 ## Done
+
+### ✅ Jul 13 2026 — founder desk decisions, executed
+- **GA4 custom dimensions registered** — `intent` (param `intent`) + `intent source` (param `source`), both Event-scoped, property 528550405. Named the second one "intent source" on purpose: GA4 already ships a built-in `source` (traffic source) and two identically-named dimensions in the picker is a trap. ⚠️ **NOT retroactive** — they populate forward from Jul 13 only, so the pre-existing `intent_armed` events stay unqueryable by intent.
+- **Sitemap submitted to GSC** — `https://www.pdflokal.id/sitemap.xml`, status **Success**, **15 pages discovered** on first read. (Submitted the `www` host: canonical tags, sitemap `<loc>`s and robots.txt all agree on `www.pdflokal.id`.)
+- **Sentry duplicate-key bug fixed** (`c2523b3`) — `alat-gambar.html` had **two `ignoreErrors` keys** in one object literal; last-key-wins meant the newer fetch filters shipped completely dead. Merged to one, marked SSOT. Also brought `js/sentry-init.js` (the LIVE v2 wing) up to the parity its own header promised — v2 never had the module-import regex (and v2 loads `app.js` as a real ES module, so every dropped dynamic import on a flaky mobile connection was reporting) nor `beforeSend` (which strips URL fragments before an event leaves the device).
+- **Taste lock committed** (`c81c761`) — `npm run seo` now refuses to run on copy no human has looked at.
 
 ### ✅ SEO LEGS — Phases 0–3 SHIPPED (Jul 12 2026, branch `feat/seo-legs`)
 
