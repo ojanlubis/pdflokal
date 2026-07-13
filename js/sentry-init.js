@@ -39,12 +39,25 @@ if (window.Sentry) Sentry.init({
     /google-adservices\.com/i,
     /\/gtag\//i,
   ],
+  // SINGLE SOURCE OF TRUTH — exactly ONE ignoreErrors key. A second one would
+  // silently overwrite this entire list (last key wins in a JS object literal).
   ignoreErrors: [
-    // Stackless variants of the above — a bare rejection with no frames
-    // can't be matched by denyUrls, so match the message too.
-    'Failed to fetch',
+    // Stackless variants of the denyUrls above — a bare rejection has no frames,
+    // so denyUrls cannot match it; match the message too.
     'Load failed',                                    // Safari's phrasing
     'NetworkError when attempting to fetch resource', // Firefox's phrasing
+    // WHY this matters MORE in v2 than in the old wing: app.js is a real ES
+    // module, so every flaky mobile connection that drops a dynamic import
+    // lands here. Each browser words it differently — Chrome "Failed to fetch
+    // dynamically imported module", Firefox "error loading", Safari "Importing
+    // a module script failed" — all the same transient network class, none
+    // actionable. (Also covers bare 'Failed to fetch'.)
+    /(Importing a module script failed|Failed to fetch|(fetch|loading) dynamically imported module)/i,
+    // Battle-tested entries adapted from Excalidraw's sentry.ts.
+    "undefined is not an object (evaluating 'window.__pad.performLoop')",
+    "InvalidStateError: Failed to execute 'transaction' on 'IDBDatabase': The database connection is closing.",
+    /QuotaExceededError: (The quota has been exceeded|.*setItem.*Storage)/i,
+    'Internal error opening backing store for indexedDB.open',
   ],
   replaysSessionSampleRate: 0.10,
   replaysOnErrorSampleRate: 1.0,
@@ -60,4 +73,13 @@ if (window.Sentry) Sentry.init({
       block: ['canvas', '.pv-bg', '.pv-anno img', '.pm-thumb', '#sig-preview'],
     }),
   ],
+  beforeSend(event) {
+    // Strip URL fragments before an event leaves the device — they can carry
+    // UI state we never want in a third-party service. Privacy first, always.
+    // WHY split, not regex: SonarCloud S5852 flags greedy `.*$` as ReDoS-prone.
+    if (event.request?.url) {
+      event.request.url = event.request.url.split('#')[0];
+    }
+    return event;
+  },
 });

@@ -1600,6 +1600,24 @@
       enabled: location.hostname === 'pdflokal.id' || location.hostname === 'www.pdflokal.id',
       release: window.APP_VERSION,
       sampleRate: 1.0,
+      // Third-party noise, not our code: ad blockers / privacy extensions hook
+      // window.fetch and cancel Google's analytics + ads requests (gtag →
+      // doubleclick), which surface as unhandled "Failed to fetch" rejections.
+      // Filter by SOURCE so genuine first-party errors still report. (Sentry
+      // JAVASCRIPT-C / -A were pure extension noise. We make zero first-party
+      // fetches for file work — 100% client-side — so these are never actionable.)
+      denyUrls: [
+        /chrome-extension:\/\//i,
+        /moz-extension:\/\//i,
+        /safari-(web-)?extension:\/\//i,
+        /^chrome:\/\//i,
+        /doubleclick\.net/i,
+        /googletagmanager\.com/i,
+        /google-analytics\.com/i,
+        /googlesyndication\.com/i,
+        /google-adservices\.com/i,
+        /\/gtag\//i,
+      ],
       // WHY 10%: replays are sampled on session START. At 1% we caught about
       // 5 navigational replays per month — useful for UX research but thin.
       // Bumped to 10% because privacy risk is zero (maskAllText + canvas
@@ -1619,9 +1637,18 @@
         })
       ],
       // Battle-tested ignore list adapted from Excalidraw's sentry.ts.
+      // SINGLE SOURCE OF TRUTH — there must be exactly ONE ignoreErrors key in
+      // this object. A second one silently overwrites this whole list (last key
+      // wins in a JS object literal), which is how a set of fetch filters once
+      // shipped completely dead. If you are adding a pattern, add it HERE.
       ignoreErrors: [
         "undefined is not an object (evaluating 'window.__pad.performLoop')",
         "InvalidStateError: Failed to execute 'transaction' on 'IDBDatabase': The database connection is closing.",
+        // Stackless fetch rejections from ad blockers / privacy extensions: a
+        // bare rejection has no frames, so denyUrls can't match it. ('Failed to
+        // fetch' is already covered by the module-import regex below.)
+        'Load failed',                                    // Safari's phrasing
+        'NetworkError when attempting to fetch resource', // Firefox's phrasing
         // WHY each browser worded differently: Chrome says "Failed to fetch
         // dynamically imported module", Firefox says "error loading", Safari
         // says "Importing a module script failed." — all the same class of
