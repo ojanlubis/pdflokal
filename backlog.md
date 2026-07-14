@@ -32,7 +32,8 @@ Running list of UI/UX findings + small fixes to pick up later. Append new items 
   - Fix: **ad groups per tool, each pointed at its own SEO page.** Merge → `/gabung-pdf`, compress → `/kompres-pdf`, cap queries → `/kompres-pdf-1mb`, image → `/jpg-ke-pdf`. Negative-keyword the generic `gabungkan file` / `gabung file` (broad, ~1.2% CTR, no PDF intent).
   - Campaign matched **3,372 distinct queries.** Google's own status: *"Eligible (Limited) — Bid setting limited, Missing enough relevant keywords."*
 
-- **[high] `Conversions: 0.00` — conversion tracking was never set up.** Google has zero goal signal; "Maximize clicks" is buying clicks blind. This was already written down (scale-run plan: "set the conversion up NOW so it logs history in the background") and never done. **Do not re-run any campaign until `download` is a key event imported as an Ads conversion action.**
+- **[✅ DONE Jul 14] Conversion tracking is LIVE.** Was `Conversions: 0.00` — never set up. Now: GA4 key event `download` → Ads conversion action **"PDFLokal (web) download"** (source GA4, **Primary**, **Count = One** per click, 90-day window). Goal **Engagement = account-default, 4 of 4 campaigns**. See Done section for the two traps this hit.
+  - **BIDDING DELIBERATELY UNCHANGED** — still Maximize clicks. Let the Rp100k run die on Jul 17 without confounding it; switch to Maximize conversions only on the NEXT campaign, once history has accumulated. Volume is a non-issue: **~62 download conversions on Jul 13 alone** (Google needs 15–30/month to learn).
   - ⚠️ Do NOT click "Apply" on the Ads *recommendations* panel. That mobile-prompt path is how junk keywords got approved before.
 
 - **[med] The "~95% of paid is mobile" premise is stale.** That's Ads 1 (April: 461 mobile vs 6 desktop new users). **Ads 2 is 58% mobile by clicks** (mobile 243 / desktop 131 / tablet 42). Mobile-first still holds directionally, but CLAUDE.md + `product-definition.md` quote 95% as if current. Mobile also takes **64% of spend (IDR 30,319) at 1/5 the desktop CTR**.
@@ -156,6 +157,16 @@ Running list of UI/UX findings + small fixes to pick up later. Append new items 
 ---
 
 ## Done
+
+### ✅ Jul 14 2026 — conversion tracking wired end-to-end (Ads can finally optimize for a real goal)
+GA4 key event `download` → imported as Ads conversion action **"PDFLokal (web) download"** (Engagement category, source GA4, **Primary**, **Count = One**, 90-day click window). Goal **Engagement flipped to account-default (4 of 4 campaigns)**.
+
+**THREE TRAPS this hit — every one of them a silent no-op that LOOKED like success:**
+1. **GA4's star toast lies.** Clicking the star next to `download` showed a green *"download has now been enabled as a key event"* — and did **nothing**. A hard reload showed the star still empty and the Key events list still holding only `purchase`. Second click stuck. **Never trust the toast; reload and re-read the list.** (Same species as the "Data collection is active" banner that masked the 5-day blackout.)
+2. **The import wizard leaves the conversion DISCONNECTED.** It created the action with `Included in account-level goals: No` — recording data no campaign would ever use. Had to flip the Engagement goal to account-default by hand. **A conversion action existing ≠ a conversion action counting.**
+3. **"Page view" was the account-default goal on 4 of 4 campaigns.** It fires on *every visit*, so it would have outnumbered real downloads ~20:1 and drowned the signal the moment bidding switched to conversions. Demoted to 0 of 4. Also demoted **YouTube channel subscriptions** (Primary → Secondary): a YouTube sub is not a signal for a PDF tool.
+
+Also: the phone-calls data source is **pre-checked by default** in the setup wizard. Unchecked it — that default is how "Get directions" and "YouTube follow-on views" became goals on a client-side PDF tool with no phone and no channel.
 
 ### ✅ Jul 13 2026 — founder desk decisions, executed
 - **GA4 custom dimensions registered** — `intent` (param `intent`) + `intent source` (param `source`), both Event-scoped, property 528550405. Named the second one "intent source" on purpose: GA4 already ships a built-in `source` (traffic source) and two identically-named dimensions in the picker is a trap. ⚠️ **NOT retroactive** — they populate forward from Jul 13 only, so the pre-existing `intent_armed` events stay unqueryable by intent.
