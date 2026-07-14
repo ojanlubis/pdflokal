@@ -45,6 +45,19 @@ Running list of UI/UX findings + small fixes to pick up later. Append new items 
   - **Primary alone is NOT sufficient** — biddable requires **Primary AND the goal is applied to the campaign AND the goal is biddable**. All three are now true. Note Google's doc warns *"conversion actions created through the Google Analytics interface will be set as secondary"* — ours was created via the Ads UI and landed Primary, but **always verify all three switches by hand.**
   - ⚠️ Do NOT click "Apply" on the Ads *recommendations* panel. That mobile-prompt path is how junk keywords got approved before.
 
+### ☠️ RESEARCHED Jul 14 — THE BLACKOUT'S REAL ROOT CAUSE (our recorded story was wrong)
+
+- **[crit — the ID was never dead; we recreated the stream for nothing]** The five-day GA4 blackout was **not** "Google refused a corrupted measurement ID," and **not** the shared Ads tag. **`G-0XJY0WLCZ1` existed only as a DESTINATION of the Google tag `GT-5MRGDJVG`, never as a SOURCE — and a `G-` id that is only a destination cannot be loaded via `gtag/js?id=G-…`. That request 404s.** Measured live on Jul 14, two days *after* the "fix":
+  ```
+  gtag/js?id=GT-5MRGDJVG   → 200, 550,099 bytes — payload CONTAINS G-0XJY0WLCZ1   ← alive, today
+  gtag/js?id=G-0XJY0WLCZ1  → 404, 1,584 bytes (HTML error page, not JS)
+  ```
+  **The fix was ONE LINE** — load `gtag/js?id=GT-5MRGDJVG`. Instead we recreated the stream, minted `G-7J8JF8XZ1Q`, swapped it across 4 pages and left the property with a second stream. **Unnecessary.** (Identity was not wiped — returners still exist post-swap — but it was a risk and a cost we didn't need.)
+  - **⛔ NEW STANDING RULE: before declaring any measurement ID dead, curl the `GT-`/`AW-` container that carries it and grep for the `G-` id. If it's in there, the ID is fine and your PAGE is wrong.**
+  - **Why GA4's own alarm never fired:** Tag Diagnostics escalates to "Urgent" only when a tag *"was previously detected but hasn't been detected in the last 48 hours."* Ours was reported as **never detected** — so the one native drop-to-zero alarm **structurally could not fire.** The worse the break, the quieter GA4 gets. **This is the argument for the external tripwire.**
+  - **The "Data collection is active" badge is a BINARY PRESENCE CHECK** — one hit keeps it green, no volume awareness. A trickle of stragglers (browsers with the old container still cached) kept it green while collection was ~97% dead.
+  - All of this is now in the **`google-measurement` skill** (user-level, so mesindev and GAS get it too).
+
 ### 🔬 RESEARCHED Jul 14 — where the Jul-13 ads audit was WRONG (read before acting on any of it)
 
 - **[crit, 1-field fix] The bottom-of-page cause is a MAX-CPC BID LIMIT, not "Maximize clicks buys cheap clicks."** My original mechanism was backwards. Maximize clicks' documented FIRST priority is **spending the budget in full** — it will *raise* CPCs to do so; it is not a bid-suppression strategy and **has no position lever at all**. The real culprit is named in the campaign's own status: *"Bid setting limited"* = *"Maximum and/or minimum bid limits are preventing your bids from being fully optimized"* ([docs](https://support.google.com/google-ads/answer/6263057)). **Corroborating arithmetic: we spent Rp47,313 of Rp100,000 with 10 of 15 days gone — ~29% UNDERSPENT.** A Maximize-clicks campaign that *cannot spend its budget* is hard-capped by something. **ACTION: open the bid strategy and remove/raise the max CPC limit.** If we want the top slot deliberately, the purpose-built tool is **Target Impression Share (Absolute top)**, not Maximize clicks.

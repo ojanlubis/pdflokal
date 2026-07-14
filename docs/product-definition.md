@@ -55,7 +55,7 @@ Grounding (July 2026, see appendix): audience **91% Indonesia**; organic mix **6
 ## 5. The strategic bets (stated so we can be deliberately right or wrong)
 
 1. **Unified editor > modular tools.** iLovePDF makes a separate tool per intent and forces a re-upload to switch. But humans don't have "a merge task" and "a reorder task" — they have *"fix this document."* Data confirms it: people merge *and* reorder *and* type *and* sign in one session. Modular models the software; unified models the human. **We bet on the human.** (Cost: harder to build well — see §8.)
-2. **Mobile-first, following the acquisition vector.** Not because today's usage is mobile (it's 30%), but because the paid growth engine is ~95% mobile. We build for who we're acquiring.
+2. **Mobile-first.** ⚠️ *The original reasoning here ("the paid growth engine is ~95% mobile") is retired — see the Grounding note; that number is stale AND paid is negative-ROI for a free tool.* **The conclusion survives on stronger ground: mobile is ~half of all real traffic (49%), and the growth channel we're actually betting on — organic/SEO — is where mobile users arrive.** We build for the phone because that's who is there.
 3. **SEO-per-intent → editor funnel.** A dedicated, rankable landing page for every intent ("gabung pdf", "kompres pdf", "tanda tangan pdf", …) that delivers *that one job instantly*, then reveals the editor's breadth. **Rule: lead with their intent; breadth is available but never in the way.** (Progressive disclosure at the product level.)
 
 ---
@@ -127,7 +127,7 @@ When a PDFLokal user, offered iLovePDF, thinks: *"Why would I upload my file to 
 
 - **Audience:** Indonesia **91%** (Vercel). Java-concentrated (Ads map).
 - **Device (organic):** Desktop **69%**, Mobile **30%** (Android 23%, iOS 7%), Tablet 1%.
-- **Device (paid acquisition):** **~95% mobile** (bid +90% on mobile deliberately).
+- **Device (paid acquisition):** ~~**~95% mobile** (bid +90% on mobile deliberately).~~ ⚠️ **STALE — that's April's campaign, which carried a +90% mobile bid adjustment.** The July campaign measured **58% mobile** by clicks. **Site-wide reality (Vercel, Jul 2026): 49% mobile / 46% desktop / 5% tablet, 94% Indonesia.** And paid is now understood to be **negative-ROI by construction for a free product** — a conversion is worth Rp0. **Mobile-first still holds, on better grounds: mobile is half the actual user base, and the growth channel is organic/SEO, not paid.**
 - **Demographics (Ads):** 18–34, slight female skew.
 - **Tools opened:** unified-editor **75%**; every standalone tool <8% each → *the editor is the product.*
 - **In-editor actions:** text_inline 30% · signature 15% · reorder 14% · whiteout 14% · delete_page 8% · rotate 8% · split 6% · paraf 4%.
