@@ -35,3 +35,6 @@ tests/golden/actual/
 *.tmp
 *.log
 node_modules/
+
+# Agent skills working dir (installed via skills CLI; lockfile is tracked instead)
+.agents/
