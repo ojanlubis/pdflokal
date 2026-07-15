@@ -67,6 +67,43 @@ function toast(msg) {
   toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2600);
 }
 
+// ---- processing telegraph ----------------------------------------------------
+// WHY: a real user merged 35 files and thought the app had errored — the dropzone
+// sat frozen through the whole parse loop with no feedback (contact-form, Jul 2026).
+// This overlay covers that surface and shows honest, advancing progress. The 180ms
+// delay means instant loads never flash it (feedback without jank). General word
+// "Memproses" (not "menjepit") — comprehension of THIS step is the whole point.
+const loadingOverlay = document.getElementById('v2-loading');
+const lpFill = loadingOverlay.querySelector('.lp-fill');
+const lpCount = loadingOverlay.querySelector('.lp-count');
+let processingTimer = null;
+
+function showProcessing(total) {
+  clearTimeout(processingTimer);
+  updateProcessing(0, total);
+  processingTimer = setTimeout(() => { loadingOverlay.hidden = false; }, 180);
+}
+function updateProcessing(done, total) {
+  if (total > 1) {
+    // Determinate: count = file we're working on now; fill = files finished.
+    lpFill.classList.remove('lp-indet');
+    lpFill.style.width = Math.round((done / total) * 100) + '%';
+    lpCount.textContent = `${Math.min(done + 1, total)} dari ${total} file`;
+    lpCount.hidden = false;
+  } else {
+    // Single file: no honest sub-file count exists — indeterminate bar, no number.
+    lpFill.classList.add('lp-indet');
+    lpFill.style.width = '';
+    lpCount.hidden = true;
+  }
+}
+function hideProcessing() {
+  clearTimeout(processingTimer);
+  loadingOverlay.hidden = true;
+  lpFill.style.width = '0';
+  lpFill.classList.remove('lp-indet');
+}
+
 function download(blob, filename) {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -665,9 +702,9 @@ document.addEventListener('keydown', (e) => {
 });
 
 // ---- file loading (multi-file = merge, by construction) --------------------------------
-// Size guards (carried from the live app): heads-up above 20MB, block at 100MB
-// — a 100MB+ file will OOM the weak phones we build for before it ever renders.
-const SIZE_WARN = 20 * 1024 * 1024;
+// Size guard (carried from the live app): block at 100MB — a 100MB+ file will OOM
+// the weak phones we build for before it ever renders. (The old >20MB heads-up
+// toast was retired when the processing overlay landed — see showProcessing.)
 const SIZE_BLOCK = 100 * 1024 * 1024;
 
 let loadingFiles = false; // re-entry guard: double-taps and rapid picks interleave imports
@@ -679,6 +716,7 @@ async function loadFiles(files) {
     await loadFilesInner(files);
   } finally {
     loadingFiles = false;
+    hideProcessing();
   }
 }
 
@@ -690,24 +728,53 @@ async function loadFilesInner(files) {
   if (usable.length === 0) { toast('Pilih file PDF atau gambar ya'); return; }
   const oversize = usable.find((f) => f.size > SIZE_BLOCK);
   if (oversize) { toast(`"${oversize.name}" terlalu besar (maks 100MB)`); return; }
-  if (usable.some((f) => f.size > SIZE_WARN)) toast('Filenya lumayan besar, sabar sebentar ya');
   const firstLoad = doc.pages.length === 0;
   if (firstLoad) baseName = usable[0].name.replace(/\.[^.]+$/, '');
 
-  for (const f of usable) {
-    const bytes = new Uint8Array(await f.arrayBuffer());
-    if (isPdf(f)) await importPdf(doc, { name: f.name, bytes });
-    else await importImage(doc, { name: f.name, bytes, mimeType: f.type });
-    // Carry the intent so the funnel actually joins up: intent_armed → file_loaded
-    // → download. Without it we'd know people PRESSED "Pisah PDF" but not whether
-    // any of them ever brought a file — which is the half that matters.
-    // pendingIntent is still set here; applyIntent() clears it further down.
-    track('file_loaded', {
-      tool: 'editor-v2',
-      fileType: isPdf(f) ? 'pdf' : 'image',
-      intent: pendingIntent || 'none',
-    });
+  // Telegraph the parse loop. Note the >20MB heads-up toast is gone: it fired
+  // here but sat hidden BEHIND this overlay (z-order), and the overlay itself
+  // — plus its "diproses di HP-mu" note — is the honest heads-up now.
+  showProcessing(usable.length);
+  // Per-file resilience: one empty/corrupt/unreadable file must NOT crash the whole
+  // load. Before this guard, a 0-byte PDF (Sentry JAVASCRIPT-H) and a file that went
+  // unreadable after the picker handed its reference (JAVASCRIPT-G) both bubbled to
+  // onunhandledrejection — the user saw a silent broken load. Now we skip the bad
+  // one, keep the good ones, and say so plainly. Honest failure is still feedback.
+  let failed = 0;
+  for (let i = 0; i < usable.length; i++) {
+    const f = usable[i];
+    updateProcessing(i, usable.length); // i files done, working on i+1
+    try {
+      const bytes = new Uint8Array(await f.arrayBuffer());
+      if (bytes.length === 0) throw new Error('empty file'); // 0-byte → JAVASCRIPT-H
+      if (isPdf(f)) await importPdf(doc, { name: f.name, bytes });
+      else await importImage(doc, { name: f.name, bytes, mimeType: f.type });
+      // Carry the intent so the funnel joins up: intent_armed → file_loaded →
+      // download. Without it we'd know people PRESSED "Pisah PDF" but not whether
+      // any ever brought a file — the half that matters. applyIntent() clears it below.
+      track('file_loaded', {
+        tool: 'editor-v2',
+        fileType: isPdf(f) ? 'pdf' : 'image',
+        intent: pendingIntent || 'none',
+      });
+    } catch (err) {
+      // Expected class: the user brought a bad file. Swallow at the user level (no
+      // Sentry noise), keep a console trail for us, count it for the notice below.
+      failed++;
+      console.warn('Lewati file yang gagal dibuka:', f.name, err);
+      track('file_failed', { tool: 'editor-v2', fileType: isPdf(f) ? 'pdf' : 'image' });
+    }
   }
+
+  // Every file failed → leave the landing untouched, say it plainly, bail. Also
+  // guards the doc.pages[0] read below, which would throw on an empty document.
+  if (doc.pages.length === 0) {
+    toast(usable.length === 1
+      ? 'File itu nggak bisa dibuka — mungkin kosong atau rusak'
+      : 'Nggak ada file yang bisa dibuka — mungkin kosong atau rusak');
+    return;
+  }
+
   if (!rasterizer) rasterizer = createPageRasterizer(doc);
   emptyEl.style.display = 'none';
   document.body.classList.remove('is-empty'); // landing yields, editor chrome returns
@@ -716,7 +783,13 @@ async function loadFilesInner(files) {
     zoom = Math.min(1, (scrollEl.clientWidth - 16) / doc.pages[0].width);
   }
   rebuildStage(); // applies zoom + sizer at the end
-  if (!firstLoad) toast(`Dijepit jadi satu, sekarang ${doc.pages.length} halaman`);
+  // Honest close-out: skips take priority over the merge tally — the user needs to
+  // know something was left out more than they need the count.
+  if (failed > 0) {
+    toast(`${failed} file dilewati — kosong atau rusak`);
+  } else if (!firstLoad) {
+    toast(`Dijepit jadi satu, sekarang ${doc.pages.length} halaman`);
+  }
   // If the Halaman sheet triggered this add, refresh its grid in place.
   if (document.getElementById('pm-sheet').open) pageManager.render();
 
