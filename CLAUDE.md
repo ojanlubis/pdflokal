@@ -2,14 +2,14 @@
 
 ## ⚡ STATUS (July 3, 2026): V2 SHIPPED — pdflokal.id IS the clean rebuild
 
-**Read this section first; much of the rest of this file describes the OLD wing and awaits the demolition-phase rewrite.**
+**Read this section first; much of the rest of this file describes the OLD wing and awaits the demolition-phase rewrite.** Current product status/priorities live at the project seat: `../STATE.md`.
 
 - **`index.html` is Editor v2**: the landing page IS the editor's empty state (kop-surat header, dropzone, tool cards with `?buat=` intent hook, FAQ). Architecture: headless core (`js/core/` — model, operations, history, import, export, compress, export-images), render layer (`js/render/` — page-view, viewport, interaction; pages are `<img>`, one overlay, one pointer path), app shell (`js/v2/` — app, download-sheet, page-manager, signature-modal, format-bar, celebrate). Self-contained CSS inside index.html — style.css belongs to the old wing.
 - **The old app lives at `alat-gambar.html`** (renamed old index.html, noindexed) solely to keep the image tools alive until absorption. It still uses `js/editor/`, `js/pdf-tools/`, `style.css`, the old init files. **All of that dies at demolition** (after the post-launch bake) along with most of this file's "Core Architecture" section.
 - **Design language is LAW**: memory `design-language-2026-07.md` — red #dc2626 on warm stone, Plus Jakarta Sans, red-chrome-never-prints, paper-on-desk shadows, stempel-press buttons, the 5-stamp language ("cap = pernyataan status"). Design skills installed in `.agents/skills/` — load before UI work.
 - **Interaction model**: camera-first touch (selection commits at release); select-then-edit for text (first click/tap selects, the next one edits — no double-tap timing windows). Both founder-ratified.
 - **Tests**: `tests/mobile/**` (mobile-chrome project, the deep suite) + `tests/editor-v2-desktop.spec.js` target v2 at `/`. Old suites were repointed at `/alat-gambar.html` and die with the old wing. `tests/core/` runs headless via `npm run test:core`. Full sweep: `npm run lint` + `npx playwright test`.
-- **Working rhythm**: branch → failing test → green → full sweep → PR → `gh pr merge --squash --admin --delete-branch` (authorized) → verify Vercel deploy via commit status → update backlog.md + memory STATE.md. Screenshot every new UI surface (a broken dialog once passed all functional tests).
+- **Working rhythm**: branch → failing test → green → full sweep → PR → `gh pr merge --squash --admin --delete-branch` (authorized) → verify Vercel deploy via commit status → update the project seat (`../backlog.md` + `../STATE.md`). Screenshot every new UI surface (a broken dialog once passed all functional tests).
 - **Gotchas (v2)**: `npx serve` cleanUrls 301 strips query strings (tests use extensionless URLs); the global `dialog` CSS rule IS the overlay — new dialogs must use a `.sheet` child; `history` is shadowed in app.js by the undo history (use `window.history`); no grid rebuilds mid-drag in page-manager (render parks on `dragActive`).
 
 ## Project Overview
@@ -21,15 +21,11 @@
 - **Tech**: Vanilla JS, native ES modules, no build step, no frameworks
 - **Libraries**: pdf-lib, PDF.js, Signature Pad, pdf-encrypt-lite, Canvas API — all self-hosted in `js/vendor/`, zero CDN deps (see [docs/security.md](docs/security.md))
 
-## ★ North Star — read [docs/product-definition.md](docs/product-definition.md) before any product/design/architecture call
+## ★ North Star & product status → `../STATE.md` (project seat)
 
-**Mission:** be the **WinRAR × Excalidraw of PDF, for Indonesia** — every PDF operation done in the browser, crafted so well *it doesn't make sense to use another tool.* Ubiquity **through** craft. **UX is everything.**
+The product vision, status, roadmap, and founder-desk log moved UP to the project seat during the Great Reorg (2026-07-15): `../STATE.md` (read first), `../product-definition.md` (the North Star — read before any product/design/architecture call), `../roadmap.md`, `../foundation-plan.md`, `../backlog.md`. This file is code-guidance for the repo only.
 
-- **The moat is the constraint.** 100% client-side isn't a limitation — it's one choice paying off four ways: **private + fast + free-forever + offline**. iLovePDF *can't copy it* without breaking their server-dependent business. Protect the moat by only doing what the browser does GREAT — **refuse server-jobs (OCR, PDF↔Word).**
-- **The editor IS the product** (75% of tool opens). The unified editor beats iLovePDF's modular tools because humans have *"fix this document,"* not "a merge task." Standalone tools fold in over time.
-- **Mobile-first** — **half of all real traffic is mobile** (Vercel, Jul 2026: 49% mobile / 46% desktop / 5% tablet, 94% Indonesia). ⚠️ **The old justification — "~95% of paid acquisition is mobile" — is STALE and its channel is dead.** That figure is April's campaign (which carried a +90% mobile bid adjustment); the July campaign measured **58% mobile**, and paid is now understood to be **negative-ROI by construction for a free product** (a conversion is worth Rp0 — see `memory/monetization-licensing-strategy-2026-07.md`). **Mobile-first survives on stronger ground:** it's half the actual user base, and organic/SEO — the channel that compounds — is where growth comes from. **Every mobile bug is a leak in the channel we're actually betting on.**
-- **Vision and architecture are ONE bet.** "Best experience in the world" is impossible on a spaghetti foundation — so the foundation rebuild ([docs/future-architecture.md](docs/future-architecture.md) + memory `architectural-direction-2026-06-09.md`) is the vision's price of entry, not a detour.
-- **Success:** when a user offered iLovePDF thinks *"why would I upload my file and wait?"*
+One-line anchor kept here: **WinRAR × Excalidraw of PDF for Indonesia; 100% client-side IS the moat (private + fast + free-forever + offline); the editor is the product; refuse server-jobs (OCR, PDF↔Word).**
 
 ## Reference Projects
 
