@@ -73,17 +73,24 @@ function toast(msg) {
 // This overlay covers that surface and shows honest, advancing progress. The 180ms
 // delay means instant loads never flash it (feedback without jank). General word
 // "Memproses" (not "menjepit") — comprehension of THIS step is the whole point.
+// Null-safe: app.js is shared by index.html AND the generated SEO pages. If a page
+// ships without the overlay markup (e.g. an SEO page generated before it existed),
+// these must degrade to no-ops, NOT crash the whole module at load. (Sentry
+// JAVASCRIPT-J: the overlay landed in index.html but the SEO pages weren't
+// regenerated, so `.querySelector` on null killed the editor on every SEO page.)
 const loadingOverlay = document.getElementById('v2-loading');
-const lpFill = loadingOverlay.querySelector('.lp-fill');
-const lpCount = loadingOverlay.querySelector('.lp-count');
+const lpFill = loadingOverlay?.querySelector('.lp-fill');
+const lpCount = loadingOverlay?.querySelector('.lp-count');
 let processingTimer = null;
 
 function showProcessing(total) {
+  if (!loadingOverlay) return;
   clearTimeout(processingTimer);
   updateProcessing(0, total);
   processingTimer = setTimeout(() => { loadingOverlay.hidden = false; }, 180);
 }
 function updateProcessing(done, total) {
+  if (!loadingOverlay) return;
   if (total > 1) {
     // Determinate: count = file we're working on now; fill = files finished.
     lpFill.classList.remove('lp-indet');
@@ -98,6 +105,7 @@ function updateProcessing(done, total) {
   }
 }
 function hideProcessing() {
+  if (!loadingOverlay) return;
   clearTimeout(processingTimer);
   loadingOverlay.hidden = true;
   lpFill.style.width = '0';
