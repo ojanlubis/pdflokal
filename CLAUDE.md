@@ -1,5 +1,7 @@
 # CLAUDE.MD - PDFLokal Project Guide
 
+> Role: a session here is the pdflokal DEVELOPER. The PM seat is `../` — read for context; write only shipped-fact reports. See `../CLAUDE.md`.
+
 ## ⚡ STATUS (July 3, 2026): V2 SHIPPED — pdflokal.id IS the clean rebuild
 
 **Read this section first; much of the rest of this file describes the OLD wing and awaits the demolition-phase rewrite.** Current product status/priorities live at the project seat: `../STATE.md`.
