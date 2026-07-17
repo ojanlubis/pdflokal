@@ -23,13 +23,13 @@ async function openDoc(page) {
 }
 
 test.describe('growth loop — mobile', () => {
-  // The install nudge now intercepts a user's FIRST successful download (the recall
-  // play — see pwa-install.spec.js). These tests exercise the RETURNING-user share/
-  // tip invite, so simulate someone who has downloaded before. Deterministic
-  // regardless of whether Chromium fires beforeinstallprompt during the run.
+  // A 2nd+ download with the one-tap install armed can take the download slot (see
+  // pwa-install.spec.js). These tests exercise the share/tip invite, so suppress the
+  // install nudge — deterministic regardless of whether Chromium fires
+  // beforeinstallprompt during the run.
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
-      try { localStorage.setItem('pdflokal-has-downloaded', '1'); } catch { /* private mode */ }
+      try { localStorage.setItem('pdflokal-install-seen', '1'); } catch { /* private mode */ }
     });
   });
 

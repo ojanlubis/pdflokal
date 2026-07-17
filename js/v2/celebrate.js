@@ -48,12 +48,6 @@ function isStandalone() {
   return window.matchMedia?.('(display-mode: standalone)').matches
     || window.navigator.standalone === true;
 }
-function isIOS() {
-  return /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
-}
-function isAndroid() {
-  return /android/i.test(navigator.userAgent);
-}
 
 // ---- the stamp language -----------------------------------------------------------
 // "Cap = pernyataan status": a stamp asserts the document's status, exactly like
@@ -209,31 +203,19 @@ export function createCelebration(deps) {
     hideInstall();
   });
 
-  // Offer install on any install-capable surface, not already installed/seen.
-  // WHY we don't gate on deferredInstallPrompt: Chrome's beforeinstallprompt is
-  // FLAKY on a first visit — its engagement heuristic usually hasn't fired it yet,
-  // even while "Install app" sits right there in the ⋮ menu (confirmed on a real
-  // Android device, Jul 2026). So we show the recall moment regardless: one-tap
-  // when the event is ready, a manual "⋮ → Add to Home screen" hint otherwise.
+  // Offer install ONLY when the strong native one-tap is armed — never the weak
+  // manual "⋮ → menu" instruction. A menu-chore ask isn't worth overriding the
+  // share card, and "Install app" is always in Chrome's menu anyway for anyone
+  // who wants it (founder call, Jul 2026: don't spend a prime moment on a weak ask).
   function canOfferInstall() {
     if (isStandalone()) return false;
     if (safeGet(INSTALL_SEEN_KEY) === '1') return false;
-    return !!deferredInstallPrompt || isIOS() || isAndroid();
+    return !!deferredInstallPrompt;
   }
   function showInstallCard() {
-    const hint = installCard.querySelector('#ic-hint');
-    const btn = installCard.querySelector('#ic-install');
-    const canPrompt = !!deferredInstallPrompt;
-    btn.hidden = !canPrompt;   // no native prompt yet → show the manual hint instead
-    hint.hidden = canPrompt;
-    if (!canPrompt) {
-      hint.textContent = isIOS()
-        ? 'Ketuk tombol Bagikan di browser, lalu pilih “Tambah ke Layar Utama”.'
-        : 'Buka menu ⋮ Chrome (pojok kanan atas), lalu pilih “Instal aplikasi” atau “Tambahkan ke Layar utama”.';
-    }
     installCard.classList.add('show');
     safeSet(INSTALL_SEEN_KEY, '1'); // at most once, ever
-    track('pwa_nudge_shown', { mode: canPrompt ? 'prompt' : (isIOS() ? 'ios' : 'android') });
+    track('pwa_nudge_shown', { mode: 'prompt' });
   }
 
   return {
@@ -243,14 +225,14 @@ export function createCelebration(deps) {
       // notification own the first second; we celebrate once the stage clears.
       showStamp('Beres ✓', { big: true, delay: 1200, duration: 3000 });
 
-      // Route the ONE post-download ask by first-vs-returning — never stack them.
-      // A user's FIRST successful download + installable → the recall play: get
-      // PDFLokal onto the home screen so their next PDF job returns free instead of
-      // a re-searched ad click (GA4 finding, Jul 2026: paid users don't return
-      // unprompted). Aimed exactly at the one-and-done cohort.
+      // The FIRST win belongs to the share ask — its viral value beats an install
+      // prompt, and it's the peak-enthusiasm moment (founder call, Jul 2026). From
+      // the 2nd download on, if the strong one-tap install is armed, take the slot
+      // once: get PDFLokal onto the home screen so the next job returns free (GA4
+      // finding: paid users don't return unprompted). Returning + one-tap only.
       const firstWin = !safeGet(DOWNLOADED_KEY);
       safeSet(DOWNLOADED_KEY, '1');
-      if (firstWin && canOfferInstall()) {
+      if (!firstWin && canOfferInstall()) {
         setTimeout(showInstallCard, 200);
         return;
       }

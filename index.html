@@ -734,14 +734,10 @@
       border: 1.5px solid var(--line); background: var(--bg); color: var(--ink);
     }
     .sc-actions button svg { width: 17px; height: 17px; }
-    /* `display:flex` above beats the UA [hidden] rule — restore it so the install
-       button truly hides on the manual-hint path (no native prompt available). */
-    .sc-actions button[hidden] { display: none; }
     /* WHY share is the filled primary: sharing costs the user nothing, donating
        costs money — the free ask earns the bigger button (growth-loop guardrail). */
     #sc-share { border-color: var(--accent); background: var(--accent); color: #fff; }
     #ic-install { border-color: var(--accent); background: var(--accent); color: #fff; }
-    .ic-ios { font-size: 12.5px; color: var(--muted); line-height: 1.5; margin: 2px 2px 4px; text-align: center; }
     .sc-qr { display: none; text-align: center; padding-top: 12px; }
     #support-card.qr-open .sc-qr { display: block; }
     #support-card.qr-open .sc-actions #sc-donate { border-color: var(--accent); color: var(--accent); }
@@ -1036,7 +1032,6 @@
         Pasang PDFLokal
       </button>
     </div>
-    <p id="ic-hint" class="ic-ios" hidden></p>
   </div>
 
   <dialog id="pm-sheet" aria-label="Kelola halaman">
