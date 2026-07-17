@@ -1048,4 +1048,15 @@ window.v2 = {
   getTool: () => tool,
   history,
   pageManager, // tests: force a grid re-render mid-drag (Sentry fee8a76e repro)
+  celebration, // tests: drive the post-download routing (install nudge vs share card)
 };
+
+// ---- PWA: register the service worker ---------------------------------------------------
+// Enhancement only — makes the app installable + offline. Silent-fail on purpose:
+// a registration error must NEVER surface to the user or block the editor. Shared
+// by index.html AND the generated SEO pages (all register the same root-scoped SW).
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}

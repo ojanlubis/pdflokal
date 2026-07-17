@@ -13,8 +13,12 @@
  * BARU in the future changelog.
  */
 
+import { track } from '../lib/analytics.js';
+
 const OPTOUT_KEY = 'pdflokal-support-optout';
 const LAST_SHOWN_KEY = 'pdflokal-support-last';
+const DOWNLOADED_KEY = 'pdflokal-has-downloaded'; // marks a user's first successful download
+const INSTALL_SEEN_KEY = 'pdflokal-install-seen'; // install nudge shown at most once, ever
 const SHARE_URL = 'https://www.pdflokal.id';
 // Written the way a friend would actually send it, not like a brochure.
 const SHARE_TEXT = 'Eh coba deh pdflokal.id, bisa edit + tanda tangan PDF langsung di HP. Gratis, dan filenya nggak diupload ke mana-mana.';
@@ -25,6 +29,27 @@ function safeGet(key) {
 }
 function safeSet(key, val) {
   try { localStorage.setItem(key, val); } catch { /* private mode, session-only */ }
+}
+
+// ---- PWA install capture ----------------------------------------------------------
+// beforeinstallprompt fires when Chrome deems the app installable. This module loads
+// at app startup (app.js imports it), early enough to catch it. We stash the event
+// and fire it on the user's tap at the download peak — never Chrome's mini-infobar.
+let deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+});
+window.addEventListener('appinstalled', () => {
+  deferredInstallPrompt = null;
+  safeSet(INSTALL_SEEN_KEY, '1');
+});
+function isStandalone() {
+  return window.matchMedia?.('(display-mode: standalone)').matches
+    || window.navigator.standalone === true;
+}
+function isIOS() {
+  return /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
 }
 
 // ---- the stamp language -----------------------------------------------------------
@@ -95,6 +120,7 @@ export function showStamp(text, {
 export function createCelebration(deps) {
   let shownThisSession = false;
   const card = document.getElementById('support-card');
+  const installCard = document.getElementById('install-card');
 
   // TETAP JALAN: connection dies, PDFLokal doesn't (no server in the loop).
   // The moat made visible — once per session, only while a page is open.
@@ -111,28 +137,32 @@ export function createCelebration(deps) {
     card.style.transform = ''; // reset any swipe offset
   }
 
-  // Swipe-down to dismiss: it looks like a sheet, so it must behave like one.
-  let swipe = null;
-  card.addEventListener('pointerdown', (e) => {
-    if (e.target.closest('button, a, img')) return; // taps on controls stay taps
-    swipe = { y: e.clientY, id: e.pointerId, moved: false };
-    card.setPointerCapture(e.pointerId);
-  });
-  card.addEventListener('pointermove', (e) => {
-    if (!swipe || e.pointerId !== swipe.id) return;
-    const dy = e.clientY - swipe.y;
-    if (dy > 6) swipe.moved = true;
-    if (swipe.moved) card.style.transform = `translate(-50%, ${Math.max(0, dy)}px)`;
-  });
-  const endSwipe = (e) => {
-    if (!swipe || e.pointerId !== swipe.id) return;
-    const dy = e.clientY - swipe.y;
-    swipe = null;
-    if (dy > 56) hide();
-    else card.style.transform = ''; // spring back (CSS transition)
-  };
-  card.addEventListener('pointerup', endSwipe);
-  card.addEventListener('pointercancel', endSwipe);
+  // Swipe-down to dismiss: these look like sheets, so they behave like sheets.
+  // Shared by both the support card and the install card.
+  function attachSwipeDismiss(el, onDismiss) {
+    let swipe = null;
+    el.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('button, a, img')) return; // taps on controls stay taps
+      swipe = { y: e.clientY, id: e.pointerId, moved: false };
+      el.setPointerCapture(e.pointerId);
+    });
+    el.addEventListener('pointermove', (e) => {
+      if (!swipe || e.pointerId !== swipe.id) return;
+      const dy = e.clientY - swipe.y;
+      if (dy > 6) swipe.moved = true;
+      if (swipe.moved) el.style.transform = `translate(-50%, ${Math.max(0, dy)}px)`;
+    });
+    const end = (e) => {
+      if (!swipe || e.pointerId !== swipe.id) return;
+      const dy = e.clientY - swipe.y;
+      swipe = null;
+      if (dy > 56) onDismiss();
+      else el.style.transform = ''; // spring back (CSS transition)
+    };
+    el.addEventListener('pointerup', end);
+    el.addEventListener('pointercancel', end);
+  }
+  attachSwipeDismiss(card, hide);
 
   card.querySelector('#sc-close').addEventListener('click', hide);
   card.querySelector('#sc-never').addEventListener('click', () => {
@@ -159,16 +189,64 @@ export function createCelebration(deps) {
     card.classList.add('qr-open');
   });
 
+  // ---- the install card (first-win recall play) ----
+  function hideInstall() { installCard.classList.remove('show'); installCard.style.transform = ''; }
+  attachSwipeDismiss(installCard, hideInstall);
+  installCard.querySelector('#ic-close').addEventListener('click', hideInstall);
+  installCard.querySelector('#ic-install').addEventListener('click', async () => {
+    const prompt = deferredInstallPrompt;
+    if (!prompt) { hideInstall(); return; }
+    deferredInstallPrompt = null; // the event can only be used once
+    try {
+      prompt.prompt();
+      const { outcome } = await prompt.userChoice;
+      track('pwa_install', { outcome }); // 'accepted' | 'dismissed'
+      if (outcome === 'accepted') deps.toast('Sip! PDFLokal sekarang ada di layar HP-mu');
+    } catch { /* prompt already consumed or cancelled — no nagging */ }
+    hideInstall();
+  });
+
+  // Offer install only when it's real: installable (or iOS manual), not already
+  // installed, not shown before.
+  function canOfferInstall() {
+    if (isStandalone()) return false;
+    if (safeGet(INSTALL_SEEN_KEY) === '1') return false;
+    return !!deferredInstallPrompt || isIOS();
+  }
+  function showInstallCard() {
+    const iosHint = installCard.querySelector('#ic-ios-hint');
+    const btn = installCard.querySelector('#ic-install');
+    const canPrompt = !!deferredInstallPrompt;
+    btn.hidden = !canPrompt;      // iOS can't be prompted → show the manual hint instead
+    iosHint.hidden = canPrompt;
+    installCard.classList.add('show');
+    safeSet(INSTALL_SEEN_KEY, '1'); // at most once, ever
+    track('pwa_nudge_shown', { mode: canPrompt ? 'prompt' : 'ios' });
+  }
+
   return {
     // The one hook: called by the app's shared download chokepoint.
     onDownloadSuccess() {
       // Big, and ~1.2s late on purpose: Android Chrome's download dialog +
       // notification own the first second; we celebrate once the stage clears.
       showStamp('Beres ✓', { big: true, delay: 1200, duration: 3000 });
-      // Once per CALENDAR DAY (founder call, Jul 3): heavy users get a gentle
-      // daily reminder that free has a sponsor, never a toll booth per file.
-      // shownThisSession stays as the fallback where localStorage is unwritable
-      // (private mode) so it degrades to once-per-session, not every download.
+
+      // Route the ONE post-download ask by first-vs-returning — never stack them.
+      // A user's FIRST successful download + installable → the recall play: get
+      // PDFLokal onto the home screen so their next PDF job returns free instead of
+      // a re-searched ad click (GA4 finding, Jul 2026: paid users don't return
+      // unprompted). Aimed exactly at the one-and-done cohort.
+      const firstWin = !safeGet(DOWNLOADED_KEY);
+      safeSet(DOWNLOADED_KEY, '1');
+      if (firstWin && canOfferInstall()) {
+        setTimeout(showInstallCard, 200);
+        return;
+      }
+
+      // Everyone else: the share/tip invite, once per CALENDAR DAY (founder call,
+      // Jul 3) — a gentle reminder that free has a sponsor, never a toll booth per
+      // file. shownThisSession is the fallback where localStorage is unwritable
+      // (private mode), degrading to once-per-session, not every download.
       if (shownThisSession || safeGet(OPTOUT_KEY) === '1') return;
       if (safeGet(LAST_SHOWN_KEY) === new Date().toDateString()) return;
       shownThisSession = true;

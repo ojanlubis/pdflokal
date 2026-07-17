@@ -23,6 +23,16 @@ async function openDoc(page) {
 }
 
 test.describe('growth loop — mobile', () => {
+  // The install nudge now intercepts a user's FIRST successful download (the recall
+  // play — see pwa-install.spec.js). These tests exercise the RETURNING-user share/
+  // tip invite, so simulate someone who has downloaded before. Deterministic
+  // regardless of whether Chromium fires beforeinstallprompt during the run.
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      try { localStorage.setItem('pdflokal-has-downloaded', '1'); } catch { /* private mode */ }
+    });
+  });
+
   test('download celebrates (BERES stamp) and then invites — once per day', async ({ page }) => {
     await openDoc(page);
     await downloadOnce(page);
@@ -30,7 +40,7 @@ test.describe('growth loop — mobile', () => {
     await expect(page.locator('.v2-stamp', { hasText: 'Beres' })).toBeAttached();
     // The card arrives after the sheet closes.
     await expect(page.locator('#support-card')).toBeVisible({ timeout: 4000 });
-    await expect(page.locator('.sc-head')).toContainText('filemu udah jadi');
+    await expect(page.locator('#support-card .sc-head')).toContainText('filemu udah jadi');
 
     // Dismiss, download again: same day → no second ask.
     await page.tap('#sc-close');
