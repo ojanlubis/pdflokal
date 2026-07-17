@@ -51,6 +51,9 @@ function isStandalone() {
 function isIOS() {
   return /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
 }
+function isAndroid() {
+  return /android/i.test(navigator.userAgent);
+}
 
 // ---- the stamp language -----------------------------------------------------------
 // "Cap = pernyataan status": a stamp asserts the document's status, exactly like
@@ -206,22 +209,31 @@ export function createCelebration(deps) {
     hideInstall();
   });
 
-  // Offer install only when it's real: installable (or iOS manual), not already
-  // installed, not shown before.
+  // Offer install on any install-capable surface, not already installed/seen.
+  // WHY we don't gate on deferredInstallPrompt: Chrome's beforeinstallprompt is
+  // FLAKY on a first visit — its engagement heuristic usually hasn't fired it yet,
+  // even while "Install app" sits right there in the ⋮ menu (confirmed on a real
+  // Android device, Jul 2026). So we show the recall moment regardless: one-tap
+  // when the event is ready, a manual "⋮ → Add to Home screen" hint otherwise.
   function canOfferInstall() {
     if (isStandalone()) return false;
     if (safeGet(INSTALL_SEEN_KEY) === '1') return false;
-    return !!deferredInstallPrompt || isIOS();
+    return !!deferredInstallPrompt || isIOS() || isAndroid();
   }
   function showInstallCard() {
-    const iosHint = installCard.querySelector('#ic-ios-hint');
+    const hint = installCard.querySelector('#ic-hint');
     const btn = installCard.querySelector('#ic-install');
     const canPrompt = !!deferredInstallPrompt;
-    btn.hidden = !canPrompt;      // iOS can't be prompted → show the manual hint instead
-    iosHint.hidden = canPrompt;
+    btn.hidden = !canPrompt;   // no native prompt yet → show the manual hint instead
+    hint.hidden = canPrompt;
+    if (!canPrompt) {
+      hint.textContent = isIOS()
+        ? 'Ketuk tombol Bagikan di browser, lalu pilih “Tambah ke Layar Utama”.'
+        : 'Buka menu ⋮ Chrome (pojok kanan atas), lalu pilih “Instal aplikasi” atau “Tambahkan ke Layar utama”.';
+    }
     installCard.classList.add('show');
     safeSet(INSTALL_SEEN_KEY, '1'); // at most once, ever
-    track('pwa_nudge_shown', { mode: canPrompt ? 'prompt' : 'ios' });
+    track('pwa_nudge_shown', { mode: canPrompt ? 'prompt' : (isIOS() ? 'ios' : 'android') });
   }
 
   return {

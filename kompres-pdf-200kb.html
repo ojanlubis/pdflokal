@@ -734,6 +734,9 @@
       border: 1.5px solid var(--line); background: var(--bg); color: var(--ink);
     }
     .sc-actions button svg { width: 17px; height: 17px; }
+    /* `display:flex` above beats the UA [hidden] rule — restore it so the install
+       button truly hides on the manual-hint path (no native prompt available). */
+    .sc-actions button[hidden] { display: none; }
     /* WHY share is the filled primary: sharing costs the user nothing, donating
        costs money — the free ask earns the bigger button (growth-loop guardrail). */
     #sc-share { border-color: var(--accent); background: var(--accent); color: #fff; }
@@ -1058,14 +1061,14 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     </button>
     <div class="sc-head">Simpan PDFLokal di HP-mu</div>
-    <p class="sc-sub">Biar besok nggak usah nyari lagi — sekali tap, langsung ada di layar HP. Tetap jalan walau lagi offline.</p>
+    <p class="sc-sub">Biar besok nggak usah nyari lagi — langsung ada di layar HP, tetap jalan walau lagi offline.</p>
     <div class="sc-actions">
       <button id="ic-install">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m8 11 4 4 4-4"/><path d="M4 19h16"/></svg>
         Pasang PDFLokal
       </button>
     </div>
-    <p id="ic-ios-hint" class="ic-ios" hidden>Ketuk tombol <b>Bagikan</b> di browsermu, lalu pilih <b>“Tambah ke Layar Utama”.</b></p>
+    <p id="ic-hint" class="ic-ios" hidden></p>
   </div>
 
   <dialog id="pm-sheet" aria-label="Kelola halaman">
