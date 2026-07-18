@@ -314,6 +314,9 @@ function setTool(next) {
     btn.classList.toggle('active', active);
     btn.setAttribute('aria-pressed', String(active));
   }
+  // Delete-mode is armed via #btn-delete-anno (no data-tool: its tap can also
+  // mean "delete the selection"). Armed = lit, same grammar as every tool.
+  document.getElementById('btn-delete-anno').classList.toggle('active', next === 'delete');
   // While a placement tool is active the page must not pan under the finger.
   stage.style.touchAction = next === 'select' ? '' : 'none';
   syncFormatBar();
@@ -322,6 +325,10 @@ function setTool(next) {
 for (const btn of document.querySelectorAll('#toolbar .tool[data-tool]')) {
   btn.addEventListener('click', () => {
     const t = btn.dataset.tool;
+    // FOUNDER RULING (2026-07-19, banked in ojan-ui-taste): a lit tool button
+    // is an ON-OFF switch — tapping it again disarms back to neutral. This is
+    // also the ONLY touch-side escape from an armed tool (Escape is keyboard).
+    if (tool === t) { setTool('select'); return; }
     if (t === 'signature' && !storedSignature) { signatureModal.open(); return; }
     setTool(t);
     if (t === 'text') toast('Pilih tempat untuk menulis');
@@ -434,6 +441,7 @@ document.addEventListener('pointermove', (e) => {
 // Hapus works BOTH ways (founder ask): with a selection it deletes now; with
 // nothing selected it arms delete-mode — the next tapped object is removed.
 document.getElementById('btn-delete-anno').addEventListener('click', () => {
+  if (tool === 'delete') { setTool('select'); return; } // toggle off (on-off law)
   if (doc.selection.annotationId) { deleteSelected(); return; }
   setTool('delete');
   toast('Pilih objek yang mau dihapus');

@@ -778,10 +778,9 @@
   </header>
 
   <div id="toolbar" role="toolbar" aria-label="Alat">
-    <button class="tool active" data-tool="select" aria-pressed="true">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 3 7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/></svg>
-      Pilih
-    </button>
+    <!-- No "Pilih" button (founder ruling 2026-07-19): the neutral mode is a
+         STATE, not a tool — nothing lit means nothing armed. Every armed tool
+         toggles off on a second tap; V / Escape also disarm. -->
     <button class="tool" data-tool="text" aria-pressed="false">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
       Teks
