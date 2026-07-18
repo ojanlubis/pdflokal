@@ -30,8 +30,8 @@
 </head>
 <body class="show-boxes">
 <header>
-  <strong>lab-edit · fase 1</strong>
-  <span class="note">bukti: ekstraksi run teks + kotak koordinat + hit-test + router born-digital/scan. Halaman internal, noindex, bukan produk.</span>
+  <strong>lab-edit · fase 1 + 2</strong>
+  <span class="note">fase 1: ekstraksi run + kotak + hit-test + router. fase 2: HAPUS run dari content stream (Rung B — teks benar-benar hilang, bukan ditutup). Halaman internal, noindex, bukan produk.</span>
 </header>
 <div class="toolbar">
   <input type="file" id="file" accept="application/pdf">
@@ -43,96 +43,6 @@
 <div id="pages"></div>
 <aside id="panel">tap salah satu kotak merah di halaman untuk melihat isi run-nya…</aside>
 
-<script type="module">
-import { ensurePdfJs } from '/js/core/vendor.js';
-
-const MAX_PAGES = 3; // fase 1: cukup untuk membuktikan mekanismenya
-const pagesEl = document.getElementById('pages');
-const panel = document.getElementById('panel');
-const statsEl = document.getElementById('stats');
-const routerEl = document.getElementById('router');
-
-document.getElementById('toggle-boxes').addEventListener('change', (e) => {
-  document.body.classList.toggle('show-boxes', e.target.checked);
-});
-document.getElementById('file').addEventListener('change', async (e) => {
-  const f = e.target.files[0];
-  if (f) open(new Uint8Array(await f.arrayBuffer()), f.name);
-});
-document.getElementById('load-sample').addEventListener('click', async () => {
-  const res = await fetch('/tests/fixtures/sample-2pages.pdf');
-  open(new Uint8Array(await res.arrayBuffer()), 'sample-2pages.pdf');
-});
-
-let selected = null;
-
-async function open(data, name) {
-  const pdfjs = await ensurePdfJs();
-  const doc = await pdfjs.getDocument({ data }).promise;
-  pagesEl.textContent = '';
-  const fonts = new Set();
-  let runCount = 0;
-
-  const n = Math.min(doc.numPages, MAX_PAGES);
-  for (let p = 1; p <= n; p++) {
-    const page = await doc.getPage(p);
-    // Skala render menyesuaikan lebar layar; semua koordinat run ikut viewport
-    // yang SAMA, jadi kotak menempel tepat di atas glyph di kanvas.
-    const base = page.getViewport({ scale: 1 });
-    const scale = Math.min(2, (Math.min(900, pagesEl.clientWidth - 8)) / base.width);
-    const viewport = page.getViewport({ scale });
-
-    const wrap = document.createElement('div');
-    wrap.className = 'page-wrap';
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.floor(viewport.width);
-    canvas.height = Math.floor(viewport.height);
-    wrap.appendChild(canvas);
-    pagesEl.appendChild(wrap);
-    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-
-    const tc = await page.getTextContent();
-    for (const item of tc.items) {
-      if (!item.str || !item.str.trim()) continue;
-      runCount++;
-      const style = tc.styles[item.fontName] || {};
-      fonts.add(style.fontFamily || item.fontName);
-
-      // PDF meletakkan teks lewat matriks transform; proyeksikan ke ruang
-      // viewport, lalu tinggi glyph = panjang vektor sumbu-Y matriks itu.
-      const tx = pdfjs.Util.transform(viewport.transform, item.transform);
-      const fh = Math.hypot(tx[2], tx[3]);
-      const w = item.width * viewport.scale;
-
-      const box = document.createElement('div');
-      box.className = 'run';
-      box.style.left = `${tx[4]}px`;
-      box.style.top = `${tx[5] - fh}px`;
-      box.style.width = `${w}px`;
-      box.style.height = `${fh * 1.15}px`;
-      box.addEventListener('click', () => {
-        if (selected) selected.classList.remove('selected');
-        selected = box;
-        box.classList.add('selected');
-        panel.innerHTML =
-          `<b>run</b> "${item.str.replace(/&/g, '&amp;').replace(/</g, '&lt;')}"<br>` +
-          `<b>font</b> ${item.fontName} → ${style.fontFamily || '?'}` +
-          ` · ${style.ascent ? `ascent ${style.ascent.toFixed(2)}` : ''}` +
-          ` · ukuran ±${(fh / viewport.scale).toFixed(1)} pt<br>` +
-          `<b>posisi</b> hal ${p} · PDF(${item.transform[4].toFixed(1)}, ${item.transform[5].toFixed(1)})` +
-          ` · lebar ${(item.width).toFixed(1)} pt · ${item.hasEOL ? 'akhir baris' : 'tengah baris'}`;
-      });
-      wrap.appendChild(box);
-    }
-  }
-
-  const isDigital = runCount > 0;
-  routerEl.textContent = isDigital
-    ? 'ROUTER: born-digital → tangga teks-asli'
-    : 'ROUTER: scan/foto → tangga dokumen-foto';
-  routerEl.className = isDigital ? 'digital' : 'scan';
-  statsEl.textContent = `${name} · ${doc.numPages} hal (render ${n}) · ${runCount} run · ${fonts.size} font: ${[...fonts].join(', ')}`;
-}
-</script>
+<script type="module" src="/js/lab-edit.js"></script>
 </body>
 </html>
