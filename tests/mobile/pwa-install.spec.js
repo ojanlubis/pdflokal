@@ -80,6 +80,6 @@ test.describe('PWA install — iOS steps', () => {
     await expect(page.locator('#ic-steps')).toBeVisible();
     await expect(page.locator('#ic-onetap')).toBeHidden();     // no native prompt on iOS
     await expect(page.locator('.ic-steps-title')).toContainText('iPhone');
-    await expect(page.locator('#ic-steps li').first()).toContainText('Bagikan');
+    await expect(page.locator('#ic-steps li').first()).toContainText('Share');
   });
 });

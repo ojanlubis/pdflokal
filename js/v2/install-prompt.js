@@ -70,29 +70,29 @@ function detectInstall() {
 
   if (isIOS()) {
     return { kind: 'steps', title: 'Caranya di iPhone/iPad:', url: GUIDE.ios, steps: [
-      'Ketuk ikon Bagikan (kotak dengan panah ke atas) di bilah browser.',
-      'Geser ke bawah, lalu ketuk “Tambah ke Layar Utama”.',
-      'Ketuk “Tambah” di pojok kanan atas.',
+      'Tap ikon Share (kotak dengan panah ke atas) di bawah.',
+      'Scroll ke bawah, tap “Add to Home Screen”.',
+      'Tap “Add” di kanan atas.',
     ] };
   }
   if (/android/i.test(ua)) {
     if (firefox) {
       return { kind: 'steps', title: 'Caranya di Firefox:', steps: [
-        'Ketuk menu titik-tiga di pojok kanan atas.',
+        'Tap menu titik-tiga di kanan atas.',
         'Pilih “Install”.',
       ] };
     }
     if (samsung) {
       return { kind: 'steps', title: 'Caranya di Samsung Internet:', steps: [
-        'Ketuk menu di bagian bawah.',
-        'Pilih “Tambahkan halaman ke”, lalu “Layar Utama”.',
+        'Tap menu di bawah.',
+        'Pilih “Add page to” → “Home screen”.',
       ] };
     }
     // Official (Chrome Help, 2026-07-18): ⋮ More → "Add to home screen" → "Install".
     return { kind: 'steps', title: 'Caranya di Chrome:', url: GUIDE.android, steps: [
-      'Ketuk menu titik-tiga di kanan address bar.',
-      'Pilih “Tambahkan ke Layar utama” (Add to Home screen).',
-      'Ketuk “Instal” buat konfirmasi.',
+      'Tap menu titik-tiga di kanan address bar.',
+      'Pilih “Add to Home screen”.',
+      'Tap “Install”.',
     ] };
   }
   // Desktop. Official (Chrome Help, 2026-07-18): the address-bar install icon, OR
@@ -100,9 +100,9 @@ function detectInstall() {
   // it used to be a top-level "Install…").
   if (chromium) {
     return { kind: 'steps', title: 'Caranya di Chrome/Edge:', url: GUIDE.desktop, steps: [
-      'Klik ikon Instal (layar kecil dengan panah) di ujung kanan address bar, kalau ada.',
+      'Klik ikon Install (layar kecil dengan panah) di ujung kanan address bar, kalau ada.',
       'Atau: menu titik-tiga → “Cast, save, and share” → “Install page as app…”.',
-      'Klik “Instal”.',
+      'Klik “Install”.',
     ] };
   }
   if (/safari/i.test(ua)) {
@@ -113,7 +113,7 @@ function detectInstall() {
   }
   return { kind: 'steps', title: 'Biar gampang dibuka lagi:', steps: [
     'Tekan Ctrl+D (atau ⌘D) buat bookmark halaman ini.',
-    'Atau buka pdflokal.id lewat Chrome/Edge buat install jadi aplikasi.',
+    'Atau buka pdflokal.id lewat Chrome/Edge buat install jadi app.',
   ] };
 }
 
