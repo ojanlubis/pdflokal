@@ -32,6 +32,7 @@ import { createSignatureModal } from './signature-modal.js';
 import { createDownloadSheet } from './download-sheet.js';
 import { track } from '../lib/analytics.js';
 import { createCelebration } from './celebrate.js';
+import { initInstallPrompt } from './install-prompt.js';
 import { applyIntentCopy } from './intent-copy.js';
 import { ensurePdfLib } from '../core/vendor.js';
 
@@ -123,6 +124,7 @@ function download(blob, filename) {
   celebration.onDownloadSuccess();
 }
 const celebration = createCelebration({ toast });
+initInstallPrompt(); // homepage "install to home screen" chip + adaptive card (off the download moment)
 
 // ---- zoom ---------------------------------------------------------------------
 // transform:scale + a sizer that carries the scaled layout size. NOT CSS zoom:
@@ -1048,4 +1050,15 @@ window.v2 = {
   getTool: () => tool,
   history,
   pageManager, // tests: force a grid re-render mid-drag (Sentry fee8a76e repro)
+  celebration, // tests: drive the post-download routing (install nudge vs share card)
 };
+
+// ---- PWA: register the service worker ---------------------------------------------------
+// Enhancement only — makes the app installable + offline. Silent-fail on purpose:
+// a registration error must NEVER surface to the user or block the editor. Shared
+// by index.html AND the generated SEO pages (all register the same root-scoped SW).
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}

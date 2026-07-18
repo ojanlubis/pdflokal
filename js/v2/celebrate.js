@@ -111,28 +111,31 @@ export function createCelebration(deps) {
     card.style.transform = ''; // reset any swipe offset
   }
 
-  // Swipe-down to dismiss: it looks like a sheet, so it must behave like one.
-  let swipe = null;
-  card.addEventListener('pointerdown', (e) => {
-    if (e.target.closest('button, a, img')) return; // taps on controls stay taps
-    swipe = { y: e.clientY, id: e.pointerId, moved: false };
-    card.setPointerCapture(e.pointerId);
-  });
-  card.addEventListener('pointermove', (e) => {
-    if (!swipe || e.pointerId !== swipe.id) return;
-    const dy = e.clientY - swipe.y;
-    if (dy > 6) swipe.moved = true;
-    if (swipe.moved) card.style.transform = `translate(-50%, ${Math.max(0, dy)}px)`;
-  });
-  const endSwipe = (e) => {
-    if (!swipe || e.pointerId !== swipe.id) return;
-    const dy = e.clientY - swipe.y;
-    swipe = null;
-    if (dy > 56) hide();
-    else card.style.transform = ''; // spring back (CSS transition)
-  };
-  card.addEventListener('pointerup', endSwipe);
-  card.addEventListener('pointercancel', endSwipe);
+  // Swipe-down to dismiss: the card looks like a sheet, so it behaves like one.
+  function attachSwipeDismiss(el, onDismiss) {
+    let swipe = null;
+    el.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('button, a, img')) return; // taps on controls stay taps
+      swipe = { y: e.clientY, id: e.pointerId, moved: false };
+      el.setPointerCapture(e.pointerId);
+    });
+    el.addEventListener('pointermove', (e) => {
+      if (!swipe || e.pointerId !== swipe.id) return;
+      const dy = e.clientY - swipe.y;
+      if (dy > 6) swipe.moved = true;
+      if (swipe.moved) el.style.transform = `translate(-50%, ${Math.max(0, dy)}px)`;
+    });
+    const end = (e) => {
+      if (!swipe || e.pointerId !== swipe.id) return;
+      const dy = e.clientY - swipe.y;
+      swipe = null;
+      if (dy > 56) onDismiss();
+      else el.style.transform = ''; // spring back (CSS transition)
+    };
+    el.addEventListener('pointerup', end);
+    el.addEventListener('pointercancel', end);
+  }
+  attachSwipeDismiss(card, hide);
 
   card.querySelector('#sc-close').addEventListener('click', hide);
   card.querySelector('#sc-never').addEventListener('click', () => {
@@ -165,10 +168,10 @@ export function createCelebration(deps) {
       // Big, and ~1.2s late on purpose: Android Chrome's download dialog +
       // notification own the first second; we celebrate once the stage clears.
       showStamp('Beres ✓', { big: true, delay: 1200, duration: 3000 });
-      // Once per CALENDAR DAY (founder call, Jul 3): heavy users get a gentle
-      // daily reminder that free has a sponsor, never a toll booth per file.
-      // shownThisSession stays as the fallback where localStorage is unwritable
-      // (private mode) so it degrades to once-per-session, not every download.
+      // The share/tip invite, once per CALENDAR DAY (founder call, Jul 3) — a gentle
+      // reminder that free has a sponsor, never a toll booth per file. (Install lives
+      // on the homepage now, off this moment — see install-prompt.js.) shownThisSession
+      // is the private-mode fallback, degrading to once-per-session, not every download.
       if (shownThisSession || safeGet(OPTOUT_KEY) === '1') return;
       if (safeGet(LAST_SHOWN_KEY) === new Date().toDateString()) return;
       shownThisSession = true;

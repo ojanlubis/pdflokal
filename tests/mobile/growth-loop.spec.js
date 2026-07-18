@@ -30,7 +30,7 @@ test.describe('growth loop — mobile', () => {
     await expect(page.locator('.v2-stamp', { hasText: 'Beres' })).toBeAttached();
     // The card arrives after the sheet closes.
     await expect(page.locator('#support-card')).toBeVisible({ timeout: 4000 });
-    await expect(page.locator('.sc-head')).toContainText('filemu udah jadi');
+    await expect(page.locator('#support-card .sc-head')).toContainText('filemu udah jadi');
 
     // Dismiss, download again: same day → no second ask.
     await page.tap('#sc-close');

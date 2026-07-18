@@ -75,6 +75,11 @@
   <meta name="theme-color" content="#faf9f7">
   <link rel="icon" href="/images/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/images/apple-touch-icon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="PDFLokal">
 
   <!-- Google tag (gtag.js) -->
   <!-- WHY G-7J8JF8XZ1Q and not the old G-0XJY0WLCZ1: the old measurement ID went into a state Google
@@ -698,8 +703,8 @@
       .pv-anno-watermark, .pv-anno-pageNumber { cursor: default; }
     }
 
-    /* ---- support card (celebrate → invite; never modal, never nagging) ---- */
-    #support-card {
+    /* ---- support card + install card (celebrate → invite; never modal, never nagging) ---- */
+    #support-card, #install-card {
       position: fixed; left: 50%; transform: translate(-50%, 12px); bottom: 14px; z-index: 110;
       width: min(92vw, 360px); background: var(--surface); border-radius: 16px;
       padding: 14px 16px 10px; box-shadow: 0 8px 30px rgba(15,18,26,.22);
@@ -709,17 +714,17 @@
       opacity: 0; visibility: hidden; pointer-events: none;
       transition: opacity .3s ease, transform .3s ease, visibility 0s linear .3s;
     }
-    #support-card.show {
+    #support-card.show, #install-card.show {
       opacity: 1; visibility: visible; pointer-events: auto;
       transform: translate(-50%, 0); transition-delay: 0s;
     }
-    @media (prefers-reduced-motion: reduce) { #support-card { transition: none; } }
-    #sc-close {
+    @media (prefers-reduced-motion: reduce) { #support-card, #install-card { transition: none; } }
+    #sc-close, #ic-close {
       position: absolute; top: 6px; right: 6px; width: 34px; height: 34px;
       display: inline-flex; align-items: center; justify-content: center;
       color: var(--muted); border-radius: 8px;
     }
-    #sc-close svg { width: 16px; height: 16px; }
+    #sc-close svg, #ic-close svg { width: 16px; height: 16px; }
     .sc-head { font-weight: 700; font-size: 15px; color: var(--ink); margin-bottom: 4px; }
     .sc-sub { font-size: 12.5px; color: var(--muted); line-height: 1.5; margin-bottom: 10px; }
     .sc-actions { display: flex; gap: 8px; }
@@ -732,12 +737,32 @@
     /* WHY share is the filled primary: sharing costs the user nothing, donating
        costs money — the free ask earns the bigger button (growth-loop guardrail). */
     #sc-share { border-color: var(--accent); background: var(--accent); color: #fff; }
+    #ic-install { border-color: var(--accent); background: var(--accent); color: #fff; }
+    /* install chip — quiet, below the dropzone; shown to returning users only */
+    .ip-chip-wrap { display: flex; justify-content: center; margin-top: 14px; }
+    .ip-chip {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 8px 13px 8px 9px; border: 1px solid var(--line); background: var(--surface);
+      border-radius: 999px; font: inherit; font-size: 13px; font-weight: 600; color: var(--ink);
+      box-shadow: 0 2px 8px rgba(15,18,26,.06); cursor: pointer;
+    }
+    .ip-chip[hidden] { display: none; } /* beat the inline-flex vs [hidden] gotcha */
+    .ip-chip-ic { width: 20px; height: 20px; border-radius: 6px; }
+    .ip-chip-chev { width: 15px; height: 15px; color: var(--accent); margin-left: -1px; }
+    /* install card — step-by-step mode (when one-tap isn't available) */
+    #ic-onetap[hidden], #ic-steps[hidden] { display: none; }
+    #ic-steps { text-align: left; }
+    .ic-steps-title { font-size: 13px; font-weight: 600; color: var(--ink); margin: 2px 0 9px; }
+    #ic-steps ol { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 7px; }
+    #ic-steps li { font-size: 13px; color: var(--ink); line-height: 1.45; }
+    .ic-guide { display: inline-block; margin-top: 11px; font-size: 12.5px; font-weight: 600; color: var(--accent); }
+    .ic-guide[hidden] { display: none; }
     .sc-qr { display: none; text-align: center; padding-top: 12px; }
     #support-card.qr-open .sc-qr { display: block; }
     #support-card.qr-open .sc-actions #sc-donate { border-color: var(--accent); color: var(--accent); }
     .sc-qr img { width: min(70vw, 220px); border-radius: 10px; border: 1px solid var(--line); }
     .sc-qr p { font-size: 11.5px; color: var(--muted); margin-top: 6px; }
-    #sc-never {
+    #sc-never, #ic-never {
       display: block; margin: 8px auto 0; color: var(--muted); font-size: 11px;
       text-decoration: underline; min-height: 32px; padding: 0 8px;
     }
@@ -841,6 +866,16 @@
           <span class="dz-buka">Buka File</span>
           <span class="dz-hint">PDF atau foto, boleh banyak sekaligus</span>
         </button>
+        <!-- Install chip: quiet, below the dropzone. Shown only to RETURNING users
+             (js/v2/install-prompt.js); tap opens the adaptive install card. Never
+             on the download moment — install must not compete with the share ask. -->
+        <div class="ip-chip-wrap">
+          <button class="ip-chip" id="ip-chip" hidden>
+            <img class="ip-chip-ic" src="/images/icon-192.png" alt="">
+            <span class="ip-chip-label">Install PDFLokal di hapemu</span>
+            <svg class="ip-chip-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </div>
         </div>
         <p class="ld-label">Mau ngapain hari ini?</p>
         <div class="ld-grid">
@@ -1041,6 +1076,31 @@
       <p>Scan pakai e-wallet atau m-banking kamu. Makasih banyak!</p>
     </div>
     <button id="sc-never">jangan tampilkan lagi</button>
+  </div>
+
+  <!-- Install nudge: shown once, on a user's FIRST successful download, when the app
+       is installable. Opened by the install chip; adapts to the browser — one-tap
+       when armed, point-by-point steps otherwise (js/v2/install-prompt.js). -->
+  <div id="install-card" role="dialog" aria-label="Install PDFLokal">
+    <button id="ic-close" aria-label="Tutup">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <div class="sc-head">Install PDFLokal di hapemu</div>
+    <p class="sc-sub">Biar besok nggak usah nyari lagi — langsung ada di layar HP, tetap jalan walau lagi offline.</p>
+    <div class="sc-actions" id="ic-onetap">
+      <button id="ic-install">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m8 11 4 4 4-4"/><path d="M4 19h16"/></svg>
+        Install PDFLokal
+      </button>
+    </div>
+    <div id="ic-steps" hidden>
+      <p class="ic-steps-title"></p>
+      <ol></ol>
+      <!-- Always-current backstop: our steps are a friendly first-guess; this links
+           to the browser vendor's official guide (exact labels drift by version). -->
+      <a id="ic-guide" class="ic-guide" target="_blank" rel="noopener" hidden>Lihat panduan resmi →</a>
+    </div>
+    <button id="ic-never">jangan tampilkan lagi</button>
   </div>
 
   <dialog id="pm-sheet" aria-label="Kelola halaman">
