@@ -738,12 +738,29 @@
        costs money — the free ask earns the bigger button (growth-loop guardrail). */
     #sc-share { border-color: var(--accent); background: var(--accent); color: #fff; }
     #ic-install { border-color: var(--accent); background: var(--accent); color: #fff; }
+    /* install chip — quiet, below the dropzone; shown to returning users only */
+    .ip-chip-wrap { display: flex; justify-content: center; margin-top: 14px; }
+    .ip-chip {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 8px 13px 8px 9px; border: 1px solid var(--line); background: var(--surface);
+      border-radius: 999px; font: inherit; font-size: 13px; font-weight: 600; color: var(--ink);
+      box-shadow: 0 2px 8px rgba(15,18,26,.06); cursor: pointer;
+    }
+    .ip-chip[hidden] { display: none; } /* beat the inline-flex vs [hidden] gotcha */
+    .ip-chip-ic { width: 20px; height: 20px; border-radius: 6px; }
+    .ip-chip-chev { width: 15px; height: 15px; color: var(--accent); margin-left: -1px; }
+    /* install card — step-by-step mode (when one-tap isn't available) */
+    #ic-onetap[hidden], #ic-steps[hidden] { display: none; }
+    #ic-steps { text-align: left; }
+    .ic-steps-title { font-size: 13px; font-weight: 600; color: var(--ink); margin: 2px 0 9px; }
+    #ic-steps ol { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 7px; }
+    #ic-steps li { font-size: 13px; color: var(--ink); line-height: 1.45; }
     .sc-qr { display: none; text-align: center; padding-top: 12px; }
     #support-card.qr-open .sc-qr { display: block; }
     #support-card.qr-open .sc-actions #sc-donate { border-color: var(--accent); color: var(--accent); }
     .sc-qr img { width: min(70vw, 220px); border-radius: 10px; border: 1px solid var(--line); }
     .sc-qr p { font-size: 11.5px; color: var(--muted); margin-top: 6px; }
-    #sc-never {
+    #sc-never, #ic-never {
       display: block; margin: 8px auto 0; color: var(--muted); font-size: 11px;
       text-decoration: underline; min-height: 32px; padding: 0 8px;
     }
@@ -847,6 +864,16 @@
           <span class="dz-buka">Buka File</span>
           <span class="dz-hint">PDF atau foto, boleh banyak sekaligus</span>
         </button>
+        <!-- Install chip: quiet, below the dropzone. Shown only to RETURNING users
+             (js/v2/install-prompt.js); tap opens the adaptive install card. Never
+             on the download moment — install must not compete with the share ask. -->
+        <div class="ip-chip-wrap">
+          <button class="ip-chip" id="ip-chip" hidden>
+            <img class="ip-chip-ic" src="/images/icon-192.png" alt="">
+            <span class="ip-chip-label">Install PDFLokal di hapemu</span>
+            <svg class="ip-chip-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </div>
         </div>
         <p class="ld-label">Mau ngapain hari ini?</p>
         <div class="ld-grid">
@@ -1042,20 +1069,25 @@
   </div>
 
   <!-- Install nudge: shown once, on a user's FIRST successful download, when the app
-       is installable. The recall play — put PDFLokal on the home screen so the next
-       PDF job returns free instead of a re-searched ad click (GA4 finding, Jul 2026). -->
-  <div id="install-card" role="dialog" aria-label="Simpan PDFLokal di HP">
+       is installable. Opened by the install chip; adapts to the browser — one-tap
+       when armed, point-by-point steps otherwise (js/v2/install-prompt.js). -->
+  <div id="install-card" role="dialog" aria-label="Install PDFLokal">
     <button id="ic-close" aria-label="Tutup">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     </button>
-    <div class="sc-head">Simpan PDFLokal di HP-mu</div>
+    <div class="sc-head">Install PDFLokal di hapemu</div>
     <p class="sc-sub">Biar besok nggak usah nyari lagi — langsung ada di layar HP, tetap jalan walau lagi offline.</p>
-    <div class="sc-actions">
+    <div class="sc-actions" id="ic-onetap">
       <button id="ic-install">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m8 11 4 4 4-4"/><path d="M4 19h16"/></svg>
-        Pasang PDFLokal
+        Install PDFLokal
       </button>
     </div>
+    <div id="ic-steps" hidden>
+      <p class="ic-steps-title"></p>
+      <ol></ol>
+    </div>
+    <button id="ic-never">jangan tampilkan lagi</button>
   </div>
 
   <dialog id="pm-sheet" aria-label="Kelola halaman">

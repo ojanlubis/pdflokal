@@ -23,16 +23,6 @@ async function openDoc(page) {
 }
 
 test.describe('growth loop — mobile', () => {
-  // A 2nd+ download with the one-tap install armed can take the download slot (see
-  // pwa-install.spec.js). These tests exercise the share/tip invite, so suppress the
-  // install nudge — deterministic regardless of whether Chromium fires
-  // beforeinstallprompt during the run.
-  test.beforeEach(async ({ page }) => {
-    await page.addInitScript(() => {
-      try { localStorage.setItem('pdflokal-install-seen', '1'); } catch { /* private mode */ }
-    });
-  });
-
   test('download celebrates (BERES stamp) and then invites — once per day', async ({ page }) => {
     await openDoc(page);
     await downloadOnce(page);

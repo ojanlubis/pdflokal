@@ -32,6 +32,7 @@ import { createSignatureModal } from './signature-modal.js';
 import { createDownloadSheet } from './download-sheet.js';
 import { track } from '../lib/analytics.js';
 import { createCelebration } from './celebrate.js';
+import { initInstallPrompt } from './install-prompt.js';
 import { applyIntentCopy } from './intent-copy.js';
 import { ensurePdfLib } from '../core/vendor.js';
 
@@ -123,6 +124,7 @@ function download(blob, filename) {
   celebration.onDownloadSuccess();
 }
 const celebration = createCelebration({ toast });
+initInstallPrompt(); // homepage "install to home screen" chip + adaptive card (off the download moment)
 
 // ---- zoom ---------------------------------------------------------------------
 // transform:scale + a sizer that carries the scaled layout size. NOT CSS zoom:
