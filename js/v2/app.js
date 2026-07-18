@@ -52,6 +52,7 @@ let storedSignature = null;   // { dataUrl, width, height } from the sig modal
 let baseName = 'dokumen';
 let editingAnno = null;       // text annotation currently in the inline editor
 let editingEl = null;         // its contenteditable (format bar restyles it live)
+let editingIsReplace = false; // Ganti Teks draft open → NO format bar (see below)
 
 const scrollEl = document.getElementById('v2-scroll');
 const stage = document.getElementById('v2-stage');
@@ -290,7 +291,14 @@ const formatBar = createFormatBar({
 });
 
 function syncFormatBar() {
-  formatBar.sync(!!(editingAnno || editingEl || selectedTextAnno() || tool === 'text'));
+  // FOUNDER RULING (2026-07-18, banked in ojan-ui-taste): editing ≠ redefining.
+  // A Ganti Teks draft's contract is IDENTITY with the printed original —
+  // offering font/color pickers there misreads the intent ("they want to edit,
+  // not redefine the text"). Fidelity is the machine's job (sampling, Rung C
+  // font matching), never a decision pushed to the user. The bar returns for
+  // authoring flows and for a committed text object selected afterwards.
+  const editing = (editingAnno || editingEl) && !editingIsReplace;
+  formatBar.sync(!!(editing || (!editingIsReplace && selectedTextAnno()) || tool === 'text'));
 }
 
 // ---- tools ----------------------------------------------------------------------
@@ -643,6 +651,7 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
 
   editingAnno = anno || null;
   editingEl = ed;
+  editingIsReplace = !!draft;
   syncFormatBar();
 
   let committed = false; // guard: blur fires after Enter-commit too
@@ -653,6 +662,7 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
     ed.remove();
     editingAnno = null;
     editingEl = null;
+    editingIsReplace = false;
     if (anno) {
       if (text && text !== anno.text) {
         record(history, doc);
