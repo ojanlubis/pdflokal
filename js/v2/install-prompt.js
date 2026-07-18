@@ -49,6 +49,17 @@ function countVisit() {
 }
 function isReturning() { return (parseInt(lget(VISITS_KEY), 10) || 0) >= 2; }
 
+// Official install guides — the authoritative source for the EXACT, current UI
+// labels (which drift by browser version + OS + locale). We keep a friendly
+// Indonesian first-guess AND link out to these. Step labels below were verified
+// against the live pages on 2026-07-18; re-check periodically — see the memory note
+// pwa-install-instructions-maintenance. (The link is the always-current backstop.)
+const GUIDE = {
+  ios: 'https://support.apple.com/guide/iphone/open-as-web-app-iphea86e5236/ios',
+  android: 'https://support.google.com/chrome/answer/9658361?hl=id&co=GENIE.Platform%3DAndroid',
+  desktop: 'https://support.google.com/chrome/answer/9658361?hl=id&co=GENIE.Platform%3DDesktop',
+};
+
 // The sophisticated bit: what CAN this browser do, and if not one-tap, how exactly?
 function detectInstall() {
   if (deferredPrompt) return { kind: 'onetap' };
@@ -58,7 +69,7 @@ function detectInstall() {
   const chromium = /chrome|crios|chromium|edg/i.test(ua) && !firefox;
 
   if (isIOS()) {
-    return { kind: 'steps', title: 'Caranya di iPhone/iPad:', steps: [
+    return { kind: 'steps', title: 'Caranya di iPhone/iPad:', url: GUIDE.ios, steps: [
       'Ketuk ikon Bagikan (kotak dengan panah ke atas) di bilah browser.',
       'Geser ke bawah, lalu ketuk “Tambah ke Layar Utama”.',
       'Ketuk “Tambah” di pojok kanan atas.',
@@ -77,18 +88,21 @@ function detectInstall() {
         'Pilih “Tambahkan halaman ke”, lalu “Layar Utama”.',
       ] };
     }
-    return { kind: 'steps', title: 'Caranya di Chrome:', steps: [
-      'Ketuk menu titik-tiga di pojok kanan atas.',
-      'Pilih “Install aplikasi” atau “Tambahkan ke Layar utama”.',
-      'Ketuk “Install”.',
+    // Official (Chrome Help, 2026-07-18): ⋮ More → "Add to home screen" → "Install".
+    return { kind: 'steps', title: 'Caranya di Chrome:', url: GUIDE.android, steps: [
+      'Ketuk menu titik-tiga di kanan address bar.',
+      'Pilih “Tambahkan ke Layar utama” (Add to Home screen).',
+      'Ketuk “Instal” buat konfirmasi.',
     ] };
   }
-  // Desktop
+  // Desktop. Official (Chrome Help, 2026-07-18): the address-bar install icon, OR
+  // ⋮ → "Cast, save, and share" → "Install page as app…" (the menu path moved —
+  // it used to be a top-level "Install…").
   if (chromium) {
-    return { kind: 'steps', title: 'Caranya di Chrome/Edge:', steps: [
-      'Klik ikon install (monitor dengan panah ke bawah) di ujung kanan address bar.',
-      'Atau buka menu titik-tiga lalu pilih “Install PDFLokal”.',
-      'Klik “Install”.',
+    return { kind: 'steps', title: 'Caranya di Chrome/Edge:', url: GUIDE.desktop, steps: [
+      'Klik ikon Instal (layar kecil dengan panah) di ujung kanan address bar, kalau ada.',
+      'Atau: menu titik-tiga → “Cast, save, and share” → “Install page as app…”.',
+      'Klik “Instal”.',
     ] };
   }
   if (/safari/i.test(ua)) {
@@ -115,6 +129,7 @@ export function initInstallPrompt() {
   const stepsBox = card.querySelector('#ic-steps');
   const stepsTitle = stepsBox.querySelector('.ic-steps-title');
   const stepsList = stepsBox.querySelector('ol');
+  const guideLink = stepsBox.querySelector('#ic-guide');
   const installBtn = card.querySelector('#ic-install');
 
   countVisit();
@@ -140,6 +155,9 @@ export function initInstallPrompt() {
         li.textContent = s;
         return li;
       }));
+      // Always-current backstop: link to the official guide when we have one.
+      if (info.url) { guideLink.href = info.url; guideLink.hidden = false; }
+      else { guideLink.hidden = true; }
     }
     card.classList.add('show');
     track('pwa_card_open', { mode: info.kind });

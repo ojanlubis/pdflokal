@@ -755,6 +755,8 @@
     .ic-steps-title { font-size: 13px; font-weight: 600; color: var(--ink); margin: 2px 0 9px; }
     #ic-steps ol { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 7px; }
     #ic-steps li { font-size: 13px; color: var(--ink); line-height: 1.45; }
+    .ic-guide { display: inline-block; margin-top: 11px; font-size: 12.5px; font-weight: 600; color: var(--accent); }
+    .ic-guide[hidden] { display: none; }
     .sc-qr { display: none; text-align: center; padding-top: 12px; }
     #support-card.qr-open .sc-qr { display: block; }
     #support-card.qr-open .sc-actions #sc-donate { border-color: var(--accent); color: var(--accent); }
@@ -1107,6 +1109,9 @@
     <div id="ic-steps" hidden>
       <p class="ic-steps-title"></p>
       <ol></ol>
+      <!-- Always-current backstop: our steps are a friendly first-guess; this links
+           to the browser vendor's official guide (exact labels drift by version). -->
+      <a id="ic-guide" class="ic-guide" target="_blank" rel="noopener" hidden>Lihat panduan resmi →</a>
     </div>
     <button id="ic-never">jangan tampilkan lagi</button>
   </div>
