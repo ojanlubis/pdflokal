@@ -348,23 +348,22 @@ async function smartReplace(pageId, x, y) {
     x: run.x, y: run.y, width: run.w, height: run.h,
   }));
   syncPage(pageId);
-  matchWhiteoutColor(cover, pageId, run.x + run.w / 2, run.y + run.h / 2);
   track('editor_action', { action: 'ganti_teks' });
-  openTextEditor({
-    pageId,
-    x: run.x,
-    y: run.y,
-    anno: null,
-    draft: {
-      text: run.str,
-      fontSize: Math.min(120, Math.max(6, Math.round(run.size))),
-      fontFamily: mapRunFont(run.fontFamily, run.fontName),
-      recorded: true,
-      // Backing out (Escape / empty commit) must not leave a mute cover over
-      // the original words — the cover belongs to the replace, not to itself.
-      onCancel: () => { removeAnnotation(doc, cover.id); syncPage(pageId); },
-    },
-  });
+  const draft = {
+    text: run.str,
+    fontSize: Math.min(120, Math.max(6, Math.round(run.size))),
+    fontFamily: mapRunFont(run.fontFamily, run.fontName),
+    recorded: true,
+    // Backing out (Escape / empty commit) must not leave a mute cover over
+    // the original words — the cover belongs to the replace, not to itself.
+    onCancel: () => { removeAnnotation(doc, cover.id); syncPage(pageId); },
+  };
+  openTextEditor({ pageId, x: run.x, y: run.y, anno: null, draft });
+  // Disarm NOW, not at commit (founder ruling, Jul 18 phone test): with the
+  // tool still armed, the tap that should only COMMIT also fired a second
+  // replace (miss toast / surprise editor). Click-down elsewhere = commit.
+  setTool('select');
+  matchReplaceColors(cover, draft, pageId, run); // async; colors land live
 }
 
 // Armed-mode affordance (recognition over recall): faintly mark every tappable
@@ -438,41 +437,95 @@ document.getElementById('btn-delete-anno').addEventListener('click', () => {
 // end). Sample two rings around the press point from the page raster and take
 // the per-channel median — thin ink strokes lose the vote to the surrounding
 // paper, so covering text on a cream scan yields cream. White stays white.
-async function matchWhiteoutColor(anno, pageId, ox, oy) {
+async function withPageRasterCtx(pageId) {
   const page = doc.pages.find((p) => p.id === pageId);
-  if (!page?.raster) return; // page not rasterized — keep default white
+  if (!page?.raster) return null; // page not rasterized — callers keep defaults
+  const img = new Image();
+  await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = page.raster.dataUrl; });
+  const c = document.createElement('canvas');
+  c.width = img.width; c.height = img.height;
+  const cx = c.getContext('2d', { willReadFrequently: true });
+  cx.drawImage(img, 0, 0);
+  const rotated = (page.rotation || 0) % 180 !== 0;
+  const frameW = rotated ? page.height : page.width;
+  return { cx, w: c.width, h: c.height, s: img.width / frameW }; // s = raster px per page point
+}
+const medOf = (arr) => arr.sort((a, b) => a - b)[Math.floor(arr.length / 2)];
+const medColor = (px) =>
+  `#${[0, 1, 2].map((ch) => medOf(px.map((p) => p[ch])).toString(16).padStart(2, '0')).join('')}`;
+const lumOf = (p) => 0.299 * p[0] + 0.587 * p[1] + 0.114 * p[2];
+
+function takeSample(r, x, y, into) {
+  if (x < 0 || y < 0 || x >= r.w || y >= r.h) return;
+  const px = r.cx.getImageData(Math.round(x), Math.round(y), 1, 1).data;
+  into.push([px[0], px[1], px[2]]);
+}
+
+async function matchWhiteoutColor(anno, pageId, ox, oy) {
   try {
-    const img = new Image();
-    await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = page.raster.dataUrl; });
-    const c = document.createElement('canvas');
-    c.width = img.width; c.height = img.height;
-    const cx = c.getContext('2d', { willReadFrequently: true });
-    cx.drawImage(img, 0, 0);
-    const rotated = (page.rotation || 0) % 180 !== 0;
-    const frameW = rotated ? page.height : page.width;
-    const s = img.width / frameW;              // raster px per page point
-    const samples = { r: [], g: [], b: [] };
-    const take = (x, y) => {
-      if (x < 0 || y < 0 || x >= c.width || y >= c.height) return;
-      const px = cx.getImageData(Math.round(x), Math.round(y), 1, 1).data;
-      samples.r.push(px[0]); samples.g.push(px[1]); samples.b.push(px[2]);
-    };
-    for (const radius of [6 * s, 12 * s]) {
+    const r = await withPageRasterCtx(pageId);
+    if (!r) return;
+    const samples = [];
+    for (const radius of [6 * r.s, 12 * r.s]) {
       for (let i = 0; i < 10; i += 1) {
         const ang = (Math.PI * 2 * i) / 10;
-        take(ox * s + radius * Math.cos(ang), oy * s + radius * Math.sin(ang));
+        takeSample(r, ox * r.s + radius * Math.cos(ang), oy * r.s + radius * Math.sin(ang), samples);
       }
     }
-    if (samples.r.length < 8) return;
-    const med = (arr) => arr.sort((a, b) => a - b)[Math.floor(arr.length / 2)];
-    const hex = (n) => n.toString(16).padStart(2, '0');
-    const color = `#${hex(med(samples.r))}${hex(med(samples.g))}${hex(med(samples.b))}`;
+    if (samples.length < 8) return;
+    const color = medColor(samples);
     updateAnnotation(doc, anno.id, { color });
     // Mid-gesture: update the LIVE element directly — rebuilding the overlay
     // here would destroy the element holding the pointer capture.
     const el = stage.querySelector(`[data-anno-id="${anno.id}"]`);
     if (el) el.style.background = color;
   } catch { /* sampling is best-effort; white stays */ }
+}
+
+// Ganti Teks colors, one raster read: the ring sampler above fails on big/bold
+// runs — rings around the CENTER land on ink, and the founder's deck title got
+// a dark slab for a cover (phone test, Jul 18). Paper is sampled just OUTSIDE
+// the run's box instead; ink = the in-box cluster farthest in luminance from
+// that paper, so a navy heading is retyped in navy without asking. Ink lands on
+// the DRAFT object live (the open editor restyles; commit reads the draft).
+async function matchReplaceColors(cover, draft, pageId, run) {
+  try {
+    const r = await withPageRasterCtx(pageId);
+    if (!r) return;
+    const o = 3 * r.s;
+    const paper = [];
+    for (let i = 0; i <= 4; i += 1) {
+      const x = (run.x + (run.w * i) / 4) * r.s;
+      takeSample(r, x, run.y * r.s - o, paper);
+      takeSample(r, x, (run.y + run.h) * r.s + o, paper);
+    }
+    for (const fy of [0.25, 0.75]) {
+      takeSample(r, run.x * r.s - o, (run.y + run.h * fy) * r.s, paper);
+      takeSample(r, (run.x + run.w) * r.s + o, (run.y + run.h * fy) * r.s, paper);
+    }
+    if (paper.length < 6) return;
+    const coverColor = medColor(paper);
+    updateAnnotation(doc, cover.id, { color: coverColor });
+    const el = stage.querySelector(`[data-anno-id="${cover.id}"]`);
+    if (el) el.style.background = coverColor;
+
+    const paperLum = lumOf(paper.map((p) => [p[0], p[1], p[2]])
+      .reduce((a, b) => [a[0] + b[0] / paper.length, a[1] + b[1] / paper.length, a[2] + b[2] / paper.length], [0, 0, 0]));
+    const inside = [];
+    for (let ix = 1; ix <= 8; ix += 1) {
+      for (let iy = 1; iy <= 3; iy += 1) {
+        takeSample(r, (run.x + (run.w * ix) / 9) * r.s, (run.y + (run.h * iy) / 4) * r.s, inside);
+      }
+    }
+    const ranked = inside.sort((a, b) => Math.abs(lumOf(b) - paperLum) - Math.abs(lumOf(a) - paperLum));
+    const ink = ranked.slice(0, Math.max(3, Math.floor(ranked.length / 4)));
+    // Anti-aliased gray on plain paper must NOT tint the text — only adopt the
+    // ink color when it clearly separates from the paper.
+    if (ink.length && Math.abs(lumOf(ink[Math.floor(ink.length / 2)]) - paperLum) > 40) {
+      draft.color = medColor(ink);
+      if (editingEl && !editingAnno) editingEl.style.color = draft.color;
+    }
+  } catch { /* best-effort; white cover + default ink stand */ }
 }
 
 // ---- interaction wiring ------------------------------------------------------------
