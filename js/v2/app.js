@@ -378,6 +378,9 @@ async function smartReplace(pageId, x, y) {
   // tool still armed, the tap that should only COMMIT also fired a second
   // replace (miss toast / surprise editor). Click-down elsewhere = commit.
   setTool('select');
+  // The arm toast ("Tap tulisan…") must not outlive its own step — with the
+  // editor open it instructs a thing already done (taste-judge, path law).
+  toastEl.classList.remove('show');
   matchReplaceColors(cover, draft, pageId, run); // async; colors land live
 }
 
@@ -690,9 +693,13 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
         fontSize: d.fontSize, fontFamily: d.fontFamily,
         bold: d.bold, italic: d.italic, color: d.color,
       }));
-      // Keep the fresh text SELECTED: the user sees it's an object, and a
-      // format-bar dropdown change right after the blur-commit still lands.
-      selectAnnotation(doc, created.id);
+      // Authored text stays SELECTED (the user sees it's an object; a format
+      // tweak right after the blur-commit still lands). A Ganti Teks commit
+      // does NOT auto-select: post-commit selection resurfaces the format bar
+      // on the flow's last frame — the redefine-invitation the founder ruled
+      // out (taste-judge finding, night run 2026-07-19). A later deliberate
+      // tap still selects it like any text object — one grammar, kept.
+      if (!draft) selectAnnotation(doc, created.id);
       track('editor_action', { action: 'text' });
     } else if (draft?.onCancel) {
       // Ganti Teks backed out with nothing typed — take the cover back too.

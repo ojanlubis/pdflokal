@@ -73,13 +73,17 @@ test.describe('ganti teks — happy path (tame fixture)', () => {
     expect(await page.evaluate(() => window.v2.getDoc().pages[0].annotations.length)).toBe(2);
   });
 
-  test('editing is not redefining: NO format bar during the replace draft (founder ruling)', async ({ page }) => {
+  test('editing is not redefining: NO format bar during the draft NOR at commit (founder ruling)', async ({ page }) => {
     await openDoc(page, FX('sample-2pages.pdf'));
     await armGanti(page);
     await tapRun(page);
     await expect(page.locator('#format-bar')).not.toHaveClass(/show/);
-    // After commit the object is selected — object-selected grammar brings it back.
+    // Commit does NOT auto-select (taste-judge, night 2026-07-19): the flow
+    // ends bar-free. A later DELIBERATE tap selects it like any text object —
+    // one grammar — and only then may the bar return.
     await page.keyboard.press('Enter');
+    await expect(page.locator('#format-bar')).not.toHaveClass(/show/);
+    await page.locator('.pv-anno-text').click();
     await expect(page.locator('#format-bar')).toHaveClass(/show/);
   });
 
