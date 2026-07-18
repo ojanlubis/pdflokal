@@ -67,7 +67,7 @@ function detectInstall() {
   if (/android/i.test(ua)) {
     if (firefox) {
       return { kind: 'steps', title: 'Caranya di Firefox:', steps: [
-        'Ketuk menu ⋮ di pojok kanan atas.',
+        'Ketuk menu titik-tiga di pojok kanan atas.',
         'Pilih “Install”.',
       ] };
     }
@@ -78,7 +78,7 @@ function detectInstall() {
       ] };
     }
     return { kind: 'steps', title: 'Caranya di Chrome:', steps: [
-      'Ketuk menu ⋮ di pojok kanan atas.',
+      'Ketuk menu titik-tiga di pojok kanan atas.',
       'Pilih “Install aplikasi” atau “Tambahkan ke Layar utama”.',
       'Ketuk “Install”.',
     ] };
@@ -87,7 +87,7 @@ function detectInstall() {
   if (chromium) {
     return { kind: 'steps', title: 'Caranya di Chrome/Edge:', steps: [
       'Klik ikon install (monitor dengan panah ke bawah) di ujung kanan address bar.',
-      'Atau buka menu ⋮ lalu pilih “Install PDFLokal”.',
+      'Atau buka menu titik-tiga lalu pilih “Install PDFLokal”.',
       'Klik “Install”.',
     ] };
   }
@@ -110,6 +110,7 @@ export function initInstallPrompt() {
 
   const chipLabel = chip.querySelector('.ip-chip-label');
   const cardTitle = card.querySelector('.sc-head');
+  const cardSub = card.querySelector('.sc-sub');
   const onetap = card.querySelector('#ic-onetap');
   const stepsBox = card.querySelector('#ic-steps');
   const stepsTitle = stepsBox.querySelector('.ic-steps-title');
@@ -117,9 +118,11 @@ export function initInstallPrompt() {
   const installBtn = card.querySelector('#ic-install');
 
   countVisit();
-  const where = deviceWord();
+  const where = deviceWord();                          // hapemu | komputermu
+  const screen = isMobile() ? 'layar HP' : 'desktop';  // where the icon lands
   chipLabel.textContent = `Install PDFLokal di ${where}`;
   cardTitle.textContent = `Install PDFLokal di ${where}`;
+  cardSub.textContent = `Biar besok nggak usah nyari lagi — langsung ada di ${screen}, tetap jalan walau lagi offline.`;
 
   function hideCard() { card.classList.remove('show'); }
   function openCard() {
