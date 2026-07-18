@@ -28,7 +28,7 @@ const TAP_SLOP = 12; // px of finger movement beyond which a press is not a tap
 //   stage:      container holding .pv-page views
 //   getDoc:     () => Doc
 //   getZoom:    () => number (CSS scale on the stage)
-//   getTool:    () => 'select' | 'text' | 'whiteout' | 'signature' | 'paraf'
+//   getTool:    () => 'select' | 'text' | 'whiteout' | 'signature' | 'paraf' | 'ganti'
 //   history:    core history (or null to disable undo recording)
 //   onChange:   (kind, payload) => void   — 'select' | 'move' | 'resize' | 'draw'
 //   onPlace:    (tool, {pageId, x, y}) => void — tap-to-place for text/signature
@@ -170,7 +170,7 @@ export function createInteraction(ctx) {
       startDraw(e, pageView, page);
       return;
     }
-    if (tool === 'text' || tool === 'signature' || tool === 'paraf') {
+    if (tool === 'text' || tool === 'signature' || tool === 'paraf' || tool === 'ganti') {
       // WHY preventDefault: onPlace may create + focus an inline editor NOW.
       // Canceling pointerdown suppresses the compatibility mousedown that
       // would otherwise fire right after and BLUR it (mouse only — touch

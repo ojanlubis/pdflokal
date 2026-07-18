@@ -27,6 +27,7 @@ import { createPageSlot, syncOverlay, textFontCss } from '../render/page-view.js
 import { createViewportStream } from '../render/viewport.js';
 import { createInteraction } from '../render/interaction.js';
 import { createFormatBar } from './format-bar.js';
+import { createTextRunIndex, mapRunFont } from './text-runs.js';
 import { createPageManager } from './page-manager.js';
 import { createSignatureModal } from './signature-modal.js';
 import { createDownloadSheet } from './download-sheet.js';
@@ -295,6 +296,7 @@ function syncFormatBar() {
 // ---- tools ----------------------------------------------------------------------
 function setTool(next) {
   tool = next;
+  if (next === 'ganti') showRunHints(); else clearRunHints();
   if (next !== 'signature') {
     const g = document.getElementById('sig-ghost');
     if (g) g.style.display = 'none';
@@ -317,7 +319,78 @@ for (const btn of document.querySelectorAll('#toolbar .tool[data-tool]')) {
     if (t === 'text') toast('Pilih tempat untuk menulis');
     if (t === 'whiteout') toast('Seret di halaman untuk menutup teks');
     if (t === 'signature') toast('Pilih tempat untuk menempatkan tanda tangan');
+    if (t === 'ganti') toast('Tap tulisan yang mau kamu ganti');
   });
+}
+
+// ---- Ganti Teks (Edit Teks Asli, Rung A — seat spec-edit-teks-asli.md) -----------
+// Tap a PRINTED run → cover it with a color-matched Tip-Ex + reopen the same
+// words as an editable text object, pre-selected so typing replaces. One
+// gesture, ONE undo step (recorded here; the editor commit skips its own).
+const textRuns = createTextRunIndex({ getDoc: () => doc });
+
+async function smartReplace(pageId, x, y) {
+  const run = await textRuns.hitTest(pageId, x, y);
+  if (!run) {
+    const runs = await textRuns.getRuns(pageId);
+    if (runs.length === 0) {
+      // The router (two-ladder ruling, seat decisions.md 2026-07-18): no text
+      // layer = a scan/photo — that's the dokumen-foto ladder, not this one.
+      track('ganti_no_text_layer');
+      toast('Halaman ini hasil scan/foto — teksnya belum bisa diganti');
+    } else {
+      toast('Nggak kena tulisan — tap tepat di teksnya ya');
+    }
+    return;
+  }
+  record(history, doc);
+  const cover = addAnnotation(doc, pageId, createAnnotation('whiteout', {
+    x: run.x, y: run.y, width: run.w, height: run.h,
+  }));
+  syncPage(pageId);
+  matchWhiteoutColor(cover, pageId, run.x + run.w / 2, run.y + run.h / 2);
+  track('editor_action', { action: 'ganti_teks' });
+  openTextEditor({
+    pageId,
+    x: run.x,
+    y: run.y,
+    anno: null,
+    draft: {
+      text: run.str,
+      fontSize: Math.min(120, Math.max(6, Math.round(run.size))),
+      fontFamily: mapRunFont(run.fontFamily, run.fontName),
+      recorded: true,
+      // Backing out (Escape / empty commit) must not leave a mute cover over
+      // the original words — the cover belongs to the replace, not to itself.
+      onCancel: () => { removeAnnotation(doc, cover.id); syncPage(pageId); },
+    },
+  });
+}
+
+// Armed-mode affordance (recognition over recall): faintly mark every tappable
+// run on the pages currently in the streaming window. Chrome-red, never prints.
+async function showRunHints() {
+  for (const slot of slots) {
+    if (!slot.page.raster) continue; // windowed pages only — bounded work
+    const runs = await textRuns.getRuns(slot.page.id);
+    if (tool !== 'ganti') return;    // disarmed while we were extracting
+    const overlay = slot.view.querySelector('.pv-overlay');
+    if (!overlay || overlay.querySelector('.pv-run-hints')) continue;
+    const layer = document.createElement('div');
+    layer.className = 'pv-run-hints';
+    layer.style.cssText = 'position:absolute;inset:0;pointer-events:none';
+    for (const r of runs) {
+      const d = document.createElement('div');
+      d.style.cssText =
+        `position:absolute;left:${r.x}px;top:${r.y}px;width:${r.w}px;height:${r.h}px;` +
+        'background:rgba(220,38,38,.07);outline:1px dashed rgba(220,38,38,.4);border-radius:1px';
+      layer.appendChild(d);
+    }
+    overlay.appendChild(layer);
+  }
+}
+function clearRunHints() {
+  stage.querySelectorAll('.pv-run-hints').forEach((el) => el.remove());
 }
 
 // ---- carried-signature ghost (desktop telegraph, founder Jul 3) -------------------
@@ -424,6 +497,8 @@ const interaction = createInteraction({
   onPlace: (t, { pageId, x, y }) => {
     if (t === 'text') {
       openTextEditor({ pageId, x, y, anno: null });
+    } else if (t === 'ganti') {
+      smartReplace(pageId, x, y); // async: extraction may need a moment on first tap
     } else if (t === 'signature' && storedSignature) {
       record(history, doc);
       // Paraf places small (initials), signature at document scale.
@@ -465,7 +540,7 @@ const pageManager = createPageManager({
   getDoc: () => doc,
   history,
   getRasterizer: () => rasterizer,
-  onDocChanged: rebuildStage,
+  onDocChanged: () => { textRuns.invalidateAll(); rebuildStage(); },
   onAddFiles: () => document.getElementById('file-input').click(),
   onExtract: async (pages) => {
     // Export ONLY the selected pages: a shallow Doc sharing the same sources.
@@ -492,12 +567,13 @@ document.getElementById('pm-close').addEventListener('click', () => pageManager.
 // ---- inline text editing ------------------------------------------------------------
 // One code path for "place new text" and "edit existing text": a contenteditable
 // positioned in the page overlay at page coords. Commit on blur / Enter.
-function openTextEditor({ pageId, x, y, anno }) {
+function openTextEditor({ pageId, x, y, anno, draft }) {
   const slot = slots.find((s) => s.page.id === pageId);
   if (!slot) return;
   const overlay = slot.view.querySelector('.pv-overlay');
   // New text starts from the format bar's sticky defaults (Canva behavior).
-  const style = anno || formatBar.getDefaults();
+  // A `draft` (Ganti Teks) pre-seeds content + matched font over those defaults.
+  const style = anno || (draft ? { ...formatBar.getDefaults(), ...draft } : formatBar.getDefaults());
 
   const ed = document.createElement('div');
   ed.className = 'v2-text-edit';
@@ -506,7 +582,7 @@ function openTextEditor({ pageId, x, y, anno }) {
   ed.style.top = (anno ? anno.y : y) + 'px';
   ed.style.font = textFontCss(style);
   ed.style.color = style.color || '#000';
-  ed.textContent = anno?.text || '';
+  ed.textContent = anno?.text || draft?.text || '';
 
   // Hide the original while editing (the editor visually replaces it).
   const origEl = anno ? overlay.querySelector(`[data-anno-id="${anno.id}"]`) : null;
@@ -534,8 +610,10 @@ function openTextEditor({ pageId, x, y, anno }) {
         removeAnnotation(doc, anno.id);
       }
     } else if (text) {
-      record(history, doc);
-      const d = formatBar.getDefaults();
+      // Ganti Teks recorded its ONE undo step before the cover was placed —
+      // recording again here would split one gesture into two undos.
+      if (!draft?.recorded) record(history, doc);
+      const d = { ...formatBar.getDefaults(), ...(draft || {}) };
       const created = addAnnotation(doc, pageId, createAnnotation('text', {
         text, x, y,
         fontSize: d.fontSize, fontFamily: d.fontFamily,
@@ -545,6 +623,9 @@ function openTextEditor({ pageId, x, y, anno }) {
       // format-bar dropdown change right after the blur-commit still lands.
       selectAnnotation(doc, created.id);
       track('editor_action', { action: 'text' });
+    } else if (draft?.onCancel) {
+      // Ganti Teks backed out with nothing typed — take the cover back too.
+      draft.onCancel();
     }
     syncPage(pageId);
     setTool('select');
@@ -566,7 +647,9 @@ function openTextEditor({ pageId, x, y, anno }) {
   // InvalidStateError. Caret-at-start beats a dead text tool.
   const sel = window.getSelection();
   sel.selectAllChildren(ed);
-  if (sel.rangeCount > 0) sel.collapseToEnd();
+  // Ganti Teks keeps the prefill SELECTED — typing straight over the old words
+  // is the whole gesture. Everyone else gets caret-at-end as before.
+  if (!draft && sel.rangeCount > 0) sel.collapseToEnd();
 }
 
 // ---- signature modal (draw / upload / paraf) --------------------------------------------
@@ -680,6 +763,7 @@ document.addEventListener('keydown', (e) => {
     if (k === 'v') setTool('select');
     else if (k === 't') setTool('text');
     else if (k === 'w') setTool('whiteout');
+    else if (k === 'g') setTool('ganti');
     else if (k === 's' || k === 'p') {
       if (storedSignature) setTool('signature');
       else signatureModal.open();
@@ -941,6 +1025,7 @@ async function resetDoc() {
   history.undoStack.length = 0;
   history.redoStack.length = 0;
   if (rasterizer) { await rasterizer.destroy(); rasterizer = null; }
+  await textRuns.destroy(); // fresh doc = fresh sources; cached pdf.js docs die with the old one
   slots = [];
   stage.innerHTML = '';
   baseName = 'dokumen';
