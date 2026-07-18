@@ -13,7 +13,14 @@
 
 // WHY crypto.randomUUID: Resets on page refresh — not a persistent user ID.
 // This is intentional: we only care about single-session behavior.
-const sessionId = crypto.randomUUID();
+// WHY the fallback: randomUUID exists only in SECURE contexts (https/localhost).
+// Over LAN http (phone → http://192.168.x.x:5050, the founder's device-test
+// path) it is undefined — and because this line runs at module top level, the
+// throw killed the ENTIRE app.js import graph: page rendered, every button
+// dead. A session id needs uniqueness, not cryptography.
+const sessionId = typeof crypto?.randomUUID === 'function'
+  ? crypto.randomUUID()
+  : `s-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
 /**
  * Track a custom event via Vercel Web Analytics.
