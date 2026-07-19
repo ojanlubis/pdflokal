@@ -27,6 +27,7 @@ create index if not exists events_ts_idx on events (ts desc);
 create index if not exists events_event_idx on events (event);
 
 alter table events enable row level security;
+revoke all on table events from anon, authenticated;
 -- No policies are created — intentionally. RLS with zero policies denies
 -- ALL access to anon and authenticated roles by default in PostgREST. The
 -- service-role key api/t.js uses BYPASSES RLS entirely (Supabase's
@@ -37,7 +38,8 @@ alter table events enable row level security;
 
 -- Daily volume per event — the first thing any PM session should look at
 -- before writing a new spec: is the wild sending anything at all.
-create or replace view v_daily_events as
+create or replace view v_daily_events
+with (security_invoker = on) as
 select
   date_trunc('day', ts) as day,
   event,
@@ -50,7 +52,8 @@ order by 1 desc, 2;
 -- `reason` prop (surgery / insert / block_edit) — the honesty rate: how often
 -- the real world declines each rung, and why, verbatim per the code's own
 -- named reasons (js/core/telemetry-schema.js's SCHEMA).
-create or replace view v_decline_reasons as
+create or replace view v_decline_reasons
+with (security_invoker = on) as
 select
   event,
   props->>'reason' as reason,
@@ -65,7 +68,8 @@ order by 1, n desc;
 -- Android column, now live from day one of the ladder merge. duration is
 -- stored as a number (ms, already clamped+rounded by durationBucket()) inside
 -- props, so it's cast numeric here rather than compared as text.
-create or replace view v_commit_latency as
+create or replace view v_commit_latency
+with (security_invoker = on) as
 select
   props->>'device' as device,
   percentile_cont(0.5) within group (order by (props->>'duration')::numeric) as p50_ms,
@@ -77,6 +81,15 @@ where event = 'commit_paint'
   and props ? 'duration'
 group by 1
 order by 1;
+
+-- WHY security_invoker + revokes (hardening, applied 2026-07-20): a default
+-- Postgres view runs with its OWNER's privileges, which BYPASSES the events
+-- table's RLS — through PostgREST the anon key could have read the aggregate
+-- views even though the table denies everything. security_invoker=on makes
+-- each view respect the CALLER's rights (PG15+), and the revokes close direct
+-- REST access to the views themselves. Applied to project gvtknjudulezpoyhlmzx
+-- as migration telemetry_events_v1 (this file is its source of truth).
+revoke all on v_daily_events, v_decline_reasons, v_commit_latency from anon, authenticated;
 
 -- ---- retention (spec §2/§7): 180 days, instrumentation not a warehouse --------
 -- This is NOT scheduled by this migration (no pg_cron dependency assumed).
