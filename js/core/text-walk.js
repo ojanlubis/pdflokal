@@ -197,6 +197,11 @@ export function walkShowOps(src, fonts) {
           op: rec.op, start: rec.start, end: rec.end, tokens: rec.tokens,
           x: full[4], y: full[5], ux, uy, size,
           exact, advanceText, th: Th, fontSize, btIndex,
+          // The RESOURCE font name (the Tf operand) — Rung C's re-insert needs
+          // it to write replacement text with the document's OWN font; pdf.js
+          // only ever exposes its internal id, so the walk is the one place
+          // this name is knowable.
+          fontName,
         });
 
         if (advanceText === null) posValid = false; // can't prove where the NEXT op sits
@@ -274,7 +279,22 @@ export function planRunRemoval(src, fonts, targets) {
     const matches = matchesByTarget[ti];
     if (matches.length === 0) continue;
     if (matches.some((r) => badBts.has(r.btIndex))) continue; // declined
-    results[ti] = { matched: true, ops: matches.length };
+    // `insert` describes where/how the REMOVED text was painted — everything
+    // Rung C's native re-insert needs to put replacement text back with the
+    // document's own font: the resource font name + size of the first cut op,
+    // and its exact painted origin/direction/rendered size. Single-font per
+    // target is the honest claim (a mixed-font line reports its FIRST op's
+    // font; the coverage check downstream decides whether that's usable).
+    const first = matches.reduce((a, b) => (a.start <= b.start ? a : b));
+    results[ti] = {
+      matched: true,
+      ops: matches.length,
+      insert: {
+        fontName: first.fontName, fontSize: first.fontSize,
+        x: first.x, y: first.y, ux: first.ux, uy: first.uy, size: first.size,
+        mixedFonts: matches.some((r) => r.fontName !== first.fontName),
+      },
+    };
     cuts.push(...matches);
   }
 

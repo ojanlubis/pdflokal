@@ -173,3 +173,20 @@ test('12. adjacent-run guard: target geometry for the first run does not eat the
   assert.equal(after[1].tokens.some((t) => t.t === 'str'), true);
   approx(after[1].x, before[1].x);
 });
+
+test('planRunRemoval reports the removed text\'s paint info for re-insert (Rung C)', () => {
+  const fonts = new Map([['F1', { bytesPerCode: 1, widths: new Map([[65, 500], [66, 500]]), defaultWidth: 0 }]]);
+  const src = 'BT /F1 12 Tf 72 700 Td (AB) Tj ET';
+  const { results } = planRunRemoval(src, fonts, [
+    { x0: 72, y0: 700, ux: 1, uy: 0, len: 12, size: 12 },
+  ]);
+  assert.equal(results[0].matched, true);
+  // The insert block carries the RESOURCE font name + exact painted geometry —
+  // pdf.js never exposes the resource name, so the walk must.
+  assert.equal(results[0].insert.fontName, 'F1');
+  assert.equal(results[0].insert.fontSize, 12);
+  assert.equal(results[0].insert.x, 72);
+  assert.equal(results[0].insert.y, 700);
+  assert.equal(results[0].insert.size, 12);
+  assert.equal(results[0].insert.mixedFonts, false);
+});
