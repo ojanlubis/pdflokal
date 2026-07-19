@@ -14,6 +14,7 @@
 import { createSource, createPage, getSource } from './model.js';
 import { addSource, addPages } from './operations.js';
 import { ensurePdfJs } from './vendor.js';
+import { editSignature } from './page-surgery.js';
 
 // bytes → append a Source + its Pages (metadata only) to `doc`. Returns the pages.
 export async function importPdf(doc, { name, bytes }) {
@@ -112,9 +113,68 @@ export async function rasterizePage(doc, page, opts = {}) {
 // rendering (Phase 2) can rasterize many pages without reloading the whole PDF
 // each time. This is the render-layer's tool for "3-nearest" loading on any
 // document size within a bounded memory budget.
-export function createPageRasterizer(doc) {
+//
+// `opts.editedPageProvider` (spec-live-surgery.md §4, increment 2): an
+// optional async `(page) => ({ bytes } | null)`. When present AND a page
+// carries committed edits (`editSignature(page)` non-empty), that page
+// rasterizes from page 1 of the PROVIDER's bytes instead of `sourcePageNum`
+// of the shared source doc — the edited single-page pdf.js document is
+// cached per page.id, keyed by the edit-signature that produced it, so an
+// unchanged edit set never re-asks the provider (which itself re-runs the
+// surgery pipeline — not free). Injected rather than imported directly: this
+// module stays ignorant of how bytes get built (pdf-lib/fontkit loading,
+// pairing cover+text annotations into an edit) — that's js/v2/app.js's job,
+// kept OUT of this headless-adjacent I/O adapter. `editSignature` itself is
+// imported directly (pure core, zero vendor deps, not "v2 code") purely so
+// this cache can know WHEN to ask again.
+export function createPageRasterizer(doc, opts = {}) {
   const docCache = new Map(); // sourceId -> PDF.js document promise
   const imgCache = new Map(); // sourceId -> ImageBitmap promise (image sources)
+  const editedDocCache = new Map(); // page.id -> { signature, docPromise: Promise<PDF.js doc|null> }
+
+  // Drop (and destroy) any cached edited-page doc for `pageId`. Increment 2
+  // wires this method but nothing yet CALLS it on commit/undo/redo (spec
+  // build order §8.2 — that's increment 3's job); it exists now so the cache
+  // is self-correcting the moment that wiring lands, and so a page whose
+  // edit-signature has already changed (checked below) never serves a stale
+  // doc even before that wiring exists.
+  function invalidateEditedPage(pageId) {
+    const cached = editedDocCache.get(pageId);
+    if (!cached) return;
+    editedDocCache.delete(pageId);
+    cached.docPromise.then((pdfDoc) => pdfDoc && pdfDoc.destroy()).catch(() => { /* already gone */ });
+  }
+
+  // Resolve the edited-page pdf.js document for `page`, or null when there's
+  // no provider, no committed edits, or the provider declined (any throw is
+  // swallowed here too — belt and suspenders alongside the provider's own
+  // guard — a broken provider must never break rasterization).
+  function getEditedDoc(page) {
+    if (!opts.editedPageProvider) return null;
+    const signature = editSignature(page);
+    if (!signature) {
+      invalidateEditedPage(page.id); // edits were undone/removed — stop serving stale bytes
+      return null;
+    }
+    const cached = editedDocCache.get(page.id);
+    if (cached && cached.signature === signature) return cached.docPromise;
+    if (cached) invalidateEditedPage(page.id); // signature moved on — rebuild
+    const docPromise = (async () => {
+      let result;
+      try {
+        result = await opts.editedPageProvider(page);
+      } catch (err) {
+        console.warn('[core/import] editedPageProvider threw, falling back to source render:', err);
+        return null;
+      }
+      if (!result || !result.bytes) return null;
+      const pdfjsLib = await ensurePdfJs();
+      const bytes = result.bytes;
+      return pdfjsLib.getDocument({ data: bytes.slice ? bytes.slice() : Uint8Array.from(bytes) }).promise;
+    })();
+    editedDocCache.set(page.id, { signature, docPromise });
+    return docPromise;
+  }
 
   function getPdf(sourceId) {
     if (!docCache.has(sourceId)) {
@@ -141,11 +201,20 @@ export function createPageRasterizer(doc) {
   }
 
   async function renderPdfToCanvas(page, scale) {
-    const pdf = await getPdf(page.sourceId);
-    const pdfPage = await pdf.getPage(page.sourcePageNum + 1);
-    // Intrinsic /Rotate + the user's rotation (PDF.js `rotation:` is absolute).
-    const rotation = ((page.baseRotation || 0) + (page.rotation || 0)) % 360;
-    const vp = pdfPage.getViewport({ scale, rotation });
+    const editedDoc = await getEditedDoc(page);
+    const pdf = editedDoc || await getPdf(page.sourceId);
+    const pdfPage = editedDoc ? await pdf.getPage(1) : await pdf.getPage(page.sourcePageNum + 1);
+    // Edited docs are a single already-baked page — buildEditedPageBytes sets
+    // its /Rotate exactly the way buildPdfBytes does (see page-surgery.js),
+    // so its OWN metadata is authoritative and pdf.js should just read it —
+    // no explicit override, unlike the plain path below. This is also
+    // exactly what a downloaded PDF would render as, so the editor's live
+    // raster and the final export stay pixel-consistent by construction.
+    // Plain path: intrinsic /Rotate + the user's rotation (PDF.js
+    // `rotation:` is absolute, not additive over the intrinsic value).
+    const vp = editedDoc
+      ? pdfPage.getViewport({ scale })
+      : pdfPage.getViewport({ scale, rotation: ((page.baseRotation || 0) + (page.rotation || 0)) % 360 });
     const canvas = document.createElement('canvas');
     canvas.width = Math.ceil(vp.width);
     canvas.height = Math.ceil(vp.height);
@@ -193,11 +262,16 @@ export function createPageRasterizer(doc) {
       const canvas = await renderToCanvas(page, width / pageW);
       return { dataUrl: canvas.toDataURL('image/png'), width: canvas.width, height: canvas.height };
     },
+    invalidateEditedPage,
     async destroy() {
       for (const p of docCache.values()) { try { (await p).destroy(); } catch { /* already gone */ } }
       docCache.clear();
       for (const p of imgCache.values()) { try { (await p).close(); } catch { /* already gone */ } }
       imgCache.clear();
+      for (const { docPromise } of editedDocCache.values()) {
+        try { const pdfDoc = await docPromise; if (pdfDoc) await pdfDoc.destroy(); } catch { /* already gone */ }
+      }
+      editedDocCache.clear();
     },
   };
 }

@@ -39,6 +39,7 @@ import { readPageContents, extractFontMetrics } from '../core/redact.js';
 import { planRunRemoval } from '../core/text-walk.js';
 import { extractFontProgram } from '../core/reinsert.js';
 import { getFontStyleInfo } from '../core/font-style.js';
+import { buildEditedPageBytes, editSignature } from '../core/page-surgery.js';
 
 // WHY there is no `window.pdfjsLib.…workerSrc = …` line here any more: pdf.js is
 // loaded on demand now (core/vendor.js), so touching it at module top-level
@@ -377,6 +378,38 @@ function getDryRunDoc(PDFLib, source) {
     pdfLibDocCache.set(source.id, PDFLib.PDFDocument.load(source.bytes));
   }
   return pdfLibDocCache.get(source.id);
+}
+
+// spec-live-surgery.md increment 2 (§3/§4/§8.2): the rasterizer's injected
+// boundary onto a page's committed edits, WITHOUT core/import.js ever
+// importing this v2 app module. Reuses the SAME dry-run pdf-lib doc
+// smartReplace/prepareDocFont already cache per source above — copyPages
+// only READS srcDoc (buildPdfBytes' own srcDocCache already shares one load
+// across every page of a source the same way), so handing the throwaway
+// dry-run doc to buildEditedPageBytes is safe even though it was originally
+// named for a different caller.
+//
+// Only the PIPELINE lands here, not its trigger: nothing yet calls
+// rasterizer.invalidateEditedPage() or re-rasterizes on commit/undo/redo
+// (that's increment 3) — this provider just answers "what should this
+// page's background be, right now" correctly whenever createPageRasterizer
+// happens to ask (first render, zoom change, viewport re-entry). Any
+// failure — missing source, no PDFLib/fontkit, buildEditedPageBytes
+// throwing — returns null so the rasterizer falls back to the plain source
+// render; a broken edited-page build must never break rasterization.
+async function editedPageProvider(page) {
+  try {
+    if (!editSignature(page)) return null; // no committed edits — today's path
+    const source = getSource(doc, page.sourceId);
+    if (!source) return null;
+    const { PDFLib, fontkit } = await ensurePdfLib();
+    const srcDoc = await getDryRunDoc(PDFLib, source);
+    const result = await buildEditedPageBytes(srcDoc, page, page.annotations, { PDFLib, fontkit });
+    return result.bytes ? { bytes: result.bytes } : null;
+  } catch (err) {
+    console.warn('editedPageProvider gagal, pakai raster asli:', err);
+    return null;
+  }
 }
 
 // Outcome cache, keyed by sourceId + RESOURCE font name (not by line — many
@@ -1202,7 +1235,7 @@ async function loadFilesInner(files) {
     return;
   }
 
-  if (!rasterizer) rasterizer = createPageRasterizer(doc);
+  if (!rasterizer) rasterizer = createPageRasterizer(doc, { editedPageProvider });
   emptyEl.style.display = 'none';
   document.body.classList.remove('is-empty'); // landing yields, editor chrome returns
 
@@ -1478,4 +1511,5 @@ window.v2 = {
   getTool: () => tool,
   history,
   pageManager, // tests: force a grid re-render mid-drag (Sentry fee8a76e repro)
+  getRasterizer: () => rasterizer, // tests: drive the real live-surgery raster path (tests/live-raster.spec.js)
 };

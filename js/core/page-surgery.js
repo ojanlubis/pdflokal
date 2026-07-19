@@ -157,3 +157,109 @@ export function applyPageSurgery(pdfPage, PDFLib, fontkit, annotations) {
   const skipDraw = planNativeInserts(pdfPage, PDFLib, fontkit, annotations, skipCovers, insertByCover);
   return { skipCovers, skipDraw, insertByCover };
 }
+
+// ---- Rung D: the editor's own per-page pipeline (spec-live-surgery.md §3/§4) --
+// buildPdfBytes above needs the WHOLE document; the editor needs exactly ONE
+// page's bytes, on demand, at commit time — same two rungs, same honesty,
+// scoped down. Both callers converge on applyPageSurgery(); this section adds
+// the second caller's own entry points.
+
+// A committed Ganti pair on `page`: a whiteout cover carrying replaceTargets/
+// replaceBox, paired with the text annotation (if any) whose replaceCoverId
+// points back at it. This is the SAME candidate shape runSurgery's own
+// `candidates` filter uses (type==='whiteout' && replaceTargets?.length &&
+// replaceBox) — deliberately not re-deriving a different notion of "edit".
+// Freeform annotations (signatures, standalone Teks, real whiteout, TTD) never
+// match this filter, so they never count as edits (spec §2).
+function pageEdits(page) {
+  return page.annotations
+    .filter((anno) => anno.type === 'whiteout' && anno.replaceTargets?.length && anno.replaceBox)
+    .map((cover) => ({
+      coverId: cover.id,
+      targets: cover.replaceTargets,
+      replacement: page.annotations.find((anno) => anno.type === 'text' && anno.replaceCoverId === cover.id),
+    }));
+}
+
+// A stable string over a page's committed edit set — the memo key
+// core/import.js's edited-page cache (and any future caller) uses to decide
+// "has this page's edit set actually changed since I last baked it". Empty
+// string means "no committed edits", i.e. the plain source render is already
+// correct. Built ONLY from fields that actually change buildEditedPageBytes'
+// output (target geometry, replacement text, its style) — an unrelated
+// annotation field (e.g. the cover's own current x/y, which surgery never
+// reads) must NOT appear here, or a no-op change would falsely invalidate a
+// still-correct cache.
+export function editSignature(page) {
+  const edits = pageEdits(page);
+  if (edits.length === 0) return '';
+  const parts = edits.map(({ coverId, targets, replacement }) => ({
+    coverId,
+    targets,
+    text: replacement?.text ?? null,
+    style: replacement
+      ? {
+        fontFamily: replacement.fontFamily,
+        fontSize: replacement.fontSize,
+        bold: !!replacement.bold,
+        italic: !!replacement.italic,
+        color: replacement.color,
+      }
+      : null,
+  }));
+  return JSON.stringify(parts);
+}
+
+// Build a single-page PDF for `page` carrying the SAME surgery + native-
+// insert pipeline export.js runs at download time — the editor's live re-
+// render calls this at commit (spec-live-surgery.md §3/§4) so a page's
+// background raster shows the truth instead of a DOM cover+sticker collage.
+//
+// `srcDoc` is the ALREADY-LOADED pdf-lib document for the page's source
+// (callers are expected to cache this per source, same discipline
+// buildPdfBytes' own srcDocCache and js/v2/app.js's pdfLibDocCache already
+// follow — copyPages only READS srcDoc, so sharing one load across many
+// pages/edits is safe). `annotations` is the page's own annotation list —
+// the SAME input shape buildPdfBytes hands to applyPageSurgery; this
+// function does not pre-filter it down to just the Ganti pairs —
+// applyPageSurgery already scopes itself to whiteout-with-replaceTargets /
+// text-with-replaceCoverId internally, exactly as it does for export.
+//
+// Declined edits are NEVER drawn into these bytes (spec Decision 2 default:
+// a declined edit stays a DOM-overlay cover, not baked Tip-Ex) — unlike
+// buildPdfBytes, there is no ANNOTATION_DRAWERS loop here at all.
+//
+// Returns `{ bytes: null, applied: new Set(), declined }` when nothing
+// applied — the caller must render the plain source page in that case.
+export async function buildEditedPageBytes(srcDoc, page, annotations, deps = {}) {
+  const { PDFLib, fontkit } = deps;
+  const newDoc = await PDFLib.PDFDocument.create();
+  // ONE copyPages call — variant B from the timing spike
+  // (tests/spike/live-surgery-timing-lib.js): a page-scoped save is cheaper
+  // than a whole-doc save on large files, identical on small ones.
+  const [copiedPage] = await newDoc.copyPages(srcDoc, [page.sourcePageNum]);
+  const pdfPage = newDoc.addPage(copiedPage);
+  // Same rotation handling as buildPdfBytes' own copyPages path, exactly:
+  // the copy already carries the source page's inherited /Rotate; only an
+  // explicit page.rotation (a user-applied in-editor rotate) overrides it.
+  if (page.rotation) pdfPage.setRotation(PDFLib.degrees(page.rotation));
+
+  const { skipCovers, skipDraw } = applyPageSurgery(pdfPage, PDFLib, fontkit, annotations);
+
+  // Every whiteout carrying a replace intent is a candidate edit (regardless
+  // of whether its birth-box overlap still holds — see overlapsBirthBox
+  // above); any that didn't make skipCovers declined, exactly answering the
+  // question runSurgery itself already asked internally — read back out here
+  // so the caller knows which covers still need their DOM-overlay fallback
+  // (spec Decision 2 default).
+  const editCoverIds = annotations
+    .filter((anno) => anno.type === 'whiteout' && anno.replaceTargets?.length && anno.replaceBox)
+    .map((anno) => anno.id);
+  const declined = editCoverIds.filter((coverId) => !skipCovers.has(coverId));
+  const applied = new Set([...skipCovers, ...skipDraw]);
+
+  if (applied.size === 0) return { bytes: null, applied, declined };
+
+  const bytes = await newDoc.save({ useObjectStreams: true, addDefaultPage: false });
+  return { bytes, applied, declined };
+}
