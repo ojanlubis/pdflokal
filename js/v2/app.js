@@ -391,6 +391,11 @@ async function smartReplace(pageId, x, y) {
     fontSize: Math.min(120, Math.max(6, Math.round(line.size))),
     fontFamily: mapRunFont(line.fontFamily, line.fontName),
     recorded: true,
+    // Rung C (core/export.js): pairs the committed TEXT annotation with the
+    // cover it replaces, so export can try writing it natively into the
+    // content stream with the document's OWN font once surgery on THIS cover
+    // has proven the original run is truly gone.
+    replaceCoverId: cover.id,
     // Backing out (Escape / empty commit) must not leave a mute cover over
     // the original words — the cover belongs to the replace, not to itself.
     onCancel: () => { removeAnnotation(doc, cover.id); syncPage(pageId); },
@@ -738,10 +743,14 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
       // recording again here would split one gesture into two undos.
       if (!draft?.recorded) record(history, doc);
       const d = { ...formatBar.getDefaults(), ...(draft || {}) };
+      // replaceCoverId only ever comes from a Ganti Teks draft — omit the key
+      // entirely for ordinary authored text rather than carry an undefined.
+      const replaceProps = d.replaceCoverId ? { replaceCoverId: d.replaceCoverId } : {};
       const created = addAnnotation(doc, pageId, createAnnotation('text', {
         text, x, y,
         fontSize: d.fontSize, fontFamily: d.fontFamily,
         bold: d.bold, italic: d.italic, color: d.color,
+        ...replaceProps,
       }));
       // Authored text stays SELECTED (the user sees it's an object; a format
       // tweak right after the blur-commit still lands). A Ganti Teks commit

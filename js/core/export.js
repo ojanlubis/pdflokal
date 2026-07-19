@@ -23,6 +23,7 @@
 
 import { buildExportPlan } from './operations.js';
 import { removeRunsFromPdfPage } from './redact.js';
+import { planNativeInsert, appendNativeText } from './reinsert.js';
 
 // ---- fonts ------------------------------------------------------------------
 
@@ -303,10 +304,15 @@ function overlapsBirthBox(anno) {
 }
 
 // Cut the original show-text ops for every whiteout cover that still carries
-// a valid, un-moved replace intent. Returns the set of annotation ids whose
-// cover should be SKIPPED at draw time (the true background shows through —
-// strictly better than a sampled-color rectangle). Never throws: any surgery
-// failure falls back to an empty set, so the cover ships and the export lives.
+// a valid, un-moved replace intent. Returns { skipCovers, insertByCover }:
+// skipCovers is the set of annotation ids whose cover should be SKIPPED at
+// draw time (the true background shows through — strictly better than a
+// sampled-color rectangle); insertByCover maps that SAME cover id to the
+// text-walk.js `insert` geometry the removed run painted with — Rung C's
+// native re-insert needs it to write the replacement back with the
+// document's own font (see planNativeInserts below). Never throws: any
+// surgery failure falls back to both empty, so the cover ships and the
+// export lives.
 //
 // replaceTargets is an ARRAY (founder ruling 2026-07-19: the LINE is the
 // editing primitive — a whole-line target can in principle span more than one
@@ -315,10 +321,11 @@ function overlapsBirthBox(anno) {
 // sliced back per annotation in the same order they were flattened.
 function runSurgery(pdfPage, PDFLib, annotations) {
   const skipCovers = new Set();
+  const insertByCover = new Map();
   const candidates = annotations.filter(
     (a) => a.type === 'whiteout' && a.replaceTargets?.length && a.replaceBox && overlapsBirthBox(a),
   );
-  if (candidates.length === 0) return skipCovers;
+  if (candidates.length === 0) return { skipCovers, insertByCover };
   try {
     const flatTargets = [];
     const spans = []; // [start, end) into flatTargets, per candidate
@@ -335,14 +342,51 @@ function runSurgery(pdfPage, PDFLib, annotations) {
       // gone from the content stream either way, so the cover MUST stay to
       // hide the now-broken remainder. Never leave a half-removed line
       // uncovered.
-      if (slice.length > 0 && slice.every((r) => r.matched)) skipCovers.add(a.id);
+      if (slice.length > 0 && slice.every((r) => r.matched)) {
+        skipCovers.add(a.id);
+        // The line always STARTS at its first target — the honest entry
+        // point for where replacement text should paint, even on the (not
+        // yet produced, but architecturally allowed) multi-target line.
+        insertByCover.set(a.id, slice[0].insert);
+      }
     });
   } catch (err) {
     // WHY warn-and-continue: an export must NEVER fail or degrade because
     // surgery had trouble — the Rung A cover fallback is always still there.
     console.warn('[core/export] surgery failed, covers kept:', err);
   }
-  return skipCovers;
+  return { skipCovers, insertByCover };
+}
+
+// ---- Rung C: native re-insert (own-font replacement) ------------------------
+
+// For every TEXT annotation born from a Ganti Teks replace (carries
+// replaceCoverId — see js/v2/app.js's smartReplace/openTextEditor) whose
+// cover's surgery just succeeded, try to write its text INTO the content
+// stream using the document's OWN font instead of drawing a metric-twin
+// annotation on top. Returns the set of annotation ids painted natively —
+// the drawing loop below skips those. Any decline (mixed fonts, multiline,
+// missing glyph, unsupported font shape, no fontkit, …) or thrown error just
+// leaves the id out of the set: the twin drawer paints it exactly as today.
+// Never a hard failure — mirrors runSurgery's discipline one level up.
+function planNativeInserts(pdfPage, PDFLib, fontkit, annotations, skipCovers, insertByCover) {
+  const skipDraw = new Set();
+  if (!fontkit) return skipDraw; // same deps guard as the custom-font embed path
+  for (const anno of annotations) {
+    if (anno.type !== 'text' || !anno.replaceCoverId || !skipCovers.has(anno.replaceCoverId)) continue;
+    const insert = insertByCover.get(anno.replaceCoverId);
+    if (!insert) continue;
+    try {
+      const plan = planNativeInsert(pdfPage, PDFLib, fontkit, { insert, text: anno.text, color: anno.color });
+      if (plan.ok) {
+        appendNativeText(pdfPage, PDFLib, plan.snippet);
+        skipDraw.add(anno.id);
+      }
+    } catch (err) {
+      console.warn('[core/export] native re-insert failed, falling back to twin draw:', err);
+    }
+  }
+  return skipDraw;
 }
 
 // ---- image pages -------------------------------------------------------------
@@ -414,7 +458,15 @@ export async function buildPdfBytes(doc, deps = {}) {
     // content pdf-lib itself just wrote (and rewrite the wrong stream at that).
     // Image pages can't carry text targets at all — guarded (not just inert)
     // so a future image-page shape change can't accidentally feed it here.
-    const skipCovers = page.isFromImage ? new Set() : runSurgery(pdfPage, PDFLib, annotations);
+    const { skipCovers, insertByCover } = page.isFromImage
+      ? { skipCovers: new Set(), insertByCover: new Map() }
+      : runSurgery(pdfPage, PDFLib, annotations);
+    // Rung C also runs HERE, before any drawing, for the same reason —
+    // appendNativeText's own content-stream append must land before pdf-lib's
+    // first draw call touches this page (see reinsert.js).
+    const skipDraw = page.isFromImage
+      ? new Set()
+      : planNativeInserts(pdfPage, PDFLib, fontkit, annotations, skipCovers, insertByCover);
 
     if (annotations.length === 0) continue;
     // wU/hU: UNROTATED page dims (MediaBox) — setRotation is metadata only,
@@ -423,6 +475,7 @@ export async function buildPdfBytes(doc, deps = {}) {
     const frame = { rotation: page.rotation || 0, wU, hU };
     for (const anno of annotations) {
       if (skipCovers.has(anno.id)) continue; // surgery succeeded — true background shows through
+      if (skipDraw.has(anno.id)) continue; // Rung C wrote this one natively — don't double-paint
       const draw = ANNOTATION_DRAWERS[anno.type];
       if (!draw) {
         console.warn('[core/export] Unknown annotation type, skipping:', anno.type);
