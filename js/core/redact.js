@@ -159,6 +159,26 @@ export function extractFontMetrics(page, PDFLib) {
   return metrics;
 }
 
+// Read a page's content stream(s) as ONE joined latin1 string — the EXACT
+// decode shape removeRunsFromPdfPage uses internally (Contents may be a
+// single stream or an array; PDF 32000 7.8.2 treats multiple streams as one
+// logical stream), exposed here for a caller that only needs to LOOK, never
+// write: Rung C's live-font-preview dry run (js/v2/app.js's prepareDocFont)
+// runs planRunRemoval read-only against the SOURCE page to learn a tapped
+// line's resource font name, and must not duplicate this decode inline.
+export function readPageContents(page, PDFLib) {
+  const { PDFArray, PDFRawStream, decodePDFRawStream } = PDFLib;
+  const context = page.doc.context;
+  const contents = page.node.Contents();
+  const refs = contents instanceof PDFArray ? contents.asArray() : [contents];
+  const latin1 = (u8) => Array.from(u8, (b) => String.fromCharCode(b)).join('');
+  const parts = refs.map((r) => {
+    const s = context.lookup(r);
+    return latin1(s instanceof PDFRawStream ? decodePDFRawStream(s).decode() : s.getContents());
+  });
+  return parts.join('\n');
+}
+
 // Remove show-text ops matching `targets` (user-space run geometries) from a
 // pdf-lib PDFPage's content stream(s), writing the result back onto the page.
 // Returns { removed, results } — results[i] mirrors planRunRemoval's per-

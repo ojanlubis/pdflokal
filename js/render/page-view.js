@@ -110,7 +110,16 @@ export const FONT_CSS = {
 // SSOT for a text annotation's CSS font string (page-view + inline editor).
 export function textFontCss(anno) {
   const family = FONT_CSS[anno.fontFamily] || FONT_CSS['Helvetica'];
-  return `${anno.italic ? 'italic ' : ''}${anno.bold ? '700 ' : '400 '}${anno.fontSize || 24}px ${family}`;
+  // Rung C live-font-preview (2026-07-19): a committed Ganti replacement whose
+  // draft successfully loaded the document's OWN embedded font (js/v2/app.js's
+  // prepareDocFont) carries docFontFamily — a FontFace already registered on
+  // document.fonts under that name. Prepending it keeps the committed
+  // annotation looking like the document between commit and export; the twin
+  // stack stays right behind it as the per-glyph fallback (a char the doc font
+  // doesn't cover silently falls through to the twin — the same honest
+  // preview export's own coverage check performs).
+  const stack = anno.docFontFamily ? `"${anno.docFontFamily}", ${family}` : family;
+  return `${anno.italic ? 'italic ' : ''}${anno.bold ? '700 ' : '400 '}${anno.fontSize || 24}px ${stack}`;
 }
 
 // One annotation as a positioned DOM element (page-space px).

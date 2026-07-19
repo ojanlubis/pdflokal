@@ -16,7 +16,7 @@
  *   - nothing hover-only; touch targets ≥44px
  */
 
-import { createDoc, createAnnotation } from '../core/model.js';
+import { createDoc, createAnnotation, getPage, getSource } from '../core/model.js';
 import {
   addAnnotation, removeAnnotation, updateAnnotation, clearSelection, selectAnnotation,
   moveAnnotation,
@@ -35,6 +35,9 @@ import { track } from '../lib/analytics.js';
 import { createCelebration } from './celebrate.js';
 import { applyIntentCopy } from './intent-copy.js';
 import { ensurePdfLib } from '../core/vendor.js';
+import { readPageContents, extractFontMetrics } from '../core/redact.js';
+import { planRunRemoval } from '../core/text-walk.js';
+import { extractFontProgram } from '../core/reinsert.js';
 
 // WHY there is no `window.pdfjsLib.…workerSrc = …` line here any more: pdf.js is
 // loaded on demand now (core/vendor.js), so touching it at module top-level
@@ -352,6 +355,128 @@ for (const btn of document.querySelectorAll('#toolbar .tool[data-tool]')) {
 // gesture, ONE undo step (recorded here; the editor commit skips its own).
 const textRuns = createTextRunIndex({ getDoc: () => doc });
 
+// ---- Rung C — live doc-font preview (founder ruling, tonight 2026-07-19) ---------
+// core/export.js already writes the FINAL file with the document's own
+// embedded font when coverage allows it (core/reinsert.js) — but until now the
+// EDITOR only ever showed the twin CSS font while typing/after commit, so
+// "what you see" and "what you get" visibly diverged for exactly the window
+// between tap and download. This loads the SAME font program into the browser
+// via the FontFace API so the draft (and the committed annotation, until
+// export) render in the document's real font live. The twin stays right
+// behind it in the CSS font stack as the honest per-glyph fallback: if a
+// later-typed char isn't in the doc font, the browser's own fallback to the
+// twin IS the preview of exactly what export's coverage check will do.
+
+// pdf-lib load of a SOURCE's bytes, cached per sourceId — a throwaway dry-run
+// doc, never mutated or saved, shared across every line tapped on that source
+// so re-tapping the same page doesn't re-parse the PDF each time.
+const pdfLibDocCache = new Map(); // sourceId -> Promise<PDFLib PDFDocument>
+function getDryRunDoc(PDFLib, source) {
+  if (!pdfLibDocCache.has(source.id)) {
+    pdfLibDocCache.set(source.id, PDFLib.PDFDocument.load(source.bytes));
+  }
+  return pdfLibDocCache.get(source.id);
+}
+
+// Outcome cache, keyed by sourceId + RESOURCE font name (not by line — many
+// lines on a page share one font resource): { cssFamily, fontkitFont } once
+// the FontFace has actually loaded, or null once we've tried and it failed
+// (missing program / FontFace refused the bytes / standard-14 with nothing to
+// load) — null is remembered so a failed font isn't re-attempted on every tap.
+const docFontCache = new Map(); // `${sourceId}:${fontName}` -> Promise<{cssFamily, fontkitFont}|null>
+const addedFontFaces = new Set(); // live FontFace objects on document.fonts — swept on Buka Baru
+
+// A resource font name can carry PDF name-escape bytes (#xx) or characters
+// invalid in a CSS custom ident — collapse to a safe, still-unique token.
+function sanitizeForCssIdent(s) {
+  return String(s).replace(/[^a-zA-Z0-9_-]/g, '_');
+}
+
+// Load (or reuse) the doc font for one resource font name on one source.
+// Returns null on ANY decline (never throws into the caller) — extraction
+// failure, fontkit parse failure, or the FontFace API itself refusing the
+// bytes are all the same honest "no live preview for this line", the twin
+// stays exactly as it already was.
+function loadDocFont(sourceId, fontName, pdfPage, PDFLib, fontkit) {
+  const key = `${sourceId}:${fontName}`;
+  if (!docFontCache.has(key)) {
+    docFontCache.set(key, (async () => {
+      let extracted;
+      try {
+        extracted = extractFontProgram(pdfPage, PDFLib, fontName);
+      } catch {
+        return null;
+      }
+      if (!extracted.ok) return null;
+      let fontkitFont;
+      try {
+        fontkitFont = fontkit.create(extracted.bytes);
+      } catch {
+        return null; // decline, never guess — same law as reinsert.js's planNativeInsert
+      }
+      const cssFamily = `pdflokal-doc-${sanitizeForCssIdent(sourceId)}-${sanitizeForCssIdent(fontName)}`;
+      let face;
+      try {
+        face = new FontFace(cssFamily, extracted.bytes);
+        await face.load();
+      } catch (_err) {
+        // Some CFF shapes need an explicit sfnt/OpenType wrap the FontFace
+        // constructor won't infer from raw bytes alone — decline rather than
+        // throw; the twin (already showing) is the honest fallback.
+        return null;
+      }
+      document.fonts.add(face);
+      addedFontFaces.add(face);
+      return { cssFamily, fontkitFont };
+    })().catch(() => null));
+  }
+  return docFontCache.get(key);
+}
+
+// Fire-and-forget from smartReplace: never blocks the editor opening (the
+// twin shows immediately, same as before this feature existed). `draft` is
+// the SAME object handed to openTextEditor — mutated in place once the doc
+// font lands, so the commit path (reading draft fields at blur/Enter time)
+// picks it up for free if it arrives before the user finishes typing.
+async function prepareDocFont(pageId, line, draft) {
+  try {
+    const page = getPage(doc, pageId);
+    const source = page && getSource(doc, page.sourceId);
+    if (!source) return;
+    const { PDFLib, fontkit } = await ensurePdfLib();
+    const srcDoc = await getDryRunDoc(PDFLib, source);
+    const pdfPage = srcDoc.getPages()[page.sourcePageNum];
+    if (!pdfPage) return;
+    // DRY RUN ONLY: learns the resource font name painting this line on the
+    // SOURCE page. Nothing here is written back anywhere — same throwaway
+    // read core/redact.js's own removeRunsFromPdfPage performs for real at
+    // export time, run here purely to look.
+    const joined = readPageContents(pdfPage, PDFLib);
+    const fonts = extractFontMetrics(pdfPage, PDFLib);
+    const { results } = planRunRemoval(joined, fonts, [line.pdf]);
+    const fontName = results[0]?.insert?.fontName;
+    if (!fontName) return; // unmatched / declined run — no font to learn
+
+    const result = await loadDocFont(page.sourceId, fontName, pdfPage, PDFLib, fontkit);
+    if (!result) return; // extraction/parse/FontFace decline — twin stays, honestly
+
+    // Guard: the draft may have been cancelled/committed already, or a NEWER
+    // tap may have replaced it — only this draft's own reference matters.
+    draft.docFontFamily = result.cssFamily;
+    draft.docFontkitFont = result.fontkitFont; // commit-time coverage check
+    if (draft.editorEl && draft.editorEl.isConnected) {
+      // Progressive swap: prepend the doc font ahead of whatever twin stack
+      // is already set — the browser's own per-glyph fallback to that twin
+      // for any char the doc font doesn't cover is EXACTLY the honest
+      // preview of what export will do.
+      const twinStack = draft.editorEl.style.fontFamily;
+      draft.editorEl.style.fontFamily = `"${result.cssFamily}", ${twinStack}`;
+    }
+  } catch (err) {
+    console.warn('prepareDocFont gagal:', err);
+  }
+}
+
 async function smartReplace(pageId, x, y) {
   // Founder ruling 2026-07-19: the LINE is the editing primitive — hitTest
   // now resolves to a Line (core/text-lines.js), one or more fragments
@@ -409,6 +534,7 @@ async function smartReplace(pageId, x, y) {
   // editor open it instructs a thing already done (taste-judge, path law).
   toastEl.classList.remove('show');
   matchReplaceColors(cover, draft, pageId, line); // async; colors land live
+  prepareDocFont(pageId, line, draft); // async; never blocks the editor opening
 }
 
 // ---- Ganti Teks steering highlight (press→steer→release-commit, 2026-07-19) ------
@@ -718,6 +844,11 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
   editingAnno = anno || null;
   editingEl = ed;
   editingIsReplace = !!draft;
+  // Rung C live-font-preview: prepareDocFont (fired from smartReplace, still
+  // in flight) needs to reach THIS specific editor element once the doc font
+  // lands — the draft is its only handle, since a newer tap can open another
+  // editor (and another draft) before this async work resolves.
+  if (draft) draft.editorEl = ed;
   syncFormatBar();
 
   let committed = false; // guard: blur fires after Enter-commit too
@@ -746,11 +877,30 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
       // replaceCoverId only ever comes from a Ganti Teks draft — omit the key
       // entirely for ordinary authored text rather than carry an undefined.
       const replaceProps = d.replaceCoverId ? { replaceCoverId: d.replaceCoverId } : {};
+      // docFontFamily only ever lands via prepareDocFont on a Ganti draft —
+      // same omit-if-absent shape, so a committed annotation without a live
+      // doc font carries no dead key. render/page-view.js's textFontCss reads
+      // this to keep the committed replacement looking like the document.
+      const docFontProps = d.docFontFamily ? { docFontFamily: d.docFontFamily } : {};
+      // Founder ruling (tonight, 2026-07-19): when a substitute font WILL be
+      // used for this Ganti replacement, say so plainly at commit — decided
+      // with whatever prepareDocFont has managed to load by NOW (it's async;
+      // a very fast typist can commit before it lands). No doc font loaded
+      // (extraction declined / FontFace refused / a standard-14 font with
+      // nothing to embed) OR the loaded font doesn't cover every non-space
+      // char of the FINAL typed text → the honest substitute notice. Ordinary
+      // (non-Ganti) text never carries replaceCoverId, so never toasts here.
+      if (d.replaceCoverId) {
+        const covered = !!d.docFontkitFont
+          && [...text].every((ch) => ch === ' ' || d.docFontkitFont.hasGlyphForCodePoint(ch.codePointAt(0)));
+        if (!covered) toast('Huruf ini memakai font pengganti yang mirip');
+      }
       const created = addAnnotation(doc, pageId, createAnnotation('text', {
         text, x, y,
         fontSize: d.fontSize, fontFamily: d.fontFamily,
         bold: d.bold, italic: d.italic, color: d.color,
         ...replaceProps,
+        ...docFontProps,
       }));
       // Authored text stays SELECTED (the user sees it's an object; a format
       // tweak right after the blur-commit still lands). A Ganti Teks commit
@@ -1163,6 +1313,15 @@ async function resetDoc() {
   history.redoStack.length = 0;
   if (rasterizer) { await rasterizer.destroy(); rasterizer = null; }
   await textRuns.destroy(); // fresh doc = fresh sources; cached pdf.js docs die with the old one
+  // Rung C live-font-preview: the doc-font caches are keyed by sourceId — a
+  // fresh doc means fresh (or reused-but-unrelated) source ids, and every
+  // FontFace we registered on document.fonts belongs to the OLD document. Not
+  // clearing them would leak faces forever across repeated Buka Baru, and
+  // document.fonts.check() for a stale name would still (wrongly) report true.
+  pdfLibDocCache.clear();
+  docFontCache.clear();
+  for (const face of addedFontFaces) document.fonts.delete(face);
+  addedFontFaces.clear();
   slots = [];
   stage.innerHTML = '';
   baseName = 'dokumen';

@@ -84,7 +84,13 @@ function escapeNameForWrite(name) {
 // only (see module header). Returns { ok:true, bytes } or { ok:false, reason }
 // — never throws (the caller wraps in try/catch anyway as a second layer,
 // since a malformed dict can still throw INSIDE this function's own gets).
-function extractFontProgram(page, PDFLib, fontName) {
+// EXPORTED (Rung C live-font-preview, 2026-07-19): js/v2/app.js needs this at
+// draft-open time too — a DRY RUN against the SOURCE page purely to learn
+// whether the tapped line's font has a real program to load into the browser
+// via FontFace, before any cut/insert ever happens. Same function, same
+// guarantees (never throws, ok:false is a decline never a guess); no logic
+// changed for the export path that already called it.
+export function extractFontProgram(page, PDFLib, fontName) {
   const { PDFName, PDFDict, PDFRef, PDFRawStream, decodePDFRawStream } = PDFLib;
   const context = page.doc.context;
   const res = (v) => resolve(context, PDFRef, v);

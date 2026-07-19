@@ -47,6 +47,7 @@ export default [
         matchMedia: 'readonly',
         crypto: 'readonly',
         AbortController: 'readonly',
+        FontFace: 'readonly',
 
         // Vendor libs (loaded via <script> tags, accessed as window.*)
         pdfjsLib: 'readonly',
