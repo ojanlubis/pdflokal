@@ -48,18 +48,29 @@ function decodeHexString(body) {
   return out;
 }
 
+// Decode a PDF name token's body (the part after the leading '/'): #xx hex
+// escapes stand for a raw byte (e.g. a space in a font subset name).
+function decodeName(body) {
+  return body.replace(/#([0-9a-fA-F]{2})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+}
+
 const isWS = (c) => c === ' ' || c === '\n' || c === '\r' || c === '\t' || c === '\f' || c === '\0';
 const isDelim = (c) => '()<>[]{}/%'.includes(c);
 
 // Tokenize a content stream string into ordered OP RECORDS:
-//   { op, start, end, strings }
-// where start..end spans the operands AND the operator (safe to splice), and
-// strings holds every decoded string operand (for match predicates).
+//   { op, start, end, strings, tokens }
+// where start..end spans the operands AND the operator (safe to splice),
+// strings holds every decoded string operand (for match predicates), and
+// tokens is the ORDERED operand list the interpreter walk consumes:
+//   {t:'str',v} {t:'num',v} {t:'name',v} {t:'['} {t:']'}
+// (TJ kern numbers keep their position between strings — that order IS the
+// glyph advance math). Dicts and braces carry no walk meaning and are skipped.
 export function tokenizeOps(src) {
   const ops = [];
   let i = 0;
   let groupStart = -1;   // byte offset where the current operand group began
   let strings = [];
+  let tokens = [];
 
   const beginToken = (at) => { if (groupStart === -1) groupStart = at; };
 
@@ -78,7 +89,9 @@ export function tokenizeOps(src) {
         if (depth > 0) body += ch;
         j += 1;
       }
-      strings.push(decodeLiteralString(body));
+      const lit = decodeLiteralString(body);
+      strings.push(lit);
+      tokens.push({ t: 'str', v: lit });
       i = j; continue;
     }
     if (c === '<' && src[i + 1] === '<') {         // dict
@@ -94,21 +107,31 @@ export function tokenizeOps(src) {
     if (c === '<') {                               // hex string
       beginToken(i);
       const close = src.indexOf('>', i + 1);
-      strings.push(decodeHexString(src.slice(i + 1, close === -1 ? src.length : close)));
+      const hexStr = decodeHexString(src.slice(i + 1, close === -1 ? src.length : close));
+      strings.push(hexStr);
+      tokens.push({ t: 'str', v: hexStr });
       i = close === -1 ? src.length : close + 1; continue;
     }
-    if (c === '[' || c === ']' || c === '{' || c === '}') { beginToken(i); i += 1; continue; }
+    if (c === '[' || c === ']' || c === '{' || c === '}') {
+      beginToken(i);
+      if (c === '[' || c === ']') tokens.push({ t: c }); // {} carry no walk meaning: skipped
+      i += 1; continue;
+    }
     if (c === ')' || c === '>') { i += 1; continue; } // stray closer (malformed stream): skip, never loop
     if (c === '/') {                               // name
       beginToken(i);
+      const nameStart = i + 1;
       i += 1;
       while (i < src.length && !isWS(src[i]) && !isDelim(src[i])) i += 1;
+      tokens.push({ t: 'name', v: decodeName(src.slice(nameStart, i)) });
       continue;
     }
     if (c === '+' || c === '-' || c === '.' || (c >= '0' && c <= '9')) {  // number
       beginToken(i);
+      const numStart = i;
       i += 1;
       while (i < src.length && (src[i] === '.' || (src[i] >= '0' && src[i] <= '9'))) i += 1;
+      tokens.push({ t: 'num', v: parseFloat(src.slice(numStart, i)) });
       continue;
     }
 
@@ -122,12 +145,13 @@ export function tokenizeOps(src) {
     if (op === 'BI') {                             // inline image: raw-skip to EI
       const ei = src.indexOf('EI', j);
       const end = ei === -1 ? src.length : ei + 2;
-      ops.push({ op: 'BI', start: groupStart, end, strings: [] });
+      ops.push({ op: 'BI', start: groupStart, end, strings: [], tokens: [] });
     } else {
-      ops.push({ op, start: groupStart, end: j, strings });
+      ops.push({ op, start: groupStart, end: j, strings, tokens });
     }
     groupStart = -1;
     strings = [];
+    tokens = [];
     i = op === 'BI' ? (ops[ops.length - 1].end) : j;
   }
   return ops;

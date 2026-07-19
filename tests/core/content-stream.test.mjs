@@ -78,3 +78,58 @@ test('stray closers never hang the tokenizer (the infinite-loop guard)', () => {
   assert.equal(ops[0].op, 'Tj');
   assert.equal(ops[0].strings[0], 'ok');
 });
+
+// --- tokens[] (Rung B production: the interpreter walk's operand feed) ---
+
+test('tokens capture numbers, including negatives and decimals', () => {
+  const src = '-12.5 700 .25 -3 Td';
+  const ops = tokenizeOps(src);
+  assert.deepEqual(ops[0].tokens, [
+    { t: 'num', v: -12.5 },
+    { t: 'num', v: 700 },
+    { t: 'num', v: 0.25 },
+    { t: 'num', v: -3 },
+  ]);
+});
+
+test('tokens decode a name with a #xx hex escape', () => {
+  const src = '/F#20oo 12 Tf';
+  const ops = tokenizeOps(src);
+  assert.deepEqual(ops[0].tokens[0], { t: 'name', v: 'F oo' });
+  assert.deepEqual(ops[0].tokens[1], { t: 'num', v: 12 });
+});
+
+test('TJ array tokens keep [ ] markers and preserve kern order between strings', () => {
+  const src = '[(Su) -20 (rat) 15 ( Resmi)] TJ';
+  const ops = tokenizeOps(src);
+  assert.deepEqual(ops[0].tokens, [
+    { t: '[' },
+    { t: 'str', v: 'Su' },
+    { t: 'num', v: -20 },
+    { t: 'str', v: 'rat' },
+    { t: 'num', v: 15 },
+    { t: 'str', v: ' Resmi' },
+    { t: ']' },
+  ]);
+});
+
+test('hex string produces a str token alongside the strings[] entry', () => {
+  const src = '<48616C6F> Tj';
+  const ops = tokenizeOps(src);
+  assert.deepEqual(ops[0].tokens, [{ t: 'str', v: 'Halo' }]);
+});
+
+test('tokens reset per op record — no bleed from a prior op', () => {
+  const src = '1 0 0 1 72 700 cm (Halo) Tj';
+  const ops = tokenizeOps(src);
+  assert.equal(ops[0].tokens.length, 6); // cm's 6 operands
+  assert.deepEqual(ops[1].tokens, [{ t: 'str', v: 'Halo' }]); // no leftover cm tokens
+});
+
+test('BI record carries an empty tokens array (payload is raw-skipped, not parsed)', () => {
+  const src = 'BI /W 2 /H 2 ID \x00\x00\x00\x00 EI (after) Tj';
+  const ops = tokenizeOps(src);
+  assert.equal(ops[0].op, 'BI');
+  assert.deepEqual(ops[0].tokens, []);
+  assert.deepEqual(ops[1].tokens, [{ t: 'str', v: 'after' }]);
+});
