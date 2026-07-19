@@ -31,8 +31,11 @@ const TAP_SLOP = 12; // px of finger movement beyond which a press is not a tap
 //   getTool:    () => 'select' | 'text' | 'whiteout' | 'signature' | 'paraf' | 'ganti'
 //   history:    core history (or null to disable undo recording)
 //   onChange:   (kind, payload) => void   — 'select' | 'move' | 'resize' | 'draw'
-//   onPlace:    (tool, {pageId, x, y}) => void — tap-to-place for text/signature
+//   onPlace:    (tool, {pageId, x, y}) => void — tap-to-place for text/signature;
+//               for 'ganti' this now fires at RELEASE (see startGanti below)
 //   onEditText: (annotationId) => void — click/tap on an already-selected text
+//   onGantiSteer: ({pageId, x, y} | null) => void — live line-highlight while
+//               a Ganti Teks press/drag/hover is in flight; null clears it
 // }
 export function createInteraction(ctx) {
   const { stage } = ctx;
@@ -137,6 +140,33 @@ export function createInteraction(ctx) {
     pageView.setPointerCapture(e.pointerId);
   }
 
+  // Ganti Teks: press → highlight the line under the finger (nothing
+  // committed), move → re-target live (steering), release → commit at the
+  // RELEASE point via onPlace. WHY (founder field report, dense documents,
+  // 2026-07-19): pointer-DOWN commit meant a fat finger couldn't aim a single
+  // printed line among many tight ones — no way to correct before the editor
+  // opened on the wrong line. This mirrors the camera-first release-commit
+  // law whiteout already uses to steal the armed gesture for its own verb
+  // (draw); Ganti's verb is "aim", and a quick tap (press+release in place)
+  // still reduces to the old outcome.
+  function startGanti(e, pageView, page) {
+    const p = toPage(e, pageView);
+    gesture = {
+      kind: 'ganti', pointerId: e.pointerId, pageView, pageId: page.id,
+      // zoom/startX/startY kept for parity with every other gesture even
+      // though this one doesn't use the shared delta math — their absence
+      // silently NaN'd whiteout-draw once (see startDraw above); not worth
+      // re-learning that lesson for a second gesture kind.
+      zoom: ctx.getZoom(), startX: e.clientX, startY: e.clientY,
+    };
+    // Light up BEFORE capturing: setPointerCapture is a no-op for the
+    // highlight either way, but keeping onGantiSteer first means a capture
+    // failure can never swallow the "lit at press" affordance the founder
+    // asked for.
+    ctx.onGantiSteer?.({ pageId: page.id, x: p.x, y: p.y });
+    pageView.setPointerCapture(e.pointerId);
+  }
+
   function onPointerDown(e) {
     if (gesture || tapCandidate) return;    // one gesture at a time
     if (e.button !== undefined && e.button !== 0 && e.pointerType === 'mouse') return;
@@ -170,7 +200,15 @@ export function createInteraction(ctx) {
       startDraw(e, pageView, page);
       return;
     }
-    if (tool === 'text' || tool === 'signature' || tool === 'paraf' || tool === 'ganti') {
+    if (tool === 'ganti') {
+      // Press→steer→release-commit (see startGanti's WHY comment) — Ganti no
+      // longer commits at pointerDOWN, so it does NOT join the immediate
+      // onPlace branch below (text/signature/paraf still do — unchanged).
+      e.preventDefault();
+      startGanti(e, pageView, page);
+      return;
+    }
+    if (tool === 'text' || tool === 'signature' || tool === 'paraf') {
       // WHY preventDefault: onPlace may create + focus an inline editor NOW.
       // Canceling pointerdown suppresses the compatibility mousedown that
       // would otherwise fire right after and BLUR it (mouse only — touch
@@ -228,7 +266,22 @@ export function createInteraction(ctx) {
   }
 
   function onPointerMove(e) {
-    if (!gesture || e.pointerId !== gesture.pointerId) return;
+    if (!gesture || e.pointerId !== gesture.pointerId) {
+      // Fine-pointer hover preview (Sejda-style, founder-requested): with NO
+      // gesture in flight and a mouse roaming while Ganti is armed, forward
+      // the position so the line highlight can track the cursor before any
+      // press — cheap, the ctx handler (app.js) throttles via rAF.
+      if (!gesture && e.pointerType === 'mouse' && ctx.getTool() === 'ganti') {
+        const hoverPage = e.target.closest?.('.pv-page');
+        if (hoverPage) {
+          const p = toPage(e, hoverPage);
+          ctx.onGantiSteer?.({ pageId: hoverPage.dataset.pageId, x: p.x, y: p.y });
+        } else {
+          ctx.onGantiSteer?.(null);
+        }
+      }
+      return;
+    }
     const doc = ctx.getDoc();
     const dx = (e.clientX - gesture.startX) / gesture.zoom;
     const dy = (e.clientY - gesture.startY) / gesture.zoom;
@@ -296,6 +349,10 @@ export function createInteraction(ctx) {
         gesture.el.style.width = a.width + 'px';
         gesture.el.style.height = a.height + 'px';
       }
+    } else if (gesture.kind === 'ganti') {
+      // Steering: re-target the highlight live, nothing committed yet.
+      const p = toPage(e, gesture.pageView);
+      ctx.onGantiSteer?.({ pageId: gesture.pageId, x: p.x, y: p.y });
     }
   }
 
@@ -314,6 +371,23 @@ export function createInteraction(ctx) {
         if (found) setSelected(tc.annoEl, found.anno);
       } else {
         setSelected(null, null);
+      }
+      return;
+    }
+
+    // Ganti Teks: release commits (pointerup) at the RELEASE point via the
+    // existing onPlace/smartReplace path; a cancel (scroll/pinch stole the
+    // gesture) clears the highlight with no commit at all. This gesture has
+    // no "moved" concept — unlike move/resize/draw, EVERY release commits,
+    // a still-finger tap included — so it's handled before the generic
+    // moved-gated logic below, not through it.
+    if (gesture && gesture.kind === 'ganti' && e.pointerId === gesture.pointerId) {
+      const g = gesture;
+      gesture = null;
+      ctx.onGantiSteer?.(null);
+      if (e.type === 'pointerup') {
+        const p = toPage(e, g.pageView);
+        ctx.onPlace?.('ganti', { pageId: g.pageId, x: p.x, y: p.y });
       }
       return;
     }
@@ -343,6 +417,10 @@ export function createInteraction(ctx) {
     if (!gesture) return;
     const g = gesture;
     gesture = null;
+    // A second finger landing mid-steer (pinch) must not leave the highlight
+    // stuck lit with no gesture left to clear it — no geometry to restore
+    // either, ganti never mutates the doc until release.
+    if (g.kind === 'ganti') { ctx.onGantiSteer?.(null); return; }
     if (!g.moved) return;
     const doc = ctx.getDoc();
     if (g.kind === 'move') {

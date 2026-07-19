@@ -219,7 +219,8 @@ stream.attach();
 // (shared through history snapshots), so undo/redo re-shows pages instantly —
 // no PDF.js work. Per-gesture hot paths never come through here.
 function rebuildStage() {
-  stage.innerHTML = '';
+  stage.innerHTML = ''; // detaches gantiGlowEl too — drop the stale reference
+  clearGantiGlow();
   slots = doc.pages.map((page, i) => {
     const slot = createPageSlot(page, {
       activeId: doc.selection.annotationId,
@@ -236,6 +237,10 @@ function rebuildStage() {
 // Re-render one page's overlay after a structural annotation change.
 function syncPage(pageId) {
   const slot = slots.find((s) => s.page.id === pageId);
+  // syncOverlay does overlay.innerHTML = '' — that would silently detach
+  // gantiGlowEl if it happened to be riding THIS page's overlay; drop the
+  // reference rather than leave it dangling (see rebuildStage).
+  if (gantiGlowEl && slot?.view.contains(gantiGlowEl)) clearGantiGlow();
   if (slot) syncOverlay(slot.page, slot.view, { activeId: doc.selection.annotationId });
   interaction.refreshSelection();
   refreshChrome();
@@ -304,7 +309,10 @@ function syncFormatBar() {
 // ---- tools ----------------------------------------------------------------------
 function setTool(next) {
   tool = next;
-  if (next === 'ganti') showRunHints(); else clearRunHints();
+  // The steering highlight belongs to the 'ganti' tool only — leaving it lit
+  // after a tool switch (e.g. Escape, or the on-off toggle) would show a
+  // commit target for a gesture that no longer exists.
+  if (next === 'ganti') showRunHints(); else { clearRunHints(); clearGantiGlow(); }
   if (next !== 'signature') {
     const g = document.getElementById('sig-ghost');
     if (g) g.style.display = 'none';
@@ -423,6 +431,55 @@ async function showRunHints() {
 }
 function clearRunHints() {
   stage.querySelectorAll('.pv-run-hints').forEach((el) => el.remove());
+}
+
+// ---- Ganti Teks steering highlight (press→steer→release-commit, 2026-07-19) ------
+// One reusable div, moved (not recreated) between page overlays as the press/
+// drag/hover resolves to different lines — distinct from the faint dashed
+// pv-run-hints (that one marks EVERY line while armed; this one marks the
+// single line that would commit if released NOW). Solid chrome-red, matches
+// the founder's camera-first release-commit law: nothing is true until the
+// finger lifts, but the user must see what WOULD happen.
+let gantiGlowEl = null;
+let gantiSteerSeq = 0;    // guards against a late hitTest landing after a newer one
+let gantiSteerRaf = null;
+let gantiSteerPending;    // undefined = nothing queued (null is a valid "clear" value)
+
+function clearGantiGlow() {
+  if (gantiGlowEl) { gantiGlowEl.remove(); gantiGlowEl = null; }
+}
+
+async function applyGantiSteer(pt) {
+  const seq = (gantiSteerSeq += 1);
+  if (!pt) { clearGantiGlow(); return; }
+  const line = await textRuns.hitTest(pt.pageId, pt.x, pt.y);
+  // Stale guard: a newer steer landed first, or the tool moved on while this
+  // hitTest (async — first call per page extracts text) was in flight.
+  if (seq !== gantiSteerSeq || tool !== 'ganti') return;
+  if (!line) { clearGantiGlow(); return; }
+  const slot = slots.find((s) => s.page.id === pt.pageId);
+  const overlay = slot?.view.querySelector('.pv-overlay');
+  if (!overlay) { clearGantiGlow(); return; }
+  if (!gantiGlowEl) {
+    gantiGlowEl = document.createElement('div');
+    gantiGlowEl.className = 'pv-ganti-glow';
+  }
+  gantiGlowEl.style.cssText =
+    `position:absolute;left:${line.x}px;top:${line.y}px;width:${line.w}px;height:${line.h}px;` +
+    'pointer-events:none;border:1.5px solid rgba(220,38,38,.8);background:rgba(220,38,38,.08);border-radius:2px;';
+  if (gantiGlowEl.parentElement !== overlay) overlay.appendChild(gantiGlowEl);
+}
+
+// rAF-throttled: interaction.js forwards a raw pointermove stream (steering +
+// fine-pointer hover) — coalesce to one hitTest per frame instead of one per
+// event.
+function onGantiSteer(pt) {
+  gantiSteerPending = pt;
+  if (gantiSteerRaf) return;
+  gantiSteerRaf = requestAnimationFrame(() => {
+    gantiSteerRaf = null;
+    applyGantiSteer(gantiSteerPending);
+  });
 }
 
 // ---- carried-signature ghost (desktop telegraph, founder Jul 3) -------------------
@@ -618,6 +675,7 @@ const interaction = createInteraction({
       if (anno) { openTextEditor({ pageId: page.id, x: anno.x, y: anno.y, anno }); return; }
     }
   },
+  onGantiSteer,
 });
 
 // ---- page manager (Halaman sheet) -----------------------------------------------
