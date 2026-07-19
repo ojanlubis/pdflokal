@@ -65,6 +65,9 @@ test.describe('ganti teks — happy path (tame fixture)', () => {
     await armGanti(page);
     await tapLine(page, { str: 'Test Page 1' });
     await expect(page.locator('#format-bar')).not.toHaveClass(/show/);
+    // A genuine edit (not a no-op — an unmodified commit is now a CANCEL and
+    // creates nothing, see tests/ganti-teks-fidelity.spec.js's bug 1 suite).
+    await page.keyboard.type('Test Page 1 Ubah');
     // Commit does NOT auto-select (taste-judge, night 2026-07-19): the flow
     // ends bar-free. A later DELIBERATE tap selects it like any text object —
     // one grammar — and only then may the bar return.
@@ -136,6 +139,10 @@ test.describe('ganti teks — the nasty fixtures (field-bug pins)', () => {
     await tapLine(page, { index: 2 }); // a body line below the letterhead (paint order)
     const text = await page.locator('.v2-text-edit').textContent();
     expect(text.length).toBeGreaterThan(3); // real extracted words, not garbage
+    // A genuine edit — an unmodified commit is now a CANCEL and creates no
+    // annotation (see tests/ganti-teks-fidelity.spec.js's bug 1 suite); this
+    // test is about the font-family MAPPING, not the exact prefill text.
+    await page.keyboard.type('Teks pengganti Times');
     await page.keyboard.press('Enter');
     const anno = await page.evaluate(() =>
       window.v2.getDoc().pages[0].annotations.find((a) => a.type === 'text'));

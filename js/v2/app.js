@@ -38,6 +38,7 @@ import { ensurePdfLib } from '../core/vendor.js';
 import { readPageContents, extractFontMetrics } from '../core/redact.js';
 import { planRunRemoval } from '../core/text-walk.js';
 import { extractFontProgram } from '../core/reinsert.js';
+import { getFontStyleInfo } from '../core/font-style.js';
 
 // WHY there is no `window.pdfjsLib.…workerSrc = …` line here any more: pdf.js is
 // loaded on demand now (core/vendor.js), so touching it at module top-level
@@ -457,6 +458,26 @@ async function prepareDocFont(pageId, line, draft) {
     const fontName = results[0]?.insert?.fontName;
     if (!fontName) return; // unmatched / declined run — no font to learn
 
+    // BUG FIX (founder field test, 2026-07-19, bold Arial headings): pdf.js's
+    // OWN getTextContent() never exposes the real font name to the main
+    // thread — text-runs.js's `fontFamily` is pdf.js's generic CSS collapse
+    // ('serif'/'sans-serif'/'monospace'), not the ascii PostScript name (see
+    // js/core/font-style.js's header for how this was verified against the
+    // vendored pdf.worker.min.js). The document's own /Font resource dict
+    // has the real name — read INDEPENDENTLY of whether the font PROGRAM
+    // below loads: a bold heading whose program we decline to extract (e.g.
+    // a simple TrueType font outside loadDocFont's Type0/Identity-H scope)
+    // still has a /BaseFont worth parsing for "Bold"/"Italic".
+    const styleInfo = getFontStyleInfo(pdfPage, PDFLib, fontName);
+    if (styleInfo.ok && (styleInfo.bold || styleInfo.italic)) {
+      draft.bold = draft.bold || styleInfo.bold;
+      draft.italic = draft.italic || styleInfo.italic;
+      // Live-restyle the open draft the same way docFontFamily does below —
+      // the twin font stays, only weight/style changes, so this is safe to
+      // apply even if the doc-font FontFace load (next) ultimately declines.
+      if (draft.editorEl && draft.editorEl.isConnected) draft.editorEl.style.font = textFontCss(draft);
+    }
+
     const result = await loadDocFont(page.sourceId, fontName, pdfPage, PDFLib, fontkit);
     if (!result) return; // extraction/parse/FontFace decline — twin stays, honestly
 
@@ -716,12 +737,30 @@ async function matchReplaceColors(cover, draft, pageId, line) {
         takeSample(r, (line.x + (line.w * ix) / 9) * r.s, (line.y + (line.h * iy) / 4) * r.s, inside);
       }
     }
-    const ranked = inside.sort((a, b) => Math.abs(lumOf(b) - paperLum) - Math.abs(lumOf(a) - paperLum));
-    const ink = ranked.slice(0, Math.max(3, Math.floor(ranked.length / 4)));
-    // Anti-aliased gray on plain paper must NOT tint the text — only adopt the
-    // ink color when it clearly separates from the paper.
-    if (ink.length && Math.abs(lumOf(ink[Math.floor(ink.length / 2)]) - paperLum) > 40) {
-      draft.color = medColor(ink);
+    // BUG FIX (founder phone test, 2026-07-19): solid BLACK bold text was
+    // coming back visibly GRAY. Root cause — the old code ranked all 24
+    // interior samples by |luminance - paper|, took the top QUARTILE (up to
+    // 6 points), then took the MEDIAN of that quartile. A glyph's bounding
+    // box is mostly background even for bold text (strokes cover maybe a
+    // third of their own box), so most "farthest from paper" samples that
+    // land near a stroke land on its ANTI-ALIASED EDGE (a partial ink/paper
+    // blend), not its solid interior — genuinely solid-black pixels are rare
+    // in a sparse grid. The median of a quartile stuffed with edge pixels
+    // lands in the middle of the ink<->paper range: literal gray, not a
+    // sampling fluke. Fix: find the single most extreme (most ink-like)
+    // sample actually seen, then keep only samples within a tight band of
+    // THAT extreme — the genuine ink-CORE cluster — and median only those.
+    // A real solid-ink glyph always has a few pixels near its own extreme;
+    // partial-coverage edge pixels fall well short of it and get excluded
+    // instead of diluting the result toward gray.
+    const dists = inside.map((p) => Math.abs(lumOf(p) - paperLum));
+    const maxDist = inside.length ? Math.max(...dists) : 0;
+    // Anti-aliased gray on plain paper must NOT tint the text — only adopt
+    // the ink color when SOMETHING in the box clearly separates from paper.
+    if (maxDist > 40) {
+      const CORE_BAND = 0.75; // keep samples within 25% of the extreme seen
+      const core = inside.filter((_, i) => dists[i] >= maxDist * CORE_BAND);
+      draft.color = medColor(core);
       if (editingEl && !editingAnno) editingEl.style.color = draft.color;
     }
   } catch { /* best-effort; white cover + default ink stand */ }
@@ -869,6 +908,15 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
         record(history, doc);
         removeAnnotation(doc, anno.id);
       }
+    } else if (draft && text === String(draft.text || '').trim()) {
+      // BUG FIX (founder field test, 2026-07-19): tap a line, change NOTHING,
+      // blur — must behave EXACTLY like the empty/Escape backout below, not
+      // create a cover + a same-text replacement annotation (the founder
+      // watched pixels change after "doing nothing"). Compare the committed
+      // text against the PREFILL (draft.text, trimmed) — there is no `anno`
+      // yet on this path, so this is the Ganti-draft equivalent of the
+      // `anno` branch's own `text !== anno.text` no-op guard above.
+      if (draft.onCancel) draft.onCancel();
     } else if (text) {
       // Ganti Teks recorded its ONE undo step before the cover was placed —
       // recording again here would split one gesture into two undos.
