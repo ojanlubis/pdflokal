@@ -208,3 +208,121 @@ export function groupRunsIntoLines(runs) {
   }
   return lines;
 }
+
+// ============================================================================
+// TAP RESOLUTION — founder field report 2026-07-19: dense single-spaced text
+// (a tax letter on a phone) was resolving fat-finger taps to the wrong line.
+// Two bugs layered on top of the display-space Line[] geometry above:
+//
+//   1. Every line's hit box inflated toward MIN_HIT (the ~44px-law touch
+//      target) REGARDLESS of neighbors — on dense text the inflated boxes
+//      overlapped, always, no matter how tight the real line spacing was.
+//   2. Overlapping candidates resolved by nearest-CENTER, which is the wrong
+//      question for a line: a 500px-wide line's center is nowhere near a tap
+//      at its far edge, and two stacked 12px lines fight over whose center
+//      is closer even right at their shared border.
+//
+// Fix: inflation is clamped PER SIDE to stop at the midpoint gap to the
+// nearest neighbor on that side (an isolated side keeps the full, generous
+// growth — this only degrades where growth would otherwise collide), and
+// resolution scores candidates by distance to their real (uninflated) box,
+// falling back to center distance only to break an exact tie.
+// ============================================================================
+
+// True when two 1-D ranges overlap by a positive amount. Touching endpoints
+// (gap of exactly zero) don't count as overlap — a run whose box abuts
+// another's isn't fighting it for space.
+function rangesOverlap(aStart, aEnd, bStart, bEnd) {
+  return Math.min(aEnd, bEnd) - Math.max(aStart, bStart) > 0;
+}
+
+// Per-side desired growth for one line, clamped against every OTHER line
+// that shares an x-range (a vertical neighbor — above or below) or a
+// y-range (a column neighbor — left or right). Each side clamps
+// independently: a line can keep full growth on top while its bottom is
+// squeezed by a close neighbor below, in the same call. A neighbor whose
+// box already overlaps this line's (negative gap) clamps that side to zero
+// growth, never negative — inflation never eats into an already-touching
+// box.
+function clampedGrowth(line, lines, minHit) {
+  const growX = Math.max(0, (minHit - line.w) / 2);
+  const growY = Math.max(0, (minHit - line.h) / 2);
+  let top = growY;
+  let bottom = growY;
+  let left = growX;
+  let right = growX;
+
+  const lx0 = line.x;
+  const lx1 = line.x + line.w;
+  const ly0 = line.y;
+  const ly1 = line.y + line.h;
+
+  for (const m of lines) {
+    if (m === line) continue;
+    const mx0 = m.x;
+    const mx1 = m.x + m.w;
+    const my0 = m.y;
+    const my1 = m.y + m.h;
+
+    // Vertical neighbor: x-ranges overlap, so a tap in the gap between this
+    // line and M is genuinely ambiguous — cap growth at the midpoint.
+    if (rangesOverlap(lx0, lx1, mx0, mx1)) {
+      if (my1 <= ly0) top = Math.min(top, Math.max(0, (ly0 - my1) / 2));
+      else if (my0 >= ly1) bottom = Math.min(bottom, Math.max(0, (my0 - ly1) / 2));
+    }
+
+    // Column neighbor: y-ranges overlap — same clamp, horizontal axis.
+    if (rangesOverlap(ly0, ly1, my0, my1)) {
+      if (mx1 <= lx0) left = Math.min(left, Math.max(0, (lx0 - mx1) / 2));
+      else if (mx0 >= lx1) right = Math.min(right, Math.max(0, (mx0 - lx1) / 2));
+    }
+  }
+
+  return { top, bottom, left, right };
+}
+
+// Euclidean distance from (x, y) to the nearest point of a box — 0 when
+// (x, y) already sits inside it.
+function distanceToBox(x, y, bx, by, bw, bh) {
+  const cx = Math.min(Math.max(x, bx), bx + bw);
+  const cy = Math.min(Math.max(y, by), by + bh);
+  return Math.hypot(x - cx, y - cy);
+}
+
+// Tap → line. `lines` carry display-space { x, y, w, h } top-left boxes in
+// the same frame as the tap point (x, y) — js/v2/text-runs.js's Line[], or
+// any plain objects shaped like one (tests build these directly). `minHit`
+// is the finger-sized hit-box target each line's box grows toward, per side,
+// clamped against neighbors (see clampedGrowth above). Returns the resolved
+// line, or null when no line's (clamped, inflated) box contains the tap.
+export function resolveTap(lines, x, y, minHit) {
+  if (!lines || lines.length === 0) return null;
+
+  let best = null;
+  let bestDist = Infinity;
+  let bestCenterDist = Infinity;
+
+  for (const line of lines) {
+    const grow = clampedGrowth(line, lines, minHit);
+    const bx0 = line.x - grow.left;
+    const bx1 = line.x + line.w + grow.right;
+    const by0 = line.y - grow.top;
+    const by1 = line.y + line.h + grow.bottom;
+    if (x < bx0 || x > bx1 || y < by0 || y > by1) continue;
+
+    // Primary score: distance to the REAL (uninflated) box — "which box am
+    // I inside / nearest to" is the honest question; nearest-CENTER
+    // penalizes long lines at their ends and misresolves stacked dense
+    // lines fighting over a shared border. Tie-break: distance to center.
+    const dist = distanceToBox(x, y, line.x, line.y, line.w, line.h);
+    const centerDist = Math.hypot(x - (line.x + line.w / 2), y - (line.y + line.h / 2));
+
+    if (dist < bestDist || (dist === bestDist && centerDist < bestCenterDist)) {
+      best = line;
+      bestDist = dist;
+      bestCenterDist = centerDist;
+    }
+  }
+
+  return best;
+}

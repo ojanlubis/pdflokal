@@ -8,7 +8,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { groupRunsIntoLines } from '../../js/core/text-lines.js';
+import { groupRunsIntoLines, resolveTap } from '../../js/core/text-lines.js';
 
 // Build one synthetic run. Horizontal by default (ux=1, uy=0); pass
 // { ux, uy } for other directions. Display fields mirror the pdf geometry
@@ -171,4 +171,134 @@ test('9. pdf.len spans first fragment start to last fragment end; ' +
 test('10. empty input -> []', () => {
   assert.deepEqual(groupRunsIntoLines([]), []);
   assert.deepEqual(groupRunsIntoLines(undefined), []);
+});
+
+// ============================================================================
+// resolveTap — tap-point -> line, with per-side clamped inflation. Founder
+// field report 2026-07-19: on a dense single-spaced tax letter, every line's
+// hit box inflated toward MIN_HIT regardless of neighbors, so on tight
+// spacing the inflated boxes overlapped and a fat-finger tap resolved by
+// nearest-CENTER — deterministic but often the wrong line. resolveTap only
+// reads x/y/w/h off each line, so these build plain boxes directly; no pdf
+// geometry needed.
+// ============================================================================
+function box(x, y, w, h) {
+  return { x, y, w, h };
+}
+
+// Distance from a 1-D point to a 1-D range — 0 when inside it. Used by the
+// tests below to independently predict which line's real box is nearer,
+// so the assertions aren't just re-deriving resolveTap's own arithmetic.
+function distToRange(v, start, end) {
+  if (v < start) return start - v;
+  if (v > end) return v - end;
+  return 0;
+}
+
+test('11. sparse: an isolated line keeps FULL growth (no neighbor to clamp against)', () => {
+  const minHit = 22;
+  const line = box(0, 0, 40, 8); // 8px tall, no other lines on the page at all
+  const growY = (minHit - 8) / 2; // 7 — full desired growth, nothing clamps it
+
+  // A tap just inside the top growth still resolves to the line...
+  assert.equal(resolveTap([line], 20, -growY + 0.5, minHit), line);
+  // ...but one just past the (unclamped) growth boundary does not.
+  assert.equal(resolveTap([line], 20, -growY - 0.5, minHit), null);
+});
+
+test('12. dense stack: a tap just above line 2\'s top resolves to line 2, not line 1', () => {
+  const minHit = 22;
+  // Three 12px lines, identical x-range (0..100), 4px vertical gaps.
+  const line1 = box(0, 0, 100, 12);  // 0..12
+  const line2 = box(0, 16, 100, 12); // 16..28
+  const line3 = box(0, 32, 100, 12); // 32..44
+  const lines = [line1, line2, line3];
+
+  // Old nearest-CENTER logic inflated every line's box by the full 5px
+  // (minHit 22, h 12 -> growY 5) on every side, so line1's box reached down
+  // to y=17 and line2's reached up to y=11 — they overlapped, and a tap at
+  // y=15 could resolve either way depending on which center was closer. The
+  // clamp caps each facing side at half the 4px gap (2px), so the boxes
+  // meet exactly at y=14 with no overlap: y=15 is unambiguously line2's.
+  assert.equal(resolveTap(lines, 50, 15, minHit), line2);
+
+  // Dead center of each line resolves to that line.
+  assert.equal(resolveTap(lines, 50, 6, minHit), line1);
+  assert.equal(resolveTap(lines, 50, 22, minHit), line2);
+  assert.equal(resolveTap(lines, 50, 38, minHit), line3);
+
+  // A tap in a gap resolves to whichever line is nearer.
+  assert.equal(resolveTap(lines, 50, 13, minHit), line1); // 1px from line1, 3 from line2
+  assert.equal(resolveTap(lines, 50, 15, minHit), line2); // 3px from line1, 1 from line2
+});
+
+test('13. dense stack: clamp keeps inflated boxes from overlapping across the whole gap', () => {
+  const minHit = 22;
+  const line1 = box(0, 0, 100, 12);  // 0..12
+  const line2 = box(0, 16, 100, 12); // 16..28
+  const lines = [line1, line2];
+
+  // Sample a grid of points across the gap (and a bit into each line). For
+  // every sample, resolveTap must pick whichever line's UNINFLATED box is
+  // actually nearer — never the farther one, which is what unclamped
+  // inflation (both boxes reaching into the same overlap zone) used to
+  // allow.
+  for (let y = 10; y <= 18; y += 0.5) {
+    const distTo1 = distToRange(y, 0, 12);
+    const distTo2 = distToRange(y, 16, 28);
+    const nearer = distTo1 <= distTo2 ? line1 : line2;
+    const got = resolveTap(lines, 50, y, minHit);
+    if (got !== null) assert.equal(got, nearer, `y=${y}`);
+  }
+
+  // The isolated side (line1's top — no neighbor above) keeps the FULL 5px
+  // growth: a tap 4px above line1's top still hits it.
+  assert.equal(resolveTap(lines, 50, -4, minHit), line1);
+
+  // The clamped side (line1's bottom, 4px gap to line2) is capped at 2px —
+  // a point that WOULD be inside an unclamped 5px growth (y=15.5, since
+  // 12+5=17) but is outside the clamped 2px growth (12+2=14) must resolve
+  // to line2 instead, never line1.
+  assert.equal(resolveTap(lines, 50, 15.5, minHit), line2);
+});
+
+test('14. long line: box-distance beats a closer CENTER on a short neighbor', () => {
+  const minHit = 22;
+  const longLine = box(0, 0, 500, 12); // far-left edge at x=0
+  const shortLine = box(5, 3, 6, 6);   // small box, sits near the tap
+  const lines = [longLine, shortLine];
+
+  // Tap 2px above longLine's far-left corner. Box-distance: longLine's
+  // uninflated box is 2px away (nearest point is (0,0)); shortLine's is
+  // ~7.07px away. Center-distance (the OLD resolution rule): longLine's
+  // center (250, 6) is ~250px away; shortLine's center (8, 6) is only
+  // ~11.3px away — a center-based resolver would wrongly prefer shortLine.
+  // box-distance must win for the long line.
+  assert.equal(resolveTap(lines, 0, -2, minHit), longLine);
+});
+
+test('15. column neighbors: horizontal growth clamps at the gap midpoint; a tap in the gap resolves to the nearer column', () => {
+  const minHit = 22;
+  const lineA = box(0, 0, 10, 12);  // x: 0..10
+  const lineB = box(16, 0, 10, 12); // x: 16..26 -- 6px horizontal gap, same baseline
+  const lines = [lineA, lineB];
+
+  // Desired growX = (22-10)/2 = 6 each, but the 6px gap only allows 3px
+  // each before the boxes would touch — clamp caps it there. The boxes
+  // meet exactly at x=13 (10+3 == 16-3).
+  assert.equal(resolveTap(lines, 12.9, 6, minHit), lineA); // just inside lineA's clamped box
+  assert.equal(resolveTap(lines, 13.1, 6, minHit), lineB); // just inside lineB's clamped box
+
+  // A tap in the gap resolves to the nearer column.
+  assert.equal(resolveTap(lines, 11, 6, minHit), lineA); // 1px from lineA, 5 from lineB
+  assert.equal(resolveTap(lines, 15, 6, minHit), lineB); // 1px from lineB, 5 from lineA
+});
+
+test('16. empty lines array -> null; tap far from every line -> null', () => {
+  const minHit = 22;
+  assert.equal(resolveTap([], 0, 0, minHit), null);
+  assert.equal(resolveTap(undefined, 0, 0, minHit), null);
+
+  const line = box(0, 0, 40, 12);
+  assert.equal(resolveTap([line], 5000, 5000, minHit), null);
 });

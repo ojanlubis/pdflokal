@@ -17,7 +17,7 @@
 
 import { getSource } from '../core/model.js';
 import { ensurePdfJs } from '../core/vendor.js';
-import { groupRunsIntoLines } from '../core/text-lines.js';
+import { groupRunsIntoLines, resolveTap } from '../core/text-lines.js';
 
 // Finger-sized minimum hit box (page-space px at zoom 1). Small print is a
 // <10px-tall run — the ≥44px touch-target law is met by inflating the HIT box,
@@ -159,23 +159,14 @@ export function createTextRunIndex({ getDoc }) {
       return lineCache.get(pageId);
     },
 
-    // The tap → line resolver. Inflates each line's box to a finger-sized
-    // target and, when several candidates overlap, picks the nearest center.
-    // Ported as-is from the old run-based hitTest — lines carry the same
-    // display-space x/y/w/h fields runs did, so the logic is unchanged.
+    // The tap → line resolver. Delegates to core/text-lines.js's resolveTap:
+    // per-side clamped inflation toward MIN_HIT (stops at the neighbor
+    // instead of overlapping it on dense text) + nearest-box (not
+    // nearest-center) resolution among candidates. See that module's
+    // docstring for the founder field report this fixed (2026-07-19).
     async hitTest(pageId, x, y) {
       const lines = await this.getLines(pageId);
-      let best = null;
-      let bestD = Infinity;
-      for (const r of lines) {
-        const growX = Math.max(0, (MIN_HIT - r.w) / 2);
-        const growY = Math.max(0, (MIN_HIT - r.h) / 2);
-        if (x < r.x - growX || x > r.x + r.w + growX) continue;
-        if (y < r.y - growY || y > r.y + r.h + growY) continue;
-        const d = Math.hypot(x - (r.x + r.w / 2), y - (r.y + r.h / 2));
-        if (d < bestD) { best = r; bestD = d; }
-      }
-      return best;
+      return resolveTap(lines, x, y, MIN_HIT);
     },
 
     // User-rotation changes the display frame → cached boxes are stale.
