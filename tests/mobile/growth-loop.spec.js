@@ -23,6 +23,15 @@ async function openDoc(page) {
 }
 
 test.describe('growth loop — mobile', () => {
+  // TEMPORARY: during the Play Store drive the vote card takes the download
+  // moment from share/tip for un-voted users. These tests exercise share/tip
+  // itself, so we mark the vote as already cast — the moment then falls through
+  // to share/tip, exactly as it does for a voted user or once the drive ends.
+  // (Remove this hook when PLAYSTORE_CAMPAIGN is retired.)
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('pdflokal-ps-voted', '1'));
+  });
+
   test('download celebrates (BERES stamp) and then invites — once per day', async ({ page }) => {
     await openDoc(page);
     await downloadOnce(page);
