@@ -766,6 +766,59 @@
       display: block; margin: 8px auto 0; color: var(--muted); font-size: 11px;
       text-decoration: underline; min-height: 32px; padding: 0 8px;
     }
+    /* ---- Play Store vote (TEMPORARY drive) — centered + scrim, more presence
+       than the quiet cards; still non-modal (scrim tap dismisses, file saved) ---- */
+    #vote-card {
+      position: fixed; inset: 0; z-index: 120; display: flex;
+      align-items: center; justify-content: center; padding: 20px;
+      background: rgba(20,16,12,.42);
+      opacity: 0; visibility: hidden; pointer-events: none;
+      transition: opacity .28s ease, visibility 0s linear .28s;
+    }
+    #vote-card.show { opacity: 1; visibility: visible; pointer-events: auto; transition-delay: 0s; }
+    .vc-inner {
+      position: relative; width: min(92vw, 340px); background: var(--surface);
+      border-radius: 18px; padding: 22px 20px 16px; text-align: center;
+      box-shadow: 0 18px 50px rgba(15,18,26,.34); border: 1px solid var(--line);
+      transform: translateY(10px) scale(.98);
+      transition: transform .28s cubic-bezier(.34,1.4,.44,1);
+    }
+    #vote-card.show .vc-inner { transform: none; }
+    @media (prefers-reduced-motion: reduce) { #vote-card, .vc-inner { transition: none; } }
+    #vc-close {
+      position: absolute; top: 8px; right: 8px; width: 32px; height: 32px;
+      display: inline-flex; align-items: center; justify-content: center;
+      color: var(--muted); border-radius: 8px;
+    }
+    #vc-close svg { width: 16px; height: 16px; }
+    .vc-eyebrow {
+      display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .06em;
+      text-transform: uppercase; color: var(--accent); background: rgba(220,38,38,.08);
+      padding: 4px 11px; border-radius: 999px; margin-bottom: 12px;
+    }
+    .vc-head { font-size: 18px; font-weight: 700; color: var(--ink); line-height: 1.3; margin-bottom: 8px; }
+    .vc-sub { font-size: 12.8px; color: var(--muted); line-height: 1.5; margin-bottom: 16px; }
+    .vc-actions { display: flex; gap: 9px; }
+    .vc-actions button {
+      flex: 1; min-height: 46px; border-radius: 11px; font: inherit; font-size: 14px; font-weight: 700;
+      border: 1.5px solid var(--line); background: var(--bg); color: var(--ink);
+    }
+    #vc-yes { border-color: var(--accent); background: var(--accent); color: #fff; box-shadow: 0 2px 0 var(--accent-down); }
+    #vc-yes:active { transform: translateY(1px); box-shadow: 0 1px 0 var(--accent-down); }
+    /* two-step machine: s1 (vote) by default, s2 (tester opt-in) after .step2 */
+    .vc-s2 { display: none; }
+    #vote-card.step2 .vc-s1 { display: none; }
+    #vote-card.step2 .vc-s2 { display: block; }
+    #vc-tester {
+      display: block; width: 100%; min-height: 46px; line-height: 46px; border-radius: 11px;
+      background: var(--accent); color: #fff; font-weight: 700; font-size: 14px; text-decoration: none;
+      box-shadow: 0 2px 0 var(--accent-down);
+    }
+    #vc-tester:active { transform: translateY(1px); box-shadow: 0 1px 0 var(--accent-down); }
+    #vc-later {
+      display: block; margin: 10px auto 0; color: var(--muted); font-size: 12px;
+      text-decoration: underline; min-height: 32px; padding: 0 8px;
+    }
 
     #toast {
       position: fixed; left: 50%; transform: translateX(-50%); bottom: 130px; z-index: 40;
@@ -1093,6 +1146,35 @@
       <a id="ic-guide" class="ic-guide" target="_blank" rel="noopener" hidden>Lihat panduan resmi →</a>
     </div>
     <button id="ic-never">jangan tampilkan lagi</button>
+  </div>
+
+  <!-- TEMPORARY: Play Store demand-validation vote. Shown at the download moment
+       IN PLACE OF the share/tip card during the drive (js/v2/playstore-vote.js;
+       toggled by PLAYSTORE_CAMPAIGN in celebrate.js). Two steps: binary vote →
+       tester opt-in for "Ya" voters only. Centered + scrim (founder call: more
+       attention than the quiet bottom card). -->
+  <div id="vote-card" aria-hidden="true">
+    <div class="vc-inner" role="dialog" aria-label="Mau PDFLokal di Play Store?">
+      <button id="vc-close" aria-label="Tutup">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+      <div class="vc-step vc-s1">
+        <span class="vc-eyebrow">Kabar PDFLokal</span>
+        <div class="vc-head">Mau PDFLokal ada di Play Store?</div>
+        <p class="vc-sub">Biar bisa kamu install sekali tap — jalan tanpa internet, layar penuh buat ngedit, dan tetap 100% di HP-mu.</p>
+        <div class="vc-actions">
+          <button id="vc-no">Nggak perlu</button>
+          <button id="vc-yes">Ya, mau</button>
+        </div>
+      </div>
+      <div class="vc-step vc-s2">
+        <span class="vc-eyebrow">Bantu wujudkan</span>
+        <div class="vc-head">Mau bantu jadi tester?</div>
+        <p class="vc-sub">Google minta 15 orang nyoba dulu selama 2 minggu biar PDFLokal lolos. Gampang — cukup install &amp; sesekali dibuka.</p>
+        <a id="vc-tester" href="#" target="_blank" rel="noopener">Jadi tester &rarr;</a>
+        <button id="vc-later">Nanti aja</button>
+      </div>
+    </div>
   </div>
 
   <dialog id="pm-sheet" aria-label="Kelola halaman">

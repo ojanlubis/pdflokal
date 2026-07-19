@@ -13,6 +13,14 @@
  * BARU in the future changelog.
  */
 
+import { createPlaystoreVote } from './playstore-vote.js';
+
+// TEMPORARY (founder call 2026-07-19): during the Play Store demand-validation
+// drive, the download moment shows the binary VOTE card instead of share/tip —
+// the peak-enthusiasm slot is spent, on purpose, on the go/no-go signal. Flip
+// this to false to end the drive; the share/tip card returns, nothing else.
+const PLAYSTORE_CAMPAIGN = true;
+
 const OPTOUT_KEY = 'pdflokal-support-optout';
 const LAST_SHOWN_KEY = 'pdflokal-support-last';
 const SHARE_URL = 'https://www.pdflokal.id';
@@ -95,6 +103,9 @@ export function showStamp(text, {
 export function createCelebration(deps) {
   let shownThisSession = false;
   const card = document.getElementById('support-card');
+  // The temporary Play Store vote — owns its own gating; celebrate.js only asks
+  // it to try, and skips the share/tip card when it takes the moment.
+  const vote = createPlaystoreVote({ toast: deps.toast });
 
   // TETAP JALAN: connection dies, PDFLokal doesn't (no server in the loop).
   // The moat made visible — once per session, only while a page is open.
@@ -168,6 +179,10 @@ export function createCelebration(deps) {
       // Big, and ~1.2s late on purpose: Android Chrome's download dialog +
       // notification own the first second; we celebrate once the stage clears.
       showStamp('Beres ✓', { big: true, delay: 1200, duration: 3000 });
+      // During the drive, the vote takes this slot from share/tip. If it shows,
+      // we stop here; if it declines (already voted / dismissed today), the
+      // share/tip card runs as usual — so voters still get the normal invite.
+      if (PLAYSTORE_CAMPAIGN && vote.maybeShow()) return;
       // The share/tip invite, once per CALENDAR DAY (founder call, Jul 3) — a gentle
       // reminder that free has a sponsor, never a toll booth per file. (Install lives
       // on the homepage now, off this moment — see install-prompt.js.) shownThisSession
