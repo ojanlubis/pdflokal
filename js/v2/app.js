@@ -22,7 +22,8 @@ import {
   moveAnnotation,
 } from '../core/operations.js';
 import { createHistory, record, undo, redo, canUndo, canRedo } from '../core/history.js';
-import { importPdf, importImage, createPageRasterizer } from '../core/import.js';
+import { importPdf, importImage, createPageRasterizer, probeTextLayer } from '../core/import.js';
+import { pagesBucket } from '../core/telemetry-schema.js';
 import { createPageSlot, syncOverlay, textFontCss } from '../render/page-view.js';
 import { createViewportStream } from '../render/viewport.js';
 import { createInteraction } from '../render/interaction.js';
@@ -31,6 +32,7 @@ import { createPageManager } from './page-manager.js';
 import { createSignatureModal } from './signature-modal.js';
 import { createDownloadSheet } from './download-sheet.js';
 import { track } from '../lib/analytics.js';
+import { tel } from './telemetry.js';
 import { createCelebration } from './celebrate.js';
 import { applyIntentCopy } from './intent-copy.js';
 import { ensurePdfLib } from '../core/vendor.js';
@@ -39,6 +41,18 @@ import { ensurePdfLib } from '../core/vendor.js';
 // loaded on demand now (core/vendor.js), so touching it at module top-level
 // would resurrect the very boot-time dependency we removed. The worker path is
 // set inside ensurePdfJs(), the instant the lib lands.
+
+// ---- telemetry: device class (spec-telemetry.md §3's doc_open/commit_paint) --
+// Mirrors the old wing's detectMobile() thresholds (js/init.js) exactly — that
+// SSOT convention (vw<=599 phone, <=900 tablet, else desktop) already matches
+// this app's own 900px mobile-layout breakpoint, so v2 gets the same bucket a
+// user on the old wing would have gotten, for free comparability.
+function deviceClass() {
+  const vw = window.innerWidth;
+  if (vw <= 599) return 'phone';
+  if (vw <= 900) return 'tablet';
+  return 'desktop';
+}
 
 // ---- state (ONE doc, ONE history — everything else is DOM or derived) -------
 let doc = createDoc(); // replaced wholesale by "Buka Baru" (File menu)
@@ -412,7 +426,11 @@ const interaction = createInteraction({
   onChange: (kind) => {
     // Tip-Ex stroke finished (color was already matched at stroke START):
     // return home to Pilih (founder: whiteout should NOT stay sticky).
-    if (kind === 'draw') { track('editor_action', { action: 'whiteout' }); setTool('select'); }
+    if (kind === 'draw') {
+      track('editor_action', { action: 'whiteout' });
+      tel('tool_use', { tool: 'tipex', action: 'whiteout' }); // spec-telemetry.md §6.2
+      setTool('select');
+    }
     refreshChrome();
   },
   onDeleteTap: (annoId, pageId) => {
@@ -434,6 +452,7 @@ const interaction = createInteraction({
         x: Math.max(0, x - w / 2), y: Math.max(0, y - h / 2), width: w, height: h,
       }));
       track('editor_action', { action: storedSignature.subtype === 'paraf' ? 'paraf' : 'signature' });
+      tel('tool_use', { tool: 'ttd', action: storedSignature.subtype === 'paraf' ? 'paraf' : 'signature' });
       selectAnnotation(doc, created.id); // selected → "Semua Hal." is one tap away
       syncPage(pageId);
       setTool('select'); // tools are verbs; back home
@@ -486,7 +505,12 @@ const pageManager = createPageManager({
   },
   toast,
 });
-document.getElementById('btn-pages').addEventListener('click', () => pageManager.open());
+document.getElementById('btn-pages').addEventListener('click', () => {
+  pageManager.open();
+  // Discoverability signal (spec-telemetry.md §6.2) — armIntent()'s own note
+  // above explains why this never existed before: card clicks fired NOTHING.
+  tel('tool_use', { tool: 'halaman', action: 'pages_open' });
+});
 document.getElementById('pm-close').addEventListener('click', () => pageManager.close());
 
 // ---- inline text editing ------------------------------------------------------------
@@ -529,6 +553,7 @@ function openTextEditor({ pageId, x, y, anno }) {
         record(history, doc);
         updateAnnotation(doc, anno.id, { text });
         track('editor_action', { action: 'text_inline' });
+        tel('tool_use', { tool: 'teks', action: 'text_inline' });
       } else if (!text) {
         record(history, doc);
         removeAnnotation(doc, anno.id);
@@ -545,6 +570,7 @@ function openTextEditor({ pageId, x, y, anno }) {
       // format-bar dropdown change right after the blur-commit still lands.
       selectAnnotation(doc, created.id);
       track('editor_action', { action: 'text' });
+      tel('tool_use', { tool: 'teks', action: 'text' });
     }
     syncPage(pageId);
     setTool('select');
@@ -652,6 +678,7 @@ function deleteSelected() {
   }
   record(history, doc);
   removeAnnotation(doc, id);
+  tel('tool_use', { tool: 'hapus', action: 'delete' }); // spec-telemetry.md §6.2
   if (pageId) syncPage(pageId);
 }
 
@@ -755,8 +782,23 @@ async function loadFilesInner(files) {
     try {
       const bytes = new Uint8Array(await f.arrayBuffer());
       if (bytes.length === 0) throw new Error('empty file'); // 0-byte → JAVASCRIPT-H
-      if (isPdf(f)) await importPdf(doc, { name: f.name, bytes });
-      else await importImage(doc, { name: f.name, bytes, mimeType: f.type });
+      if (isPdf(f)) {
+        const importedPages = await importPdf(doc, { name: f.name, bytes });
+        // doc_open (spec-telemetry.md §3 — scan-vs-born-digital ratio). The
+        // text-layer probe re-opens the PDF independently (probeTextLayer,
+        // core/import.js) — NOT awaited: it must never slow down a multi-file
+        // merge loop, and a probe failure is just "don't know" (dropped).
+        probeTextLayer(bytes)
+          .then((hasText) => tel('doc_open', {
+            text_layer: hasText, pages: pagesBucket(importedPages.length), device: deviceClass(),
+          }))
+          .catch(() => {});
+      } else {
+        await importImage(doc, { name: f.name, bytes, mimeType: f.type });
+        // An image page has no text layer at all — that's the scan ladder's
+        // own job (spec-edit-dokumen-foto.md), not this rail's.
+        tel('doc_open', { text_layer: false, pages: pagesBucket(1), device: deviceClass() });
+      }
       // Carry the intent so the funnel joins up: intent_armed → file_loaded →
       // download. Without it we'd know people PRESSED "Pisah PDF" but not whether
       // any ever brought a file — the half that matters. applyIntent() clears it below.

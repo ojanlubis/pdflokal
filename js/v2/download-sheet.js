@@ -17,6 +17,8 @@
 import { buildPdfBytes } from '../core/export.js';
 import { ensurePdfJs, ensurePdfLib, ensureFflate } from '../core/vendor.js';
 import { track } from '../lib/analytics.js';
+import { tel } from './telemetry.js';
+import { durationBucket } from '../core/telemetry-schema.js';
 import { showStamp } from './celebrate.js';
 
 const COMPRESS_QUALITY = 0.72; // the "Otomatis" preset — one sane default, still
@@ -326,6 +328,7 @@ export function createDownloadSheet(deps) {
     state.exporting = true;
     render();
     const seq = state.seq;
+    const t0 = performance.now(); // spec-telemetry.md §3 export.duration — tap to bytes-in-hand
     try {
       // Belt-and-braces: if Compress is selected but its bytes are missing and
       // nothing is computing them (any invalidation path), start it here.
@@ -380,6 +383,14 @@ export function createDownloadSheet(deps) {
         format: state.format === 'pdf' ? 'pdf' : state.imgfmt,
         size: state.size,
         pages: state.picked ? 'some' : 'all',
+      });
+      // surgery_used/fallback are hardcoded for now — Rung B/C (the ladder)
+      // don't exist on this branch yet; those props start carrying real
+      // values the moment the ladder merges (spec-telemetry.md §6 step 5).
+      tel('export', {
+        surgery_used: false,
+        fallback: 'none',
+        duration: durationBucket(performance.now() - t0),
       });
       modal.close();
     } catch (err) {
