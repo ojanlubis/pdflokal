@@ -20,8 +20,11 @@
  * touching that invariant (see tests/ganti-teks.spec.js, unchanged).
  */
 import { test, expect } from '@playwright/test';
+// Line addressing via the app's own index (helpers/lines.js) — the hint DOM
+// the old helpers clicked was removed by the QUIET PAGE ruling.
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { armGanti, lineBox, centerOf, tapLine as tapLineByTarget } from './helpers/lines.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const NASTY = (name) => path.join(__dirname, 'fixtures', 'nasty', name);
@@ -33,24 +36,6 @@ async function openDoc(page, fixture) {
   await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
 }
 
-// Arm Ganti Teks and wait for the LINE hints (one box per line, not per
-// fragment — the founder ruling this whole suite pins).
-async function armGanti(page) {
-  await page.click('[data-tool="ganti"]');
-  await expect(page.locator('.pv-run-hints div').first()).toBeVisible();
-}
-
-// Tap the Nth hinted LINE and wait for the prefilled inline editor. Unlike
-// tests/ganti-teks.spec.js's tapRun, this fixture's lines span a page taller
-// than the viewport (y=760 down to y=90) — scrollIntoViewIfNeeded first so a
-// hint below the fold still gets a real, on-screen click.
-async function tapLine(page, nth = 0) {
-  const hint = page.locator('.pv-run-hints div').nth(nth);
-  await hint.scrollIntoViewIfNeeded();
-  const box = await hint.boundingBox();
-  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-  await expect(page.locator('.v2-text-edit')).toBeVisible();
-}
 
 // Index of each hinted LINE, verified against a live extraction (not
 // guessed): text-runs.js's getLines() re-sorts groupRunsIntoLines' output back
@@ -65,7 +50,7 @@ const LINE = { A: 0, B: 1, C_KIRI: 2, C_KANAN: 3, D: 4, E: 5 };
 async function replaceLineAndDownload(page, idx, replacement) {
   await openDoc(page, FIXTURE);
   await armGanti(page);
-  await tapLine(page, idx);
+  await tapLineByTarget(page, { index: idx });
   await page.keyboard.type(replacement);
   await page.keyboard.press('Enter');
 
@@ -93,32 +78,41 @@ test.describe('ganti baris — the LINE is the editing primitive (fragmented fix
   test('whole-line prefill: tap the middle of line A → draft is the FULL line, fragments joined, no doubled spaces', async ({ page }) => {
     await openDoc(page, FIXTURE);
     await armGanti(page);
-    await tapLine(page, LINE.A);
+    await tapLineByTarget(page, { index: LINE.A });
     await expect(page.locator('.v2-text-edit')).toHaveText('Nomor: 045/SEK/VII/2026');
   });
 
   test('word-gap join: line B\'s fragments join with exactly ONE inferred space', async ({ page }) => {
     await openDoc(page, FIXTURE);
     await armGanti(page);
-    await tapLine(page, LINE.B);
+    await tapLineByTarget(page, { index: LINE.B });
     await expect(page.locator('.v2-text-edit')).toHaveText('Perihal: Undangan Rapat Anggota');
   });
 
   test('column safety: tapping the left column never pulls in the right column\'s text', async ({ page }) => {
     await openDoc(page, FIXTURE);
     await armGanti(page);
-    await tapLine(page, LINE.C_KIRI);
+    await tapLineByTarget(page, { index: LINE.C_KIRI });
     const text = await page.locator('.v2-text-edit').textContent();
     expect(text).toBe('Kolom Kiri A');
     expect(text).not.toContain('Kolom Kanan B');
   });
 
-  test('hints are per LINE: page 1 shows exactly 6 boxes (A, B, C-kiri, C-kanan, D, E) — not 9 fragments', async ({ page }) => {
+  test('QUIET PAGE ("mending opsi a"): no hint boxes; the hover glow spans the WHOLE line, not one fragment', async ({ page }) => {
     await openDoc(page, FIXTURE);
     await armGanti(page);
-    // armGanti already waited for the first hint; give the rest of the
-    // (already-cached) extraction a beat to paint the remaining boxes.
-    await expect(page.locator('.pv-run-hints div')).toHaveCount(6);
+    // Arming paints NOTHING (founder ruling 2026-07-19) — the layer that once
+    // showed 6 boxes here no longer exists at all.
+    await expect(page.locator('.pv-run-hints')).toHaveCount(0);
+    // The per-LINE grouping this test used to pin via box count is now pinned
+    // via the glow: hovering line A (3 kern fragments) lights ONE glow whose
+    // width spans the full clustered line, not a single fragment.
+    const boxA = await lineBox(page, { index: LINE.A });
+    const c = centerOf(boxA);
+    await page.mouse.move(c.x, c.y);
+    await expect(page.locator('.pv-ganti-glow')).toBeVisible();
+    const glow = await page.locator('.pv-ganti-glow').boundingBox();
+    expect(glow.width).toBeGreaterThan(boxA.width * 0.9); // all fragments, one line
   });
 
   test('line surgery end-to-end: replacing line A cuts all three fragments; line B survives untouched', async ({ page }) => {

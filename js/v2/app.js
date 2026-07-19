@@ -312,7 +312,7 @@ function setTool(next) {
   // The steering highlight belongs to the 'ganti' tool only — leaving it lit
   // after a tool switch (e.g. Escape, or the on-off toggle) would show a
   // commit target for a gesture that no longer exists.
-  if (next === 'ganti') showRunHints(); else { clearRunHints(); clearGantiGlow(); }
+  if (next !== 'ganti') clearGantiGlow();
   if (next !== 'signature') {
     const g = document.getElementById('sig-ghost');
     if (g) g.style.display = 'none';
@@ -406,40 +406,15 @@ async function smartReplace(pageId, x, y) {
   matchReplaceColors(cover, draft, pageId, line); // async; colors land live
 }
 
-// Armed-mode affordance (recognition over recall): faintly mark every tappable
-// LINE on the pages currently in the streaming window. Chrome-red, never
-// prints. One hint box per line, not per fragment (founder ruling 2026-07-19).
-async function showRunHints() {
-  for (const slot of slots) {
-    if (!slot.page.raster) continue; // windowed pages only — bounded work
-    const lines = await textRuns.getLines(slot.page.id);
-    if (tool !== 'ganti') return;    // disarmed while we were extracting
-    const overlay = slot.view.querySelector('.pv-overlay');
-    if (!overlay || overlay.querySelector('.pv-run-hints')) continue;
-    const layer = document.createElement('div');
-    layer.className = 'pv-run-hints';
-    layer.style.cssText = 'position:absolute;inset:0;pointer-events:none';
-    for (const r of lines) {
-      const d = document.createElement('div');
-      d.style.cssText =
-        `position:absolute;left:${r.x}px;top:${r.y}px;width:${r.w}px;height:${r.h}px;` +
-        'background:rgba(220,38,38,.07);outline:1px dashed rgba(220,38,38,.4);border-radius:1px';
-      layer.appendChild(d);
-    }
-    overlay.appendChild(layer);
-  }
-}
-function clearRunHints() {
-  stage.querySelectorAll('.pv-run-hints').forEach((el) => el.remove());
-}
-
 // ---- Ganti Teks steering highlight (press→steer→release-commit, 2026-07-19) ------
-// One reusable div, moved (not recreated) between page overlays as the press/
-// drag/hover resolves to different lines — distinct from the faint dashed
-// pv-run-hints (that one marks EVERY line while armed; this one marks the
-// single line that would commit if released NOW). Solid chrome-red, matches
-// the founder's camera-first release-commit law: nothing is true until the
-// finger lifts, but the user must see what WOULD happen.
+// FOUNDER RULING (2026-07-19, "mending opsi a" — QUIET PAGE): when Ganti Teks
+// is armed the page shows NO per-line hint boxes. On a dense document
+// everything is tappable, so marking everything marks nothing. The armed-mode
+// affordance is now ONLY: the arm toast + this glow (hover on fine pointers,
+// press-steer on touch) — one reusable div, moved (not recreated) between page
+// overlays as the press/drag/hover resolves to different lines. Solid
+// chrome-red, matches the founder's camera-first release-commit law: nothing
+// is true until the finger lifts, but the user must see what WOULD happen.
 let gantiGlowEl = null;
 let gantiSteerSeq = 0;    // guards against a late hitTest landing after a newer one
 let gantiSteerRaf = null;
@@ -1281,6 +1256,7 @@ document.getElementById('hc-go').addEventListener('click', () => {
 window.v2 = {
   getDoc: () => doc,
   getSlots: () => slots,
+  textRuns, // tests: line geometry for string-addressed taps (quiet-page ruling removed the hint boxes specs used to click)
   loadFiles,
   setTool,
   getTool: () => tool,

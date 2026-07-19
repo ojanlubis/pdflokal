@@ -23,6 +23,7 @@ import { test, expect } from '@playwright/test';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import { armGanti, tapLine } from './helpers/lines.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const NASTY = (name) => path.join(__dirname, 'fixtures', 'nasty', name);
@@ -34,25 +35,6 @@ async function openDoc(page, fixture) {
   await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
 }
 
-async function armGanti(page) {
-  await page.click('[data-tool="ganti"]');
-  await expect(page.locator('.pv-run-hints div').first()).toBeVisible();
-}
-
-async function tapRun(page, nth = 0) {
-  const hint = page.locator('.pv-run-hints div').nth(nth);
-  const box = await hint.boundingBox();
-  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-  await expect(page.locator('.v2-text-edit')).toBeVisible();
-}
-
-// undangan-cid.pdf draws "Rapat Anggota Tahunan 2026" THREE times (PDF-space
-// y0 660, 630, 600 — see tests/rung-b-lab.spec.js, which pins this same
-// fixture's geometry). Run index 3 of the page's 8 extracted runs (0:title,
-// 1:nomor, 2/3/4:the three repeats, 5:tempat, 6:tanggal, 7:footer) is the
-// MIDDLE repeat (y0=630) — verified against a live extraction before writing
-// this test, not guessed.
-const MIDDLE_RUN_INDEX = 3;
 
 // Full flow: arm → tap the middle repeat → type → commit → download via the
 // REAL Unduh sheet (never a synthetic buildPdfBytes call — this is the path
@@ -60,7 +42,10 @@ const MIDDLE_RUN_INDEX = 3;
 async function replaceMiddleLineAndDownload(page) {
   await openDoc(page, NASTY('undangan-cid.pdf'));
   await armGanti(page);
-  await tapRun(page, MIDDLE_RUN_INDEX);
+  // undangan-cid.pdf draws "Rapat Anggota Tahunan 2026" THREE times (PDF-space
+  // y0 660, 630, 600 — tests/rung-b-lab.spec.js pins this same geometry). The
+  // string's 2nd paint-order match (nth: 1) is the MIDDLE repeat.
+  await tapLine(page, { str: 'Rapat Anggota Tahunan 2026', nth: 1 });
   await expect(page.locator('.v2-text-edit')).toHaveText('Rapat Anggota Tahunan 2026');
   await page.keyboard.type('Rapat Luar Biasa');
   await page.keyboard.press('Enter');

@@ -12,6 +12,7 @@
 import { test, expect } from '@playwright/test';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { armGanti, lineBox, centerOf, tapLine } from './helpers/lines.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FX = (name) => path.join(__dirname, 'fixtures', name);
@@ -23,25 +24,11 @@ async function openDoc(page, fixture) {
   await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
 }
 
-// Arm Ganti Teks and wait for the run hints (they appear after extraction).
-async function armGanti(page) {
-  await page.click('[data-tool="ganti"]');
-  await expect(page.locator('.pv-run-hints div').first()).toBeVisible();
-}
-
-// Tap the Nth hinted run and wait for the prefilled inline editor.
-async function tapRun(page, nth = 0) {
-  const hint = page.locator('.pv-run-hints div').nth(nth);
-  const box = await hint.boundingBox();
-  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-  await expect(page.locator('.v2-text-edit')).toBeVisible();
-}
-
 test.describe('ganti teks — happy path (tame fixture)', () => {
   test('tap → prefilled selected editor, type replaces, ONE undo reverts all', async ({ page }) => {
     await openDoc(page, FX('sample-2pages.pdf'));
     await armGanti(page);
-    await tapRun(page);
+    await tapLine(page, { str: 'Test Page 1' });
 
     // Prefill is the printed run, pre-selected: typing replaces wholesale.
     await expect(page.locator('.v2-text-edit')).toHaveText('Test Page 1');
@@ -62,7 +49,7 @@ test.describe('ganti teks — happy path (tame fixture)', () => {
   test('the commit tap commits ONLY — no second replace fires (founder ruling)', async ({ page }) => {
     await openDoc(page, FX('sample-2pages.pdf'));
     await armGanti(page);
-    await tapRun(page);
+    await tapLine(page, { str: 'Test Page 1' });
     // The tool disarmed the moment the editor opened.
     expect(await page.evaluate(() => window.v2.getTool())).toBe('select');
 
@@ -76,7 +63,7 @@ test.describe('ganti teks — happy path (tame fixture)', () => {
   test('editing is not redefining: NO format bar during the draft NOR at commit (founder ruling)', async ({ page }) => {
     await openDoc(page, FX('sample-2pages.pdf'));
     await armGanti(page);
-    await tapRun(page);
+    await tapLine(page, { str: 'Test Page 1' });
     await expect(page.locator('#format-bar')).not.toHaveClass(/show/);
     // Commit does NOT auto-select (taste-judge, night 2026-07-19): the flow
     // ends bar-free. A later DELIBERATE tap selects it like any text object —
@@ -90,17 +77,24 @@ test.describe('ganti teks — happy path (tame fixture)', () => {
   test('Escape backs out and takes the cover with it', async ({ page }) => {
     await openDoc(page, FX('sample-2pages.pdf'));
     await armGanti(page);
-    await tapRun(page);
+    await tapLine(page, { str: 'Test Page 1' });
     await page.keyboard.press('Escape');
     expect(await page.evaluate(() => window.v2.getDoc().pages[0].annotations.length)).toBe(0);
   });
 
-  test('armed tool is an on-off switch; hints die with it (founder ruling)', async ({ page }) => {
+  test('armed tool is an on-off switch; QUIET PAGE — no hint layer, the glow dies with disarm', async ({ page }) => {
     await openDoc(page, FX('sample-2pages.pdf'));
     await armGanti(page);
+    // QUIET PAGE (founder ruling 2026-07-19, "mending opsi a"): arming paints
+    // NOTHING — the hint layer does not exist. The armed affordance is the
+    // toast + the hover/press glow.
+    await expect(page.locator('.pv-run-hints')).toHaveCount(0);
+    const c = centerOf(await lineBox(page, { str: 'Test Page 1' }));
+    await page.mouse.move(c.x, c.y);
+    await expect(page.locator('.pv-ganti-glow')).toBeVisible();
     await page.click('[data-tool="ganti"]'); // second tap = off
     expect(await page.evaluate(() => window.v2.getTool())).toBe('select');
-    await expect(page.locator('.pv-run-hints')).toHaveCount(0);
+    await expect(page.locator('.pv-ganti-glow')).toHaveCount(0);
   });
 });
 
@@ -108,12 +102,15 @@ test.describe('ganti teks — the nasty fixtures (field-bug pins)', () => {
   test('deck: bold navy title gets a PAPER cover (not an ink slab) + adopts the navy ink', async ({ page }) => {
     await openDoc(page, NASTY('deck-berwarna.pdf'));
     await armGanti(page);
-    // Tap the big title run specifically (the one whose text starts with "Optimalisasi").
-    const idx = await page.evaluate(() => {
-      const hints = [...document.querySelectorAll('.pv-run-hints div')];
-      return hints.findIndex((h) => parseFloat(h.style.height) > 20); // display-size run
+    // Tap the big title line specifically — found by display size through the
+    // app's own line index (the hint DOM the old lookup scanned is gone —
+    // quiet-page ruling).
+    const title = await page.evaluate(async () => {
+      const pg = window.v2.getDoc().pages[0];
+      const lines = await window.v2.textRuns.getLines(pg.id);
+      return lines.find((l) => l.h > 20).str; // display-size line
     });
-    await tapRun(page, idx);
+    await tapLine(page, { str: title });
     // The async color sampling lands on the open editor — wait for it.
     await page.waitForTimeout(400);
 
@@ -136,7 +133,7 @@ test.describe('ganti teks — the nasty fixtures (field-bug pins)', () => {
   test('surat: dense small serif text — prefill exact, Times mapped', async ({ page }) => {
     await openDoc(page, NASTY('surat-resmi.pdf'));
     await armGanti(page);
-    await tapRun(page, 2); // a body run below the letterhead
+    await tapLine(page, { index: 2 }); // a body line below the letterhead (paint order)
     const text = await page.locator('.v2-text-edit').textContent();
     expect(text.length).toBeGreaterThan(3); // real extracted words, not garbage
     await page.keyboard.press('Enter');
@@ -157,14 +154,16 @@ test.describe('ganti teks — the nasty fixtures (field-bug pins)', () => {
   test('rotated page (/Rotate 90): runs land inside the displayed frame', async ({ page }) => {
     await openDoc(page, NASTY('halaman-miring.pdf'));
     await armGanti(page);
-    const ok = await page.evaluate(() => {
-      const view = document.querySelector('.pv-page');
+    // The hint DOM this test used to measure is gone (quiet page) — the pin
+    // moves to the SOURCE the hints projected: the line index's display boxes
+    // must land inside the rotated page frame.
+    const ok = await page.evaluate(async () => {
+      const pg = window.v2.getDoc().pages[0];
+      const lines = await window.v2.textRuns.getLines(pg.id);
+      const view = document.querySelector(`.pv-page[data-page-id="${pg.id}"]`);
       const vw = view.offsetWidth; const vh = view.offsetHeight;
-      return [...document.querySelectorAll('.pv-run-hints div')].every((h) => {
-        const x = parseFloat(h.style.left); const y = parseFloat(h.style.top);
-        const w = parseFloat(h.style.width); const hh = parseFloat(h.style.height);
-        return x >= -2 && y >= -2 && x + w <= vw + 2 && y + hh <= vh + 2;
-      });
+      return lines.length > 0 && lines.every((l) =>
+        l.x >= -2 && l.y >= -2 && l.x + l.w <= vw + 2 && l.y + l.h <= vh + 2);
     });
     expect(ok).toBe(true);
   });

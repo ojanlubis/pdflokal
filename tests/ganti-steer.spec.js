@@ -18,6 +18,7 @@
 import { test, expect } from '@playwright/test';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { armGanti, lineBox } from './helpers/lines.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const NASTY = (name) => path.join(__dirname, 'fixtures', 'nasty', name);
@@ -33,21 +34,11 @@ async function openDoc(page, fixture) {
   await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
 }
 
-async function armGanti(page) {
-  await page.click('[data-tool="ganti"]');
-  await expect(page.locator('.pv-run-hints div').first()).toBeVisible();
-}
-
-async function hintBox(page, nth) {
-  const hint = page.locator('.pv-run-hints div').nth(nth);
-  await hint.scrollIntoViewIfNeeded();
-  return hint.boundingBox();
-}
 
 // Fraction of the smaller box's area that the two boxes share — 1 = exact
-// overlap. The glow is styled from the SAME line.x/y/w/h the hints are, in
-// the same page-space overlay, so a hover over a line's hint should produce
-// near-total overlap, not just "somewhere nearby".
+// overlap. The glow is styled from the SAME line.x/y/w/h 
+// helpers/lines.js's lineBox measures, in the same page-space overlay, so a
+// hover over a line should produce near-total overlap, not just "somewhere nearby".
 function overlapFraction(a, b) {
   const left = Math.max(a.x, b.x);
   const right = Math.min(a.x + a.width, b.x + b.width);
@@ -64,7 +55,7 @@ test.describe('ganti steer — hover preview + release-commit (desktop mouse)', 
     await openDoc(page, FIXTURE);
     await armGanti(page);
 
-    const boxA = await hintBox(page, LINE.A);
+    const boxA = await lineBox(page, { index: LINE.A });
     await page.mouse.move(boxA.x + boxA.width / 2, boxA.y + boxA.height / 2);
     await expect(page.locator('.pv-ganti-glow')).toBeVisible();
     const glowA = await page.locator('.pv-ganti-glow').boundingBox();
@@ -72,7 +63,7 @@ test.describe('ganti steer — hover preview + release-commit (desktop mouse)', 
     // Hover alone must never open the editor — nothing is committed until release.
     await expect(page.locator('.v2-text-edit')).toHaveCount(0);
 
-    const boxB = await hintBox(page, LINE.B);
+    const boxB = await lineBox(page, { index: LINE.B });
     await page.mouse.move(boxB.x + boxB.width / 2, boxB.y + boxB.height / 2);
     await expect(async () => {
       const glowB = await page.locator('.pv-ganti-glow').boundingBox();
@@ -86,7 +77,7 @@ test.describe('ganti steer — hover preview + release-commit (desktop mouse)', 
   test('disarming the tool clears the glow', async ({ page }) => {
     await openDoc(page, FIXTURE);
     await armGanti(page);
-    const boxA = await hintBox(page, LINE.A);
+    const boxA = await lineBox(page, { index: LINE.A });
     await page.mouse.move(boxA.x + boxA.width / 2, boxA.y + boxA.height / 2);
     await expect(page.locator('.pv-ganti-glow')).toBeVisible();
 
@@ -105,7 +96,7 @@ test.describe('ganti steer — hover preview + release-commit (desktop mouse)', 
   test('a click still commits — quick press+release in place opens the editor prefilled with that line (unchanged outcome)', async ({ page }) => {
     await openDoc(page, FIXTURE);
     await armGanti(page);
-    const boxB = await hintBox(page, LINE.B);
+    const boxB = await lineBox(page, { index: LINE.B });
     await page.mouse.click(boxB.x + boxB.width / 2, boxB.y + boxB.height / 2);
     await expect(page.locator('.v2-text-edit')).toBeVisible();
     await expect(page.locator('.v2-text-edit')).toHaveText('Perihal: Undangan Rapat Anggota');

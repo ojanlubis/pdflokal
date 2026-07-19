@@ -14,6 +14,7 @@
 import { test, expect } from '@playwright/test';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { armGanti, lineBox, centerOf, marginPoint } from '../helpers/lines.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const NASTY = (name) => path.join(__dirname, '..', 'fixtures', 'nasty', name);
@@ -28,41 +29,6 @@ async function openDoc(page) {
   await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
 }
 
-async function armGanti(page) {
-  await page.tap('[data-tool="ganti"]');
-  await expect(page.locator('.pv-run-hints div').first()).toBeVisible();
-}
-
-async function hintCenter(page, nth) {
-  const hint = page.locator('.pv-run-hints div').nth(nth);
-  await hint.scrollIntoViewIfNeeded();
-  const box = await hint.boundingBox();
-  return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
-}
-
-// A point on the current page that overlaps NONE of the hinted lines (with
-// generous padding) — real margin, not "probably empty".
-async function marginPoint(page) {
-  const pageBox = await page.locator('.pv-page').first().boundingBox();
-  const hints = await page.locator('.pv-run-hints div').evaluateAll(
-    (els) => els.map((el) => el.getBoundingClientRect())
-      .map((r) => ({ x: r.x, y: r.y, width: r.width, height: r.height })),
-  );
-  const pad = 24;
-  const candidates = [
-    { x: pageBox.x + 8, y: pageBox.y + 8 },
-    { x: pageBox.x + pageBox.width - 8, y: pageBox.y + 8 },
-    { x: pageBox.x + 8, y: pageBox.y + pageBox.height - 8 },
-    { x: pageBox.x + pageBox.width - 8, y: pageBox.y + pageBox.height - 8 },
-    { x: pageBox.x + pageBox.width / 2, y: pageBox.y + 8 },
-  ];
-  for (const c of candidates) {
-    const hit = hints.some((h) => c.x >= h.x - pad && c.x <= h.x + h.width + pad
-      && c.y >= h.y - pad && c.y <= h.y + h.height + pad);
-    if (!hit) return c;
-  }
-  throw new Error('marginPoint: every candidate overlapped a hinted line — fixture geometry changed');
-}
 
 // Real touch-typed PointerEvents, dispatched via elementFromPoint at each
 // coordinate — same shape as whiteout-drag.spec.js's touchDrag helper. Exposed
@@ -107,7 +73,7 @@ test.describe('ganti steer — press/drag/release on real touch', () => {
   test('quick tap on a line still opens the editor prefilled with that line (regression)', async ({ page }) => {
     await openDoc(page);
     await armGanti(page);
-    const c = await hintCenter(page, LINE.A);
+    const c = centerOf(await lineBox(page, { index: LINE.A }));
     await page.touchscreen.tap(c.x, c.y);
     await expect(page.locator('.v2-text-edit')).toBeVisible();
     await expect(page.locator('.v2-text-edit')).toHaveText('Nomor: 045/SEK/VII/2026');
@@ -116,8 +82,8 @@ test.describe('ganti steer — press/drag/release on real touch', () => {
   test('press on line A, drag to line B, release — prefill is line B, NOT line A', async ({ page }) => {
     await openDoc(page);
     await armGanti(page);
-    const a = await hintCenter(page, LINE.A);
-    const b = await hintCenter(page, LINE.B);
+    const a = centerOf(await lineBox(page, { index: LINE.A }));
+    const b = centerOf(await lineBox(page, { index: LINE.B }));
 
     await touchDrag(page, a.x, a.y, b.x, b.y);
 
@@ -128,8 +94,8 @@ test.describe('ganti steer — press/drag/release on real touch', () => {
   test('the glow exists mid-drag (steering is visible before commit)', async ({ page }) => {
     await openDoc(page);
     await armGanti(page);
-    const a = await hintCenter(page, LINE.A);
-    const b = await hintCenter(page, LINE.B);
+    const a = centerOf(await lineBox(page, { index: LINE.A }));
+    const b = centerOf(await lineBox(page, { index: LINE.B }));
 
     await fireTouch(page, 'pointerdown', a.x, a.y, { button: 0, buttons: 1 });
     await expect(page.locator('.pv-ganti-glow')).toHaveCount(1); // lit at press
@@ -150,7 +116,7 @@ test.describe('ganti steer — press/drag/release on real touch', () => {
   test('press, drag off all text into the margin, release — no editor opens, miss-toast fires', async ({ page }) => {
     await openDoc(page);
     await armGanti(page);
-    const a = await hintCenter(page, LINE.A);
+    const a = centerOf(await lineBox(page, { index: LINE.A }));
     const margin = await marginPoint(page);
 
     await touchDrag(page, a.x, a.y, margin.x, margin.y);
