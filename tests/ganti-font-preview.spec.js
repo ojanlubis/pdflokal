@@ -65,12 +65,43 @@ test.describe('ganti teks — live doc-font preview', () => {
   test('draft editor: twin shows immediately, doc font swaps in live', async ({ page }) => {
     await openDoc(page, CID_FIXTURE);
     await armGanti(page);
+
+    // Capture the editor's font family at the EXACT instant it enters the DOM.
+    // WHY a MutationObserver and not a read after the editor is visible: the
+    // "twin first" claim is about the very first frame, and openTextEditor sets
+    // the twin font synchronously (`ed.style.font = textFontCss(...)`) BEFORE
+    // appendChild, whereas prepareDocFont only prepends the `pdflokal-doc-`
+    // family in an async continuation many awaits later (ensurePdfLib script
+    // load → pdf-lib dry run → FontFace.load — see js/v2/app.js). The observer's
+    // microtask fires right after that synchronous appendChild, so it records a
+    // guaranteed twin-only value. The old approach — a page.evaluate round-trip
+    // AFTER the editor was already visible — was never synchronized against that
+    // async prepend, so a warm module/HTTP cache (full-suite runs) could let the
+    // doc font land inside the round-trip window and flip this assertion. That
+    // was the intermittent full-suite failure diagnosed 2026-07-20.
+    await page.evaluate(() => {
+      window.__firstEditorFont = null;
+      const obs = new MutationObserver((records) => {
+        for (const rec of records) {
+          for (const node of rec.addedNodes) {
+            if (node.nodeType === 1 && node.classList.contains('v2-text-edit')) {
+              window.__firstEditorFont = getComputedStyle(node).fontFamily;
+              obs.disconnect();
+              return;
+            }
+          }
+        }
+      });
+      obs.observe(document.body, { childList: true, subtree: true });
+    });
+
     await tapLine(page, { str: 'Rapat Anggota Tahunan 2026', nth: 1 });
     await expect(page.locator('.v2-text-edit')).toBeVisible();
 
-    // Twin immediately — no doc font yet on the very first frame.
-    const initialFamily = await page.evaluate(() =>
-      getComputedStyle(document.querySelector('.v2-text-edit')).fontFamily);
+    // Twin immediately — the family captured at insertion time is never the doc
+    // font, no matter how fast prepareDocFont resolves afterward.
+    const initialFamily = await page.evaluate(() => window.__firstEditorFont);
+    expect(initialFamily, 'observer never saw the .v2-text-edit insertion').not.toBeNull();
     expect(firstFontFamily(initialFamily)).not.toMatch(/^pdflokal-doc-/);
 
     // prepareDocFont is async (vendor scripts + pdf-lib dry run + FontFace
