@@ -1,0 +1,159 @@
+/*
+ * PDFLokal — core/page-surgery.js  (RUNG B+C — the per-page surgery pipeline)
+ * ============================================================================
+ * Extracted out of core/export.js (founder ruling 2026-07-20, executing
+ * spec-live-surgery.md's build order §8.1: "Extract the per-page surgery+
+ * insert pipeline from export.js into core/page-surgery.js; buildPdfBytes
+ * calls it; prove export parity"). PURE REFACTOR — runSurgery and
+ * planNativeInserts move here UNCHANGED (same names, same signatures, same
+ * behavior), export.js now imports and calls them.
+ *
+ * WHY this lives outside export.js now: export.js already produces the whole
+ * document's honest result at download time — that's still its only job.
+ * spec-live-surgery.md's next increment (not this one) makes the EDITOR itself
+ * re-render a page's background raster from a surgically-modified copy at
+ * commit time, using this exact same pipeline. Two callers (export at
+ * download, the editor at commit) must share ONE honest implementation of
+ * "cut the original run, try to write the replacement back with the
+ * document's own font" — that pipeline can't keep living inside export.js's
+ * module once a second, non-export caller needs it. This module is that
+ * single home; export.js is now just one of its two callers.
+ *
+ * Same vendor-injection discipline as redact.js/reinsert.js: PDFLib and
+ * fontkit are passed in by the caller — this file has zero vendor imports.
+ */
+
+import { removeRunsFromPdfPage } from './redact.js';
+import { planNativeInsert, appendNativeText } from './reinsert.js';
+
+// ---- Rung B: honest replacement (surgery) ------------------------------------
+
+// WHY 60%: replaceBox is the cover's BIRTH-TIME rect; if the user later drags
+// the cover away from it, they've un-covered the original words — the surgery
+// intent (born together with the cover) no longer holds, and cutting the show
+// ops would leave a hole with nothing drawn over it. A small nudge (still
+// mostly overlapping) is not a "moved away" — hence a threshold, not exact
+// equality. Both rects are page-space top-left, same frame — plain rect math.
+const REPLACE_OVERLAP_MIN = 0.6;
+
+function overlapsBirthBox(anno) {
+  const box = anno.replaceBox;
+  const boxArea = box.w * box.h;
+  if (boxArea <= 0) return false;
+  const ix0 = Math.max(anno.x, box.x);
+  const iy0 = Math.max(anno.y, box.y);
+  const ix1 = Math.min(anno.x + anno.width, box.x + box.w);
+  const iy1 = Math.min(anno.y + anno.height, box.y + box.h);
+  const iw = Math.max(0, ix1 - ix0);
+  const ih = Math.max(0, iy1 - iy0);
+  return (iw * ih) >= REPLACE_OVERLAP_MIN * boxArea;
+}
+
+// Cut the original show-text ops for every whiteout cover that still carries
+// a valid, un-moved replace intent. Returns { skipCovers, insertByCover }:
+// skipCovers is the set of annotation ids whose cover should be SKIPPED at
+// draw time (the true background shows through — strictly better than a
+// sampled-color rectangle); insertByCover maps that SAME cover id to the
+// text-walk.js `insert` geometry the removed run painted with — Rung C's
+// native re-insert needs it to write the replacement back with the
+// document's own font (see planNativeInserts below). Never throws: any
+// surgery failure falls back to both empty, so the cover ships and the
+// export lives.
+//
+// replaceTargets is an ARRAY (founder ruling 2026-07-19: the LINE is the
+// editing primitive — a whole-line target can in principle span more than one
+// content-stream cut). All candidates' targets are flattened into ONE
+// removeRunsFromPdfPage call (it already accepts an array), then results are
+// sliced back per annotation in the same order they were flattened.
+export function runSurgery(pdfPage, PDFLib, annotations) {
+  const skipCovers = new Set();
+  const insertByCover = new Map();
+  const candidates = annotations.filter(
+    (a) => a.type === 'whiteout' && a.replaceTargets?.length && a.replaceBox && overlapsBirthBox(a),
+  );
+  if (candidates.length === 0) return { skipCovers, insertByCover };
+  try {
+    const flatTargets = [];
+    const spans = []; // [start, end) into flatTargets, per candidate
+    for (const a of candidates) {
+      spans.push([flatTargets.length, flatTargets.length + a.replaceTargets.length]);
+      flatTargets.push(...a.replaceTargets);
+    }
+    const { results } = removeRunsFromPdfPage(pdfPage, PDFLib, flatTargets);
+    candidates.forEach((a, i) => {
+      const [start, end] = spans[i];
+      const slice = results.slice(start, end);
+      // WHY all-matched, not any-matched: a partial match means some of the
+      // line's fragments got cut and some didn't — the already-cut ops are
+      // gone from the content stream either way, so the cover MUST stay to
+      // hide the now-broken remainder. Never leave a half-removed line
+      // uncovered.
+      if (slice.length > 0 && slice.every((r) => r.matched)) {
+        skipCovers.add(a.id);
+        // The line always STARTS at its first target — the honest entry
+        // point for where replacement text should paint, even on the (not
+        // yet produced, but architecturally allowed) multi-target line.
+        insertByCover.set(a.id, slice[0].insert);
+      }
+    });
+  } catch (err) {
+    // WHY warn-and-continue: an export must NEVER fail or degrade because
+    // surgery had trouble — the Rung A cover fallback is always still there.
+    console.warn('[core/page-surgery] surgery failed, covers kept:', err);
+  }
+  return { skipCovers, insertByCover };
+}
+
+// ---- Rung C: native re-insert (own-font replacement) ------------------------
+
+// For every TEXT annotation born from a Ganti Teks replace (carries
+// replaceCoverId — see js/v2/app.js's smartReplace/openTextEditor) whose
+// cover's surgery just succeeded, try to write its text INTO the content
+// stream using the document's OWN font instead of drawing a metric-twin
+// annotation on top. Returns the set of annotation ids painted natively —
+// the drawing loop below skips those. Any decline (mixed fonts, multiline,
+// missing glyph, unsupported font shape, no fontkit, …) or thrown error just
+// leaves the id out of the set: the twin drawer paints it exactly as today.
+// Never a hard failure — mirrors runSurgery's discipline one level up.
+export function planNativeInserts(pdfPage, PDFLib, fontkit, annotations, skipCovers, insertByCover) {
+  const skipDraw = new Set();
+  if (!fontkit) return skipDraw; // same deps guard as the custom-font embed path
+  for (const anno of annotations) {
+    if (anno.type !== 'text' || !anno.replaceCoverId || !skipCovers.has(anno.replaceCoverId)) continue;
+    const insert = insertByCover.get(anno.replaceCoverId);
+    if (!insert) continue;
+    try {
+      const plan = planNativeInsert(pdfPage, PDFLib, fontkit, { insert, text: anno.text, color: anno.color });
+      if (plan.ok) {
+        appendNativeText(pdfPage, PDFLib, plan.snippet);
+        skipDraw.add(anno.id);
+      }
+    } catch (err) {
+      console.warn('[core/page-surgery] native re-insert failed, falling back to twin draw:', err);
+    }
+  }
+  return skipDraw;
+}
+
+// ---- the composed pipeline ----------------------------------------------------
+
+// Run BOTH rungs, in the exact order buildPdfBytes has always run them, over
+// one already-copied pdf-lib page. This is the ONE call a caller needs —
+// export.js and (spec-live-surgery.md increment 2) the editor's live
+// re-render both call this instead of re-deriving the sequencing themselves.
+//
+// WHY surgery runs before native-insert, and both run before ANY drawing:
+// runSurgery must cut ops out of the copied page's ORIGINAL content stream
+// before pdf-lib's first draw call (drawRectangle/drawText/…) appends its OWN
+// content stream to the page — run it after and removeRunsFromPdfPage would
+// have to contend with content pdf-lib itself just wrote (and rewrite the
+// wrong stream at that). planNativeInserts' appendNativeText has the same
+// constraint (see reinsert.js) — its append must land before pdf-lib's first
+// draw call touches this page. Callers that draw annotations afterward (e.g.
+// export.js's ANNOTATION_DRAWERS loop) get the ordering guarantee for free by
+// calling this function first, before their own first draw.
+export function applyPageSurgery(pdfPage, PDFLib, fontkit, annotations) {
+  const { skipCovers, insertByCover } = runSurgery(pdfPage, PDFLib, annotations);
+  const skipDraw = planNativeInserts(pdfPage, PDFLib, fontkit, annotations, skipCovers, insertByCover);
+  return { skipCovers, skipDraw, insertByCover };
+}
