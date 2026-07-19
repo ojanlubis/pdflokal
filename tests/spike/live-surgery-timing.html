@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex, nofollow">
+<title>spike — live-surgery commit timing (internal, not a product page)</title>
+</head>
+<body>
+<!--
+  MEASUREMENT SPIKE (architecture decision input, 2026-07-19) — NOT a product
+  page, not linked from anywhere, noindexed. Loads the REAL core modules
+  (js/core/vendor.js, js/core/redact.js — same ones core/export.js calls at
+  export time) and exposes window.spikeMeasure()/window.spikeBuildLargeDoc()
+  for tests/spike/live-surgery-timing.spec.js to drive via page.evaluate().
+  See that spec file for the invocation (SPIKE=1 gate).
+-->
+<script type="module" src="/tests/spike/live-surgery-timing-lib.js"></script>
+</body>
+</html>
