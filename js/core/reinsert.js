@@ -27,6 +27,32 @@
  *     exactly how pdf-lib's own drawText paints Latin text today (no ligature/
  *     kerning-pair substitution), so this is not a regression for the fonts
  *     this path targets — just not a general text-shaping engine.
+ *
+ * RUNG C+ EXTENSION (2026-07-19 — founder field test on a real Word-made PDF):
+ * Word does not write Type0/Identity-H — it writes a SIMPLE /Subtype
+ * /TrueType font, code-keyed (not CID-keyed), with /Encoding the NAME
+ * /WinAnsiEncoding and /FirstChar+/Widths declaring advances. v1's whole
+ * pipeline (hex-glyph-id CID strings, /W-array widths) doesn't apply to that
+ * shape at all — it needs its own byte-encoded path, added alongside v1
+ * without touching it:
+ *   - Font dict test: /Subtype /TrueType (not Type0). /Encoding must be the
+ *     bare NAME /WinAnsiEncoding — a /Differences dict, /MacRomanEncoding, or
+ *     no /Encoding at all is a genuinely different byte table we don't know,
+ *     declined as 'unsupported-encoding' (new reason, same discipline).
+ *   - Every replacement char must round-trip to ONE WinAnsi byte (PDF 32000
+ *     Annex D.2) AND that font's own program must have a real glyph for it
+ *     (fontkit hasGlyphForCodePoint) — either failure declines
+ *     'missing-glyph', same as v1's coverage guard.
+ *   - Advances come from /FirstChar+/Widths (code-keyed, same shape
+ *     core/redact.js's extractFontMetrics already reads for the CUT side);
+ *     a byte outside that declared range with no /MissingWidth to fall back
+ *     on declines 'unsupported-font' — writing a 0-width glyph would corrupt
+ *     the layout, not just mis-trust a position like the read-only reader may.
+ *   - The show op is a literal string of real encoded BYTES (Tj), not a
+ *     hex-glyph-id TJ run — WinAnsi bytes ARE character codes for this font,
+ *     so there's no subset-glyph-id indirection and no need for the CID
+ *     path's space-as-kern trick (this path's space is a real, provable,
+ *     0x20 byte with its own declared /Widths advance).
  */
 
 // ---- shared little helpers ---------------------------------------------------
@@ -77,13 +103,124 @@ function escapeNameForWrite(name) {
   return out;
 }
 
+// ---- Word-shape (simple TrueType) helpers --------------------------------------
+
+// PDF 32000-1:2008 Annex D.2 WinAnsiEncoding, unicode codepoint -> byte.
+// ASCII 0x20-0x7E is a straight identity mapping (checked separately below,
+// no table lookup needed). 0xA0-0xFF mirrors the Latin-1 supplement
+// byte-for-byte (also identity — built with a loop, not typed out, since
+// "byte === codepoint" is exactly what it says). 0x80-0x9F is the genuinely
+// NONOBVIOUS part: CP1252's overlay of curly quotes, dashes, the Euro sign,
+// etc. — the ~27 entries below, listed explicitly. Five codes in that range
+// (0x81, 0x8D, 0x8F, 0x90, 0x9D) are undefined in WinAnsiEncoding — no entry,
+// so a char that maps to one of those codepoints correctly falls through to
+// "not encodable" rather than us inventing a byte for it.
+const WINANSI_CP1252_OVERLAY = new Map([
+  [0x20ac, 0x80], [0x201a, 0x82], [0x0192, 0x83], [0x201e, 0x84],
+  [0x2026, 0x85], [0x2020, 0x86], [0x2021, 0x87], [0x02c6, 0x88],
+  [0x2030, 0x89], [0x0160, 0x8a], [0x2039, 0x8b], [0x0152, 0x8c],
+  [0x017d, 0x8e], [0x2018, 0x91], [0x2019, 0x92], [0x201c, 0x93],
+  [0x201d, 0x94], [0x2022, 0x95], [0x2013, 0x96], [0x2014, 0x97],
+  [0x02dc, 0x98], [0x2122, 0x99], [0x0161, 0x9a], [0x203a, 0x9b],
+  [0x0153, 0x9c], [0x017e, 0x9e], [0x0178, 0x9f],
+]);
+const WINANSI_UNICODE_TO_BYTE = new Map(WINANSI_CP1252_OVERLAY);
+for (let byte = 0xa0; byte <= 0xff; byte += 1) WINANSI_UNICODE_TO_BYTE.set(byte, byte);
+
+// A codepoint's WinAnsi byte, or undefined when WinAnsiEncoding simply has no
+// byte for it (a genuine "can't encode this", not something to guess around).
+function winAnsiByteFor(codepoint) {
+  if (codepoint >= 0x20 && codepoint <= 0x7e) return codepoint;
+  return WINANSI_UNICODE_TO_BYTE.get(codepoint);
+}
+
+// PDF literal-string byte escaping (32000 7.3.4.2). '\', '(' and ')' would
+// otherwise corrupt or prematurely close the '(...)' body; every byte outside
+// printable ASCII — control bytes below 0x20, and 0x7F upward, which is where
+// this path's whole Latin-1-supplement half (accented Latin, curly
+// punctuation) lives — gets the spec's own 1-3 digit octal \nnn escape
+// instead of a raw byte. 0x20 (space) is left as a real byte on purpose (see
+// module header: no TJ-kern trick on this path).
+function encodeLiteralStringBytes(bytes) {
+  let out = '';
+  for (const byte of bytes) {
+    if (byte === 0x5c) out += '\\\\';
+    else if (byte === 0x28) out += '\\(';
+    else if (byte === 0x29) out += '\\)';
+    else if (byte < 0x20 || byte > 0x7e) out += `\\${byte.toString(8).padStart(3, '0')}`;
+    else out += String.fromCharCode(byte);
+  }
+  return out;
+}
+
+// /FirstChar + /Widths (code-keyed) — same shape core/redact.js's
+// parseSimpleFont already reads for the CUT side, but that reader is
+// read-only positioning (a missing entry safely degrades to 0/"untrusted").
+// Writing a brand-new show op can't take that shortcut: a byte with no
+// declared width and no /MissingWidth fallback must decline outright, not
+// silently paint at 0 width. Returns { widths: Map<byte,width>, missingWidth }
+// (missingWidth is `null`, not 0, when the FontDescriptor carries none — the
+// caller tells "no fallback" and "font declares 0" apart) or `null` when
+// there's no /Widths (or no /FirstChar to anchor it) to read at all.
+function readSimpleFontWidths(fontObj, context, PDFLib) {
+  const { PDFName, PDFRef } = PDFLib;
+  const res = (v) => resolve(context, PDFRef, v);
+
+  const widthsRaw = fontObj.get(PDFName.of('Widths'));
+  const firstCharRaw = fontObj.get(PDFName.of('FirstChar'));
+  if (!widthsRaw || !firstCharRaw) return null;
+
+  const firstChar = res(firstCharRaw).asNumber();
+  const widthsArr = res(widthsRaw).asArray();
+  const widths = new Map();
+  widthsArr.forEach((w, i) => widths.set(firstChar + i, res(w).asNumber()));
+
+  let missingWidth = null;
+  const fdRaw = fontObj.get(PDFName.of('FontDescriptor'));
+  if (fdRaw) {
+    const fd = res(fdRaw);
+    const mwRaw = fd.get(PDFName.of('MissingWidth'));
+    if (mwRaw) missingWidth = res(mwRaw).asNumber();
+  }
+  return { widths, missingWidth };
+}
+
 // ---- font program extraction ---------------------------------------------------
 
-// Pull the raw embedded font PROGRAM bytes for `fontName` (a page Resources
-// /Font key, no leading '/') out of the page — v1 scope: Type0/Identity-H
-// only (see module header). Returns { ok:true, bytes } or { ok:false, reason }
-// — never throws (the caller wraps in try/catch anyway as a second layer,
-// since a malformed dict can still throw INSIDE this function's own gets).
+// Shared page/Resources/Font walk: resolve `fontName` (a page Resources
+// /Font key, no leading '/') down to its font dict object, or `null` if
+// anything along the way is missing/wrong-shaped. Both extractFontProgram
+// (the embedded PROGRAM bytes) and planNativeInsert's simple-TrueType guards
+// (which need the DICT itself — /Subtype, /Encoding, /Widths) walk this same
+// path; this is the one place that walk lives.
+function lookupFontObject(page, PDFLib, fontName) {
+  const { PDFName, PDFDict, PDFRef } = PDFLib;
+  const context = page.doc.context;
+  const res = (v) => resolve(context, PDFRef, v);
+
+  const resources = page.node.Resources();
+  if (!resources) return null;
+  const fontDictRaw = resources.get(PDFName.of('Font'));
+  if (!fontDictRaw) return null;
+  const fontDict = res(fontDictRaw);
+  if (!(fontDict instanceof PDFDict)) return null;
+
+  const fontObjRaw = fontDict.get(PDFName.of(fontName));
+  if (!fontObjRaw) return null;
+  return res(fontObjRaw);
+}
+
+// Pull the raw embedded font PROGRAM bytes for `fontName` out of the page —
+// Type0/Identity-H (v1) OR a simple /Subtype /TrueType font (the Word shape,
+// see module header): either way, the FontDescriptor's FontFile2 (TrueType
+// glyf) or FontFile3 (CFF/OpenType-CFF) is a real program fontkit can parse.
+// A simple font's FontDescriptor sits directly on the font dict; a Type0
+// font's sits one level down, on its sole DescendantFont. Anything else —
+// standard-14 (no embedded program), a Type1 font's raw FontFile, any other
+// /Subtype — is "unsupported-font": a genuine decline, not malformed input.
+// Returns { ok:true, bytes } or { ok:false, reason } — never throws (the
+// caller wraps in try/catch anyway as a second layer, since a malformed dict
+// can still throw INSIDE this function's own gets).
 // EXPORTED (Rung C live-font-preview, 2026-07-19): js/v2/app.js needs this at
 // draft-open time too — a DRY RUN against the SOURCE page purely to learn
 // whether the tapped line's font has a real program to load into the browser
@@ -91,25 +228,34 @@ function escapeNameForWrite(name) {
 // guarantees (never throws, ok:false is a decline never a guess); no logic
 // changed for the export path that already called it.
 export function extractFontProgram(page, PDFLib, fontName) {
-  const { PDFName, PDFDict, PDFRef, PDFRawStream, decodePDFRawStream } = PDFLib;
+  const { PDFName, PDFRef, PDFRawStream, decodePDFRawStream } = PDFLib;
   const context = page.doc.context;
   const res = (v) => resolve(context, PDFRef, v);
 
-  const resources = page.node.Resources();
-  if (!resources) return { ok: false, reason: 'unsupported-font' };
-  const fontDictRaw = resources.get(PDFName.of('Font'));
-  if (!fontDictRaw) return { ok: false, reason: 'unsupported-font' };
-  const fontDict = res(fontDictRaw);
-  if (!(fontDict instanceof PDFDict)) return { ok: false, reason: 'unsupported-font' };
+  const fontObj = lookupFontObject(page, PDFLib, fontName);
+  if (!fontObj) return { ok: false, reason: 'unsupported-font' };
 
-  const fontObjRaw = fontDict.get(PDFName.of(fontName));
-  if (!fontObjRaw) return { ok: false, reason: 'unsupported-font' };
-  const fontObj = res(fontObjRaw);
+  const readProgram = (fd) => {
+    if (!fd) return null;
+    const streamRaw = fd.get(PDFName.of('FontFile2')) || fd.get(PDFName.of('FontFile3'));
+    if (!streamRaw) return null;
+    const stream = res(streamRaw);
+    if (!(stream instanceof PDFRawStream)) return null;
+    return decodePDFRawStream(stream).decode();
+  };
 
   const subtype = res(fontObj.get(PDFName.of('Subtype')));
-  if (!(subtype instanceof PDFName) || subtype.toString() !== '/Type0') {
-    return { ok: false, reason: 'unsupported-font' };
+  const subtypeName = subtype instanceof PDFName ? subtype.toString() : '';
+
+  if (subtypeName === '/TrueType') {
+    const fdRaw = fontObj.get(PDFName.of('FontDescriptor'));
+    const bytes = readProgram(fdRaw ? res(fdRaw) : null);
+    if (!bytes) return { ok: false, reason: 'unsupported-font' };
+    return { ok: true, bytes };
   }
+
+  if (subtypeName !== '/Type0') return { ok: false, reason: 'unsupported-font' };
+
   const encoding = res(fontObj.get(PDFName.of('Encoding')));
   if (!(encoding instanceof PDFName) || encoding.toString() !== '/Identity-H') {
     return { ok: false, reason: 'unsupported-font' };
@@ -121,20 +267,101 @@ export function extractFontProgram(page, PDFLib, fontName) {
   const desc0 = res(descendants.asArray()[0]);
 
   const fdRaw = desc0.get(PDFName.of('FontDescriptor'));
-  if (!fdRaw) return { ok: false, reason: 'unsupported-font' };
-  const fd = res(fdRaw);
-
-  // FontFile2 (TrueType/OpenType-TT glyf outlines) or FontFile3 (CFF /
-  // OpenType-CFF) — either is a real font PROGRAM fontkit can parse.
-  // Standard-14 fonts (no embedded program at all) carry neither: that's the
-  // normal "decline, don't guess" shape, not malformed input.
-  const streamRaw = fd.get(PDFName.of('FontFile2')) || fd.get(PDFName.of('FontFile3'));
-  if (!streamRaw) return { ok: false, reason: 'unsupported-font' };
-  const stream = res(streamRaw);
-  if (!(stream instanceof PDFRawStream)) return { ok: false, reason: 'unsupported-font' };
-
-  const bytes = decodePDFRawStream(stream).decode();
+  const bytes = readProgram(fdRaw ? res(fdRaw) : null);
+  if (!bytes) return { ok: false, reason: 'unsupported-font' };
   return { ok: true, bytes };
+}
+
+// ---- the plan: simple TrueType (Word shape) ----------------------------------
+
+// The Rung C+ counterpart of planNativeInsert's v1 body below, for a font
+// dict already proven /Subtype /TrueType. Same return shape, same
+// never-throw-past-this discipline; declines in the exact order the module
+// header lists: encoding shape, then per-char WinAnsi encodability, then
+// per-char glyph existence, then advance widths.
+function planSimpleTrueTypeInsert(fontObj, context, PDFLib, fontkit, extracted, insert, color, text) {
+  const { PDFName, PDFRef } = PDFLib;
+  const res = (v) => resolve(context, PDFRef, v);
+
+  // Only the bare NAME /WinAnsiEncoding is a byte table we actually know. A
+  // /Differences dict remaps individual codes away from it, /MacRomanEncoding
+  // is a different table entirely, and no /Encoding at all means "whatever
+  // this font's built-in cmap says" (font-specific, opaque to us) — all three
+  // are a genuine unknown, never guessed at.
+  const encoding = res(fontObj.get(PDFName.of('Encoding')));
+  if (!(encoding instanceof PDFName) || encoding.toString() !== '/WinAnsiEncoding') {
+    return { ok: false, reason: 'unsupported-encoding' };
+  }
+
+  // Every char needs ONE WinAnsi byte to become part of the show string. A
+  // char WinAnsiEncoding has no byte for at all can't be written on this
+  // path — same practical effect as v1's coverage decline (this glyph can't
+  // be painted), so it reuses 'missing-glyph' rather than inventing a
+  // separate reason for what the caller experiences identically.
+  const bytes = [];
+  for (const ch of text) {
+    const byte = winAnsiByteFor(ch.codePointAt(0));
+    if (byte === undefined) return { ok: false, reason: 'missing-glyph' };
+    bytes.push(byte);
+  }
+
+  let font;
+  try {
+    // Same fontkit.create contract v1 relies on (see its own comment below) —
+    // a plain Uint8Array of the extracted program bytes.
+    font = fontkit.create(extracted.bytes);
+  } catch (_err) {
+    return { ok: false, reason: 'font-parse-failed' };
+  }
+
+  // WinAnsi encodability (above) only proves the BYTE exists in the table —
+  // it says nothing about whether THIS embedded program actually drew a
+  // glyph for that codepoint (a font can legally omit glyphs it never uses).
+  // No space exemption here (unlike v1): this path has no subset-CID reality
+  // to work around, so a space glyph is checked and proven like anything
+  // else.
+  for (const ch of text) {
+    if (!font.hasGlyphForCodePoint(ch.codePointAt(0))) return { ok: false, reason: 'missing-glyph' };
+  }
+
+  const widthInfo = readSimpleFontWidths(fontObj, context, PDFLib);
+  if (!widthInfo) return { ok: false, reason: 'unsupported-font' };
+  let widthUnits = 0; // /Widths units — 1/1000 em by the format's own convention
+  for (const byte of bytes) {
+    let w = widthInfo.widths.get(byte);
+    if (w === undefined) {
+      // No declared width for this byte AND no /MissingWidth fallback: an
+      // honest decline, not a 0-width glyph that would silently corrupt the
+      // painted layout.
+      if (widthInfo.missingWidth === null) return { ok: false, reason: 'unsupported-font' };
+      w = widthInfo.missingWidth;
+    }
+    widthUnits += w;
+  }
+
+  const escapedName = escapeNameForWrite(insert.fontName);
+  if (escapedName === null) return { ok: false, reason: 'font-name-unwritable' };
+
+  const width = (widthUnits / 1000) * insert.size;
+  const [r, g, b] = hexToRgb01(color);
+  const literal = encodeLiteralStringBytes(bytes);
+
+  // Same rendering-matrix reproduction v1 uses (see its own comment below):
+  // Tf fixed at 1, size folded into Tm.
+  const a = fmtNum(insert.size * insert.ux);
+  const bC = fmtNum(insert.size * insert.uy);
+  const c = fmtNum(-insert.size * insert.uy);
+  const d = fmtNum(insert.size * insert.ux);
+  const x = fmtNum(insert.x);
+  const y = fmtNum(insert.y);
+
+  // A literal string of real encoded BYTES + Tj — not a hex-glyph-id TJ run:
+  // WinAnsi bytes ARE this font's character codes, so no kern-array trick is
+  // needed even for the spaces (see module header).
+  const snippet = `q BT /${escapedName} 1 Tf ${fmtNum(r)} ${fmtNum(g)} ${fmtNum(b)} rg `
+    + `${a} ${bC} ${c} ${d} ${x} ${y} Tm (${literal}) Tj ET Q`;
+
+  return { ok: true, snippet, width };
 }
 
 // ---- the plan ---------------------------------------------------------------
@@ -158,6 +385,24 @@ export function planNativeInsert(page, PDFLib, fontkit, req) {
     return { ok: false, reason: 'font-parse-failed' };
   }
   if (!extracted.ok) return extracted;
+
+  // Branch on the font dict's ACTUAL shape (not just whether the program
+  // parsed): a simple /Subtype /TrueType font (the Word shape — see module
+  // header) needs the byte-encoded path below, not v1's hex-glyph-id one.
+  // `fontObj` can't be null here — extractFontProgram just proved this exact
+  // walk resolves — but the guard stays because "can't happen" is still a
+  // decline, not an assumption, on this file's own discipline.
+  const { PDFName, PDFRef } = PDFLib;
+  const context = page.doc.context;
+  const res = (v) => resolve(context, PDFRef, v);
+  const fontObj = lookupFontObject(page, PDFLib, insert.fontName);
+  if (!fontObj) return { ok: false, reason: 'unsupported-font' };
+  const subtype = res(fontObj.get(PDFName.of('Subtype')));
+  const subtypeName = subtype instanceof PDFName ? subtype.toString() : '';
+
+  if (subtypeName === '/TrueType') {
+    return planSimpleTrueTypeInsert(fontObj, context, PDFLib, fontkit, extracted, insert, color, text);
+  }
 
   let font;
   try {
