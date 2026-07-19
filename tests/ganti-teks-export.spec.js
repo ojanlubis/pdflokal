@@ -231,7 +231,7 @@ test.describe('ganti teks export — surgery fallback paths (core adapter)', () 
       const emptyTarget = { x0: 10, y0: 10, ux: 1, uy: 0, len: 50, size: 12 };
       ops.addAnnotation(doc, p0.id, model.createAnnotation('whiteout', {
         x: rect.x, y: rect.y, width: rect.width, height: rect.height,
-        replaceTarget: emptyTarget,
+        replaceTargets: [emptyTarget],
         replaceBox: { x: rect.x, y: rect.y, w: rect.width, h: rect.height },
       }));
 
@@ -266,14 +266,14 @@ test.describe('ganti teks export — surgery fallback paths (core adapter)', () 
       const { tokenizeOps } = await import('/js/core/content-stream.js');
       const p0 = doc.pages[0];
 
-      // replaceTarget is REAL and matchable (proven self-consistent when this
+      // replaceTargets is REAL and matchable (proven self-consistent when this
       // helper built it) — but the annotation's OWN rect has moved far from
       // replaceBox, so the cover no longer sits over the run it was born on.
       const birthBox = { x: 280, y: 380, w: 200, h: 40 };
       const movedRect = { x: 280, y: 600, width: 200, height: 40 }; // zero overlap with birthBox
       ops.addAnnotation(doc, p0.id, model.createAnnotation('whiteout', {
         x: movedRect.x, y: movedRect.y, width: movedRect.width, height: movedRect.height,
-        replaceTarget: target,
+        replaceTargets: [target],
         replaceBox: birthBox,
       }));
 

@@ -307,15 +307,36 @@ function overlapsBirthBox(anno) {
 // cover should be SKIPPED at draw time (the true background shows through —
 // strictly better than a sampled-color rectangle). Never throws: any surgery
 // failure falls back to an empty set, so the cover ships and the export lives.
+//
+// replaceTargets is an ARRAY (founder ruling 2026-07-19: the LINE is the
+// editing primitive — a whole-line target can in principle span more than one
+// content-stream cut). All candidates' targets are flattened into ONE
+// removeRunsFromPdfPage call (it already accepts an array), then results are
+// sliced back per annotation in the same order they were flattened.
 function runSurgery(pdfPage, PDFLib, annotations) {
   const skipCovers = new Set();
   const candidates = annotations.filter(
-    (a) => a.type === 'whiteout' && a.replaceTarget && a.replaceBox && overlapsBirthBox(a),
+    (a) => a.type === 'whiteout' && a.replaceTargets?.length && a.replaceBox && overlapsBirthBox(a),
   );
   if (candidates.length === 0) return skipCovers;
   try {
-    const { results } = removeRunsFromPdfPage(pdfPage, PDFLib, candidates.map((a) => a.replaceTarget));
-    candidates.forEach((a, i) => { if (results[i].matched) skipCovers.add(a.id); });
+    const flatTargets = [];
+    const spans = []; // [start, end) into flatTargets, per candidate
+    for (const a of candidates) {
+      spans.push([flatTargets.length, flatTargets.length + a.replaceTargets.length]);
+      flatTargets.push(...a.replaceTargets);
+    }
+    const { results } = removeRunsFromPdfPage(pdfPage, PDFLib, flatTargets);
+    candidates.forEach((a, i) => {
+      const [start, end] = spans[i];
+      const slice = results.slice(start, end);
+      // WHY all-matched, not any-matched: a partial match means some of the
+      // line's fragments got cut and some didn't — the already-cut ops are
+      // gone from the content stream either way, so the cover MUST stay to
+      // hide the now-broken remainder. Never leave a half-removed line
+      // uncovered.
+      if (slice.length > 0 && slice.every((r) => r.matched)) skipCovers.add(a.id);
+    });
   } catch (err) {
     // WHY warn-and-continue: an export must NEVER fail or degrade because
     // surgery had trouble — the Rung A cover fallback is always still there.

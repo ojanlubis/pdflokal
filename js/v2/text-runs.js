@@ -17,6 +17,7 @@
 
 import { getSource } from '../core/model.js';
 import { ensurePdfJs } from '../core/vendor.js';
+import { groupRunsIntoLines } from '../core/text-lines.js';
 
 // Finger-sized minimum hit box (page-space px at zoom 1). Small print is a
 // <10px-tall run — the ≥44px touch-target law is met by inflating the HIT box,
@@ -35,6 +36,10 @@ function normalize(x, y) {
 export function createTextRunIndex({ getDoc }) {
   const docCache = new Map(); // sourceId -> Promise<pdf.js document>
   const runCache = new Map(); // page.id  -> Promise<Run[]>
+  // Lines are runs grouped by geometry (core/text-lines.js) — same lifecycle
+  // as runCache (invalidated together), computed lazily from the cached runs
+  // rather than re-extracting, so hit-testing/hints never re-touch pdf.js.
+  const lineCache = new Map(); // page.id  -> Promise<Line[]>
 
   function getPdf(sourceId) {
     if (!docCache.has(sourceId)) {
@@ -129,13 +134,40 @@ export function createTextRunIndex({ getDoc }) {
       return runCache.get(pageId);
     },
 
-    // The tap → run resolver. Inflates each run's box to a finger-sized target
-    // and, when several candidates overlap, picks the nearest run center.
+    // Lines for a page — runs clustered by geometry (founder ruling
+    // 2026-07-19: the LINE is the editing primitive for Ganti Teks). Grouped
+    // from the same cached runs, so a single-fragment-per-line document (every
+    // pre-line fixture) yields one Line per Run, byte-identical in shape.
+    async getLines(pageId) {
+      if (!lineCache.has(pageId)) {
+        lineCache.set(pageId, this.getRuns(pageId).then((runs) => {
+          const lines = groupRunsIntoLines(runs);
+          // core/text-lines.js is DELIBERATELY paint-order-independent (its own
+          // docstring: "paint-order scrambling doesn't change the result") —
+          // correct for clustering, but it means the returned Line[] order is
+          // an artifact of the clustering's internal geometry sort, not the
+          // page's reading order. Hints/hitTest must keep PAINT order (what
+          // getRuns already returns, what every existing index-based caller —
+          // including this suite's own paint-order test pins — assumes), so
+          // re-sort lines by their earliest constituent run's original index.
+          const indexOf = new Map(runs.map((r, i) => [r, i]));
+          lines.sort((a, b) => Math.min(...a.runs.map((r) => indexOf.get(r)))
+            - Math.min(...b.runs.map((r) => indexOf.get(r))));
+          return lines;
+        }));
+      }
+      return lineCache.get(pageId);
+    },
+
+    // The tap → line resolver. Inflates each line's box to a finger-sized
+    // target and, when several candidates overlap, picks the nearest center.
+    // Ported as-is from the old run-based hitTest — lines carry the same
+    // display-space x/y/w/h fields runs did, so the logic is unchanged.
     async hitTest(pageId, x, y) {
-      const runs = await this.getRuns(pageId);
+      const lines = await this.getLines(pageId);
       let best = null;
       let bestD = Infinity;
-      for (const r of runs) {
+      for (const r of lines) {
         const growX = Math.max(0, (MIN_HIT - r.w) / 2);
         const growY = Math.max(0, (MIN_HIT - r.h) / 2);
         if (x < r.x - growX || x > r.x + r.w + growX) continue;
@@ -147,16 +179,17 @@ export function createTextRunIndex({ getDoc }) {
     },
 
     // User-rotation changes the display frame → cached boxes are stale.
-    invalidatePage(pageId) { runCache.delete(pageId); },
+    invalidatePage(pageId) { runCache.delete(pageId); lineCache.delete(pageId); },
 
     // Page-manager operations (rotate/reorder/delete) don't say which pages
     // moved — re-extracting is cheap (docs stay cached), staleness is not.
-    invalidateAll() { runCache.clear(); },
+    invalidateAll() { runCache.clear(); lineCache.clear(); },
 
     async destroy() {
       for (const p of docCache.values()) { try { (await p).destroy(); } catch { /* already gone */ } }
       docCache.clear();
       runCache.clear();
+      lineCache.clear();
     },
   };
 }

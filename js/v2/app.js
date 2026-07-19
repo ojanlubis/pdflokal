@@ -345,8 +345,12 @@ for (const btn of document.querySelectorAll('#toolbar .tool[data-tool]')) {
 const textRuns = createTextRunIndex({ getDoc: () => doc });
 
 async function smartReplace(pageId, x, y) {
-  const run = await textRuns.hitTest(pageId, x, y);
-  if (!run) {
+  // Founder ruling 2026-07-19: the LINE is the editing primitive — hitTest
+  // now resolves to a Line (core/text-lines.js), one or more fragments
+  // clustered by geometry. On a single-fragment-per-line document (every
+  // pre-line fixture) a Line IS a Run, so this whole flow is unchanged.
+  const line = await textRuns.hitTest(pageId, x, y);
+  if (!line) {
     const runs = await textRuns.getRuns(pageId);
     if (runs.length === 0) {
       // The router (two-ladder ruling, seat decisions.md 2026-07-18): no text
@@ -360,28 +364,30 @@ async function smartReplace(pageId, x, y) {
   }
   record(history, doc);
   const cover = addAnnotation(doc, pageId, createAnnotation('whiteout', {
-    x: run.x, y: run.y, width: run.w, height: run.h,
+    x: line.x, y: line.y, width: line.w, height: line.h,
     // Carries the surgery intent (Rung B honest-replacement — seat spec):
-    // replaceTarget is the tapped run's user-space geometry (core/redact.js's
-    // frame); replaceBox is this cover's OWN creation-time page-space rect, so
-    // export can confirm the cover is still where it was born before cutting
-    // the original show-text ops — move the cover away and you've un-covered
-    // the text, so the surgery intent no longer holds (see core/export.js).
-    replaceTarget: run.pdf,
-    replaceBox: { x: run.x, y: run.y, w: run.w, h: run.h },
+    // replaceTargets is an ARRAY of user-space geometry (core/redact.js's
+    // frame) — one whole-line target, spanning every fragment pdf.js split
+    // the line into; replaceBox is this cover's OWN creation-time page-space
+    // rect, so export can confirm the cover is still where it was born before
+    // cutting the original show-text ops — move the cover away and you've
+    // un-covered the text, so the surgery intent no longer holds (see
+    // core/export.js).
+    replaceTargets: [line.pdf],
+    replaceBox: { x: line.x, y: line.y, w: line.w, h: line.h },
   }));
   syncPage(pageId);
   track('editor_action', { action: 'ganti_teks' });
   const draft = {
-    text: run.str,
-    fontSize: Math.min(120, Math.max(6, Math.round(run.size))),
-    fontFamily: mapRunFont(run.fontFamily, run.fontName),
+    text: line.str,
+    fontSize: Math.min(120, Math.max(6, Math.round(line.size))),
+    fontFamily: mapRunFont(line.fontFamily, line.fontName),
     recorded: true,
     // Backing out (Escape / empty commit) must not leave a mute cover over
     // the original words — the cover belongs to the replace, not to itself.
     onCancel: () => { removeAnnotation(doc, cover.id); syncPage(pageId); },
   };
-  openTextEditor({ pageId, x: run.x, y: run.y, anno: null, draft });
+  openTextEditor({ pageId, x: line.x, y: line.y, anno: null, draft });
   // Disarm NOW, not at commit (founder ruling, Jul 18 phone test): with the
   // tool still armed, the tap that should only COMMIT also fired a second
   // replace (miss toast / surprise editor). Click-down elsewhere = commit.
@@ -389,22 +395,23 @@ async function smartReplace(pageId, x, y) {
   // The arm toast ("Tap tulisan…") must not outlive its own step — with the
   // editor open it instructs a thing already done (taste-judge, path law).
   toastEl.classList.remove('show');
-  matchReplaceColors(cover, draft, pageId, run); // async; colors land live
+  matchReplaceColors(cover, draft, pageId, line); // async; colors land live
 }
 
 // Armed-mode affordance (recognition over recall): faintly mark every tappable
-// run on the pages currently in the streaming window. Chrome-red, never prints.
+// LINE on the pages currently in the streaming window. Chrome-red, never
+// prints. One hint box per line, not per fragment (founder ruling 2026-07-19).
 async function showRunHints() {
   for (const slot of slots) {
     if (!slot.page.raster) continue; // windowed pages only — bounded work
-    const runs = await textRuns.getRuns(slot.page.id);
+    const lines = await textRuns.getLines(slot.page.id);
     if (tool !== 'ganti') return;    // disarmed while we were extracting
     const overlay = slot.view.querySelector('.pv-overlay');
     if (!overlay || overlay.querySelector('.pv-run-hints')) continue;
     const layer = document.createElement('div');
     layer.className = 'pv-run-hints';
     layer.style.cssText = 'position:absolute;inset:0;pointer-events:none';
-    for (const r of runs) {
+    for (const r of lines) {
       const d = document.createElement('div');
       d.style.cssText =
         `position:absolute;left:${r.x}px;top:${r.y}px;width:${r.w}px;height:${r.h}px;` +
@@ -512,23 +519,25 @@ async function matchWhiteoutColor(anno, pageId, ox, oy) {
 // Ganti Teks colors, one raster read: the ring sampler above fails on big/bold
 // runs — rings around the CENTER land on ink, and the founder's deck title got
 // a dark slab for a cover (phone test, Jul 18). Paper is sampled just OUTSIDE
-// the run's box instead; ink = the in-box cluster farthest in luminance from
+// the line's box instead; ink = the in-box cluster farthest in luminance from
 // that paper, so a navy heading is retyped in navy without asking. Ink lands on
 // the DRAFT object live (the open editor restyles; commit reads the draft).
-async function matchReplaceColors(cover, draft, pageId, run) {
+// 4th arg only ever reads x/y/w/h — a Line has those fields same as a Run did,
+// verified against core/text-lines.js's assembleLine() shape.
+async function matchReplaceColors(cover, draft, pageId, line) {
   try {
     const r = await withPageRasterCtx(pageId);
     if (!r) return;
     const o = 3 * r.s;
     const paper = [];
     for (let i = 0; i <= 4; i += 1) {
-      const x = (run.x + (run.w * i) / 4) * r.s;
-      takeSample(r, x, run.y * r.s - o, paper);
-      takeSample(r, x, (run.y + run.h) * r.s + o, paper);
+      const x = (line.x + (line.w * i) / 4) * r.s;
+      takeSample(r, x, line.y * r.s - o, paper);
+      takeSample(r, x, (line.y + line.h) * r.s + o, paper);
     }
     for (const fy of [0.25, 0.75]) {
-      takeSample(r, run.x * r.s - o, (run.y + run.h * fy) * r.s, paper);
-      takeSample(r, (run.x + run.w) * r.s + o, (run.y + run.h * fy) * r.s, paper);
+      takeSample(r, line.x * r.s - o, (line.y + line.h * fy) * r.s, paper);
+      takeSample(r, (line.x + line.w) * r.s + o, (line.y + line.h * fy) * r.s, paper);
     }
     if (paper.length < 6) return;
     const coverColor = medColor(paper);
@@ -541,7 +550,7 @@ async function matchReplaceColors(cover, draft, pageId, run) {
     const inside = [];
     for (let ix = 1; ix <= 8; ix += 1) {
       for (let iy = 1; iy <= 3; iy += 1) {
-        takeSample(r, (run.x + (run.w * ix) / 9) * r.s, (run.y + (run.h * iy) / 4) * r.s, inside);
+        takeSample(r, (line.x + (line.w * ix) / 9) * r.s, (line.y + (line.h * iy) / 4) * r.s, inside);
       }
     }
     const ranked = inside.sort((a, b) => Math.abs(lumOf(b) - paperLum) - Math.abs(lumOf(a) - paperLum));
