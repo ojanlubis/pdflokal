@@ -24,6 +24,14 @@ import { ensurePdfJs } from '../core/vendor.js';
 // how every other annotation target behaves.
 const MIN_HIT = 22;
 
+// A zero-length baseline vector (degenerate transform) must not divide by
+// zero into NaN — fall back to the "along +x" direction, same convention
+// text-walk.js uses for its own normalize().
+function normalize(x, y) {
+  const len = Math.hypot(x, y);
+  return len === 0 ? [1, 0] : [x / len, y / len];
+}
+
 export function createTextRunIndex({ getDoc }) {
   const docCache = new Map(); // sourceId -> Promise<pdf.js document>
   const runCache = new Map(); // page.id  -> Promise<Run[]>
@@ -79,6 +87,11 @@ export function createTextRunIndex({ getDoc }) {
       const xs = corners.map((c) => c[0]);
       const ys = corners.map((c) => c[1]);
       const pad = fh * 0.06;
+      // pdf: the RAW (unprojected) user-space geometry — content-stream frame,
+      // viewport- and rotation-INDEPENDENT. This is what core/redact.js needs
+      // (it walks the content stream directly, never the display viewport);
+      // `m` above is the viewport-projected matrix and must never feed it.
+      const [ux, uy] = normalize(item.transform[0], item.transform[1]);
       runs.push({
         str: item.str,
         x: Math.min(...xs) - pad,
@@ -88,6 +101,12 @@ export function createTextRunIndex({ getDoc }) {
         size: fh,
         fontName: item.fontName,
         fontFamily: style.fontFamily || '',
+        pdf: {
+          x0: item.transform[4], y0: item.transform[5],
+          ux, uy,
+          len: item.width,
+          size: Math.hypot(item.transform[2], item.transform[3]),
+        },
       });
     }
     return runs;

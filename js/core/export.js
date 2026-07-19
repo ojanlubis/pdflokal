@@ -22,6 +22,7 @@
  */
 
 import { buildExportPlan } from './operations.js';
+import { removeRunsFromPdfPage } from './redact.js';
 
 // ---- fonts ------------------------------------------------------------------
 
@@ -278,6 +279,51 @@ const ANNOTATION_DRAWERS = {
   pageNumber: drawPageNumber,
 };
 
+// ---- Rung B: honest replacement (surgery) ------------------------------------
+
+// WHY 60%: replaceBox is the cover's BIRTH-TIME rect; if the user later drags
+// the cover away from it, they've un-covered the original words — the surgery
+// intent (born together with the cover) no longer holds, and cutting the show
+// ops would leave a hole with nothing drawn over it. A small nudge (still
+// mostly overlapping) is not a "moved away" — hence a threshold, not exact
+// equality. Both rects are page-space top-left, same frame — plain rect math.
+const REPLACE_OVERLAP_MIN = 0.6;
+
+function overlapsBirthBox(anno) {
+  const box = anno.replaceBox;
+  const boxArea = box.w * box.h;
+  if (boxArea <= 0) return false;
+  const ix0 = Math.max(anno.x, box.x);
+  const iy0 = Math.max(anno.y, box.y);
+  const ix1 = Math.min(anno.x + anno.width, box.x + box.w);
+  const iy1 = Math.min(anno.y + anno.height, box.y + box.h);
+  const iw = Math.max(0, ix1 - ix0);
+  const ih = Math.max(0, iy1 - iy0);
+  return (iw * ih) >= REPLACE_OVERLAP_MIN * boxArea;
+}
+
+// Cut the original show-text ops for every whiteout cover that still carries
+// a valid, un-moved replace intent. Returns the set of annotation ids whose
+// cover should be SKIPPED at draw time (the true background shows through —
+// strictly better than a sampled-color rectangle). Never throws: any surgery
+// failure falls back to an empty set, so the cover ships and the export lives.
+function runSurgery(pdfPage, PDFLib, annotations) {
+  const skipCovers = new Set();
+  const candidates = annotations.filter(
+    (a) => a.type === 'whiteout' && a.replaceTarget && a.replaceBox && overlapsBirthBox(a),
+  );
+  if (candidates.length === 0) return skipCovers;
+  try {
+    const { results } = removeRunsFromPdfPage(pdfPage, PDFLib, candidates.map((a) => a.replaceTarget));
+    candidates.forEach((a, i) => { if (results[i].matched) skipCovers.add(a.id); });
+  } catch (err) {
+    // WHY warn-and-continue: an export must NEVER fail or degrade because
+    // surgery had trouble — the Rung A cover fallback is always still there.
+    console.warn('[core/export] surgery failed, covers kept:', err);
+  }
+  return skipCovers;
+}
+
 // ---- image pages -------------------------------------------------------------
 
 function sniffImageFormat(bytes) {
@@ -340,12 +386,22 @@ export async function buildPdfBytes(doc, deps = {}) {
     }
     if (page.rotation) pdfPage.setRotation(PDFLib.degrees(page.rotation));
 
+    // WHY surgery runs HERE, before any drawing: it must cut ops out of the
+    // copied page's ORIGINAL content stream before pdf-lib's first draw call
+    // (drawRectangle/drawText/…) appends its OWN content stream to the page —
+    // run it after and removeRunsFromPdfPage would have to contend with
+    // content pdf-lib itself just wrote (and rewrite the wrong stream at that).
+    // Image pages can't carry text targets at all — guarded (not just inert)
+    // so a future image-page shape change can't accidentally feed it here.
+    const skipCovers = page.isFromImage ? new Set() : runSurgery(pdfPage, PDFLib, annotations);
+
     if (annotations.length === 0) continue;
     // wU/hU: UNROTATED page dims (MediaBox) — setRotation is metadata only,
     // drawing happens in this frame. See transformAnnotationCoords.
     const { width: wU, height: hU } = pdfPage.getSize();
     const frame = { rotation: page.rotation || 0, wU, hU };
     for (const anno of annotations) {
+      if (skipCovers.has(anno.id)) continue; // surgery succeeded — true background shows through
       const draw = ANNOTATION_DRAWERS[anno.type];
       if (!draw) {
         console.warn('[core/export] Unknown annotation type, skipping:', anno.type);

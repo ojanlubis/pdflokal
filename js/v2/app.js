@@ -361,6 +361,14 @@ async function smartReplace(pageId, x, y) {
   record(history, doc);
   const cover = addAnnotation(doc, pageId, createAnnotation('whiteout', {
     x: run.x, y: run.y, width: run.w, height: run.h,
+    // Carries the surgery intent (Rung B honest-replacement — seat spec):
+    // replaceTarget is the tapped run's user-space geometry (core/redact.js's
+    // frame); replaceBox is this cover's OWN creation-time page-space rect, so
+    // export can confirm the cover is still where it was born before cutting
+    // the original show-text ops — move the cover away and you've un-covered
+    // the text, so the surgery intent no longer holds (see core/export.js).
+    replaceTarget: run.pdf,
+    replaceBox: { x: run.x, y: run.y, w: run.w, h: run.h },
   }));
   syncPage(pageId);
   track('editor_action', { action: 'ganti_teks' });
