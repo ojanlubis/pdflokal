@@ -47,6 +47,25 @@ export async function importPdf(doc, { name, bytes }) {
   return pages;
 }
 
+// Additive, standalone from importPdf's own document handle (already
+// destroyed by the time telemetry fires): checks ONLY page 1's text content
+// for telemetry's doc_open (spec-telemetry.md §3 — scan-vs-born-digital
+// ratio). Full-document text extraction would cost real time on a 200-page
+// file for a bucketed yes/no the first page already answers accurately in
+// practice. Never throws — a probe failure just means "don't know", and the
+// caller treats that as "no text layer" rather than blocking the import.
+export async function probeTextLayer(bytes) {
+  const pdfjsLib = await ensurePdfJs();
+  const pdf = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+  try {
+    const page = await pdf.getPage(1);
+    const content = await page.getTextContent();
+    return content.items.some((it) => it.str && it.str.trim().length > 0);
+  } finally {
+    await pdf.destroy();
+  }
+}
+
 // pdf-lib (the export adapter) can only embed PNG and JPEG. Anything else
 // (WEBP/GIF/BMP/…) is transcoded to PNG HERE, at the browser edge, so the bytes
 // stored on the Source are always export-safe and export never has to sniff for

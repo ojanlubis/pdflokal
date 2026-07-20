@@ -24,7 +24,10 @@ const BASELINES_DIR = path.join(__dirname, 'baselines');
 const ACTUAL_DIR = path.join(__dirname, 'actual');
 
 async function loadSamplePdf(page) {
-  await page.goto('/');
+  // The OLD wing (this suite drives ueState/#file-input) moved to
+  // /alat-gambar.html when v2 became `/` (Jul 3) — every old suite was
+  // repointed then except this one, which sat broken until 2026-07-19.
+  await page.goto('/alat-gambar.html');
   await page.setInputFiles('#file-input', SAMPLE_PDF);
   await page.waitForFunction(() => document.body.classList.contains('editor-active'));
   await page.waitForSelector('.ue-page-slot canvas', { state: 'attached' });
