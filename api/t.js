@@ -88,6 +88,17 @@ export default async function handler(req, res) {
       return;
     }
 
+    // Stamp the SERVER's own deployed commit SHA (Vercel system env) rather
+    // than the client's self-report. WHY: js/v2/telemetry.js reads its version
+    // from a <meta name="pdflokal-rev"> that nothing stamps (there is no build
+    // step to inject it — the moat), so the client ALWAYS sends 'dev'. This
+    // function, however, knows its own deploy SHA. Prefer it; fall back to the
+    // already-validated client value on local/preview where the env var is
+    // absent. (Requires Vercel "Automatically expose System Environment
+    // Variables" — default on.)
+    const serverSha = String(process.env.VERCEL_GIT_COMMIT_SHA || '').toLowerCase();
+    const storedVersion = /^[0-9a-f]{7,40}$/.test(serverSha) ? serverSha : appVersion;
+
     const capped = events.slice(0, MAX_EVENTS);
     const ts = new Date().toISOString();
     const rows = [];
@@ -95,7 +106,7 @@ export default async function handler(req, res) {
       if (!e || typeof e.event !== 'string') continue; // malformed single event — drop it, not the batch
       const { ok, clean } = validateEvent(e.event, e.props);
       if (!ok) continue; // off-schema single event — silently dropped, never 400s the batch
-      rows.push({ ts, session_id: sessionId, app_version: appVersion, event: e.event, props: clean });
+      rows.push({ ts, session_id: sessionId, app_version: storedVersion, event: e.event, props: clean });
     }
 
     if (rows.length === 0) { res.status(204).end(); return; }
