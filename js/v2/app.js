@@ -37,8 +37,10 @@ import { applyIntentCopy } from './intent-copy.js';
 import { ensurePdfLib } from '../core/vendor.js';
 import { readPageContents, extractFontMetrics } from '../core/redact.js';
 import { planRunRemoval } from '../core/text-walk.js';
-import { extractFontProgram } from '../core/reinsert.js';
+import { extractFontProgram, lookupFontObject } from '../core/reinsert.js';
+import { planComposedChar } from '../core/compose.js';
 import { getFontStyleInfo } from '../core/font-style.js';
+import { cloneFamilyFor } from '../core/font-decide.js';
 import { buildEditedPageBytes, editSignature } from '../core/page-surgery.js';
 
 // WHY there is no `window.pdfjsLib.…workerSrc = …` line here any more: pdf.js is
@@ -504,6 +506,18 @@ function loadDocFont(sourceId, fontName, pdfPage, PDFLib, fontkit) {
       } catch {
         return null; // decline, never guess — same law as reinsert.js's planNativeInsert
       }
+      // Font shape, for the commit-time compose check (font-fidelity tier 2):
+      // composition writes GIDs, which only the Type0/Identity-H path can —
+      // the toast decision must know the shape or it would promise a
+      // composed paint export can't deliver on a simple-TrueType font.
+      let flavor = 'other';
+      try {
+        const { PDFName, PDFRef } = PDFLib;
+        const fontObj = lookupFontObject(pdfPage, PDFLib, fontName);
+        const stRaw = fontObj && fontObj.get(PDFName.of('Subtype'));
+        const st = stRaw instanceof PDFRef ? pdfPage.doc.context.lookup(stRaw) : stRaw;
+        if (st instanceof PDFName) flavor = st.toString() === '/Type0' ? 'type0' : st.toString() === '/TrueType' ? 'truetype' : 'other';
+      } catch { /* flavor stays 'other' — compose check simply won't fire */ }
       const cssFamily = `pdflokal-doc-${sanitizeForCssIdent(sourceId)}-${sanitizeForCssIdent(fontName)}`;
       let face;
       try {
@@ -517,7 +531,7 @@ function loadDocFont(sourceId, fontName, pdfPage, PDFLib, fontkit) {
       }
       document.fonts.add(face);
       addedFontFaces.add(face);
-      return { cssFamily, fontkitFont };
+      return { cssFamily, fontkitFont, bytes: extracted.bytes, flavor };
     })().catch(() => null));
   }
   return docFontCache.get(key);
@@ -566,6 +580,22 @@ async function prepareDocFont(pageId, line, draft) {
       // apply even if the doc-font FontFace load (next) ultimately declines.
       if (draft.editorEl && draft.editorEl.isConnected) draft.editorEl.style.font = textFontCss(draft);
     }
+    // Font-fidelity tier 1 (core/font-decide.js, founder-ratified 2026-07-20):
+    // the real /BaseFont routes the SUBSTITUTE tier to a metric-identical
+    // clone (Calibri→Carlito, Arial→Arimo, …) instead of mapRunFont's generic
+    // bucket — same widths by construction, so the replacement occupies
+    // exactly the original's space. Applied to the draft (and live-restyled)
+    // BEFORE the doc-font load below: if that load succeeds, the doc font
+    // still renders in front and this clone is the per-glyph fallback; if it
+    // declines, the clone IS the committed family. Honesty unchanged: a clone
+    // is still a substitute — the commit toast keeps firing (one grammar).
+    if (styleInfo.ok) {
+      const clone = cloneFamilyFor(styleInfo.baseFont);
+      if (clone) {
+        draft.fontFamily = clone;
+        if (draft.editorEl && draft.editorEl.isConnected) draft.editorEl.style.font = textFontCss(draft);
+      }
+    }
 
     const result = await loadDocFont(page.sourceId, fontName, pdfPage, PDFLib, fontkit);
     if (!result) return; // extraction/parse/FontFace decline — twin stays, honestly
@@ -574,6 +604,8 @@ async function prepareDocFont(pageId, line, draft) {
     // tap may have replaced it — only this draft's own reference matters.
     draft.docFontFamily = result.cssFamily;
     draft.docFontkitFont = result.fontkitFont; // commit-time coverage check
+    draft.docFontBytes = result.bytes; // commit-time compose check (tier 2)
+    draft.docFontFlavor = result.flavor; // compose is Type0-only — see commit()
     if (draft.editorEl && draft.editorEl.isConnected) {
       // Progressive swap: prepend the doc font ahead of whatever twin stack
       // is already set — the browser's own per-glyph fallback to that twin
@@ -1027,17 +1059,25 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
       // doc font carries no dead key. render/page-view.js's textFontCss reads
       // this to keep the committed replacement looking like the document.
       const docFontProps = d.docFontFamily ? { docFontFamily: d.docFontFamily } : {};
-      // Founder ruling (tonight, 2026-07-19): when a substitute font WILL be
-      // used for this Ganti replacement, say so plainly at commit — decided
-      // with whatever prepareDocFont has managed to load by NOW (it's async;
-      // a very fast typist can commit before it lands). No doc font loaded
-      // (extraction declined / FontFace refused / a standard-14 font with
-      // nothing to embed) OR the loaded font doesn't cover every non-space
-      // char of the FINAL typed text → the honest substitute notice. Ordinary
-      // (non-Ganti) text never carries replaceCoverId, so never toasts here.
+      // Founder ruling (2026-07-19): when a substitute font WILL be used for
+      // this Ganti replacement, say so plainly at commit — decided with
+      // whatever prepareDocFont has managed to load by NOW (it's async; a
+      // very fast typist can commit before it lands). Extended by the
+      // font-fidelity ruling (2026-07-20): a char the doc font doesn't cover
+      // but CAN COMPOSE from the subset's own outlines (core/compose.js,
+      // Type0 only — the shape export's own compose gate demands) counts as
+      // covered and stays SILENT: the pixels are the document's, nothing is
+      // substituted. Clone/twin substitutes keep this one unchanged sentence
+      // — one grammar for every substitute tier (ratified over per-tier
+      // wording). Ordinary (non-Ganti) text never carries replaceCoverId, so
+      // never toasts here.
       if (d.replaceCoverId) {
+        const composable = (ch) => d.docFontFlavor === 'type0' && !!d.docFontBytes
+          && planComposedChar(d.docFontkitFont, d.docFontBytes, ch).ok;
         const covered = !!d.docFontkitFont
-          && [...text].every((ch) => ch === ' ' || d.docFontkitFont.hasGlyphForCodePoint(ch.codePointAt(0)));
+          && [...text.normalize('NFC')].every((ch) => ch === ' '
+            || d.docFontkitFont.hasGlyphForCodePoint(ch.codePointAt(0))
+            || composable(ch));
         if (!covered) toast('Huruf ini memakai font pengganti yang mirip');
       }
       const created = addAnnotation(doc, pageId, createAnnotation('text', {

@@ -35,6 +35,13 @@ const FONT_NAME_MAP = {
   'Courier':     { '00': 'Courier', '10': 'CourierBold', '01': 'CourierOblique', '11': 'CourierBoldOblique' },
   'Montserrat':  { '00': 'Montserrat', '10': 'Montserrat-Bold', '01': 'Montserrat-Italic', '11': 'Montserrat-BoldItalic' },
   'Carlito':     { '00': 'Carlito', '10': 'Carlito-Bold', '01': 'Carlito-Italic', '11': 'Carlito-BoldItalic' },
+  // Metric clones (font-fidelity tier 1, core/font-decide.js): substitution
+  // infrastructure only — routed by /BaseFont, never offered in the font
+  // dropdown (spec-font-fidelity-engine.md §3).
+  'Arimo':       { '00': 'Arimo', '10': 'Arimo-Bold', '01': 'Arimo-Italic', '11': 'Arimo-BoldItalic' },
+  'Tinos':       { '00': 'Tinos', '10': 'Tinos-Bold', '01': 'Tinos-Italic', '11': 'Tinos-BoldItalic' },
+  'Cousine':     { '00': 'Cousine', '10': 'Cousine-Bold', '01': 'Cousine-Italic', '11': 'Cousine-BoldItalic' },
+  'Caladea':     { '00': 'Caladea', '10': 'Caladea-Bold', '01': 'Caladea-Italic', '11': 'Caladea-BoldItalic' },
 };
 
 const CUSTOM_FONT_URLS = {
@@ -46,9 +53,25 @@ const CUSTOM_FONT_URLS = {
   'Carlito-Bold': 'fonts/carlito-bold.woff2',
   'Carlito-Italic': 'fonts/carlito-italic.woff2',
   'Carlito-BoldItalic': 'fonts/carlito-bolditalic.woff2',
+  'Arimo': 'fonts/arimo-regular.woff2',
+  'Arimo-Bold': 'fonts/arimo-bold.woff2',
+  'Arimo-Italic': 'fonts/arimo-italic.woff2',
+  'Arimo-BoldItalic': 'fonts/arimo-bolditalic.woff2',
+  'Tinos': 'fonts/tinos-regular.woff2',
+  'Tinos-Bold': 'fonts/tinos-bold.woff2',
+  'Tinos-Italic': 'fonts/tinos-italic.woff2',
+  'Tinos-BoldItalic': 'fonts/tinos-bolditalic.woff2',
+  'Cousine': 'fonts/cousine-regular.woff2',
+  'Cousine-Bold': 'fonts/cousine-bold.woff2',
+  'Cousine-Italic': 'fonts/cousine-italic.woff2',
+  'Cousine-BoldItalic': 'fonts/cousine-bolditalic.woff2',
+  'Caladea': 'fonts/caladea-regular.woff2',
+  'Caladea-Bold': 'fonts/caladea-bold.woff2',
+  'Caladea-Italic': 'fonts/caladea-italic.woff2',
+  'Caladea-BoldItalic': 'fonts/caladea-bolditalic.woff2',
 };
 
-const CUSTOM_FONT_FAMILIES = new Set(['Montserrat', 'Carlito']);
+const CUSTOM_FONT_FAMILIES = new Set(['Montserrat', 'Carlito', 'Arimo', 'Tinos', 'Cousine', 'Caladea']);
 
 // WHY: AbortController timeout prevents export from hanging indefinitely if a
 // self-hosted font file fails to load (e.g. offline, 404). Same guard as the

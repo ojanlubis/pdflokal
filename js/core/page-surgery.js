@@ -24,7 +24,8 @@
  */
 
 import { removeRunsFromPdfPage } from './redact.js';
-import { planNativeInsert, appendNativeText } from './reinsert.js';
+import { planNativeInsert, appendNativeText, extractFontProgram, lookupFontObject } from './reinsert.js';
+import { planComposedInsert, patchToUnicodeForMarks } from './compose.js';
 
 // ---- Rung B: honest replacement (surgery) ------------------------------------
 
@@ -106,6 +107,41 @@ export function runSurgery(pdfPage, PDFLib, annotations) {
 
 // ---- Rung C: native re-insert (own-font replacement) ------------------------
 
+// Font-fidelity tier 2 fallback: try composing the missing glyph(s) from the
+// subset's own outlines. Returns true when the composed paint landed (caller
+// adds the anno to skipDraw), false on ANY decline — the twin draw is always
+// still there. Kept out of planNativeInserts' loop body so the loop reads as
+// the decision ladder it is: native → composed → twin.
+function planComposedFallback(pdfPage, PDFLib, fontkit, insert, anno) {
+  try {
+    // Type0 gate: extractFontProgram succeeding on a /Type0 dict already
+    // implies Identity-H (it declines every other Type0 encoding) — so the
+    // shape test is just the subtype read; the extract does the rest.
+    const { PDFName, PDFRef } = PDFLib;
+    const context = pdfPage.doc.context;
+    const fontObj = lookupFontObject(pdfPage, PDFLib, insert.fontName);
+    if (!fontObj) return false;
+    const subtypeRaw = fontObj.get(PDFName.of('Subtype'));
+    const subtype = subtypeRaw instanceof PDFRef ? context.lookup(subtypeRaw) : subtypeRaw;
+    if (!(subtype instanceof PDFName) || subtype.toString() !== '/Type0') return false;
+
+    const extracted = extractFontProgram(pdfPage, PDFLib, insert.fontName);
+    if (!extracted.ok) return false;
+    const font = fontkit.create(extracted.bytes);
+
+    const plan = planComposedInsert(font, extracted.bytes, insert, anno.text, anno.color);
+    if (!plan.ok) return false;
+    appendNativeText(pdfPage, PDFLib, plan.snippet);
+    // Extraction honesty (spec §4 step 6): best-effort by design — the
+    // composed paint ships even when the font carries no ToUnicode to patch.
+    patchToUnicodeForMarks(pdfPage, PDFLib, insert.fontName, plan.marks);
+    return true;
+  } catch (err) {
+    console.warn('[core/page-surgery] composed insert failed, falling back to twin draw:', err);
+    return false;
+  }
+}
+
 // For every TEXT annotation born from a Ganti Teks replace (carries
 // replaceCoverId — see js/v2/app.js's smartReplace/openTextEditor) whose
 // cover's surgery just succeeded, try to write its text INTO the content
@@ -127,6 +163,18 @@ export function planNativeInserts(pdfPage, PDFLib, fontkit, annotations, skipCov
       if (plan.ok) {
         appendNativeText(pdfPage, PDFLib, plan.snippet);
         skipDraw.add(anno.id);
+      } else if (plan.reason === 'missing-glyph') {
+        // Font-fidelity tier 2 (core/compose.js, founder-ratified 2026-07-20):
+        // a missing glyph may still be COMPOSABLE from outlines the subset
+        // itself carries (É = E + é's own acute) — the document's own font
+        // stays on the page. Gated to Type0 (the GID-writable shape; a
+        // simple-TrueType font writes encoding bytes, which cannot reach an
+        // un-cmapped mark). 'missing-glyph' is the ONLY rescued decline:
+        // mixed-fonts/multiline/unsupported-* stay declined exactly as
+        // before. Any compose decline or throw lands back on the twin draw —
+        // same never-a-hard-failure discipline as everything else here.
+        const composed = planComposedFallback(pdfPage, PDFLib, fontkit, insert, anno);
+        if (composed) skipDraw.add(anno.id);
       }
     } catch (err) {
       console.warn('[core/page-surgery] native re-insert failed, falling back to twin draw:', err);

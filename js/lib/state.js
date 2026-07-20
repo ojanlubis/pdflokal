@@ -379,7 +379,14 @@ export const CSS_FONT_MAP = {
   'Times-Roman': 'Times New Roman, Times, serif',
   'Courier': 'Courier New, Courier, monospace',
   'Montserrat': 'Montserrat, sans-serif',
-  'Carlito': 'Carlito, Calibri, sans-serif'
+  'Carlito': 'Carlito, Calibri, sans-serif',
+  // Metric clones (font-fidelity tier 1) — the system original rides second
+  // in each stack: identical widths, so paint is stable even before the
+  // lazy woff2 arrives. Never shown in the font dropdown.
+  'Arimo': 'Arimo, Arial, Helvetica, sans-serif',
+  'Tinos': 'Tinos, Times New Roman, Times, serif',
+  'Cousine': 'Cousine, Courier New, Courier, monospace',
+  'Caladea': 'Caladea, Cambria, serif'
 };
 
 // SINGLE SOURCE OF TRUTH — builds CSS font string from annotation properties.
