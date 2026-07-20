@@ -3,7 +3,8 @@
  * ============================================================================
  * Lives on the HOMEPAGE, never on the download moment — install must not compete
  * with the share ask (founder call, Jul 2026). A quiet chip under the dropzone,
- * shown only to RETURNING users, opens a card that ADAPTS to the browser:
+ * shown by DEFAULT on every visit (founder call, Jul 20: the 2nd-visit gate was
+ * wrong — the chip should just be there), opens a card that ADAPTS to the browser:
  *   - one-tap when the native prompt is armed (Chromium desktop + Android),
  *   - point-by-point instructions otherwise (iOS Safari, Android menu, desktop…).
  * Goal: recall — get PDFLokal onto the home screen so the next PDF job returns
@@ -12,8 +13,6 @@
 import { track } from '../lib/analytics.js';
 
 const DISMISS_KEY = 'pdflokal-install-dismissed';
-const VISITS_KEY = 'pdflokal-visits';
-const SESSION_FLAG = 'pdflokal-visit-counted';
 
 function lget(k) { try { return localStorage.getItem(k); } catch { return null; } }
 function lset(k, v) { try { localStorage.setItem(k, v); } catch { /* private mode */ } }
@@ -39,15 +38,6 @@ function isMobile() {
 }
 function deviceWord() { return isMobile() ? 'hapemu' : 'komputermu'; }
 
-// One visit counted per browser session; "returning" = the 2nd session onward.
-function countVisit() {
-  try {
-    if (window.sessionStorage.getItem(SESSION_FLAG)) return;
-    window.sessionStorage.setItem(SESSION_FLAG, '1');
-  } catch { /* private mode: count every load — harmless */ }
-  lset(VISITS_KEY, String((parseInt(lget(VISITS_KEY), 10) || 0) + 1));
-}
-function isReturning() { return (parseInt(lget(VISITS_KEY), 10) || 0) >= 2; }
 
 // Official install guides — the authoritative source for the EXACT, current UI
 // labels (which drift by browser version + OS + locale). We keep a friendly
@@ -132,7 +122,6 @@ export function initInstallPrompt() {
   const guideLink = stepsBox.querySelector('#ic-guide');
   const installBtn = card.querySelector('#ic-install');
 
-  countVisit();
   const where = deviceWord();                          // hapemu | komputermu
   const screen = isMobile() ? 'layar HP' : 'desktop';  // where the icon lands
   chipLabel.textContent = `Install PDFLokal di ${where}`;
@@ -189,9 +178,12 @@ export function initInstallPrompt() {
     track('pwa_installed');
   });
 
-  // Reveal the chip for returning, non-installed, non-dismissed users. (Whether it
-  // opens to one-tap or steps is decided at tap time by detectInstall.)
-  if (!isStandalone() && lget(DISMISS_KEY) !== '1' && isReturning()) {
+  // Reveal the chip by DEFAULT — every visit — for non-installed, non-dismissed
+  // users (founder call, Jul 20: the 2nd-visit gate was wrong; the chip should
+  // just be there). Still suppressed for anyone already running the installed
+  // PWA, or who tapped "jangan tampilkan lagi". One-tap vs steps is decided at
+  // tap time by detectInstall.
+  if (!isStandalone() && lget(DISMISS_KEY) !== '1') {
     chip.hidden = false;
   }
 }

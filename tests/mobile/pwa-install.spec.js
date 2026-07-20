@@ -1,19 +1,12 @@
 // PWA install — the recall play on the HOMEPAGE (GA4 finding Jul 2026: paid users
 // complete the task but don't return unprompted). A quiet chip under the dropzone,
-// shown only to RETURNING users, opens an adaptive card: one-tap when Chrome has
-// armed beforeinstallprompt, point-by-point steps otherwise. Never on the download
+// shown by DEFAULT on every visit (founder call Jul 20: the 2nd-visit gate was
+// wrong), opens an adaptive card: one-tap when Chrome has armed
+// beforeinstallprompt, point-by-point steps otherwise. Still suppressed for
+// already-installed (standalone) or dismissed users. Never on the download
 // moment — install must not compete with the share ask.
 import { test, expect } from '@playwright/test';
 
-// Simulate a returning visitor (2nd session onward) so the chip is eligible.
-async function seedReturning(page) {
-  await page.addInitScript(() => {
-    try {
-      localStorage.setItem('pdflokal-visits', '2');
-      sessionStorage.setItem('pdflokal-visit-counted', '1');
-    } catch { /* private mode */ }
-  });
-}
 async function armInstallPrompt(page) {
   await page.evaluate(() => {
     const e = new Event('beforeinstallprompt');
@@ -32,17 +25,12 @@ test.describe('PWA install — mobile', () => {
       .toBe(true);
   });
 
-  test('chip is hidden on a first visit, shown for a returning visitor', async ({ page }) => {
-    await page.goto('/'); // first visit → counted as visit 1
-    await expect(page.locator('#ip-chip')).toBeHidden();
-
-    await seedReturning(page);
-    await page.goto('/');
+  test('chip shows by default on the very first visit (non-installed, non-dismissed)', async ({ page }) => {
+    await page.goto('/'); // first visit — no returning gate any more
     await expect(page.locator('#ip-chip')).toBeVisible();
   });
 
-  test('returning + one-tap armed → chip opens the one-tap card', async ({ page }) => {
-    await seedReturning(page);
+  test('one-tap armed → chip opens the one-tap card', async ({ page }) => {
     await page.goto('/');
     await armInstallPrompt(page);
     await page.locator('#ip-chip').click();
@@ -56,13 +44,12 @@ test.describe('PWA install — mobile', () => {
   });
 
   test('"jangan tampilkan lagi" hides the chip permanently', async ({ page }) => {
-    await seedReturning(page);
     await page.goto('/');
     await page.locator('#ip-chip').click();
     await page.locator('#ic-never').click();
     await expect(page.locator('#ip-chip')).toBeHidden();
 
-    await page.goto('/'); // still a returning visit, but dismissed → stays gone
+    await page.goto('/'); // dismissed → stays gone even though the chip is now default-on
     await expect(page.locator('#ip-chip')).toBeHidden();
   });
 });
@@ -71,8 +58,7 @@ test.describe('PWA install — mobile', () => {
 test.describe('PWA install — iOS steps', () => {
   test.use({ userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1' });
 
-  test('returning iPhone user → chip opens the step-by-step card', async ({ page }) => {
-    await seedReturning(page);
+  test('iPhone user → chip opens the step-by-step card', async ({ page }) => {
     await page.goto('/');
     await page.locator('#ip-chip').click();
 
