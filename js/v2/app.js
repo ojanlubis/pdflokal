@@ -27,7 +27,8 @@ import { createPageSlot, syncOverlay, textFontCss } from '../render/page-view.js
 import { createViewportStream } from '../render/viewport.js';
 import { createInteraction } from '../render/interaction.js';
 import { createFormatBar } from './format-bar.js';
-import { createTextRunIndex, mapRunFont } from './text-runs.js';
+import { createTextRunIndex, mapRunFont, MIN_HIT } from './text-runs.js';
+import { resolveTap } from '../core/text-lines.js';
 import { createPageManager } from './page-manager.js';
 import { createSignatureModal } from './signature-modal.js';
 import { createDownloadSheet } from './download-sheet.js';
@@ -41,7 +42,7 @@ import { extractFontProgram, lookupFontObject } from '../core/reinsert.js';
 import { planComposedChar } from '../core/compose.js';
 import { getFontStyleInfo } from '../core/font-style.js';
 import { cloneFamilyFor } from '../core/font-decide.js';
-import { buildEditedPageBytes, editSignature } from '../core/page-surgery.js';
+import { buildEditedPageBytes, editSignature, pageEdits } from '../core/page-surgery.js';
 
 // WHY there is no `window.pdfjsLib.…workerSrc = …` line here any more: pdf.js is
 // loaded on demand now (core/vendor.js), so touching it at module top-level
@@ -629,7 +630,98 @@ async function prepareDocFont(pageId, line, draft) {
   }
 }
 
+// spec-live-surgery.md §5 Decision 3 (increment 4 — re-edit): does `x, y`
+// land inside a committed edit's OWN box? Scoped to page.annotations (the
+// live model — never the pristine source), so this is orthogonal to
+// textRuns.hitTest, which only ever knows about the ORIGINAL bytes and would
+// have no idea an edit exists at all. Boxes come from each edit's cover's
+// replaceBox — the pristine-source line geometry captured at the edit's
+// BIRTH, not the cover's current x/y/width/height — because that birth box
+// is the one guaranteed to still be the honest target (a committed edit
+// never drags, spec Decision 1, but anchoring to replaceBox rather than
+// "wherever the cover currently sits" is the same defensive discipline
+// core/page-surgery.js's own overlapsBirthBox already applies at export/bake
+// time). Reuses core/text-lines.js's resolveTap (same clamped, finger-sized
+// inflation as every other tap) scoped to just this page's edited lines, so
+// a tap that's a few px off a small edited line still resolves the same way
+// a fresh line tap would.
+function hitTestEditedLine(page, x, y) {
+  const edits = pageEdits(page);
+  if (edits.length === 0) return null;
+  const boxes = edits.map((edit) => ({
+    x: edit.cover.replaceBox.x, y: edit.cover.replaceBox.y,
+    w: edit.cover.replaceBox.w, h: edit.cover.replaceBox.h,
+    edit,
+  }));
+  const hit = resolveTap(boxes, x, y, MIN_HIT);
+  return hit ? hit.edit : null;
+}
+
+// spec-live-surgery.md §5 Decision 3 (increment 4): reopen Ganti Teks on an
+// ALREADY-EDITED line. Prefills with the edit's CURRENT text (the paired
+// replacement text annotation) — never the original line's words — and
+// keeps the same size/font/color/box the edit already has (no re-sampling;
+// matchReplaceColors already did that work when the edit was first made).
+// Nothing about the model is touched here at tap time — only at commit
+// (openTextEditor's commit(), the `draft.reEdit` branch) does the actual
+// drop-and-reapply happen. That means Escape / no-op-retype leaves the
+// existing edit completely untouched, same "nothing is true until commit"
+// discipline smartReplace's own onCancel gives a fresh replace.
+// Font-fidelity note: the prefill's fontFamily/bold/italic/docFontFamily are
+// only the SYNCHRONOUS starting point (whatever the previous commit landed
+// with) — prepareDocFont below re-derives the doc-font/clone-routing decision
+// from scratch off cover.replaceTargets[0] (the pristine-source line), same
+// as a fresh smartReplace, since that pristine target is the one durable
+// truth a re-edit can trust (the committed replacement carries no cached
+// docFontkitFont/docFontBytes/flavor/coverage fields to reuse).
+function reEditLine(pageId, cover, replacement) {
+  const box = cover.replaceBox;
+  track('editor_action', { action: 'ganti_teks_reedit' });
+  const draft = {
+    text: replacement?.text ?? '',
+    fontSize: replacement?.fontSize ?? Math.min(120, Math.max(6, Math.round(box.h))),
+    fontFamily: replacement?.fontFamily,
+    bold: !!replacement?.bold,
+    italic: !!replacement?.italic,
+    color: replacement?.color,
+    docFontFamily: replacement?.docFontFamily,
+    // Everything commit's `draft.reEdit` branch needs to remove the PREVIOUS
+    // edit and reapply a fresh one against the SAME pristine-source target
+    // (Decision 3: drop-and-reapply, never surgery-on-surgery).
+    reEdit: {
+      coverId: cover.id,
+      textId: replacement?.id ?? null,
+      targets: cover.replaceTargets,
+      box: { x: box.x, y: box.y, w: box.w, h: box.h },
+      coverColor: cover.color,
+    },
+  };
+  openTextEditor({ pageId, x: box.x, y: box.y, anno: null, draft });
+  setTool('select');
+  toastEl.classList.remove('show');
+  // Re-derive the doc font / coverage-check / clone-routing decision the same
+  // way smartReplace does (prepareDocFont only ever reads `line.pdf` —
+  // cover.replaceTargets[0] IS that same pdf-space target, captured at the
+  // original edit's birth). Fire-and-forget: the twin (already showing via
+  // draft.fontFamily) is the honest fallback until/unless this resolves.
+  if (cover.replaceTargets?.[0]) {
+    prepareDocFont(pageId, { pdf: cover.replaceTargets[0] }, draft);
+  }
+}
+
 async function smartReplace(pageId, x, y) {
+  // spec-live-surgery.md §5 Decision 3 (increment 4): a tap inside an
+  // ALREADY-EDITED line's own box routes to RE-EDIT, checked BEFORE the
+  // fresh hitTest below — that hitTest reads pdf.js's getTextContent() off
+  // the PRISTINE source (js/v2/text-runs.js), which never sees a committed
+  // edit and would otherwise reopen Ganti prefilled with the ORIGINAL words,
+  // silently discarding the user's own edit (the founder-verified bug this
+  // increment exists to fix).
+  const page = getPage(doc, pageId);
+  if (page) {
+    const hit = hitTestEditedLine(page, x, y);
+    if (hit) { reEditLine(pageId, hit.cover, hit.replacement); return; }
+  }
   // Founder ruling 2026-07-19: the LINE is the editing primitive — hitTest
   // now resolves to a Line (core/text-lines.js), one or more fragments
   // clustered by geometry. On a single-fragment-per-line document (every
@@ -1058,9 +1150,38 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
       if (draft.onCancel) draft.onCancel();
     } else if (text) {
       // Ganti Teks recorded its ONE undo step before the cover was placed —
-      // recording again here would split one gesture into two undos.
+      // recording again here would split one gesture into two undos. A
+      // re-edit draft (below) is the mirror-image case: nothing about the
+      // model was touched when the editor opened (reEditLine only reads),
+      // so `recorded` is left unset on purpose — THIS is where a re-edit's
+      // one undo step is born, right before its drop-and-reapply mutates
+      // anything.
       if (!draft?.recorded) record(history, doc);
-      const d = { ...formatBar.getDefaults(), ...(draft || {}) };
+      let d = { ...formatBar.getDefaults(), ...(draft || {}) };
+      if (draft?.reEdit) {
+        // spec-live-surgery.md §5 Decision 3 (increment 4): RE-EDIT commit =
+        // drop-and-reapply from the pristine source, never surgery-on-
+        // surgery. Remove the previous edit's cover+text pair entirely, then
+        // create a FRESH pair anchored to the SAME original target geometry
+        // the first edit captured (draft.reEdit.targets/box are the OLD
+        // cover's own replaceTargets/replaceBox — the pristine-source line —
+        // never anything about the current, already-baked page).
+        // buildEditedPageBytes always re-derives a page's edited bytes from
+        // srcDoc (the untouched source) on every bake regardless of what the
+        // model looked like before — this fresh pair is what keeps the
+        // MODEL's own story matching that reality: exactly one edit per
+        // original line, never two annotations stacked on the same target.
+        removeAnnotation(doc, draft.reEdit.coverId);
+        if (draft.reEdit.textId) removeAnnotation(doc, draft.reEdit.textId);
+        const newCover = addAnnotation(doc, pageId, createAnnotation('whiteout', {
+          x: draft.reEdit.box.x, y: draft.reEdit.box.y,
+          width: draft.reEdit.box.w, height: draft.reEdit.box.h,
+          color: draft.reEdit.coverColor,
+          replaceTargets: draft.reEdit.targets,
+          replaceBox: draft.reEdit.box,
+        }));
+        d = { ...d, replaceCoverId: newCover.id };
+      }
       // replaceCoverId only ever comes from a Ganti Teks draft — omit the key
       // entirely for ordinary authored text rather than carry an undefined.
       const replaceProps = d.replaceCoverId ? { replaceCoverId: d.replaceCoverId } : {};

@@ -219,15 +219,23 @@ export function applyPageSurgery(pdfPage, PDFLib, fontkit, annotations) {
 // replaceBox) — deliberately not re-deriving a different notion of "edit".
 // Freeform annotations (signatures, standalone Teks, real whiteout, TTD) never
 // match this filter, so they never count as edits (spec §2).
+// Exported (spec-live-surgery.md §5/§8.4, increment 4): js/v2/app.js's
+// tap→edit entry needs the SAME "what counts as a committed edit" filter this
+// module already uses internally, to detect a tap landing on an
+// ALREADY-EDITED line (re-edit) before running a fresh hitTest against the
+// pristine source. One filter, two callers — never let app.js re-derive its
+// own notion of "edit" that could drift from this one.
 function pageEdits(page) {
   return page.annotations
     .filter((anno) => anno.type === 'whiteout' && anno.replaceTargets?.length && anno.replaceBox)
     .map((cover) => ({
       coverId: cover.id,
+      cover,
       targets: cover.replaceTargets,
       replacement: page.annotations.find((anno) => anno.type === 'text' && anno.replaceCoverId === cover.id),
     }));
 }
+export { pageEdits };
 
 // A stable string over a page's committed edit set — the memo key
 // core/import.js's edited-page cache (and any future caller) uses to decide
