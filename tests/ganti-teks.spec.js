@@ -133,7 +133,7 @@ test.describe('ganti teks — the nasty fixtures (field-bug pins)', () => {
     expect(Number(m[3])).toBeGreaterThan(Number(m[1]));
   });
 
-  test('surat: dense small serif text — prefill exact, Times mapped', async ({ page }) => {
+  test('surat: dense small serif text — prefill exact, Tinos clone routed', async ({ page }) => {
     await openDoc(page, NASTY('surat-resmi.pdf'));
     await armGanti(page);
     await tapLine(page, { index: 2 }); // a body line below the letterhead (paint order)
@@ -143,10 +143,22 @@ test.describe('ganti teks — the nasty fixtures (field-bug pins)', () => {
     // annotation (see tests/ganti-teks-fidelity.spec.js's bug 1 suite); this
     // test is about the font-family MAPPING, not the exact prefill text.
     await page.keyboard.type('Teks pengganti Times');
+    // PIN MOVED (font-fidelity tier 1, founder-ratified 2026-07-20): this
+    // fixture's body text is unembedded standard-14 /Times-Roman — exactly
+    // spec-font-fidelity-engine.md §3's "the /BaseFont is ALL the file
+    // knows" case. The old pin was mapRunFont's 'Times-Roman' bucket guess;
+    // core/font-decide.js now routes the real /BaseFont to Tinos — same
+    // widths (metric-compatible by construction), real embedded outlines.
+    // The clone lands asynchronously (prepareDocFont) — wait for it before
+    // committing, same beat the doc-font preview tests give the same path.
+    await expect.poll(async () => page.evaluate(() => {
+      const ed = document.querySelector('.v2-text-edit');
+      return ed ? getComputedStyle(ed).fontFamily : '';
+    })).toContain('Tinos');
     await page.keyboard.press('Enter');
     const anno = await page.evaluate(() =>
       window.v2.getDoc().pages[0].annotations.find((a) => a.type === 'text'));
-    expect(anno.fontFamily).toBe('Times-Roman'); // metric-twin family guess
+    expect(anno.fontFamily).toBe('Tinos'); // metric clone, routed by /BaseFont
   });
 
   test('scan: the router declines honestly — no cover, no editor, the toast says why', async ({ page }) => {

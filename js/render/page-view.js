@@ -151,6 +151,13 @@ export const FONT_CSS = {
   'Courier': '"Courier New", Courier, monospace',
   'Montserrat': 'Montserrat, sans-serif',
   'Carlito': 'Carlito, Calibri, sans-serif',
+  // Metric clones (font-fidelity tier 1, core/font-decide.js) — the system
+  // original rides second in each stack: identical widths, so layout is
+  // stable even before the lazy woff2 arrives.
+  'Arimo': 'Arimo, Arial, Helvetica, sans-serif',
+  'Tinos': 'Tinos, "Times New Roman", Times, serif',
+  'Cousine': 'Cousine, "Courier New", Courier, monospace',
+  'Caladea': 'Caladea, Cambria, serif',
 };
 
 // SSOT for a text annotation's CSS font string (page-view + inline editor).

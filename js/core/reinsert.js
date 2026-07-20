@@ -65,7 +65,7 @@ function resolve(context, PDFRef, value) {
 
 // PDF number literal: ≤4 decimals, trailing zeros (and a bare trailing '.')
 // stripped — same convention as text-walk.js's replacementFor.
-function fmtNum(n) {
+export function fmtNum(n) {
   let v = Math.round(n * 10000) / 10000;
   if (Object.is(v, -0)) v = 0;
   let s = String(v);
@@ -73,7 +73,7 @@ function fmtNum(n) {
   return s;
 }
 
-function hexToRgb01(hex) {
+export function hexToRgb01(hex) {
   const h = (hex || '#000000').replace('#', '');
   return [
     Number.parseInt(h.slice(0, 2), 16) / 255,
@@ -89,7 +89,7 @@ function hexToRgb01(hex) {
 // which UN-escapes #XX back to the raw byte — so a name pulled off a Tf
 // operand may need exactly this re-escaping to go back into a content stream.
 const NAME_DELIMS = new Set(['(', ')', '<', '>', '[', ']', '{', '}', '/', '%', '#']);
-function escapeNameForWrite(name) {
+export function escapeNameForWrite(name) {
   let out = '';
   for (let i = 0; i < name.length; i += 1) {
     const code = name.charCodeAt(i);
@@ -193,7 +193,7 @@ function readSimpleFontWidths(fontObj, context, PDFLib) {
 // (the embedded PROGRAM bytes) and planNativeInsert's simple-TrueType guards
 // (which need the DICT itself — /Subtype, /Encoding, /Widths) walk this same
 // path; this is the one place that walk lives.
-function lookupFontObject(page, PDFLib, fontName) {
+export function lookupFontObject(page, PDFLib, fontName) {
   const { PDFName, PDFDict, PDFRef } = PDFLib;
   const context = page.doc.context;
   const res = (v) => resolve(context, PDFRef, v);

@@ -182,18 +182,39 @@ test.describe('ganti teks — live doc-font preview', () => {
     expect(after).not.toBe(before);
   });
 
-  test('commit with no embeddable font: verbatim substitute-font toast', async ({ page }) => {
+  test('name-only font + exact clone: commit is SILENT and the clone is the committed family', async ({ page }) => {
+    // PIN MOVED (name-only ruling, founder 2026-07-20 evening — the e-AHU
+    // field case): this line's Helvetica is standard-14, no FontFile at all —
+    // the file has NO outlines of its own and every viewer substitutes for
+    // it. With the exact clone (Arimo) routed, the old substitute toast
+    // compared us against an original that never existed — so this commit is
+    // now SILENT. The toast still fires when a REAL embedded font gets a
+    // substitute (pinned by ganti-compose.spec.js's uncomposable case).
     await openDoc(page, FRAGMEN_FIXTURE);
     await armGanti(page);
     // Line A (index 0, per rung-c-native.spec.js / ganti-baris.spec.js's LINE
-    // map): Helvetica standard-14 — no FontFile2/3 at all, guaranteed
-    // 'unsupported-font' — extraction declines, no doc font ever loads.
+    // map): Helvetica standard-14 — extraction declines, no doc font loads.
     await tapLine(page, { index: 0 });
     await expect(page.locator('.v2-text-edit')).toHaveText('Nomor: 045/SEK/VII/2026');
+    // The ruling's facts (fontUnembedded + cloneRouted) land async via
+    // prepareDocFont — wait for the clone to reach the draft's editor style
+    // so the commit decision is deterministic, not a race.
+    await expect.poll(async () => page.evaluate(() => {
+      const ed = document.querySelector('.v2-text-edit');
+      return ed ? getComputedStyle(ed).fontFamily : '';
+    }), { timeout: 10_000 }).toContain('Arimo');
     await page.keyboard.type('Nomor Baru 001');
     await page.keyboard.press('Enter');
 
-    await expect(page.locator('#toast')).toHaveText(SUBSTITUTE_TOAST);
+    // Silent — check twice across the toast's own display window, same
+    // double-read discipline as the doc-font suite above.
+    expect(await page.locator('#toast').textContent()).not.toBe(SUBSTITUTE_TOAST);
+    await page.waitForTimeout(400);
+    expect(await page.locator('#toast').textContent()).not.toBe(SUBSTITUTE_TOAST);
+
+    const anno = await page.evaluate(() =>
+      window.v2.getDoc().pages[0].annotations.find((a) => a.type === 'text'));
+    expect(anno.fontFamily).toBe('Arimo');
   });
 
   test('Buka Baru clears the doc-font cache: the old FontFace is gone from document.fonts', async ({ page }) => {

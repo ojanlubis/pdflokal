@@ -85,9 +85,20 @@ export function getFontStyleInfo(page, PDFLib, fontName) {
 
     let italicFlag = false;
     let boldFlag = false;
+    // embedded: does this font carry ANY program (FontFile/2/3)? A name-only
+    // font (no FontDescriptor at all, or one without a program — the
+    // standard-14 server-generator shape) has NO glyphs of its own: every
+    // viewer substitutes. The honesty ruling (founder, 2026-07-20 evening)
+    // keys on this: substituting for a font that never shipped outlines is
+    // not a substitution worth announcing — there is nothing to be unfaithful
+    // to. Exotic-but-embedded programs we merely fail to parse stay
+    // embedded:true, so they keep the notice.
+    let embedded = false;
     const fdRaw = fdOwner.get(PDFName.of('FontDescriptor'));
     if (fdRaw) {
       const fd = res(fdRaw);
+      embedded = ['FontFile', 'FontFile2', 'FontFile3']
+        .some((key) => !!fd.get(PDFName.of(key)));
       const flagsRaw = fd.get(PDFName.of('Flags'));
       if (flagsRaw) {
         const flags = res(flagsRaw).asNumber();
@@ -105,6 +116,7 @@ export function getFontStyleInfo(page, PDFLib, fontName) {
     return {
       ok: true,
       baseFont,
+      embedded,
       bold: fromName.bold || boldFlag,
       italic: fromName.italic || italicFlag,
     };
