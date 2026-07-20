@@ -246,8 +246,17 @@ green. Proposed grades:
 | clone | different outlines, identical metrics — layout provably cannot shift | **notice, TODAY'S COPY** — founder-ratified: "Huruf ini memakai font pengganti yang mirip" stays. One grammar for every substitute tier beats per-tier precision. (My "sharpen" option B was declined — banked to the taste corpus.) |
 | twin | different font, approximate look; widths differ | **notice, today's copy** (unchanged) |
 
-Net effect on code: the toast logic stays a single boolean — notice fires iff path ∈
-{clone, twin} — no new strings enter the product. The grade still flows to telemetry (§7),
+**Name-only carve-out (founder-ratified 2026-07-20 evening, after the e-AHU field case):**
+when the file provably embeds NO font program (`font-style.js embedded:false` — the standard-14
+server-generator shape) AND the exact clone fired, the commit is **silent**: the "original"
+being substituted is only a name that every viewer already substitutes — a notice would compare
+against nothing real. Scoped tight: an exotic-but-embedded program we merely fail to parse
+keeps the notice (a real font exists and our shapes diverge from it). Everything else about the
+one-grammar ruling stands — the notice text never varies; only this one case stops counting as
+a substitution at all.
+
+Net effect on code: notice fires iff a substitute paints AND (the file had a real font OR no
+exact clone matched) — still no new strings in the product. The grade flows to telemetry (§7),
 where precision belongs.
 
 ## 7. Telemetry (the loop that makes this self-correcting)
@@ -306,10 +315,14 @@ Test plan for the build (all headless `tests/core/`):
 ## ⚖ Decision points — status after founder review (2026-07-20, in-session)
 1. ~~Bless the ladder + build order~~ — **RATIFIED: build both, tier 1 then tier 2.**
 2. ~~Honesty grades~~ — **RATIFIED: composed = silent; clone = today's copy unchanged.**
-3. Clones in the user font dropdown: **open** — proceeding on the recommendation (no) until said otherwise.
+3. ~~Clones in the user font dropdown~~ — **RATIFIED: YES** (2026-07-20 evening, overriding the
+   keep-it-5 recommendation) — labeled with their familiar equivalents ("Arimo (Arial)", …).
+   Honest correction recorded: the dropdown enumerates FONT_CSS keys, so the clones had already
+   entered it when tier 1 landed — the "stays 5" claim in the first commit was wrong; the ruling
+   makes the state deliberate.
 4. ~~Tier-3 refusal~~ — **RATIFIED** (part of the blessed ladder: "Tier 3 stays refused").
-5. Composed-glyph live preview: **open** — proceeding on the recommendation (twin-preview in
-   editor is acceptable for v1) until said otherwise.
+5. ~~Composed-glyph live preview~~ — **RATIFIED: twin preview ships v1** (2026-07-20 evening);
+   the canvas-drawn composed preview stays a bolt-on candidate, evidence-gated.
 
 🤚 One Fauzan-hand item before tier 1 can complete: the four clone families' woff2 files
 (Arimo/Tinos/Cousine/Caladea) are not in the repo — they must be fetched from a vetted source

@@ -19,11 +19,14 @@
  * exactly yesterday's behavior (mapRunFont) — same decline-never-guess shape
  * as every reader in core/.
  *
- * HONESTY (founder-ratified 2026-07-20): a clone is still a SUBSTITUTE — the
- * commit toast keeps firing with today's copy, one grammar for every
- * substitute tier. Only `native`/`composed` (the document's own outlines) are
- * silent. Do not add per-tier toast wording — that precision was explicitly
- * declined; it belongs in telemetry when the rail lands.
+ * HONESTY (founder-ratified 2026-07-20, refined same evening): a clone
+ * substituting a REAL embedded font still toasts, with today's copy — one
+ * grammar, no per-tier wording (that precision was explicitly declined; it
+ * belongs in telemetry). ONE carve-out, ruled after the e-AHU field case:
+ * when the file provably embeds NO program at all (name-only standard-14 —
+ * see font-style.js's `embedded`) AND the exact clone fired, the commit is
+ * SILENT — the "original" being substituted is only a name every viewer
+ * already substitutes; a notice would compare against nothing real.
  */
 
 // The metric-clone table — EXACT matches against a normalized /BaseFont (see

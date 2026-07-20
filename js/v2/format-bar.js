@@ -35,10 +35,22 @@ export function createFormatBar(deps) {
   const fontSel = document.createElement('select');
   fontSel.className = 'fb-font';
   fontSel.setAttribute('aria-label', 'Jenis huruf');
+  // The metric clones ARE authoring choices (founder ruling 2026-07-20
+  // evening: "yes, add them" — overriding the keep-it-5 recommendation).
+  // Their family names mean nothing to users, so each label carries the
+  // familiar font it matches — the label answers "what does this look like"
+  // without a decode step.
+  const FONT_LABELS = {
+    'Times-Roman': 'Times',
+    'Arimo': 'Arimo (Arial)',
+    'Tinos': 'Tinos (Times New Roman)',
+    'Cousine': 'Cousine (Courier New)',
+    'Caladea': 'Caladea (Cambria)',
+  };
   for (const name of Object.keys(FONT_CSS)) {
     const opt = document.createElement('option');
     opt.value = name;
-    opt.textContent = name === 'Times-Roman' ? 'Times' : name;
+    opt.textContent = FONT_LABELS[name] || name;
     opt.style.fontFamily = FONT_CSS[name];
     fontSel.appendChild(opt);
   }

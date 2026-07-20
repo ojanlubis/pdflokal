@@ -94,6 +94,9 @@ test('getFontStyleInfo: real embedded Bold font (Type0/Identity-H) — name carr
   assert.equal(info.ok, true);
   assert.match(info.baseFont, /bold/i);
   assert.equal(info.bold, true);
+  // embedded: this font carries a real program (FontFile2) — the name-only
+  // honesty ruling (app.js commit) must see embedded:true here.
+  assert.equal(info.embedded, true);
 });
 
 test('getFontStyleInfo: standard-14 non-bold font — no false positive', async () => {
@@ -107,6 +110,9 @@ test('getFontStyleInfo: standard-14 non-bold font — no false positive', async 
   assert.equal(info.ok, true);
   assert.equal(info.bold, false);
   assert.equal(info.italic, false);
+  // embedded: standard-14 = name-only, zero program bytes — the exact shape
+  // the name-only silence ruling keys on (e-AHU case, 2026-07-20).
+  assert.equal(info.embedded, false);
 });
 
 test('getFontStyleInfo: unknown font name on the page declines honestly', async () => {

@@ -382,7 +382,8 @@ export const CSS_FONT_MAP = {
   'Carlito': 'Carlito, Calibri, sans-serif',
   // Metric clones (font-fidelity tier 1) — the system original rides second
   // in each stack: identical widths, so paint is stable even before the
-  // lazy woff2 arrives. Never shown in the font dropdown.
+  // lazy woff2 arrives. Also authoring choices in the v2 font dropdown
+  // (founder ruling 2026-07-20 evening).
   'Arimo': 'Arimo, Arial, Helvetica, sans-serif',
   'Tinos': 'Tinos, Times New Roman, Times, serif',
   'Cousine': 'Cousine, Courier New, Courier, monospace',

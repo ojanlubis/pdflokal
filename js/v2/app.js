@@ -595,6 +595,16 @@ async function prepareDocFont(pageId, line, draft) {
         draft.fontFamily = clone;
         if (draft.editorEl && draft.editorEl.isConnected) draft.editorEl.style.font = textFontCss(draft);
       }
+      // Name-only ruling (founder, 2026-07-20 evening — the e-AHU case): a
+      // font that provably embeds NO program has no outlines of its own —
+      // every viewer already substitutes for it. When the exact-match clone
+      // fired on top of that, the commit stays SILENT: a notice would compare
+      // our substitute against an original that never existed. Both facts
+      // ride the draft so commit() can apply the ruling without re-reading
+      // the PDF. Absent fields (async race lost) → conservative toast, same
+      // as every other race here.
+      draft.fontUnembedded = !styleInfo.embedded;
+      draft.cloneRouted = !!clone;
     }
 
     const result = await loadDocFont(page.sourceId, fontName, pdfPage, PDFLib, fontkit);
@@ -1078,7 +1088,11 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
           && [...text.normalize('NFC')].every((ch) => ch === ' '
             || d.docFontkitFont.hasGlyphForCodePoint(ch.codePointAt(0))
             || composable(ch));
-        if (!covered) toast('Huruf ini memakai font pengganti yang mirip');
+        // Name-only ruling (2026-07-20 evening): a file with NO embedded
+        // program + an exact metric clone routed = nothing real was
+        // substituted — silent. See prepareDocFont for the fields' WHY.
+        const nameOnlyClone = d.fontUnembedded && d.cloneRouted;
+        if (!covered && !nameOnlyClone) toast('Huruf ini memakai font pengganti yang mirip');
       }
       const created = addAnnotation(doc, pageId, createAnnotation('text', {
         text, x, y,

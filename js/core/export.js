@@ -35,9 +35,9 @@ const FONT_NAME_MAP = {
   'Courier':     { '00': 'Courier', '10': 'CourierBold', '01': 'CourierOblique', '11': 'CourierBoldOblique' },
   'Montserrat':  { '00': 'Montserrat', '10': 'Montserrat-Bold', '01': 'Montserrat-Italic', '11': 'Montserrat-BoldItalic' },
   'Carlito':     { '00': 'Carlito', '10': 'Carlito-Bold', '01': 'Carlito-Italic', '11': 'Carlito-BoldItalic' },
-  // Metric clones (font-fidelity tier 1, core/font-decide.js): substitution
-  // infrastructure only — routed by /BaseFont, never offered in the font
-  // dropdown (spec-font-fidelity-engine.md §3).
+  // Metric clones (font-fidelity tier 1, core/font-decide.js): routed by
+  // /BaseFont for substitution AND offered in the font dropdown as authoring
+  // choices (founder ruling 2026-07-20 evening; spec §3).
   'Arimo':       { '00': 'Arimo', '10': 'Arimo-Bold', '01': 'Arimo-Italic', '11': 'Arimo-BoldItalic' },
   'Tinos':       { '00': 'Tinos', '10': 'Tinos-Bold', '01': 'Tinos-Italic', '11': 'Tinos-BoldItalic' },
   'Cousine':     { '00': 'Cousine', '10': 'Cousine-Bold', '01': 'Cousine-Italic', '11': 'Cousine-BoldItalic' },
