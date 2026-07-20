@@ -23,7 +23,11 @@ import { groupRunsIntoLines, resolveTap } from '../core/text-lines.js';
 // <10px-tall run — the ≥44px touch-target law is met by inflating the HIT box,
 // never the visual one. Zoom shrinks/grows this with the page, which matches
 // how every other annotation target behaves.
-const MIN_HIT = 22;
+// Exported: js/v2/app.js's re-edit detection (spec-live-surgery.md §5/§8.4,
+// increment 4) reuses this SAME constant against a page's committed-edit
+// boxes, via core/text-lines.js's resolveTap — one hit-box law for every tap
+// in the editor, not a second guessed number.
+export const MIN_HIT = 22;
 
 // A zero-length baseline vector (degenerate transform) must not divide by
 // zero into NaN — fall back to the "along +x" direction, same convention
