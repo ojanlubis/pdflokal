@@ -37,11 +37,19 @@
 const DIRECTION_DOT_MIN = 0.996;
 
 // Perp-offset gate: a run joins a baseline group only if its `p` sits within
-// this fraction of the larger of (run size, group's running max size) from
-// the group's running mean `p`. 0.35 is generous enough to swallow ordinary
-// baseline jitter (subscript/superscript nudges) while still separating
-// distinct lines at normal single-spacing — see test 5 for the documented
-// edge case this tolerance deliberately accepts.
+// this fraction of the SMALLER of (run size, group's running min size) from
+// the group's running mean `p`. Scaling by the smaller participant, not the
+// larger, is deliberate (founder field report 2026-07-21, lorem-testing.pdf):
+// a 72pt heading sitting 25.2pt above a 10.45pt body line used to get a
+// 0.35*72=25.2pt band — wide enough to reach all the way down into the body
+// line's own baseline and merge "TESTING" into "Lorem ipsum...". A big run's
+// size must not license a band that bridges a much smaller run's own line-
+// spacing; the SMALLER participant's jitter is what actually bounds "same
+// line" here. The residual cost is smaller and more defensible: a
+// superscript/subscript a few points off its base line's baseline may now
+// split into its own tiny Line instead of silently merging — see test 5,
+// updated to match (a stray tiny fragment is far less harmful than a heading
+// eating a whole paragraph).
 const PERP_TOLERANCE_FACTOR = 0.35;
 
 // Column-guard gate for the along pass: a gap bigger than this multiple of
@@ -54,6 +62,32 @@ const COLUMN_GAP_FACTOR = 1.5;
 // synthesized space, unless one side already carries whitespace (pdf.js
 // items often already include their own leading/trailing space — doubling
 // it would corrupt the reconstructed string).
+//
+// INVESTIGATED 2026-07-21 (founder field report, perpres-letterhead.pdf):
+// pdf.js splits the letter-spaced word "PRESIDEN" into "PRES"+"IDEN", and
+// this flat gap/size test can't tell that 4.09pt intra-word tracked gap (on
+// 10pt text) apart from a real word boundary — it inserts a spurious space,
+// "PRES IDEN". A same-line-relative fix was attempted: require a candidate
+// gap to be a statistical OUTLIER above the line's own median gap (only
+// meaningful with 3+ gaps) rather than merely clearing the flat threshold.
+// It was REJECTED after checking it against this project's own real
+// fixtures, not just the bug's own repro: perpres-letterhead.pdf's line
+// "sebagaimana dimaksud pada ayat (1) paling sedikit" is 6 runs / 5 GENUINE
+// word gaps (5.72/5.52/5.04/5.04/4.73pt on 13.5-16.5pt text, sizes vary
+// per-run same as PRESIDEN's runs do) — every one of those real gaps sits at
+// 1.69x-2.35x its own flat threshold, which fully overlaps PRESIDEN's own
+// 2.27x ratio. There is no gap-magnitude or median-relative cutoff that
+// keeps this line's 5 real spaces while rejecting PRESIDEN's 1 spurious one:
+// any threshold that fixes PRESIDEN also silently deletes every space in
+// this line (confirmed by running the diagnostic dump end-to-end, not just
+// unit tests — the run-on "sebagaimanadimaksud padaayat(1)palingsedikit" is
+// what a median-outlier version of this constant actually produced). Ship
+// the flat threshold instead, unattended: it is the ONLY test applied,
+// regardless of gap count. PRESIDEN staying "PRES IDEN" is an accepted
+// residual (tests/diag-extraction.spec.js pins it) — the user edits the
+// prefill anyway; a real fix needs a signal this module's pure-geometry
+// input (x0/y0/ux/uy/len/size per run, no font-metrics or content-stream
+// operator access) cannot provide.
 const SPACE_GAP_FACTOR = 0.18;
 
 function along(run) {
@@ -79,13 +113,13 @@ function clusterBaselines(geomItems) {
     const { ux, uy, size } = item.run.pdf;
     if (current) {
       const dot = ux * current.dirX + uy * current.dirY;
-      const tolerance = PERP_TOLERANCE_FACTOR * Math.max(size, current.maxSize);
+      const tolerance = PERP_TOLERANCE_FACTOR * Math.min(size, current.minSize);
       if (dot >= DIRECTION_DOT_MIN && Math.abs(item.p - current.meanP) <= tolerance) {
         current.items.push(item);
         current.count += 1;
         // Running mean, not a sum/n division — never touches a zero count.
         current.meanP += (item.p - current.meanP) / current.count;
-        current.maxSize = Math.max(current.maxSize, size);
+        current.minSize = Math.min(current.minSize, size);
         continue;
       }
     }
@@ -94,7 +128,7 @@ function clusterBaselines(geomItems) {
       dirX: ux,
       dirY: uy,
       meanP: item.p,
-      maxSize: size,
+      minSize: size,
       count: 1,
     };
     groups.push(current);

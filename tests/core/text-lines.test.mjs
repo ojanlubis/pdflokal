@@ -65,7 +65,61 @@ test('2. 0.3em gap with no boundary whitespace -> joined WITH one space; ' +
   assert.equal(linesB[0].str, 'Perihal: Undangan'); // not doubled
 });
 
-test('3. column guard: two runs on one baseline, 3em gap -> TWO lines', () => {
+test('3. REGRESSION GUARD: a real multi-word line with 5 similarly-sized ' +
+  'word gaps (varying per-run size) -> every gap still gets its space', () => {
+  // Exact numbers from perpres-letterhead.pdf's real line "sebagaimana
+  // dimaksud pada ayat (1) paling sedikit" (6 runs / 5 genuine word gaps,
+  // sizes 13.5/15/16/16.5/15.5/13.5 — this fixture varies font size per run
+  // even on ordinary body text). WHY this test exists: while investigating
+  // BUG 2 (PRESIDEN extracting as "PRES IDEN" — see SPACE_GAP_FACTOR's
+  // comment in text-lines.js), a "gap must be a statistical outlier above
+  // the line's own median gap" fix was tried and, when run against this
+  // REAL line (not just the PRESIDEN repro), silently deleted every one of
+  // its 5 spaces — median([5.72,5.52,5.04,5.04,4.73])=5.04, 1.6x that is
+  // 8.06, bigger than every individual gap, so NONE cleared the bar. That
+  // fix was reverted specifically because of this line. This test pins the
+  // correct behavior going forward: the flat per-gap SPACE_GAP_FACTOR
+  // threshold alone, with no line-wide statistics muting it.
+  const runs = [
+    run('sebagaimana', 0, 0, 81.041, 13.5),         // a0=0, a1=81.041
+    run('dimaksud pada', 86.760, 0, 102.120, 15),   // gap=5.719, a1=188.880
+    run('ayat', 194.400, 0, 30.240, 16),            // gap=5.520, a1=224.640
+    run('(1)', 229.680, 0, 20.163, 16.5),           // gap=5.040, a1=249.843
+    run('paling', 254.880, 0, 41.354, 15.5),        // gap=5.037, a1=296.234
+    run('sedikit', 300.960, 0, 38.259, 13.5),       // gap=4.726
+  ];
+  const lines = groupRunsIntoLines(runs);
+  assert.equal(lines.length, 1);
+  assert.equal(lines[0].str, 'sebagaimana dimaksud pada ayat (1) paling sedikit');
+});
+
+test('4. DOCUMENTED RESIDUAL: uniform letter-tracking split into 4+ ' +
+  'fragments still produces spurious spaces (no safe geometric fix found)', () => {
+  // Generalizes the PRESIDEN bug ("PRES"+"IDEN", one 4.09pt gap on 10pt
+  // text) to more fragments: "P","R","E","S" each separated by a uniform
+  // 3pt tracking gap, followed by a genuinely separate word "book" with a
+  // real 12pt gap. A median/outlier-based fix COULD suppress the 3 uniform
+  // tracking gaps here in isolation — but test 3 above proves that same
+  // mechanism deletes real spaces on actual documents, so it was rejected
+  // project-wide (see text-lines.js's SPACE_GAP_FACTOR comment for the
+  // concrete counter-evidence). This test pins the resulting, still-present
+  // limitation: every gap here also clears the flat 0.18*10=1.8pt
+  // threshold, so ALL of them (including the 3 spurious ones) get a space.
+  // Accepted residual, same class as PRESIDEN -> "PRES IDEN".
+  const size = 10;
+  const runs = [
+    run('P', 0, 0, 6, size),
+    run('R', 6 + 3, 0, 6, size),
+    run('E', 6 + 3 + 6 + 3, 0, 6, size),
+    run('S', 6 + 3 + 6 + 3 + 6 + 3, 0, 6, size),
+    run('book', 6 + 3 + 6 + 3 + 6 + 3 + 6 + 12, 0, 24, size),
+  ];
+  const lines = groupRunsIntoLines(runs);
+  assert.equal(lines.length, 1);
+  assert.equal(lines[0].str, 'P R E S book');
+});
+
+test('5. column guard: two runs on one baseline, 3em gap -> TWO lines', () => {
   const size = 12;
   const runs = [
     run('Kolom Kiri', 0, 0, 24, size),
@@ -75,7 +129,7 @@ test('3. column guard: two runs on one baseline, 3em gap -> TWO lines', () => {
   assert.equal(lines.length, 2);
 });
 
-test('4. two baselines 1.2em apart (12pt text, 14.4pt leading) -> two lines', () => {
+test('6. two baselines 1.2em apart (12pt text, 14.4pt leading) -> two lines', () => {
   const size = 12;
   const leading = 1.2 * size; // 14.4, above the 0.35*12=4.2 perp tolerance
   const runs = [
@@ -86,27 +140,60 @@ test('4. two baselines 1.2em apart (12pt text, 14.4pt leading) -> two lines', ()
   assert.equal(lines.length, 2);
 });
 
-test('5. superscript-ish: documented v1 behavior — merges into the base line', () => {
+test('7. heading swallow guard: a 72pt heading 25.2pt above a 10.45pt body ' +
+  'run stays its OWN line (perp tolerance scales by the SMALLER run)', () => {
+  // Regression pin for the exact numbers in the founder field report
+  // 2026-07-21 (lorem-testing.pdf): a 72pt "TESTING" heading sat 25.2pt
+  // above a 10.45pt body paragraph's baseline. Under the OLD max()-based
+  // tolerance, 0.35*max(72,10.45) = 25.2 — exactly equal to the offset, so
+  // the (<=) perp gate let them merge into one Line ("Lorem
+  // ipsumTESTINGdolor..."). Scaling by the SMALLER run instead —
+  // 0.35*min(72,10.45) = 3.6575 — is far below the 25.2pt offset, so they
+  // now split into two lines as they visually are.
+  const bodySize = 10.45;
+  const headingSize = 72;
+  const diff = 25.2; // exactly the old tolerance boundary at max(72,10.45)
+  const runs = [
+    run('Lorem ipsum dolor sit amet', 0, 0, 150, bodySize),
+    run('TESTING', 0, diff, 90, headingSize),
+  ];
+  const lines = groupRunsIntoLines(runs);
+  assert.equal(lines.length, 2);
+  const body = lines.find((l) => l.str.startsWith('Lorem'));
+  const heading = lines.find((l) => l.str === 'TESTING');
+  assert.ok(body, 'body paragraph keeps its own line');
+  assert.ok(heading, 'heading resolves to its OWN line, not merged with body');
+});
+
+test('8. superscript-ish: v2 behavior — splits into its own line ' +
+  '(perp tolerance now scales by the SMALLER run, not the larger)', () => {
   // Small run (size 6) sits 0.3*12=3.6 above a 12pt run's baseline, inside
-  // its horizontal span. Tolerance is 0.35*max(6,12) = 4.2, which is bigger
-  // than the 3.6 offset -> the perp gate lets it join the same baseline
-  // group, and the along pass doesn't split it out either (it sits fully
-  // inside the big run's a0..a1 span, so the gap is negative). This is
-  // accepted v1 behavior, not a bug: distinguishing a superscript from a
-  // genuinely separate short line at this offset needs more than geometry
-  // (baseline-shift metadata pdf.js doesn't expose here) — pinned so a
-  // future tightening of the tolerance is a deliberate choice, not a
-  // silent regression.
+  // its horizontal span. Under the OLD max()-based tolerance
+  // (0.35*max(6,12)=4.2, bigger than the 3.6 offset) this merged into one
+  // line — accepted as v1 behavior at the time. WHY this changed
+  // (founder field report 2026-07-21, lorem-testing.pdf): that same
+  // max()-based formula let a 72pt heading's size license a 25.2pt band
+  // that reached all the way down into an unrelated 10.45pt body line and
+  // swallowed it whole ("Lorem ipsumTESTINGdolor..."). Scaling by the
+  // SMALLER participant instead (0.35*min(6,12)=2.1, smaller than 3.6) fixes
+  // that heading/body bug and, as a side effect, also stops treating this
+  // superscript as automatically "close enough" — it now clears its own
+  // small line instead. A stray tiny fragment splitting out is far less
+  // harmful than a heading eating a whole paragraph, so this is accepted as
+  // the more correct v2 behavior, not a regression.
   const runs = [
     run('Text', 0, 0, 48, 12),
     run('2', 10, 3.6, 6, 6),
   ];
   const lines = groupRunsIntoLines(runs);
-  assert.equal(lines.length, 1);
-  assert.equal(lines[0].runs.length, 2);
+  assert.equal(lines.length, 2);
+  const base = lines.find((l) => l.str === 'Text');
+  const sup = lines.find((l) => l.str === '2');
+  assert.ok(base, 'base run keeps its own line');
+  assert.ok(sup, 'superscript run splits into its own line');
 });
 
-test('6. rotated runs group by the same rules; a horizontal run at a similar p ' +
+test('9. rotated runs group by the same rules; a horizontal run at a similar p ' +
   'does NOT join (direction gate)', () => {
   const runs = [
     run('Up', 0, 0, 24, 12, { ux: 0, uy: 1 }),
@@ -123,7 +210,7 @@ test('6. rotated runs group by the same rules; a horizontal run at a similar p '
   assert.equal(horizontal.str, 'Side');
 });
 
-test('7. unsorted input (paint order scrambled) -> same result as sorted', () => {
+test('10. unsorted input (paint order scrambled) -> same result as sorted', () => {
   const size = 12;
   const sorted = [
     run('Kern', 0, 0, 24, size),
@@ -141,7 +228,7 @@ test('7. unsorted input (paint order scrambled) -> same result as sorted', () =>
   assert.deepEqual(strsScrambled, strsSorted);
 });
 
-test('8. dominant style: 3-char bold fragment + 40-char regular fragment -> ' +
+test('11. dominant style: 3-char bold fragment + 40-char regular fragment -> ' +
   'line takes the regular run\'s fontName/size', () => {
   const bold = run('Bld', 0, 0, 18, 14, { fontName: 'Arial-Bold', fontFamily: 'Arial' });
   const regular = run(
@@ -153,7 +240,7 @@ test('8. dominant style: 3-char bold fragment + 40-char regular fragment -> ' +
   assert.equal(lines[0].size, 11);
 });
 
-test('9. pdf.len spans first fragment start to last fragment end; ' +
+test('12. pdf.len spans first fragment start to last fragment end; ' +
   'pdf.x0/y0 = first fragment start', () => {
   const runs = [
     run('Kern', 0, 5, 24, 12),
@@ -168,7 +255,7 @@ test('9. pdf.len spans first fragment start to last fragment end; ' +
   assert.equal(pdf.len, 42 + 24); // last run's a0 (42) + its len (24)
 });
 
-test('10. empty input -> []', () => {
+test('13. empty input -> []', () => {
   assert.deepEqual(groupRunsIntoLines([]), []);
   assert.deepEqual(groupRunsIntoLines(undefined), []);
 });
@@ -195,7 +282,7 @@ function distToRange(v, start, end) {
   return 0;
 }
 
-test('11. sparse: an isolated line keeps FULL growth (no neighbor to clamp against)', () => {
+test('14. sparse: an isolated line keeps FULL growth (no neighbor to clamp against)', () => {
   const minHit = 22;
   const line = box(0, 0, 40, 8); // 8px tall, no other lines on the page at all
   const growY = (minHit - 8) / 2; // 7 — full desired growth, nothing clamps it
@@ -206,7 +293,7 @@ test('11. sparse: an isolated line keeps FULL growth (no neighbor to clamp again
   assert.equal(resolveTap([line], 20, -growY - 0.5, minHit), null);
 });
 
-test('12. dense stack: a tap just above line 2\'s top resolves to line 2, not line 1', () => {
+test('15. dense stack: a tap just above line 2\'s top resolves to line 2, not line 1', () => {
   const minHit = 22;
   // Three 12px lines, identical x-range (0..100), 4px vertical gaps.
   const line1 = box(0, 0, 100, 12);  // 0..12
@@ -232,7 +319,7 @@ test('12. dense stack: a tap just above line 2\'s top resolves to line 2, not li
   assert.equal(resolveTap(lines, 50, 15, minHit), line2); // 3px from line1, 1 from line2
 });
 
-test('13. dense stack: clamp keeps inflated boxes from overlapping across the whole gap', () => {
+test('16. dense stack: clamp keeps inflated boxes from overlapping across the whole gap', () => {
   const minHit = 22;
   const line1 = box(0, 0, 100, 12);  // 0..12
   const line2 = box(0, 16, 100, 12); // 16..28
@@ -262,7 +349,7 @@ test('13. dense stack: clamp keeps inflated boxes from overlapping across the wh
   assert.equal(resolveTap(lines, 50, 15.5, minHit), line2);
 });
 
-test('14. long line: box-distance beats a closer CENTER on a short neighbor', () => {
+test('17. long line: box-distance beats a closer CENTER on a short neighbor', () => {
   const minHit = 22;
   const longLine = box(0, 0, 500, 12); // far-left edge at x=0
   const shortLine = box(5, 3, 6, 6);   // small box, sits near the tap
@@ -277,7 +364,7 @@ test('14. long line: box-distance beats a closer CENTER on a short neighbor', ()
   assert.equal(resolveTap(lines, 0, -2, minHit), longLine);
 });
 
-test('15. column neighbors: horizontal growth clamps at the gap midpoint; a tap in the gap resolves to the nearer column', () => {
+test('18. column neighbors: horizontal growth clamps at the gap midpoint; a tap in the gap resolves to the nearer column', () => {
   const minHit = 22;
   const lineA = box(0, 0, 10, 12);  // x: 0..10
   const lineB = box(16, 0, 10, 12); // x: 16..26 -- 6px horizontal gap, same baseline
@@ -294,7 +381,7 @@ test('15. column neighbors: horizontal growth clamps at the gap midpoint; a tap 
   assert.equal(resolveTap(lines, 15, 6, minHit), lineB); // 1px from lineB, 5 from lineA
 });
 
-test('16. empty lines array -> null; tap far from every line -> null', () => {
+test('19. empty lines array -> null; tap far from every line -> null', () => {
   const minHit = 22;
   assert.equal(resolveTap([], 0, 0, minHit), null);
   assert.equal(resolveTap(undefined, 0, 0, minHit), null);

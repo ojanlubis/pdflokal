@@ -1,29 +1,50 @@
 /*
- * PDFLokal — tests/diag-extraction.spec.js  (DIAGNOSTIC PROBE — no fix)
+ * PDFLokal — tests/diag-extraction.spec.js  (REGRESSION PIN — fixed 2026-07-21)
  * ============================================================================
  * Founder field report (phone test, 2026-07-21): the per-line editor's
- * EXTRACTED text doesn't match what's visually on the page, on two fresh
+ * EXTRACTED text didn't match what's visually on the page, on two fresh
  * fixtures:
  *
- *   lorem-testing.pdf     — tapping the big "TESTING" heading opens the
- *                            editor prefilled with "Lorem ipsumTESTINGdolo…":
- *                            the heading (its own, much larger, far-above
- *                            line) got merged with body-paragraph text.
- *   perpres-letterhead.pdf — tapping "PRESIDEN" in the letterhead extracts
- *                            "PRES IDEN": a space inferred INSIDE one
- *                            letter-spaced word.
+ *   lorem-testing.pdf      — tapping the big "TESTING" heading opened the
+ *                             editor prefilled with "Lorem ipsumTESTINGdolo…":
+ *                             the heading (its own, much larger, far-above
+ *                             line) got merged with body-paragraph text.
+ *   perpres-letterhead.pdf — tapping "PRESIDEN" in the letterhead extracted
+ *                             "PRES IDEN": a space inferred INSIDE one
+ *                             letter-spaced word.
  *
- * This spec does not fix anything. It dumps the pipeline's own numbers at
- * every stage — pdf.js raw items (js/v2/text-runs.js's extract(), exposed as
- * window.v2.textRuns.getRuns), the clustered Lines (getLines), and the
- * hitTest resolution — so the PM can see exactly where the divergence
- * originates: raw pdf.js items, our baseline/along CLUSTERING (core/
- * text-lines.js groupRunsIntoLines), or our SPACE-INFERENCE (assembleLine's
- * SPACE_GAP_FACTOR check).
+ * BUG 1 FIX (js/core/text-lines.js clusterBaselines): the same-baseline perp
+ * band was PERP_TOLERANCE_FACTOR * Math.max(runSize, groupMaxSize) — a 72pt
+ * heading licensed a 25.2pt band wide enough to reach a 10.45pt body line's
+ * baseline 25.2pt below it. Changed to Math.min(runSize, groupMinSize) — the
+ * SMALLER participant now bounds the band, so a big heading can no longer
+ * license a band that bridges a much smaller line's own spacing. The heading
+ * now resolves to its OWN line ("TESTING"), never merged with the body
+ * paragraph — see the updated assertions below.
  *
- * It DOES assert the two symptoms reproduce (so the repro is locked), but
- * asserts nothing about what the "correct" output should be — that's the
- * PM's call once the data is in hand.
+ * BUG 2 INVESTIGATED, FIX REJECTED (js/core/text-lines.js assembleLine): the
+ * flat SPACE_GAP_FACTOR * prevSize threshold can't tell a real word boundary
+ * from a wide intra-word TRACKED gap — "PRES"->"IDEN"'s 4.09pt gap on 10pt
+ * text clears the 1.8pt flat threshold same as a real space would. A
+ * same-line statistical fix was tried (require a gap to be a clear OUTLIER
+ * above the line's own median gap, only meaningful with 3+ gaps) and it
+ * DID fix PRESIDEN in isolation — but checking it against this project's
+ * OTHER real multi-run lines (not just the bug's own repro) found it
+ * silently deletes every space on perpres-letterhead.pdf's own line
+ * "sebagaimana dimaksud pada ayat (1) paling sedikit" (6 runs / 5 genuine
+ * word gaps, 1.69x-2.35x their own flat threshold — fully overlapping
+ * PRESIDEN's 2.27x ratio, so no cutoff separates them). That fix was
+ * reverted; see tests/core/text-lines.test.mjs tests 3 and 4 for the pinned
+ * before/after. "PRESIDEN" stays an ACCEPTED RESIDUAL: it still extracts as
+ * "PRES IDEN". The user edits the prefill anyway; a real fix needs a
+ * signal (font-metrics or a visual oracle) this module's pure-geometry
+ * input can't provide. This is pinned below, not papered over.
+ *
+ * This spec dumps the pipeline's own numbers at every stage — pdf.js raw
+ * items (js/v2/text-runs.js's extract(), exposed as window.v2.textRuns.
+ * getRuns), the clustered Lines (getLines), and the hitTest resolution — so
+ * the numbers stay visible next to the assertions they justify, as a
+ * permanent regression pin for these two real documents.
  *
  * Run: SPIKE= npx playwright test tests/diag-extraction.spec.js --project=chromium --reporter=list
  */
@@ -117,8 +138,8 @@ function perp(pdf) {
   return -pdf.x0 * pdf.uy + pdf.y0 * pdf.ux;
 }
 
-test.describe('DIAGNOSTIC PROBE — extraction vs visual divergence (no fix, dump only)', () => {
-  test('lorem-testing.pdf: heading "TESTING" merges with body paragraph', async ({ page }) => {
+test.describe('REGRESSION PIN — extraction vs visual divergence (fixed 2026-07-21)', () => {
+  test('lorem-testing.pdf: heading "TESTING" resolves to its OWN line, not merged with body', async ({ page }) => {
     await openDoc(page, NASTY('lorem-testing.pdf'));
     const dump = await dumpPage1(page);
 
@@ -145,10 +166,14 @@ test.describe('DIAGNOSTIC PROBE — extraction vs visual divergence (no fix, dum
       const hP = perp(headingRun.pdf);
       const bP = perp(bodyRun.pdf);
       const dot = headingRun.pdf.ux * bodyRun.pdf.ux + headingRun.pdf.uy * bodyRun.pdf.uy;
-      const tol = PERP_TOLERANCE_FACTOR * Math.max(headingRun.pdf.size, bodyRun.pdf.size);
+      // FIXED formula: Math.min(size, size), not max — see js/core/text-lines.js
+      // clusterBaselines. The OLD max()-based band was exactly this wide
+      // (0.35*72=25.2, equal to the real |Δp|) and let the heading merge in;
+      // the min()-based band (0.35*10.45=3.66) is far below |Δp|, so it splits.
+      const tol = PERP_TOLERANCE_FACTOR * Math.min(headingRun.pdf.size, bodyRun.pdf.size);
       console.log(`heading "TESTING" run: pdf.size=${fmt(headingRun.pdf.size)} display.size=${fmt(headingRun.size)} perp(p)=${fmt(hP)} display.y=${fmt(headingRun.y)}`);
       console.log(`body "Lorem..." run:   pdf.size=${fmt(bodyRun.pdf.size)} display.size=${fmt(bodyRun.size)} perp(p)=${fmt(bP)} display.y=${fmt(bodyRun.y)}`);
-      console.log(`|Δp| = ${fmt(Math.abs(hP - bP))}   PERP_TOLERANCE_FACTOR(${PERP_TOLERANCE_FACTOR}) * max(size) = ${fmt(tol)}   within tolerance? ${Math.abs(hP - bP) <= tol}`);
+      console.log(`|Δp| = ${fmt(Math.abs(hP - bP))}   PERP_TOLERANCE_FACTOR(${PERP_TOLERANCE_FACTOR}) * min(size) = ${fmt(tol)}   within tolerance? ${Math.abs(hP - bP) <= tol}`);
       console.log(`direction dot product = ${fmt(dot)}   DIRECTION_DOT_MIN = ${DIRECTION_DOT_MIN}   direction agrees? ${dot >= DIRECTION_DOT_MIN}`);
     } else {
       console.log(`could not isolate a single heading/body run pair — headingRun=${!!headingRun} bodyRun=${!!bodyRun}`);
@@ -171,13 +196,16 @@ test.describe('DIAGNOSTIC PROBE — extraction vs visual divergence (no fix, dum
     console.log(`resolved line str = ${JSON.stringify(resolved && resolved.str)}`);
     console.log(`resolved line member runs = ${JSON.stringify(resolved && resolved.runStrs)}`);
 
-    // LOCK THE REPRO — this is what the founder saw on the phone.
+    // LOCK THE FIX — the founder saw "Lorem ipsumTESTINGdolor…" on the phone;
+    // after the Math.min() perp-band fix the heading must resolve to ITSELF
+    // only, never merged with (or containing any trace of) the body text.
     expect(resolved, 'tap at the TESTING heading must resolve to SOME line').not.toBeNull();
-    expect(resolved.str).toContain('TESTING');
-    expect(resolved.str).toMatch(/lorem/i);
+    expect(resolved.str).toBe('TESTING');
+    expect(resolved.str).not.toMatch(/lorem/i);
+    expect(resolved.runStrs).toEqual(['TESTING']);
   });
 
-  test('perpres-letterhead.pdf: "PRESIDEN" extracts as "PRES IDEN"', async ({ page }) => {
+  test('perpres-letterhead.pdf: "PRESIDEN" still extracts as "PRES IDEN" (accepted residual — single-gap, no median to outlier-test against)', async ({ page }) => {
     await openDoc(page, NASTY('perpres-letterhead.pdf'));
     const dump = await dumpPage1(page);
 
