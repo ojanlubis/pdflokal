@@ -399,16 +399,72 @@ function getDryRunDoc(PDFLib, source) {
 // render; a broken edited-page build must never break rasterization.
 async function editedPageProvider(page) {
   try {
-    if (!editSignature(page)) return null; // no committed edits — today's path
+    if (!editSignature(page)) { page.editApplied = null; return null; } // no committed edits — today's path
     const source = getSource(doc, page.sourceId);
-    if (!source) return null;
+    if (!source) { page.editApplied = null; return null; }
     const { PDFLib, fontkit } = await ensurePdfLib();
     const srcDoc = await getDryRunDoc(PDFLib, source);
     const result = await buildEditedPageBytes(srcDoc, page, page.annotations, { PDFLib, fontkit });
+    // Increment 3 (spec-live-surgery.md §5/§8.3): stash exactly which cover/
+    // text annotation ids THIS bake consumed, directly on the page (the same
+    // render-layer-cache pattern as page.raster — see page-view.js's header
+    // comment). js/render/page-view.js's overlay builder reads this to skip
+    // drawing a SUCCESSFUL edit's cover/text as a DOM overlay (Decision 1) —
+    // reading it straight off buildEditedPageBytes' own `applied` set means
+    // the overlay can never independently disagree with what the raster
+    // actually shows. A declined edit's ids are simply absent from this set,
+    // so its cover (and, if native-insert alone declined, its twin text)
+    // keep rendering exactly as before (Decision 2).
+    page.editApplied = result.bytes ? result.applied : new Set();
     return result.bytes ? { bytes: result.bytes } : null;
   } catch (err) {
     console.warn('editedPageProvider gagal, pakai raster asli:', err);
+    page.editApplied = null;
     return null;
+  }
+}
+
+// spec-live-surgery.md §5/§8.3 (increment 3): re-render `pageId`'s background
+// raster from its CURRENT edit set and swap it in with no blank frame
+// (page-view.js's swapPageRaster — holds the old raster until the new
+// dataUrl's img.decode() resolves). Called right after a Ganti commit touches
+// a page's edit set, and after any undo/redo whose edit-signature changed
+// (see syncEditedRasters below). editedPageProvider (above) is what actually
+// determines the applied/declined outcome, as a side effect of the SAME
+// buildEditedPageBytes call the raster is built from — this function never
+// re-derives that outcome itself.
+async function rebakePage(pageId) {
+  if (!rasterizer) return;
+  const slot = slots.find((s) => s.page.id === pageId);
+  if (!slot) return;
+  const page = slot.page;
+  rasterizer.invalidateEditedPage(page.id); // reuse inc.2's invalidate (spec §8.2)
+  if (!editSignature(page)) page.editApplied = null; // no edits left — nothing to suppress
+  const raster = await rasterizer.rasterize(page, { scale: 2 });
+  // Stale guard: a fast undo/redo (or page delete) may have rebuilt the stage
+  // while this rasterize() was in flight — only swap if this slot is still
+  // the page's current, live one. syncEditedRasters below re-derives from
+  // scratch for whatever page set actually ends up live, so this rebake
+  // simply stands down rather than clobbering newer state.
+  if (slots.find((s) => s.page.id === pageId) !== slot) return;
+  await slot.reattach(raster);
+}
+
+// spec-live-surgery.md §5/§8.3 (increment 3): after undo/redo swaps in a new
+// set of pages, any page whose edit-signature actually CHANGED needs its
+// raster re-baked — a page that lost its last edit must revert to the plain
+// source render, a page whose edits came back (redo) must re-bake. Diffed by
+// page.id against the PRE-history-op pages (ids are stable across undo/redo —
+// history.js's snapshot/restore both spread-copy the same id onto a fresh
+// object), so this is a plain signature comparison, never a re-derivation of
+// WHAT changed. Pages whose signature is unchanged are left alone — undo/redo
+// elsewhere in the doc must not pay for a re-bake it didn't cause.
+function syncEditedRasters(prevPages) {
+  const prevSig = new Map(prevPages.map((p) => [p.id, editSignature(p)]));
+  for (const page of doc.pages) {
+    if (editSignature(page) !== (prevSig.get(page.id) ?? '')) {
+      rebakePage(page.id).catch((err) => console.warn('rebakePage (undo/redo) gagal:', err));
+    }
   }
 }
 
@@ -932,14 +988,22 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
     editingAnno = null;
     editingEl = null;
     editingIsReplace = false;
+    // spec-live-surgery.md §5/§8.3 (increment 3): did THIS commit create,
+    // re-type, or clear a Ganti edit's cover/text (an annotation carrying
+    // replaceCoverId, or the cover it points at)? Gates the re-bake below —
+    // ordinary authored text never touches a page's edit set, so it must
+    // never pay for a rasterize+swap it has no stake in.
+    let touchedEdit = false;
     if (anno) {
       if (text && text !== anno.text) {
         record(history, doc);
         updateAnnotation(doc, anno.id, { text });
         track('editor_action', { action: 'text_inline' });
+        touchedEdit = !!anno.replaceCoverId;
       } else if (!text) {
         record(history, doc);
         removeAnnotation(doc, anno.id);
+        touchedEdit = !!anno.replaceCoverId;
       }
     } else if (draft && text === String(draft.text || '').trim()) {
       // BUG FIX (founder field test, 2026-07-19): tap a line, change NOTHING,
@@ -991,12 +1055,24 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
       // tap still selects it like any text object — one grammar, kept.
       if (!draft) selectAnnotation(doc, created.id);
       track('editor_action', { action: 'text' });
+      touchedEdit = !!d.replaceCoverId;
     } else if (draft?.onCancel) {
       // Ganti Teks backed out with nothing typed — take the cover back too.
       draft.onCancel();
     }
     syncPage(pageId);
     setTool('select');
+    // spec-live-surgery.md §5/§8.3 (increment 3): a Ganti edit's cover/text
+    // just changed — bake it into the page's raster now, then re-sync the
+    // overlay once the bake resolves so the suppression (page.editApplied)
+    // matches the new reality. Fire-and-forget from commit()'s own POV: the
+    // tool has already returned to Pilih; the brief window before the bake
+    // lands (~85-90ms, spec §6) is the same latency the taste-judge already
+    // accepted, and the raster swap itself never flashes (page-view.js's
+    // swapPageRaster holds the old raster until the new one decodes).
+    if (touchedEdit) {
+      rebakePage(pageId).then(() => syncPage(pageId)).catch((err) => console.warn('rebakePage gagal:', err));
+    }
   };
 
   ed.addEventListener('blur', commit);
@@ -1106,8 +1182,18 @@ function deleteSelected() {
   if (pageId) syncPage(pageId);
 }
 
-function doUndo() { if (undo(history, doc)) { pageManager.invalidateThumbs(); rebuildStage(); } }
-function doRedo() { if (redo(history, doc)) { pageManager.invalidateThumbs(); rebuildStage(); } }
+// spec-live-surgery.md §5/§8.3 (increment 3): undo/redo can bring a page's
+// committed edits into or out of existence — capture the PRE-op pages so
+// syncEditedRasters can diff edit-signatures by page.id afterward and
+// re-bake only the pages that actually changed.
+function doUndo() {
+  const prevPages = doc.pages;
+  if (undo(history, doc)) { pageManager.invalidateThumbs(); rebuildStage(); syncEditedRasters(prevPages); }
+}
+function doRedo() {
+  const prevPages = doc.pages;
+  if (redo(history, doc)) { pageManager.invalidateThumbs(); rebuildStage(); syncEditedRasters(prevPages); }
+}
 document.getElementById('btn-undo').addEventListener('click', doUndo);
 document.getElementById('btn-redo').addEventListener('click', doRedo);
 

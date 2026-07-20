@@ -130,7 +130,22 @@ test.describe('ganti teks — live doc-font preview', () => {
     expect(registered).toBe(true);
   });
 
-  test('commit with covered text: no substitute toast, committed annotation keeps the doc font', async ({ page }) => {
+  // RETARGETED (spec-live-surgery.md increment 3, Decision 1, 2026-07-20):
+  // this test used to read the COMMITTED annotation's computed font-family
+  // off `.pv-anno-text` — proof that the live-preview doc font "stuck" past
+  // commit. Under live surgery a committed Ganti edit is no longer a
+  // draggable DOM twin holding a live CSS font: this fixture's Montserrat is
+  // full-coverage, so native re-insert SUCCEEDS and the replacement is baked
+  // straight into the page's own content stream (in the document's real
+  // font) — the DOM overlay is suppressed so it can't double-paint the same
+  // pixels (js/render/page-view.js's editApplied skip). Reading
+  // `.pv-anno-text` after commit now races the async bake and, once it
+  // resolves, finds nothing there at all. The claim this test protects — the
+  // doc font genuinely reaches the page, not just the draft — now shows up
+  // as: no DOM twin survives the commit, and the PAGE RASTER actually
+  // changed (the pixels ARE the document; page-view.js's swapPageRaster is
+  // what got them there with no visible seam).
+  test('commit with covered text: no substitute toast, the edit bakes into the page raster', async ({ page }) => {
     await openDoc(page, CID_FIXTURE);
     await armGanti(page);
     await tapLine(page, { str: 'Rapat Anggota Tahunan 2026', nth: 1 });
@@ -140,8 +155,8 @@ test.describe('ganti teks — live doc-font preview', () => {
         getComputedStyle(document.querySelector('.v2-text-edit')).fontFamily);
       return firstFontFamily(family);
     }, { timeout: 10_000 }).toMatch(/^pdflokal-doc-/);
-    const docFontName = firstFontFamily(await page.evaluate(() =>
-      getComputedStyle(document.querySelector('.v2-text-edit')).fontFamily));
+
+    const before = await page.evaluate(() => window.v2.getDoc().pages[0].raster.dataUrl);
 
     // Every character here already appears in the original painted line — the
     // fixture's font is full-coverage, so this is squarely the "covered" case
@@ -158,12 +173,13 @@ test.describe('ganti teks — live doc-font preview', () => {
     await page.waitForTimeout(300);
     expect(await page.locator('#toast').textContent()).not.toBe(SUBSTITUTE_TOAST);
 
-    // The committed annotation renders with the SAME doc font first in its
-    // computed font-family — it must keep looking like the document between
-    // commit and export (js/render/page-view.js's textFontCss).
-    const annoFamily = await page.evaluate(() =>
-      getComputedStyle(document.querySelector('.pv-anno-text')).fontFamily);
-    expect(firstFontFamily(annoFamily)).toBe(docFontName);
+    // Both halves of the edit baked: neither the cover nor its twin text
+    // survive as a DOM overlay (Decision 1), and the raster genuinely
+    // changed (Decision 1's "the pixels are the document" — not a no-op).
+    await expect(page.locator('.pv-anno-whiteout')).toHaveCount(0);
+    await expect(page.locator('.pv-anno-text')).toHaveCount(0);
+    const after = await page.evaluate(() => window.v2.getDoc().pages[0].raster.dataUrl);
+    expect(after).not.toBe(before);
   });
 
   test('commit with no embeddable font: verbatim substitute-font toast', async ({ page }) => {

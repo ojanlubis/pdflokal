@@ -91,7 +91,19 @@ test.describe('bug 1 — no-op commit is a cancel', () => {
 });
 
 test.describe('bug 2 — bold/italic adoption', () => {
-  test('a real Bold-named font seeds draft.bold live, and the committed annotation carries it', async ({ page }) => {
+  // RETARGETED (spec-live-surgery.md increment 3, Decision 1, 2026-07-20):
+  // this test used to read the COMMITTED annotation's computed font-weight
+  // off `.pv-anno-text` to prove bold survived past commit. tebal-hitam.pdf's
+  // heading font is real/embedded, so native re-insert SUCCEEDS here — the
+  // replacement bakes straight into the page's content stream and the DOM
+  // twin is suppressed (js/render/page-view.js's editApplied skip), so it can
+  // no longer be read at all once the async bake lands. (Reading it
+  // synchronously right after Enter used to "pass" only by racing that bake
+  // — never a reliable proof.) The model-level anno.bold assertion below
+  // already proves bold was captured; the render-layer half of the claim now
+  // shows up as "the DOM twin is gone and the page raster actually changed" —
+  // the pixels are the document, per Decision 1.
+  test('a real Bold-named font seeds draft.bold live, and the committed edit bakes into the page raster', async ({ page }) => {
     await openDoc(page, NASTY('tebal-hitam.pdf'));
     await armGanti(page);
     await tapLine(page, { str: 'PENGUMUMAN' });
@@ -103,6 +115,8 @@ test.describe('bug 2 — bold/italic adoption', () => {
       () => getComputedStyle(document.querySelector('.v2-text-edit')).fontWeight,
     ), { timeout: 10_000 }).toBe('700');
 
+    const before = await page.evaluate(() => window.v2.getDoc().pages[0].raster.dataUrl);
+
     // A genuine edit (not a no-op — bug 1's cancel path must not swallow this).
     await page.keyboard.type('PENGUMUMAN BARU');
     await page.keyboard.press('Enter');
@@ -111,12 +125,13 @@ test.describe('bug 2 — bold/italic adoption', () => {
       window.v2.getDoc().pages[0].annotations.find((a) => a.type === 'text'));
     expect(anno.bold).toBe(true);
 
-    // Export twin path already draws bold/italic end-to-end (core/export.js's
-    // resolveFontName/FONT_NAME_MAP) — proven here at the render layer, which
-    // reads the SAME anno.bold field via render/page-view.js's textFontCss.
-    const annoWeight = await page.evaluate(() =>
-      getComputedStyle(document.querySelector('.pv-anno-text')).fontWeight);
-    expect(annoWeight).toBe('700');
+    // Both halves of the edit baked: no DOM twin survives, and the raster
+    // genuinely changed. (Export's own bold/italic drawing end-to-end,
+    // core/export.js's resolveFontName/FONT_NAME_MAP, is proven elsewhere —
+    // this pins that the EDITOR's live render followed the same bake.)
+    await expect(page.locator('.pv-anno-text')).toHaveCount(0, { timeout: 10_000 });
+    const after = await page.evaluate(() => window.v2.getDoc().pages[0].raster.dataUrl);
+    expect(after).not.toBe(before);
   });
 
   test('the regular-weight control line does NOT come back bold', async ({ page }) => {

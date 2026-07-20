@@ -15,6 +15,16 @@
  * zoom without recomputing anything.
  *
  * Reads the core model only. No ueState, no vendor libs. DOM out.
+ *
+ * `page.editApplied` (spec-live-surgery.md §5/§8.3, increment 3): an optional
+ * Set<annotationId>, the SAME render-layer-cache pattern as `page.raster` —
+ * not a core model field, just a value app.js stashes directly on the page
+ * object. When present, it names exactly which cover/text ids a SUCCESSFUL
+ * Ganti bake consumed (js/core/page-surgery.js's buildEditedPageBytes
+ * `applied` set, read back verbatim) — those ids are baked into the raster
+ * and must NOT also draw as a DOM overlay (Decision 1). Anything else
+ * (declined edits, ordinary annotations) renders exactly as before
+ * (Decision 2).
  */
 
 // Render a full page view (background + annotation overlay).
@@ -45,6 +55,12 @@ export function renderPageView(page, opts = {}) {
   overlay.className = 'pv-overlay';
   overlay.style.cssText = 'position:absolute;inset:0';
   for (const anno of page.annotations) {
+    // spec-live-surgery.md §5/§8.3 (increment 3, Decision 1/2): a SUCCESSFUL
+    // committed Ganti edit's cover+text are baked into the raster — drawing
+    // them ALSO as a DOM overlay would double-paint. A DECLINED edit's cover
+    // (and its twin text, when native-insert alone declined) still renders —
+    // see the editApplied skip below.
+    if (page.editApplied?.has(anno.id)) continue;
     const el = renderAnnotationEl(anno);
     el.style.zIndex = anno.id === activeId ? '1000' : '1'; // active always on top
     overlay.appendChild(el);
@@ -87,6 +103,36 @@ export function setPageRaster(view, raster) {
   if (view.querySelector('.pv-bg')) return;
   view.querySelector('.pv-ph')?.remove();
   attachRaster(view, raster);
+}
+
+// Swap in a NEW raster for a page that is ALREADY showing one — a commit or
+// undo/redo re-bake (spec-live-surgery.md §5/§7/§8.3, increment 3's "no
+// visible seam" law), never the first-render/streaming-entry case (that
+// stays setPageRaster above, which deliberately no-ops when a `.pv-bg`
+// already exists). The new <img> is decoded OFF-DOM first — by the time it
+// touches the DOM it is already paintable — then insertion of the new node
+// and removal of the old one happen in the SAME synchronous tick (no
+// `await` between them), so the browser can only ever paint the FINAL state;
+// there is no frame where neither image (or a blank view) is on screen.
+export async function swapPageRaster(view, raster) {
+  const old = view.querySelector('.pv-bg');
+  const ph = view.querySelector('.pv-ph');
+  const img = document.createElement('img');
+  img.className = 'pv-bg';
+  img.src = raster.dataUrl;
+  img.draggable = false;
+  img.alt = '';
+  img.style.cssText =
+    'position:absolute;inset:0;width:100%;height:100%;user-select:none;pointer-events:none';
+  try {
+    await img.decode();
+  } catch {
+    // decode() can reject (or be unsupported) — proceed anyway; the swap
+    // below is still correct, it just didn't get the pre-decode guarantee.
+  }
+  view.insertBefore(img, view.firstChild);
+  old?.remove();
+  ph?.remove();
 }
 
 // Called when a page leaves the window — drop the image to free memory, restore
@@ -184,6 +230,10 @@ export function syncOverlay(page, view, opts = {}) {
   if (!overlay) return;
   overlay.innerHTML = '';
   for (const anno of page.annotations) {
+    // See renderPageView's identical skip — same suppression signal, kept in
+    // lockstep so a resync (undo/redo, format bar, drag) never re-draws a
+    // baked edit's overlay back into existence.
+    if (page.editApplied?.has(anno.id)) continue;
     const el = renderAnnotationEl(anno);
     const active = anno.id === activeId;
     el.style.zIndex = active ? '1000' : '1';
@@ -243,6 +293,15 @@ export function createPageSlot(page, opts = {}) {
     attach(raster) {
       page.raster = raster;
       setPageRaster(view, raster);
+    },
+    // Increment 3 (spec-live-surgery.md §5/§7/§8.3): the re-bake swap for a
+    // page that's ALREADY rastered (a Ganti commit, or an undo/redo whose
+    // edit-signature changed) — never the first-render path, that's still
+    // attach() above. No blank frame (swapPageRaster holds the old raster
+    // until the new one is decoded).
+    async reattach(raster) {
+      page.raster = raster;
+      await swapPageRaster(view, raster);
     },
     release() {
       page.raster = null;
