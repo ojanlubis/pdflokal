@@ -131,6 +131,7 @@ export function createPageRasterizer(doc, opts = {}) {
   const docCache = new Map(); // sourceId -> PDF.js document promise
   const imgCache = new Map(); // sourceId -> ImageBitmap promise (image sources)
   const editedDocCache = new Map(); // page.id -> { signature, docPromise: Promise<PDF.js doc|null> }
+  const renderSeq = new Map(); // page.id -> latest ISSUED rasterize seq (stale-guard, see rasterize)
 
   // Drop (and destroy) any cached edited-page doc for `pageId`. Increment 2
   // wires this method but nothing yet CALLS it on commit/undo/redo (spec
@@ -250,7 +251,20 @@ export function createPageRasterizer(doc, opts = {}) {
 
   return {
     async rasterize(page, { scale = 2 } = {}) {
+      // Stale-guard (founder doubling bug, 2026-07-20): renderToCanvas is async
+      // (getEditedDoc + pdf.js render), so a rasterize issued EARLIER — e.g. a
+      // viewport-stream "page entered view" render of the PLAIN page, started
+      // before an edit committed — can resolve AFTER a later rebake's render of
+      // the EDITED page. Last-ISSUED must win, not last-RESOLVED: otherwise the
+      // stale plain raster overwrites page.raster and the edit visually reverts
+      // (the intermittent "doubling"/loss the founder saw). Tag each call with a
+      // per-page monotonic seq; if a newer rasterize for this page was issued
+      // while we rendered, DISCARD this result and keep what the newer one set
+      // (return the current raster so a caller's attach() shows it, not stale).
+      const seq = (renderSeq.get(page.id) || 0) + 1;
+      renderSeq.set(page.id, seq);
       const canvas = await renderToCanvas(page, scale);
+      if (renderSeq.get(page.id) !== seq) return page.raster;
       page.raster = { dataUrl: canvas.toDataURL('image/png'), width: canvas.width, height: canvas.height, scale };
       return page.raster;
     },
