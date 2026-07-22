@@ -1,18 +1,21 @@
 /*
  * Edit (Teks Asli) BETA — rename + thumbs-feedback loop + correlated telemetry.
  * ============================================================================
- * Founder pivot 2026-07-22: ship the per-line editor as BETA, ask 👍/👎 after
- * every use, and let real usage be the oracle. This gate pins that surface:
+ * Founder pivot 2026-07-22: ship the per-line editor as BETA, and — refined the
+ * same day — ask 👍/👎 at the DOWNLOAD moment ("before they choose output
+ * format"), NOT after every commit (too naggy for a 20-line session). This gate
+ * pins that surface:
  *   - the tool is renamed "Edit" and marked beta (title + arm-toast);
- *   - a successful commit shows the quiet pill; 👍 and 👎+note both send to
- *     /api/feedback with THIS session's id (the join key) and NEVER document text;
- *   - the ladder telemetry events (ganti_tap/ganti_commit/surgery/insert/
- *     commit_paint) fire, so a 👎 is correlatable with what the edit did;
- *   - cancel/Escape asks nothing (the pill only follows a real edit).
+ *   - opening the Unduh sheet AFTER an edit shows the feedback strip at the top;
+ *     opening it with NO edit shows nothing;
+ *   - 👍 and 👎+note both send to /api/feedback with THIS session's id (the join
+ *     key) and NEVER document text; an abandoned 👎 is recorded on sheet-close;
+ *   - the ladder telemetry (ganti_tap/ganti_commit/surgery/insert/commit_paint)
+ *     fires, so a 👎 is correlatable with what the edit did.
  *
- * Reuses the undangan-cid.pdf nasty fixture (Type0/Identity-H, "Rapat Anggota
- * Tahunan 2026" ×3) the surgery/reedit suites already pin — the MIDDLE repeat
- * (nth:1) cuts + re-inserts NATIVELY, proven in tests/core/page-surgery-edited.
+ * Fixture: undangan-cid.pdf (Type0/Identity-H, "Rapat Anggota Tahunan 2026" ×3)
+ * the surgery/reedit suites already pin — the MIDDLE repeat (nth:1) cuts +
+ * re-inserts NATIVELY (proven in tests/core/page-surgery-edited).
  */
 import { test, expect } from '@playwright/test';
 import path from 'path';
@@ -22,9 +25,8 @@ import { armGanti, tapLine } from './helpers/lines.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const NASTY = (name) => path.join(__dirname, 'fixtures', 'nasty', name);
 
-// In-page sendBeacon override (same seam as telemetry.spec.js — `npx serve`
-// can't intercept a background beacon at the network layer), extended to record
-// the URL so /api/t (telemetry) and /api/feedback (human) are distinguishable.
+// In-page sendBeacon override (same seam as telemetry.spec.js), extended to
+// record the URL so /api/t (telemetry) and /api/feedback (human) split apart.
 async function captureBeacons(page) {
   await page.addInitScript(() => {
     window.__beacons = [];
@@ -36,6 +38,7 @@ async function captureBeacons(page) {
   });
 }
 const beacons = (page) => page.evaluate(() => (window.__beacons || []).slice());
+const feedbackBodies = async (page) => (await beacons(page)).filter((b) => b.url.includes('/api/feedback')).map((b) => b.body);
 const fakeTabHidden = (page) => page.evaluate(() => {
   Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
   document.dispatchEvent(new Event('visibilitychange'));
@@ -47,9 +50,6 @@ async function openDoc(page, fixture) {
   await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
 }
 
-// Edit the middle "Rapat…" repeat and commit; resolves once the pill has shown
-// (the pill is the last thing the commit's rebake .then() does, AFTER the
-// telemetry is queued — so waiting on it also guarantees the events are ready).
 async function editMiddleLine(page, newText) {
   await armGanti(page);
   await tapLine(page, { str: 'Rapat Anggota Tahunan 2026', nth: 1 });
@@ -57,6 +57,8 @@ async function editMiddleLine(page, newText) {
   await page.keyboard.press('Enter');
   await expect(page.locator('.v2-text-edit')).toHaveCount(0);
 }
+
+const openSheet = (page) => page.locator('#btn-download').click();
 
 test.describe('edit beta: rename + feedback loop', () => {
   test('the tool is renamed Edit and marked beta (title + arm-toast)', async ({ page }) => {
@@ -69,58 +71,88 @@ test.describe('edit beta: rename + feedback loop', () => {
     await expect(page.locator('#toast')).toContainText(/beta/i);
   });
 
-  test('a successful commit shows the quiet pill; 👍 sends rating:up (no note)', async ({ page }) => {
+  test('the Unduh sheet asks feedback ONLY after an edit; a no-edit download stays quiet', async ({ page }) => {
+    await openDoc(page, NASTY('undangan-cid.pdf'));
+    // No edit yet → the strip is hidden.
+    await openSheet(page);
+    await expect(page.locator('#ds-feedback')).toBeHidden();
+    await page.locator('#ds-close').click();
+    // Now edit, reopen → the strip shows, above the Format control.
+    await editMiddleLine(page, 'Rapat Baru');
+    await openSheet(page);
+    await expect(page.locator('#ds-feedback')).toBeVisible();
+    await expect(page.locator('#ds-feedback')).toContainText(/hasil editnya/i);
+  });
+
+  test('👍 in the sheet sends rating:up (no note), carrying this session id', async ({ page }) => {
     await captureBeacons(page);
     await openDoc(page, NASTY('undangan-cid.pdf'));
     await editMiddleLine(page, 'Rapat Baru');
+    await openSheet(page);
 
-    const pill = page.locator('#edit-feedback');
-    await expect(pill).toHaveClass(/show/);
-    await pill.locator('[aria-label="Bagus"]').click();
+    const strip = page.locator('#ds-feedback');
+    await expect(strip).toBeVisible();
+    await strip.locator('[aria-label="Bagus"]').click();
 
-    await expect.poll(async () => (await beacons(page))
-      .some((b) => b.url.includes('/api/feedback') && b.body.rating === 'up')).toBe(true);
-    const fb = (await beacons(page)).find((b) => b.url.includes('/api/feedback'));
-    expect(fb.body).not.toHaveProperty('note');
-    expect(fb.body.session_id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+    await expect.poll(async () => (await feedbackBodies(page)).some((b) => b.rating === 'up')).toBe(true);
+    const fb = (await feedbackBodies(page)).find((b) => b.rating === 'up');
+    expect(fb).not.toHaveProperty('note');
+    expect(fb.session_id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
   });
 
   test('👎 opens a note; Kirim sends rating:down + the typed note, never document text', async ({ page }) => {
     await captureBeacons(page);
     await openDoc(page, NASTY('undangan-cid.pdf'));
     await editMiddleLine(page, 'Rapat Baru');
+    await openSheet(page);
 
-    const pill = page.locator('#edit-feedback');
-    await expect(pill).toHaveClass(/show/);
-    await pill.locator('[aria-label="Kurang pas"]').click();
-    const note = pill.locator('.ef-note');
+    const strip = page.locator('#ds-feedback');
+    await strip.locator('[aria-label="Kurang pas"]').click();
+    const note = strip.locator('.ef-note');
     await expect(note).toBeVisible();
     await note.fill('hurufnya beda dikit');
-    await pill.locator('.ef-send').click();
+    await strip.locator('.ef-send').click();
 
-    await expect.poll(async () => (await beacons(page))
-      .find((b) => b.url.includes('/api/feedback'))?.body)
+    await expect.poll(async () => (await feedbackBodies(page))[0])
       .toEqual(expect.objectContaining({ rating: 'down', note: 'hurufnya beda dikit' }));
-    // The payload must NEVER carry the edited document's text.
-    const fb = (await beacons(page)).find((b) => b.url.includes('/api/feedback'));
-    expect(JSON.stringify(fb.body)).not.toContain('Rapat');
+    const fb = (await feedbackBodies(page))[0];
+    expect(JSON.stringify(fb)).not.toContain('Rapat'); // never the document's text
+  });
+
+  test('an abandoned 👎 (note opened, sheet closed) is still recorded note-less', async ({ page }) => {
+    await captureBeacons(page);
+    await openDoc(page, NASTY('undangan-cid.pdf'));
+    await editMiddleLine(page, 'Rapat Baru');
+    await openSheet(page);
+
+    await page.locator('#ds-feedback [aria-label="Kurang pas"]').click();
+    await expect(page.locator('#ds-feedback .ef-note')).toBeVisible();
+    await page.locator('#ds-close').click(); // walk away without Kirim
+
+    await expect.poll(async () => (await feedbackBodies(page)).length).toBe(1);
+    const fb = (await feedbackBodies(page))[0];
+    expect(fb.rating).toBe('down');
+    expect(fb).not.toHaveProperty('note'); // abandoned → recorded note-less
   });
 
   test('the ladder telemetry events fire (correlated with the edit)', async ({ page }) => {
     await captureBeacons(page);
     await openDoc(page, NASTY('undangan-cid.pdf'));
     await editMiddleLine(page, 'Rapat Baru');
-    await expect(page.locator('#edit-feedback')).toHaveClass(/show/); // telemetry is queued by now
 
-    await fakeTabHidden(page); // batched (<10) — force the same flush a real tab-hide does
-    const evs = (await beacons(page))
-      .filter((b) => b.url.includes('/api/t'))
-      .flatMap((b) => b.body.events || []);
+    // The commit-path events land in the rebake .then() (async). Flush on each
+    // poll iteration until commit_paint (the last one) has arrived.
+    const evNames = async () => {
+      await fakeTabHidden(page);
+      return (await beacons(page)).filter((b) => b.url.includes('/api/t')).flatMap((b) => (b.body.events || []).map((e) => e.event));
+    };
+    await expect.poll(evNames).toContain('commit_paint');
+
+    const evs = (await beacons(page)).filter((b) => b.url.includes('/api/t')).flatMap((b) => b.body.events || []);
     const names = evs.map((e) => e.event);
     expect(names).toContain('ganti_tap');
     expect(names).toContain('ganti_commit');
     expect(names).toContain('surgery');
-    expect(names).toContain('commit_paint');
 
     expect(evs.find((e) => e.event === 'ganti_commit').props.outcome).toBe('commit');
     expect(evs.find((e) => e.event === 'surgery').props).toEqual({ matched: true, reason: 'clean' });
@@ -129,15 +161,5 @@ test.describe('edit beta: rename + feedback loop', () => {
     const paint = evs.find((e) => e.event === 'commit_paint');
     expect(typeof paint.props.duration).toBe('number');
     expect(paint.props.duration % 10).toBe(0); // durationBucket invariant
-  });
-
-  test('cancel (Escape) asks nothing — the pill only follows a real edit', async ({ page }) => {
-    await openDoc(page, NASTY('undangan-cid.pdf'));
-    await armGanti(page);
-    await tapLine(page, { str: 'Rapat Anggota Tahunan 2026', nth: 1 });
-    await page.keyboard.press('Escape');
-    await expect(page.locator('.v2-text-edit')).toHaveCount(0);
-    await page.waitForTimeout(300); // give the commit path its async window
-    await expect(page.locator('#edit-feedback')).toHaveCount(0);
   });
 });

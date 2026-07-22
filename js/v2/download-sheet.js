@@ -20,6 +20,8 @@ import { track } from '../lib/analytics.js';
 import { tel } from './telemetry.js';
 import { durationBucket } from '../core/telemetry-schema.js';
 import { showStamp } from './celebrate.js';
+import { renderEditFeedback } from './edit-feedback.js';
+import { editSignature } from '../core/page-surgery.js';
 
 const COMPRESS_QUALITY = 0.72; // the "Otomatis" preset — one sane default, still
 const COMPRESS_MAXDIM = 1600;  // the right answer when the user has no hard cap.
@@ -323,6 +325,24 @@ export function createDownloadSheet(deps) {
   el('#ds-close').addEventListener('click', () => modal.close());
   modal.addEventListener('click', (e) => { if (e.target === modal) modal.close(); });
 
+  // BETA edit-feedback (founder ruling 2026-07-22): ask 👍/👎 at the DOWNLOAD
+  // moment — "before they choose output format" — but ONLY when the doc carries
+  // an Edit (Ganti). A merge/compress/sign-only download never asks. Mounted at
+  // the top of the sheet on open; finalize() on close records an un-submitted 👎.
+  let feedbackHandle = null;
+  function mountFeedback() {
+    const host = el('#ds-feedback');
+    const hasEdit = deps.getDoc().pages.some((p) => editSignature(p) !== '');
+    if (!host || !hasEdit) { if (host) host.hidden = true; feedbackHandle = null; return; }
+    host.hidden = false;
+    feedbackHandle = renderEditFeedback(host);
+  }
+  modal.addEventListener('close', () => {
+    if (feedbackHandle) { feedbackHandle.finalize(); feedbackHandle = null; }
+    const host = el('#ds-feedback');
+    if (host) host.hidden = true;
+  });
+
   async function doExport() {
     if (state.exporting) return;
     state.exporting = true;
@@ -420,6 +440,7 @@ export function createDownloadSheet(deps) {
       state.compressing = false; // belt-and-braces vs any historic flag leak
       state.exporting = false;
       modal.showModal();
+      mountFeedback(); // beta 👍/👎 strip at the top, only if the doc has an Edit
       buildBase(); // truth on the button + pre-warmed bytes for the 90% path
       // buildBase's tail re-runs buildCompressed when size is already 'kompres'.
     },

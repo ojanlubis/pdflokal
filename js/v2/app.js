@@ -35,7 +35,6 @@ import { createSignatureModal } from './signature-modal.js';
 import { createDownloadSheet } from './download-sheet.js';
 import { track } from '../lib/analytics.js';
 import { tel } from './telemetry.js';
-import { showEditFeedback, dismissEditFeedback } from './edit-feedback.js';
 import { createCelebration } from './celebrate.js';
 import { initInstallPrompt } from './install-prompt.js';
 import { applyIntentCopy } from './intent-copy.js';
@@ -1138,9 +1137,6 @@ document.getElementById('pm-close').addEventListener('click', () => pageManager.
 function openTextEditor({ pageId, x, y, anno, draft }) {
   const slot = slots.find((s) => s.page.id === pageId);
   if (!slot) return;
-  // Moving on to another edit supersedes a lingering feedback ask — so a
-  // power-edit streak never stacks pills (an open 👎 is recorded note-less).
-  dismissEditFeedback();
   const overlay = slot.view.querySelector('.pv-overlay');
   // New text starts from the format bar's sticky defaults (Canva behavior).
   // A `draft` (Ganti Teks) pre-seeds content + matched font over those defaults.
@@ -1357,10 +1353,6 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
           tel('surgery', oc.surgery);
           if (oc.insert) tel('insert', oc.insert);
         }
-        // Beta feedback ask (founder ruling 2026-07-22): only after a real
-        // commit paints — never on cancel/noop. A deletion counts (gantiOutcome
-        // is 'commit' there too — they used the feature).
-        if (gantiOutcome === 'commit') showEditFeedback();
       }).catch((err) => console.warn('rebakePage gagal:', err));
     }
   };
