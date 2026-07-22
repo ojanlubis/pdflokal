@@ -366,7 +366,12 @@ for (const btn of document.querySelectorAll('#toolbar .tool[data-tool]')) {
     if (t === 'text') toast('Pilih tempat untuk menulis');
     if (t === 'whiteout') toast('Seret di halaman untuk menutup teks');
     if (t === 'signature') toast('Pilih tempat untuk menempatkan tanda tangan');
-    if (t === 'ganti') toast('Tap tulisan yang mau kamu ganti');
+    // Beta note lives HERE (not just the button's title=) because a title tip
+    // is desktop-hover only — ~half of pdflokal's traffic is mobile and would
+    // never see "beta". The arm-toast announces it on every device, once per
+    // arming, right as the user starts. Verb shifted ganti→edit to match the
+    // renamed button (taste: the verb matches the interaction model everywhere).
+    if (t === 'ganti') toast('Edit teks asli — fitur beta. Tap tulisan yang mau kamu ubah');
   });
 }
 
@@ -749,7 +754,7 @@ async function smartReplace(pageId, x, y) {
       // The router (two-ladder ruling, seat decisions.md 2026-07-18): no text
       // layer = a scan/photo — that's the dokumen-foto ladder, not this one.
       track('ganti_no_text_layer');
-      toast('Halaman ini hasil scan/foto — teksnya belum bisa diganti');
+      toast('Halaman ini hasil scan/foto — teksnya belum bisa diedit');
     } else {
       toast('Nggak kena tulisan — tap tepat di teksnya ya');
     }
