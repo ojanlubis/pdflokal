@@ -23,7 +23,7 @@ import {
 } from '../core/operations.js';
 import { createHistory, record, undo, redo, canUndo, canRedo } from '../core/history.js';
 import { importPdf, importImage, createPageRasterizer, probeTextLayer } from '../core/import.js';
-import { pagesBucket } from '../core/telemetry-schema.js';
+import { pagesBucket, durationBucket } from '../core/telemetry-schema.js';
 import { createPageSlot, syncOverlay, textFontCss } from '../render/page-view.js';
 import { createViewportStream } from '../render/viewport.js';
 import { createInteraction } from '../render/interaction.js';
@@ -440,10 +440,17 @@ async function editedPageProvider(page) {
     // so its cover (and, if native-insert alone declined, its twin text)
     // keep rendering exactly as before (Decision 2).
     page.editApplied = result.bytes ? result.applied : new Set();
+    // Stash the per-edit telemetry outcomes on the page (same render-cache
+    // pattern as editApplied) so commit()'s rebake can fire the surgery/insert
+    // events for the edit it just committed — WITHOUT this provider (which
+    // also runs on plain zoom/viewport re-renders) ever firing telemetry
+    // itself. Data here; the firing is gated to the commit path in commit().
+    page.editOutcomes = result.outcomes || [];
     return result.bytes ? { bytes: result.bytes } : null;
   } catch (err) {
     console.warn('editedPageProvider gagal, pakai raster asli:', err);
     page.editApplied = null;
+    page.editOutcomes = null;
     return null;
   }
 }
@@ -630,6 +637,18 @@ async function prepareDocFont(pageId, line, draft) {
     }
 
     const result = await loadDocFont(page.sourceId, fontName, pdfPage, PDFLib, fontkit);
+    // font_seen (spec-telemetry.md §3): the doc font we tried to load for this
+    // edit. flavor maps loadDocFont's own shape read to the schema's FLAVOR
+    // list; extract is 'ok' when the FontFace loaded, else 'declined'. NOTE: on
+    // a decline the flavor isn't recomputed here (loadDocFont only returns it
+    // on success) — collapsed to 'other', a conscious v1 simplification (the
+    // primary signal is the ok-rate + the flavor of docs that DO load). A
+    // finer failed/declined split is an easy follow-up if the data warrants it.
+    tel('font_seen', {
+      flavor: result?.flavor === 'type0' ? 'type0-identity-h'
+        : result?.flavor === 'truetype' ? 'truetype-simple' : 'other',
+      extract: result ? 'ok' : 'declined',
+    });
     if (!result) return; // extraction/parse/FontFace decline — twin stays, honestly
 
     // Guard: the draft may have been cancelled/committed already, or a NEWER
@@ -741,7 +760,7 @@ async function smartReplace(pageId, x, y) {
   const page = getPage(doc, pageId);
   if (page) {
     const hit = hitTestEditedLine(page, x, y);
-    if (hit) { reEditLine(pageId, hit.cover, hit.replacement); return; }
+    if (hit) { tel('ganti_tap', { hit: true }); reEditLine(pageId, hit.cover, hit.replacement); return; }
   }
   // Founder ruling 2026-07-19: the LINE is the editing primitive — hitTest
   // now resolves to a Line (core/text-lines.js), one or more fragments
@@ -749,6 +768,7 @@ async function smartReplace(pageId, x, y) {
   // pre-line fixture) a Line IS a Run, so this whole flow is unchanged.
   const line = await textRuns.hitTest(pageId, x, y);
   if (!line) {
+    tel('ganti_tap', { hit: false });
     const runs = await textRuns.getRuns(pageId);
     if (runs.length === 0) {
       // The router (two-ladder ruling, seat decisions.md 2026-07-18): no text
@@ -760,6 +780,7 @@ async function smartReplace(pageId, x, y) {
     }
     return;
   }
+  tel('ganti_tap', { hit: true });
   record(history, doc);
   const cover = addAnnotation(doc, pageId, createAnnotation('whiteout', {
     x: line.x, y: line.y, width: line.w, height: line.h,
@@ -1159,6 +1180,16 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
     // ordinary authored text never touches a page's edit set, so it must
     // never pay for a rasterize+swap it has no stake in.
     let touchedEdit = false;
+    // Ganti/Edit telemetry (spec-telemetry.md §3): set ONLY for a Ganti
+    // interaction — `draft` is always a Ganti draft (smartReplace/reEditLine;
+    // plain Teks passes none) and anno.replaceCoverId marks a committed
+    // replacement. gantiOutcome stays null for ordinary authored text, so
+    // ganti_commit never fires for it. gantiCoverId lets the post-bake read
+    // pull THIS edit's surgery/insert outcome; gantiDocFont is the synchronous
+    // "did the commit land in the document's own font" signal (font_path).
+    let gantiOutcome = null;
+    let gantiCoverId = null;
+    let gantiDocFont = false;
     if (anno) {
       if (text && text !== anno.text) {
         record(history, doc);
@@ -1166,10 +1197,14 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
         track('editor_action', { action: 'text_inline' });
         tel('tool_use', { tool: 'teks', action: 'text_inline' });
         touchedEdit = !!anno.replaceCoverId;
+        if (anno.replaceCoverId) {
+          gantiOutcome = 'commit'; gantiCoverId = anno.replaceCoverId; gantiDocFont = !!anno.docFontFamily;
+        }
       } else if (!text) {
         record(history, doc);
         removeAnnotation(doc, anno.id);
         touchedEdit = !!anno.replaceCoverId;
+        if (anno.replaceCoverId) { gantiOutcome = 'commit'; gantiCoverId = anno.replaceCoverId; }
       }
     } else if (draft && text === String(draft.text || '').trim()) {
       // BUG FIX (founder field test, 2026-07-19): tap a line, change NOTHING,
@@ -1180,6 +1215,9 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
       // yet on this path, so this is the Ganti-draft equivalent of the
       // `anno` branch's own `text !== anno.text` no-op guard above.
       if (draft.onCancel) draft.onCancel();
+      gantiOutcome = 'noop';
+      gantiCoverId = draft.replaceCoverId ?? draft.reEdit?.coverId ?? null;
+      gantiDocFont = !!draft.docFontFamily;
     } else if (text) {
       // Ganti Teks recorded its ONE undo step before the cover was placed —
       // recording again here would split one gesture into two undos. A
@@ -1246,6 +1284,12 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
         // substituted — silent. See prepareDocFont for the fields' WHY.
         const nameOnlyClone = d.fontUnembedded && d.cloneRouted;
         if (!covered && !nameOnlyClone) toast('Huruf ini memakai font pengganti yang mirip');
+        // font_path is 'doc-font' only when the document's OWN font (or a glyph
+        // composed from its own outlines) paints this — a name-only clone is
+        // still a substitute, so it reads as 'twin'.
+        gantiOutcome = 'commit';
+        gantiCoverId = d.replaceCoverId;
+        gantiDocFont = covered;
       }
       const created = addAnnotation(doc, pageId, createAnnotation('text', {
         text, x, y,
@@ -1267,9 +1311,20 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
     } else if (draft?.onCancel) {
       // Ganti Teks backed out with nothing typed — take the cover back too.
       draft.onCancel();
+      gantiOutcome = 'cancel';
+      gantiCoverId = draft.replaceCoverId ?? draft.reEdit?.coverId ?? null;
+      gantiDocFont = !!draft.docFontFamily;
     }
     syncPage(pageId);
     setTool('select');
+    // ganti_commit (spec-telemetry.md §3): fires for EVERY Ganti interaction
+    // outcome — commit / cancel / noop — never for ordinary authored text
+    // (gantiOutcome stays null). Synchronous: font_path is the draft-time
+    // reality the user committed in, distinct from the export-time `insert`
+    // event fired post-bake below.
+    if (gantiOutcome) {
+      tel('ganti_commit', { outcome: gantiOutcome, font_path: gantiDocFont ? 'doc-font' : 'twin' });
+    }
     // spec-live-surgery.md §5/§8.3 (increment 3): a Ganti edit's cover/text
     // just changed — bake it into the page's raster now, then re-sync the
     // overlay once the bake resolves so the suppression (page.editApplied)
@@ -1279,7 +1334,26 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
     // accepted, and the raster swap itself never flashes (page-view.js's
     // swapPageRaster holds the old raster until the new one decodes).
     if (touchedEdit) {
-      rebakePage(pageId).then(() => syncPage(pageId)).catch((err) => console.warn('rebakePage gagal:', err));
+      const t0 = performance.now();
+      rebakePage(pageId).then(() => {
+        syncPage(pageId);
+        // commit_paint (spec-telemetry.md §3): the REAL device commit→pixels
+        // latency the desktop-only spike could never measure — the ladder's
+        // whole reason for the rail. surgery/insert read THIS edit's outcome
+        // off the fresh bake (editedPageProvider stashed page.editOutcomes as a
+        // side effect of the SAME buildEditedPageBytes call this rebake ran).
+        tel('commit_paint', {
+          duration: durationBucket(performance.now() - t0),
+          pages: pagesBucket(doc.pages.length),
+          device: deviceClass(),
+        });
+        const page = getPage(doc, pageId);
+        const oc = gantiCoverId && page?.editOutcomes?.find((o) => o.coverId === gantiCoverId);
+        if (oc) {
+          tel('surgery', oc.surgery);
+          if (oc.insert) tel('insert', oc.insert);
+        }
+      }).catch((err) => console.warn('rebakePage gagal:', err));
     }
   };
 

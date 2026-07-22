@@ -123,7 +123,7 @@ test('page-surgery integration: missing-glyph rescues via compose; uncomposable 
   const insertByCover = new Map([['c1', insert], ['c2', { ...insert, y: 520 }]]);
 
   const before = readPageContents(pdfPage, PDFLib);
-  const skipDraw = planNativeInserts(pdfPage, PDFLib, fontkit, annotations, skipCovers, insertByCover);
+  const { skipDraw } = planNativeInserts(pdfPage, PDFLib, fontkit, annotations, skipCovers, insertByCover);
 
   assert.ok(skipDraw.has('t-compose'), 'composable edit painted natively (composed)');
   assert.equal(skipDraw.has('t-twin'), false, 'uncomposable edit left for the twin drawer');

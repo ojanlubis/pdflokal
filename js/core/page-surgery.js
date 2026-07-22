@@ -69,10 +69,18 @@ function overlapsBirthBox(anno) {
 export function runSurgery(pdfPage, PDFLib, annotations) {
   const skipCovers = new Set();
   const insertByCover = new Map();
+  // Per-candidate surgery outcome for telemetry (spec-telemetry.md §3), kept
+  // beside the working sets so the app layer can fire the `surgery` event
+  // without re-deriving what runSurgery already decided. coverId -> {matched,
+  // reason}. reason is 'clean' when every fragment cut, else 'no-match': the
+  // code only knows matched:boolean per target (planRunRemoval), so the
+  // schema's finer 'untrustworthy-run' isn't distinguishable here — exactly
+  // the best-effort the schema author flagged for surgery.reason.
+  const surgeryByCover = new Map();
   const candidates = annotations.filter(
     (a) => a.type === 'whiteout' && a.replaceTargets?.length && a.replaceBox && overlapsBirthBox(a),
   );
-  if (candidates.length === 0) return { skipCovers, insertByCover };
+  if (candidates.length === 0) return { skipCovers, insertByCover, surgeryByCover };
   try {
     const flatTargets = [];
     const spans = []; // [start, end) into flatTargets, per candidate
@@ -89,7 +97,9 @@ export function runSurgery(pdfPage, PDFLib, annotations) {
       // gone from the content stream either way, so the cover MUST stay to
       // hide the now-broken remainder. Never leave a half-removed line
       // uncovered.
-      if (slice.length > 0 && slice.every((r) => r.matched)) {
+      const matched = slice.length > 0 && slice.every((r) => r.matched);
+      surgeryByCover.set(a.id, { matched, reason: matched ? 'clean' : 'no-match' });
+      if (matched) {
         skipCovers.add(a.id);
         // The line always STARTS at its first target — the honest entry
         // point for where replacement text should paint, even on the (not
@@ -102,7 +112,7 @@ export function runSurgery(pdfPage, PDFLib, annotations) {
     // surgery had trouble — the Rung A cover fallback is always still there.
     console.warn('[core/page-surgery] surgery failed, covers kept:', err);
   }
-  return { skipCovers, insertByCover };
+  return { skipCovers, insertByCover, surgeryByCover };
 }
 
 // ---- Rung C: native re-insert (own-font replacement) ------------------------
@@ -153,7 +163,14 @@ function planComposedFallback(pdfPage, PDFLib, fontkit, insert, anno) {
 // Never a hard failure — mirrors runSurgery's discipline one level up.
 export function planNativeInserts(pdfPage, PDFLib, fontkit, annotations, skipCovers, insertByCover) {
   const skipDraw = new Set();
-  if (!fontkit) return skipDraw; // same deps guard as the custom-font embed path
+  // Per-annotation insert outcome for telemetry (spec-telemetry.md §3):
+  // annoId -> { path:'native'|'twin', reason }. 'native' when the doc's own
+  // font (or a composed glyph from its own outlines) painted the replacement;
+  // 'twin' + the verbatim decline reason when it fell back to a metric twin —
+  // this is the highest-value beta signal (WHY a replacement isn't the
+  // document's own font). The app layer fires `insert` from this at commit.
+  const insertOutcomes = new Map();
+  if (!fontkit) return { skipDraw, insertOutcomes }; // same deps guard as the custom-font embed path
   for (const anno of annotations) {
     if (anno.type !== 'text' || !anno.replaceCoverId || !skipCovers.has(anno.replaceCoverId)) continue;
     const insert = insertByCover.get(anno.replaceCoverId);
@@ -163,6 +180,7 @@ export function planNativeInserts(pdfPage, PDFLib, fontkit, annotations, skipCov
       if (plan.ok) {
         appendNativeText(pdfPage, PDFLib, plan.snippet);
         skipDraw.add(anno.id);
+        insertOutcomes.set(anno.id, { path: 'native', reason: 'clean' });
       } else if (plan.reason === 'missing-glyph') {
         // Font-fidelity tier 2 (core/compose.js, founder-ratified 2026-07-20):
         // a missing glyph may still be COMPOSABLE from outlines the subset
@@ -174,13 +192,26 @@ export function planNativeInserts(pdfPage, PDFLib, fontkit, annotations, skipCov
         // before. Any compose decline or throw lands back on the twin draw —
         // same never-a-hard-failure discipline as everything else here.
         const composed = planComposedFallback(pdfPage, PDFLib, fontkit, insert, anno);
-        if (composed) skipDraw.add(anno.id);
+        if (composed) {
+          skipDraw.add(anno.id);
+          // Composed from the subset's own outlines — the document's OWN font
+          // painted the glyph, so telemetry counts this as the native path.
+          insertOutcomes.set(anno.id, { path: 'native', reason: 'clean' });
+        } else {
+          insertOutcomes.set(anno.id, { path: 'twin', reason: 'missing-glyph' });
+        }
+      } else {
+        insertOutcomes.set(anno.id, { path: 'twin', reason: plan.reason });
       }
     } catch (err) {
+      // A rare throw drops to the twin draw exactly as before; leave it out of
+      // insertOutcomes rather than mislabel it as a specific decline reason —
+      // the surgery event still carries this edit, and `insert` simply won't
+      // fire for it (better silent than a wrong enum).
       console.warn('[core/page-surgery] native re-insert failed, falling back to twin draw:', err);
     }
   }
-  return skipDraw;
+  return { skipDraw, insertOutcomes };
 }
 
 // ---- the composed pipeline ----------------------------------------------------
@@ -201,9 +232,12 @@ export function planNativeInserts(pdfPage, PDFLib, fontkit, annotations, skipCov
 // export.js's ANNOTATION_DRAWERS loop) get the ordering guarantee for free by
 // calling this function first, before their own first draw.
 export function applyPageSurgery(pdfPage, PDFLib, fontkit, annotations) {
-  const { skipCovers, insertByCover } = runSurgery(pdfPage, PDFLib, annotations);
-  const skipDraw = planNativeInserts(pdfPage, PDFLib, fontkit, annotations, skipCovers, insertByCover);
-  return { skipCovers, skipDraw, insertByCover };
+  const { skipCovers, insertByCover, surgeryByCover } = runSurgery(pdfPage, PDFLib, annotations);
+  const { skipDraw, insertOutcomes } = planNativeInserts(pdfPage, PDFLib, fontkit, annotations, skipCovers, insertByCover);
+  // surgeryByCover/insertOutcomes are telemetry-only extras (spec-telemetry.md
+  // §3); export.js reads only skipCovers/skipDraw/insertByCover — additive, so
+  // its destructure is untouched.
+  return { skipCovers, skipDraw, insertByCover, surgeryByCover, insertOutcomes };
 }
 
 // ---- Rung D: the editor's own per-page pipeline (spec-live-surgery.md §3/§4) --
@@ -300,7 +334,7 @@ export async function buildEditedPageBytes(srcDoc, page, annotations, deps = {})
   // explicit page.rotation (a user-applied in-editor rotate) overrides it.
   if (page.rotation) pdfPage.setRotation(PDFLib.degrees(page.rotation));
 
-  const { skipCovers, skipDraw } = applyPageSurgery(pdfPage, PDFLib, fontkit, annotations);
+  const { skipCovers, skipDraw, surgeryByCover, insertOutcomes } = applyPageSurgery(pdfPage, PDFLib, fontkit, annotations);
 
   // Every whiteout carrying a replace intent is a candidate edit (regardless
   // of whether its birth-box overlap still holds — see overlapsBirthBox
@@ -314,8 +348,21 @@ export async function buildEditedPageBytes(srcDoc, page, annotations, deps = {})
   const declined = editCoverIds.filter((coverId) => !skipCovers.has(coverId));
   const applied = new Set([...skipCovers, ...skipDraw]);
 
-  if (applied.size === 0) return { bytes: null, applied, declined };
+  // Per-edit telemetry outcomes (spec-telemetry.md §3), built for EVERY
+  // candidate — including a fully-declined edit (bytes null below), which is
+  // exactly the signal worth capturing. app.js fires the surgery/insert events
+  // from this ONLY on the commit path; a plain re-render reads the same array
+  // harmlessly. insert is null when the edit has no replacement text (a pure
+  // deletion) or its native-insert wasn't attempted (surgery declined first).
+  const outcomes = editCoverIds.map((coverId) => {
+    const surgery = surgeryByCover.get(coverId) || { matched: false, reason: 'no-match' };
+    const replAnno = annotations.find((a) => a.type === 'text' && a.replaceCoverId === coverId);
+    const insert = replAnno ? (insertOutcomes.get(replAnno.id) || null) : null;
+    return { coverId, surgery, insert };
+  });
+
+  if (applied.size === 0) return { bytes: null, applied, declined, outcomes };
 
   const bytes = await newDoc.save({ useObjectStreams: true, addDefaultPage: false });
-  return { bytes, applied, declined };
+  return { bytes, applied, declined, outcomes };
 }

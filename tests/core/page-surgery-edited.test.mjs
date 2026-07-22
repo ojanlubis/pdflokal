@@ -115,6 +115,12 @@ test('buildEditedPageBytes: undangan-cid.pdf — target line surgically cut + na
   assert.ok(result.applied.has(cover.id), 'surgery should have succeeded for the cover');
   assert.ok(result.applied.has(text.id), 'the replacement should have been written natively');
 
+  // Telemetry outcomes contract (spec-telemetry.md §3): one per candidate edit,
+  // carrying the surgery + insert reasons app.js fires the events from.
+  assert.equal(result.outcomes.length, 1);
+  assert.deepEqual(result.outcomes[0].surgery, { matched: true, reason: 'clean' });
+  assert.deepEqual(result.outcomes[0].insert, { path: 'native', reason: 'clean' });
+
   const outPdfDoc = await PDFLib.PDFDocument.load(result.bytes);
   assert.equal(outPdfDoc.getPageCount(), 1); // a single-page doc, not the whole document
   const outPage = outPdfDoc.getPages()[0];
@@ -153,6 +159,13 @@ test('buildEditedPageBytes: a target that matches nothing declines — declined 
   assert.equal(result.bytes, null);
   assert.deepEqual(result.declined, [cover.id]);
   assert.equal(result.applied.size, 0);
+
+  // Telemetry outcomes exist EVEN when nothing applied (bytes null) — a
+  // fully-declined edit is exactly the signal worth capturing. Surgery found
+  // no match; the native insert was never attempted, so insert is null.
+  assert.equal(result.outcomes.length, 1);
+  assert.deepEqual(result.outcomes[0].surgery, { matched: false, reason: 'no-match' });
+  assert.equal(result.outcomes[0].insert, null);
 });
 
 test('editSignature: empty with no edits, stable across identical edits, changes when the replacement text changes', async () => {
