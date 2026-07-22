@@ -1,59 +1,99 @@
 /*
  * PDFLokal — v2/edit-feedback.js  (BETA edit-feedback — founder ruling 2026-07-22)
  * ============================================================================
- * "Ship the per-line editor as beta, ask a thumbs up/down, and let telemetry
- * do the rest of our work." WHEN to ask, refined by the founder the same day:
- * NOT after every commit (too naggy for a 20-line edit session) — instead once,
- * at the DOWNLOAD moment, "before they choose output format." So this renders a
- * quiet strip at the TOP of the Unduh sheet (js/v2/download-sheet.js), shown
- * only when the doc actually carries an Edit. It feeds js/v2/telemetry.js's
- * feedback() (its own endpoint + table; never the string-free events rail).
+ * "Ship the per-line editor as beta, ask 👍/👎, let telemetry do the rest."
+ * WHEN to ask, refined twice by the founder the same day:
+ *   1. NOT after every commit (naggy for a 20-line session).
+ *   2. NOT in the download sheet either ("to put it here is wrong").
+ *   3. → a DEBOUNCED toast: after the user's edit activity goes QUIET for a
+ *      beat (~2.5s with no new commit and no re-arm of the Edit tool), ask once.
+ *      The idle-detector lives in js/v2/app.js; this module is just the toast.
  *
- * Taste (ojan-ui-taste): QUIET — the format choice is the primary action here;
- * this is calm chrome above it, muted question + small thumbs, never a gate.
- * 👎 opens a short optional note; an un-submitted 👎 is still recorded note-less
- * when the sheet closes (finalize()), so a dissatisfied user is never lost.
+ * A floating pill (bottom-center), quiet per ojan-ui-taste: one small ask, never
+ * covers the page, auto-vanishes if ignored. 👎 opens a short note whose
+ * placeholder ASKS for detail ("isi feedback biar kita bisa improve") rather
+ * than waving it off as optional. An abandoned 👎 is still recorded note-less.
+ * Feeds telemetry.js feedback() (its own endpoint + table; never the events rail).
  */
 import { feedback } from './telemetry.js';
 
+const ASK_MS = 7000;   // ignored ask → vanish, no vote recorded
+const NOTE_MS = 25000; // ignored open note box → record the 👎 without a note
 const NOTE_MAXLEN = 500;
+
+let root = null;
+let body = null;
+let hideTimer = null;
+let downPending = false;
+let resolved = false;
 
 function injectStyleOnce() {
   if (document.getElementById('edit-feedback-style')) return;
   const style = document.createElement('style');
   style.id = 'edit-feedback-style';
-  // Scoped to the strip's host inside the sheet. Uses the app's brand tokens
-  // (index.html :root) so it matches without duplicating colors. Light-only.
   style.textContent = `
-    .ds-feedback {
-      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-      padding: 10px 12px; margin-bottom: 4px; border-radius: 11px;
-      background: var(--bg, #f1ede7); border: 1px solid var(--line, rgba(63,49,35,.12));
+    #edit-feedback {
+      position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 74px);
+      transform: translate(-50%, 8px); z-index: 60;
+      display: flex; align-items: center; gap: 10px;
+      max-width: min(92vw, 460px);
+      padding: 9px 12px; border-radius: 13px;
+      background: var(--surface, #fff); color: var(--ink, #211d1a);
+      border: 1px solid var(--line, rgba(63,49,35,.12));
+      box-shadow: 0 6px 22px rgba(33,29,26,.16), 0 1px 3px rgba(33,29,26,.08);
+      font: 14px/1.3 'Plus Jakarta Sans', system-ui, sans-serif;
+      opacity: 0; pointer-events: none;
+      transition: opacity .18s ease, transform .18s ease;
     }
-    .ds-feedback .ef-q { color: var(--muted, #79716b); font-size: 14px; }
-    .ds-feedback .ef-thumb {
+    #edit-feedback.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+    #edit-feedback .ef-q { color: var(--muted, #79716b); white-space: nowrap; }
+    #edit-feedback .ef-thumb {
       appearance: none; border: 1px solid var(--line, rgba(63,49,35,.12));
-      background: var(--surface, #fff); border-radius: 9px;
+      background: var(--bg, #f1ede7); border-radius: 9px;
       width: 42px; height: 34px; font-size: 18px; line-height: 1; cursor: pointer;
       display: inline-flex; align-items: center; justify-content: center;
       transition: transform .1s ease, background .1s ease;
     }
-    .ds-feedback .ef-thumb:hover { background: #eae4dc; }
-    .ds-feedback .ef-thumb:active { transform: scale(.92); }
-    .ds-feedback .ef-note {
-      flex: 1 1 140px; min-width: 0; padding: 8px 10px; font: inherit; font-size: 14px;
+    #edit-feedback .ef-thumb:hover { background: #eae4dc; }
+    #edit-feedback .ef-thumb:active { transform: scale(.92); }
+    #edit-feedback .ef-note {
+      flex: 1 1 170px; min-width: 0; padding: 7px 9px; font: inherit;
       border: 1px solid var(--line, rgba(63,49,35,.12)); border-radius: 8px;
-      background: var(--surface, #fff); color: var(--ink, #211d1a);
+      background: var(--bg, #f1ede7); color: var(--ink, #211d1a);
     }
-    .ds-feedback .ef-note:focus { outline: 2px solid var(--accent, #dc2626); outline-offset: 0; }
-    .ds-feedback .ef-send {
+    #edit-feedback .ef-note:focus { outline: 2px solid var(--accent, #dc2626); outline-offset: 0; }
+    #edit-feedback .ef-send {
       appearance: none; border: 0; cursor: pointer; white-space: nowrap;
-      background: var(--accent, #dc2626); color: #fff; font: inherit; font-size: 14px; font-weight: 600;
-      padding: 8px 14px; border-radius: 8px;
+      background: var(--accent, #dc2626); color: #fff; font: inherit; font-weight: 600;
+      padding: 8px 12px; border-radius: 8px;
     }
-    .ds-feedback .ef-send:active { background: var(--accent-down, #b91c1c); }
+    #edit-feedback .ef-send:active { background: var(--accent-down, #b91c1c); }
+    @media (prefers-reduced-motion: reduce) {
+      #edit-feedback, #edit-feedback.show { transform: translate(-50%, 0); transition: opacity .18s ease; }
+    }
   `;
   document.head.appendChild(style);
+}
+
+function buildRoot() {
+  root = document.createElement('div');
+  root.id = 'edit-feedback';
+  root.setAttribute('role', 'status');
+  root.setAttribute('aria-live', 'polite');
+  body = document.createElement('div');
+  body.style.cssText = 'display:flex;align-items:center;gap:10px;width:100%;';
+  root.appendChild(body);
+  document.body.appendChild(root);
+}
+
+function clearTimer() { if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; } }
+function hide() { clearTimer(); if (root) root.classList.remove('show'); }
+function clear() { while (body.firstChild) body.removeChild(body.firstChild); }
+
+// Close the pill; a still-open 👎 is recorded note-less exactly once.
+function finish() {
+  if (downPending && !resolved) { resolved = true; try { feedback('down'); } catch { /* never throws */ } }
+  hide();
 }
 
 function el(tag, cls, text) {
@@ -63,81 +103,76 @@ function el(tag, cls, text) {
   return e;
 }
 
-/**
- * Render the feedback flow into `host` (a strip inside the download sheet).
- * Fresh each call (host is emptied). Returns { finalize } — the sheet calls
- * finalize() on close so an un-submitted 👎 is still recorded note-less.
- * @param {HTMLElement} host
- */
-export function renderEditFeedback(host) {
-  injectStyleOnce();
-  let sent = false; // this render's rating already went out — never double-send
-  let downPending = false; // 👎 tapped, note not yet submitted
+function renderThanks() {
+  clear();
+  body.appendChild(el('span', 'ef-q', 'Makasih — masukanmu ngebantu kami 🙏'));
+  clearTimer();
+  hideTimer = setTimeout(hide, 1700);
+}
 
-  const clear = () => { while (host.firstChild) host.removeChild(host.firstChild); };
-
-  function thanks() {
-    clear();
-    host.appendChild(el('span', 'ef-q', 'Makasih — masukanmu ngebantu kami 🙏'));
-  }
-
-  function note() {
-    clear();
-    host.appendChild(el('span', 'ef-q', 'Apa yang kurang pas?'));
-    const input = el('input', 'ef-note');
-    input.type = 'text';
-    input.maxLength = NOTE_MAXLEN;
-    input.placeholder = 'boleh kosong…';
-    input.setAttribute('aria-label', 'Ceritakan apa yang kurang pas (opsional)');
-    const send = el('button', 'ef-send', 'Kirim');
-    send.type = 'button';
-    const submit = () => {
-      if (sent) return;
-      sent = true; downPending = false;
-      try { feedback('down', input.value); } catch { /* never throws */ }
-      thanks();
-    };
-    send.addEventListener('click', submit);
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); submit(); }
-      e.stopPropagation(); // don't trigger app shortcuts while typing
-    });
-    host.appendChild(input);
-    host.appendChild(send);
-    input.focus();
-  }
-
-  function ask() {
-    clear();
-    host.appendChild(el('span', 'ef-q', 'Gimana hasil editnya?'));
-    const up = el('button', 'ef-thumb', '👍');
-    up.type = 'button';
-    up.setAttribute('aria-label', 'Bagus');
-    up.addEventListener('click', () => {
-      if (sent) return;
-      sent = true;
-      try { feedback('up'); } catch { /* never throws */ }
-      thanks();
-    });
-    const down = el('button', 'ef-thumb', '👎');
-    down.type = 'button';
-    down.setAttribute('aria-label', 'Kurang pas');
-    down.addEventListener('click', () => { downPending = true; note(); });
-    host.appendChild(up);
-    host.appendChild(down);
-  }
-
-  ask();
-
-  return {
-    // Called when the sheet closes: a 👎 that opened the note box but was never
-    // submitted is still recorded (note-less) — the dissatisfaction is the
-    // signal; losing it because they didn't elaborate would defeat the loop.
-    finalize() {
-      if (downPending && !sent) {
-        sent = true;
-        try { feedback('down'); } catch { /* never throws */ }
-      }
-    },
+function renderNote() {
+  clear();
+  body.appendChild(el('span', 'ef-q', 'Apa yang kurang pas?'));
+  const input = el('input', 'ef-note');
+  input.type = 'text';
+  input.maxLength = NOTE_MAXLEN;
+  // Founder ruling 2026-07-22: the placeholder ASKS for the detail, not "boleh
+  // kosong" — we want the reason, and telemetry only works if the signal comes.
+  input.placeholder = 'isi feedback biar kita bisa improve';
+  input.setAttribute('aria-label', 'Ceritakan apa yang kurang pas');
+  const send = el('button', 'ef-send', 'Kirim');
+  send.type = 'button';
+  const submit = () => {
+    if (resolved) return;
+    resolved = true; downPending = false;
+    try { feedback('down', input.value); } catch { /* never throws */ }
+    renderThanks();
   };
+  send.addEventListener('click', submit);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); submit(); }
+    e.stopPropagation();
+  });
+  body.appendChild(input);
+  body.appendChild(send);
+  input.focus();
+  clearTimer();
+  hideTimer = setTimeout(finish, NOTE_MS);
+}
+
+function renderAsk() {
+  clear();
+  body.appendChild(el('span', 'ef-q', 'Gimana hasil editnya?'));
+  const up = el('button', 'ef-thumb', '👍');
+  up.type = 'button'; up.setAttribute('aria-label', 'Bagus');
+  up.addEventListener('click', () => {
+    if (resolved) return;
+    resolved = true;
+    try { feedback('up'); } catch { /* never throws */ }
+    renderThanks();
+  });
+  const down = el('button', 'ef-thumb', '👎');
+  down.type = 'button'; down.setAttribute('aria-label', 'Kurang pas');
+  down.addEventListener('click', () => { downPending = true; renderNote(); });
+  body.appendChild(up);
+  body.appendChild(down);
+  clearTimer();
+  hideTimer = setTimeout(hide, ASK_MS);
+}
+
+// Show the ask (called by app.js's idle-detector once edit activity settles).
+export function showEditFeedback() {
+  try {
+    injectStyleOnce();
+    if (!root) buildRoot();
+    finish();
+    downPending = false; resolved = false;
+    renderAsk();
+    requestAnimationFrame(() => { if (root) root.classList.add('show'); });
+  } catch { /* the pill must NEVER break the editor */ }
+}
+
+// Dismiss a shown pill because the user resumed editing (records an open 👎).
+export function dismissEditFeedback() {
+  try { finish(); } catch { /* never throws */ }
 }
