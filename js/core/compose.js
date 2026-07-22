@@ -38,7 +38,7 @@
  * passed in; this file has zero vendor imports.
  */
 
-import { fmtNum, hexToRgb01, escapeNameForWrite } from './reinsert.js';
+import { fmtNum, hexToRgb01, escapeNameForWrite, neutralizeCTMPrefix } from './reinsert.js';
 
 // NFD combining mark -> spacing clone, for the cmap ladder's rung b. ONLY
 // above-marks: below-marks (cedilla, ogonek, dot-below) attach differently
@@ -255,6 +255,12 @@ export function planComposedInsert(font, subsetBytes, insert, text, color) {
   const escapedName = escapeNameForWrite(insert.fontName);
   if (escapedName === null) return { ok: false, reason: 'font-name-unwritable' };
 
+  // Same residual-CTM neutralization as planNativeInsert (see reinsert.js): each
+  // block is absolutely positioned, so a non-identity page CTM would transform it
+  // away. Prepended right after every `q`. null = singular CTM → decline.
+  const ctm = neutralizeCTMPrefix(insert.baseCTM);
+  if (ctm === null) return { ok: false, reason: 'unsupported-font' };
+
   const s = insert.size;
   const [r, g, b] = hexToRgb01(color);
   // Same rendering-matrix reproduction as planNativeInsert: Tf fixed at 1,
@@ -265,7 +271,7 @@ export function planComposedInsert(font, subsetBytes, insert, text, color) {
   const d = fmtNum(s * insert.ux);
 
   const blocks = [];
-  blocks.push(`q BT /${escapedName} 1 Tf ${fmtNum(r)} ${fmtNum(g)} ${fmtNum(b)} rg `
+  blocks.push(`q ${ctm}BT /${escapedName} 1 Tf ${fmtNum(r)} ${fmtNum(g)} ${fmtNum(b)} rg `
     + `${a} ${bC} ${c} ${d} ${fmtNum(insert.x)} ${fmtNum(insert.y)} Tm [${tjParts.join(' ')}] TJ ET Q`);
   for (const m of marks) {
     // Absolute mark position: origin + baseline-direction × horizontal

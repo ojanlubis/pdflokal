@@ -212,6 +212,14 @@ export function walkShowOps(src, fonts) {
         break; // Do, BI, and unknown ops: no state change (BI...EI already raw-skipped)
     }
   }
+  // The CTM in effect at the END of the content is what a stream APPENDED after
+  // this page (Rung C's native re-insert, appendNativeText) runs under. Exposed
+  // as a property on the array so every existing [i]/destructure/.map consumer
+  // is untouched. A page whose base `cm` persists to end (PowerPoint/Word
+  // exports) has a NON-identity endCTM; the re-insert must neutralize it or the
+  // absolute-positioned replacement lands transformed away (founder's
+  // org-structure.pdf, 2026-07-22: "test" baked at (267,207) instead of (356,517)).
+  records.endCTM = CTM.slice();
   return records;
 }
 
@@ -293,6 +301,9 @@ export function planRunRemoval(src, fonts, targets) {
         fontName: first.fontName, fontSize: first.fontSize,
         x: first.x, y: first.y, ux: first.ux, uy: first.uy, size: first.size,
         mixedFonts: matches.some((r) => r.fontName !== first.fontName),
+        // The page's residual CTM (see walkShowOps) — the re-insert neutralizes
+        // it so its absolute Tm lands where the original run was painted.
+        baseCTM: records.endCTM,
       },
     };
     cuts.push(...matches);

@@ -274,6 +274,49 @@ export function extractFontProgram(page, PDFLib, fontName) {
 
 // ---- the plan: simple TrueType (Word shape) ----------------------------------
 
+// Does `cp` map to a glyph that will ACTUALLY PAINT in this program?
+// hasGlyphForCodePoint alone is NOT enough: a SUBSET font's cmap can LIE — it
+// keeps a full-font entry for a codepoint whose outline the subset dropped or
+// re-indexed, so the glyph resolves to .notdef or an EMPTY contour and bakes
+// as INVISIBLE text. (Founder's org-structure.pdf, 2026-07-22: 's' never
+// appears in "(Berlaku 01 Maret 2026)", so the F2 subset has no real 's'
+// glyph, yet hasGlyphForCodePoint('s') returned true and native-insert painted
+// nothing.) Require a real, non-empty outline. Space (cp 32) legitimately has
+// no outline and is handled by its caller (exempt / kern), so it's accepted as
+// long as the cmap covers it. Never throws — any fontkit quirk = "won't paint".
+function glyphPaints(font, cp) {
+  if (!font.hasGlyphForCodePoint(cp)) return false;
+  if (cp === 32) return true; // space: valid without contours
+  try {
+    const g = font.glyphForCodePoint(cp);
+    if (!g || g.id === 0) return false; // .notdef
+    const cmds = g.path && g.path.commands;
+    return Array.isArray(cmds) && cmds.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+// The page's residual CTM (text-walk's endCTM, on insert.baseCTM) is in effect
+// when appendNativeText's snippet runs — so our ABSOLUTE Tm (which already IS the
+// original run's device-space matrix) would be transformed by it a SECOND time
+// (PowerPoint/Word exports carry a base `cm` that persists to end-of-content).
+// Return the `<R⁻¹> cm ` string to prepend right after the snippet's own `q`,
+// cancelling that CTM to identity for OUR text only — the trailing `Q` restores
+// it, so pdf-lib's later draws see the same state as before. '' when the CTM is
+// already identity (the common case, incl. undangan-cid — a true no-op); null
+// when it's singular (unrecoverable — the caller declines to the twin).
+export function neutralizeCTMPrefix(baseCTM) {
+  if (!Array.isArray(baseCTM) || baseCTM.length !== 6) return '';
+  const [a, b, c, d, e, f] = baseCTM;
+  if (a === 1 && b === 0 && c === 0 && d === 1 && e === 0 && f === 0) return '';
+  const det = a * d - b * c;
+  if (!Number.isFinite(det) || Math.abs(det) < 1e-9) return null; // singular — can't invert
+  const ia = d / det, ib = -b / det, ic = -c / det, id = a / det;
+  const ie = (c * f - d * e) / det, iff = (b * e - a * f) / det;
+  return `${fmtNum(ia)} ${fmtNum(ib)} ${fmtNum(ic)} ${fmtNum(id)} ${fmtNum(ie)} ${fmtNum(iff)} cm `;
+}
+
 // The Rung C+ counterpart of planNativeInsert's v1 body below, for a font
 // dict already proven /Subtype /TrueType. Same return shape, same
 // never-throw-past-this discipline; declines in the exact order the module
@@ -321,7 +364,7 @@ function planSimpleTrueTypeInsert(fontObj, context, PDFLib, fontkit, extracted, 
   // to work around, so a space glyph is checked and proven like anything
   // else.
   for (const ch of text) {
-    if (!font.hasGlyphForCodePoint(ch.codePointAt(0))) return { ok: false, reason: 'missing-glyph' };
+    if (!glyphPaints(font, ch.codePointAt(0))) return { ok: false, reason: 'missing-glyph' };
   }
 
   const widthInfo = readSimpleFontWidths(fontObj, context, PDFLib);
@@ -358,7 +401,9 @@ function planSimpleTrueTypeInsert(fontObj, context, PDFLib, fontkit, extracted, 
   // A literal string of real encoded BYTES + Tj — not a hex-glyph-id TJ run:
   // WinAnsi bytes ARE this font's character codes, so no kern-array trick is
   // needed even for the spaces (see module header).
-  const snippet = `q BT /${escapedName} 1 Tf ${fmtNum(r)} ${fmtNum(g)} ${fmtNum(b)} rg `
+  const ctmPrefix = neutralizeCTMPrefix(insert.baseCTM);
+  if (ctmPrefix === null) return { ok: false, reason: 'unsupported-font' }; // singular base CTM
+  const snippet = `q ${ctmPrefix}BT /${escapedName} 1 Tf ${fmtNum(r)} ${fmtNum(g)} ${fmtNum(b)} rg `
     + `${a} ${bC} ${c} ${d} ${x} ${y} Tm (${literal}) Tj ET Q`;
 
   return { ok: true, snippet, width };
@@ -422,7 +467,7 @@ export function planNativeInsert(page, PDFLib, fontkit, req) {
   // painted glyphs, so a missing space glyph is not a coverage failure.
   for (const ch of text) {
     if (ch === ' ') continue;
-    if (!font.hasGlyphForCodePoint(ch.codePointAt(0))) return { ok: false, reason: 'missing-glyph' };
+    if (!glyphPaints(font, ch.codePointAt(0))) return { ok: false, reason: 'missing-glyph' };
   }
 
   const escapedName = escapeNameForWrite(insert.fontName);
@@ -477,7 +522,9 @@ export function planNativeInsert(page, PDFLib, fontkit, req) {
   const x = fmtNum(insert.x);
   const y = fmtNum(insert.y);
 
-  const snippet = `q BT /${escapedName} 1 Tf ${fmtNum(r)} ${fmtNum(g)} ${fmtNum(b)} rg `
+  const ctmPrefix = neutralizeCTMPrefix(insert.baseCTM);
+  if (ctmPrefix === null) return { ok: false, reason: 'unsupported-font' }; // singular base CTM
+  const snippet = `q ${ctmPrefix}BT /${escapedName} 1 Tf ${fmtNum(r)} ${fmtNum(g)} ${fmtNum(b)} rg `
     + `${a} ${bC} ${c} ${d} ${x} ${y} Tm [${tjParts.join(' ')}] TJ ET Q`;
 
   return { ok: true, snippet, width };
