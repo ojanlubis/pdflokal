@@ -1,20 +1,18 @@
 /*
- * Edit (Teks Asli) BETA — rename + beta badge + debounced feedback + telemetry.
+ * Edit (Teks Asli) BETA — rename + beta badge + first-commit feedback + telemetry.
  * ============================================================================
- * Founder pivot 2026-07-22, WHEN-to-ask refined twice: not per-commit (naggy),
- * not in the download sheet ("wrong place") → a DEBOUNCED ask. After the user's
- * edit activity settles (~2.5s idle: no new commit, no re-arm of Edit, no open
- * editor), a quiet floating pill asks 👍/👎 once. This gate pins:
+ * Founder pivot 2026-07-22, WHEN-to-ask settled after three tries: not per-commit
+ * (naggy), not in the download sheet ("wrong place"), not a debounced idle-timer
+ * ("bollocks, buggy") → SIMPLEST: ask ONCE, on the FIRST successful commit of a
+ * document. This gate pins:
  *   - the tool is renamed "Edit", carries a VISIBLE beta badge + arm-toast;
- *   - the pill appears after a commit + idle; NEVER if nothing was committed;
- *   - re-arming Edit defers, doesn't break the ask;
+ *   - the pill appears on the first commit; not before a commit; once per doc;
  *   - 👍 / 👎+note both send to /api/feedback (session-correlated, no doc text),
  *     and the 👎 placeholder ASKS for detail;
  *   - the ladder telemetry (ganti_tap/ganti_commit/surgery/insert/commit_paint)
  *     fires, so a 👎 is correlatable with what the edit did.
  *
  * Fixture: undangan-cid.pdf ("Rapat Anggota Tahunan 2026" ×3), middle repeat.
- * Tests shrink the idle wait via window.v2.setFeedbackIdleMs so they don't sleep.
  */
 import { test, expect } from '@playwright/test';
 import path from 'path';
@@ -41,11 +39,10 @@ const fakeTabHidden = (page) => page.evaluate(() => {
   document.dispatchEvent(new Event('visibilitychange'));
 });
 
-async function openDoc(page, fixture, { idleMs = 150 } = {}) {
+async function openDoc(page, fixture) {
   await page.goto('/');
   await page.setInputFiles('#file-input', fixture);
   await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
-  await page.evaluate((ms) => window.v2.setFeedbackIdleMs(ms), idleMs);
 }
 
 async function editMiddleLine(page, newText) {
@@ -56,7 +53,7 @@ async function editMiddleLine(page, newText) {
   await expect(page.locator('.v2-text-edit')).toHaveCount(0);
 }
 
-test.describe('edit beta: rename + debounced feedback', () => {
+test.describe('edit beta: rename + first-commit feedback', () => {
   test('the tool is renamed Edit with a VISIBLE beta badge + beta arm-toast', async ({ page }) => {
     await openDoc(page, NASTY('undangan-cid.pdf'));
     const btn = page.locator('[data-tool="ganti"]');
@@ -69,13 +66,13 @@ test.describe('edit beta: rename + debounced feedback', () => {
     await expect(page.locator('#toast')).toContainText(/beta/i);
   });
 
-  test('the pill appears after a commit settles; 👍 sends rating:up (no note)', async ({ page }) => {
+  test('the pill appears on the first commit; 👍 sends rating:up (no note)', async ({ page }) => {
     await captureBeacons(page);
     await openDoc(page, NASTY('undangan-cid.pdf'));
     await editMiddleLine(page, 'Rapat Baru');
 
     const pill = page.locator('#edit-feedback');
-    await expect(pill).toHaveClass(/show/); // idle timer fired
+    await expect(pill).toHaveClass(/show/);
     await pill.locator('[aria-label="Bagus"]').click();
 
     await expect.poll(async () => (await feedbackBodies(page)).some((b) => b.rating === 'up')).toBe(true);
@@ -103,25 +100,26 @@ test.describe('edit beta: rename + debounced feedback', () => {
     expect(JSON.stringify((await feedbackBodies(page))[0])).not.toContain('Rapat');
   });
 
-  test('never asks if nothing was committed (arm + cancel, wait out the idle)', async ({ page }) => {
-    await openDoc(page, NASTY('undangan-cid.pdf'), { idleMs: 120 });
+  test('never asks before a commit (arm + cancel shows no pill)', async ({ page }) => {
+    await openDoc(page, NASTY('undangan-cid.pdf'));
     await armGanti(page);
     await tapLine(page, { str: 'Rapat Anggota Tahunan 2026', nth: 1 });
     await page.keyboard.press('Escape');
     await expect(page.locator('.v2-text-edit')).toHaveCount(0);
-    await page.waitForTimeout(400); // well past the idle window
+    await page.waitForTimeout(300);
     await expect(page.locator('#edit-feedback')).toHaveCount(0);
   });
 
-  test('re-arming Edit after a commit defers but does not break the ask', async ({ page }) => {
-    await openDoc(page, NASTY('undangan-cid.pdf'), { idleMs: 300 });
+  test('asks only ONCE — a second commit does not re-open the pill', async ({ page }) => {
+    await openDoc(page, NASTY('undangan-cid.pdf'));
     await editMiddleLine(page, 'Rapat Baru');
-    // Re-arm immediately — the pending ask should be deferred, not fired twice.
-    await page.click('[data-tool="ganti"]');
-    const pill = page.locator('#edit-feedback');
-    await expect(pill).toHaveClass(/show/); // still arrives after the new idle window
-    // exactly one pill element exists (no stacking)
-    await expect(page.locator('#edit-feedback')).toHaveCount(1);
+    await expect(page.locator('#edit-feedback')).toHaveClass(/show/);
+    // answer + let it fade, then edit again
+    await page.locator('#edit-feedback [aria-label="Bagus"]').click();
+    await page.waitForTimeout(300);
+    await editMiddleLine(page, 'Rapat Lagi');
+    await page.waitForTimeout(300);
+    await expect(page.locator('#edit-feedback')).not.toHaveClass(/show/);
   });
 
   test('the ladder telemetry events fire (correlated with the edit)', async ({ page }) => {

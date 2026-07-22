@@ -78,37 +78,13 @@ let editingAnno = null;       // text annotation currently in the inline editor
 let editingEl = null;         // its contenteditable (format bar restyles it live)
 let editingIsReplace = false; // Ganti Teks draft open → NO format bar (see below)
 
-// ---- BETA edit-feedback idle-detector (founder ruling 2026-07-22) ---------------
-// Ask 👍/👎 ONCE, after the user's edit activity goes QUIET — NOT per-commit
-// (naggy) and NOT in the download sheet (founder: "wrong place"). Any edit
-// activity — a commit, re-arming Edit, opening the editor — (re)starts a short
-// idle timer; when it elapses with the user settled (no editor open), the pill
-// asks. Only someone who actually COMMITTED an edit is ever asked, and only once
-// per loaded document (reset on Buka Baru / a fresh load). The re-arm/open bumps
-// are what defer the ask while they keep editing (his "they wanna edit more"
-// signal); the commit bump is what qualifies them + starts the clock.
-let feedbackIdleMs = 2500; // overridable via window.v2.setFeedbackIdleMs (tests only)
+// ---- BETA edit-feedback (founder ruling 2026-07-22, SIMPLIFIED) -----------------
+// Ask 👍/👎 ONCE, on the FIRST successful commit of a document. The founder
+// killed the earlier debounced/idle version — "to make a toast like that is just
+// bollocks; default it to the first commit, simpler, no algo, less chance to be
+// buggy." Reset on a fresh document so a new editing session can be asked again.
 let feedbackAsked = false;
-let feedbackEdited = false;
-let feedbackTimer = null;
-function bumpEditFeedback({ committed = false } = {}) {
-  if (feedbackAsked) return;
-  if (committed) feedbackEdited = true;
-  if (!feedbackEdited) return; // never ask someone who only armed/opened, never committed
-  if (feedbackTimer) clearTimeout(feedbackTimer);
-  feedbackTimer = setTimeout(() => {
-    feedbackTimer = null;
-    if (editingEl) { bumpEditFeedback(); return; } // still mid-edit — wait for the real pause
-    feedbackAsked = true;
-    showEditFeedback();
-  }, feedbackIdleMs);
-}
-function resetEditFeedback() {
-  feedbackAsked = false;
-  feedbackEdited = false;
-  if (feedbackTimer) { clearTimeout(feedbackTimer); feedbackTimer = null; }
-  dismissEditFeedback();
-}
+function resetEditFeedback() { feedbackAsked = false; dismissEditFeedback(); }
 
 const scrollEl = document.getElementById('v2-scroll');
 const stage = document.getElementById('v2-stage');
@@ -404,7 +380,7 @@ for (const btn of document.querySelectorAll('#toolbar .tool[data-tool]')) {
     // never see "beta". The arm-toast announces it on every device, once per
     // arming, right as the user starts. Verb shifted ganti→edit to match the
     // renamed button (taste: the verb matches the interaction model everywhere).
-    if (t === 'ganti') { toast('Edit teks asli — fitur beta. Tap tulisan yang mau kamu ubah'); bumpEditFeedback(); }
+    if (t === 'ganti') toast('Edit teks asli — fitur beta. Tap tulisan yang mau kamu ubah');
   });
 }
 
@@ -1170,7 +1146,6 @@ document.getElementById('pm-close').addEventListener('click', () => pageManager.
 function openTextEditor({ pageId, x, y, anno, draft }) {
   const slot = slots.find((s) => s.page.id === pageId);
   if (!slot) return;
-  bumpEditFeedback(); // opening an editor = still active → defer any pending ask
   const overlay = slot.view.querySelector('.pv-overlay');
   // New text starts from the format bar's sticky defaults (Canva behavior).
   // A `draft` (Ganti Teks) pre-seeds content + matched font over those defaults.
@@ -1387,9 +1362,8 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
           tel('surgery', oc.surgery);
           if (oc.insert) tel('insert', oc.insert);
         }
-        // Beta feedback: a real commit qualifies the user + (re)starts the idle
-        // clock. The pill asks only once they settle (see bumpEditFeedback).
-        if (gantiOutcome === 'commit') bumpEditFeedback({ committed: true });
+        // Beta feedback: ask once, on the first successful commit of this doc.
+        if (gantiOutcome === 'commit' && !feedbackAsked) { feedbackAsked = true; showEditFeedback(); }
       }).catch((err) => console.warn('rebakePage gagal:', err));
     }
   };
@@ -1937,7 +1911,6 @@ window.v2 = {
   pageManager, // tests: force a grid re-render mid-drag (Sentry fee8a76e repro)
   getRasterizer: () => rasterizer, // tests: drive the real live-surgery raster path (tests/live-raster.spec.js)
   celebration, // tests: drive the post-download routing (install nudge vs share card)
-  setFeedbackIdleMs: (ms) => { feedbackIdleMs = ms; }, // tests: shrink the beta-feedback idle wait
 };
 
 // ---- PWA: register the service worker ---------------------------------------------------
