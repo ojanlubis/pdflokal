@@ -105,3 +105,36 @@ export function tel(event, props = {}) {
     // Telemetry can NEVER throw into app code (spec §2).
   }
 }
+
+// ---- human feedback (BETA loop — founder ruling 2026-07-22) --------------------
+// A DELIBERATE exception to this file's string-free law: the thumbs pill lets a
+// user TYPE a note. That note is the ONE user-authored free field in the whole
+// telemetry surface — so it does NOT ride tel()/the typed events table. It goes
+// to its OWN endpoint (/api/feedback) and its OWN Supabase table, keeping the
+// `events` rail's "no string field ever" invariant intact (spec-telemetry.md
+// §2 — the boundary law is about the MACHINE filling a free field; a human
+// consciously writing feedback is the inverse case, and it stays walled off).
+// Reuses THIS session's id + app_version so a 👎 correlates with the ganti_
+// commit/insert/surgery events that same session emitted. Sent immediately
+// (a discrete, deliberate tap), never batched. NEVER carries document text.
+const FEEDBACK_ENDPOINT = '/api/feedback';
+const FEEDBACK_NOTE_MAX = 1000;
+
+/**
+ * Record a thumbs rating (+ optional free-text note) for the edit feature.
+ * @param {'up'|'down'} rating
+ * @param {string} [note] user-typed, capped, optional
+ */
+export function feedback(rating, note) {
+  try {
+    if (rating !== 'up' && rating !== 'down') return;
+    const payload = { session_id: sessionId, app_version: appVersion, rating };
+    const trimmed = typeof note === 'string' ? note.trim().slice(0, FEEDBACK_NOTE_MAX) : '';
+    if (trimmed) payload.note = trimmed;
+    if (typeof navigator?.sendBeacon !== 'function') return; // no beacon — drop, never retry
+    const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+    navigator.sendBeacon(FEEDBACK_ENDPOINT, blob);
+  } catch {
+    // Feedback can NEVER throw into app code — same law as tel().
+  }
+}
