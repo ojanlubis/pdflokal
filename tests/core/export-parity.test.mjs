@@ -293,8 +293,8 @@ test('export-parity: surat-fragmen.pdf — Line A surgically cut, falls back to 
 
   // 3. TWIN path, not native: a NEW /Font resource WAS added (drawText ->
   // env.getFont -> embedFont) — the honest fallback since Helvetica
-  // standard-14 has no embedded program for reinsert.js to prove coverage
-  // against (v1 scope is Type0/Identity-H only).
+  // standard-14 has no embedded program for stamp.js's doc-subset rung to
+  // prove coverage against.
   assert.ok(countFontKeys(PDFLib, outPage) > origFontCount);
 
   // 4. The replacement text actually landed — content-stream.js's tokenizer

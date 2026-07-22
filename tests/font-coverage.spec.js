@@ -2,10 +2,10 @@
  * Ganti Teks — font-fidelity e2e coverage gate (INDEPENDENT of the concurrent
  * font-engine effort; tests + fixtures only, no production code touched).
  * ============================================================================
- * The Rung C font-coverage contract (core/reinsert.js's planNativeInsert +
+ * The Rung C font-coverage contract (core/stamp.js's resolveStampFont +
  * js/v2/app.js's loadDocFont/prepareDocFont/smartReplace) has so far only
- * ever been proven headless — tests/core/rung-c-native.spec.js drives
- * planNativeInsert directly, tests/ganti-font-preview.spec.js proves the
+ * ever been proven headless — tests/rung-c-native.spec.js drives the ladder
+ * directly, tests/ganti-font-preview.spec.js proves the
  * live-preview FontFace wiring on undangan-cid.pdf/surat-fragmen.pdf. This
  * suite pins the SAME contract's two permanent ENDPOINTS through the real
  * editor UI on purpose-built fixtures whose coverage shape is stated in their

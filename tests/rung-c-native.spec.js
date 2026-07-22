@@ -58,7 +58,7 @@ async function downloadCurrent(page) {
   return Buffer.concat(chunks);
 }
 
-// Same read shape as core/redact.js / core/reinsert.js: Contents may be one
+// Same read shape as core/redact.js / core/doc-fonts.js: Contents may be one
 // stream or an array, decode/tokenize is irrelevant here — we only need the
 // page's Resources -> Font key COUNT, which is what a NEW drawText/embedFont
 // call ALWAYS grows now (see module header — native and twin both add one

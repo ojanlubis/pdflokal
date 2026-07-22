@@ -2,7 +2,7 @@
  * Ganti Teks — Rung C live doc-font preview (founder ruling, tonight 2026-07-19).
  * ============================================================================
  * core/export.js already writes the FINAL file with the document's own
- * embedded font when coverage allows it (core/reinsert.js, proven in
+ * embedded font when coverage allows it (core/stamp.js's ladder, proven in
  * rung-c-native.spec.js) — but until now the EDITOR only ever showed the twin
  * CSS font while typing and after commit, so "what you see" and "what you
  * get" visibly diverged for the whole window between tap and download. This
@@ -189,7 +189,7 @@ test.describe('ganti teks — live doc-font preview', () => {
     // it. With the exact clone (Arimo) routed, the old substitute toast
     // compared us against an original that never existed — so this commit is
     // now SILENT. The toast still fires when a REAL embedded font gets a
-    // substitute (pinned by ganti-compose.spec.js's uncomposable case).
+    // substitute (pinned by ganti-clone.spec.js's clone-rung cases).
     await openDoc(page, FRAGMEN_FIXTURE);
     await armGanti(page);
     // Line A (index 0, per rung-c-native.spec.js / ganti-baris.spec.js's LINE

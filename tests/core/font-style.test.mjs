@@ -51,7 +51,7 @@ test('parseStyleFromName: never throws on undefined/null/empty', () => {
 // indirect object into the context lazily, at save time — calling
 // context.lookup() on a freshly-embedded (not yet saved) font's ref returns
 // undefined. Every REAL caller of this adapter (core/redact.js,
-// core/reinsert.js, js/v2/app.js's prepareDocFont) only ever runs against an
+// core/doc-fonts.js, js/v2/app.js's prepareDocFont) only ever runs against an
 // ALREADY-LOADED document (PDFLib.PDFDocument.load(source.bytes)) — so
 // round-tripping here isn't a workaround, it's matching production's actual
 // input shape.
