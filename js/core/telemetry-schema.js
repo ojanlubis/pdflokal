@@ -120,16 +120,29 @@ export const SCHEMA = {
     matched: 'bool',
     reason: ['clean', 'no-match', 'untrustworthy-run'],
   },
-  // path/reason describe the Rung C re-insert step (core/reinsert.js):
-  // 'native' when the doc's own font could be reused, 'twin' when any guard
-  // declined and export fell back to the metric-twin annotation. reason
-  // enumerates reinsert.js's own named decline reasons verbatim, plus
-  // 'clean' for the native-succeeded case.
+  // path/reason describe the Rung C STAMP step (core/stamp.js, rebuilt
+  // 2026-07-22 per spec-edit-rebuild-composite.md — Path B, founder-ruled):
+  // 'native' now means the replacement was STAMPED (pdf-lib's own
+  // drawText+embedFont) in the document's OWN embedded font program —
+  // previously it meant a hand-rolled content-stream snippet reusing the
+  // doc's font RESOURCE; the pixels-are-the-document's guarantee is the
+  // same, the mechanism that produces them changed. 'clone' is new: the
+  // doc's own font declined but font-decide.js's /BaseFont routing found a
+  // bundled Croscore/crosextra metric-twin that covers the text, stamped
+  // instead — metrically exact, not pixel-identical (spec §6). 'twin' is
+  // unchanged: both rungs declined, export fell back to the metric-twin
+  // ANNOTATION. reason enumerates stamp.js's own named decline reasons
+  // verbatim (reused from reinsert.js's vocabulary wherever the shape is the
+  // same — decline-never-guess extends to never inventing a new enum value
+  // when an old one already means this), plus 'clean' for a resolved stamp.
+  // 'clone-unavailable' is the one genuinely NEW reason: no clone route for
+  // this /BaseFont, or the clone rung's own fetch/embed/headless guard
+  // declined.
   insert: {
-    path: ['native', 'twin'],
+    path: ['native', 'clone', 'twin'],
     reason: [
       'clean', 'unsupported-font', 'mixed-fonts', 'multiline', 'empty',
-      'font-parse-failed', 'missing-glyph', 'font-name-unwritable',
+      'font-parse-failed', 'missing-glyph', 'font-name-unwritable', 'clone-unavailable',
     ],
   },
   // reason/align values are given verbatim in spec-telemetry.md §3's own

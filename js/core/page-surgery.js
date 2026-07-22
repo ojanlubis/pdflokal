@@ -4,28 +4,35 @@
  * Extracted out of core/export.js (founder ruling 2026-07-20, executing
  * spec-live-surgery.md's build order §8.1: "Extract the per-page surgery+
  * insert pipeline from export.js into core/page-surgery.js; buildPdfBytes
- * calls it; prove export parity"). PURE REFACTOR — runSurgery and
- * planNativeInserts move here UNCHANGED (same names, same signatures, same
- * behavior), export.js now imports and calls them.
+ * calls it; prove export parity"). runSurgery/applyPageSurgery are the two
+ * callers' (export at download, the editor at commit) shared entry points.
  *
  * WHY this lives outside export.js now: export.js already produces the whole
  * document's honest result at download time — that's still its only job.
  * spec-live-surgery.md's next increment (not this one) makes the EDITOR itself
  * re-render a page's background raster from a surgically-modified copy at
- * commit time, using this exact same pipeline. Two callers (export at
- * download, the editor at commit) must share ONE honest implementation of
- * "cut the original run, try to write the replacement back with the
- * document's own font" — that pipeline can't keep living inside export.js's
- * module once a second, non-export caller needs it. This module is that
- * single home; export.js is now just one of its two callers.
+ * commit time, using this exact same pipeline. Two callers must share ONE
+ * honest implementation of "cut the original run, try to write the
+ * replacement back with the best font the ladder resolves" — that pipeline
+ * can't keep living inside export.js's module once a second, non-export
+ * caller needs it. This module is that single home.
  *
- * Same vendor-injection discipline as redact.js/reinsert.js: PDFLib and
- * fontkit are passed in by the caller — this file has zero vendor imports.
+ * RUNG C REBUILD (spec-edit-rebuild-composite.md, founder-ruled Path B,
+ * 2026-07-22): planNativeInserts no longer hand-writes a content-stream
+ * snippet (core/reinsert.js's planNativeInsert/appendNativeText) or composes
+ * a missing glyph from the subset's own outlines (core/compose.js). Both
+ * files stay on disk (increment 2 deletes them) but are no longer CALLED from
+ * here — the write mechanism is now core/stamp.js's resolveStampFont +
+ * pdfPage.drawText(): pdf-lib itself lays out, encodes, and embeds the
+ * replacement, so this function is ASYNC (it awaits stamp.js's font-embed).
+ *
+ * Same vendor-injection discipline as redact.js/reinsert.js/stamp.js: PDFLib
+ * and fontkit are passed in by the caller — this file has zero vendor
+ * imports.
  */
 
 import { removeRunsFromPdfPage } from './redact.js';
-import { planNativeInsert, appendNativeText, extractFontProgram, lookupFontObject } from './reinsert.js';
-import { planComposedInsert, patchToUnicodeForMarks } from './compose.js';
+import { resolveStampFont, stampText } from './stamp.js';
 
 // ---- Rung B: honest replacement (surgery) ------------------------------------
 
@@ -115,60 +122,29 @@ export function runSurgery(pdfPage, PDFLib, annotations) {
   return { skipCovers, insertByCover, surgeryByCover };
 }
 
-// ---- Rung C: native re-insert (own-font replacement) ------------------------
-
-// Font-fidelity tier 2 fallback: try composing the missing glyph(s) from the
-// subset's own outlines. Returns true when the composed paint landed (caller
-// adds the anno to skipDraw), false on ANY decline — the twin draw is always
-// still there. Kept out of planNativeInserts' loop body so the loop reads as
-// the decision ladder it is: native → composed → twin.
-function planComposedFallback(pdfPage, PDFLib, fontkit, insert, anno) {
-  try {
-    // Type0 gate: extractFontProgram succeeding on a /Type0 dict already
-    // implies Identity-H (it declines every other Type0 encoding) — so the
-    // shape test is just the subtype read; the extract does the rest.
-    const { PDFName, PDFRef } = PDFLib;
-    const context = pdfPage.doc.context;
-    const fontObj = lookupFontObject(pdfPage, PDFLib, insert.fontName);
-    if (!fontObj) return false;
-    const subtypeRaw = fontObj.get(PDFName.of('Subtype'));
-    const subtype = subtypeRaw instanceof PDFRef ? context.lookup(subtypeRaw) : subtypeRaw;
-    if (!(subtype instanceof PDFName) || subtype.toString() !== '/Type0') return false;
-
-    const extracted = extractFontProgram(pdfPage, PDFLib, insert.fontName);
-    if (!extracted.ok) return false;
-    const font = fontkit.create(extracted.bytes);
-
-    const plan = planComposedInsert(font, extracted.bytes, insert, anno.text, anno.color);
-    if (!plan.ok) return false;
-    appendNativeText(pdfPage, PDFLib, plan.snippet);
-    // Extraction honesty (spec §4 step 6): best-effort by design — the
-    // composed paint ships even when the font carries no ToUnicode to patch.
-    patchToUnicodeForMarks(pdfPage, PDFLib, insert.fontName, plan.marks);
-    return true;
-  } catch (err) {
-    console.warn('[core/page-surgery] composed insert failed, falling back to twin draw:', err);
-    return false;
-  }
-}
+// ---- Rung C: the composite stamp (own-font or clone, own-font-first) --------
 
 // For every TEXT annotation born from a Ganti Teks replace (carries
 // replaceCoverId — see js/v2/app.js's smartReplace/openTextEditor) whose
-// cover's surgery just succeeded, try to write its text INTO the content
-// stream using the document's OWN font instead of drawing a metric-twin
-// annotation on top. Returns the set of annotation ids painted natively —
-// the drawing loop below skips those. Any decline (mixed fonts, multiline,
-// missing glyph, unsupported font shape, no fontkit, …) or thrown error just
-// leaves the id out of the set: the twin drawer paints it exactly as today.
-// Never a hard failure — mirrors runSurgery's discipline one level up.
-export function planNativeInserts(pdfPage, PDFLib, fontkit, annotations, skipCovers, insertByCover) {
+// cover's surgery just succeeded, resolve a font via stamp.js's ladder and
+// STAMP its text into the page with pdf-lib's own drawText — never a
+// hand-rolled content-stream snippet. Returns the set of annotation ids
+// painted (native OR clone) — the drawing loop below skips those. Any
+// decline (mixed fonts, multiline, missing glyph, unsupported font shape, no
+// clone route, no fontkit, …) or thrown error just leaves the id out of the
+// set: the twin drawer paints it exactly as today. Never a hard failure —
+// mirrors runSurgery's discipline one level up. ASYNC (unlike the old
+// planNativeInserts): stamp.js's ladder awaits pdf-lib's own embedFont.
+export async function planNativeInserts(pdfPage, PDFLib, fontkit, annotations, skipCovers, insertByCover) {
   const skipDraw = new Set();
   // Per-annotation insert outcome for telemetry (spec-telemetry.md §3):
-  // annoId -> { path:'native'|'twin', reason }. 'native' when the doc's own
-  // font (or a composed glyph from its own outlines) painted the replacement;
-  // 'twin' + the verbatim decline reason when it fell back to a metric twin —
-  // this is the highest-value beta signal (WHY a replacement isn't the
-  // document's own font). The app layer fires `insert` from this at commit.
+  // annoId -> { path:'native'|'clone'|'twin', reason }. 'native' when the
+  // doc's own embedded font program covered the text; 'clone' when it didn't
+  // but font-decide.js's /BaseFont routing found a bundled metric-twin that
+  // does; 'twin' + the verbatim decline reason when both rungs declined and
+  // it fell back to a metric-twin ANNOTATION instead — this is the
+  // highest-value beta signal (WHY a replacement isn't the document's own
+  // font). The app layer fires `insert` from this at commit.
   const insertOutcomes = new Map();
   if (!fontkit) return { skipDraw, insertOutcomes }; // same deps guard as the custom-font embed path
   for (const anno of annotations) {
@@ -176,39 +152,22 @@ export function planNativeInserts(pdfPage, PDFLib, fontkit, annotations, skipCov
     const insert = insertByCover.get(anno.replaceCoverId);
     if (!insert) continue;
     try {
-      const plan = planNativeInsert(pdfPage, PDFLib, fontkit, { insert, text: anno.text, color: anno.color });
-      if (plan.ok) {
-        appendNativeText(pdfPage, PDFLib, plan.snippet);
+      const text = anno.text ?? '';
+      const style = { bold: !!anno.bold, italic: !!anno.italic };
+      const resolved = await resolveStampFont(pdfPage, PDFLib, fontkit, insert, text, style);
+      if (resolved.ok) {
+        stampText(pdfPage, PDFLib, resolved.font, insert, text, anno.color);
         skipDraw.add(anno.id);
-        insertOutcomes.set(anno.id, { path: 'native', reason: 'clean' });
-      } else if (plan.reason === 'missing-glyph') {
-        // Font-fidelity tier 2 (core/compose.js, founder-ratified 2026-07-20):
-        // a missing glyph may still be COMPOSABLE from outlines the subset
-        // itself carries (É = E + é's own acute) — the document's own font
-        // stays on the page. Gated to Type0 (the GID-writable shape; a
-        // simple-TrueType font writes encoding bytes, which cannot reach an
-        // un-cmapped mark). 'missing-glyph' is the ONLY rescued decline:
-        // mixed-fonts/multiline/unsupported-* stay declined exactly as
-        // before. Any compose decline or throw lands back on the twin draw —
-        // same never-a-hard-failure discipline as everything else here.
-        const composed = planComposedFallback(pdfPage, PDFLib, fontkit, insert, anno);
-        if (composed) {
-          skipDraw.add(anno.id);
-          // Composed from the subset's own outlines — the document's OWN font
-          // painted the glyph, so telemetry counts this as the native path.
-          insertOutcomes.set(anno.id, { path: 'native', reason: 'clean' });
-        } else {
-          insertOutcomes.set(anno.id, { path: 'twin', reason: 'missing-glyph' });
-        }
+        insertOutcomes.set(anno.id, { path: resolved.path, reason: 'clean' });
       } else {
-        insertOutcomes.set(anno.id, { path: 'twin', reason: plan.reason });
+        insertOutcomes.set(anno.id, { path: 'twin', reason: resolved.reason });
       }
     } catch (err) {
       // A rare throw drops to the twin draw exactly as before; leave it out of
       // insertOutcomes rather than mislabel it as a specific decline reason —
       // the surgery event still carries this edit, and `insert` simply won't
       // fire for it (better silent than a wrong enum).
-      console.warn('[core/page-surgery] native re-insert failed, falling back to twin draw:', err);
+      console.warn('[core/page-surgery] stamp failed, falling back to twin draw:', err);
     }
   }
   return { skipDraw, insertOutcomes };
@@ -220,20 +179,25 @@ export function planNativeInserts(pdfPage, PDFLib, fontkit, annotations, skipCov
 // one already-copied pdf-lib page. This is the ONE call a caller needs —
 // export.js and (spec-live-surgery.md increment 2) the editor's live
 // re-render both call this instead of re-deriving the sequencing themselves.
+// ASYNC (spec-edit-rebuild-composite.md increment 1): planNativeInserts now
+// awaits stamp.js's font-resolve ladder (fontkit parse + pdf-lib embedFont),
+// so this and every caller must await it too.
 //
-// WHY surgery runs before native-insert, and both run before ANY drawing:
+// WHY surgery runs before the stamp, and both run before ANY OTHER drawing:
 // runSurgery must cut ops out of the copied page's ORIGINAL content stream
-// before pdf-lib's first draw call (drawRectangle/drawText/…) appends its OWN
-// content stream to the page — run it after and removeRunsFromPdfPage would
-// have to contend with content pdf-lib itself just wrote (and rewrite the
-// wrong stream at that). planNativeInserts' appendNativeText has the same
-// constraint (see reinsert.js) — its append must land before pdf-lib's first
-// draw call touches this page. Callers that draw annotations afterward (e.g.
-// export.js's ANNOTATION_DRAWERS loop) get the ordering guarantee for free by
-// calling this function first, before their own first draw.
-export function applyPageSurgery(pdfPage, PDFLib, fontkit, annotations) {
+// before pdf-lib's first draw call (drawRectangle/drawText/embedFont-then-
+// draw/…) appends its OWN content stream to the page — run it after and
+// removeRunsFromPdfPage would have to contend with content pdf-lib itself
+// just wrote (and rewrite the wrong stream at that). The stamp's own
+// drawText call has no such ordering constraint against ITSELF (it's pdf-lib
+// drawing through pdf-lib's own normal path), but it must still land before
+// any OTHER caller-side draw for the same "don't contend with content pdf-lib
+// just wrote for THIS page" reason. Callers that draw annotations afterward
+// (e.g. export.js's ANNOTATION_DRAWERS loop) get the ordering guarantee for
+// free by calling this function first, before their own first draw.
+export async function applyPageSurgery(pdfPage, PDFLib, fontkit, annotations) {
   const { skipCovers, insertByCover, surgeryByCover } = runSurgery(pdfPage, PDFLib, annotations);
-  const { skipDraw, insertOutcomes } = planNativeInserts(pdfPage, PDFLib, fontkit, annotations, skipCovers, insertByCover);
+  const { skipDraw, insertOutcomes } = await planNativeInserts(pdfPage, PDFLib, fontkit, annotations, skipCovers, insertByCover);
   // surgeryByCover/insertOutcomes are telemetry-only extras (spec-telemetry.md
   // §3); export.js reads only skipCovers/skipDraw/insertByCover — additive, so
   // its destructure is untouched.
@@ -324,6 +288,12 @@ export function editSignature(page) {
 export async function buildEditedPageBytes(srcDoc, page, annotations, deps = {}) {
   const { PDFLib, fontkit } = deps;
   const newDoc = await PDFLib.PDFDocument.create();
+  // fontkit is only needed for the stamp's native/clone rungs (core/stamp.js
+  // embeds raw font bytes via fontkit); a headless caller injecting only
+  // PDFLib still gets valid bytes — every Ganti replacement just declines to
+  // the twin draw (same guard export.js's buildPdfBytes already applies to
+  // its own newDoc).
+  if (fontkit) newDoc.registerFontkit(fontkit);
   // ONE copyPages call — variant B from the timing spike
   // (tests/spike/live-surgery-timing-lib.js): a page-scoped save is cheaper
   // than a whole-doc save on large files, identical on small ones.
@@ -334,7 +304,7 @@ export async function buildEditedPageBytes(srcDoc, page, annotations, deps = {})
   // explicit page.rotation (a user-applied in-editor rotate) overrides it.
   if (page.rotation) pdfPage.setRotation(PDFLib.degrees(page.rotation));
 
-  const { skipCovers, skipDraw, surgeryByCover, insertOutcomes } = applyPageSurgery(pdfPage, PDFLib, fontkit, annotations);
+  const { skipCovers, skipDraw, surgeryByCover, insertOutcomes } = await applyPageSurgery(pdfPage, PDFLib, fontkit, annotations);
 
   // Every whiteout carrying a replace intent is a candidate edit (regardless
   // of whether its birth-box overlap still holds — see overlapsBirthBox
