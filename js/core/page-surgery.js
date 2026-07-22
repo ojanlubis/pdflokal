@@ -19,14 +19,14 @@
  *
  * RUNG C REBUILD (spec-edit-rebuild-composite.md, founder-ruled Path B,
  * 2026-07-22): planNativeInserts no longer hand-writes a content-stream
- * snippet (core/reinsert.js's planNativeInsert/appendNativeText) or composes
- * a missing glyph from the subset's own outlines (core/compose.js). Both
- * files stay on disk (increment 2 deletes them) but are no longer CALLED from
- * here — the write mechanism is now core/stamp.js's resolveStampFont +
- * pdfPage.drawText(): pdf-lib itself lays out, encodes, and embeds the
- * replacement, so this function is ASYNC (it awaits stamp.js's font-embed).
+ * snippet (core/reinsert.js's old planNativeInsert/appendNativeText) or
+ * composes a missing glyph from the subset's own outlines (core/compose.js).
+ * Both files retired whole in increment 2 (spec §1's DIES list) — the write
+ * mechanism is now core/stamp.js's resolveStampFont + pdfPage.drawText():
+ * pdf-lib itself lays out, encodes, and embeds the replacement, so this
+ * function is ASYNC (it awaits stamp.js's font-embed).
  *
- * Same vendor-injection discipline as redact.js/reinsert.js/stamp.js: PDFLib
+ * Same vendor-injection discipline as redact.js/doc-fonts.js/stamp.js: PDFLib
  * and fontkit are passed in by the caller — this file has zero vendor
  * imports.
  */

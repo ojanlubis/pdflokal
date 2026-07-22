@@ -18,7 +18,7 @@
  * (PostScript convention — 'Arial-BoldMT', 'TimesNewRomanPS-BoldItalicMT')
  * and, for embedded fonts, the FontDescriptor's /Flags (PDF 32000 Table 123,
  * bit 7 = Italic, bit 19 = ForceBold) and /FontWeight. Same PDFLib-adapter
- * discipline as core/redact.js / core/reinsert.js: PDFLib is injected by the
+ * discipline as core/redact.js / core/doc-fonts.js: PDFLib is injected by the
  * caller, zero vendor imports here, every read degrades to "unknown" rather
  * than throwing or guessing.
  */
@@ -44,13 +44,13 @@ function resolve(context, PDFRef, value) {
 // "synthetic style flags... as corroboration" — here the CORROBORATION is
 // the PDF's own FontDescriptor, since pdf.js itself hands back nothing
 // usable, see module header). `fontName` is a page Resources /Font key (no
-// leading '/'), the same shape core/reinsert.js's extractFontProgram takes —
+// leading '/'), the same shape core/doc-fonts.js's extractFontProgram takes —
 // but UNLIKE that function this is not restricted to Type0/Identity-H: bold
 // detection must work on ordinary simple (Type1/TrueType) fonts too, which
 // is exactly the shape of an unembedded "Arial-BoldMT" heading.
 // Returns { ok:true, baseFont, bold, italic } or { ok:false } — never throws
 // into the caller (same decline discipline as every other redact.js/
-// reinsert.js reader).
+// doc-fonts.js reader).
 export function getFontStyleInfo(page, PDFLib, fontName) {
   try {
     const { PDFName, PDFDict, PDFRef } = PDFLib;

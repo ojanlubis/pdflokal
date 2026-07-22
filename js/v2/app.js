@@ -42,8 +42,8 @@ import { applyIntentCopy } from './intent-copy.js';
 import { ensurePdfLib } from '../core/vendor.js';
 import { readPageContents, extractFontMetrics } from '../core/redact.js';
 import { planRunRemoval } from '../core/text-walk.js';
-import { extractFontProgram, lookupFontObject } from '../core/reinsert.js';
-import { planComposedChar } from '../core/compose.js';
+import { extractFontProgram, lookupFontObject } from '../core/doc-fonts.js';
+import { textCoveredBy } from '../core/stamp.js';
 import { getFontStyleInfo } from '../core/font-style.js';
 import { cloneFamilyFor } from '../core/font-decide.js';
 import { buildEditedPageBytes, editSignature, pageEdits } from '../core/page-surgery.js';
@@ -392,8 +392,8 @@ const textRuns = createTextRunIndex({ getDoc: () => doc });
 
 // ---- Rung C — live doc-font preview (founder ruling, tonight 2026-07-19) ---------
 // core/export.js already writes the FINAL file with the document's own
-// embedded font when coverage allows it (core/reinsert.js) — but until now the
-// EDITOR only ever showed the twin CSS font while typing/after commit, so
+// embedded font when coverage allows it (core/stamp.js's ladder) — but until
+// now the EDITOR only ever showed the twin CSS font while typing/after commit, so
 // "what you see" and "what you get" visibly diverged for exactly the window
 // between tap and download. This loads the SAME font program into the browser
 // via the FontFace API so the draft (and the committed annotation, until
@@ -542,12 +542,11 @@ function loadDocFont(sourceId, fontName, pdfPage, PDFLib, fontkit) {
       try {
         fontkitFont = fontkit.create(extracted.bytes);
       } catch {
-        return null; // decline, never guess — same law as reinsert.js's planNativeInsert
+        return null; // decline, never guess — same law as stamp.js's resolveStampFont
       }
-      // Font shape, for the commit-time compose check (font-fidelity tier 2):
-      // composition writes GIDs, which only the Type0/Identity-H path can —
-      // the toast decision must know the shape or it would promise a
-      // composed paint export can't deliver on a simple-TrueType font.
+      // Font shape, for font_seen telemetry's FLAVOR enum (spec-telemetry.md
+      // §3) — the doc-subset ladder rung itself is shape-agnostic (fontkit
+      // reads any program by codepoint); this is purely a reporting signal.
       let flavor = 'other';
       try {
         const { PDFName, PDFRef } = PDFLib;
@@ -555,7 +554,7 @@ function loadDocFont(sourceId, fontName, pdfPage, PDFLib, fontkit) {
         const stRaw = fontObj && fontObj.get(PDFName.of('Subtype'));
         const st = stRaw instanceof PDFRef ? pdfPage.doc.context.lookup(stRaw) : stRaw;
         if (st instanceof PDFName) flavor = st.toString() === '/Type0' ? 'type0' : st.toString() === '/TrueType' ? 'truetype' : 'other';
-      } catch { /* flavor stays 'other' — compose check simply won't fire */ }
+      } catch { /* flavor stays 'other' — telemetry just reports 'other' */ }
       const cssFamily = `pdflokal-doc-${sanitizeForCssIdent(sourceId)}-${sanitizeForCssIdent(fontName)}`;
       let face;
       try {
@@ -569,7 +568,7 @@ function loadDocFont(sourceId, fontName, pdfPage, PDFLib, fontkit) {
       }
       document.fonts.add(face);
       addedFontFaces.add(face);
-      return { cssFamily, fontkitFont, bytes: extracted.bytes, flavor };
+      return { cssFamily, fontkitFont, flavor };
     })().catch(() => null));
   }
   return docFontCache.get(key);
@@ -663,9 +662,7 @@ async function prepareDocFont(pageId, line, draft) {
     // Guard: the draft may have been cancelled/committed already, or a NEWER
     // tap may have replaced it — only this draft's own reference matters.
     draft.docFontFamily = result.cssFamily;
-    draft.docFontkitFont = result.fontkitFont; // commit-time coverage check
-    draft.docFontBytes = result.bytes; // commit-time compose check (tier 2)
-    draft.docFontFlavor = result.flavor; // compose is Type0-only — see commit()
+    draft.docFontkitFont = result.fontkitFont; // commit-time coverage check (see commit())
     if (draft.editorEl && draft.editorEl.isConnected) {
       // Progressive swap: prepend the doc font ahead of whatever twin stack
       // is already set — the browser's own per-glyph fallback to that twin
@@ -722,7 +719,7 @@ function hitTestEditedLine(page, x, y) {
 // from scratch off cover.replaceTargets[0] (the pristine-source line), same
 // as a fresh smartReplace, since that pristine target is the one durable
 // truth a re-edit can trust (the committed replacement carries no cached
-// docFontkitFont/docFontBytes/flavor/coverage fields to reuse).
+// docFontkitFont/flavor/coverage fields to reuse).
 function reEditLine(pageId, cover, replacement) {
   const box = cover.replaceBox;
   track('editor_action', { action: 'ganti_teks_reedit' });
@@ -1272,30 +1269,29 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
       // Founder ruling (2026-07-19): when a substitute font WILL be used for
       // this Ganti replacement, say so plainly at commit — decided with
       // whatever prepareDocFont has managed to load by NOW (it's async; a
-      // very fast typist can commit before it lands). Extended by the
-      // font-fidelity ruling (2026-07-20): a char the doc font doesn't cover
-      // but CAN COMPOSE from the subset's own outlines (core/compose.js,
-      // Type0 only — the shape export's own compose gate demands) counts as
-      // covered and stays SILENT: the pixels are the document's, nothing is
-      // substituted. Clone/twin substitutes keep this one unchanged sentence
-      // — one grammar for every substitute tier (ratified over per-tier
-      // wording). Ordinary (non-Ganti) text never carries replaceCoverId, so
-      // never toasts here.
+      // very fast typist can commit before it lands). Rebuilt (spec-edit-
+      // rebuild-composite.md increment 2, Path B): compose.js retired, so a
+      // char the doc font doesn't cover natively is no longer offered a
+      // "composed from the subset's own outlines" escape — it falls straight
+      // to whatever core/stamp.js's resolveStampFont will actually do at
+      // export (clone rung if font-decide.js routes one, else twin), and the
+      // notice policy judges THAT prediction. textCoveredBy is the exact same
+      // coverage function stamp.js's own doc-subset rung calls at commit time
+      // (imported from core/stamp.js, not reimplemented) — the toast can never
+      // drift from what export actually does. Clone/twin substitutes keep this
+      // one unchanged sentence — one grammar for every substitute tier
+      // (ratified over per-tier wording). Ordinary (non-Ganti) text never
+      // carries replaceCoverId, so never toasts here.
       if (d.replaceCoverId) {
-        const composable = (ch) => d.docFontFlavor === 'type0' && !!d.docFontBytes
-          && planComposedChar(d.docFontkitFont, d.docFontBytes, ch).ok;
-        const covered = !!d.docFontkitFont
-          && [...text.normalize('NFC')].every((ch) => ch === ' '
-            || d.docFontkitFont.hasGlyphForCodePoint(ch.codePointAt(0))
-            || composable(ch));
+        const covered = !!d.docFontkitFont && textCoveredBy(d.docFontkitFont, text);
         // Name-only ruling (2026-07-20 evening): a file with NO embedded
         // program + an exact metric clone routed = nothing real was
         // substituted — silent. See prepareDocFont for the fields' WHY.
         const nameOnlyClone = d.fontUnembedded && d.cloneRouted;
         if (!covered && !nameOnlyClone) toast('Huruf ini memakai font pengganti yang mirip');
-        // font_path is 'doc-font' only when the document's OWN font (or a glyph
-        // composed from its own outlines) paints this — a name-only clone is
-        // still a substitute, so it reads as 'twin'.
+        // font_path is 'doc-font' only when the document's OWN font paints
+        // this — a name-only clone is still a substitute, so it reads as
+        // 'twin' (the schema's font_path enum has no separate 'clone' value).
         gantiOutcome = 'commit';
         gantiCoverId = d.replaceCoverId;
         gantiDocFont = covered;

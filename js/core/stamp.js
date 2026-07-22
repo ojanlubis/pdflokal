@@ -30,17 +30,16 @@
  * "don't invent a new enum value when an old one already means this").
  */
 
-import { extractFontProgram, lookupFontObject } from './reinsert.js';
+import { extractFontProgram, lookupFontObject } from './doc-fonts.js';
 import { getFontStyleInfo } from './font-style.js';
 import { cloneFamilyFor } from './font-decide.js';
 import { CLONE_FONT_VARIANTS, CLONE_FONT_URLS } from './clone-fonts.js';
 
 // ---- shared little helpers ---------------------------------------------------
 
-// Same hex->0..1 conversion reinsert.js already has — ported, not imported:
-// reinsert.js is dormant-but-present in this increment and retires whole in
-// increment 2 (spec §1's DIES list), so a survivor that needs to outlive it
-// gets its own tiny copy here rather than a link to a file about to vanish.
+// Same hex->0..1 conversion reinsert.js used to have — ported, not imported:
+// reinsert.js retired whole in increment 2 (spec §1's DIES list), so this
+// survivor keeps its own tiny copy rather than a link to a file that's gone.
 export function hexToRgb01(hex) {
   const h = (hex || '#000000').replace('#', '');
   return [
@@ -70,6 +69,24 @@ function glyphPaints(font, cp) {
   } catch {
     return false;
   }
+}
+
+// Does `parsedFont` (a fontkit-parsed program) cover EVERY char of `text`?
+// EXPORTED (spec-edit-rebuild-composite.md increment 2): js/v2/app.js's
+// draft-time notice prediction needs the EXACT same answer this module's own
+// rung 1 (tryNativeSubset) uses at commit time — the toast may not lie about
+// what export will do, so the two call sites share this ONE implementation
+// rather than each hand-rolling their own coverage loop that could drift
+// apart. Same NFC normalize (a user typing e + combining-acute means é —
+// judge coverage on the composed form, one char at a time) and the same
+// space carve-out glyphPaints already gives (cp 32 is exempt from the
+// contour check, but still gated on the font actually having a cmap entry
+// for it).
+export function textCoveredBy(parsedFont, text) {
+  for (const ch of text.normalize('NFC')) {
+    if (!glyphPaints(parsedFont, ch.codePointAt(0))) return false;
+  }
+  return true;
 }
 
 // ---- per-document embed cache -------------------------------------------------
@@ -119,10 +136,7 @@ async function tryNativeSubset(pdfPage, PDFLib, fontkit, insert, text, cache) {
       cache.set(fontObj, entry);
     }
 
-    const normalized = text.normalize('NFC');
-    for (const ch of normalized) {
-      if (!glyphPaints(entry.parsed, ch.codePointAt(0))) return { ok: false, reason: 'missing-glyph' };
-    }
+    if (!textCoveredBy(entry.parsed, text)) return { ok: false, reason: 'missing-glyph' };
 
     if (!entry.embedded) {
       // WHY here, not at buildEditedPageBytes/buildPdfBytes call sites only:
@@ -191,10 +205,7 @@ async function tryClone(pdfPage, PDFLib, fontkit, insert, text, style, cache) {
       cache.set(key, entry);
     }
 
-    const normalized = text.normalize('NFC');
-    for (const ch of normalized) {
-      if (!glyphPaints(entry.parsed, ch.codePointAt(0))) return { ok: false, reason: 'missing-glyph' };
-    }
+    if (!textCoveredBy(entry.parsed, text)) return { ok: false, reason: 'missing-glyph' };
 
     if (!entry.embedded) entry.embedded = await pdfPage.doc.embedFont(entry.bytes);
     return { ok: true, font: entry.embedded };

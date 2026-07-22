@@ -140,9 +140,15 @@ export const SCHEMA = {
   // declined.
   insert: {
     path: ['native', 'clone', 'twin'],
+    // Pruned 2026-07-22 (spec-edit-rebuild-composite.md increment 2):
+    // 'font-parse-failed' and 'font-name-unwritable' were reinsert.js-only
+    // decline reasons (its hand-rolled snippet builder) — verified dead by
+    // grepping js/ for both strings post-deletion; core/stamp.js's ladder
+    // never emits either (a parse throw collapses to 'unsupported-font', and
+    // pdf-lib's own embedFont needs no PDF-name escaping at all).
     reason: [
       'clean', 'unsupported-font', 'mixed-fonts', 'multiline', 'empty',
-      'font-parse-failed', 'missing-glyph', 'font-name-unwritable', 'clone-unavailable',
+      'missing-glyph', 'clone-unavailable',
     ],
   },
   // reason/align values are given verbatim in spec-telemetry.md §3's own
