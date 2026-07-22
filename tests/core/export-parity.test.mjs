@@ -24,9 +24,23 @@
  *     succeed (own font, single line, no mixed fonts).
  *   - surat-fragmen.pdf: "Nomor: 045/SEK/VII/2026" (Line A, ganti-baris.spec.js's
  *     LINE map index 0) is Helvetica standard-14 (Type1, no embedded font
- *     program) — reinsert.js's v1 scope only covers Type0/Identity-H, so this
- *     is a guaranteed 'unsupported-font' decline; the twin path must still
- *     paint it.
+ *     program) — the doc-subset rung only covers a real embedded program, so
+ *     this is a guaranteed 'unsupported-font' decline (and Montserrat isn't a
+ *     clone-routed family either); the twin path must still paint it.
+ *
+ * RUNG C REBUILD (spec-edit-rebuild-composite.md, 2026-07-22): the native
+ * path used to reuse the doc's OWN font RESOURCE (reinsert.js's hand-rolled
+ * snippet referenced the exact same /Font key, so the resource COUNT never
+ * grew). It now goes through core/stamp.js's resolveStampFont + pdf-lib's
+ * own drawText+embedFont — pdf-lib always registers a FRESH font object (even
+ * when fed the exact same program bytes as an existing resource), so a native
+ * stamp ALSO grows the resource count by exactly one, same as a twin. What
+ * still tells native apart from twin/clone is the freshly-added font's OWN
+ * /BaseFont name: pdf-lib derives it from the embedded program's internal
+ * name table, so a native embed of this fixture's Montserrat subset carries
+ * "Montserrat" in its BaseFont, where a twin/clone would carry Helvetica/
+ * Arimo/Tinos/Cousine/Caladea instead (verified empirically against this
+ * exact fixture — see the test body).
  *
  * Doc-model construction mirrors tests/ganti-teks-export.spec.js's
  * buildTextSourceDoc: model.js/operations.js directly (no import.js/pdf.js
@@ -124,19 +138,51 @@ function addGantiPair(doc, page, target, replacementText) {
   return { cover, text };
 }
 
-// Resources -> Font key count — the SAME structural proof
-// tests/rung-c-native.spec.js uses: a native re-insert reuses an EXISTING
-// font key (count unchanged), a twin draw (drawText -> embedFont) always
-// grows it by at least one.
-function countFontKeys(PDFLib, pdfPage) {
+// Resources -> Font dict, resolved (or null if the page carries none).
+function fontDictOf(PDFLib, pdfPage) {
   const { PDFName, PDFRef, PDFDict } = PDFLib;
   const resources = pdfPage.node.Resources();
-  if (!resources) return 0;
+  if (!resources) return null;
   const fontDictRaw = resources.get(PDFName.of('Font'));
-  if (!fontDictRaw) return 0;
+  if (!fontDictRaw) return null;
   const fontDict = fontDictRaw instanceof PDFRef ? pdfPage.doc.context.lookup(fontDictRaw) : fontDictRaw;
-  if (!(fontDict instanceof PDFDict)) return 0;
-  return fontDict.keys().length;
+  return fontDict instanceof PDFDict ? fontDict : null;
+}
+
+// Resources -> Font key count — the stamp (native OR clone OR twin) always
+// registers a FRESH pdf-lib font object even when the bytes it embeds are
+// identical to an existing resource (pdf-lib doesn't reuse dict entries in
+// place), so this count grows by exactly one for ANY successful stamp/twin.
+// It no longer distinguishes native from twin on its own — see
+// nativeBaseFontOf below for the assertion that does.
+function countFontKeys(PDFLib, pdfPage) {
+  const fontDict = fontDictOf(PDFLib, pdfPage);
+  return fontDict ? fontDict.keys().length : 0;
+}
+
+// Whichever font KEY (the raw '/Fxx' name string) is NOT in `beforeKeys` —
+// i.e. the ONE resource the stamp/twin just added.
+function newFontKey(PDFLib, pdfPage, beforeKeys) {
+  const fontDict = fontDictOf(PDFLib, pdfPage);
+  return fontDict?.keys().find((k) => !beforeKeys.includes(k.toString())) ?? null;
+}
+
+// The /BaseFont name of the new font key. pdf-lib derives /BaseFont from the
+// embedded program's own internal name table, so this is the one honest
+// after-the-fact signal for WHICH rung fired: a native stamp of this
+// fixture's Montserrat subset carries "Montserrat" in it; a clone or twin
+// substitute would carry Arimo/Tinos/Cousine/Caladea/Helvetica instead.
+function newFontBaseName(PDFLib, pdfPage, beforeKeys) {
+  const { PDFName, PDFRef } = PDFLib;
+  const context = pdfPage.doc.context;
+  const res = (v) => (v instanceof PDFRef ? context.lookup(v) : v);
+  const key = newFontKey(PDFLib, pdfPage, beforeKeys);
+  if (!key) return null;
+  const fontObj = res(fontDictOf(PDFLib, pdfPage).get(key));
+  // /BaseFont sits on the wrapper for BOTH Type0 and simple fonts — no
+  // descendant indirection needed just for the name.
+  const baseFontRaw = fontObj.get(PDFName.of('BaseFont'));
+  return baseFontRaw ? res(baseFontRaw).toString() : null;
 }
 
 // Same 'f' (fill) discriminator as ganti-teks-export.spec.js's
@@ -148,7 +194,7 @@ function countFillOps(content) {
   return tokenizeOps(content).filter((op) => op.op === 'f').length;
 }
 
-test('export-parity: undangan-cid.pdf — middle repeat surgically cut and NATIVELY re-inserted (own font, no new resource)', async () => {
+test('export-parity: undangan-cid.pdf — middle repeat surgically cut and STAMPED via the NATIVE rung (doc\'s own font program)', async () => {
   const PDFLib = loadUmd('js/vendor/pdf-lib.min.js');
   const fontkit = loadUmd('js/vendor/fontkit.umd.min.js');
 
@@ -163,6 +209,7 @@ test('export-parity: undangan-cid.pdf — middle repeat surgically cut and NATIV
   addGantiPair(doc, page, target, 'Rapat Baru');
 
   const origFontCount = countFontKeys(PDFLib, srcPage);
+  const origFontKeys = (fontDictOf(PDFLib, srcPage)?.keys() ?? []).map((k) => k.toString());
   const origFillCount = countFillOps(origContent);
 
   const outBytes = await buildPdfBytes(doc, { PDFLib, fontkit });
@@ -191,12 +238,26 @@ test('export-parity: undangan-cid.pdf — middle repeat surgically cut and NATIV
     assert.ok(outContent.includes(origContent.slice(u.start, u.end)), `expected untouched run at y=${Math.round(u.y)} to survive`);
   }
 
-  // 4. NATIVE re-insert, not a twin draw: no new /Font resource was added —
-  assert.equal(countFontKeys(PDFLib, outPage), origFontCount);
-  // — and the replacement was written using the REMOVED run's own resource
-  // font name with Tf=1 (reinsert.js folds size into Tm instead — see its
-  // module header) — a marker only the native path's snippet ever emits.
-  assert.ok(outContent.includes(`/${rec.fontName} 1 Tf`));
+  // 4. A stamp always registers a FRESH pdf-lib font object (module header)
+  // — exactly one new /Font resource, whichever rung supplied it.
+  assert.equal(countFontKeys(PDFLib, outPage), origFontCount + 1);
+  // — and it's the NATIVE rung specifically, not clone/twin: the newly-added
+  // resource's /BaseFont carries this fixture's own font family name, proving
+  // pdf-lib embedded the DOC'S subset program (extracted via
+  // extractFontProgram) rather than a Croscore/crosextra clone or a
+  // Helvetica substitute.
+  const newBaseFont = newFontBaseName(PDFLib, outPage, origFontKeys);
+  assert.match(newBaseFont, /Montserrat/i);
+
+  // 5. The new resource was actually USED — a fresh Tf op referencing it
+  // appears in the content stream (not just embedded-but-unreferenced). A
+  // Type0/CID show string encodes raw glyph IDs, not readable text (pdf-lib's
+  // ToUnicode is what makes it EXTRACTABLE — proven by the acceptance-case
+  // Playwright spec, tests/edit-org-structure.spec.js, via real pdf.js
+  // getTextContent — not re-litigated at this content-stream level here).
+  const newKey = newFontKey(PDFLib, outPage, origFontKeys);
+  const escaped = newKey.toString().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  assert.match(outContent, new RegExp(`${escaped} [\\d.]+ Tf`));
 });
 
 test('export-parity: surat-fragmen.pdf — Line A surgically cut, falls back to TWIN draw (unsupported font)', async () => {

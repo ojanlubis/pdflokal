@@ -20,7 +20,6 @@ import { fileURLToPath } from 'node:url';
 import { planComposedChar, planComposedInsert, patchToUnicodeForMarks } from '../../js/core/compose.js';
 import { extractFontProgram } from '../../js/core/reinsert.js';
 import { planNativeInserts } from '../../js/core/page-surgery.js';
-import { readPageContents } from '../../js/core/redact.js';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const loadUmd = (p) => {
@@ -94,47 +93,91 @@ test('planComposedInsert: full plan — base run + one mark block per É, width 
   assert.equal(planComposedInsert(font, SUBSET_BYTES, insert, 'KAFÉ Ñ', '#000000').ok, false);
 });
 
-test('page-surgery integration: missing-glyph rescues via compose; uncomposable stays twin', async () => {
-  // a real Type0/Identity-H PDF around the subset, exactly the export shape
-  const doc = await PDFLib.PDFDocument.create();
-  doc.registerFontkit(fontkit);
-  const embedded = await doc.embedFont(SUBSET_BYTES, { subset: false });
-  const page0 = doc.addPage([595, 842]);
-  page0.drawText('Kafé Andréa', { x: 72, y: 720, size: 12, font: embedded });
-  const loaded = await PDFLib.PDFDocument.load(await doc.save());
-  const pdfPage = loaded.getPages()[0];
+test('page-surgery integration (POST-REBUILD, spec-edit-rebuild-composite.md): missing-glyph now falls to the CLONE rung, not compose', async () => {
+  // WHY this test changed shape (report this in full to whoever reads the
+  // rebuild PR): planNativeInserts no longer calls core/compose.js AT ALL —
+  // a doc-subset decline (missing-glyph) now tries font-decide.js's CLONE
+  // rung instead (spec §3 rung 2), which is a STRICTLY WIDER net than
+  // compose.js's single-mark-composition trick ever was. This fixture's font
+  // (carlito-subset.ttf) has a /BaseFont pdf-lib itself names
+  // "Carlito-Regular-<n>" (verified empirically — see stamp.js's own tests
+  // for the derivation), which font-decide.js's normalizeBaseFont resolves to
+  // the 'Carlito' clone family — so BOTH the composable case (É) AND the
+  // former "uncomposable" case (Ñ, which compose.js could never reach) now
+  // succeed via the REAL bundled Carlito font, which has full coverage for
+  // both. A genuinely uncoverable case (CJK, which no Croscore/crosextra
+  // clone in this repo carries at any weight) still declines to twin — that
+  // endpoint survives the rebuild unchanged, just via a different fixture
+  // character.
+  //
+  // Rung 2 needs a working `fetch` for the clone woff2 — stubbed here to
+  // read the SAME bundled font file export.js would fetch over HTTP in the
+  // browser, so this Node harness exercises the real embed path instead of
+  // hitting the "no fetch" headless decline (core/stamp.js's own dedicated
+  // tests pin THAT guard explicitly).
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const fontBytes = fs.readFileSync(path.join(root, String(url)));
+    return { ok: true, arrayBuffer: async () => fontBytes.buffer.slice(fontBytes.byteOffset, fontBytes.byteOffset + fontBytes.byteLength) };
+  };
 
-  const { PDFName, PDFRef, PDFDict } = PDFLib;
-  const context = pdfPage.doc.context;
-  const res = (v) => (v instanceof PDFRef ? context.lookup(v) : v);
-  const fontDict = res(pdfPage.node.Resources().get(PDFName.of('Font')));
-  assert.ok(fontDict instanceof PDFDict);
-  const fontName = fontDict.keys()[0].toString().replace(/^\//, '');
+  try {
+    // a real Type0/Identity-H PDF around the subset, exactly the export shape
+    const doc = await PDFLib.PDFDocument.create();
+    doc.registerFontkit(fontkit);
+    const embedded = await doc.embedFont(SUBSET_BYTES, { subset: false });
+    const page0 = doc.addPage([595, 842]);
+    page0.drawText('Kafé Andréa', { x: 72, y: 720, size: 12, font: embedded });
+    const loaded = await PDFLib.PDFDocument.load(await doc.save());
+    // Production callers (export.js's buildPdfBytes, page-surgery.js's own
+    // buildEditedPageBytes) always registerFontkit on the doc that OWNS the
+    // pdfPage passed into planNativeInserts — stamp.js's embedFont calls
+    // need it. `loaded` is a FRESH document (saved then reloaded), distinct
+    // from `doc` above which already had it — mirror that same precondition
+    // here rather than let stamp.js's ladder silently decline both rungs.
+    loaded.registerFontkit(fontkit);
+    const pdfPage = loaded.getPages()[0];
 
-  const insert = { fontName, x: 72, y: 560, ux: 1, uy: 0, size: 28, mixedFonts: false };
-  const annotations = [
-    // É is missing from the subset but composable → must paint natively-composed
-    { id: 't-compose', type: 'text', replaceCoverId: 'c1', text: 'KAFÉ ANDRÉA', color: '#112233' },
-    // S/E/O/R/A are all covered — the decline is genuinely the tilde, which
-    // the subset carries nowhere (no ñ donor, no cmap) → whole plan → twin
-    { id: 't-twin', type: 'text', replaceCoverId: 'c2', text: 'SEÑORA', color: '#112233' },
-  ];
-  const skipCovers = new Set(['c1', 'c2']);
-  const insertByCover = new Map([['c1', insert], ['c2', { ...insert, y: 520 }]]);
+    const { PDFName, PDFRef, PDFDict } = PDFLib;
+    const context = pdfPage.doc.context;
+    const res = (v) => (v instanceof PDFRef ? context.lookup(v) : v);
+    const fontDict = res(pdfPage.node.Resources().get(PDFName.of('Font')));
+    assert.ok(fontDict instanceof PDFDict);
+    const fontName = fontDict.keys()[0].toString().replace(/^\//, '');
 
-  const before = readPageContents(pdfPage, PDFLib);
-  const { skipDraw } = planNativeInserts(pdfPage, PDFLib, fontkit, annotations, skipCovers, insertByCover);
+    const insert = { fontName, x: 72, y: 560, ux: 1, uy: 0, size: 28, mixedFonts: false };
+    const annotations = [
+      // É is missing from the subset but Carlito (the clone) covers it
+      { id: 't-clone-1', type: 'text', replaceCoverId: 'c1', text: 'KAFÉ ANDRÉA', color: '#112233' },
+      // Ñ is ALSO missing from the subset, and was never composable
+      // (compose.js's own unit tests above pin 'compose-mark-missing' for
+      // Ñ) — but the real Carlito clone covers it fine, so this now resolves
+      // via clone too. Strictly wider than the old compose rescue.
+      { id: 't-clone-2', type: 'text', replaceCoverId: 'c2', text: 'SEÑORA', color: '#112233' },
+      // 中 (CJK) is covered by NEITHER the subset NOR any Croscore/crosextra
+      // clone this repo ships (verified: font-decide.js only routes
+      // Latin-script Word/system font names) — genuinely uncoverable,
+      // the twin endpoint that survives the rebuild.
+      { id: 't-twin', type: 'text', replaceCoverId: 'c3', text: '中文', color: '#112233' },
+    ];
+    const skipCovers = new Set(['c1', 'c2', 'c3']);
+    const insertByCover = new Map([
+      ['c1', insert],
+      ['c2', { ...insert, y: 520 }],
+      ['c3', { ...insert, y: 480 }],
+    ]);
 
-  assert.ok(skipDraw.has('t-compose'), 'composable edit painted natively (composed)');
-  assert.equal(skipDraw.has('t-twin'), false, 'uncomposable edit left for the twin drawer');
+    const { skipDraw, insertOutcomes } = await planNativeInserts(pdfPage, PDFLib, fontkit, annotations, skipCovers, insertByCover);
 
-  const after = readPageContents(pdfPage, PDFLib);
-  const added = after.slice(before.length);
-  // one base run + two mark blocks, and nothing painted for the declined edit
-  assert.equal(added.split(' BT ').length - 1, 3);
-  // the base run substitutes E's gid in É's slot
-  const gidE = font.glyphForCodePoint(0x45).id.toString(16).padStart(4, '0');
-  assert.ok(added.includes(gidE), 'base run carries E in the composed slot');
+    assert.ok(skipDraw.has('t-clone-1'), 'É resolves via the clone rung (Carlito covers it)');
+    assert.equal(insertOutcomes.get('t-clone-1').path, 'clone');
+    assert.ok(skipDraw.has('t-clone-2'), 'Ñ ALSO resolves via the clone rung now — strictly wider than compose ever was');
+    assert.equal(insertOutcomes.get('t-clone-2').path, 'clone');
+    assert.equal(skipDraw.has('t-twin'), false, 'a genuinely foreign-script char still declines to the twin drawer');
+    assert.equal(insertOutcomes.get('t-twin').path, 'twin');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 }, { timeout: 20000 });
 
 test('patchToUnicodeForMarks: extraction honesty — mark GID gains an NFD bfchar, idempotently', async () => {

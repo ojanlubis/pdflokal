@@ -1,16 +1,24 @@
 /*
- * Rung C — native re-insert (core/reinsert.js).
+ * Rung C — native re-insert (core/stamp.js, rebuilt spec-edit-rebuild-
+ * composite.md 2026-07-22, Path B founder ruling).
  * ============================================================================
  * Rung B (ganti-teks-export.spec.js) proves the ORIGINAL run is truly cut
  * from the content stream and the cover skipped. This suite proves the other
  * half: when the cut run's own font is provably covered by the replacement
  * text (founder ruling 2026-07-19 — never guess a substitute font), the
  * replacement is written INTO the content stream with the document's OWN
- * font, not drawn as a metric-twin annotation on top. Structural proof: no
- * NEW font resource is added to the page for a native replacement (the twin
- * path always embeds one via drawText -> env.getFont). Every fallback path
- * (no embedded font program, multiline text) must still export cleanly via
- * the twin — Rung C never costs the export anything.
+ * font, not drawn as a metric-twin annotation on top.
+ *
+ * REBUILD NOTE: core/stamp.js's ladder stamps via pdf-lib's own
+ * drawText+embedFont — pdf-lib ALWAYS registers a fresh font object (even for
+ * the exact same program bytes an existing resource already carries), so a
+ * native stamp now ALSO grows the page's font-resource count by exactly one,
+ * same as a twin. The structural proof that used to be "no new resource" is
+ * now "the NEW resource's /BaseFont carries the doc's own font family name"
+ * (see fontKeyCount's replacement, newFontBaseName, below) — a clone or twin
+ * substitute would carry a Croscore/crosextra/Helvetica name instead. Every
+ * fallback path (no embedded font program, multiline text) must still export
+ * cleanly via the twin — Rung C never costs the export anything.
  *
  * Fixtures:
  *   nasty/undangan-cid.pdf  — Montserrat embedded FULL coverage (subset:
@@ -53,8 +61,8 @@ async function downloadCurrent(page) {
 // Same read shape as core/redact.js / core/reinsert.js: Contents may be one
 // stream or an array, decode/tokenize is irrelevant here — we only need the
 // page's Resources -> Font key COUNT, which is what a NEW drawText/embedFont
-// call (the twin path) would grow. A native re-insert reuses an EXISTING key
-// and adds none. Self-contained (no closure refs) — passed straight into
+// call ALWAYS grows now (see module header — native and twin both add one
+// post-rebuild). Self-contained (no closure refs) — passed straight into
 // page.evaluate(fontKeyCount, arr).
 async function fontKeyCount(arr) {
   const bytes = new Uint8Array(arr);
@@ -73,6 +81,36 @@ async function fontKeyCount(arr) {
   return fontDict.keys().length;
 }
 
+// The /BaseFont name of whichever font key in the OUTPUT is NOT present (by
+// key string) in the ORIGINAL — i.e. the one resource this edit just added.
+// pdf-lib derives /BaseFont from the embedded program's own internal name
+// table, so this is the one honest after-the-fact signal for WHICH rung
+// fired (see module header): a native stamp of undangan-cid.pdf's Montserrat
+// subset carries "Montserrat" in it; a clone/twin substitute would carry
+// Arimo/Tinos/Cousine/Carlito/Caladea/Helvetica instead.
+async function newFontBaseName({ origArr, outArr }) {
+  const { PDFLib } = window;
+  const { PDFName, PDFRef, PDFDict } = PDFLib;
+  const origDoc = await PDFLib.PDFDocument.load(new Uint8Array(origArr));
+  const outDoc = await PDFLib.PDFDocument.load(new Uint8Array(outArr));
+  const fontDictOf = (pdfDoc) => {
+    const pg = pdfDoc.getPages()[0];
+    const context = pdfDoc.context;
+    const res = (v) => (v instanceof PDFRef ? context.lookup(v) : v);
+    const resources = pg.node.Resources();
+    const raw = resources?.get(PDFName.of('Font'));
+    const dict = raw ? res(raw) : null;
+    return dict instanceof PDFDict ? { dict, context, res } : null;
+  };
+  const origKeys = (fontDictOf(origDoc)?.dict.keys() ?? []).map((k) => k.toString());
+  const out = fontDictOf(outDoc);
+  const newKey = out.dict.keys().find((k) => !origKeys.includes(k.toString()));
+  if (!newKey) return null;
+  const fontObj = out.res(out.dict.get(newKey));
+  const baseFontRaw = fontObj.get(PDFName.of('BaseFont'));
+  return baseFontRaw ? out.res(baseFontRaw).toString() : null;
+}
+
 async function extractItems(page, buf) {
   return page.evaluate(async (arr) => {
     const bytes = new Uint8Array(arr);
@@ -84,7 +122,7 @@ async function extractItems(page, buf) {
 }
 
 test.describe('rung C — native re-insert (own-font replacement)', () => {
-  test('native re-insert end-to-end: replacement lands in the text layer with NO new font resource added', async ({ page }) => {
+  test('native re-insert end-to-end: replacement lands in the text layer, stamped with the doc\'s OWN font', async ({ page }) => {
     await openDoc(page, CID_FIXTURE);
     await armGanti(page);
     // The 2nd paint-order match (nth: 1) is the MIDDLE of the three identical
@@ -108,12 +146,15 @@ test.describe('rung C — native re-insert (own-font replacement)', () => {
     const origCount = await page.evaluate(fontKeyCount, Array.from(origBuf));
     const outCount = await page.evaluate(fontKeyCount, Array.from(outBuf));
 
-    // No NEW font resource was added for this replacement — the twin path
-    // (drawText -> env.getFont -> embedFont) always grows this count by at
-    // least one; a native re-insert reuses an EXISTING /Font key and adds
-    // none. This is the structural proof the replacement was painted with
-    // the document's OWN font, not a metric-twin annotation.
-    expect(outCount).toBe(origCount);
+    // A stamp (native, clone, OR twin) always registers a FRESH pdf-lib font
+    // object (module header) — exactly one new resource, whichever rung
+    // supplied it.
+    expect(outCount).toBe(origCount + 1);
+    // — and it's the NATIVE rung specifically: the new resource's /BaseFont
+    // carries this fixture's own font family name, proving pdf-lib embedded
+    // the DOC'S Montserrat subset program, not a clone/twin substitute.
+    const newBaseFont = await page.evaluate(newFontBaseName, { origArr: Array.from(origBuf), outArr: Array.from(outBuf) });
+    expect(newBaseFont).toMatch(/Montserrat/i);
   });
 
   test('position held: the replacement paints at the removed line\'s own baseline (y) and start (x)', async ({ page }) => {
@@ -144,11 +185,22 @@ test.describe('rung C — native re-insert (own-font replacement)', () => {
     expect(Math.abs(replacement.x - middle.x)).toBeLessThanOrEqual(1);
   });
 
-  test('fallback intact: a standard-14 (no embedded font program) line still exports via the twin path', async ({ page }) => {
+  test('fallback intact: Line A\'s multi-fragment geometry declines BOTH stamp rungs (mixed-fonts) — still exports via the twin path', async ({ page }) => {
+    // CORRECTED WHY (verified empirically against this exact fixture+edit via
+    // window.v2.getDoc().pages[0].editOutcomes, not assumed): Line A is 3 kern
+    // fragments (ganti-baris.spec.js's module header) — text-walk.js's walk
+    // flags this target's `insert.mixedFonts` true, and core/stamp.js's
+    // resolveStampFont checks that structural guard FIRST, before either rung
+    // (same order reinsert.js's old planNativeInsert used) — so this was
+    // ALWAYS a twin via 'mixed-fonts', unaffected by the Path B rebuild. (An
+    // earlier draft of this test guessed the font-decide.js CLONE_TABLE route
+    // for standard-14 Helvetica would fire here instead — it doesn't, because
+    // the mixed-fonts guard short-circuits before font resolution is ever
+    // attempted. That clone route DOES exist and IS reachable — see
+    // core/stamp.test.mjs's rung-2 coverage — just not on this fixture/edit.)
     await openDoc(page, FRAGMEN_FIXTURE);
     await armGanti(page);
-    // Line A (index 0, per ganti-baris.spec.js's LINE map): Helvetica
-    // Type1/standard-14 — no FontFile2/3 at all, guaranteed 'unsupported-font'.
+    // Line A (index 0, per ganti-baris.spec.js's LINE map).
     await tapLine(page, { index: 0 });
     await expect(page.locator('.v2-text-edit')).toHaveText('Nomor: 045/SEK/VII/2026');
     await page.keyboard.type('Nomor Baru 001');
@@ -161,7 +213,7 @@ test.describe('rung C — native re-insert (own-font replacement)', () => {
     expect(items.some((i) => i.str.includes('Nomor Baru 001'))).toBe(true);
 
     // Contrast proof: the twin path DID add a new font resource (drawText ->
-    // embedFont), unlike the native path in the test above.
+    // embedFont), unlike a resolved stamp reusing an already-cached embed.
     const origBuf = fs.readFileSync(FRAGMEN_FIXTURE);
     const origCount = await page.evaluate(fontKeyCount, Array.from(origBuf));
     const outCount = await page.evaluate(fontKeyCount, Array.from(outBuf));

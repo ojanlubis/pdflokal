@@ -68,3 +68,76 @@ test('subtitle edit under a base CTM bakes natively at the ORIGINAL position', a
   expect(out.testItem).not.toBeNull();
   expect(Math.abs(out.testItem.y - origY)).toBeLessThan(3); // AT the original position (the bug)
 });
+
+/*
+ * ACCEPTANCE CASE — spec-edit-rebuild-composite.md increment 1 (Path B,
+ * founder-ruled 2026-07-22): "the org-structure edit that produced
+ * 'T estinggg' is the acceptance case: 'Testinggg' stamps with correct
+ * spacing at y≈517." The old hand-rolled native writer (core/reinsert.js's
+ * CID hex-TJ builder) could paint a stray TJ kern INSIDE a word when its
+ * per-glyph advance math drifted — "Testinggg" (a single word, no real word
+ * gap at all) rendered back with a spurious space as "T estinggg" on this
+ * exact fixture. pdf-lib's own drawText lays out and encodes the string
+ * itself — no hand-rolled TJ array, no advance math to drift — so that bug
+ * CLASS is deleted, not patched. pdf-lib also generates a real ToUnicode CMap
+ * for the font it embeds, which is what makes the assertion below possible
+ * at all: getTextContent() actually resolves the stamped CIDs back to text
+ * (the old snippet path had no such CMap for its own re-inserted run).
+ */
+test('acceptance: "Testinggg" stamps with NO spurious space, at the original position (y≈517)', async ({ page }) => {
+  await page.goto('/');
+  await page.setInputFiles('#file-input', NASTY('org-structure.pdf'));
+  await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
+  await expect(page.locator('[data-tool="ganti"]')).toBeVisible();
+  await page.waitForTimeout(500);
+  await armGanti(page);
+
+  const { origY, c } = await page.evaluate(async () => {
+    const pg = window.v2.getDoc().pages[0];
+    const line = (await window.v2.textRuns.getLines(pg.id)).find((l) => /Berlaku|Maret/.test(l.str));
+    const view = document.querySelector(`.pv-page[data-page-id="${pg.id}"]`);
+    const r = view.getBoundingClientRect();
+    window.scrollTo(0, Math.max(0, r.top + window.scrollY + line.y * (r.height / view.offsetHeight) - innerHeight / 2));
+    const r2 = view.getBoundingClientRect();
+    return {
+      origY: Math.round(line.pdf.y0),
+      c: { x: r2.left + (line.x + line.w / 2) * (r2.width / view.offsetWidth), y: r2.top + (line.y + line.h / 2) * (r2.height / view.offsetHeight) },
+    };
+  });
+  expect(Math.abs(origY - 517)).toBeLessThan(2); // the spec's own pinned position
+
+  await page.mouse.click(c.x, c.y);
+  await expect(page.locator('.v2-text-edit')).toBeVisible();
+  await page.locator('.v2-text-edit').evaluate((el) => { el.textContent = ''; });
+  await page.keyboard.type('Testinggg');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.v2-text-edit')).toHaveCount(0);
+
+  const out = await page.evaluate(async () => {
+    const { ensurePdfLib } = await import('/js/core/vendor.js');
+    const { buildEditedPageBytes } = await import('/js/core/page-surgery.js');
+    const { PDFLib, fontkit } = await ensurePdfLib();
+    const d = window.v2.getDoc(); const pg = d.pages[0];
+    const srcDoc = await PDFLib.PDFDocument.load(d.sources.find((s) => s.id === pg.sourceId).bytes);
+    const result = await buildEditedPageBytes(srcDoc, pg, pg.annotations, { PDFLib, fontkit });
+    const parsed = await window.pdfjsLib.getDocument({ data: result.bytes.slice() }).promise;
+    const tc = await (await parsed.getPage(1)).getTextContent();
+    // The EXACT string, not a substring match — "T estinggg" would also
+    // match /testinggg/i via includes-style loose matching, so this looks
+    // for the precise item text pdf.js reconstructed.
+    const exact = tc.items.find((i) => i.str === 'Testinggg');
+    const spurious = tc.items.find((i) => i.str.includes('T estinggg'));
+    return {
+      outcome: pg.editOutcomes[0],
+      exactY: exact ? Math.round(exact.transform[5]) : null,
+      spuriousFound: !!spurious,
+      allStrings: tc.items.map((i) => i.str),
+    };
+  });
+
+  expect(out.outcome.insert.path).toBe('native'); // doc's own Montserrat/whatever subset, not a clone/twin
+  expect(out.outcome.insert.reason).toBe('clean');
+  expect(out.spuriousFound).toBe(false); // the exact bug this rebuild deletes
+  expect(out.exactY).not.toBeNull(); // "Testinggg" extracts as ONE clean string
+  expect(Math.abs(out.exactY - 517)).toBeLessThan(2); // AND at the original position
+});

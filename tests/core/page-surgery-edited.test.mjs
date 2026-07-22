@@ -71,6 +71,39 @@ function deriveTarget(srcPage, PDFLib, recIndex) {
   return { rec, target, content, records };
 }
 
+// Resources -> Font dict, resolved (or null). Same shape as
+// export-parity.test.mjs's fontDictOf — the stamp rebuild (spec-edit-rebuild-
+// composite.md) means a native re-insert now ALSO grows the font resource
+// count by one (pdf-lib always registers a fresh font object, even for the
+// exact same program bytes an existing resource already carries), so telling
+// native apart from clone/twin needs the new resource's OWN /BaseFont name,
+// not just a key-count delta. See export-parity.test.mjs's fuller comment.
+function fontDictOf(PDFLib, pdfPage) {
+  const { PDFName, PDFRef, PDFDict } = PDFLib;
+  const resources = pdfPage.node.Resources();
+  if (!resources) return null;
+  const fontDictRaw = resources.get(PDFName.of('Font'));
+  if (!fontDictRaw) return null;
+  const fontDict = fontDictRaw instanceof PDFRef ? pdfPage.doc.context.lookup(fontDictRaw) : fontDictRaw;
+  return fontDict instanceof PDFDict ? fontDict : null;
+}
+
+function newFontKey(PDFLib, pdfPage, beforeKeys) {
+  const fontDict = fontDictOf(PDFLib, pdfPage);
+  return fontDict?.keys().find((k) => !beforeKeys.includes(k.toString())) ?? null;
+}
+
+function newFontBaseName(PDFLib, pdfPage, beforeKeys) {
+  const { PDFName, PDFRef } = PDFLib;
+  const context = pdfPage.doc.context;
+  const res = (v) => (v instanceof PDFRef ? context.lookup(v) : v);
+  const key = newFontKey(PDFLib, pdfPage, beforeKeys);
+  if (!key) return null;
+  const fontObj = res(fontDictOf(PDFLib, pdfPage).get(key));
+  const baseFontRaw = fontObj.get(PDFName.of('BaseFont'));
+  return baseFontRaw ? res(baseFontRaw).toString() : null;
+}
+
 // The "ganti" pair: a whiteout cover carrying replaceTargets/replaceBox + a
 // text annotation carrying replaceCoverId — the exact shape js/v2/app.js's
 // smartReplace/openTextEditor commit path produces, and the exact input
@@ -107,6 +140,8 @@ test('buildEditedPageBytes: undangan-cid.pdf — target line surgically cut + na
   const { cover, text } = addGantiPair(doc, page, target, 'Rapat Baru');
   assert.notEqual(editSignature(page), ''); // a page carrying a committed edit has a non-empty signature
 
+  const origFontKeys = (fontDictOf(PDFLib, srcPage)?.keys() ?? []).map((k) => k.toString());
+
   const srcDoc = await PDFLib.PDFDocument.load(bytes);
   const result = await buildEditedPageBytes(srcDoc, page, page.annotations, { PDFLib, fontkit });
 
@@ -135,8 +170,13 @@ test('buildEditedPageBytes: undangan-cid.pdf — target line surgically cut + na
   );
   assert.equal(stillThere ? stillThere.tokens.some((tok) => tok.t === 'str') : false, false);
 
-  // The native insert landed with the removed run's own resource font.
-  assert.ok(outContent.includes(`/${rec.fontName} 1 Tf`));
+  // The native insert landed: pdf-lib always registers a FRESH font object
+  // (spec-edit-rebuild-composite.md — no more reusing the removed run's own
+  // resource key), but the new resource's /BaseFont carries this fixture's
+  // own font family name — proof pdf-lib embedded the DOC'S subset program,
+  // not a clone/twin substitute (see export-parity.test.mjs's fuller WHY).
+  const newBaseFont = newFontBaseName(PDFLib, outPage, origFontKeys);
+  assert.match(newBaseFont, /Montserrat/i);
 
   // The two untouched repeats survive verbatim — surgery only cut the one
   // tapped occurrence.

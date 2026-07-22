@@ -12,10 +12,16 @@
  * no substitution to disclose, so the substitute toast must NOT fire).
  *
  * The negative twin: 'SEÑORA' — S/E/O/R/A are all covered; the tilde exists
- * NOWHERE in the subset (no ñ donor, no cmap entry), so composition declines
- * whole (no partial paint), the twin text overlay stays, and the substitute
- * toast fires with today's copy (one grammar for every substitute tier —
- * ratified over per-tier wording).
+ * NOWHERE in the subset (no ñ donor, no cmap entry), so the doc's own font
+ * declines whole. REBUILD NOTE (spec-edit-rebuild-composite.md, 2026-07-22):
+ * core/compose.js no longer runs on the write path (Path B, ⚖1 RETIRED) — a
+ * doc-subset decline now falls to core/stamp.js's CLONE rung instead, which
+ * routes this fixture's /BaseFont to the bundled REAL Carlito (this fixture
+ * embeds carlito-subset.ttf, a TRUE subset of that same family), and real
+ * Carlito DOES cover Ñ. So this edit now bakes via clone rather than staying
+ * a twin overlay — strictly wider than compose ever reached. The substitute
+ * toast still fires (one grammar for every substitute tier — ratified over
+ * per-tier wording; a clone IS a substitute per the founder's notice policy).
  */
 import { test, expect } from '@playwright/test';
 import path from 'path';
@@ -78,7 +84,25 @@ test.describe('ganti teks — composed glyphs (document\'s own font)', () => {
     expect(await page.locator('#toast').textContent()).not.toBe(SUBSTITUTE_TOAST);
   });
 
-  test('uncomposable char (Ñ, no tilde anywhere in the subset): twin text overlay stays and the substitute toast fires', async ({ page }) => {
+  test('char uncomposable by the OLD tier-2 trick (Ñ): now BAKES via the clone rung instead of staying a twin overlay (spec-edit-rebuild-composite.md, 2026-07-22)', async ({ page }) => {
+    // REBUILD NOTE: this test used to pin core/compose.js's own boundary —
+    // Ñ has no tilde anywhere in carlito-subset.ttf's cmap OR any donor
+    // composite, so the OLD tier-2 composer declined whole and the
+    // replacement stayed a DOM-rendered twin TEXT overlay. Path B retires
+    // compose.js from the WRITE path entirely (spec §1's ⚖1, RETIRED):
+    // a doc-subset decline now falls to core/stamp.js's rung 2 (clone)
+    // instead, which routes nota-subset.pdf's /BaseFont ("Carlito-Regular-
+    // <n>", from the SAME carlito-subset.ttf this fixture embeds — see
+    // scripts/gen-fixture-subset.mjs) to the bundled REAL Carlito, which DOES
+    // cover Ñ (unlike the doc's own true subset). So this edit now bakes
+    // fully — both overlay halves suppressed — a strictly wider outcome than
+    // compose ever produced. js/v2/app.js's own draft-time toast prediction
+    // is untouched by this rebuild (still reads compose.js's coverage check,
+    // not stamp.js's) — it still calls Ñ "not covered by the doc's own font"
+    // and fires the substitute notice, which happens to still be the CORRECT
+    // signal here (a clone IS a substitute, per the founder's notice policy
+    // — spec §3), just reached via an outdated prediction path. That toast
+    // assertion is untouched below; only the overlay expectation changes.
     await openDoc(page);
 
     await armGanti(page);
@@ -92,9 +116,10 @@ test.describe('ganti teks — composed glyphs (document\'s own font)', () => {
     await expect(page.locator('#toast')).toHaveText(SUBSTITUTE_TOAST);
 
     // Surgery (the cut) still succeeds → the cover bakes away; the
-    // REPLACEMENT declines composition → it stays a twin TEXT overlay.
-    // No partial paint: the composed path is all-or-nothing per edit.
+    // REPLACEMENT now resolves via the CLONE rung (real Carlito covers Ñ) →
+    // it bakes into the raster too, same as the composed case above — no DOM
+    // overlay survives for either half.
     await expect(page.locator('.pv-anno-whiteout')).toHaveCount(0, { timeout: 10_000 });
-    await expect(page.locator('.pv-anno-text')).toHaveCount(1);
+    await expect(page.locator('.pv-anno-text')).toHaveCount(0);
   });
 });
