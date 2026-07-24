@@ -17,6 +17,7 @@
 import { buildPdfBytes } from '../core/export.js';
 import { ensurePdfJs, ensurePdfLib, ensureFflate } from '../core/vendor.js';
 import { track } from '../lib/analytics.js';
+import { formatDecimal } from '../lib/i18n.js';
 import { tel } from './telemetry.js';
 import { durationBucket } from '../core/telemetry-schema.js';
 import { showStamp } from './celebrate.js';
@@ -46,7 +47,9 @@ const IMG_DIMS = { asli: null, sedang: 1500, kecil: 800 };
 function fmtMB(bytes) {
   const mb = bytes / (1024 * 1024);
   if (mb < 1) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
-  return `${mb.toFixed(1).replace('.', ',')} MB`;
+  // Decimal separator is locale-driven (id → "0,5 MB", en → "0.5 MB"). Byte-identical
+  // to the old hardcoded ',' while the active locale is `id`. SINGLE SOURCE OF TRUTH: i18n.
+  return `${formatDecimal(mb, 1)} MB`;
 }
 
 // deps = {
