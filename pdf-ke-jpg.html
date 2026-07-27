@@ -131,6 +131,25 @@
     @font-face { font-family: 'Carlito'; src: url('fonts/carlito-bold.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
     @font-face { font-family: 'Carlito'; src: url('fonts/carlito-italic.woff2') format('woff2'); font-weight: 400; font-style: italic; font-display: swap; }
     @font-face { font-family: 'Carlito'; src: url('fonts/carlito-bolditalic.woff2') format('woff2'); font-weight: 700; font-style: italic; font-display: swap; }
+    /* Metric clones (font-fidelity tier 1) — declared, never preloaded: the
+       browser fetches a face only when text actually uses the family, so
+       these 16 files cost zero bytes until Edit (teks asli) routes to one. */
+    @font-face { font-family: 'Arimo'; src: url('fonts/arimo-regular.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+    @font-face { font-family: 'Arimo'; src: url('fonts/arimo-bold.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
+    @font-face { font-family: 'Arimo'; src: url('fonts/arimo-italic.woff2') format('woff2'); font-weight: 400; font-style: italic; font-display: swap; }
+    @font-face { font-family: 'Arimo'; src: url('fonts/arimo-bolditalic.woff2') format('woff2'); font-weight: 700; font-style: italic; font-display: swap; }
+    @font-face { font-family: 'Tinos'; src: url('fonts/tinos-regular.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+    @font-face { font-family: 'Tinos'; src: url('fonts/tinos-bold.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
+    @font-face { font-family: 'Tinos'; src: url('fonts/tinos-italic.woff2') format('woff2'); font-weight: 400; font-style: italic; font-display: swap; }
+    @font-face { font-family: 'Tinos'; src: url('fonts/tinos-bolditalic.woff2') format('woff2'); font-weight: 700; font-style: italic; font-display: swap; }
+    @font-face { font-family: 'Cousine'; src: url('fonts/cousine-regular.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+    @font-face { font-family: 'Cousine'; src: url('fonts/cousine-bold.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
+    @font-face { font-family: 'Cousine'; src: url('fonts/cousine-italic.woff2') format('woff2'); font-weight: 400; font-style: italic; font-display: swap; }
+    @font-face { font-family: 'Cousine'; src: url('fonts/cousine-bolditalic.woff2') format('woff2'); font-weight: 700; font-style: italic; font-display: swap; }
+    @font-face { font-family: 'Caladea'; src: url('fonts/caladea-regular.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+    @font-face { font-family: 'Caladea'; src: url('fonts/caladea-bold.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
+    @font-face { font-family: 'Caladea'; src: url('fonts/caladea-italic.woff2') format('woff2'); font-weight: 400; font-style: italic; font-display: swap; }
+    @font-face { font-family: 'Caladea'; src: url('fonts/caladea-bolditalic.woff2') format('woff2'); font-weight: 700; font-style: italic; font-display: swap; }
     /* UI face: Plus Jakarta Sans, the brand font (Indonesian-designed, already self-hosted) */
     @font-face { font-family: 'Plus Jakarta Sans'; src: url('fonts/plusjakartasans-regular.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
     @font-face { font-family: 'Plus Jakarta Sans'; src: url('fonts/plusjakartasans-500.woff2') format('woff2'); font-weight: 500; font-style: normal; font-display: swap; }
@@ -213,11 +232,21 @@
       padding: 0 8px; overflow-x: auto;
     }
     .tool {
+      position: relative;
       display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
       gap: 1px; min-width: 56px; height: 44px; border-radius: 10px;
       font-size: 10.5px; color: var(--muted);
     }
     .tool svg { width: 19px; height: 19px; }
+    /* Beta status chip on the Edit tool (cap = pernyataan status, never
+       decoration) — corner-positioned so it never widens the tight toolbar. */
+    .tool .beta-tag {
+      position: absolute; top: 1px; right: 1px;
+      font-size: 7.5px; font-weight: 700; line-height: 1;
+      letter-spacing: .03em; text-transform: uppercase;
+      color: #fff; background: var(--accent, #dc2626);
+      border-radius: 4px; padding: 1.5px 3px; pointer-events: none;
+    }
     .tool.active { background: rgba(220,38,38,.08); color: var(--accent); }
 
     /* ---- format bar: contextual, only when text is in play ---- */
@@ -856,10 +885,9 @@
   </header>
 
   <div id="toolbar" role="toolbar" aria-label="Alat">
-    <button class="tool active" data-tool="select" aria-pressed="true">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 3 7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/></svg>
-      Pilih
-    </button>
+    <!-- No "Pilih" button (founder ruling 2026-07-19): the neutral mode is a
+         STATE, not a tool — nothing lit means nothing armed. Every armed tool
+         toggles off on a second tap; V / Escape also disarm. -->
     <button class="tool" data-tool="text" aria-pressed="false">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
       Teks
@@ -867,6 +895,10 @@
     <button class="tool" data-tool="whiteout" aria-pressed="false">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="8" rx="1"/></svg>
       Tip-Ex
+    </button>
+    <button class="tool" data-tool="ganti" aria-pressed="false" aria-label="Edit teks asli yang sudah tercetak di PDF (fitur beta)" title="Edit teks asli di PDF — masih beta, kabari kami kalau ada yang aneh">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+      Edit<span class="beta-tag">beta</span>
     </button>
     <button class="tool" data-tool="signature" aria-pressed="false">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17c3-6 5-8 6-6s-1 7 1 7 3-9 5-9 0 9 2 9 2-3 4-3"/></svg>

@@ -82,6 +82,20 @@ export async function ensurePdfLib() {
   return { PDFLib: window.PDFLib, fontkit: window.fontkit };
 }
 
+// fontkit alone — Rung C's live-font-preview dry run (js/v2/app.js's
+// prepareDocFont) only needs to LEARN a font's coverage at draft-open time; it
+// doesn't need pdf-lib's full export surface for that. In practice the export
+// path's ensurePdfLib() above already fetches this alongside PDFLib (they
+// "always travel together" per that function's own comment) so a caller doing
+// BOTH reads (pdf-lib parsing + fontkit coverage) — as app.js's dry run
+// does — should still prefer ensurePdfLib() for one round trip; this exists
+// for a caller that genuinely only needs fontkit, mirroring the same
+// idempotent lazy-loader shape as ensureSignaturePad/ensureFflate below.
+export async function ensureFontkit() {
+  if (!window.fontkit) await loadScript('/js/vendor/fontkit.umd.min.js');
+  return window.fontkit;
+}
+
 // SignaturePad — the draw pane of the signature/paraf sheet.
 export async function ensureSignaturePad() {
   if (!window.SignaturePad) await loadScript('/js/vendor/signature_pad.umd.min.js');

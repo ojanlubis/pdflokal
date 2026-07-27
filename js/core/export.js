@@ -22,18 +22,28 @@
  */
 
 import { buildExportPlan } from './operations.js';
+import { applyPageSurgery } from './page-surgery.js';
+import { CLONE_FONT_VARIANTS, CLONE_FONT_URLS } from './clone-fonts.js';
 
 // ---- fonts ------------------------------------------------------------------
 
 // Key format: [family] → { [bold][italic] } → pdf-lib font name.
 // Helvetica/Times/Courier are pdf-lib standard fonts (no bytes embedded);
-// Montserrat/Carlito are self-hosted files embedded via fontkit.
+// Montserrat is a self-hosted file embedded via fontkit. The five
+// Croscore/crosextra clone families (Arimo/Tinos/Cousine/Carlito/Caladea —
+// font-fidelity tier 1, core/font-decide.js) are spread in from
+// clone-fonts.js: routed by /BaseFont for substitution AND offered in the
+// font dropdown as authoring choices (founder ruling 2026-07-20 evening;
+// spec-font-fidelity-engine.md §3) — core/stamp.js's rung-2 clone ladder
+// needs the EXACT same weight-file mapping to fetch the same woff2 this
+// module would, so it's factored into one shared source rather than kept as
+// two copies.
 const FONT_NAME_MAP = {
   'Helvetica':   { '00': 'Helvetica', '10': 'HelveticaBold', '01': 'HelveticaOblique', '11': 'HelveticaBoldOblique' },
   'Times-Roman': { '00': 'TimesRoman', '10': 'TimesRomanBold', '01': 'TimesRomanItalic', '11': 'TimesRomanBoldItalic' },
   'Courier':     { '00': 'Courier', '10': 'CourierBold', '01': 'CourierOblique', '11': 'CourierBoldOblique' },
   'Montserrat':  { '00': 'Montserrat', '10': 'Montserrat-Bold', '01': 'Montserrat-Italic', '11': 'Montserrat-BoldItalic' },
-  'Carlito':     { '00': 'Carlito', '10': 'Carlito-Bold', '01': 'Carlito-Italic', '11': 'Carlito-BoldItalic' },
+  ...CLONE_FONT_VARIANTS,
 };
 
 const CUSTOM_FONT_URLS = {
@@ -41,13 +51,10 @@ const CUSTOM_FONT_URLS = {
   'Montserrat-Bold': 'fonts/montserrat-bold.woff2',
   'Montserrat-Italic': 'fonts/montserrat-italic.woff2',
   'Montserrat-BoldItalic': 'fonts/montserrat-bolditalic.woff2',
-  'Carlito': 'fonts/carlito-regular.woff2',
-  'Carlito-Bold': 'fonts/carlito-bold.woff2',
-  'Carlito-Italic': 'fonts/carlito-italic.woff2',
-  'Carlito-BoldItalic': 'fonts/carlito-bolditalic.woff2',
+  ...CLONE_FONT_URLS,
 };
 
-const CUSTOM_FONT_FAMILIES = new Set(['Montserrat', 'Carlito']);
+const CUSTOM_FONT_FAMILIES = new Set(['Montserrat', 'Carlito', 'Arimo', 'Tinos', 'Cousine', 'Caladea']);
 
 // WHY: AbortController timeout prevents export from hanging indefinitely if a
 // self-hosted font file fails to load (e.g. offline, 404). Same guard as the
@@ -340,12 +347,26 @@ export async function buildPdfBytes(doc, deps = {}) {
     }
     if (page.rotation) pdfPage.setRotation(PDFLib.degrees(page.rotation));
 
+    // WHY this runs HERE, before any drawing: applyPageSurgery's two rungs
+    // must cut/append into the copied page's content stream before pdf-lib's
+    // first draw call (drawRectangle/drawText/…) appends its OWN content
+    // stream to the page — run it after and both rungs would have to contend
+    // with content pdf-lib itself just wrote (see page-surgery.js's own WHY
+    // for the full ordering argument). Image pages can't carry text targets
+    // at all — guarded (not just inert) so a future image-page shape change
+    // can't accidentally feed it here.
+    const { skipCovers, skipDraw } = page.isFromImage
+      ? { skipCovers: new Set(), skipDraw: new Set() }
+      : await applyPageSurgery(pdfPage, PDFLib, fontkit, annotations);
+
     if (annotations.length === 0) continue;
     // wU/hU: UNROTATED page dims (MediaBox) — setRotation is metadata only,
     // drawing happens in this frame. See transformAnnotationCoords.
     const { width: wU, height: hU } = pdfPage.getSize();
     const frame = { rotation: page.rotation || 0, wU, hU };
     for (const anno of annotations) {
+      if (skipCovers.has(anno.id)) continue; // surgery succeeded — true background shows through
+      if (skipDraw.has(anno.id)) continue; // Rung C wrote this one natively — don't double-paint
       const draw = ANNOTATION_DRAWERS[anno.type];
       if (!draw) {
         console.warn('[core/export] Unknown annotation type, skipping:', anno.type);

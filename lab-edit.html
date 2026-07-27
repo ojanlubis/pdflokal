@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>lab — edit teks asli · fase 1 (text-run intelligence)</title>
+<style>
+  :root { --ink: #1c1917; --paper: #fafaf9; --line: #d6d3d1; --red: #dc2626; --hit: rgba(220, 38, 38, .08); }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.5 system-ui, sans-serif; background: var(--paper); color: var(--ink); padding-bottom: 130px; }
+  header { padding: 10px 16px; border-bottom: 1px solid var(--line); display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  header strong { color: var(--red); }
+  header .note { color: #78716c; font-size: 12px; }
+  .toolbar { padding: 10px 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  #stats { font-size: 12px; color: #57534e; }
+  #router { font-weight: 600; padding: 2px 8px; border-radius: 4px; border: 1px solid var(--line); }
+  #router.digital { color: #166534; border-color: #166534; }
+  #router.scan { color: #9a3412; border-color: #9a3412; }
+  #pages { display: flex; flex-direction: column; gap: 20px; align-items: center; padding: 8px 16px; }
+  .page-wrap { position: relative; box-shadow: 0 1px 6px rgba(0,0,0,.15); max-width: 100%; }
+  .page-wrap canvas { display: block; max-width: 100%; height: auto; }
+  .run { position: absolute; cursor: pointer; }
+  body.show-boxes .run { outline: 1px solid rgba(220, 38, 38, .35); background: var(--hit); }
+  .run.selected { outline: 2px solid var(--red); background: rgba(220, 38, 38, .18); }
+  #panel { position: fixed; left: 0; right: 0; bottom: 0; background: #fff; border-top: 2px solid var(--red);
+           padding: 10px 16px; font-family: ui-monospace, monospace; font-size: 12px; min-height: 110px; }
+  #panel b { color: var(--red); font-family: system-ui, sans-serif; }
+</style>
+</head>
+<body class="show-boxes">
+<header>
+  <strong>lab-edit · fase 1 + 2</strong>
+  <span class="note">fase 1: ekstraksi run + kotak + hit-test + router. fase 2: HAPUS run dari content stream (Rung B — teks benar-benar hilang, bukan ditutup). Halaman internal, noindex, bukan produk.</span>
+</header>
+<div class="toolbar">
+  <input type="file" id="file" accept="application/pdf">
+  <button id="load-sample">muat sample (tests/fixtures)</button>
+  <label><input type="checkbox" id="toggle-boxes" checked> tampilkan kotak</label>
+  <span id="router"></span>
+  <span id="stats"></span>
+</div>
+<div id="pages"></div>
+<aside id="panel">tap salah satu kotak merah di halaman untuk melihat isi run-nya…</aside>
+
+<script type="module" src="/js/lab-edit.js"></script>
+</body>
+</html>

@@ -58,8 +58,9 @@ test.describe('punch list rd2 — mobile', () => {
     await drawStroke(page);
     await page.tap('#sig-use');
     await page.tap('.pv-page >> nth=0', { position: { x: 150, y: 250 } });
-    // Deselect by choosing Pilih, then arm delete-mode and tap the signature.
-    await page.tap('[data-tool="select"]');
+    // Disarm to neutral (the Pilih button is gone — neutral is a state, not a
+    // tool), then arm delete-mode and tap the signature.
+    await page.evaluate(() => { window.v2.setTool('select'); });
     await page.evaluate(() => { window.v2.getDoc().selection.annotationId = null; });
     await page.tap('#btn-delete-anno');
     await page.tap('.pv-page >> nth=0', { position: { x: 150, y: 250 } });

@@ -17,6 +17,7 @@
  * event.
  */
 import { validateEvent } from '../core/telemetry-schema.js';
+import { validateSample } from '../core/feedback-sample.js';
 
 const ENDPOINT = '/api/t';
 const FLUSH_AT = 10;
@@ -103,5 +104,94 @@ export function tel(event, props = {}) {
     if (queue.length >= FLUSH_AT) flush();
   } catch {
     // Telemetry can NEVER throw into app code (spec §2).
+  }
+}
+
+// ---- human feedback (BETA loop — founder ruling 2026-07-22) --------------------
+// A DELIBERATE exception to this file's string-free law: the thumbs pill lets a
+// user TYPE a note. That note is the ONE user-authored free field in the whole
+// telemetry surface — so it does NOT ride tel()/the typed events table. It goes
+// to its OWN endpoint (/api/feedback) and its OWN Supabase table, keeping the
+// `events` rail's "no string field ever" invariant intact (spec-telemetry.md
+// §2 — the boundary law is about the MACHINE filling a free field; a human
+// consciously writing feedback is the inverse case, and it stays walled off).
+// Reuses THIS session's id + app_version so a 👎 correlates with the ganti_
+// commit/insert/surgery events that same session emitted. Sent immediately
+// (a discrete, deliberate tap), never batched. NEVER carries document text.
+const FEEDBACK_ENDPOINT = '/api/feedback';
+const FEEDBACK_NOTE_MAX = 1000;
+
+// ---- Increment D: the consent-gated sample (spec-edit-fidelity-instrumentation.md) --
+// Two small crops (before/after PNG data URLs of the edited line's OWN box) a
+// user explicitly asked us to send after a 👎 — never automatic, never the
+// page or the file (decisions.md 2026-07-23/2026-07-27). Only PLUMBING lives
+// here: js/v2/app.js decides WHETHER to offer a sample and captures the
+// crops; js/v2/edit-feedback.js decides whether the user actually tapped
+// Kirim. This module's only job is "is this pair small/well-formed enough to
+// go out the wire at all" (validateSample, shared with api/feedback.js's
+// server-side mirror so the two never disagree) and "which transport".
+//
+// TRANSPORT FINDING (builder, 2026-07-27): sendBeacon's common ~64KiB payload
+// cap is NOT sendBeacon-specific — fetch's own spec enforces the identical
+// 64KiB budget for ANY keepalive:true request ("if contentLengthValue +
+// inflightKeepaliveBytes > 64 KiB, network error", confirmed against the
+// Fetch Standard + real Chromium/WebKit behavior). Two PNG crops capped at
+// 70KB combined (core/feedback-sample.js) base64-encode to ~93KB — still
+// comfortably over BOTH. So `keepalive`
+// buys nothing here; a PLAIN (non-keepalive) fetch is the actual fix, and is
+// safe for this specific call because a 👎→Kirim tap is a synchronous,
+// foreground user action — the page stays open (the pill still has to show
+// "Makasih" for ~1.7s), unlike flush()'s visibilitychange-triggered batch
+// send above, which genuinely needs beacon/keepalive's survive-navigation
+// guarantee. If fetch itself is unavailable/throws synchronously, fall back
+// to sendBeacon WITHOUT the images — the core rating+note signal must never
+// be lost just because the bonus sample couldn't go.
+
+/**
+ * Record a thumbs rating (+ optional free-text note, + optional consent-
+ * gated before/after sample) for the edit feature.
+ * @param {'up'|'down'} rating
+ * @param {string} [note] user-typed, capped, optional
+ * @param {{before: string, after: string}} [sample] two PNG data URLs — only
+ *   ever passed when the user saw them rendered in the pill and tapped Kirim.
+ */
+export function feedback(rating, note, sample) {
+  try {
+    if (rating !== 'up' && rating !== 'down') return;
+    const payload = { session_id: sessionId, app_version: appVersion, rating };
+    const trimmed = typeof note === 'string' ? note.trim().slice(0, FEEDBACK_NOTE_MAX) : '';
+    if (trimmed) payload.note = trimmed;
+
+    const validSample = validateSample(sample);
+    if (validSample) {
+      payload.sample_before = validSample.before;
+      payload.sample_after = validSample.after;
+    }
+
+    if (validSample && typeof fetch === 'function') {
+      try {
+        // Plain fetch, no keepalive — see the transport finding above. Never
+        // awaited, never surfaced to app code; a failed send here just means
+        // no beacon fallback fires either (accepted residual loss, same as
+        // every other telemetry drop in this file).
+        fetch(FEEDBACK_ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }).catch(() => {});
+        return;
+      } catch {
+        // fetch threw synchronously (disabled/CSP/etc) — fall through to the
+        // beacon path below, WITHOUT the images (they're what made this
+        // request too big for beacon in the first place).
+      }
+    }
+
+    if (typeof navigator?.sendBeacon !== 'function') return; // no beacon — drop, never retry
+    if (validSample) { delete payload.sample_before; delete payload.sample_after; }
+    const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+    navigator.sendBeacon(FEEDBACK_ENDPOINT, blob);
+  } catch {
+    // Feedback can NEVER throw into app code — same law as tel().
   }
 }

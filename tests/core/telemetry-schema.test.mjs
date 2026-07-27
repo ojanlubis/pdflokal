@@ -19,13 +19,21 @@ const VALID_PROPS = {
   doc_open: { text_layer: true, pages: '1', device: 'desktop' },
   tool_use: { tool: 'teks', action: 'text' },
   export: { surgery_used: false, fallback: 'none', duration: 100 },
-  font_seen: { flavor: 'type0-identity-h', extract: 'ok' },
+  // font_seen/insert widened spec-edit-fidelity-instrumentation.md Increment
+  // B (rides with Increment A's fingerprint ladder, core/font-fingerprint.js).
+  font_seen: {
+    flavor: 'type0-identity-h', extract: 'ok', embedded: true, subtype: 'type0',
+    name_informative: false, bold: true, style_source: 'program-name',
+  },
   ganti_tap: { hit: true },
   ganti_commit: { outcome: 'commit', font_path: 'doc-font' },
   surgery: { matched: true, reason: 'clean' },
-  insert: { path: 'native', reason: 'clean' },
+  insert: { path: 'native', reason: 'clean', style_source: 'pdf-name', glyph_shortfall: 0 },
   block_edit: { editable: true, reason: 'single-line', align: 'left' },
   commit_paint: { duration: 250, pages: '2-5', device: 'phone' },
+  // visual_oracle (spec-edit-fidelity-instrumentation.md Increment C):
+  // core/visual-oracle.js's compareRegions() ratios, bucketed.
+  visual_oracle: { weight_ratio: 'near-parity', height_ratio: 'near-parity', overflow: false },
 };
 
 test('every SCHEMA event has a VALID_PROPS fixture (test coverage stays complete as events are added)', () => {
