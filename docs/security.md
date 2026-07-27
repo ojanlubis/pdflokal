@@ -4,10 +4,32 @@ Detailed security configuration and library documentation. See [CLAUDE.md](../CL
 
 ## Privacy Requirements
 
-- Files must NEVER leave the user's device
-- No analytics or tracking without explicit user consent
+- **Files must NEVER leave the user's device** — the invariant everything else serves. Unchanged.
 - No external API calls with user data
 - Open source = users can verify privacy claims
+- **Analytics are anonymous and content-blind, not consent-gated** _(corrected 2026-07-27 — this
+  line previously read "no analytics or tracking without explicit user consent," which the product
+  has not matched since GA4 shipped; a requirements doc that states a rule the code doesn't follow
+  is worse than no doc)._ What actually runs: GA4 for **acquisition only** (how people arrive), and
+  a first-party typed rail for **behavior**. Neither carries file contents or a persistent user id.
+  The one consent-gated exception is the beta Edit image crop, below.
+
+## Server surface (added 2026-07 — keep this honest)
+
+All *file processing* is client-side, but the app is no longer purely static. Two serverless
+endpoints are the only code that runs off-device, and neither ever receives a PDF:
+
+- **`api/t.js`** — typed, content-blind telemetry. Every event is validated against
+  `js/core/telemetry-schema.js` and **dropped if off-schema**. The schema has no free-string field,
+  so it cannot carry document content even by accident. Always answers 204, so it never reveals
+  whether a write happened. Writes to Supabase with a service key held only in env.
+- **`api/feedback.js`** — the beta Edit 👍/👎, plus an **opt-in** image crop of the one edited line.
+  Sent only when the user rates 👎, *sees the exact crops*, and taps Kirim. Size-capped client-side,
+  re-checked server-side (never trust the client), and constrained again by DB check constraints.
+
+Both **fail closed**: if their env vars are absent the endpoint 204s and writes nothing. That
+property is load-bearing and also a trap — it silently swallowed a week of preview telemetry in
+July 2026 before anyone noticed. Verify the rail by querying for rows, never by a 2xx response.
 
 ## Security Headers (vercel.json)
 

@@ -1,15 +1,21 @@
 # CLAUDE.MD - PDFLokal Project Guide
 
-## ⚡ STATUS (July 3, 2026): V2 SHIPPED — pdflokal.id IS the clean rebuild
+## ⚡ STATUS (updated July 27, 2026): V2 IS THE PRODUCT — pdflokal.id runs the clean rebuild
 
-**Read this section first; much of the rest of this file describes the OLD wing and awaits the demolition-phase rewrite.** Current product status/priorities live at the project seat: `../STATE.md`.
+**Read this section first.** Sections below marked as describing the OLD wing (`js/editor/`, `js/pdf-tools/`, `ueState`) are kept only because that wing still serves the image tools at `alat-gambar.html`; it dies at demolition. Their detail docs now live in [docs/legacy/](docs/legacy/) behind a warning banner. Current product status/priorities live at the project seat: `../STATE.md` → `../TODO.md`.
+
+**Since the July 3 v2 swap, all live:** 12 SEO pages (`seo/pages.json` + generator — never hand-edit the output) · installable PWA · a first-party content-blind telemetry rail (`api/t.js`, the repo's only server code besides `api/feedback.js`) · **Edit Teks Asli (beta)** — editing the text already printed in a PDF.
+
+**The Edit engine, in one paragraph** (it is the newest and least obvious subsystem): a PDF has no text, only instructions to paint glyphs. So editing means cut + stamp — `js/core/text-walk.js` interprets the content stream to find and remove the original show-ops, then `js/core/stamp.js` picks a font it can *prove* is right (the document's own embedded program → a bundled metric clone → a generic twin) and lets **pdf-lib** lay the replacement out. We do not hand-write glyph operators; that approach was built, shipped, and deleted (−1118 LOC) because its bug class was unbounded. Two laws came out of that and both are load-bearing: **read the artifact, not its label** (a font wrapper claiming `CIDFont+F1` can *be* `Arial-BoldMT`), and **the export path derives from the document, never inherits from UI state that may not have loaded.**
 
 - **`index.html` is Editor v2**: the landing page IS the editor's empty state (kop-surat header, dropzone, tool cards with `?buat=` intent hook, FAQ). Architecture: headless core (`js/core/` — model, operations, history, import, export, compress, export-images), render layer (`js/render/` — page-view, viewport, interaction; pages are `<img>`, one overlay, one pointer path), app shell (`js/v2/` — app, download-sheet, page-manager, signature-modal, format-bar, celebrate). Self-contained CSS inside index.html — style.css belongs to the old wing.
 - **The old app lives at `alat-gambar.html`** (renamed old index.html, noindexed) solely to keep the image tools alive until absorption. It still uses `js/editor/`, `js/pdf-tools/`, `style.css`, the old init files. **All of that dies at demolition** (after the post-launch bake) along with most of this file's "Core Architecture" section.
 - **Design language is LAW**: red #dc2626 on warm stone, Plus Jakarta Sans, red-chrome-never-prints, paper-on-desk shadows, stempel-press buttons, the 5-stamp language ("cap = pernyataan status", never decoration). Never default signature ink to a colour — user content renders as the user made it. Design skills installed in `.agents/skills/` — load before UI work.
 - **Interaction model**: camera-first touch (selection commits at release); select-then-edit for text (first click/tap selects, the next one edits — no double-tap timing windows). Both founder-ratified.
-- **Tests**: `tests/mobile/**` (mobile-chrome project, the deep suite) + `tests/editor-v2-desktop.spec.js` target v2 at `/`. Old suites were repointed at `/alat-gambar.html` and die with the old wing. `tests/core/` runs headless via `npm run test:core`. Full sweep: `npm run lint` + `npx playwright test`.
-- **Working rhythm**: branch → failing test → green → full sweep → PR → `gh pr merge --squash --admin --delete-branch` (authorized) → verify Vercel deploy via commit status → update the project seat (`../backlog.md` + `../STATE.md`). Screenshot every new UI surface (a broken dialog once passed all functional tests).
+- **Tests**: `tests/mobile/**` (mobile-chrome project, the deep suite) + `tests/editor-v2-desktop.spec.js` target v2 at `/`. Old suites were repointed at `/alat-gambar.html` and die with the old wing. `tests/core/` runs headless via `npm run test:core`. Full sweep: `npm run lint` + `npx playwright test` (currently ~190 core + ~266 Playwright). `tests/fixtures/nasty/` is the corpus of real documents that have actually broken things — add to it whenever a real file finds a bug.
+- **Never run two Playwright invocations at once** — they fight over the dev-server port and produce phantom `ERR_CONNECTION_REFUSED` failures that look like real ones. Agents should run lint + core only and let one owner run the sweep.
+- **Verify a green signal by asking what would look identical if broken.** Real examples from this repo: a telemetry endpoint that 204s whether or not it wrote (a week of data lost silently); tests asserting "no images sent" while watching only `sendBeacon` when the send went by `fetch`; two crops asserted "non-empty" when both were the same stale image. Assertions must be able to fail.
+- **Working rhythm**: branch → failing test → green → full sweep → PR → `gh pr merge --squash --admin --delete-branch` (authorized) → verify Vercel deploy via commit status → update the project seat (`../STATE.md` + `../TODO.md`). Screenshot every new UI surface (a broken dialog once passed all functional tests). **Squash-merging means `git branch --merged` will report the source branch as unmerged forever — audit with a three-dot diff (`git diff origin/main...$b`), never commit counts.**
 - **Gotchas (v2)**: `npx serve` cleanUrls 301 strips query strings (tests use extensionless URLs); the global `dialog` CSS rule IS the overlay — new dialogs must use a `.sheet` child; `history` is shadowed in app.js by the undo history (use `window.history`); no grid rebuilds mid-drag in page-manager (render parks on `dragActive`).
 
 ## Project Overview
@@ -23,7 +29,7 @@
 
 ## ★ North Star & product status → `../STATE.md` (project seat)
 
-The product vision, status, roadmap, and founder-desk log moved UP to the project seat during the Great Reorg (2026-07-15): `../STATE.md` (read first), `../product-definition.md` (the North Star — read before any product/design/architecture call), `../roadmap.md`, `../foundation-plan.md`, `../backlog.md`. This file is code-guidance for the repo only.
+The product vision, status, roadmap, and founder-desk log live at the project seat one level up (moved 2026-07-15, re-foldered 2026-07-27): **`../STATE.md`** (read first — current state only) → **`../TODO.md`** (the single queue) → `../decisions.md` (rulings + why). Reference docs are in `../reference/` (`product-definition.md` = the North Star, read before any product/design/architecture call · `roadmap.md` · `foundation-plan.md` · `backlog.md` = the ads/SEO log); build specs are in `../specs/`. This file is code-guidance for the repo only.
 
 One-line anchor kept here: **WinRAR × Excalidraw of PDF for Indonesia; 100% client-side IS the moat (private + fast + free-forever + offline); the editor is the product; refuse server-jobs (OCR, PDF↔Word).**
 
@@ -43,7 +49,7 @@ When facing a design question ("how should we structure X?"), check how these pr
 
 Read **[docs/strengths.md](docs/strengths.md)** first — explains WHY vanilla JS, WHY no framework, and WHY AI as primary developer is the core architectural decision.
 
-See **[docs/future-architecture.md](docs/future-architecture.md)** before starting any major refactor.
+See **[docs/legacy/future-architecture.md](docs/legacy/future-architecture.md)** before starting any major refactor.
 Key ideas captured there:
 1. **Reactive state layer** — COMPLETED (Mar 2026). `js/lib/events.js` pub/sub emitter
 1b. **PageRenderer class** — COMPLETED (Mar 2026). Render pipeline encapsulated in `page-rendering.js`
@@ -124,7 +130,7 @@ Everything lives in `index.html`. Vendor libs load as global `<script>` tags, th
 - Vendor libs accessed via `window.*` in modules
 - Circular deps resolved by using `window.*` for one direction of each cycle
 
-See [docs/patterns.md](docs/patterns.md) for import conventions, window bridge pattern, and circular dependency list.
+See [docs/legacy/patterns.md](docs/legacy/patterns.md) for import conventions, window bridge pattern, and circular dependency list.
 
 ### State Management
 
@@ -133,7 +139,7 @@ State objects live in `js/lib/state.js`. Key objects:
 - **`ueState`** - Unified Editor state (pages, annotations, tools, undo stacks, rendering, guards)
 - **`uePmState`** - Gabungkan Modal state (merge/split mode, selection, drag)
 
-**SSOT helpers** (Single Source of Truth — see [docs/architecture.md](docs/architecture.md)):
+**SSOT helpers** (Single Source of Truth — see [docs/legacy/architecture.md](docs/legacy/architecture.md)):
 - **`getDefaultUeState()`** (state.js) — returns all default ueState values. Used by initial definition + `ueReset()`. Adding a new field here automatically gets it reset.
 - **`createPageInfo()`** (state.js) — factory for page objects. All code paths that create pages must use this (file-loading, undo-redo). Guarantees consistent shape.
 - **`getThumbnailSource(pageIndex)`** (canvas-utils.js) — resolves best canvas for thumbnails. Used by sidebar and mobile picker. **Exception**: Gabungkan modal uses `page.thumbCanvas` directly (pageCanvases stale while modal open).
@@ -150,7 +156,7 @@ Refer to `js/lib/state.js` for full shape and comments on each field.
 
 The flagship multi-document PDF editor. When users drop a PDF on the homepage, it opens here.
 
-**Architecture:** Multi-canvas continuous vertical scroll. Each page gets its own `<canvas>` in `#ue-pages-container`. Body scroll with IntersectionObserver (`root: null`) for lazy rendering. Render pipeline owned by `PageRenderer` class (singleton in `page-rendering.js`), created/destroyed by `lifecycle.js`. See [docs/patterns.md](docs/patterns.md) for full function reference.
+**Architecture:** Multi-canvas continuous vertical scroll. Each page gets its own `<canvas>` in `#ue-pages-container`. Body scroll with IntersectionObserver (`root: null`) for lazy rendering. Render pipeline owned by `PageRenderer` class (singleton in `page-rendering.js`), created/destroyed by `lifecycle.js`. See [docs/legacy/patterns.md](docs/legacy/patterns.md) for full function reference.
 
 **Editor Layout:**
 - **Header** (40px, sticky top:0): `[File v] PDFLokal [moon] [Download PDF]`
@@ -162,7 +168,7 @@ The flagship multi-document PDF editor. When users drop a PDF on the homepage, i
 
 **Features:** Multi-file merge, page reorder/rotate/delete, annotations (whiteout, text, signatures), Gabungkan modal with split mode, zoom, undo/redo (separate stacks for page ops vs annotations), keyboard shortcuts.
 
-**Text annotations:** Font family (Helvetica, Times, Courier, Montserrat, Carlito), bold/italic, size 6-120pt, color presets.
+**Text annotations:** Font family (Helvetica, Times, Courier, Montserrat, Carlito + the metric clones Arimo/Tinos/Cousine/Caladea — labelled with their familiar equivalents, e.g. "Arimo (Arial)"), bold/italic, size 6-120pt, color presets.
 
 **Signatures:** Upload images (with background removal), draw, auto-lock after placement, double-click to unlock, delete button.
 
@@ -190,7 +196,7 @@ Compress, Resize, Convert Format (JPG/PNG/WebP), Image to PDF, Remove Background
 
 ### Homepage
 
-Hero + dropzone (opens editor), PDF tool cards (Editor, Merge, Split, PDF-to-Image, Compress, Protect), Image tool cards. Merge/Split cards use file-picker-first pattern (see [docs/patterns.md](docs/patterns.md)).
+Hero + dropzone (opens editor), PDF tool cards (Editor, Merge, Split, PDF-to-Image, Compress, Protect), Image tool cards. Merge/Split cards use file-picker-first pattern (see [docs/legacy/patterns.md](docs/legacy/patterns.md)).
 
 ### Navigation & UX
 
@@ -322,7 +328,7 @@ Hero + dropzone (opens editor), PDF tool cards (Editor, Merge, Split, PDF-to-Ima
 - **Device capability detection:** `deviceCapability` object in state.js — `isTouch`, `isCoarsePointer`, `formFactor` ('phone'/'tablet'/'desktop'), `maxCanvasPixels` (5MP/10MP/16MP). Populated by `detectMobile()` in init.js. Foundation for future pixel-budget rendering.
 - Pinch-to-zoom supported via 2-finger touch detection in `canvas-events.js`
 
-**Key patterns:** `rebuildAnnotationMapping(oldPages)` for reference-based reindex, `requestAnimationFrame` guard before `ueCreatePageSlots()` for layout reflow. See [docs/patterns.md](docs/patterns.md) for code examples.
+**Key patterns:** `rebuildAnnotationMapping(oldPages)` for reference-based reindex, `requestAnimationFrame` guard before `ueCreatePageSlots()` for layout reflow. See [docs/legacy/patterns.md](docs/legacy/patterns.md) for code examples.
 
 ## Important Gotchas
 
@@ -373,7 +379,7 @@ Edit `changelogData` array in `js/changelog.js`. Add new entries at the beginnin
 
 **Don't modify without good reason:** `vercel.json`, vendor libs, privacy promises, Indonesian UI language
 
-**Detailed references:** [docs/patterns.md](docs/patterns.md) (code examples), [docs/security.md](docs/security.md) (CSP, headers, libraries), [docs/architecture.md](docs/architecture.md) (SSOT patterns)
+**Detailed references:** [docs/legacy/patterns.md](docs/legacy/patterns.md) (code examples), [docs/security.md](docs/security.md) (CSP, headers, libraries), [docs/legacy/architecture.md](docs/legacy/architecture.md) (SSOT patterns)
 
 ---
 

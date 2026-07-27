@@ -1,3 +1,7 @@
+> ⚠️ **LEGACY — describes the OLD wing (`js/editor/`, `js/pdf-tools/`, `ueState`), which now lives only at `alat-gambar.html` and dies at demolition.**
+> Editor v2 (`js/core/` + `js/render/` + `js/v2/`) is the live product and is documented in [../../CLAUDE.md](../../CLAUDE.md).
+> Kept because the old wing still runs the image tools. Do not treat anything below as current. _(Filed 2026-07-27.)_
+
 # Editor UI Design: "Document Viewer with Annotation Superpowers"
 
 > Implemented Feb 2026. This document describes the current editor layout and the design rationale behind it.

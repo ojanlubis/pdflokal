@@ -1,6 +1,10 @@
+> ⚠️ **LEGACY — describes the OLD wing (`js/editor/`, `js/pdf-tools/`, `ueState`), which now lives only at `alat-gambar.html` and dies at demolition.**
+> Editor v2 (`js/core/` + `js/render/` + `js/v2/`) is the live product and is documented in [../../CLAUDE.md](../../CLAUDE.md).
+> Kept because the old wing still runs the image tools. Do not treat anything below as current. _(Filed 2026-07-27.)_
+
 # PDFLokal Code Patterns Reference
 
-Detailed code examples for common development tasks. See [CLAUDE.md](../CLAUDE.md) for project overview and architecture.
+Detailed code examples for common development tasks. See [CLAUDE.md](../../CLAUDE.md) for project overview and architecture.
 
 ## ES Module Patterns
 

@@ -15,7 +15,12 @@ PDFLokal adalah tool PDF gratis untuk pengguna Indonesia. Semua proses berjalan 
 ## Update Terbaru
 
 **Juli 2026:**
-- **Contextual text format bar** — pick font, bold/italic, size, and color while typing; select a text annotation and the format menu appears above it. Remembers your last-used style
+- **Edit teks asli (beta)** — tap a printed line in a PDF and rewrite it. The original glyphs are cut from the content stream and the replacement is stamped back in the document's own embedded font when it can be proven to cover the text, otherwise a metric-identical clone (Carlito/Arimo/Tinos/Cousine/Caladea). No white box, no mismatched font, and nothing is uploaded
+- **Editor is the landing page** — `index.html` IS the editor's empty state; drop a file and you're already working
+- **Installable PWA** — works offline from a cold launch
+- **12 SEO pages** for the specific jobs people actually search for
+- **First-party telemetry** — a typed, content-blind event rail (no file data, ever) so the product can see what breaks in the wild
+- **Contextual text format bar** — pick font, bold/italic, size, and color while typing
 - **Mobile editor polish** — fixed toolbar overlap and Ganti File render bugs
 
 **Mei 2026:**
@@ -47,7 +52,9 @@ PDFLokal adalah tool PDF gratis untuk pengguna Indonesia. Semua proses berjalan 
 ## Fitur
 
 ### PDF Tools
-- **Editor PDF** — Unified editor with whiteout, text (5 fonts, bold/italic, color), signatures (upload with background removal, draw, place → Konfirmasi to lock, double-click to unlock), paraf/initials, watermark, page numbers, password protection
+- **Editor PDF** — Unified editor with whiteout, text (9 fonts, bold/italic, color), signatures (upload with background removal, draw, place → Konfirmasi to lock, double-click to unlock), paraf/initials, watermark, page numbers, password protection
+- **Edit teks asli** (beta) — edit the text already printed in the PDF, in place, in the document's own font
+- **Kelola Halaman** — reorder, rotate, delete, and split pages
 - **Tema gelap / terang** — Theme toggle stored per-device
 - **Gabung PDF** — Merge multiple PDFs and images with drag-drop reordering
 - **Split PDF** — Extract selected pages as a separate PDF
@@ -64,10 +71,16 @@ PDFLokal adalah tool PDF gratis untuk pengguna Indonesia. Semua proses berjalan 
 
 ## Privasi
 
-- **100% Client-side** — All processing happens in the browser
+- **100% Client-side** — All file processing happens in the browser
 - **No uploads** — Files never leave your device
 - **Open source** — Code can be inspected by anyone
 - **Security headers** — CSP, X-Frame-Options, and more ([details](docs/security.md))
+
+The one exception, stated plainly: PDFLokal sends **anonymous, typed usage events** (which tool was
+used, how long an export took, what device class) to its own endpoint — never file contents, and the
+schema physically has no field that could carry them. The beta Edit feature can also send a small
+image crop of a single edited line, but **only** if you rate it 👎, see the exact crop, and tap Kirim.
+Full detail in [privasi.html](privasi.html).
 
 ## Cara Pakai
 
@@ -94,39 +107,36 @@ npx serve .
 - **[pdf-lib](https://pdf-lib.js.org/)** — PDF manipulation (self-hosted)
 - **[PDF.js](https://mozilla.github.io/pdf.js/)** — PDF rendering with Web Worker (self-hosted)
 - **[Signature Pad](https://github.com/szimek/signature_pad)** — Digital signatures (self-hosted)
-- **[fontkit](https://github.com/foliojs/fontkit)** — Embeds Montserrat + Carlito into exported PDFs (self-hosted)
+- **[fontkit](https://github.com/foliojs/fontkit)** — Reads a PDF's own embedded font program (glyph coverage, weight, PANOSE) and embeds fonts into exports (self-hosted)
 - **[pdf-encrypt-lite](https://github.com/nicholasohjj/pdf-encrypt-lite)** — PDF password encryption (self-hosted)
 - **Canvas API** — Image processing
-- **Self-hosted fonts** — UI font Plus Jakarta Sans + annotation fonts Montserrat / Carlito (268KB)
+- **Self-hosted fonts** — UI font Plus Jakarta Sans + annotation fonts Montserrat, Carlito, and the metric-compatible Croscore set (Arimo/Tinos/Cousine/Caladea — stand-ins for Arial/Times/Courier/Cambria when a document's own font can't be reused)
 
 ### Project Structure
 ```
 pdflokal/
-├── index.html              # Single-page application
-├── style.css               # All styles
+├── index.html              # Editor v2 — the landing page IS the editor's empty state
+├── alat-gambar.html        # the OLD wing (image tools only), noindexed, awaiting demolition
 ├── CLAUDE.md               # Technical reference for AI and developers
-├── CONTRIBUTING.md          # Contribution guide
+├── CONTRIBUTING.md         # Contribution guide
 ├── js/
-│   ├── init.js             # Entry point (imports all modules)
-│   ├── lib/
-│   │   ├── state.js        # State, constants, annotation factories
-│   │   ├── utils.js        # Helpers (toast, download, file type checks)
-│   │   └── navigation.js   # Routing, modal helpers, history
-│   ├── editor/             # Unified Editor (15 modules)
-│   │   ├── index.js        # Barrel exports + window bridges
-│   │   ├── canvas-events.js
-│   │   ├── file-loading.js
-│   │   ├── annotations.js
-│   │   ├── signatures.js
-│   │   ├── page-manager.js
-│   │   ├── page-rendering.js
-│   │   ├── pdf-export.js
-│   │   └── ...
-│   ├── pdf-tools/          # PDF tool modals (7 modules)
-│   ├── image-tools.js      # Image processing tools
-│   └── vendor/             # Self-hosted libraries (2.6 MB)
-├── fonts/                  # Self-hosted fonts
-├── docs/                   # Architecture and reference docs
+│   ├── core/               # headless engine — no DOM, unit-tested via `npm run test:core`
+│   │   ├── model.js  operations.js  history.js  import.js  export.js
+│   │   ├── text-walk.js    # content-stream interpreter: find + cut the original glyphs
+│   │   ├── stamp.js        # the write path: resolve a font, let pdf-lib lay the text out
+│   │   ├── doc-fonts.js  font-style.js  font-fingerprint.js  font-decide.js
+│   │   ├── page-surgery.js # cut + stamp, per page
+│   │   └── visual-oracle.js  telemetry-schema.js
+│   ├── render/             # page-view, viewport, interaction (pages are <img>, one overlay)
+│   ├── v2/                 # app shell — app.js, download-sheet, page-manager, telemetry
+│   ├── lib/                # state, utils, navigation (shared with the old wing)
+│   ├── editor/  pdf-tools/ # the OLD wing's modules — die at demolition
+│   └── vendor/             # self-hosted libraries (2.6 MB), zero CDN
+├── api/                    # the only server code: content-blind telemetry + feedback
+├── tests/                  # Playwright specs + core/ unit tests + fixtures/nasty/
+├── seo/                    # pages.json — the SEO generator's source of truth
+├── fonts/                  # self-hosted fonts
+├── docs/                   # current docs (legacy/ holds the old wing's, clearly marked)
 └── images/                 # UI assets
 ```
 
@@ -159,10 +169,15 @@ Some of the real bugs in this repo's history are written up as field notes: the 
 3. **PDF kompleks** — Some encrypted PDFs or PDFs with special fonts may not work
 4. **Browser lama** — Requires a modern browser with ES6+ support
 
-### Fitur yang Butuh Server (Coming Soon)
-- PDF ke Word / Excel
-- Word / Excel ke PDF
-- OCR (text recognition)
+### Yang tidak akan kami buat (dan kenapa)
+
+- **PDF ↔ Word / Excel** — needs a server to do properly, and a server breaks the one promise this
+  project is built on: your file never leaves your device. Declined permanently, not "coming soon."
+- **OCR di server** — same reason, same answer.
+
+**OCR in the browser is a different thing and it is planned** — running locally (WASM/WebGPU),
+nothing uploaded. Roughly half of all documents opened here are scans with no text layer, so this
+is the other half of the product, not a footnote.
 
 ## Lisensi & Commercial Use
 
