@@ -391,6 +391,12 @@ export function createDownloadSheet(deps) {
         surgery_used: false,
         fallback: 'none',
         duration: durationBucket(performance.now() - t0),
+        // The CHOICES — same values the GA4 event above carries, now first-party
+        // too: what they came to DO (compress? to image? extract pages?) instead
+        // of just "a download happened". format normalises img→png/jpg like GA4.
+        format: state.format === 'pdf' ? 'pdf' : state.imgfmt,
+        size: state.size,
+        pages_scope: state.picked ? 'some' : 'all',
       });
       modal.close();
     } catch (err) {

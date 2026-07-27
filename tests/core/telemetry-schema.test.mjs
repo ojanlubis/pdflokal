@@ -10,15 +10,21 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { SCHEMA, validateEvent, pagesBucket, durationBucket } from '../../js/core/telemetry-schema.js';
+import { SCHEMA, validateEvent, pagesBucket, durationBucket, intentValue } from '../../js/core/telemetry-schema.js';
 
 // A minimal, schema-valid props object for each event — used to prove every
 // declared event validates cleanly at least once, and as a base to mutate
 // for the negative tests below.
 const VALID_PROPS = {
-  doc_open: { text_layer: true, pages: '1', device: 'desktop' },
+  doc_open: { text_layer: true, pages: '1', device: 'desktop', intent: 'none' },
   tool_use: { tool: 'teks', action: 'text' },
-  export: { surgery_used: false, fallback: 'none', duration: 100 },
+  // export carries BOTH the edit-ladder fields (surgery_used/fallback/duration)
+  // and the intent fields (format/size/pages_scope) — the two branches taught
+  // this event different halves of the same question; the merge keeps both.
+  export: {
+    surgery_used: false, fallback: 'none', duration: 100,
+    format: 'pdf', size: 'asli', pages_scope: 'all',
+  },
   // font_seen/insert widened spec-edit-fidelity-instrumentation.md Increment
   // B (rides with Increment A's fingerprint ladder, core/font-fingerprint.js).
   font_seen: {
@@ -80,6 +86,55 @@ test('enum value outside the declared list fails', () => {
   assert.equal(validateEvent('doc_open', { ...VALID_PROPS.doc_open, device: 'smart-fridge' }).ok, false);
   assert.equal(validateEvent('tool_use', { ...VALID_PROPS.tool_use, tool: 'scissors' }).ok, false);
   assert.equal(validateEvent('export', { ...VALID_PROPS.export, fallback: 'server' }).ok, false);
+});
+
+// ---- the "what did they come to do?" additions (intent + export choices) ------
+
+test('doc_open.intent accepts every declared job and rejects an off-list value', () => {
+  for (const intent of ['gabung', 'split', 'halaman', 'kompres', 'ttd', 'paraf', 'teks', 'tipex', 'gambar', 'foto', 'none']) {
+    assert.equal(validateEvent('doc_open', { ...VALID_PROPS.doc_open, intent }).ok, true, `intent "${intent}" should be valid`);
+  }
+  assert.equal(validateEvent('doc_open', { ...VALID_PROPS.doc_open, intent: 'hack' }).ok, false);
+  assert.equal(validateEvent('doc_open', { ...VALID_PROPS.doc_open, intent: undefined }).ok, false); // now required
+});
+
+test('tool_use gains gabung/merge as the first-party merge signal', () => {
+  assert.equal(validateEvent('tool_use', { tool: 'gabung', action: 'merge' }).ok, true);
+  assert.equal(validateEvent('tool_use', { tool: 'gabung', action: 'text' }).ok, true); // action enum is per-event, not paired
+});
+
+test('export choices: format/size/pages_scope validate and are required', () => {
+  for (const format of ['pdf', 'png', 'jpg']) {
+    assert.equal(validateEvent('export', { ...VALID_PROPS.export, format }).ok, true);
+  }
+  for (const size of ['asli', 'kompres', 'sedang', 'kecil']) {
+    assert.equal(validateEvent('export', { ...VALID_PROPS.export, size }).ok, true);
+  }
+  for (const pages_scope of ['all', 'some']) {
+    assert.equal(validateEvent('export', { ...VALID_PROPS.export, pages_scope }).ok, true);
+  }
+  assert.equal(validateEvent('export', { ...VALID_PROPS.export, format: 'docx' }).ok, false);
+  assert.equal(validateEvent('export', { ...VALID_PROPS.export, size: 'raksasa' }).ok, false);
+  assert.equal(validateEvent('export', { ...VALID_PROPS.export, pages_scope: 'most' }).ok, false);
+  // required: dropping any one fails the whole event
+  const { format, ...noFormat } = VALID_PROPS.export; // eslint-disable-line no-unused-vars
+  assert.equal(validateEvent('export', noFormat).ok, false);
+});
+
+test('intentValue: real keys pass through, garbage/null/typos collapse to none (never off-schema)', () => {
+  for (const k of ['gabung', 'split', 'halaman', 'kompres', 'ttd', 'paraf', 'teks', 'tipex', 'gambar', 'foto', 'none']) {
+    assert.equal(intentValue(k), k);
+  }
+  assert.equal(intentValue('gabung; DROP TABLE'), 'none');
+  assert.equal(intentValue(''), 'none');
+  assert.equal(intentValue(null), 'none');
+  assert.equal(intentValue(undefined), 'none');
+  assert.equal(intentValue('GABUNG'), 'none'); // case-sensitive by design
+  // every intentValue output must satisfy the doc_open.intent descriptor
+  for (const raw of ['gabung', 'xyz', null, undefined, 42]) {
+    const r = validateEvent('doc_open', { ...VALID_PROPS.doc_open, intent: intentValue(raw) });
+    assert.equal(r.ok, true, `intentValue(${String(raw)}) must be schema-valid`);
+  }
 });
 
 test('wrong type fails for bool props', () => {
@@ -157,7 +212,7 @@ test('durationBucket: clamps to [0, 600000] and rounds to the nearest 10ms', () 
 test('durationBucket output always satisfies the "duration" type descriptor', () => {
   for (const ms of [-100, 0, 1, 9, 10, 12345, 600000, 999999]) {
     const bucketed = durationBucket(ms);
-    const result = validateEvent('export', { surgery_used: false, fallback: 'none', duration: bucketed });
+    const result = validateEvent('export', { ...VALID_PROPS.export, duration: bucketed });
     assert.equal(result.ok, true, `durationBucket(${ms}) = ${bucketed} should be schema-valid`);
   }
 });

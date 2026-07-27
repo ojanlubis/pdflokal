@@ -65,6 +65,23 @@ const STYLE_SOURCE = ['pdf-name', 'pdf-flags', 'program-name', 'os2', 'panose', 
 // 'near-parity' bucket rather than splitting across a cut by a hair.
 const RATIO_BUCKET = ['much-lower', 'lower', 'near-parity', 'higher', 'much-higher'];
 
+// The declared job the user arrived with — from ?buat=, a landing card, or a
+// /gabung-pdf-style page's <body data-intent>. Mirrors INTENT_COPY's keys in
+// js/v2/intent-copy.js exactly, plus 'none' for "arrived with nothing
+// declared" (the bare homepage). This is the ONE "what did they come to do"
+// enum — keep it in lockstep with INTENT_COPY. Content-blind: a job label,
+// never a filename. (This signal used to live ONLY in GA4's file_loaded;
+// bringing it here is what lets the first-party rail answer intent on its own.)
+const INTENT = ['gabung', 'split', 'halaman', 'kompres', 'ttd', 'paraf', 'teks', 'tipex', 'gambar', 'foto', 'none'];
+
+// The Unduh-sheet choices (the REALIZED job — mirror of GA4's download event):
+//   format:      pdf, or an image export (png/jpg)
+//   size:        asli/kompres for a PDF · asli/sedang/kecil for image dimensions
+//   pages_scope: whole doc, or a picked subset (= an extract / split)
+const EXPORT_FORMAT = ['pdf', 'png', 'jpg'];
+const EXPORT_SIZE = ['asli', 'kompres', 'sedang', 'kecil'];
+const PAGES_SCOPE = ['all', 'some'];
+
 const DURATION_MAX_MS = 600000;
 const DURATION_STEP_MS = 10;
 
@@ -77,6 +94,15 @@ export function pagesBucket(n) {
   if (v <= 5) return '2-5';
   if (v <= 20) return '6-20';
   return '21+';
+}
+
+// raw intent (a real INTENT key, null, or user-controlled ?buat= garbage) → a
+// valid enum value. Anything off-list or missing collapses to 'none' — the
+// same defensive stance as pagesBucket, and here it MATTERS: ?buat= is
+// attacker/typo-controllable, and letting a bad value through would fail the
+// WHOLE doc_open event, silently losing its text_layer/device/pages too.
+export function intentValue(raw) {
+  return INTENT.includes(raw) ? raw : 'none';
 }
 
 // spec-edit-fidelity-instrumentation.md Increment B: `insert.glyph_shortfall`
@@ -130,6 +156,7 @@ export const SCHEMA = {
     text_layer: 'bool',
     pages: PAGES_BUCKET,
     device: DEVICE,
+    intent: INTENT,
   },
   // tool: the v2 toolbar's own verbs (Pilih/Teks/Tip-Ex/TTD/Hapus/Halaman) —
   // 'ganti' (Rung B's smart-replace tool) is listed now for schema
@@ -140,8 +167,8 @@ export const SCHEMA = {
   // us this before, see app.js's armIntent() note) is distinguishable from
   // a committed edit.
   tool_use: {
-    tool: ['select', 'teks', 'tipex', 'ganti', 'ttd', 'hapus', 'halaman'],
-    action: ['select', 'whiteout', 'text', 'text_inline', 'signature', 'paraf', 'delete', 'pages_open'],
+    tool: ['select', 'teks', 'tipex', 'ganti', 'ttd', 'hapus', 'halaman', 'gabung'],
+    action: ['select', 'whiteout', 'text', 'text_inline', 'signature', 'paraf', 'delete', 'pages_open', 'merge'],
   },
   export: {
     // surgery_used/fallback are always false/'none' from call sites on this
@@ -151,6 +178,13 @@ export const SCHEMA = {
     surgery_used: 'bool',
     fallback: ['none', 'cover', 'twin'],
     duration: 'duration',
+    // The user's Unduh-sheet choices — the mirror of GA4's download event, the
+    // signal the rail used to throw away. This is what lets a plain download,
+    // a Kompres, a PDF→Gambar, and a page-extract be told apart. All three
+    // enums come straight from download-sheet.js's own state.
+    format: EXPORT_FORMAT,
+    size: EXPORT_SIZE,
+    pages_scope: PAGES_SCOPE,
   },
 
   // ---- ladder (Rung A–D) — schema-complete now, call sites land on the ladder branch ----

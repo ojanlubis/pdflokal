@@ -23,7 +23,7 @@ import {
 } from '../core/operations.js';
 import { createHistory, record, undo, redo, canUndo, canRedo } from '../core/history.js';
 import { importPdf, importImage, createPageRasterizer, probeTextLayer } from '../core/import.js';
-import { pagesBucket, durationBucket, ratioBucket } from '../core/telemetry-schema.js';
+import { pagesBucket, durationBucket, ratioBucket, intentValue } from '../core/telemetry-schema.js';
 import { compareRegions } from '../core/visual-oracle.js';
 import { validateSample } from '../core/feedback-sample.js';
 import { createPageSlot, syncOverlay, textFontCss } from '../render/page-view.js';
@@ -1853,7 +1853,8 @@ async function loadFilesInner(files) {
   if (usable.length === 0) { toast('Pilih file PDF atau gambar ya'); return; }
   const oversize = usable.find((f) => f.size > SIZE_BLOCK);
   if (oversize) { toast(`"${oversize.name}" terlalu besar (maks 100MB)`); return; }
-  const firstLoad = doc.pages.length === 0;
+  const pagesBefore = doc.pages.length;
+  const firstLoad = pagesBefore === 0;
   if (firstLoad) baseName = usable[0].name.replace(/\.[^.]+$/, '');
 
   // Telegraph the parse loop. Note the >20MB heads-up toast is gone: it fired
@@ -1872,6 +1873,14 @@ async function loadFilesInner(files) {
     try {
       const bytes = new Uint8Array(await f.arrayBuffer());
       if (bytes.length === 0) throw new Error('empty file'); // 0-byte → JAVASCRIPT-H
+      // Capture the declared intent SYNCHRONOUSLY, before any await/async .then:
+      // applyIntent() clears pendingIntent after this loop, and the PDF branch's
+      // doc_open fires from a probe .then that can resolve later — reading it
+      // inside the callback would race to 'none'. intentValue() also sanitises a
+      // user-controlled ?buat= down to the enum. (Merge-adds are !firstLoad with
+      // pendingIntent already null → 'none', which is correct: only the opening
+      // file carries the arrival intent.)
+      const docIntent = intentValue(pendingIntent);
       if (isPdf(f)) {
         const importedPages = await importPdf(doc, { name: f.name, bytes });
         // doc_open (spec-telemetry.md §3 — scan-vs-born-digital ratio). The
@@ -1880,14 +1889,14 @@ async function loadFilesInner(files) {
         // merge loop, and a probe failure is just "don't know" (dropped).
         probeTextLayer(bytes)
           .then((hasText) => tel('doc_open', {
-            text_layer: hasText, pages: pagesBucket(importedPages.length), device: deviceClass(),
+            text_layer: hasText, pages: pagesBucket(importedPages.length), device: deviceClass(), intent: docIntent,
           }))
           .catch(() => {});
       } else {
         await importImage(doc, { name: f.name, bytes, mimeType: f.type });
         // An image page has no text layer at all — that's the scan ladder's
         // own job (spec-edit-dokumen-foto.md), not this rail's.
-        tel('doc_open', { text_layer: false, pages: pagesBucket(1), device: deviceClass() });
+        tel('doc_open', { text_layer: false, pages: pagesBucket(1), device: deviceClass(), intent: docIntent });
       }
       // Carry the intent so the funnel joins up: intent_armed → file_loaded →
       // download. Without it we'd know people PRESSED "Pisah PDF" but not whether
@@ -1923,6 +1932,14 @@ async function loadFilesInner(files) {
     zoom = Math.min(1, (scrollEl.clientWidth - 16) / doc.pages[0].width);
   }
   rebuildStage(); // applies zoom + sizer at the end
+  // A non-first load that actually grew the doc IS a merge (gabung). Fire at
+  // COMPLETION so it counts real merges from EVERY entry point — the [+] tile,
+  // the File menu, dropping more files onto an open doc — not sheet-opens. GA4's
+  // gabungkan_used fired on page-manager open, which also covers split/reorder/
+  // delete; this is the clean, merge-only signal the first-party rail lacked.
+  if (!firstLoad && doc.pages.length > pagesBefore) {
+    tel('tool_use', { tool: 'gabung', action: 'merge' });
+  }
   // Honest close-out: skips take priority over the merge tally — the user needs to
   // know something was left out more than they need the count.
   if (failed > 0) {

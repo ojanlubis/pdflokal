@@ -125,6 +125,60 @@ test.describe('telemetry client', () => {
     // both pages (born-digital, not a scan) — text_layer must read true; the
     // file is 2 pages → pagesBucket puts it in '2-5'; Desktop Chrome's default
     // viewport (>900px) reads as 'desktop' (js/v2/app.js's deviceClass()).
-    expect(docOpen.props).toEqual({ text_layer: true, pages: '2-5', device: 'desktop' });
+    // No ?buat= and a bare homepage → intent is 'none'.
+    expect(docOpen.props).toEqual({ text_layer: true, pages: '2-5', device: 'desktop', intent: 'none' });
+  });
+
+  test('(e) doc_open carries the declared intent from ?buat=', async ({ page }) => {
+    await captureBeacons(page);
+    await page.goto('/?buat=kompres'); // the SEO /kompres-pdf landing arrives this way
+
+    await page.setInputFiles('#file-input', SAMPLE_PDF);
+    await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
+    await fakeTabHidden(page);
+
+    await expect.poll(async () => (await beaconBodies(page)).length).toBeGreaterThan(0);
+    const docOpen = (await beaconBodies(page)).flatMap((b) => b.events).find((e) => e.event === 'doc_open');
+    expect(docOpen).toBeTruthy();
+    expect(docOpen.props.intent).toBe('kompres'); // the "what did they come to do" answer, first-party
+  });
+
+  test('(f) a merge-add fires the first-party gabung signal', async ({ page }) => {
+    await captureBeacons(page);
+    await page.goto('/');
+
+    await page.setInputFiles('#file-input', SAMPLE_PDF); // first load: NOT a merge
+    await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
+    await page.setInputFiles('#file-input', SAMPLE_PDF); // second load onto an open doc: a merge
+    await expect.poll(async () => page.evaluate(() => window.v2.getDoc().pages.length)).toBe(4);
+    await fakeTabHidden(page);
+
+    await expect.poll(async () => (await beaconBodies(page)).length).toBeGreaterThan(0);
+    const events = (await beaconBodies(page)).flatMap((b) => b.events);
+    expect(events).toContainEqual({ event: 'tool_use', props: { tool: 'gabung', action: 'merge' } });
+    // and the FIRST load must NOT have emitted one — merge is second-load-only
+    const merges = events.filter((e) => e.event === 'tool_use' && e.props.tool === 'gabung');
+    expect(merges).toHaveLength(1);
+  });
+
+  test('(g) export records the download CHOICES (format/size/pages_scope)', async ({ page }) => {
+    await captureBeacons(page);
+    await page.goto('/');
+
+    await page.setInputFiles('#file-input', SAMPLE_PDF);
+    await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
+
+    await page.click('#btn-download');
+    await expect(page.locator('#dl-sheet')).toBeVisible();
+    const dl = page.waitForEvent('download');
+    await page.click('#ds-cta');
+    await dl;
+    await fakeTabHidden(page); // flush the batched export beacon
+
+    await expect.poll(async () => (await beaconBodies(page)).length).toBeGreaterThan(0);
+    const exp = (await beaconBodies(page)).flatMap((b) => b.events).find((e) => e.event === 'export');
+    expect(exp).toBeTruthy();
+    // A plain, unmodified PDF download: the defaults the sheet opens with.
+    expect(exp.props).toMatchObject({ format: 'pdf', size: 'asli', pages_scope: 'all' });
   });
 });
