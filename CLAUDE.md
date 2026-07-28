@@ -129,16 +129,21 @@ pdflokal/
 │   │   └── drag-reorder.js
 │   └── vendor/               # Self-hosted libs (2.6 MB), zero CDN deps
 ├── fonts/              # Self-hosted fonts (268KB, Latin charset)
-├── docs/               # Design + reference docs
-│   ├── architecture.md       # SSOT patterns diagram (scattered vs centralized)
-│   ├── editor-redesign.md
-│   ├── future-architecture.md # PageRenderer plan + reactive state notes
-│   ├── patterns.md           # Code patterns and examples
+├── docs/               # CURRENT docs only — the old wing's five moved to legacy/ (2026-07-27)
 │   ├── security.md           # Security headers, CSP, library details
 │   ├── strengths.md          # WHY vanilla JS / WHY no framework / AI-first
-│   └── system-flow.md        # End-to-end user flow + data flow
+│   ├── android-verification.md
+│   ├── spec-font-fidelity-engine.md
+│   └── legacy/               # ⚠️ OLD WING, banner'd, not current: architecture.md ·
+│                             #    patterns.md · system-flow.md · future-architecture.md ·
+│                             #    editor-redesign.md
 └── images/
 ```
+
+**Product docs are NOT here.** `product-definition.md` (the North Star), `roadmap.md`,
+`foundation-plan.md` and `backlog.md` live at the seat in `../reference/`; build specs in
+`../specs/`. There is no `backlog.md` or `roadmap-2.md` at this level — both were pointed at by the
+memory bank's index until the 2026-07-28 audit, and neither ever existed here.
 
 ### Single-Page Architecture
 
