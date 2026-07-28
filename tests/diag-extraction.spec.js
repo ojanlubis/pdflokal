@@ -52,15 +52,18 @@ import { test, expect } from '@playwright/test';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { expectFirstPage } from './helpers/render.js';
+import { SPACE_GAP_FACTOR } from '../js/core/text-lines.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const NASTY = (name) => path.join(__dirname, 'fixtures', 'nasty', name);
 
-// Mirrors core/text-lines.js's own constants — printed here (not imported;
-// this spec runs in the Playwright/node context, the constants live in a
-// browser ES module) so the dump can show the threshold next to the number
-// it's judging, without touching production code.
-const SPACE_GAP_FACTOR = 0.18;
+// SPACE_GAP_FACTOR is now IMPORTED from core/text-lines.js (see above). The
+// comment that used to sit here said it could not be — "this spec runs in the
+// Playwright/node context, the constants live in a browser ES module" — and
+// that was wrong: text-lines.js is pure (no DOM, no vendor), so node loads it
+// fine. The belief cost us a hardcoded `0.18` living beside the real one, free
+// to drift the moment either changed. The three below are still local copies
+// and carry the same hazard; they are left for a pass that verifies each.
 const PERP_TOLERANCE_FACTOR = 0.35;
 const DIRECTION_DOT_MIN = 0.996;
 const COLUMN_GAP_FACTOR = 1.5;

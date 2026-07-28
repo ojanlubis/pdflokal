@@ -88,7 +88,10 @@ const COLUMN_GAP_FACTOR = 1.5;
 // prefill anyway; a real fix needs a signal this module's pure-geometry
 // input (x0/y0/ux/uy/len/size per run, no font-metrics or content-stream
 // operator access) cannot provide.
-const SPACE_GAP_FACTOR = 0.18;
+// Exported so tests measure the REAL value. It was module-private, and
+// tests/diag-extraction.spec.js kept its own hardcoded `0.18` — a drift pair:
+// change one and the other silently keeps reporting against the old number.
+export const SPACE_GAP_FACTOR = 0.18;
 
 function along(run) {
   const { x0, y0, ux, uy, len } = run.pdf;
