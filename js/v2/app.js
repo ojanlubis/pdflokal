@@ -138,6 +138,16 @@ function toast(msg) {
   toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2600);
 }
 
+// Pull a toast down early. Needed when a dialog opens on top of one: a toast
+// lives 2.6s, so a message from the previous action can still be on screen and
+// CONTRADICT the dialog. Caught by screenshotting the scan offer — the Ganti
+// arm-toast ("Tap tulisan yang mau kamu ubah") was sitting under a sheet whose
+// whole point is that there IS no tulisan to tap. No test could have seen that.
+function hideToast() {
+  clearTimeout(toastTimer);
+  toastEl.classList.remove('show');
+}
+
 // ---- processing telegraph ----------------------------------------------------
 // WHY: a real user merged 35 files and thought the app had errored — the dropzone
 // sat frozen through the whole parse loop with no feedback (contact-form, Jul 2026).
@@ -1116,7 +1126,7 @@ async function smartReplace(pageId, x, y) {
       // The router (two-ladder ruling, seat decisions.md 2026-07-18): no text
       // layer = a scan/photo — that's the dokumen-foto ladder, not this one.
       track('ganti_no_text_layer');
-      toast('Halaman ini hasil scan/foto — teksnya belum bisa diedit');
+      showScanOffer();
     } else {
       toast('Nggak kena tulisan — tap tepat di teksnya ya');
     }
@@ -2370,6 +2380,69 @@ window.v2 = {
   getRasterizer: () => rasterizer, // tests: drive the real live-surgery raster path (tests/live-raster.spec.js)
   celebration, // tests: drive the post-download routing (install nudge vs share card)
 };
+
+// ---- The scan dead end -------------------------------------------------------------------
+// Someone tapped Edit on a page with NO TEXT LAYER — a scan or a photo. Until
+// 2026-07-28 that was a dead end: one toast, and nothing else. ~6% of daily
+// users were walking into it and the number was rising, because Edit is new.
+//
+// Tip-Ex and Teks ALREADY work on a scan — they cover and write over the image.
+// What was missing was the affordance, not the capability. So: EXPLAIN, then
+// offer. Never silently swap the tool — that would be the app doing something
+// the user didn't ask for (seat ruling).
+//
+// The copy must NOT imply OCR is coming; that is an open founder call.
+//
+// `accepted` fires when the tool is actually ARMED, never on the button click.
+// A click measures the button; we need the behaviour. And it fires ONLY from
+// this offer — someone arming Tip-Ex on a scan without hitting the wall is
+// normal use (whiting out a signature line, filling a scanned form) and counting
+// it would import a population that never wanted OCR. The organic case is a rail
+// QUERY over the sequence, which per-event timestamps now make answerable.
+function showScanOffer() {
+  const dlg = document.getElementById('scan-offer');
+  if (!dlg) { toast('Halaman ini hasil scan/foto — teksnya belum bisa diedit'); return; }
+  // The arm-toast from arming Ganti is still on screen and says the opposite of
+  // what this sheet says. One message at a time.
+  hideToast();
+
+  // EXACTLY ONE outcome event per showing. `resolved` is a closure flag, not DOM
+  // state: the close handler below fires on every close INCLUDING the ones the
+  // buttons trigger, so without this a user who accepts would be counted as
+  // having both accepted AND dismissed — inflating both halves of the number the
+  // OCR decision rests on.
+  let resolved = false;
+  const settle = (props) => {
+    if (resolved) return;
+    resolved = true;
+    tel('scan_offer', props);
+  };
+
+  const take = (toolId, name) => () => {
+    setTool(toolId);
+    // Report acceptance only if the tool genuinely ARMED. If setTool declined,
+    // the user did not get what they asked for, and recording it as accepted
+    // would overstate how well the offer works.
+    if (tool === toolId) settle({ action: 'accepted', tool: name });
+    else settle({ action: 'dismissed', tool: 'none' });
+    dlg.close();
+  };
+
+  dlg.querySelector('#so-tipex').onclick = take('tipex', 'tipex');
+  dlg.querySelector('#so-teks').onclick = take('teks', 'teks');
+  dlg.querySelector('#so-dismiss').onclick = () => { settle({ action: 'dismissed', tool: 'none' }); dlg.close(); };
+  // Backdrop or Escape counts as a dismissal too: someone who closes without
+  // choosing has rejected the offer just as much as one who taps "Nanti aja",
+  // and treating those differently would flatter the affordance.
+  dlg.addEventListener('close', function once() {
+    dlg.removeEventListener('close', once);
+    settle({ action: 'dismissed', tool: 'none' });
+  });
+
+  tel('scan_offer', { action: 'shown', tool: 'none' });
+  dlg.showModal();
+}
+
 
 // ---- Global error capture -> the first-party rail ---------------------------------------
 // WHY THIS EXISTS (2026-07-28, telemetry suite class D): Editor v2 had NO global

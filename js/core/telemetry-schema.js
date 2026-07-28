@@ -276,6 +276,30 @@ export const SCHEMA = {
     bold: 'bool',
     style_source: STYLE_SOURCE,
   },
+  // scan_offer (2026-07-28): someone tapped Edit on a page with NO TEXT LAYER —
+  // a scan or photo. That was a dead end: a toast, and nothing else. ~6% of
+  // daily users were walking into it (29 events/7 users on the 27th, 51/6 on the
+  // 28th) and rising, because Edit is new.
+  //
+  // Tip-Ex and Teks already work on a scan — they cover and write over. What was
+  // missing was the affordance, not the capability. This event measures whether
+  // the offer lands.
+  //
+  // ⚠️ `accepted` fires when the tool is actually ARMED, never on the button
+  // click — a click measures the button, and we need the behaviour (seat ruling).
+  //
+  // ⚠️ AND IT FIRES ONLY FROM THIS OFFER. Arming Tip-Ex on a scan WITHOUT having
+  // hit the wall is normal use — whiting out a signature line, filling a scanned
+  // form — and counting it here would import a population that never wanted OCR,
+  // making the workaround look better than it is. The "can they get the job done
+  // without OCR" number is a rail QUERY over the sequence (ganti_no_text_layer
+  // -> tool_use), which per-event timestamps now make answerable. Events record
+  // what happened; joins answer why. Overloading one enum value with two
+  // meanings is how `matched:true` came to mean two things.
+  scan_offer: {
+    action: ['shown', 'accepted', 'dismissed'],
+    tool: ['tipex', 'teks', 'none'],
+  },
   ganti_tap: {
     hit: 'bool',
   },

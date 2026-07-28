@@ -33,6 +33,8 @@ const VALID_PROPS = {
     flavor: 'type0-identity-h', extract: 'ok', embedded: true, subtype: 'type0',
     name_informative: false, bold: true, style_source: 'program-name',
   },
+  // scan_offer — the scan dead end's affordance (2026-07-28).
+  scan_offer: { action: 'shown', tool: 'none' },
   ganti_tap: { hit: true },
   ganti_commit: { outcome: 'commit', font_path: 'doc-font' },
   surgery: { matched: true, reason: 'clean' },
@@ -152,6 +154,25 @@ test('doc_open.display_mode: both values validate, and it is REQUIRED', () => {
   assert.equal(validateEvent('doc_open', { ...VALID_PROPS.doc_open, display_mode: 'twa' }).ok, false);
   const { display_mode, ...without } = VALID_PROPS.doc_open; // eslint-disable-line no-unused-vars
   assert.equal(validateEvent('doc_open', without).ok, false, 'display_mode must be required, not optional');
+});
+
+// scan_offer measures whether the offer LANDS, and it is deliberately narrow:
+// `accepted` fires only from the offer itself and only when the tool genuinely
+// armed. The wider question — "can these users finish the job without OCR" — is
+// a rail query over the SEQUENCE (ganti_no_text_layer -> tool_use), not a second
+// meaning bolted onto this enum. Overloading one value with two meanings is how
+// `matched:true` came to mean both "found" and "removed".
+test('scan_offer: every action/tool pair validates, and invented ones are refused', () => {
+  for (const action of ['shown', 'accepted', 'dismissed']) {
+    assert.equal(validateEvent('scan_offer', { action, tool: 'none' }).ok, true, action);
+  }
+  for (const tool of ['tipex', 'teks', 'none']) {
+    assert.equal(validateEvent('scan_offer', { action: 'accepted', tool }).ok, true, tool);
+  }
+  assert.equal(validateEvent('scan_offer', { action: 'ignored', tool: 'none' }).ok, false);
+  assert.equal(validateEvent('scan_offer', { action: 'shown', tool: 'ocr' }).ok, false);
+  // Both props required — a shown-without-tool would be untyped at the sink.
+  assert.equal(validateEvent('scan_offer', { action: 'shown' }).ok, false);
 });
 
 test('tool_use gains gabung/merge as the first-party merge signal', () => {

@@ -162,11 +162,23 @@ test.describe('ganti teks — the nasty fixtures (field-bug pins)', () => {
     expect(anno.fontFamily).toBe('Tinos'); // metric clone, routed by /BaseFont
   });
 
-  test('scan: the router declines honestly — no cover, no editor, the toast says why', async ({ page }) => {
+  // The INTENT of this pin is unchanged and still the point: on a scan the router
+  // must decline HONESTLY — no cover, no editor, and the user is told why. Only
+  // the MECHANISM moved (2026-07-28): the bare toast became an offer sheet that
+  // explains and routes to Tip-Ex/Teks, which already work on a scan. See
+  // tests/scan-offer.spec.js for the offer's own behaviour and telemetry.
+  test('scan: the router declines honestly — no cover, no editor, and it says why', async ({ page }) => {
     await openDoc(page, NASTY('mirip-scan.pdf'));
     await page.click('[data-tool="ganti"]');
     await page.click('.pv-page >> nth=0', { position: { x: 200, y: 300 } });
-    await expect(page.locator('#toast')).toContainText('scan/foto');
+
+    // It says why — and must not promise OCR, which is an open founder call.
+    const sheet = page.locator('#scan-offer');
+    await expect(sheet).toBeVisible();
+    await expect(sheet).toContainText(/scan|gambar/i);
+    await expect(sheet).not.toContainText(/OCR/i);
+
+    // The original assertions, untouched: nothing was written, nothing opened.
     expect(await page.evaluate(() => window.v2.getDoc().pages[0].annotations.length)).toBe(0);
     await expect(page.locator('.v2-text-edit')).toHaveCount(0);
   });
