@@ -23,7 +23,9 @@ import {
 } from '../core/operations.js';
 import { createHistory, record, undo, redo, canUndo, canRedo } from '../core/history.js';
 import { importPdf, importImage, createPageRasterizer, probeTextLayer } from '../core/import.js';
-import { pagesBucket, durationBucket, ratioBucket, intentValue } from '../core/telemetry-schema.js';
+import {
+  pagesBucket, durationBucket, ratioBucket, inkRatioBucket, intentValue,
+} from '../core/telemetry-schema.js';
 import { compareRegions } from '../core/visual-oracle.js';
 import { validateSample } from '../core/feedback-sample.js';
 import { createPageSlot, syncOverlay, textFontCss } from '../render/page-view.js';
@@ -622,6 +624,12 @@ async function runVisualOracle(prevRaster, newRaster, box) {
     tel('visual_oracle', {
       weight_ratio: ratioBucket(result.weightRatio),
       height_ratio: ratioBucket(result.heightRatio),
+      // ink_ratio (2026-07-28 incident fix): a DIFFERENT bucketer than
+      // weight_ratio/height_ratio on purpose — see inkRatioBucket's own
+      // header comment in core/telemetry-schema.js for why reusing
+      // ratioBucket()'s cuts here would silently hide the exact defect this
+      // field exists to catch.
+      ink_ratio: inkRatioBucket(result.inkRatio),
       overflow: result.overflow,
     });
   } catch (err) {

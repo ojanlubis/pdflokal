@@ -10,7 +10,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { SCHEMA, validateEvent, pagesBucket, durationBucket, intentValue } from '../../js/core/telemetry-schema.js';
+import {
+  SCHEMA, validateEvent, pagesBucket, durationBucket, intentValue, ratioBucket, inkRatioBucket,
+} from '../../js/core/telemetry-schema.js';
 
 // A minimal, schema-valid props object for each event — used to prove every
 // declared event validates cleanly at least once, and as a base to mutate
@@ -38,8 +40,12 @@ const VALID_PROPS = {
   block_edit: { editable: true, reason: 'single-line', align: 'left' },
   commit_paint: { duration: 250, pages: '2-5', device: 'phone' },
   // visual_oracle (spec-edit-fidelity-instrumentation.md Increment C):
-  // core/visual-oracle.js's compareRegions() ratios, bucketed.
-  visual_oracle: { weight_ratio: 'near-parity', height_ratio: 'near-parity', overflow: false },
+  // core/visual-oracle.js's compareRegions() ratios, bucketed. ink_ratio
+  // added 2026-07-28 (the "Pondok Sapi"/"Cibeber" incident) — a REQUIRED
+  // field now, bucketed by its own inkRatioBucket(), never ratioBucket().
+  visual_oracle: {
+    weight_ratio: 'near-parity', height_ratio: 'near-parity', overflow: false, ink_ratio: 'near-parity',
+  },
 };
 
 test('every SCHEMA event has a VALID_PROPS fixture (test coverage stays complete as events are added)', () => {
@@ -215,4 +221,46 @@ test('durationBucket output always satisfies the "duration" type descriptor', ()
     const result = validateEvent('export', { ...VALID_PROPS.export, duration: bucketed });
     assert.equal(result.ok, true, `durationBucket(${ms}) = ${bucketed} should be schema-valid`);
   }
+});
+
+// ---- ink_ratio / inkRatioBucket (2026-07-28 incident fix) ---------------------
+// core/visual-oracle.js's compareRegions().inkRatio is a NEW, separately-
+// bucketed field on visual_oracle — added because ratioBucket()'s cuts,
+// tuned for stroke-weight noise tolerance, missed a real production defect
+// by 0.010015 (see decisions.md / the builder's report for the full incident).
+
+test('visual_oracle.ink_ratio is a REQUIRED prop — dropping it fails the whole event, same as any other visual_oracle field', () => {
+  const { ink_ratio, ...rest } = VALID_PROPS.visual_oracle; // eslint-disable-line no-unused-vars
+  assert.equal(validateEvent('visual_oracle', rest).ok, false);
+});
+
+test('visual_oracle.ink_ratio accepts the same 5 RATIO_BUCKET labels as weight_ratio/height_ratio', () => {
+  for (const bucket of ['much-lower', 'lower', 'near-parity', 'higher', 'much-higher']) {
+    assert.equal(validateEvent('visual_oracle', { ...VALID_PROPS.visual_oracle, ink_ratio: bucket }).ok, true);
+  }
+  assert.equal(validateEvent('visual_oracle', { ...VALID_PROPS.visual_oracle, ink_ratio: 'identical' }).ok, false);
+});
+
+test('inkRatioBucket: the 5 cuts (0.7/0.9/1.1/1.3) are TIGHTER than ratioBucket\'s (0.6/0.8/1.3/1.6)', () => {
+  assert.equal(inkRatioBucket(0.5), 'much-lower');
+  assert.equal(inkRatioBucket(0.8), 'lower');
+  assert.equal(inkRatioBucket(1.0), 'near-parity');
+  assert.equal(inkRatioBucket(1.2), 'higher');
+  assert.equal(inkRatioBucket(1.5), 'much-higher');
+});
+
+test('inkRatioBucket: non-finite inputs collapse to the directional extreme, same discipline as ratioBucket', () => {
+  assert.equal(inkRatioBucket(Infinity), 'much-higher');
+  assert.equal(inkRatioBucket(NaN), 'much-lower');
+  assert.equal(inkRatioBucket(-Infinity), 'much-lower');
+});
+
+test('REGRESSION (the 2026-07-28 incident number, 863/669): ratioBucket calls it near-parity — inkRatioBucket must not', () => {
+  const incidentRatio = 863 / 669; // 1.2899850523168908 — the real emitted weightRatio/inkRatio
+  assert.ok(Math.abs(incidentRatio - 1.2899850523168908) < 1e-9);
+  // The bug as it shipped: ratioBucket's 1.3 cut reads this as an all-clear.
+  assert.equal(ratioBucket(incidentRatio), 'near-parity', 'documents the actual miss — ratioBucket was fooled by 0.010015');
+  // The fix: inkRatioBucket's tighter 1.1 cut does NOT call this near-parity.
+  assert.equal(inkRatioBucket(incidentRatio), 'higher');
+  assert.notEqual(inkRatioBucket(incidentRatio), 'near-parity');
 });

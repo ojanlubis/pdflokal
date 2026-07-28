@@ -15,7 +15,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { analyzeInkRegion, compareRegions } from '../../js/core/visual-oracle.js';
-import { ratioBucket } from '../../js/core/telemetry-schema.js';
+import { ratioBucket, inkRatioBucket } from '../../js/core/telemetry-schema.js';
 
 // Builds a WxH RGBA buffer, "paper" everywhere, with one filled ink
 // rectangle at (x,y,w,h) — same ImageData shape (`{width,height,data}`) a
@@ -133,7 +133,74 @@ test('compareRegions: identical regions -> ratios of exactly 1, no overflow', ()
   const result = compareRegions(region, region);
   assert.equal(result.weightRatio, 1);
   assert.equal(result.heightRatio, 1);
+  assert.equal(result.inkRatio, 1);
   assert.equal(result.overflow, false);
+});
+
+// ---- ink_ratio (2026-07-28 incident fix) -------------------------------------
+// Raw inkCount ratio, no bbox term — see this module's header comment for why
+// it's a separate field from weightRatio, not a duplicate of it.
+
+test('compareRegions: ink_ratio is the raw inkCount ratio, independent of bbox — diverges from weight_ratio when the bbox itself changes', () => {
+  const pristine = makeRegion(60, 60, { x: 10, y: 10, w: 10, h: 10 }); // inkCount 100, bbox 10x10, density 1
+  // Same inkCount (100) as pristine but spread over a LARGER bbox (20x20,
+  // sparse) — density drops well below 1 even though the actual ink amount
+  // didn't change at all. inkRatio must stay exactly 1 here; weightRatio must
+  // NOT (this is the "bbox grows in lockstep" masking case the module header
+  // warns about — the two signals are not redundant).
+  const width = 60; const height = 60;
+  const data = new Uint8ClampedArray(width * height * 4).fill(255);
+  let placed = 0;
+  outer:
+  for (let y = 10; y < 30; y += 2) {
+    for (let x = 10; x < 30; x += 2) {
+      if (placed >= 100) break outer;
+      const idx = (y * width + x) * 4;
+      data[idx] = 0; data[idx + 1] = 0; data[idx + 2] = 0; data[idx + 3] = 255;
+      placed += 1;
+    }
+  }
+  assert.equal(placed, 100);
+  const stamped = { width, height, data };
+  const result = compareRegions(pristine, stamped);
+  assert.equal(result.inkRatio, 1, 'same total ink -> inkRatio of exactly 1');
+  assert.ok(result.weightRatio < 1, `weightRatio should read BELOW 1 (diluted by the larger bbox), got ${result.weightRatio}`);
+  assert.notEqual(result.inkRatio, result.weightRatio);
+});
+
+test('compareRegions: when the bbox is PINNED to the same size on both sides, ink_ratio and weight_ratio coincide exactly (the furniture-pinned case)', () => {
+  // When a leader/rule pins the bbox to the SAME size in both renders,
+  // weightRatio degenerates into inkRatio algebraically — this is exactly
+  // what happened in the real incident (see the ACCEPTANCE test below).
+  // Same 20x10 bbox both sides: pristine sparse (half-filled, inkCount 100,
+  // density 0.5), stamped solid (inkCount 200, density 1).
+  const width = 50; const height = 50;
+  const sparseData = new Uint8ClampedArray(width * height * 4).fill(255);
+  const setInk = (x, y) => {
+    const idx = (y * width + x) * 4;
+    sparseData[idx] = 0; sparseData[idx + 1] = 0; sparseData[idx + 2] = 0; sparseData[idx + 3] = 255;
+  };
+  // Anchor both extreme corners of the 20x10 box FIRST so the measured bbox
+  // is forced to exactly that span regardless of how the rest is filled,
+  // then row-major-fill inward until inkCount hits 100 (half of the box's
+  // 200 area) — same technique as the incident fixture further down.
+  setInk(10, 10); setInk(29, 19);
+  let count = 2;
+  outer:
+  for (let y = 10; y < 20; y += 1) {
+    for (let x = 10; x < 30; x += 1) {
+      if (count >= 100) break outer;
+      if ((x === 10 && y === 10) || (x === 29 && y === 19)) continue;
+      setInk(x, y);
+      count += 1;
+    }
+  }
+  const sparsePristine = { width, height, data: sparseData };
+  const solidStamped = makeRegion(width, height, { x: 10, y: 10, w: 20, h: 10 }); // 200 ink, bbox 20x10, density 1
+  const result = compareRegions(sparsePristine, solidStamped);
+  assert.equal(result.inkRatio, 2);
+  assert.equal(result.weightRatio, 2);
+  assert.equal(result.inkRatio, result.weightRatio, 'same bbox on both sides -> inkRatio and weightRatio must coincide exactly');
 });
 
 test('compareRegions: a THINNER stamp (same bbox, less fill) reads a weight_ratio well below parity', () => {
@@ -238,4 +305,99 @@ test('ACCEPTANCE (Step 0 numbers): bold-correct buckets differently from thin-wr
   assert.equal(ratioBucket(boldRatio), 'near-parity');
   assert.equal(ratioBucket(thinRatio), 'lower');
   assert.notEqual(ratioBucket(boldRatio), ratioBucket(thinRatio));
+});
+
+// ---- REGRESSION: the 2026-07-28 incident, pinned as a real fixture ----------
+// A real user hit a gross defect: a text REPLACE failed to remove the
+// original, so the line went from `: Pondok Sapi, ————————` (669 ink px) to
+// `: Pondok Sapi, : Cibeber, ——————` (863 ink px) — an entire extra phrase
+// duplicated onto the line, never cut. Feeding the user's actual consented
+// crops through the SHIPPED module (before this fix) reproduced the emitted
+// event EXACTLY: analyzeInkRegion gave {inkCount:669, bboxW:524, bboxH:17}
+// pristine and {inkCount:863, bboxW:524, bboxH:17} stamped (the line ends in
+// a dashed leader that pins bboxW to the SAME 524px in both crops — the
+// "furniture dilution" blind spot documented in visual-oracle.js's header),
+// so compareRegions read {weightRatio: 1.2899850523168908, heightRatio: 1,
+// overflow: false} — near-parity/near-parity/no-overflow, a CLEAN BILL OF
+// HEALTH on a defect that added a whole extra phrase to the page.
+//
+// This fixture reconstructs those exact numbers from synthetic pixel
+// buffers (same discipline as every test above — no canvas, no PDF, no
+// screenshot) rather than trusting a description of them: two 534x27
+// regions, ink confined to a 524x17 box inset 5px from every edge (inset >
+// OVERFLOW_EDGE_MARGIN_PX so overflow reads false, matching the real event),
+// with EXACTLY 669 / 863 ink pixels — reproducing the real bboxW/bboxH/
+// inkCount triple that shipped, not an idealized stand-in for it.
+function makeIncidentRegion(inkCount) {
+  const canvasW = 534; const canvasH = 27; // 524x17 box inset 5px on every side
+  const ox = 5; const oy = 5;
+  const bboxW = 524; const bboxH = 17;
+  const x0 = ox; const y0 = oy; const x1 = ox + bboxW - 1; const y1 = oy + bboxH - 1;
+  const data = new Uint8ClampedArray(canvasW * canvasH * 4);
+  for (let i = 0; i < canvasW * canvasH; i += 1) {
+    data[i * 4] = 255; data[i * 4 + 1] = 255; data[i * 4 + 2] = 255; data[i * 4 + 3] = 255; // opaque paper
+  }
+  const setInk = (x, y) => {
+    const idx = (y * canvasW + x) * 4;
+    data[idx] = 0; data[idx + 1] = 0; data[idx + 2] = 0; data[idx + 3] = 255;
+  };
+  // Anchor ink at BOTH extreme corners of the intended bbox first, so the
+  // measured bbox is forced to exactly [x0,x1] x [y0,y1] regardless of how
+  // the remaining count is distributed — this is what makes bboxW/bboxH land
+  // on the real 524/17 deterministically rather than by luck of the fill.
+  setInk(x0, y0);
+  setInk(x1, y1);
+  let count = 2;
+  for (let y = y0; y <= y1 && count < inkCount; y += 1) {
+    for (let x = x0; x <= x1 && count < inkCount; x += 1) {
+      if ((x === x0 && y === y0) || (x === x1 && y === y1)) continue;
+      setInk(x, y);
+      count += 1;
+    }
+  }
+  return { width: canvasW, height: canvasH, data };
+}
+
+test('REGRESSION (2026-07-28 incident, real numbers): reproduces the exact shipped-bug ratios from synthetic pixel buffers', () => {
+  const pristine = makeIncidentRegion(669);
+  const stamped = makeIncidentRegion(863);
+
+  const pristineInfo = analyzeInkRegion(pristine);
+  const stampedInfo = analyzeInkRegion(stamped);
+  assert.equal(pristineInfo.inkCount, 669);
+  assert.equal(pristineInfo.bboxW, 524);
+  assert.equal(pristineInfo.bboxH, 17);
+  assert.ok(Math.abs(pristineInfo.density - 0.07510103277952403) < 1e-12);
+  assert.equal(stampedInfo.inkCount, 863);
+  assert.equal(stampedInfo.bboxW, 524);
+  assert.equal(stampedInfo.bboxH, 17);
+  assert.ok(Math.abs(stampedInfo.density - 0.09687920969914683) < 1e-12);
+
+  const result = compareRegions(pristine, stamped);
+  assert.ok(Math.abs(result.weightRatio - 1.2899850523168908) < 1e-9, `weightRatio drifted: ${result.weightRatio}`);
+  assert.equal(result.heightRatio, 1);
+  assert.equal(result.overflow, false); // matches the real event exactly — the leader never reaches the ACTUAL crop edge
+  assert.ok(Math.abs(result.inkRatio - 1.2899850523168908) < 1e-9);
+
+  // This is the actual bug, reproduced: under the OLD event shape, every
+  // field the oracle emitted read as an all-clear.
+  const oldEventWasAllClear = ratioBucket(result.weightRatio) === 'near-parity'
+    && ratioBucket(result.heightRatio) === 'near-parity'
+    && result.overflow === false;
+  assert.equal(oldEventWasAllClear, true, 'documents the actual production miss — every OLD field read clean');
+
+  // This is the fix: the NEW event (adding ink_ratio, bucketed by
+  // inkRatioBucket) must NOT be an all-clear for the same inputs.
+  const newEvent = {
+    weight_ratio: ratioBucket(result.weightRatio),
+    height_ratio: ratioBucket(result.heightRatio),
+    ink_ratio: inkRatioBucket(result.inkRatio),
+    overflow: result.overflow,
+  };
+  const newEventIsAllClear = newEvent.weight_ratio === 'near-parity'
+    && newEvent.height_ratio === 'near-parity'
+    && newEvent.ink_ratio === 'near-parity'
+    && newEvent.overflow === false;
+  assert.equal(newEventIsAllClear, false, 'the fixed event must NOT be an all-clear for the real incident numbers');
+  assert.equal(newEvent.ink_ratio, 'higher');
 });

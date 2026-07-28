@@ -135,6 +135,70 @@ export function ratioBucket(v) {
   return 'much-higher';
 }
 
+// A stamped÷pristine RAW INK-PIXEL-COUNT ratio (core/visual-oracle.js's
+// compareRegions().inkRatio) -> its OWN 5-bucket vocabulary. Added 2026-07-28
+// after a real production miss: a REPLACE that failed to cut the original
+// text (founder-consented crops, "Pondok Sapi," duplicated instead of
+// replaced by ", Cibeber") measured weightRatio 1.28998 — 0.010015 under
+// ratioBucket's own 1.3 cut, so it bucketed 'near-parity' and the oracle
+// reported a clean bill of health on a defect that had added an entire extra
+// phrase to the page. heightRatio read exactly 1.0 (same baseline, same font
+// size — duplicated text on one line changes WIDTH, never height; see
+// visual-oracle.js's header for why that is a permanent blind spot, not a
+// bug to fix). weightRatio itself was diluted: the line ends in a dashed
+// leader that pins the ink's own bbox to the SAME ~524px width in both
+// crops, so the whole extra phrase moved density only 29% even though raw
+// inkCount jumped 669 -> 863 (also +29%, not a coincidence — see below).
+//
+// inkRatio exists as its own field (not a retune of weightRatio) because the
+// two can diverge in VALUE, not just in bucket boundaries: weightRatio is
+// ink ÷ ITS OWN bbox, so a real ink increase can hide near 1.0 whenever the
+// bbox grows in step with it (a duplicated phrase that also widens its own
+// bounding box, no furniture pinning it down) — density stays flat while the
+// page gains real, wrong ink. inkRatio has no bbox term to fool: it is
+// stamped inkCount ÷ pristine inkCount, full stop. (In THIS specific
+// incident the two floats come out numerically IDENTICAL — 863/669 either
+// way — because the leader pins both crops' bboxes to the same area, which
+// makes weightRatio degenerate into inkRatio algebraically; what actually
+// catches this defect is the TIGHTER cut points below, not a different
+// number. The general case, where the two renders' bboxes differ, is why
+// inkRatio still earns its own field rather than being folded into
+// weightRatio's math.)
+//
+// A REPLACE cannot legitimately end up with substantially MORE ink than it
+// started with: the box a replacement stamps into (replaceBox) is sized to
+// the ORIGINAL text, so a genuinely longer replacement either overflows that
+// box (caught separately by the `overflow` bool) or gets shrunk to fit. A
+// large ink INCREASE with no overflow is close to proof the cut half of the
+// edit silently failed and the original glyphs are still underneath the new
+// ones.
+//
+// Deliberately NOT reusing ratioBucket()'s cuts (0.6/0.8/1.3/1.6) — that
+// band was tuned for STROKE WEIGHT (thin-vs-bold), a metric where ordinary
+// rasterization/AA noise between two CORRECT renders can legitimately move
+// the ratio 20-30% either side of 1.0 (this file's own ACCEPTANCE test: a
+// correct BOLD stamp reads 0.884, not 1.0). inkRatio has no such noise floor
+// to protect — it's a plain pixel count — and the one real incident this
+// bucket exists for sits at 1.28998. Reusing ratioBucket's 1.3 cut here
+// would ship the EXACT bug this fix is for. Cuts: 0.7 / 0.9 / 1.1 / 1.3 — a
+// tighter ±10% 'near-parity' band (width 0.2) vs ratioBucket's [0.8,1.3)
+// (width 0.5), so 1.28998 lands in 'higher': one bucket short of
+// 'much-higher', but never mistakeable for a clean bill of health again.
+//
+// The RETURNED STRINGS deliberately reuse RATIO_BUCKET's five labels (same
+// vocabulary reads the same way on a dashboard regardless of which prop it's
+// on) — only the CUTS differ. That is a distinct decision from reusing
+// ratioBucket() ITSELF, which this function does not do.
+export function inkRatioBucket(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return n === Infinity ? 'much-higher' : 'much-lower';
+  if (n < 0.7) return 'much-lower';
+  if (n < 0.9) return 'lower';
+  if (n < 1.1) return 'near-parity';
+  if (n < 1.3) return 'higher';
+  return 'much-higher';
+}
+
 // ms (a raw duration) → clamped to [0, 600000] and rounded to the nearest
 // 10ms (spec §2). This is the ONLY place a 'duration' value should be
 // produced — validateEvent then just has to check the invariant holds.
@@ -289,6 +353,15 @@ export const SCHEMA = {
     weight_ratio: RATIO_BUCKET,
     height_ratio: RATIO_BUCKET,
     overflow: 'bool',
+    // ink_ratio (added 2026-07-28, the "Pondok Sapi"/"Cibeber" incident):
+    // core/visual-oracle.js's compareRegions().inkRatio, bucketed by
+    // inkRatioBucket() above — NOT ratioBucket(). Shares RATIO_BUCKET's five
+    // string VALUES (same label vocabulary reads the same on a dashboard
+    // regardless of which prop it's on) but a completely different, tighter
+    // set of cut points — see inkRatioBucket's own header comment for the
+    // incident numbers and why ratioBucket's cuts would have hidden this
+    // exact defect again.
+    ink_ratio: RATIO_BUCKET,
   },
 };
 
