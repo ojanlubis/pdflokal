@@ -18,7 +18,7 @@ import {
 // declared event validates cleanly at least once, and as a base to mutate
 // for the negative tests below.
 const VALID_PROPS = {
-  doc_open: { text_layer: true, pages: '1', device: 'desktop', intent: 'none' },
+  doc_open: { text_layer: true, pages: '1', device: 'desktop', intent: 'none', display_mode: 'browser' },
   tool_use: { tool: 'teks', action: 'text' },
   // export carries BOTH the edit-ladder fields (surgery_used/fallback/duration)
   // and the intent fields (format/size/pages_scope) — the two branches taught
@@ -139,6 +139,19 @@ test('doc_open.intent accepts every declared job and rejects an off-list value',
   }
   assert.equal(validateEvent('doc_open', { ...VALID_PROPS.doc_open, intent: 'hack' }).ok, false);
   assert.equal(validateEvent('doc_open', { ...VALID_PROPS.doc_open, intent: undefined }).ok, false); // now required
+});
+
+// display_mode (2026-07-28): GA4 structurally cannot answer "what share of
+// sessions come FROM an installed app" — it counts install EVENTS, and iOS
+// Safari never fires appinstalled, so every iPhone Add-to-Home-Screen is
+// invisible. Asking the running session what it is measures the installed BASE.
+test('doc_open.display_mode: both values validate, and it is REQUIRED', () => {
+  for (const display_mode of ['standalone', 'browser']) {
+    assert.equal(validateEvent('doc_open', { ...VALID_PROPS.doc_open, display_mode }).ok, true, display_mode);
+  }
+  assert.equal(validateEvent('doc_open', { ...VALID_PROPS.doc_open, display_mode: 'twa' }).ok, false);
+  const { display_mode, ...without } = VALID_PROPS.doc_open; // eslint-disable-line no-unused-vars
+  assert.equal(validateEvent('doc_open', without).ok, false, 'display_mode must be required, not optional');
 });
 
 test('tool_use gains gabung/merge as the first-party merge signal', () => {

@@ -69,7 +69,18 @@ test.describe('telemetry client', () => {
     expect(typeof payload.app_version).toBe('string');
     expect(Array.isArray(payload.events)).toBe(true);
     expect(payload.events).toHaveLength(10);
-    expect(payload.events[0]).toEqual({ event: 'tool_use', props: { tool: 'teks', action: 'text' } });
+    // Each event carries `dt` — ms before THIS flush — so the server can derive a
+    // per-event ts instead of stamping one batch time for all ten. Asserted as
+    // part of the envelope shape, not stripped: it IS the contract now.
+    const { dt, ...first } = payload.events[0];
+    expect(first).toEqual({ event: 'tool_use', props: { tool: 'teks', action: 'text' } });
+    expect(typeof dt).toBe('number');
+    expect(dt).toBeGreaterThanOrEqual(0);
+    expect(dt).toBeLessThan(60_000);
+    // Ten events queued in one tick must not all report the same offset ordering
+    // problem: dt is non-increasing as you walk the batch (earlier events are older).
+    const dts = payload.events.map((e) => e.dt);
+    expect(dts.every((v, i) => i === 0 || dts[i - 1] >= v)).toBe(true);
   });
 
   test('(a) flushes on visibilitychange:hidden even under the 10-event threshold', async ({ page }) => {
@@ -127,7 +138,7 @@ test.describe('telemetry client', () => {
     // file is 2 pages → pagesBucket puts it in '2-5'; Desktop Chrome's default
     // viewport (>900px) reads as 'desktop' (js/v2/app.js's deviceClass()).
     // No ?buat= and a bare homepage → intent is 'none'.
-    expect(docOpen.props).toEqual({ text_layer: true, pages: '2-5', device: 'desktop', intent: 'none' });
+    expect(docOpen.props).toEqual({ text_layer: true, pages: '2-5', device: 'desktop', intent: 'none', display_mode: 'browser' });
   });
 
   test('(e) doc_open carries the declared intent from ?buat=', async ({ page }) => {
@@ -156,7 +167,8 @@ test.describe('telemetry client', () => {
 
     await expect.poll(async () => (await beaconBodies(page)).length).toBeGreaterThan(0);
     const events = (await beaconBodies(page)).flatMap((b) => b.events);
-    expect(events).toContainEqual({ event: 'tool_use', props: { tool: 'gabung', action: 'merge' } });
+    expect(events.map(({ dt, ...e }) => e)) // eslint-disable-line no-unused-vars
+      .toContainEqual({ event: 'tool_use', props: { tool: 'gabung', action: 'merge' } });
     // and the FIRST load must NOT have emitted one — merge is second-load-only
     const merges = events.filter((e) => e.event === 'tool_use' && e.props.tool === 'gabung');
     expect(merges).toHaveLength(1);

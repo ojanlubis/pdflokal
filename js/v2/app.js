@@ -41,7 +41,7 @@ import { track } from '../lib/analytics.js';
 import { tel } from './telemetry.js';
 import { showEditFeedback, dismissEditFeedback, setFeedbackSample } from './edit-feedback.js';
 import { createCelebration } from './celebrate.js';
-import { initInstallPrompt } from './install-prompt.js';
+import { initInstallPrompt, isStandalone } from './install-prompt.js';
 import { applyIntentCopy } from './intent-copy.js';
 import { ensurePdfLib } from '../core/vendor.js';
 import { readPageContents, extractFontMetrics } from '../core/redact.js';
@@ -113,6 +113,12 @@ const toastEl = document.getElementById('toast');
 // must still be COUNTED, or the rail goes quiet exactly when something new
 // breaks. Most runtime errors will land here, and that is fine — the value is
 // knowing they happen and how often, not naming them.
+// isStandalone() -> the schema's enum. Never throws: a detector failure must
+// not drop the whole doc_open event, which carries text_layer/pages/device too.
+function displayMode() {
+  try { return isStandalone() ? 'standalone' : 'browser'; } catch { return 'browser'; }
+}
+
 function failureReason(err) {
   switch (err?.name) {
     case 'PasswordException': return 'encrypted';
@@ -2029,13 +2035,14 @@ async function loadFilesInner(files) {
         probeTextLayer(bytes)
           .then((hasText) => tel('doc_open', {
             text_layer: hasText, pages: pagesBucket(importedPages.length), device: deviceClass(), intent: docIntent,
+            display_mode: displayMode(),
           }))
           .catch(() => {});
       } else {
         await importImage(doc, { name: f.name, bytes, mimeType: f.type });
         // An image page has no text layer at all — that's the scan ladder's
         // own job (spec-edit-dokumen-foto.md), not this rail's.
-        tel('doc_open', { text_layer: false, pages: pagesBucket(1), device: deviceClass(), intent: docIntent });
+        tel('doc_open', { text_layer: false, pages: pagesBucket(1), device: deviceClass(), intent: docIntent, display_mode: displayMode() });
       }
       // Carry the intent so the funnel joins up: intent_armed → file_loaded →
       // download. Without it we'd know people PRESSED "Pisah PDF" but not whether

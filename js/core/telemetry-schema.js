@@ -216,11 +216,19 @@ export function durationBucket(ms) {
 // ---- SCHEMA -------------------------------------------------------------------
 export const SCHEMA = {
   // ---- live today (js/v2/app.js, js/v2/download-sheet.js) ----
+  // display_mode (2026-07-28): was the app launched from the HOME SCREEN or a
+  // browser tab? GA4 structurally cannot answer this — `pwa_installed` counts
+  // install EVENTS, and iOS Safari never fires `appinstalled` at all, so every
+  // "Add to Home Screen" on an iPhone is invisible there. Asking the running
+  // session what it IS, on every doc_open, measures the installed BASE by usage
+  // instead of guessing it from a lossy install counter. Two values only:
+  // anything not standalone is a browser tab.
   doc_open: {
     text_layer: 'bool',
     pages: PAGES_BUCKET,
     device: DEVICE,
     intent: INTENT,
+    display_mode: ['standalone', 'browser'],
   },
   // tool: the v2 toolbar's own verbs (Pilih/Teks/Tip-Ex/TTD/Hapus/Halaman) —
   // 'ganti' (Rung B's smart-replace tool) is listed now for schema

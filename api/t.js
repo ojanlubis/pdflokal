@@ -99,13 +99,32 @@ export default async function handler(req, res) {
     const serverSha = String(process.env.VERCEL_GIT_COMMIT_SHA || '').toLowerCase();
     const storedVersion = /^[0-9a-f]{7,40}$/.test(serverSha) ? serverSha : appVersion;
 
+    // PER-EVENT TIMESTAMPS (2026-07-28). This used to be ONE `new Date()` for the
+    // whole batch, so every event in a flush shared a `ts` to the millisecond.
+    // Intra-session ordering worked only by `id`, and anything reasoning about
+    // INTERVALS — a funnel, an alarm, "how long between tap and commit" — was
+    // reasoning about nothing.
+    //
+    // The client sends `dt`: milliseconds before ITS flush, never an absolute
+    // clock reading. A client clock can be wrong by hours; a relative offset
+    // cannot import that error. So the only clock that matters is this one:
+    // ts = received - dt.
+    //
+    // Validated defensively because `dt` rides the envelope, NOT the props —
+    // validateEvent never sees it. A missing, negative, non-finite or absurd
+    // value collapses to 0 (= "now"), which degrades to the old behaviour for
+    // that single event rather than writing a garbage row or dropping it.
     const capped = events.slice(0, MAX_EVENTS);
-    const ts = new Date().toISOString();
+    const received = Date.now();
+    const MAX_EVENT_AGE_MS = 6 * 60 * 60 * 1000;
     const rows = [];
     for (const e of capped) {
       if (!e || typeof e.event !== 'string') continue; // malformed single event — drop it, not the batch
       const { ok, clean } = validateEvent(e.event, e.props);
       if (!ok) continue; // off-schema single event — silently dropped, never 400s the batch
+      const rawDt = Number(e.dt); // NOT `raw` — that is the request body above
+      const dt = Number.isFinite(rawDt) ? Math.max(0, Math.min(MAX_EVENT_AGE_MS, Math.round(rawDt))) : 0;
+      const ts = new Date(received - dt).toISOString();
       rows.push({ ts, session_id: sessionId, app_version: storedVersion, event: e.event, props: clean });
     }
 

@@ -56,7 +56,7 @@ function mkRes() {
 const VALID = {
   session_id: '3f1c9a52-0b6e-4a7d-9c11-2f7e5d8a4b30',
   app_version: 'abc1234',
-  events: [{ event: 'doc_open', props: { text_layer: true, pages: '1', device: 'desktop', intent: 'none' } }],
+  events: [{ event: 'doc_open', props: { text_layer: true, pages: '1', device: 'desktop', intent: 'none', display_mode: 'browser' } }],
 };
 
 // Drive the handler with fetch stubbed, and report what the insert saw.
@@ -106,7 +106,7 @@ test('DELIVERY: a valid event actually reaches the insert, with its props intact
   // The props must survive validation, or the row lands empty and the rail is
   // "working" while carrying nothing — the 2026-07 blackout's exact shape.
   assert.equal(rows[0].event, 'doc_open');
-  assert.deepEqual(rows[0].props, { text_layer: true, pages: '1', device: 'desktop', intent: 'none' });
+  assert.deepEqual(rows[0].props, { text_layer: true, pages: '1', device: 'desktop', intent: 'none', display_mode: 'browser' });
 });
 
 test('DELIVERY: an off-schema event is dropped BEFORE the insert, not stored as junk', async () => {
@@ -129,27 +129,56 @@ test('DELIVERY: a mixed batch inserts only the valid events (one bad event never
 });
 
 // ---------------------------------------------------------------------------
-// THE GAP. Expose-first per the seat's ruling — this documents what is NOT
-// true today rather than asserting a fix nobody has ruled.
+// PER-EVENT TIMESTAMPS (2026-07-28). `events.ts` used to be the BATCH FLUSH
+// time — one `new Date()` for the whole batch — so ten events in a session
+// shared a timestamp to the millisecond. Intra-session ordering worked only by
+// `id`, and anything reasoning about INTERVALS was reasoning about nothing.
+// ---------------------------------------------------------------------------
+test('TIMESTAMPS: events in one batch get DISTINCT ts, ordered by their own dt', async () => {
+  const mk = (dt) => ({ ...VALID.events[0], dt });
+  const { calls } = await run({ ...VALID, events: [mk(5000), mk(2000), mk(0)] });
+  const ts = calls[0].body.map((r) => Date.parse(r.ts));
+  assert.equal(new Set(ts).size, 3, 'all three events shared a timestamp — this is the defect');
+  // Oldest first: dt is "how long BEFORE the flush", so a bigger dt is earlier.
+  assert.ok(ts[0] < ts[1] && ts[1] < ts[2], 'ordering does not follow dt');
+  // And the intervals survive, which is the whole point of the column.
+  assert.equal(ts[2] - ts[1], 2000);
+  assert.equal(ts[1] - ts[0], 3000);
+});
+
+test('TIMESTAMPS: a missing or absurd dt degrades to now — never a garbage row, never a drop', async () => {
+  const base = VALID.events[0];
+  const { calls } = await run({
+    ...VALID,
+    events: [
+      { ...base },                       // no dt at all (an older client)
+      { ...base, dt: -5000 },            // negative
+      { ...base, dt: 'soon' },           // not a number
+      { ...base, dt: 9e15 },             // absurd — would write year 285000 BC
+      { ...base, dt: Infinity },
+    ],
+  });
+  assert.equal(calls[0].body.length, 5, 'a bad dt must not drop the event');
+  const now = Date.now();
+  for (const r of calls[0].body) {
+    const t = Date.parse(r.ts);
+    assert.ok(Number.isFinite(t), `unparseable ts: ${r.ts}`);
+    // Within the clamp window, never in the future, never prehistoric.
+    assert.ok(t <= now + 1000, `ts is in the future: ${r.ts}`);
+    assert.ok(now - t <= 6 * 60 * 60 * 1000 + 1000, `ts is older than the clamp: ${r.ts}`);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// CLOSED 2026-07-28. api/t.js used to `await fetch(...)` and DISCARD the result,
+// inside a catch that only sees network throws — so a Supabase 401/400/409/5xx
+// resolved normally, fell through, and we 204'd. The most likely failure mode
+// was not merely unreported: it could not even reach the catch.
 //
-// api/t.js awaits the insert but NEVER INSPECTS ITS RESPONSE:
-//
-//     await fetch(`${url}/rest/v1/events`, {...});   // <- result discarded
-//     } catch { /* network failure — silent */ }
-//
-// `fetch` rejects only on a NETWORK failure. A Supabase error RESPONSE — 401
-// (bad key), 400 (schema/column mismatch), 403 (RLS), 5xx, quota — RESOLVES
-// NORMALLY and is thrown away. So the single most likely failure mode is not
-// merely unreported, it is not even reachable by the existing catch.
-//
-// Concretely live right now: `failure` and `surgery.reason='residual'` both
-// shipped today and both have ZERO rows. The seat reads that as "needs specific
-// conditions", which is plausible. But a rejected insert would look EXACTLY the
-// same, and nothing in this system can tell the two apart. That is the 2026-07
-// blackout's shape — every layer green, nothing recorded.
-//
-// Marked `todo` so the gate stays a trustworthy signal while the gap stays
-// executable and visible. Flip it to a real test the day the seat rules the fix.
+// It mattered beyond the lost rows: the seat's wild-liveness check reads what is
+// IN the table, so while writes could fail silently a zero meant "never emitted"
+// OR "emitted and rejected", indistinguishably. Every liveness result and alarm
+// threshold rests on arrival == emission. These tests are what make that hold.
 // ---------------------------------------------------------------------------
 test('a REJECTED insert is reported (Supabase 401/400 must not be silently lost)', async () => {
   const { res, calls, logged } = await run(VALID, {

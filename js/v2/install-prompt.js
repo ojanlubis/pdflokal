@@ -25,7 +25,12 @@ window.addEventListener('beforeinstallprompt', (e) => {
   deferredPrompt = e;
 });
 
-function isStandalone() {
+// SINGLE SOURCE OF TRUTH for "is this session running as an installed app".
+// Exported 2026-07-28 so telemetry's doc_open.display_mode asks the SAME
+// question the install UI does — two detectors would eventually disagree, and
+// then the install-rate number and the install prompt would be telling
+// different stories about the same session.
+export function isStandalone() {
   return window.matchMedia?.('(display-mode: standalone)').matches
     || window.navigator.standalone === true;
 }

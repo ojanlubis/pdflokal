@@ -57,10 +57,34 @@ const isLocalDev = (() => {
 
 let queue = [];
 
+// WHY EACH EVENT CARRIES `dt` (2026-07-28): the stored `events.ts` used to be
+// the BATCH FLUSH time — api/t.js stamped one `new Date()` for the whole batch,
+// so ten events in a session shared a timestamp to the millisecond. Intra-
+// session ordering only worked by `id`, and anything reasoning about INTERVALS
+// (a funnel, an alarm, "how long between tap and commit") was reasoning about
+// nothing.
+//
+// `dt` is milliseconds BEFORE the flush, not an absolute clock reading, and
+// that is deliberate: a client clock can be wrong by hours (skew, manual
+// change, a wrong timezone), and an absolute client timestamp would import that
+// error straight into the table. A relative offset is immune to skew and still
+// preserves both ordering and the intervals between events. The server does
+// `ts = received - dt`, so the only clock that matters is the server's.
+//
+// Clamped to [0, 6h] here as well as on the server: a queued event older than a
+// session has no meaning, and an unclamped value would let a wrong client clock
+// write far-future or far-past rows.
+const MAX_EVENT_AGE_MS = 6 * 60 * 60 * 1000;
+
 function flush() {
   try {
     if (queue.length === 0) return;
-    const batch = queue;
+    const now = Date.now();
+    const batch = queue.map((e) => ({
+      event: e.event,
+      props: e.props,
+      dt: Math.max(0, Math.min(MAX_EVENT_AGE_MS, now - e.t)),
+    }));
     queue = [];
     const payload = JSON.stringify({ session_id: sessionId, app_version: appVersion, events: batch });
     if (typeof navigator?.sendBeacon !== 'function') return; // no beacon support — drop, never retry
@@ -100,7 +124,7 @@ export function tel(event, props = {}) {
       }
       return;
     }
-    queue.push({ event, props: clean });
+    queue.push({ event, props: clean, t: Date.now() });
     if (queue.length >= FLUSH_AT) flush();
   } catch {
     // Telemetry can NEVER throw into app code (spec §2).
