@@ -6,6 +6,7 @@
 import { test, expect } from '@playwright/test';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { expectFirstPage } from './helpers/render.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE = path.join(__dirname, 'fixtures', 'sample-2pages.pdf');
@@ -14,7 +15,7 @@ test.describe('editor v2 — desktop', () => {
   test('full flow: open → type → style → drag → download a valid PDF', async ({ page }) => {
     await page.goto('/');
     await page.setInputFiles('#file-input', FIXTURE);
-    await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
+    await expectFirstPage(page);
 
     // Keyboard verb → click to place text → type → commit.
     await page.keyboard.press('t');
@@ -49,7 +50,7 @@ test.describe('editor v2 — desktop', () => {
   test('page manager works with a mouse (click select, bulk rotate)', async ({ page }) => {
     await page.goto('/');
     await page.setInputFiles('#file-input', FIXTURE);
-    await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
+    await expectFirstPage(page);
     await page.click('#btn-pages');
     await page.click('.pm-tile >> nth=0');
     await page.click('[data-act="rotate"]');
@@ -64,7 +65,7 @@ test.describe('select-then-edit model — desktop', () => {
   async function placeText(page) {
     await page.goto('/');
     await page.setInputFiles('#file-input', FIXTURE);
-    await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
+    await expectFirstPage(page);
     await page.keyboard.press('t');
     await page.click('.pv-page >> nth=0', { position: { x: 200, y: 200 } });
     await page.keyboard.type('Klik aku');
@@ -122,7 +123,7 @@ test.describe('select-then-edit model — desktop', () => {
 test('Kelola drag settles even when pointer capture fails', async ({ page }) => {
   await page.goto('/');
   await page.setInputFiles('#file-input', FIXTURE);
-  await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
+  await expectFirstPage(page);
   await page.click('#btn-pages');
   await expect(page.locator('#pm-sheet')).toBeVisible();
   await page.evaluate(() => {
@@ -149,7 +150,7 @@ test('Kelola drag settles even when pointer capture fails', async ({ page }) => 
 test('carried-signature ghost follows the cursor, drops on click', async ({ page }) => {
   await page.goto('/');
   await page.setInputFiles('#file-input', FIXTURE);
-  await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
+  await expectFirstPage(page);
   await page.click('[data-tool="signature"]');
   await expect(page.locator('#sig-modal')).toBeVisible();
   const box = await page.locator('#sig-canvas').boundingBox();
@@ -183,7 +184,7 @@ test('Kelola grid re-render mid-drag neither throws nor kills the drop', async (
   // 4 pages: the crash needs a MIDDLE slot as insert target (a detached
   // reference node) — with 2 pages the .pm-add fallback always saved it.
   await page.setInputFiles('#file-input', FIXTURE);
-  await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
+  await expectFirstPage(page);
   await page.setInputFiles('#file-input', FIXTURE);
   await page.click('#btn-pages');
   await expect(page.locator('#pm-sheet')).toBeVisible();

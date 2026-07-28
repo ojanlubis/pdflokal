@@ -10,6 +10,7 @@
 import { test, expect } from '@playwright/test';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { expectFirstPage } from '../helpers/render.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE = path.join(__dirname, '..', 'fixtures', 'sample-2pages.pdf');
@@ -18,7 +19,7 @@ const RED_FIXTURE = path.join(__dirname, '..', 'fixtures', 'alt-red-1page.pdf');
 async function openDoc(page, fixture = FIXTURE) {
   await page.goto('/');
   await page.setInputFiles('#file-input', fixture);
-  await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
+  await expectFirstPage(page);
 }
 
 async function placeText(page, text = 'ubah ukuranku') {

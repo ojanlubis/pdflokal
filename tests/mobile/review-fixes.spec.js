@@ -6,6 +6,7 @@
 import { test, expect } from '@playwright/test';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { expectFirstPage } from '../helpers/render.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE = path.join(__dirname, '..', 'fixtures', 'sample-2pages.pdf');
@@ -38,7 +39,7 @@ test.describe('review fixes', () => {
   test('H2: selection chrome survives rebuildStage (Semua Hal. + undo keep it draggable)', async ({ page }) => {
     await page.goto('/');
     await page.setInputFiles('#file-input', FIXTURE);
-    await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
+    await expectFirstPage(page);
 
     // Draw + place a signature (lands selected), then fan out (rebuildStage).
     await page.tap('[data-tool="signature"]');

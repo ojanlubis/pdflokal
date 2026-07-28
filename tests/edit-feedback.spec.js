@@ -18,6 +18,7 @@ import { test, expect } from '@playwright/test';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { armGanti, tapLine } from './helpers/lines.js';
+import { expectFirstPage } from './helpers/render.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const NASTY = (name) => path.join(__dirname, 'fixtures', 'nasty', name);
@@ -75,7 +76,7 @@ const fakeTabHidden = (page) => page.evaluate(() => {
 async function openDoc(page, fixture) {
   await page.goto('/');
   await page.setInputFiles('#file-input', fixture);
-  await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
+  await expectFirstPage(page);
 }
 
 async function editMiddleLine(page, newText) {
@@ -325,7 +326,7 @@ test.describe('edit beta: Increment D consent-gated sample', () => {
     await page.click('#btn-file');
     await page.click('#fm-new');
     await page.setInputFiles('#file-input', NASTY('undangan-cid.pdf'));
-    await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
+    await expectFirstPage(page);
 
     await expect.poll(async () => (await feedbackRecords(page)).length).toBeGreaterThan(0);
     const records = await feedbackRecords(page);

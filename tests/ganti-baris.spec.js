@@ -25,6 +25,7 @@ import { test, expect } from '@playwright/test';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { armGanti, lineBox, centerOf, tapLine as tapLineByTarget } from './helpers/lines.js';
+import { expectFirstPage } from './helpers/render.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const NASTY = (name) => path.join(__dirname, 'fixtures', 'nasty', name);
@@ -33,7 +34,7 @@ const FIXTURE = NASTY('surat-fragmen.pdf');
 async function openDoc(page, fixture) {
   await page.goto('/');
   await page.setInputFiles('#file-input', fixture);
-  await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
+  await expectFirstPage(page);
 }
 
 

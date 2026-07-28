@@ -43,6 +43,7 @@ import { test, expect } from '@playwright/test';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { armGanti, tapLine } from './helpers/lines.js';
+import { expectFirstPage } from './helpers/render.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const NASTY = (n) => path.join(__dirname, 'fixtures', 'nasty', n);
@@ -50,7 +51,7 @@ const NASTY = (n) => path.join(__dirname, 'fixtures', 'nasty', n);
 test('bold label + regular value: the replacement must not inherit bold from the first-painted run', async ({ page }) => {
   await page.goto('/');
   await page.setInputFiles('#file-input', NASTY('label-tebal.pdf'));
-  await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
+  await expectFirstPage(page);
   await expect(page.locator('[data-tool="ganti"]')).toBeVisible();
   await armGanti(page);
 

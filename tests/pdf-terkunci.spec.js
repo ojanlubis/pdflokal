@@ -33,6 +33,7 @@
 import { test, expect } from '@playwright/test';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { expectFirstPage } from './helpers/render.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const NASTY = (n) => path.join(__dirname, 'fixtures', 'nasty', n);
@@ -74,7 +75,7 @@ test.describe('protected PDFs', () => {
     await page.setInputFiles('#file-input', NASTY('terkunci.pdf'));
 
     // Viewing is untouched: PDF.js decrypts, so the pages are really there.
-    await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
+    await expectFirstPage(page);
     const state = await page.evaluate(() => {
       const d = window.v2.getDoc();
       return { pages: d.pages.length, encrypted: d.sources.map((s) => s.encrypted) };
@@ -94,7 +95,7 @@ test.describe('protected PDFs', () => {
     await captureRail(page);
     await page.goto('/');
     await page.setInputFiles('#file-input', NASTY('surat-word.pdf'));
-    await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
+    await expectFirstPage(page);
 
     const encrypted = await page.evaluate(() => window.v2.getDoc().sources.map((s) => s.encrypted));
     expect(encrypted).toEqual([false]);
@@ -108,7 +109,7 @@ test.describe('protected PDFs', () => {
     await captureRail(page);
     await page.goto('/');
     await page.setInputFiles('#file-input', NASTY('terkunci.pdf'));
-    await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
+    await expectFirstPage(page);
 
     await page.click('#btn-download');
     await expect(page.locator('#dl-sheet')).toBeVisible();

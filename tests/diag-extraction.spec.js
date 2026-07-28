@@ -51,6 +51,7 @@
 import { test, expect } from '@playwright/test';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { expectFirstPage } from './helpers/render.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const NASTY = (name) => path.join(__dirname, 'fixtures', 'nasty', name);
@@ -67,7 +68,7 @@ const COLUMN_GAP_FACTOR = 1.5;
 async function openDoc(page, fixturePath) {
   await page.goto('/');
   await page.setInputFiles('#file-input', fixturePath);
-  await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
+  await expectFirstPage(page);
 }
 
 // Pull runs + lines for page 1 straight from the app's own live index —

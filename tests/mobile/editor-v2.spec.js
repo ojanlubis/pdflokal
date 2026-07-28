@@ -8,6 +8,7 @@
 import { test, expect } from '@playwright/test';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { expectFirstPage } from '../helpers/render.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE = path.join(__dirname, '..', 'fixtures', 'sample-2pages.pdf');
@@ -17,7 +18,7 @@ async function openWithFixture(page) {
   await page.setInputFiles('#file-input', FIXTURE);
   // Both pages get slots instantly; near pages rasterize to <img>.
   await expect(page.locator('.pv-page')).toHaveCount(2);
-  await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
+  await expectFirstPage(page);
 }
 
 test.describe('editor v2 — mobile', () => {

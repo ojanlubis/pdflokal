@@ -6,6 +6,7 @@
 import { test, expect } from '@playwright/test';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { expectFirstPage } from '../helpers/render.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE = path.join(__dirname, '..', 'fixtures', 'sample-2pages.pdf');
@@ -13,7 +14,7 @@ const FIXTURE = path.join(__dirname, '..', 'fixtures', 'sample-2pages.pdf');
 async function openAndPlaceText(page, text) {
   await page.goto('/');
   await page.setInputFiles('#file-input', FIXTURE);
-  await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
+  await expectFirstPage(page);
   await page.tap('[data-tool="text"]');
   await page.tap('.pv-page >> nth=0', { position: { x: 120, y: 180 } });
   await page.keyboard.type(text);
@@ -24,7 +25,7 @@ test.describe('format bar — mobile', () => {
   test('hidden by default; appears when the Teks tool is armed', async ({ page }) => {
     await page.goto('/');
     await page.setInputFiles('#file-input', FIXTURE);
-    await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
+    await expectFirstPage(page);
     await expect(page.locator('#format-bar')).toBeHidden();
     await page.tap('[data-tool="text"]');
     await expect(page.locator('#format-bar')).toBeVisible();

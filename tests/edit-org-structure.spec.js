@@ -16,6 +16,7 @@ import { test, expect } from '@playwright/test';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { armGanti } from './helpers/lines.js';
+import { expectFirstPage } from './helpers/render.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const NASTY = (n) => path.join(__dirname, 'fixtures', 'nasty', n);
@@ -23,7 +24,7 @@ const NASTY = (n) => path.join(__dirname, 'fixtures', 'nasty', n);
 test('subtitle edit under a base CTM bakes natively at the ORIGINAL position', async ({ page }) => {
   await page.goto('/');
   await page.setInputFiles('#file-input', NASTY('org-structure.pdf'));
-  await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
+  await expectFirstPage(page);
   await expect(page.locator('[data-tool="ganti"]')).toBeVisible(); // toolbar ready (heavier doc)
   await page.waitForTimeout(500);
   await armGanti(page);
@@ -99,7 +100,7 @@ test('subtitle edit under a base CTM bakes natively at the ORIGINAL position', a
 test('acceptance: "Testinggg" stamps with NO spurious space, at the original position (y≈517)', async ({ page }) => {
   await page.goto('/');
   await page.setInputFiles('#file-input', NASTY('org-structure.pdf'));
-  await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
+  await expectFirstPage(page);
   await expect(page.locator('[data-tool="ganti"]')).toBeVisible();
   await page.waitForTimeout(500);
   await armGanti(page);

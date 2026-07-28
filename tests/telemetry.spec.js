@@ -15,6 +15,7 @@
 import { test, expect } from '@playwright/test';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { expectFirstPage } from './helpers/render.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SAMPLE_PDF = path.join(__dirname, 'fixtures', 'sample-2pages.pdf');
@@ -111,7 +112,7 @@ test.describe('telemetry client', () => {
     await page.goto('/');
 
     await page.setInputFiles('#file-input', SAMPLE_PDF);
-    await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
+    await expectFirstPage(page);
 
     // doc_open alone won't trip the 10-event threshold — force the flush the
     // same way a real navigating-away user would (spec §2's own mitigation).
@@ -134,7 +135,7 @@ test.describe('telemetry client', () => {
     await page.goto('/?buat=kompres'); // the SEO /kompres-pdf landing arrives this way
 
     await page.setInputFiles('#file-input', SAMPLE_PDF);
-    await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
+    await expectFirstPage(page);
     await fakeTabHidden(page);
 
     await expect.poll(async () => (await beaconBodies(page)).length).toBeGreaterThan(0);
@@ -148,7 +149,7 @@ test.describe('telemetry client', () => {
     await page.goto('/');
 
     await page.setInputFiles('#file-input', SAMPLE_PDF); // first load: NOT a merge
-    await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
+    await expectFirstPage(page);
     await page.setInputFiles('#file-input', SAMPLE_PDF); // second load onto an open doc: a merge
     await expect.poll(async () => page.evaluate(() => window.v2.getDoc().pages.length)).toBe(4);
     await fakeTabHidden(page);
@@ -166,7 +167,7 @@ test.describe('telemetry client', () => {
     await page.goto('/');
 
     await page.setInputFiles('#file-input', SAMPLE_PDF);
-    await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
+    await expectFirstPage(page);
 
     await page.click('#btn-download');
     await expect(page.locator('#dl-sheet')).toBeVisible();

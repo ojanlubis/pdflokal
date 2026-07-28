@@ -25,6 +25,7 @@ import { test, expect } from '@playwright/test';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { armGanti, tapLine } from './helpers/lines.js';
+import { expectFirstPage } from './helpers/render.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const NASTY = (name) => path.join(__dirname, 'fixtures', 'nasty', name);
@@ -33,7 +34,7 @@ const FIXTURE = NASTY('surat-word.pdf');
 test('surat-word.pdf (Word-shape simple TrueType font): the replacement stamps NATIVE, extracts back exactly, the original line is gone', async ({ page }) => {
   await page.goto('/');
   await page.setInputFiles('#file-input', FIXTURE);
-  await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
+  await expectFirstPage(page);
   await expect(page.locator('[data-tool="ganti"]')).toBeVisible();
   await armGanti(page);
 

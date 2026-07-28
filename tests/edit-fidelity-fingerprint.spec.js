@@ -25,6 +25,7 @@ import { test, expect } from '@playwright/test';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { armGanti, tapLine } from './helpers/lines.js';
+import { expectFirstPage } from './helpers/render.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const NASTY = (n) => path.join(__dirname, 'fixtures', 'nasty', n);
@@ -32,7 +33,7 @@ const NASTY = (n) => path.join(__dirname, 'fixtures', 'nasty', n);
 test('acceptance: "T & PPGA" -> "testingg" bakes BOLD via the embedded program\'s own fingerprint, not the (silent) PDF wrapper name', async ({ page }) => {
   await page.goto('/');
   await page.setInputFiles('#file-input', NASTY('org-structure.pdf'));
-  await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
+  await expectFirstPage(page);
   await expect(page.locator('[data-tool="ganti"]')).toBeVisible();
   await page.waitForTimeout(500);
   await armGanti(page);

@@ -34,6 +34,7 @@ import { test, expect } from '@playwright/test';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { armGanti, tapLine } from './helpers/lines.js';
+import { expectFirstPage } from './helpers/render.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE = path.join(__dirname, 'fixtures', 'nasty', 'nota-subset.pdf');
@@ -42,7 +43,7 @@ const SUBSTITUTE_TOAST = 'Huruf ini memakai font pengganti yang mirip';
 async function openDoc(page) {
   await page.goto('/');
   await page.setInputFiles('#file-input', FIXTURE);
-  await expect(page.locator('.pv-page .pv-bg').first()).toBeVisible();
+  await expectFirstPage(page);
 }
 
 function pageRaster(page) {
