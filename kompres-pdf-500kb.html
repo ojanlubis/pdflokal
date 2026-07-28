@@ -1132,6 +1132,22 @@
     </div>
   </dialog>
 
+  <!-- Shown when Edit is tapped on a page with no text layer (a scan/photo).
+       Mirrors #home-confirm: <dialog> + a .sheet child, because the global
+       `dialog` CSS rule IS the overlay. Copy is PLACEHOLDER — TODO(copy),
+       client-facing words are Fauzan's. It must NOT imply OCR is coming. -->
+  <dialog id="scan-offer" aria-label="Halaman ini hasil scan">
+    <div class="sheet hc-sheet">
+      <h2>Halaman ini hasil scan</h2>
+      <p>Tulisannya cuma gambar, jadi nggak ada teks yang bisa diedit. Tapi kamu masih bisa menutupnya lalu menulis di atasnya.</p>
+      <div class="hc-row">
+        <button id="so-dismiss">Nanti aja</button>
+        <button id="so-tipex">Tutup tulisan</button>
+        <button id="so-teks">Tulis di atasnya</button>
+      </div>
+    </div>
+  </dialog>
+
   <div id="support-card" role="dialog" aria-label="Dukung PDFLokal">
     <button id="sc-close" aria-label="Tutup">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>

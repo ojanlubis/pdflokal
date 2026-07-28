@@ -1039,7 +1039,7 @@
           <ol>
           <li>Seret PDF-mu ke kotak di atas. Target 100KB sudah aktif.</li>
           <li>PDFLokal mencari kompresi paling ringan yang masih muat di bawah 100KB.</li>
-          <li>Ukuran akhir tampil di tombol unduh — termasuk kalau ternyata belum masuk 100KB.</li>
+          <li>Ukuran akhir tampil di tombol unduh, termasuk kalau ternyata belum masuk 100KB.</li>
           </ol>
           <h2>Realistisnya, 100KB untuk berapa halaman</h2>
           <p>100KB praktis hanya realistis untuk satu lembar. Itu sebabnya batas ini hampir selalu muncul untuk unggahan berkas tunggal: pas foto, scan KTP, atau satu lembar surat pernyataan.</p>
@@ -1136,6 +1136,22 @@
       <div class="hc-row">
         <button id="hc-cancel">Batal</button>
         <button id="hc-go">Ke Beranda</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Shown when Edit is tapped on a page with no text layer (a scan/photo).
+       Mirrors #home-confirm: <dialog> + a .sheet child, because the global
+       `dialog` CSS rule IS the overlay. Copy is PLACEHOLDER — TODO(copy),
+       client-facing words are Fauzan's. It must NOT imply OCR is coming. -->
+  <dialog id="scan-offer" aria-label="Halaman ini hasil scan">
+    <div class="sheet hc-sheet">
+      <h2>Halaman ini hasil scan</h2>
+      <p>Tulisannya cuma gambar, jadi nggak ada teks yang bisa diedit. Tapi kamu masih bisa menutupnya lalu menulis di atasnya.</p>
+      <div class="hc-row">
+        <button id="so-dismiss">Nanti aja</button>
+        <button id="so-tipex">Tutup tulisan</button>
+        <button id="so-teks">Tulis di atasnya</button>
       </div>
     </div>
   </dialog>

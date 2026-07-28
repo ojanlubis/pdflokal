@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What a PDF Really Is</title>
+<style>
+  :root {
+    --bg: #faf7f2; --ink: #1c1917; --muted: #79726a; --accent: #dc2626;
+    --card: #ffffff; --line: #e8e2d9; --good: #15803d; --bad: #b91c1c;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+    --sans: -apple-system, "Segoe UI", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; overscroll-behavior: none; }
+  body { background: var(--bg); color: var(--ink); font: 16px/1.6 var(--sans); overflow: hidden; }
+
+  .deck { position: relative; height: 100vh; height: 100dvh; }
+  .slide {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center;
+    padding: 2.5rem 1.75rem 6.5rem; opacity: 0; pointer-events: none;
+    transition: opacity .3s ease; overflow-y: auto;
+  }
+  .slide.active { opacity: 1; pointer-events: auto; }
+  .slide-inner { max-width: 42rem; width: 100%; }
+  .slide.wide .slide-inner { max-width: 54rem; }
+
+  .kicker { color: var(--accent); font-weight: 700; font-size: .74rem; text-transform: uppercase; letter-spacing: .13em; margin-bottom: .9rem; }
+  h1 { font-size: clamp(1.7rem, 4.5vw, 2.5rem); line-height: 1.18; margin: 0 0 1rem; letter-spacing: -.01em; }
+  h2 { font-size: clamp(1.4rem, 3.5vw, 1.9rem); line-height: 1.22; margin: 0 0 1rem; letter-spacing: -.01em; }
+  .lede { color: var(--muted); font-size: 1.08rem; margin: 0 auto; max-width: 34rem; }
+  p { margin: .9rem 0; text-align: left; }
+  .center-text p { text-align: center; }
+
+  code { font-family: var(--mono); font-size: .88em; background: #f1ede6; padding: .1em .35em; border-radius: 4px; }
+  .metaphor { font-style: italic; color: #44403c; font-size: 1.05rem; }
+
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: .9rem; margin-top: 1.6rem; text-align: left; }
+  @media (max-width: 640px) { .cards { grid-template-columns: 1fr; } }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 1.1rem 1.2rem; }
+  .card .t { font-weight: 700; font-size: .78rem; text-transform: uppercase; letter-spacing: .08em; color: var(--accent); margin-bottom: .4rem; }
+  .card .d { font-size: .88rem; color: #44403c; }
+
+  .stage {
+    background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+    padding: 1.5rem 1.6rem; margin-top: 1.4rem; text-align: left;
+  }
+  .btnrow { display: flex; gap: .6rem; flex-wrap: wrap; margin-top: 1rem; justify-content: center; }
+  button.act {
+    font: inherit; font-size: .88rem; font-weight: 600; padding: .55rem 1.1rem; border-radius: 8px;
+    border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer;
+  }
+  button.act.ghost { background: transparent; color: var(--accent); }
+  button.act:disabled { opacity: .4; cursor: default; }
+
+  /* hex decode demo */
+  .bytebar { display: flex; gap: .4rem; justify-content: center; flex-wrap: wrap; margin: 1.1rem 0; }
+  .byte { font-family: var(--mono); font-size: 1rem; padding: .5rem .7rem; border-radius: 8px; background: #f1ede6; color: var(--muted); border: 1px solid var(--line); transition: all .2s; }
+  .byte.done { background: #dcfce7; color: var(--good); border-color: #86efac; font-weight: 700; }
+  .byte.now { background: var(--accent); color: #fff; border-color: var(--accent); transform: scale(1.08); }
+  .math { font-family: var(--mono); font-size: .95rem; background: #1c1917; color: #e7e5e4; border-radius: 10px; padding: 1rem 1.2rem; text-align: center; min-height: 2.4rem; display: flex; align-items: center; justify-content: center; }
+  .decoded { font-family: var(--mono); font-size: 1.3rem; text-align: center; margin-top: 1rem; letter-spacing: .04em; }
+  .decoded .out { color: var(--good); font-weight: 700; }
+
+  /* matrix / position demo */
+  .pagebox { position: relative; width: 220px; height: 285px; background: #fff; border: 1px solid var(--line); border-radius: 4px; margin: 1.2rem auto 0; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+  .pen { position: absolute; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); left: 6px; top: 6px; transition: left .8s cubic-bezier(.2,.8,.2,1), top .8s cubic-bezier(.2,.8,.2,1); box-shadow: 0 0 0 4px rgba(220,38,38,.15); }
+  .pen::after { content: ''; }
+  .pen.landed::before { content: 'PRES'; position: absolute; left: 12px; top: -7px; font-family: var(--mono); font-weight: 700; font-size: .8rem; color: var(--ink); white-space: nowrap; opacity: 0; animation: fadein .3s .5s forwards; }
+  @keyframes fadein { to { opacity: 1; } }
+
+  /* scan layers demo */
+  .scanwrap { position: relative; margin-top: 1.3rem; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); background: #f4f1ea; }
+  .scanphoto { padding: 2.2rem 1.5rem; text-align: center; background: linear-gradient(180deg,#fbfaf7,#f2efe8); }
+  .scanphoto .h { font-family: Georgia, serif; font-weight: 700; font-size: 1.1rem; letter-spacing: .02em; }
+  .scanphoto .s { font-family: Georgia, serif; font-size: .85rem; color: #57534e; margin-top: .3rem; }
+  .ocrbox {
+    position: absolute; border: 1.5px solid var(--accent); background: rgba(220,38,38,.08);
+    font-family: var(--mono); font-size: .62rem; color: var(--accent); padding: 1px 3px;
+    opacity: 0; transition: opacity .3s; pointer-events: none; border-radius: 3px;
+  }
+  .scanwrap.show-ocr .ocrbox { opacity: 1; }
+  .ocrbox.mismatch { border-color: var(--bad); background: rgba(185,28,28,.12); color: var(--bad); font-weight: 700; }
+
+  /* live drop */
+  #drop { border: 2px dashed var(--line); border-radius: 12px; padding: 1.8rem 1.4rem; text-align: center; color: var(--muted); cursor: pointer; margin-top: 1.2rem; }
+  #drop.over { border-color: var(--accent); background: #fdf5f0; }
+  #drop b { color: var(--ink); }
+  #file-input { display: none; }
+  #dropresult { display: none; margin-top: 1.2rem; }
+  #dropresult.show { display: block; }
+  .verdict-row { display: flex; align-items: center; gap: .6rem; padding: .5rem 0; border-bottom: 1px solid var(--line); font-size: .92rem; }
+  .verdict-row:last-child { border-bottom: none; }
+  .pill { font-size: .72rem; font-weight: 700; padding: .12rem .55rem; border-radius: 99px; white-space: nowrap; }
+  .pill.yes { background: #dcfce7; color: var(--good); }
+  .pill.no { background: #fee2e2; color: var(--bad); }
+
+  .linkout { display: inline-block; margin-top: 1.2rem; font-size: .86rem; color: var(--accent); text-decoration: none; border-bottom: 1px solid currentColor; }
+
+  /* nav */
+  .nav { position: fixed; left: 0; right: 0; bottom: 0; padding: 1.1rem 1.5rem; display: flex; align-items: center; justify-content: center; gap: 1.2rem; background: linear-gradient(0deg, var(--bg) 55%, transparent); z-index: 10; }
+  .nav button { font: inherit; background: var(--card); border: 1px solid var(--line); border-radius: 8px; width: 2.4rem; height: 2.4rem; cursor: pointer; color: var(--ink); font-size: 1.1rem; }
+  .nav button:disabled { opacity: .3; cursor: default; }
+  .dots { display: flex; gap: .4rem; }
+  .dot { width: .5rem; height: .5rem; border-radius: 50%; background: var(--line); cursor: pointer; border: none; padding: 0; }
+  .dot.active { background: var(--accent); width: 1.3rem; border-radius: 99px; }
+  .counter { font-size: .78rem; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 2.6rem; }
+  kbd { font-family: var(--mono); background: #f1ede6; border: 1px solid var(--line); border-radius: 4px; padding: .05em .4em; font-size: .85em; }
+</style>
+</head>
+<body>
+<main class="deck" id="deck"></main>
+
+<nav class="nav">
+  <button id="prev" aria-label="Previous">‹</button>
+  <div class="dots" id="dots"></div>
+  <span class="counter" id="counter"></span>
+  <button id="next" aria-label="Next">›</button>
+</nav>
+
+<script src="js/vendor/pdf-lib.min.js"></script>
+<script type="module">
+import { getFontStyleInfo } from './js/core/font-style.js';
+import { readPageContents } from './js/core/redact.js';
+
+// ---------------------------------------------------------------------------
+// SLIDE CONTENT — each entry is innerHTML for one full slide. `init` (optional)
+// runs once every time that slide becomes active, for the interactive ones.
+// ---------------------------------------------------------------------------
+const slides = [
+  // 0 — title
+  {
+    wide: false,
+    html: `
+      <div class="kicker">PDFLokal · what a PDF really is</div>
+      <h1>A PDF is not what you think it is.</h1>
+      <p class="lede">Ten short stops. A few of them you drive yourself. Press <kbd>→</kbd> or
+      tap "next" whenever you're ready.</p>
+    `,
+  },
+  // 1 — the core claim
+  {
+    html: `
+      <div class="kicker">1 · the core claim</div>
+      <h2>It's not a document. It's a recorded performance.</h2>
+      <p class="metaphor" style="text-align:center">Word writes a recipe — the kitchen improvises
+      the plate, fresh, every time you open it. A PDF seals the finished plate in a jar. Nothing is
+      left for the guest's kitchen to decide.</p>
+      <p style="text-align:center;color:var(--muted);font-size:.92rem">Its content is a list of
+      imperative commands — <em>set this font, move the pen here, paint these bytes.</em> Not a
+      description of a page. A recording of one being painted, once.</p>
+    `,
+  },
+  // 2 — three layers
+  {
+    html: `
+      <div class="kicker">2 · three things, glued together</div>
+      <h2>Every painted line is three separable facts.</h2>
+      <div class="cards">
+        <div class="card"><div class="t">What</div><div class="d">The literal string bytes. Real, in the file, always.</div></div>
+        <div class="card"><div class="t">Where</div><div class="d">A matrix + advance widths. Real, guaranteed by the spec.</div></div>
+        <div class="card"><div class="t">How</div><div class="d">The actual glyph shapes. Only real <b>if</b> the file bothered to embed them.</div></div>
+      </div>
+      <p style="text-align:center;color:var(--muted);font-size:.9rem;margin-top:1.3rem">That third
+      one is optional. Everything on the next few slides falls out of that one fact.</p>
+    `,
+  },
+  // 3 — LIVE DEMO: hex decode
+  {
+    html: `
+      <div class="kicker">3 · demo — decode a real instruction</div>
+      <h2>What "<code>&lt;5052455320&gt;</code>" actually says</h2>
+      <p style="text-align:center;color:var(--muted);font-size:.9rem">Real bytes, pulled from a real
+      Peraturan Presiden PDF. Step through it.</p>
+      <div class="stage" style="text-align:center">
+        <div class="bytebar" id="bytebar"></div>
+        <div class="math" id="mathline">press "step" to begin</div>
+        <div class="decoded">"<span id="decoded"></span><span style="opacity:.3">▏</span>"</div>
+        <div class="btnrow">
+          <button class="act" id="step">Step →</button>
+          <button class="act ghost" id="hexreset">Reset</button>
+        </div>
+      </div>
+    `,
+    init: initHexDemo,
+  },
+  // 4 — LIVE DEMO: position matrix
+  {
+    html: `
+      <div class="kicker">4 · demo — "where" is just a matrix</div>
+      <h2>"<code>1 0 0 1 281.88 766.44 Tm</code>" moves the pen</h2>
+      <p style="text-align:center;color:var(--muted);font-size:.9rem">No mystery here — the last two
+      numbers are an x,y coordinate on the page, top-right in this document. Run it.</p>
+      <div class="stage" style="text-align:center">
+        <div class="pagebox" id="pagebox"><div class="pen" id="pen"></div></div>
+        <div class="btnrow">
+          <button class="act" id="runtm">Run the Tm</button>
+          <button class="act ghost" id="tmreset">Reset</button>
+        </div>
+      </div>
+    `,
+    init: initMatrixDemo,
+  },
+  // 5 — HOW can be missing
+  {
+    html: `
+      <div class="kicker">5 · the catch</div>
+      <h2>"How" can be missing on purpose — and it usually is fine.</h2>
+      <p>A file can legally say <code>/BaseFont /Helvetica</code> and enclose zero Helvetica glyphs.
+      It's trusting whoever opens it to already have something close enough lying around.</p>
+      <p>Almost every computer does. So this gamble quietly pays off billions of times a day —
+      until three viewers each guess slightly differently, and you notice.</p>
+    `,
+  },
+  // 6 — who paints it then
+  {
+    html: `
+      <div class="kicker">6 · demo — the receipt</div>
+      <h2>Who actually decides the shapes, then?</h2>
+      <p style="text-align:center;color:var(--muted);font-size:.9rem">Captured live from our own
+      renderer, the moment it had to paint that same Helvetica-named, glyph-less font:</p>
+      <div class="stage">
+<pre style="margin:0;font-family:var(--mono);font-size:.78rem;line-height:1.7;overflow-x:auto;white-space:pre">name: "Helvetica"    <span style="color:var(--bad)">missingFile: true</span>    embeddedBytes: 0
+src: local(Helvetica), local(Helvetica Neue), local(Arial),
+     local(Liberation Sans), local(Arimo), local(Nimbus Sans), …</pre>
+      </div>
+      <p style="text-align:center;color:var(--muted);font-size:.88rem;margin-top:1rem">On a Mac,
+      that resolves to Apple's Helvetica. On Linux: Liberation Sans. Same file, different shapes —
+      and neither viewer is wrong, because the file never actually promised any.</p>
+    `,
+  },
+  // 7 — LIVE DEMO: the image layer itself, for real
+  {
+    wide: true,
+    html: `
+      <div class="kicker">7 · demo — the layer that actually paints your eyes</div>
+      <h2>"<code>/Obj82 Do</code>" isn't a metaphor. It's a real, separately-compressed object.</h2>
+      <p style="text-align:center;color:var(--muted);font-size:.9rem">This page just built a real
+      PDF, embedded a real photo into it, saved it, and reloaded it from scratch — the same way any
+      PDF producer would. What's below is read back out of those actual bytes.</p>
+      <div class="stage" id="imgstage" style="text-align:center">
+        <p style="color:var(--muted)">building…</p>
+      </div>
+      <p style="text-align:center;color:var(--muted);font-size:.84rem;margin-top:.9rem">This one
+      happens to be a JPEG. A real scanner would more likely produce
+      <code>CCITTFaxDecode</code> or <code>JBIG2Decode</code> — fax-style black-and-white
+      compression, further still from "a PNG" than this is.</p>
+    `,
+    init: initImageDemo,
+  },
+  // 8 — scan layers demo (text stacked on top of a photo)
+  {
+    wide: true,
+    html: `
+      <div class="kicker">8 · demo — stack invisible text on top of that</div>
+      <h2>A scanned page is two files pretending to be one.</h2>
+      <p style="text-align:center;color:var(--muted);font-size:.9rem">Take a photo exactly like the
+      last slide's, and lay an OCR engine's guess on top of it — invisibly. This reproduces the real
+      decoded bytes from an actual government PDF, recreated here since that file itself isn't
+      ours to embed. Toggle it on.</p>
+      <div class="scanwrap" id="scanwrap">
+        <div class="scanphoto">
+          <div class="h">PRESIDEN REPUBLIK INDONESIA</div>
+          <div class="s">— PERATURAN PRESIDEN —</div>
+        </div>
+        <div class="ocrbox" style="left:3%;top:29%;width:28%;height:20%">PRES IDEN</div>
+        <div class="ocrbox" style="left:34%;top:29%;width:28%;height:20%">REPUBLIK</div>
+        <div class="ocrbox mismatch" style="left:66%;top:29%;width:31%;height:20%" title="OCR misread D as O — invisible, so nobody ever sees it">INOONESIA</div>
+      </div>
+      <div class="btnrow"><button class="act" id="toggleocr">Show the invisible text layer</button></div>
+      <p style="text-align:center;color:var(--muted);font-size:.84rem;margin-top:.9rem">That last
+      box is a real OCR misread of "INDONESIA" — invisible, so it never shows on the page. Search or
+      copy that exact spot, though, and this is the text you'd actually get.</p>
+    `,
+    init: initScanDemo,
+  },
+  // 9 — LIVE: drop your own file
+  {
+    wide: true,
+    html: `
+      <div class="kicker">9 · demo — try it on your own file</div>
+      <h2>Drop a real PDF in. Nothing uploads.</h2>
+      <p style="text-align:center;color:var(--muted);font-size:.9rem">This runs the same vendored
+      parser this product ships with, live in this tab. First page only, fonts only — for the full
+      breakdown (every page, every font, every image's real filter, the raw content stream), use the
+      full tool linked below.</p>
+      <div id="drop">Drag a PDF here, or <b>click to choose one</b></div>
+      <input type="file" id="file-input" accept="application/pdf">
+      <div id="dropresult"></div>
+      <p style="text-align:center"><a class="linkout" href="pdf-xray" target="_blank" rel="noopener">Open the full PDF X-Ray tool →</a></p>
+    `,
+    init: initDropDemo,
+  },
+  // 10 — closing
+  {
+    html: `
+      <div class="kicker">10 · the model, in one breath</div>
+      <h2>A PDF promises what it actually packed in the envelope — nothing more.</h2>
+      <p style="text-align:center">Text and position are always real. Shape is only real if the file
+      bothered to embed it. A page's visible pixels are usually a real, separately-compressed image
+      object — never assume "PNG," it's just as often a JPEG or a fax-style scan compressor. A scan
+      isn't text at all, just a photo with an invisible guess taped on top. Whatever a file didn't
+      finish sealing, every viewer quietly finishes guessing — differently.</p>
+      <p style="text-align:center;color:var(--muted);font-size:.88rem;margin-top:1.4rem">Deeper reads:
+      the full essay (with a self-check quiz) and the format's own history are one folder up. The
+      X-ray tool is one tab away. This deck is the fast version.</p>
+    `,
+  },
+];
+
+// ---------------------------------------------------------------------------
+// DEMO 1 — hex → decimal → ASCII, stepped
+// ---------------------------------------------------------------------------
+function initHexDemo(slideEl) {
+  const HEX = ['50', '52', '45', '53', '20'];
+  const CHARS = ['P', 'R', 'E', 'S', ' '];
+  const bytebar = slideEl.querySelector('#bytebar');
+  const mathline = slideEl.querySelector('#mathline');
+  const decodedEl = slideEl.querySelector('#decoded');
+  const stepBtn = slideEl.querySelector('#step');
+  const resetBtn = slideEl.querySelector('#hexreset');
+  let i = 0;
+
+  function draw() {
+    bytebar.innerHTML = HEX.map((h, idx) => {
+      const cls = idx < i ? 'done' : idx === i ? 'now' : '';
+      return `<span class="byte ${cls}">${h}</span>`;
+    }).join('');
+    decodedEl.textContent = CHARS.slice(0, i).join('');
+    stepBtn.disabled = i >= HEX.length;
+    stepBtn.textContent = i >= HEX.length ? 'Done' : 'Step →';
+  }
+
+  stepBtn.onclick = () => {
+    if (i >= HEX.length) return;
+    const h = HEX[i];
+    const dec = parseInt(h, 16);
+    mathline.textContent = `${h} hex = ${dec} decimal → ASCII table position ${dec} = "${CHARS[i]}"`;
+    i += 1;
+    draw();
+  };
+  resetBtn.onclick = () => { i = 0; mathline.textContent = 'press "step" to begin'; draw(); };
+  draw();
+}
+
+// ---------------------------------------------------------------------------
+// DEMO 2 — Tm moves a pen to a real coordinate, scaled into a mini page
+// ---------------------------------------------------------------------------
+function initMatrixDemo(slideEl) {
+  const pen = slideEl.querySelector('#pen');
+  const runBtn = slideEl.querySelector('#runtm');
+  const resetBtn = slideEl.querySelector('#tmreset');
+  // Real coordinates from the same document (612x792 pt Letter page,
+  // illustrative — this deck doesn't know the source file's exact size).
+  const PAGE_W = 612, PAGE_H = 792, X = 281.88, Y = 766.44;
+  const BOX_W = 220, BOX_H = 285;
+  function reset() { pen.style.left = '6px'; pen.style.top = '6px'; pen.classList.remove('landed'); }
+  runBtn.onclick = () => {
+    pen.classList.remove('landed');
+    const left = (X / PAGE_W) * BOX_W;
+    const top = ((PAGE_H - Y) / PAGE_H) * BOX_H; // PDF y is bottom-up; the box is drawn top-down
+    pen.style.left = `${left}px`;
+    pen.style.top = `${top}px`;
+    setTimeout(() => pen.classList.add('landed'), 800);
+  };
+  resetBtn.onclick = reset;
+  reset();
+}
+
+// ---------------------------------------------------------------------------
+// DEMO — the image layer, proven real: embed a real JPEG into a real PDF,
+// save it, reload the SAVED BYTES (a genuine round trip, not the in-memory
+// object), then read the XObject back out exactly like pdf-xray.html's own
+// imageRowsForPage does. The <img> below is built from the re-extracted raw
+// stream bytes, not the original fetch — so what's on screen is provably
+// what actually lives inside this PDF, not a stand-in for it.
+// ---------------------------------------------------------------------------
+function resolveRef(context, PDFRef, v) { return v instanceof PDFRef ? context.lookup(v) : v; }
+function escapeHtml(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+let imageDemoCache = null;
+
+async function initImageDemo(slideEl) {
+  const stage = slideEl.querySelector('#imgstage');
+  if (imageDemoCache) { renderImageDemo(stage, imageDemoCache); return; }
+  stage.innerHTML = '<p style="color:var(--muted)">building a real PDF, saving it, reloading it…</p>';
+  try {
+    const res = await fetch('/images/screenshot-preview.jpg');
+    const jpgBytes = new Uint8Array(await res.arrayBuffer());
+
+    const doc = await PDFLib.PDFDocument.create();
+    const jpg = await doc.embedJpg(jpgBytes);
+    const w = 340, h = (340 * jpg.height) / jpg.width;
+    const page = doc.addPage([w, h]);
+    page.drawImage(jpg, { x: 0, y: 0, width: w, height: h });
+    const savedBytes = await doc.save();
+
+    // The round trip: forget everything above, reload from the SAVED bytes.
+    const loaded = await PDFLib.PDFDocument.load(savedBytes);
+    const p = loaded.getPages()[0];
+    const stream = readPageContents(p, PDFLib);
+
+    const { PDFName, PDFRef, PDFRawStream } = PDFLib;
+    const context = p.doc.context;
+    const resources = p.node.Resources();
+    const xobjDict = resolveRef(context, PDFRef, resources.get(PDFName.of('XObject')));
+    const resName = xobjDict.keys()[0];
+    const obj = resolveRef(context, PDFRef, xobjDict.get(resName));
+    const dict = obj.dict;
+    const g = (n) => { const raw = dict.get(PDFName.of(n)); return raw ? resolveRef(context, PDFRef, raw) : null; };
+
+    const filterRaw = g('Filter');
+    const filterName = filterRaw ? filterRaw.toString().replace(/^\//, '') : 'none';
+    const width = Number(g('Width'));
+    const height = Number(g('Height'));
+    const colorSpace = (g('ColorSpace')?.toString() ?? '—').replace(/^\//, '');
+    // obj.contents on a DCTDecode stream IS the literal JPEG file bytes —
+    // that's the whole mechanism: PDF stores the already-JPEG-compressed
+    // bytes verbatim and just tags them, rather than re-encoding pixels.
+    const rawBytes = obj.contents;
+    const blobUrl = URL.createObjectURL(new Blob([rawBytes], { type: 'image/jpeg' }));
+
+    imageDemoCache = { blobUrl, filterName, width, height, colorSpace, bytesLen: rawBytes.length, stream, resName: resName.toString().replace(/^\//, '') };
+    renderImageDemo(stage, imageDemoCache);
+  } catch (err) {
+    stage.innerHTML = `<p style="color:var(--bad)">Demo failed to build: ${err.message}</p>`;
+  }
+}
+
+function renderImageDemo(stage, d) {
+  stage.innerHTML = `
+    <img src="${d.blobUrl}" alt="the actual re-extracted embedded photo" style="max-width:100%;max-height:220px;border-radius:8px;display:block;margin:0 auto;border:1px solid var(--line)">
+    <div class="btnrow">
+      <span class="pill yes">${d.filterName}</span>
+      <span class="pill yes">${d.width} × ${d.height}px</span>
+      <span class="pill yes">${d.colorSpace}</span>
+      <span class="pill yes">${(d.bytesLen / 1024).toFixed(1)} KB</span>
+    </div>
+    <p style="text-align:center;color:var(--muted);font-size:.82rem;margin:.8rem 0">Not a mockup —
+    these are the literal bytes sitting inside <code>/${d.resName}</code> of a real, saved-and-reloaded
+    PDF. The content stream that paints it, read back the same way:</p>
+    <pre style="margin:0;font-family:var(--mono);font-size:.78rem;line-height:1.7;text-align:left;overflow-x:auto;background:#1c1917;color:#e7e5e4;border-radius:10px;padding:1rem 1.2rem">${escapeHtml(d.stream.trim())}</pre>
+  `;
+}
+
+// ---------------------------------------------------------------------------
+// DEMO 3 — scan/OCR layer toggle
+// ---------------------------------------------------------------------------
+function initScanDemo(slideEl) {
+  const wrap = slideEl.querySelector('#scanwrap');
+  const btn = slideEl.querySelector('#toggleocr');
+  wrap.classList.remove('show-ocr');
+  btn.textContent = 'Show the invisible text layer';
+  btn.onclick = () => {
+    const on = wrap.classList.toggle('show-ocr');
+    btn.textContent = on ? 'Hide the invisible text layer' : 'Show the invisible text layer';
+  };
+}
+
+// ---------------------------------------------------------------------------
+// DEMO 4 — drop a real PDF, read its first page's fonts live (zero upload)
+// ---------------------------------------------------------------------------
+function res(context, PDFRef, v) { return v instanceof PDFRef ? context.lookup(v) : v; }
+
+function initDropDemo(slideEl) {
+  const dropEl = slideEl.querySelector('#drop');
+  const inputEl = slideEl.querySelector('#file-input');
+  const resultEl = slideEl.querySelector('#dropresult');
+
+  if (dropEl.dataset.wired) return; // slide can re-enter; wire listeners once
+  dropEl.dataset.wired = '1';
+
+  dropEl.addEventListener('click', () => inputEl.click());
+  inputEl.addEventListener('change', () => { if (inputEl.files[0]) handle(inputEl.files[0]); });
+  ['dragover', 'dragleave', 'drop'].forEach((evt) => {
+    dropEl.addEventListener(evt, (e) => {
+      e.preventDefault();
+      dropEl.classList.toggle('over', evt === 'dragover');
+      if (evt === 'drop' && e.dataTransfer.files[0]) handle(e.dataTransfer.files[0]);
+    });
+  });
+
+  async function handle(file) {
+    resultEl.classList.remove('show');
+    try {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const doc = await PDFLib.PDFDocument.load(bytes, { ignoreEncryption: true });
+      const page = doc.getPages()[0];
+      const { PDFName, PDFDict, PDFRef } = PDFLib;
+      const context = page.doc.context;
+      const resources = page.node.Resources();
+      const fontDict = resources && res(context, PDFRef, resources.get(PDFName.of('Font')));
+      const names = fontDict instanceof PDFDict ? fontDict.keys() : [];
+
+      let rowsHtml = '';
+      if (names.length === 0) {
+        rowsHtml = `<div class="verdict-row">No font resources on this page — likely an image-only page (a scan).</div>`;
+      } else {
+        for (const key of names) {
+          const name = key.toString().replace(/^\//, '');
+          const style = getFontStyleInfo(page, PDFLib, name);
+          const baseFont = style.ok ? style.baseFont : name;
+          const embedded = style.ok ? style.embedded : false;
+          rowsHtml += `<div class="verdict-row"><code>${baseFont}</code>
+            <span class="pill ${embedded ? 'yes' : 'no'}">${embedded ? 'embedded' : 'not embedded — every viewer substitutes'}</span></div>`;
+        }
+      }
+      resultEl.innerHTML = `<div class="stage" style="text-align:left">
+        <div style="font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:.5rem">
+          ${doc.getPages().length} page(s) · page 1's fonts</div>
+        ${rowsHtml}
+      </div>`;
+      resultEl.classList.add('show');
+    } catch (err) {
+      resultEl.innerHTML = `<div class="stage" style="color:var(--bad)">Couldn't parse this file: ${err.message}</div>`;
+      resultEl.classList.add('show');
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// DECK ENGINE
+// ---------------------------------------------------------------------------
+const deckEl = document.getElementById('deck');
+const dotsEl = document.getElementById('dots');
+const counterEl = document.getElementById('counter');
+const prevBtn = document.getElementById('prev');
+const nextBtn = document.getElementById('next');
+
+slides.forEach((s, i) => {
+  const el = document.createElement('section');
+  el.className = 'slide' + (s.wide ? ' wide' : '');
+  el.dataset.index = i;
+  el.innerHTML = `<div class="slide-inner">${s.html}</div>`;
+  deckEl.appendChild(el);
+});
+slides.forEach((s, i) => {
+  const dot = document.createElement('button');
+  dot.className = 'dot';
+  dot.setAttribute('aria-label', `Go to slide ${i + 1}`);
+  dot.addEventListener('click', () => goTo(i));
+  dotsEl.appendChild(dot);
+});
+
+let current = 0;
+function goTo(i) {
+  current = Math.max(0, Math.min(slides.length - 1, i));
+  [...deckEl.children].forEach((el, idx) => el.classList.toggle('active', idx === current));
+  [...dotsEl.children].forEach((el, idx) => el.classList.toggle('active', idx === current));
+  counterEl.textContent = `${current + 1} / ${slides.length}`;
+  prevBtn.disabled = current === 0;
+  nextBtn.disabled = current === slides.length - 1;
+  const s = slides[current];
+  if (s.init) s.init(deckEl.children[current]);
+}
+prevBtn.addEventListener('click', () => goTo(current - 1));
+nextBtn.addEventListener('click', () => goTo(current + 1));
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); goTo(current + 1); }
+  if (e.key === 'ArrowLeft') { e.preventDefault(); goTo(current - 1); }
+});
+
+goTo(0);
+</script>
+</body>
+</html>

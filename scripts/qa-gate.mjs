@@ -2,8 +2,10 @@
 /*
  * PDFLokal — scripts/qa-gate.mjs  (THE GATE)
  * ============================================================================
- * The machine QA gate: lint -> core -> Playwright, run as ONE owned sequence,
- * on a tree proven not to move underneath it.
+ * The machine QA gate: lint -> seo:check -> core -> Playwright, run as ONE owned
+ * sequence, on a tree proven not to move underneath it. The stage list MIRRORS
+ * CI: anything CI runs that this does not means the gate can be green while CI
+ * is red, which destroys the only claim it makes.
  *
  * WHY THIS EXISTS — read this before "simplifying" the fingerprint away:
  *   2026-07-28, day 1 of Edit in production. A full sweep returned
@@ -253,6 +255,13 @@ async function main() {
   console.log(`fingerprint ${watcher.first.digest} (${watcher.first.count} files watched, sampled every 4s)`);
 
   const lint = await stage('LINT', 'npm', ['run', 'lint']);
+  // WHY SEO:CHECK IS A GATE STAGE (added 2026-07-28): CI's lint workflow runs it
+  // and the gate did not, so the gate could be GREEN while CI went RED — which
+  // makes it useless for the one job it exists to do, "is this safe to push".
+  // Found the hard way: commit 24f54a7 added a <dialog> to index.html, the
+  // generator embeds the app shell into all 12 SEO pages, and every one of them
+  // was left stale. Three gate runs passed over that tree.
+  const seo = await stage('SEO', 'npm', ['run', 'seo:check']);
   const core = await stage('CORE', 'npm', ['run', 'test:core']);
   const pw = await stage('PLAYWRIGHT', 'npx', ['playwright', 'test']);
 
@@ -272,8 +281,8 @@ async function main() {
     process.exit(90);
   }
 
-  if (lint || core || pw) {
-    console.error(`\nVERDICT=RED (lint=${lint} core=${core} playwright=${pw}) on stable tree ${last.head}`);
+  if (lint || seo || core || pw) {
+    console.error(`\nVERDICT=RED (lint=${lint} seo=${seo} core=${core} playwright=${pw}) on stable tree ${last.head}`);
     process.exit(1);
   }
 

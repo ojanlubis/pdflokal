@@ -1045,7 +1045,7 @@
           <p>Berkas lamaran dan pendaftaran: KTP, KK, ijazah, sertifikat — difoto pakai HP, lalu harus dikumpulkan sebagai satu PDF.</p>
           <p>Bukti transaksi, nota, atau surat yang difoto dan perlu dikirim rapi ke kantor atau klien.</p>
           <h2>Fotonya kebalik atau miring?</h2>
-          <p>Buka Kelola Halaman dan putar halamannya sampai benar. Perputarannya ikut tersimpan ke PDF akhir — bukan sekadar terlihat lurus di layar lalu kembali miring saat dibuka orang lain.</p>
+          <p>Buka Kelola Halaman dan putar halamannya sampai benar. Perputarannya ikut tersimpan ke PDF akhir, bukan sekadar terlihat lurus di layar lalu kembali miring saat dibuka orang lain.</p>
           <h2>Fotonya besar-besar, PDF-nya jadi berat</h2>
           <p>Wajar — foto dari kamera HP sekarang bisa beberapa megabita per lembar. Setelah jadi PDF, pilih ukuran <strong>Kompres</strong> di layar unduh, dan file-nya akan dikecilkan sampai masuk batas unggah tanpa bikin tulisannya susah dibaca.</p>
           <h2>Scan pakai HP tanpa aplikasi scanner</h2>
@@ -1149,6 +1149,22 @@
       <div class="hc-row">
         <button id="hc-cancel">Batal</button>
         <button id="hc-go">Ke Beranda</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Shown when Edit is tapped on a page with no text layer (a scan/photo).
+       Mirrors #home-confirm: <dialog> + a .sheet child, because the global
+       `dialog` CSS rule IS the overlay. Copy is PLACEHOLDER — TODO(copy),
+       client-facing words are Fauzan's. It must NOT imply OCR is coming. -->
+  <dialog id="scan-offer" aria-label="Halaman ini hasil scan">
+    <div class="sheet hc-sheet">
+      <h2>Halaman ini hasil scan</h2>
+      <p>Tulisannya cuma gambar, jadi nggak ada teks yang bisa diedit. Tapi kamu masih bisa menutupnya lalu menulis di atasnya.</p>
+      <div class="hc-row">
+        <button id="so-dismiss">Nanti aja</button>
+        <button id="so-tipex">Tutup tulisan</button>
+        <button id="so-teks">Tulis di atasnya</button>
       </div>
     </div>
   </dialog>

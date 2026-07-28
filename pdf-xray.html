@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PDF X-Ray — local, uploads nothing</title>
+<style>
+  :root {
+    --bg: #faf7f2; --ink: #1c1917; --muted: #79726a; --accent: #dc2626;
+    --card: #ffffff; --line: #e8e2d9; --code-bg: #1c1917; --code-ink: #e7e5e4;
+    --good: #15803d; --bad: #b91c1c;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.6 -apple-system, "Segoe UI", system-ui, sans-serif; }
+  main { max-width: 56rem; margin: 0 auto; padding: 2.5rem 1.5rem 5rem; }
+  header { margin-bottom: 2rem; }
+  .kicker { color: var(--accent); font-weight: 700; font-size: .74rem; text-transform: uppercase; letter-spacing: .12em; margin-bottom: .5rem; }
+  h1 { font-size: 1.6rem; margin: 0 0 .4rem; letter-spacing: -.01em; }
+  .lede { color: var(--muted); margin: 0; max-width: 40rem; }
+
+  #drop {
+    border: 2px dashed var(--line); border-radius: 12px; padding: 2.5rem 1.5rem;
+    text-align: center; color: var(--muted); margin: 1.5rem 0 2rem; cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  #drop.over { border-color: var(--accent); background: #fdf5f0; }
+  #drop b { color: var(--ink); }
+  #file-input { display: none; }
+
+  #report { display: none; }
+  #report.show { display: block; }
+
+  .summary { display: flex; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+  .stat { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: .8rem 1.1rem; min-width: 5rem; }
+  .stat .n { font-size: 1.3rem; font-weight: 700; }
+  .stat .l { font-size: .74rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+
+  .meta { display: flex; flex-direction: column; gap: .25rem; margin-bottom: 1.5rem; font-size: .86rem; }
+  .meta-row { display: flex; gap: .5rem; }
+  .meta-row .l { flex: 0 0 6rem; color: var(--muted); font-size: .74rem; text-transform: uppercase; letter-spacing: .06em; padding-top: .15rem; }
+  .meta-row .v { color: var(--ink); overflow-wrap: anywhere; }
+
+  h2 { font-size: 1.05rem; margin: 2rem 0 .7rem; }
+  table { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; font-size: .86rem; }
+  th, td { text-align: left; padding: .55rem .7rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); background: #f7f4ef; }
+  tr:last-child td { border-bottom: none; }
+  code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: .88em; background: #f1ede6; padding: .08em .32em; border-radius: 4px; }
+  .pill { display: inline-block; font-size: .74rem; font-weight: 700; padding: .1rem .55rem; border-radius: 99px; }
+  .pill.yes { background: #dcfce7; color: var(--good); }
+  .pill.no { background: #fee2e2; color: var(--bad); }
+
+  .page-tabs { display: flex; gap: .4rem; flex-wrap: wrap; margin: 1rem 0; }
+  .page-tabs button {
+    font: inherit; font-size: .82rem; padding: .35rem .8rem; border-radius: 7px;
+    border: 1px solid var(--line); background: var(--card); cursor: pointer; color: var(--ink);
+  }
+  .page-tabs button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  pre#stream {
+    background: var(--code-bg); color: var(--code-ink); border-radius: 10px;
+    padding: 1.1rem 1.3rem; overflow: auto; max-height: 60vh; font-size: .82rem; line-height: 1.65;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; white-space: pre-wrap; word-break: break-word;
+  }
+  .op { color: #fca5a5; }        /* BT/ET/Tf/Tm/Tj/TJ/rg/Do/... */
+  .str { color: #86efac; }       /* (...) and <...> literal payloads */
+  .num { color: #93c5fd; }       /* bare numbers */
+  .cmt { color: #78716c; }
+
+  .note { font-size: .84rem; color: var(--muted); margin: .5rem 0 1.5rem; }
+  .error { background: #fef2f2; border: 1px solid #fecaca; color: var(--bad); border-radius: 10px; padding: .9rem 1.1rem; margin: 1rem 0; }
+  footer { margin-top: 3rem; color: var(--muted); font-size: .8rem; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="kicker">PDFLokal · internal tool · nothing here is uploaded, ever</div>
+    <h1>PDF X-Ray</h1>
+    <p class="lede">Drop a PDF in. It never leaves this tab — the same vendored pdf-lib this repo
+    ships is doing the parsing, in your browser, from a local file. Shows exactly what our own
+    editor sees: every font's real <code>/BaseFont</code>, whether its program is actually
+    embedded, and the raw, decompressed content-stream operators for any page.</p>
+  </header>
+
+  <div id="drop">Drag a PDF here, or <b>click to choose a file</b></div>
+  <input type="file" id="file-input" accept="application/pdf">
+
+  <div class="error" id="error" style="display:none"></div>
+
+  <div id="report">
+    <div class="summary" id="summary"></div>
+    <div class="meta" id="meta"></div>
+
+    <h2>Fonts — per page</h2>
+    <p class="note">"Embedded" means a real glyph program (FontFile/FontFile2/FontFile3) is packed
+    inside this file. When it says <span class="pill no">no</span>, the shapes you see on screen are
+    on loan from whatever's installed on the viewing device — not from the file at all.</p>
+    <div id="fonts"></div>
+
+    <h2>Images — per page</h2>
+    <p class="note">Every <code>/XObject</code> of <code>/Subtype /Image</code> the page paints, with
+    its real compression <code>/Filter</code> — this is what actually decides whether a "photo" on
+    the page is a JPEG, a raw/Flate pixel array (PNG-shaped), or a fax-style scan compressor
+    (<code>CCITTFaxDecode</code>/<code>JBIG2Decode</code>, the two you'll see most on scanned government
+    documents). A page with no rows here paints nothing but vector/text content.</p>
+    <div id="images"></div>
+
+    <h2>Raw content stream</h2>
+    <p class="note">The literal recorded instructions for the page: <code>BT</code>/<code>ET</code>
+    brackets a text object, <code>Tf</code> sets the font + size, <code>Tm</code> positions it,
+    <code>Tj</code>/<code>TJ</code> paints the string. Decompressed straight off the bytes — this is
+    what <code>core/redact.js</code>'s own reader sees, byte for byte.</p>
+    <div class="page-tabs" id="page-tabs"></div>
+    <pre id="stream"></pre>
+  </div>
+
+  <footer>Local dev tool, not part of the shipped app — uses <code>js/vendor/pdf-lib.min.js</code>
+  and this repo's own <code>core/redact.js</code> / <code>core/font-style.js</code> directly.</footer>
+</main>
+
+<script src="js/vendor/pdf-lib.min.js"></script>
+<script type="module">
+import { readPageContents } from './js/core/redact.js';
+import { getFontStyleInfo } from './js/core/font-style.js';
+
+const dropEl = document.getElementById('drop');
+const inputEl = document.getElementById('file-input');
+const errorEl = document.getElementById('error');
+const reportEl = document.getElementById('report');
+const summaryEl = document.getElementById('summary');
+const metaEl = document.getElementById('meta');
+const imagesEl = document.getElementById('images');
+const fontsEl = document.getElementById('fonts');
+const tabsEl = document.getElementById('page-tabs');
+const streamEl = document.getElementById('stream');
+
+dropEl.addEventListener('click', () => inputEl.click());
+inputEl.addEventListener('change', () => { if (inputEl.files[0]) load(inputEl.files[0]); });
+['dragover', 'dragleave', 'drop'].forEach((evt) => {
+  dropEl.addEventListener(evt, (e) => {
+    e.preventDefault();
+    dropEl.classList.toggle('over', evt === 'dragover');
+    if (evt === 'drop' && e.dataTransfer.files[0]) load(e.dataTransfer.files[0]);
+  });
+});
+
+let pageContents = [];
+
+async function load(file) {
+  errorEl.style.display = 'none';
+  reportEl.classList.remove('show');
+  try {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const doc = await PDFLib.PDFDocument.load(bytes, { ignoreEncryption: true });
+    render(file, bytes, doc);
+  } catch (err) {
+    errorEl.textContent = `Couldn't parse this file: ${err.message}`;
+    errorEl.style.display = 'block';
+  }
+}
+
+function res(context, PDFRef, v) { return v instanceof PDFRef ? context.lookup(v) : v; }
+
+function fontRowsForPage(page, PDFLib) {
+  const { PDFName, PDFDict, PDFRef } = PDFLib;
+  const context = page.doc.context;
+  const resources = page.node.Resources();
+  const fontDict = resources && res(context, PDFRef, resources.get(PDFName.of('Font')));
+  if (!(fontDict instanceof PDFDict)) return [];
+  return fontDict.keys().map((key) => {
+    const name = key.toString().replace(/^\//, '');
+    const fontObj = res(context, PDFRef, fontDict.get(key));
+    const g = (n) => { const raw = fontObj.get(PDFName.of(n)); return raw ? res(context, PDFRef, raw) : null; };
+    const row = { name, subtype: String(g('Subtype') ?? '—'), baseFont: '—', encoding: '—', embedded: false, embeddedVia: '', toUnicode: !!fontObj.get(PDFName.of('ToUnicode')) };
+    let fdOwner = fontObj;
+    if (row.subtype === '/Type0') {
+      const desc = g('DescendantFonts');
+      const d0 = desc && res(context, PDFRef, desc.asArray()[0]);
+      if (d0) { row.subtype += ` → ${String((d0.get(PDFName.of('Subtype')) && res(context, PDFRef, d0.get(PDFName.of('Subtype')))) ?? '?')}`; fdOwner = d0; }
+    }
+    const style = getFontStyleInfo(page, PDFLib, name);
+    row.baseFont = style.ok ? style.baseFont : String(g('BaseFont') ?? '—');
+    // WHY instanceof, not constructor.name: the vendored pdf-lib bundle is
+    // minified — every internal class name is mangled to a single letter, so
+    // a string comparison against 'PDFName' silently never matches and every
+    // encoding (including plain /Identity-H) misreports as a Differences
+    // dict. instanceof checks the prototype chain, which survives minification.
+    const enc = g('Encoding');
+    row.encoding = enc ? (enc instanceof PDFName ? enc.toString() : 'custom /Differences dict') : '—';
+    const g2 = (n) => { const raw = fdOwner.get(PDFName.of(n)); return raw ? res(context, PDFRef, raw) : null; };
+    const fd = g2('FontDescriptor');
+    if (fd) {
+      for (const ff of ['FontFile', 'FontFile2', 'FontFile3']) {
+        if (fd.get(PDFName.of(ff))) { row.embedded = true; row.embeddedVia = ff; break; }
+      }
+    }
+    return row;
+  });
+}
+
+// Human names for the compression filters actually found on scanned pages —
+// the whole point of this panel is answering "is this really a PNG?" (usually
+// not: PDF never embeds a PNG file wholesale, only a raw or filter-compressed
+// pixel stream plus its own dict of Width/Height/ColorSpace).
+const FILTER_LABEL = {
+  '/DCTDecode': 'JPEG (DCTDecode)',
+  '/JPXDecode': 'JPEG 2000 (JPXDecode)',
+  '/CCITTFaxDecode': 'B&W fax compression (CCITTFaxDecode)',
+  '/JBIG2Decode': 'B&W scan compression (JBIG2Decode)',
+  '/FlateDecode': 'raw pixels, zlib-compressed (FlateDecode) — the PNG-shaped case',
+  '/RunLengthDecode': 'run-length compressed (RunLengthDecode)',
+  '/ASCII85Decode': 'ASCII85 wrapper',
+  '/ASCIIHexDecode': 'ASCII-hex wrapper',
+};
+
+function imageRowsForPage(page, PDFLib) {
+  const { PDFName, PDFDict, PDFRef, PDFArray, PDFRawStream } = PDFLib;
+  const context = page.doc.context;
+  const resources = page.node.Resources();
+  const xobjDict = resources && res(context, PDFRef, resources.get(PDFName.of('XObject')));
+  if (!(xobjDict instanceof PDFDict)) return [];
+  const rows = [];
+  for (const key of xobjDict.keys()) {
+    const obj = res(context, PDFRef, xobjDict.get(key));
+    if (!(obj instanceof PDFRawStream)) continue;
+    const dict = obj.dict;
+    const g = (n) => { const raw = dict.get(PDFName.of(n)); return raw ? res(context, PDFRef, raw) : null; };
+    const subtype = g('Subtype');
+    if (!subtype || subtype.toString() !== '/Image') continue; // Form XObjects (nested content) are a different thing — not this panel
+
+    const filterRaw = dict.get(PDFName.of('Filter'));
+    const filterVal = filterRaw ? res(context, PDFRef, filterRaw) : null;
+    const filters = filterVal instanceof PDFArray ? filterVal.asArray().map((f) => res(context, PDFRef, f)) : (filterVal ? [filterVal] : []);
+    const filterNames = filters.map((f) => f.toString());
+    const label = filterNames.length
+      ? filterNames.map((f) => FILTER_LABEL[f] || f).join(' → ')
+      : 'none — stored as literal uncompressed bytes';
+
+    const colorSpace = g('ColorSpace');
+    rows.push({
+      name: key.toString().replace(/^\//, ''),
+      width: g('Width') ? Number(g('Width')) : null,
+      height: g('Height') ? Number(g('Height')) : null,
+      bpc: g('BitsPerComponent') ? Number(g('BitsPerComponent')) : null,
+      colorSpace: colorSpace ? (colorSpace instanceof PDFArray ? '(indexed/ICC — array)' : colorSpace.toString()) : '—',
+      filterNames,
+      label,
+      bytes: obj.contents ? obj.contents.length : (obj.getContentsSize ? obj.getContentsSize() : null),
+    });
+  }
+  return rows;
+}
+
+// Minimal syntax coloring for the raw stream — cosmetic only, never reparses.
+function highlight(text) {
+  const esc = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return esc
+    .replace(/\((?:[^()\\]|\\.)*\)/g, (m) => `<span class="str">${m}</span>`)
+    .replace(/&lt;[0-9a-fA-F\s]*&gt;/g, (m) => `<span class="str">${m}</span>`)
+    .replace(/%[^\n]*/g, (m) => `<span class="cmt">${m}</span>`)
+    .replace(/(^|\s)(-?\d*\.?\d+)(?=\s|$)/g, (m, pre, n) => `${pre}<span class="num">${n}</span>`)
+    .replace(/(^|\s)(BT|ET|Tf|Tm|Td|TD|T\*|Tj|TJ|Tc|Tw|Tz|TL|Tr|Ts|rg|RG|g|G|k|K|cs|CS|scn|SCN|sc|SC|w|J|j|M|d|ri|i|gs|q|Q|cm|re|f|F|f\*|S|s|B|B\*|b|b\*|n|W|W\*|Do|BI|ID|EI|sh|BMC|BDC|EMC|MP|DP)(?=\s|$)/g,
+      (m, pre, op) => `${pre}<span class="op">${op}</span>`);
+}
+
+function render(file, bytes, doc) {
+  const pages = doc.getPages();
+  pageContents = pages.map((p) => { try { return readPageContents(p, PDFLib); } catch { return '(could not read this page\'s content stream — possibly encrypted or exotic)'; } });
+
+  const producer = doc.getProducer?.() ?? '';
+  const creator = doc.getCreator?.() ?? '';
+
+  summaryEl.innerHTML = '';
+  const stats = [
+    ['Pages', pages.length],
+    ['File size', `${(bytes.length / 1024).toFixed(1)} KB`],
+  ];
+  for (const [l, n] of stats) {
+    const d = document.createElement('div');
+    d.className = 'stat';
+    d.innerHTML = `<div class="n"></div><div class="l"></div>`;
+    d.querySelector('.n').textContent = n;
+    d.querySelector('.l').textContent = l;
+    summaryEl.appendChild(d);
+  }
+
+  metaEl.innerHTML = '';
+  const meta = [['Producer', producer || '—'], ['Creator', creator || '—']];
+  for (const [l, v] of meta) {
+    const row = document.createElement('div');
+    row.className = 'meta-row';
+    row.innerHTML = `<div class="l"></div><div class="v"></div>`;
+    row.querySelector('.l').textContent = l;
+    row.querySelector('.v').textContent = v;
+    metaEl.appendChild(row);
+  }
+
+  fontsEl.innerHTML = '';
+  pages.forEach((page, i) => {
+    const rows = fontRowsForPage(page, PDFLib);
+    const wrap = document.createElement('div');
+    wrap.style.marginBottom = '1rem';
+    const h3 = document.createElement('div');
+    h3.style.cssText = 'font-weight:700;font-size:.82rem;margin:.6rem 0 .3rem;color:var(--muted)';
+    h3.textContent = `Page ${i + 1}`;
+    wrap.appendChild(h3);
+    if (rows.length === 0) {
+      const p = document.createElement('p');
+      p.className = 'note';
+      p.style.margin = '0';
+      p.textContent = 'No font resources on this page (an image-only page, or a scan).';
+      wrap.appendChild(p);
+    } else {
+      const table = document.createElement('table');
+      table.innerHTML = '<thead><tr><th>Resource</th><th>Subtype</th><th>BaseFont</th><th>Encoding</th><th>Embedded</th><th>ToUnicode</th></tr></thead>';
+      const tbody = document.createElement('tbody');
+      for (const r of rows) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td><code></code></td><td></td><td><code></code></td><td></td><td></td><td></td>`;
+        tr.children[0].querySelector('code').textContent = r.name;
+        tr.children[1].textContent = r.subtype;
+        tr.children[2].querySelector('code').textContent = r.baseFont;
+        tr.children[3].textContent = r.encoding;
+        tr.children[4].innerHTML = r.embedded
+          ? `<span class="pill yes">yes · ${r.embeddedVia}</span>`
+          : `<span class="pill no">no</span>`;
+        tr.children[5].innerHTML = r.toUnicode ? `<span class="pill yes">yes</span>` : `<span class="pill no">no</span>`;
+        tbody.appendChild(tr);
+      }
+      table.appendChild(tbody);
+      wrap.appendChild(table);
+    }
+    fontsEl.appendChild(wrap);
+  });
+
+  imagesEl.innerHTML = '';
+  pages.forEach((page, i) => {
+    const rows = imageRowsForPage(page, PDFLib);
+    const wrap = document.createElement('div');
+    wrap.style.marginBottom = '1rem';
+    const h3 = document.createElement('div');
+    h3.style.cssText = 'font-weight:700;font-size:.82rem;margin:.6rem 0 .3rem;color:var(--muted)';
+    h3.textContent = `Page ${i + 1}`;
+    wrap.appendChild(h3);
+    if (rows.length === 0) {
+      const p = document.createElement('p');
+      p.className = 'note';
+      p.style.margin = '0';
+      p.textContent = 'No image XObjects on this page.';
+      wrap.appendChild(p);
+    } else {
+      const table = document.createElement('table');
+      table.innerHTML = '<thead><tr><th>Resource</th><th>Dimensions</th><th>Color</th><th>Compression</th><th>Bytes on disk</th></tr></thead>';
+      const tbody = document.createElement('tbody');
+      for (const r of rows) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td><code></code></td><td></td><td></td><td></td><td></td>`;
+        tr.children[0].querySelector('code').textContent = r.name;
+        tr.children[1].textContent = r.width && r.height ? `${r.width} × ${r.height}px${r.bpc ? ` · ${r.bpc}-bit` : ''}` : '—';
+        tr.children[2].textContent = r.colorSpace;
+        tr.children[3].textContent = r.label;
+        tr.children[4].textContent = r.bytes != null ? `${(r.bytes / 1024).toFixed(1)} KB` : '—';
+        tbody.appendChild(tr);
+      }
+      table.appendChild(tbody);
+      wrap.appendChild(table);
+    }
+    imagesEl.appendChild(wrap);
+  });
+
+  tabsEl.innerHTML = '';
+  pages.forEach((_, i) => {
+    const b = document.createElement('button');
+    b.textContent = `Page ${i + 1}`;
+    if (i === 0) b.classList.add('active');
+    b.addEventListener('click', () => {
+      [...tabsEl.children].forEach((x) => x.classList.remove('active'));
+      b.classList.add('active');
+      showStream(i);
+    });
+    tabsEl.appendChild(b);
+  });
+  showStream(0);
+
+  reportEl.classList.add('show');
+  reportEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function showStream(i) {
+  streamEl.innerHTML = highlight(pageContents[i] || '(empty)');
+}
+</script>
+</body>
+</html>

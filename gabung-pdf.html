@@ -1037,7 +1037,7 @@
           <p>Gabung PDF itu pekerjaan lima detik yang sering jadi lima menit — karena kebanyakan situs menyuruh kamu upload dulu, nunggu antre, lalu unduh lagi. PDFLokal tidak. Semua penggabungan terjadi di dalam browser kamu sendiri: filemu tidak pernah dikirim ke server siapa pun, jadi prosesnya secepat perangkatmu, bukan secepat internetmu.</p>
           <h2>Cara menggabungkan PDF</h2>
           <ol>
-          <li>Seret semua PDF yang mau digabung ke kotak di atas — atau ketuk <strong>Buka File</strong> dan pilih beberapa sekaligus.</li>
+          <li>Seret semua PDF yang mau digabung ke kotak di atas, atau ketuk <strong>Buka File</strong> dan pilih beberapa sekaligus.</li>
           <li>Buka <strong>Kelola Halaman</strong> kalau urutannya perlu diatur. Seret halaman ke posisi yang kamu mau, buang yang tidak perlu.</li>
           <li>Ketuk <strong>Unduh</strong>. Satu file PDF rapi, langsung tersimpan di perangkatmu.</li>
           </ol>
@@ -1057,7 +1057,7 @@
           <p>PDFLokal tidak menanggung biaya itu, jadi tidak perlu menagihnya kepadamu. Tidak ada batas harian, tidak ada watermark, tidak ada "gratis untuk 3 file pertama". Yang ada cuma tombol dukungan sukarela, yang boleh kamu abaikan sepenuhnya.</p>
           <h2>Tetap jalan waktu internet mati</h2>
           <p>Coba ini: buka halaman ini, matikan data seluler, lalu gabungkan filemu. Tetap jalan. Karena tidak ada yang perlu dikirim ke mana pun, satu-satunya internet yang PDFLokal butuhkan adalah untuk memuat halamannya sendiri.</p>
-          <p>Ini bukan trik. Ini konsekuensi langsung dari cara kerjanya — dan sesuatu yang secara struktural tidak bisa ditiru situs yang menggantungkan hidupnya pada server.</p>
+          <p>Ini bukan trik. Ini konsekuensi langsung dari cara kerjanya, dan sesuatu yang secara struktural tidak bisa ditiru situs yang menggantungkan hidupnya pada server.</p>
           <h2>Gabung PDF dan Word?</h2>
           <p>Ini pertanyaan yang sering muncul, dan jawabannya jujur: file Word harus kamu ubah dulu jadi PDF, dan itu paling gampang dilakukan dari Word sendiri — pilih Simpan Sebagai, lalu format PDF. Setelah jadi PDF, seret ke sini bersama file lainnya.</p>
           <p>Kami tidak menyediakan konversi Word ke PDF karena mengerjakannya dengan benar butuh server, dan server berarti dokumenmu harus diunggah. Itu membatalkan satu-satunya alasan orang memilih PDFLokal, jadi kami memilih menolaknya dan mengatakan alasannya.</p>
@@ -1148,6 +1148,22 @@
       <div class="hc-row">
         <button id="hc-cancel">Batal</button>
         <button id="hc-go">Ke Beranda</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Shown when Edit is tapped on a page with no text layer (a scan/photo).
+       Mirrors #home-confirm: <dialog> + a .sheet child, because the global
+       `dialog` CSS rule IS the overlay. Copy is PLACEHOLDER — TODO(copy),
+       client-facing words are Fauzan's. It must NOT imply OCR is coming. -->
+  <dialog id="scan-offer" aria-label="Halaman ini hasil scan">
+    <div class="sheet hc-sheet">
+      <h2>Halaman ini hasil scan</h2>
+      <p>Tulisannya cuma gambar, jadi nggak ada teks yang bisa diedit. Tapi kamu masih bisa menutupnya lalu menulis di atasnya.</p>
+      <div class="hc-row">
+        <button id="so-dismiss">Nanti aja</button>
+        <button id="so-tipex">Tutup tulisan</button>
+        <button id="so-teks">Tulis di atasnya</button>
       </div>
     </div>
   </dialog>

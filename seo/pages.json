@@ -29,7 +29,7 @@
       "intro": "Gabung PDF itu pekerjaan lima detik yang sering jadi lima menit — karena kebanyakan situs menyuruh kamu upload dulu, nunggu antre, lalu unduh lagi. PDFLokal tidak. Semua penggabungan terjadi di dalam browser kamu sendiri: filemu tidak pernah dikirim ke server siapa pun, jadi prosesnya secepat perangkatmu, bukan secepat internetmu.",
       "howto": "Cara menggabungkan PDF",
       "steps": [
-        "Seret semua PDF yang mau digabung ke kotak di atas — atau ketuk <strong>Buka File</strong> dan pilih beberapa sekaligus.",
+        "Seret semua PDF yang mau digabung ke kotak di atas, atau ketuk <strong>Buka File</strong> dan pilih beberapa sekaligus.",
         "Buka <strong>Kelola Halaman</strong> kalau urutannya perlu diatur. Seret halaman ke posisi yang kamu mau, buang yang tidak perlu.",
         "Ketuk <strong>Unduh</strong>. Satu file PDF rapi, langsung tersimpan di perangkatmu."
       ],
@@ -72,7 +72,7 @@
           "h2": "Tetap jalan waktu internet mati",
           "p": [
             "Coba ini: buka halaman ini, matikan data seluler, lalu gabungkan filemu. Tetap jalan. Karena tidak ada yang perlu dikirim ke mana pun, satu-satunya internet yang PDFLokal butuhkan adalah untuk memuat halamannya sendiri.",
-            "Ini bukan trik. Ini konsekuensi langsung dari cara kerjanya — dan sesuatu yang secara struktural tidak bisa ditiru situs yang menggantungkan hidupnya pada server."
+            "Ini bukan trik. Ini konsekuensi langsung dari cara kerjanya, dan sesuatu yang secara struktural tidak bisa ditiru situs yang menggantungkan hidupnya pada server."
           ]
         },
         {
@@ -517,7 +517,7 @@
         {
           "h2": "Fotonya kebalik atau miring?",
           "p": [
-            "Buka Kelola Halaman dan putar halamannya sampai benar. Perputarannya ikut tersimpan ke PDF akhir — bukan sekadar terlihat lurus di layar lalu kembali miring saat dibuka orang lain."
+            "Buka Kelola Halaman dan putar halamannya sampai benar. Perputarannya ikut tersimpan ke PDF akhir, bukan sekadar terlihat lurus di layar lalu kembali miring saat dibuka orang lain."
           ]
         },
         {
@@ -732,7 +732,7 @@
         {
           "h2": "Yang dibuang benar-benar hilang dari hasilnya",
           "p": [
-            "Halaman yang kamu hapus tidak ikut ke file yang kamu unduh — bukan sekadar disembunyikan dari tampilan. Ini penting kalau alasanmu menghapusnya adalah karena halaman itu memuat informasi yang tidak boleh dilihat penerima.",
+            "Halaman yang kamu hapus tidak ikut ke file yang kamu unduh, bukan sekadar disembunyikan dari tampilan. Ini penting kalau alasanmu menghapusnya adalah karena halaman itu memuat informasi yang tidak boleh dilihat penerima.",
             "Perlu diingat juga: yang kamu unduh adalah file baru. File asli di perangkatmu tetap lengkap, jadi kamu tidak kehilangan apa pun kalau ternyata salah buang."
           ]
         },
@@ -999,7 +999,7 @@
       "steps": [
         "Seret PDF-mu ke kotak di atas. Target 100KB sudah aktif.",
         "PDFLokal mencari kompresi paling ringan yang masih muat di bawah 100KB.",
-        "Ukuran akhir tampil di tombol unduh — termasuk kalau ternyata belum masuk 100KB."
+        "Ukuran akhir tampil di tombol unduh, termasuk kalau ternyata belum masuk 100KB."
       ],
       "sections": [
         {

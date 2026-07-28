@@ -1055,7 +1055,7 @@
           <p>Halaman ditampilkan sebagai kartu yang cukup besar untuk disentuh jari, bukan daftar kecil yang harus diperbesar dulu. Menghapus, mengurutkan, dan memutar semuanya bisa dilakukan dengan jempol.</p>
           <p>Ini yang paling sering perlu dilakukan orang saat sedang buru-buru mengejar tenggat pendaftaran, dan hampir selalu dari HP — jadi di situlah kami menghabiskan waktu terbanyak untuk mengujinya.</p>
           <h2>Yang dibuang benar-benar hilang dari hasilnya</h2>
-          <p>Halaman yang kamu hapus tidak ikut ke file yang kamu unduh — bukan sekadar disembunyikan dari tampilan. Ini penting kalau alasanmu menghapusnya adalah karena halaman itu memuat informasi yang tidak boleh dilihat penerima.</p>
+          <p>Halaman yang kamu hapus tidak ikut ke file yang kamu unduh, bukan sekadar disembunyikan dari tampilan. Ini penting kalau alasanmu menghapusnya adalah karena halaman itu memuat informasi yang tidak boleh dilihat penerima.</p>
           <p>Perlu diingat juga: yang kamu unduh adalah file baru. File asli di perangkatmu tetap lengkap, jadi kamu tidak kehilangan apa pun kalau ternyata salah buang.</p>
           <h2>Urutkan ulang halaman</h2>
           <p>Hasil scan sering keluar dengan urutan yang kacau, apalagi kalau kertasnya dimasukkan bolak-balik. Seret kartu halaman ke posisi yang benar; urutan barunya ikut tersimpan ke file yang kamu unduh.</p>
@@ -1146,6 +1146,22 @@
       <div class="hc-row">
         <button id="hc-cancel">Batal</button>
         <button id="hc-go">Ke Beranda</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Shown when Edit is tapped on a page with no text layer (a scan/photo).
+       Mirrors #home-confirm: <dialog> + a .sheet child, because the global
+       `dialog` CSS rule IS the overlay. Copy is PLACEHOLDER — TODO(copy),
+       client-facing words are Fauzan's. It must NOT imply OCR is coming. -->
+  <dialog id="scan-offer" aria-label="Halaman ini hasil scan">
+    <div class="sheet hc-sheet">
+      <h2>Halaman ini hasil scan</h2>
+      <p>Tulisannya cuma gambar, jadi nggak ada teks yang bisa diedit. Tapi kamu masih bisa menutupnya lalu menulis di atasnya.</p>
+      <div class="hc-row">
+        <button id="so-dismiss">Nanti aja</button>
+        <button id="so-tipex">Tutup tulisan</button>
+        <button id="so-teks">Tulis di atasnya</button>
       </div>
     </div>
   </dialog>
