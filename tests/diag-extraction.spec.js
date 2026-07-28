@@ -206,7 +206,55 @@ test.describe('REGRESSION PIN — extraction vs visual divergence (fixed 2026-07
     expect(resolved.runStrs).toEqual(['TESTING']);
   });
 
-  test('perpres-letterhead.pdf: "PRESIDEN" still extracts as "PRES IDEN" (accepted residual — single-gap, no median to outlier-test against)', async ({ page }) => {
+  test('perpres-letterhead.pdf is a SEARCHABLE SCAN — pdf.js sees text, we correctly extract none', async ({ page }) => {
+    await openDoc(page, NASTY('perpres-letterhead.pdf'));
+
+    // ⚠️ THE PREMISE OF THE OLD PIN WAS WRONG (corrected 2026-07-28). This
+    // test used to assert that "PRESIDEN" extracts as "PRES IDEN" — an
+    // ACCEPTED RESIDUAL of space inference. Measured against the operator
+    // list, this document is a SCAN: ONE paintImageXObject carries everything
+    // you can see, and all 166 show-ops sit under a single `3 Tr` — an
+    // invisible OCR layer. The giveaway is in the extraction itself, which
+    // reads "INOONESIA": OCR misreading D as O. There is no typography here
+    // to infer spaces from, only OCR bounding boxes, so "PRES IDEN" was never
+    // a space-inference residual — it was us editing a picture.
+    //
+    // So the founder's 2026-07-21 tap opened an editor over a scanned Perpres.
+    // Cutting those show-ops changes nothing visible (they were invisible) and
+    // the replacement lands beside the original words, which are pixels in the
+    // image. See js/core/text-visibility.js and tests/ocr-layer.spec.js.
+    const raw = await page.evaluate(async () => {
+      const pg = window.v2.getDoc().pages[0];
+      const src = window.v2.getDoc().sources.find((s) => s.id === pg.sourceId);
+      const pdf = await window.pdfjsLib.getDocument({ data: src.bytes.slice() }).promise;
+      const p1 = await pdf.getPage(1);
+      const tc = await p1.getTextContent();
+      const n = tc.items.filter((it) => it.str && it.str.trim()).length;
+      await pdf.destroy();
+      return n;
+    });
+    console.log(`\n========== perpres-letterhead.pdf — pdf.js text items with content: ${raw} ==========`);
+
+    const dump = await dumpPage1(page);
+
+    // THE VACUITY GUARD, and the whole point of the pair of numbers: "we
+    // extracted nothing" is also what a failed load looks like. pdf.js must
+    // still find plenty of text in this file — it is there, it is just
+    // invisible — while OUR extractor, which reads render mode, returns none.
+    // Only a working render-mode filter can produce both numbers at once.
+    expect(raw, 'pdf.js must still see the invisible OCR text — otherwise this proves nothing').toBeGreaterThan(50);
+    expect(dump.runs, 'a searchable scan must yield NO editable runs').toHaveLength(0);
+    expect(dump.lines).toHaveLength(0);
+  });
+
+  test.skip('SUPERSEDED — "PRESIDEN" extracts as "PRES IDEN"', async ({ page }) => {
+    // Kept as a skipped body rather than deleted: the space-inference analysis
+    // in this file's header (the rejected statistical fix, and the counter-
+    // example that killed it) was conducted against THIS document's lines,
+    // i.e. against OCR geometry. tests/core/text-lines.test.mjs 3 and 4 pin
+    // that arithmetic on synthetic runs and still stand on their own. Whether
+    // the flat SPACE_GAP_FACTOR deserves re-derivation against born-digital
+    // documents only is a real question, and it is the PM's to schedule.
     await openDoc(page, NASTY('perpres-letterhead.pdf'));
     const dump = await dumpPage1(page);
 

@@ -223,6 +223,11 @@ export const SCHEMA = {
   // session what it IS, on every doc_open, measures the installed BASE by usage
   // instead of guessing it from a lossy install counter. Two values only:
   // anything not standalone is a browser tab.
+  // text_layer (corrected 2026-07-28): VISIBLE text, not "any text object". A
+  // searchable scan carries a full INVISIBLE text layer, so the old test
+  // counted phone-scanner PDFs as born-digital — the wrong side of the exact
+  // ratio this event exists to measure, and the population the OCR decision
+  // rests on. Readings before 2026-07-28 overstate born-digital by that share.
   doc_open: {
     text_layer: 'bool',
     pages: PAGES_BUCKET,

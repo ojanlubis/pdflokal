@@ -15,6 +15,7 @@ import { createSource, createPage, getSource } from './model.js';
 import { addSource, addPages } from './operations.js';
 import { ensurePdfJs } from './vendor.js';
 import { editSignature } from './page-surgery.js';
+import { pageHasVisibleText } from './text-visibility.js';
 
 // bytes → append a Source + its Pages (metadata only) to `doc`. Returns the pages.
 // SINGLE SOURCE OF TRUTH for "this PDF is password/permissions protected".
@@ -90,13 +91,18 @@ export async function importPdf(doc, { name, bytes }) {
 // file for a bucketed yes/no the first page already answers accurately in
 // practice. Never throws — a probe failure just means "don't know", and the
 // caller treats that as "no text layer" rather than blocking the import.
+//
+// ⚠️ VISIBLE text, not "any text object". A searchable scan carries a full
+// invisible text layer (render mode 3), so the old `str.trim()` test reported
+// TRUE on documents that are, to a reader, pure image — making the scan-vs-
+// born-digital ratio this event exists to measure count them on the wrong side.
+// core/text-visibility.js carries the why; tests/ocr-layer.spec.js the proof.
 export async function probeTextLayer(bytes) {
   const pdfjsLib = await ensurePdfJs();
   const pdf = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
   try {
     const page = await pdf.getPage(1);
-    const content = await page.getTextContent();
-    return content.items.some((it) => it.str && it.str.trim().length > 0);
+    return await pageHasVisibleText(page, pdfjsLib);
   } finally {
     await pdf.destroy();
   }

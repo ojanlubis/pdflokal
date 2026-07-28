@@ -18,6 +18,7 @@
 import { getSource } from '../core/model.js';
 import { ensurePdfJs } from '../core/vendor.js';
 import { groupRunsIntoLines, resolveTap } from '../core/text-lines.js';
+import { pageHasVisibleText } from '../core/text-visibility.js';
 
 // Finger-sized minimum hit box (page-space px at zoom 1). Small print is a
 // <10px-tall run — the ≥44px touch-target law is met by inflating the HIT box,
@@ -67,6 +68,13 @@ export function createTextRunIndex({ getDoc }) {
     // ROTATED frame the raster (and every annotation coordinate) lives in.
     const rotation = ((page.baseRotation || 0) + (page.rotation || 0)) % 360;
     const vp = pdfPage.getViewport({ scale: 1, rotation });
+    // A SEARCHABLE SCAN IS STILL A SCAN. Its text layer is painted in render
+    // mode 3 — invisible — over the image that carries the actual words. Left
+    // unchecked, those items become runs, Edit opens on them, cuts show-ops
+    // nobody could see, and stamps the replacement beside an untouched image
+    // (tests/ocr-layer.spec.js). Empty here IS the router signal, exactly as it
+    // is for a bare scan two lines up, so this lands in the scan offer.
+    if (!(await pageHasVisibleText(pdfPage, pdfjs))) return [];
     const tc = await pdfPage.getTextContent();
 
     const runs = [];
