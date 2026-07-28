@@ -24,6 +24,7 @@
 import { buildExportPlan } from './operations.js';
 import { applyPageSurgery } from './page-surgery.js';
 import { CLONE_FONT_VARIANTS, CLONE_FONT_URLS } from './clone-fonts.js';
+import { toStandardFontSafe } from './text-encode.js';
 
 // ---- fonts ------------------------------------------------------------------
 
@@ -201,7 +202,14 @@ async function drawText(pdfPage, anno, frame, env) {
   const color = parseHexColor(env.PDFLib, anno.color);
   const rotate = env.PDFLib.degrees(frame.rotation);
   const size = anno.fontSize || 16;
-  const lines = String(anno.text ?? '').split('\n');
+  // Normalise the invisible half of pasted text BEFORE pdf-lib sees it. A
+  // standard font encodes through WinAnsi, and one codepoint outside it throws
+  // a bare Error that aborts the ENTIRE export — there is no per-annotation
+  // guard in the loop below, so one thin space in one of 174 annotations loses
+  // the whole document. That is the 2026-07-28 incident (41 failed downloads,
+  // 82 minutes of work). Applied to custom fonts too: they do not throw, they
+  // paint .notdef, and a real space beats a tofu box.
+  const lines = toStandardFontSafe(anno.text).split('\n');
   for (let i = 0; i < lines.length; i += 1) {
     const yV = anno.y + size * TEXT_BASELINE_RATIO + i * size * TEXT_LINE_HEIGHT;
     const { x, y } = transformAnnotationCoords(frame.rotation, anno.x, yV, frame.wU, frame.hU);

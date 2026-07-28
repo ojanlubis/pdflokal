@@ -157,16 +157,70 @@ test('COVERAGE: the legacy GA4 error path sends no free text', () => {
   }
 });
 
-test('COVERAGE: failure reasons are classified from err.name — err.message is used NOWHERE', () => {
-  const app = strip(fs.readFileSync(path.join(JS, 'v2', 'app.js'), 'utf8'));
-  assert.match(app, /err\?\.name/, 'expected a failure reason derived from the error NAME');
-  // The strong claim: a thrown message can quote the user's document (a PDF
-  // parse error can carry stream content), so it must not reach a telemetry
-  // prop, a toast, or a log. Asserting its total absence is checkable in a way
-  // that "we were careful at the call site" is not.
+// ⚠️ THIS TEST CHANGED ITS SHAPE ON 2026-07-28, AND THE REASON MATTERS.
+// It used to assert that `err.message` appears NOWHERE — a structural proxy for
+// "a thrown message never reaches the rail": if you never read it, you cannot
+// leak it. Cheap and strong, and it was too strong. pdf-lib throws a PLAIN
+// `Error` for every failure it has — truncation, encryption, everything — so a
+// name-only classifier can never distinguish ANY export failure. That is not
+// hypothetical: on 2026-07-28 a user hit 41 consecutive export failures and all
+// 41 recorded `unknown`, because there was nothing else they could record.
+//
+// So the invariant is now enforced where it actually lives — TRANSMISSION, not
+// inspection — and it is still structural rather than a promise:
+//   1. core/failure-reason.js may read err.message. It imports NOTHING, so it
+//      has no rail to leak to; it can only return one of the schema's enum
+//      values (proved against real pdf-lib errors in failure-reason.test.mjs).
+//   2. Every OTHER file stays under the original ban.
+test('COVERAGE: only the pure classifier may read err.message, and it cannot transmit', () => {
+  const classifier = strip(fs.readFileSync(path.join(JS, 'core', 'failure-reason.js'), 'utf8'));
+  assert.match(classifier, /err\?\.message/, 'the classifier no longer reads the message it exists to read');
+  // The guarantee: a module with no imports cannot reach telemetry, the network,
+  // or a toast. If this ever grows an import, the leak becomes possible again.
   assert.equal(
-    /err\?\.message|err\.message/.test(app), false,
-    'err.message appeared in js/v2/app.js — a thrown message can quote the document back to us. '
-    + 'Branch on err.name or a value the app recorded itself.',
+    /^\s*import\s/m.test(classifier), false,
+    'core/failure-reason.js grew an import. It reads raw error text, so it must stay a PURE function '
+    + 'with no way to send anything anywhere — that isolation IS the content-blindness guarantee.',
   );
+
+  for (const rel of [['v2', 'app.js'], ['v2', 'download-sheet.js'], ['v2', 'telemetry.js']]) {
+    const src = strip(fs.readFileSync(path.join(JS, ...rel), 'utf8'));
+    assert.equal(
+      /err\?\.message|err\.message/.test(src), false,
+      `err.message appeared in js/${rel.join('/')} — a thrown message can quote the document back to us. `
+      + 'Pass the error to failureReason() and send only the bucket it returns.',
+    );
+  }
+});
+
+// THE TEST THAT WOULD HAVE CAUGHT THE 2026-07-28 INCIDENT. `reason` was the
+// LITERAL 'unknown' at the export call site, so 41 real failures reported a
+// constant — the classifier was never asked. A hard-coded enum value in a
+// failure report is indistinguishable from a real classification on the rail,
+// which is what made it survive review and a full gate.
+test('COVERAGE: no failure report hard-codes its reason', () => {
+  for (const rel of [['v2', 'app.js'], ['v2', 'download-sheet.js']]) {
+    const src = strip(fs.readFileSync(path.join(JS, ...rel), 'utf8'));
+    const calls = src.match(/tel\('failure',\s*\{[^}]*\}/g) || [];
+    assert.ok(calls.length > 0, `no failure reports found in js/${rel.join('/')} — the scan broke`);
+    for (const call of calls) {
+      const m = /reason:\s*([^}]*)/.exec(call);
+      if (!m) continue;
+      const expr = m[1].trim().replace(/,$/, '').trim();
+      // Two acceptable shapes, and nothing else:
+      //   failureReason(err)  — the classifier actually ran
+      //   'encrypted'         — a fact the app read off the DOCUMENT at import,
+      //                         which is stronger than anything derived from a
+      //                         throw. Allowed alone or as the ternary's branch.
+      const classified = /failureReason\s*\(/.test(expr);
+      const documentFact = expr === "'encrypted'";
+      assert.ok(
+        classified || documentFact,
+        `hard-coded failure reason in js/${rel.join('/')} → reason: ${expr.slice(0, 60)}\n`
+        + 'A literal here is indistinguishable from a real classification once it is on the rail — '
+        + 'that is exactly how 41 real export failures all reported "unknown" on 2026-07-28. '
+        + 'Call failureReason(err).',
+      );
+    }
+  }
 });

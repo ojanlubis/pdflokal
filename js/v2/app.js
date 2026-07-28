@@ -17,6 +17,7 @@
  */
 
 import { createDoc, createAnnotation, getPage, getSource } from '../core/model.js';
+import { failureReason } from '../core/failure-reason.js';
 import {
   addAnnotation, removeAnnotation, updateAnnotation, clearSelection, selectAnnotation,
   moveAnnotation,
@@ -119,16 +120,10 @@ function displayMode() {
   try { return isStandalone() ? 'standalone' : 'browser'; } catch { return 'browser'; }
 }
 
-function failureReason(err) {
-  switch (err?.name) {
-    case 'PasswordException': return 'encrypted';
-    case 'InvalidPDFException': return 'corrupt';
-    case 'UnknownErrorException': return 'unsupported';
-    case 'TimeoutError': return 'timeout';
-    case 'QuotaExceededError': return 'out-of-memory';
-    default: return 'unknown';
-  }
-}
+// failureReason moved to core/failure-reason.js (2026-07-28) so the EXPORT path
+// can share it. It had to grow pdf-lib awareness to be worth sharing: pdf-lib
+// throws plain `Error` for everything, so a name-only classifier reports
+// 'unknown' for every export failure there is.
 
 let toastTimer = null;
 function toast(msg) {

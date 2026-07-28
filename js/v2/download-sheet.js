@@ -18,6 +18,7 @@ import { buildPdfBytes } from '../core/export.js';
 import { ensurePdfJs, ensurePdfLib, ensureFflate } from '../core/vendor.js';
 import { track } from '../lib/analytics.js';
 import { tel } from './telemetry.js';
+import { failureReason } from '../core/failure-reason.js';
 import { durationBucket } from '../core/telemetry-schema.js';
 import { showStamp } from './celebrate.js';
 
@@ -63,6 +64,9 @@ export function createDownloadSheet(deps) {
     format: 'pdf', imgfmt: 'jpg', size: 'asli', target: null, picked: null, // null = semua / no cap
     base: null,        // { bytes, size } — the real built PDF for current selection
     compressed: null,  // { bytes, size, unchanged }
+    buildError: null,  // the error that PREVENTED base — rethrown at the CTA so the
+                       // rail reports the cause, not our own 'build missing' symptom
+
     building: false, compressing: false, exporting: false,
     seq: 0,            // invalidates in-flight builds when selection changes
   };
@@ -78,6 +82,7 @@ export function createDownloadSheet(deps) {
     const seq = ++state.seq;
     state.base = null;
     state.compressed = null;
+    state.buildError = null;
     state.building = true;
     render();
     try {
@@ -91,7 +96,18 @@ export function createDownloadSheet(deps) {
       state.base = { bytes, size: bytes.length };
     } catch (err) {
       console.error(err);
-      if (seq === state.seq) deps.toast('Waduh, gagal menyiapkan PDF. Coba lagi ya');
+      // ⚠️ KEEP THE ERROR. This is where an export ACTUALLY fails — the build,
+      // not the download click. Until 2026-07-28 it died right here: logged to
+      // the user's own console, toasted, and dropped. `doExport` later found
+      // `state.base` empty and threw its own `new Error('build missing')`, so
+      // the failure that reached the rail carried none of the original
+      // identity. One user's 41 consecutive failures all recorded
+      // `reason: 'unknown'` for that reason, and no classifier could have
+      // rescued them — by the time anything asked "why", the why was gone.
+      if (seq === state.seq) {
+        state.buildError = err;
+        deps.toast('Waduh, gagal menyiapkan PDF. Coba lagi ya'); // TODO(copy): see below
+      }
     } finally {
       if (seq === state.seq) { state.building = false; render(); }
     }
@@ -345,11 +361,15 @@ export function createDownloadSheet(deps) {
 
       if (state.format === 'pdf') {
         const src = state.size === 'kompres' ? state.compressed : state.base;
-        if (!src) throw new Error('build missing');
+        // Rethrow the REAL build error when we have it. `build missing` is the
+        // symptom (no bytes); state.buildError is the cause, and the cause is
+        // what the rail needs. Without this the catch below can only ever
+        // classify our own placeholder, which names nothing.
+        if (!src) throw state.buildError || new Error('build missing');
         // No success toast: the BERES stamp (download chokepoint) is the one voice.
         deps.download(new Blob([src.bytes], { type: 'application/pdf' }), `${baseName}-pdflokal.pdf`);
       } else {
-        if (!state.base) throw new Error('build missing');
+        if (!state.base) throw state.buildError || new Error('build missing');
         // renderPdfToImages rasterizes with pdf.js; zipFiles zips with fflate.
         // Both come off globalThis, so both must be up before we call in.
         const [{ renderPdfToImages, zipFiles }] = await Promise.all([
@@ -417,7 +437,16 @@ export function createDownloadSheet(deps) {
         : 'Waduh, gagal membuat file. Coba sekali lagi ya');
       // The rail's failure event (spec: schema `failure`). Content-blind: the
       // stage and a bucketed reason, never the error text or the file name.
-      tel('failure', { stage: 'export', reason: encrypted ? 'encrypted' : 'unknown' });
+      //
+      // ⚠️ `reason` USED TO BE THE LITERAL 'unknown' HERE. On 2026-07-28 one
+      // user hit 41 consecutive export failures in 82 minutes and every single
+      // one recorded 'unknown' — not because the classifier failed to name the
+      // error, but because it was never asked. 41 samples of a constant.
+      //
+      // The document's OWN recorded fact still wins over anything derived from
+      // the throw: core/import.js read `encrypted` off the document at import,
+      // which is more reliable than matching a library's wording.
+      tel('failure', { stage: 'export', reason: encrypted ? 'encrypted' : failureReason(err) });
     } finally {
       state.exporting = false;
       render();
