@@ -24,7 +24,7 @@
  *
  * Adding a new event = one SCHEMA entry (+ a call site once the code path
  * exists). The ladder events (font_seen, ganti_tap, ganti_commit, surgery,
- * insert, block_edit, commit_paint) are listed here for completeness NOW
+ * insert, commit_paint) are listed here for completeness NOW
  * (spec §6 step 5) even though their call sites land later, on the ladder
  * branch, as those code paths stabilize. Their enum values were checked
  * against the actual ladder code on feat/edit-teks-asli where it already
@@ -331,13 +331,33 @@ export const SCHEMA = {
     style_source: STYLE_SOURCE,
     glyph_shortfall: 'int',
   },
-  // reason/align values are given verbatim in spec-telemetry.md §3's own
-  // table (reason) and text-blocks.js's classifyAlign() (align).
-  block_edit: {
-    editable: 'bool',
-    reason: ['single-line', 'align-unknown', 'mixed-fonts', 'list'],
-    align: ['left', 'right', 'center', 'justify', 'unknown'],
-  },
+  // ---------------------------------------------------------------------
+  // `block_edit` was DELETED here on 2026-07-28. Read this before re-adding it.
+  //
+  // It was declared, fixtured, and documented in spec-telemetry.md §70 as
+  // "Rung D's evidence, live from day one of the merge" — and emitted by
+  // NOTHING, for the entire life of the schema. So we believed we were
+  // gathering evidence for the paragraph-reflow decision and were gathering
+  // zero, with the validator green and every test passing. A declared-but-dead
+  // event is worse than a missing one: it makes this file CLAIM evidence we do
+  // not have about a decision that is still open. It also violated this
+  // schema's own stated law — "anything not emitted by code does not enter an
+  // enum" — which was written down and enforced by nothing until
+  // tests/core/telemetry-liveness.test.mjs.
+  //
+  // THE QUESTION IT EXISTED TO ANSWER SURVIVES ITS DELETION: *is there real
+  // demand for paragraph reflow (Rung D)?* Deleting an instrument without
+  // keeping its question is how a parked decision quietly becomes
+  // unanswerable. The answer does NOT need a new event — a user editing
+  // several ADJACENT lines in one session is reflow demand expressed through
+  // the line primitive, and `ganti_tap`/`ganti_commit` already carry enough to
+  // see it. That is a rail QUERY, not a schema entry (seat ruling, filed as a
+  // follow-up query in the telemetry spec).
+  //
+  // Rung D is wired to nothing today, so this event may have been unfireable by
+  // construction. If Rung D ships, re-add it WITH its call site in the same
+  // change — never ahead of it.
+  // ---------------------------------------------------------------------
   commit_paint: {
     duration: 'duration',
     pages: PAGES_BUCKET,
