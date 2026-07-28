@@ -266,11 +266,11 @@ export function createDownloadSheet(deps) {
         // the user the one lever that actually works next (fewer pages) — never
         // imply the berkas will pass when it won't.
         const cap = TARGETS.find((t) => t.v === c.target)?.label ?? fmtMB(c.target);
-        sub.textContent = `paling kecil yang bisa: ${fmtMB(c.size)} — belum masuk ${cap}. Coba buang halaman yang nggak perlu.`;
+        sub.textContent = `paling kecil yang bisa: ${fmtMB(c.size)}, belum masuk ${cap}. Coba buang halaman yang nggak perlu.`;
         sub.hidden = false;
       } else if (state.size === 'kompres' && c && c.target && c.reachedTarget) {
         const cap = TARGETS.find((t) => t.v === c.target)?.label ?? fmtMB(c.target);
-        sub.textContent = `${fmtMB(c.size)} — muat di bawah ${cap}`;
+        sub.textContent = `${fmtMB(c.size)}, muat di bawah ${cap}`;
         sub.hidden = false;
       } else if (state.size === 'kompres' && c && !c.unchanged) {
         sub.textContent = `hemat ${Math.round((1 - c.size / state.base.size) * 100)}% dari ${fmtMB(state.base.size)}`;

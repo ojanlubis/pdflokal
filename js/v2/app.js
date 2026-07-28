@@ -427,7 +427,7 @@ for (const btn of document.querySelectorAll('#toolbar .tool[data-tool]')) {
     // never see "beta". The arm-toast announces it on every device, once per
     // arming, right as the user starts. Verb shifted ganti→edit to match the
     // renamed button (taste: the verb matches the interaction model everywhere).
-    if (t === 'ganti') toast('Edit teks asli — fitur beta. Tap tulisan yang mau kamu ubah');
+    if (t === 'ganti') toast('Edit teks asli, fitur beta. Tap tulisan yang mau kamu ubah');
   });
 }
 
@@ -1128,7 +1128,7 @@ async function smartReplace(pageId, x, y) {
       track('ganti_no_text_layer');
       showScanOffer();
     } else {
-      toast('Nggak kena tulisan — tap tepat di teksnya ya');
+      toast('Nggak kena tulisan, tap tepat di teksnya ya');
     }
     return;
   }
@@ -2088,8 +2088,8 @@ async function loadFilesInner(files) {
   // guards the doc.pages[0] read below, which would throw on an empty document.
   if (doc.pages.length === 0) {
     toast(usable.length === 1
-      ? 'File itu nggak bisa dibuka — mungkin kosong atau rusak'
-      : 'Nggak ada file yang bisa dibuka — mungkin kosong atau rusak');
+      ? 'File itu nggak bisa dibuka, mungkin kosong atau rusak'
+      : 'Nggak ada file yang bisa dibuka, mungkin kosong atau rusak');
     return;
   }
 
@@ -2112,7 +2112,7 @@ async function loadFilesInner(files) {
   // Honest close-out: skips take priority over the merge tally — the user needs to
   // know something was left out more than they need the count.
   if (failed > 0) {
-    toast(`${failed} file dilewati — kosong atau rusak`);
+    toast(`${failed} file dilewati, kosong atau rusak`);
   } else if (!firstLoad) {
     toast(`Dijepit jadi satu, sekarang ${doc.pages.length} halaman`);
   }
@@ -2401,7 +2401,7 @@ window.v2 = {
 // QUERY over the sequence, which per-event timestamps now make answerable.
 function showScanOffer() {
   const dlg = document.getElementById('scan-offer');
-  if (!dlg) { toast('Halaman ini hasil scan/foto — teksnya belum bisa diedit'); return; }
+  if (!dlg) { toast('Halaman ini hasil scan/foto, teksnya belum bisa diedit'); return; }
   // The arm-toast from arming Ganti is still on screen and says the opposite of
   // what this sheet says. One message at a time.
   hideToast();

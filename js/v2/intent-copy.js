@@ -34,7 +34,7 @@
 export const INTENT_COPY = {
   gabung: {
     dzTitle: 'Seret semua PDF yang mau digabung',
-    dzHint: 'Boleh banyak file sekaligus — urutannya bisa diatur setelah ini',
+    dzHint: 'Boleh banyak file sekaligus, urutannya bisa diatur setelah ini',
     pmTitle: 'Atur Urutan',
     pmHint: 'Tahan lalu geser buat mengurutkan · buang halaman yang nggak perlu',
   },
@@ -78,7 +78,7 @@ export const INTENT_COPY = {
 
   tipex: {
     dzTitle: 'Seret PDF yang tulisannya mau ditutup',
-    dzHint: 'Seret di atas bagian yang salah — seperti tip-ex di kertas',
+    dzHint: 'Seret di atas bagian yang salah, seperti tip-ex di kertas',
   },
 
   gambar: {
@@ -88,7 +88,7 @@ export const INTENT_COPY = {
 
   foto: {
     dzTitle: 'Seret foto yang mau dijadikan PDF',
-    dzHint: 'Boleh banyak sekaligus — urutannya bisa diatur setelah ini',
+    dzHint: 'Boleh banyak sekaligus, urutannya bisa diatur setelah ini',
     pmTitle: 'Atur Urutan',
     pmHint: 'Tahan lalu geser buat mengurutkan · putar foto yang miring',
   },
