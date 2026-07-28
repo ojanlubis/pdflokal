@@ -12,11 +12,15 @@
 - **The old app lives at `alat-gambar.html`** (renamed old index.html, noindexed) solely to keep the image tools alive until absorption. It still uses `js/editor/`, `js/pdf-tools/`, `style.css`, the old init files. **All of that dies at demolition** (after the post-launch bake) along with most of this file's "Core Architecture" section.
 - **Design language is LAW**: red #dc2626 on warm stone, Plus Jakarta Sans, red-chrome-never-prints, paper-on-desk shadows, stempel-press buttons, the 5-stamp language ("cap = pernyataan status", never decoration). Never default signature ink to a colour — user content renders as the user made it. Design skills installed in `.agents/skills/` — load before UI work.
 - **Interaction model**: camera-first touch (selection commits at release); select-then-edit for text (first click/tap selects, the next one edits — no double-tap timing windows). Both founder-ratified.
-- **Tests**: `tests/mobile/**` (mobile-chrome project, the deep suite) + `tests/editor-v2-desktop.spec.js` target v2 at `/`. Old suites were repointed at `/alat-gambar.html` and die with the old wing. `tests/core/` runs headless via `npm run test:core`. Full sweep: `npm run lint` + `npx playwright test` (currently ~190 core + ~266 Playwright). `tests/fixtures/nasty/` is the corpus of real documents that have actually broken things — add to it whenever a real file finds a bug.
+- **Tests**: `tests/mobile/**` (mobile-chrome project, the deep suite) + `tests/editor-v2-desktop.spec.js` target v2 at `/`. Old suites were repointed at `/alat-gambar.html` and die with the old wing. `tests/core/` runs headless via `npm run test:core`. **The full gate is `npm run gate`** (`scripts/qa-gate.mjs` — lint → core → Playwright, currently 202 core + 266 Playwright), and it is the only sweep you should report from: it fingerprints every file the dev server can serve, before and after, and exits **90 = VOID** if the tree moved under the run instead of claiming a pass. That guard exists because on 2026-07-28 an unguarded sweep returned a perfect `266 passed, exit 0` while another session committed into the tree 65 seconds before it ended — half the run tested different code than the other half. `npm run gate:self-test` proves the guard can still go red; run it if you touch the fingerprint. `tests/fixtures/nasty/` is the corpus of real documents that have actually broken things — add to it whenever a real file finds a bug.
 - **Never run two Playwright invocations at once** — they fight over the dev-server port and produce phantom `ERR_CONNECTION_REFUSED` failures that look like real ones. **A session rooted HERE owns the sweep and runs it in the FOREGROUND**; subagents it spawns run lint + core only and never Playwright (3/3 deadlocked backgrounding it — a backgrounded run waits on a notification that can only wake the parent). One owner, one invocation.
 - **Verify a green signal by asking what would look identical if broken.** Real examples from this repo: a telemetry endpoint that 204s whether or not it wrote (a week of data lost silently); tests asserting "no images sent" while watching only `sendBeacon` when the send went by `fetch`; two crops asserted "non-empty" when both were the same stale image. Assertions must be able to fail.
 - **Working rhythm**: failing test → green → full sweep → local commit on `main` → update the project seat (`../STATE.md` + `../TODO.md`) → **hand the push to Fauzan.** Screenshot every new UI surface (a broken dialog once passed all functional tests).
-- **⛔ PUSH / MERGE / DEPLOY ARE FAUZAN'S OWN HAND. Never yours.** Authorization is **per-turn, in his own window, and does NOT carry forward** — a "yes push" last turn authorizes nothing this turn. _(Corrected 2026-07-28: this line previously read `gh pr merge --squash --admin --delete-branch` **(authorized)**, a standing blanket permission that contradicted the seat's oldest standing constraint. It was written when the repo worked on feature branches; it does not survive the 2026-07-27 tidy.)_
+- **⛔ PUSH / MERGE / DEPLOY — TODAY: FAUZAN'S OWN HAND. Never yours, and never the PM's either.**
+  - **The ruling (2026-07-28, `../decisions.md`): push authority belongs to the POLICY, not to anyone's word.** Once (1) the telemetry test suite exists and (2) a low-risk **inclusion list** is ruled item by item, anything on that list ships automatically the moment `npm run gate` is green. Everything off the list stays his own hand. **Per-turn verbal authorization is RETIRED as a mechanism** — a relayed "he said yes" is a carry, and carries are what this repo keeps getting wrong.
+  - **INTERIM, i.e. right now: strictest reading — his own hand.** Neither precondition exists yet, so there is nothing to ship automatically *against*. Do not push. Do not ask to push.
+  - **The low-risk list IS the push authority**, not a description of habits — which is why it gets ruled example by example, not defined. Precondition chain, in order: telemetry suite → close the rail's blind spots (`failure {stage, reason}`, `events.ts` batch-flush time, image tools off GA4) → the list → auto-push arms.
+  - _(History, kept because both errors are instructive: this line once read `gh pr merge --squash --admin --delete-branch` **(authorized)** — a standing blanket permission, deleted 2026-07-28. It was then rewritten as "neither seat ever, his own hand, per-turn", which was **stricter than the constraint the PM was actually operating under** and produced a live conflict the same afternoon when the PM pushed on a relayed yes. The bench caught it against the disk. The ruling above is what resolved it.)_
 - **There are no branches, by his explicit instruction** (2026-07-27): local `main` and remote `main`, nothing else. Work goes straight onto `main` locally. Preserved-but-unmerged work lives on **tags** (`archive/i18n-groundwork`, `archive/edit-ladder-preheal`), never branches. If you ever do audit a branch: **squash-merging makes `git branch --merged` report it unmerged forever — use a three-dot diff (`git diff origin/main...$b`), never commit counts.**
 - **`.mcp.json` here is PROJECT-SCOPED and that is load-bearing.** `playwright`, `sentry`, and `analytics-mcp` (GA4 — service account `pdflokal-ga4-reader@pdflokal-mcp`, property `properties/528550405`) load **only for sessions rooted in this directory**. They do NOT load at the seat one level up, and they do NOT load for subagents (subagents inherit the *parent's* cwd, so a seat-spawned agent lands in the seat, not here — every brief must `cd` explicitly). You have GA4 and Sentry; the seat does not. Check this file before telling anyone a capability is missing.
 - **Never `git add -A`** — stage explicit paths. Other sessions have uncommitted work in this tree (currently `pdf-explained.html`, `pdf-xray.html` at the repo root); **never sweep another session's work**, in either direction.
@@ -367,7 +371,9 @@ Hero + dropzone (opens editor), PDF tool cards (Editor, Merge, Split, PDF-to-Ima
 - **`<dialog>` elements need explicit sizing**: Browser UA stylesheet sets `width: fit-content; height: fit-content; max-width: calc(100% - 2em)` on `<dialog>`. This overrides `right: 0; bottom: 0` stretch. All modal overlay classes (`.edit-modal`, `.signature-modal`, `.shortcuts-modal`) must set `width: 100%; height: 100%; max-width: none; max-height: none` to fill viewport. Without this, modals render top-left at content size instead of centered.
 - **`showToast()` and `showFullscreenLoading()` use DOM construction, not innerHTML**: Prevents XSS from user-controlled filenames. Never revert to innerHTML for these functions.
 
-## Changelog System
+## Changelog System — ⚠️ OLD WING ONLY, not a v2 surface
+
+**`js/changelog.js` is referenced 15 times in `alat-gambar.html` and ZERO times in `index.html`** (verified 2026-07-28). The changelog badge does not exist on the live product; this section describes a surface that dies at demolition. Do not add v2 release notes here expecting anyone to see them.
 
 Edit `changelogData` array in `js/changelog.js`. Add new entries at the beginning.
 
@@ -379,18 +385,12 @@ Edit `changelogData` array in `js/changelog.js`. Add new entries at the beginnin
 
 ## Git Workflow
 
-- Feature branches from `main`, push for Vercel preview, merge when ready
-- `main` auto-deploys to pdflokal.id
-- Commit when complete, not after every edit
-- Never commit without explicit user permission
-- Server-dependent features (PDF<->Word, OCR) are out of scope
+**One rule, one home: the working rhythm and the push/branch rules live at the top of this file (⚡ STATUS, the "Working rhythm" and ⛔ bullets). Read them there.** This section used to restate them and drifted into contradicting them — it still said *"Feature branches from `main`, push for Vercel preview, merge when ready"*, *"Implement on feature branch"*, and *"Never commit without explicit user permission"* on 2026-07-28, three hundred lines below the corrected rules saying there are no branches and that this seat owns local commits on `main`. A fresh session reads both and picks one. Deleted rather than re-synced, because two copies drift again.
 
-### AI Assistant Workflow for Major Changes
-
-1. **Implement** on feature branch
-2. **Document** (after user approves implementation): README.md -> changelog.js -> CLAUDE.md
-3. **User reviews** all changes before commit
-4. **Finalize** only after explicit user approval
+Still true and not stated elsewhere:
+- `main` auto-deploys to pdflokal.id — which is why the push is Fauzan's own hand, not a formality.
+- Server-dependent features (PDF↔Word, server OCR) are **permanently** out of scope. In-browser OCR is sanctioned.
+- Document after the work is approved, in this order: README.md → CLAUDE.md → the project seat (`../STATE.md` + `../TODO.md`).
 
 ## Quick Reference
 
