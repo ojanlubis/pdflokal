@@ -123,6 +123,40 @@ test('COVERAGE: file-open failures reach the first-party rail, not just GA4', ()
 // call sites in app.js (the protected-PDF warning and the file-open failure),
 // so it measured the wrong one and failed for a reason that had nothing to do
 // with the code. A whole-file claim cannot pick the wrong occurrence.
+// The live product's own error channel. This is the test that would have caught
+// the 2026-07-28 mistake: js/lib/errors.js LOOKS like global capture, but it is
+// imported only by js/init.js, which is loaded only by alat-gambar.html — the
+// OLD wing. Editor v2 had no global capture at all except Sentry, so a runtime
+// error on pdflokal.id reached the first-party rail nowhere.
+//
+// Asserting on the file that the LIVE page loads, rather than on "some file
+// installs a handler", is the whole point — the earlier finding was true about
+// a file and false about the product.
+test('COVERAGE: the LIVE product captures runtime errors onto the first-party rail', () => {
+  const app = strip(fs.readFileSync(path.join(JS, 'v2', 'app.js'), 'utf8'));
+  assert.match(app, /addEventListener\('error'/, 'v2 installs no window error handler');
+  assert.match(app, /addEventListener\('unhandledrejection'/, 'v2 installs no rejection handler');
+  assert.match(app, /tel\('failure',\s*\{\s*stage:\s*'runtime'/, 'v2 does not report runtime failures to the rail');
+  // index.html is the live product; it must load the file that does this.
+  const index = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+  assert.match(index, /js\/v2\/app\.js/, 'index.html no longer loads the file carrying the capture');
+});
+
+// The old wing's channel must stay free of user-controlled text. Kept as a
+// tripwire rather than deleted with the wing, because it is live until
+// demolition and a well-meaning "add the message back for debugging" is exactly
+// how it would return.
+test('COVERAGE: the legacy GA4 error path sends no free text', () => {
+  const errs = strip(fs.readFileSync(path.join(JS, 'lib', 'errors.js'), 'utf8'));
+  for (const banned of ['message', 'stack', 'filename', 'lineno', 'colno']) {
+    assert.equal(
+      new RegExp(`\\b${banned}\\b`).test(errs), false,
+      `js/lib/errors.js references "${banned}" again — an error's own text is free text we do not `
+      + 'control (String(reason) stringifies whatever a rejection holds). The ruling was STOP, not sanitise.',
+    );
+  }
+});
+
 test('COVERAGE: failure reasons are classified from err.name — err.message is used NOWHERE', () => {
   const app = strip(fs.readFileSync(path.join(JS, 'v2', 'app.js'), 'utf8'));
   assert.match(app, /err\?\.name/, 'expected a failure reason derived from the error NAME');

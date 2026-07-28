@@ -106,7 +106,7 @@ test('enum value outside the declared list fails', () => {
 // goes UNCOUNTED, which is the rail going quiet exactly when something new
 // breaks.
 test('failure carries every stage/reason, and refuses invented ones', () => {
-  for (const stage of ['import', 'commit', 'export', 'compress', 'render']) {
+  for (const stage of ['import', 'commit', 'export', 'compress', 'render', 'runtime']) {
     assert.equal(validateEvent('failure', { stage, reason: 'unknown' }).ok, true, `stage ${stage}`);
   }
   for (const reason of ['encrypted', 'corrupt', 'out-of-memory', 'unsupported', 'timeout', 'unknown']) {

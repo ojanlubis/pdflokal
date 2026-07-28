@@ -382,8 +382,15 @@ export const SCHEMA = {
   // something new breaks. Content-blind like everything else here — no file
   // names, no document text, no error strings (a thrown message can quote the
   // document).
+  // 'runtime' added 2026-07-28: an uncaught error or unhandled rejection, which
+  // is not any of the pipeline stages. It exists because Editor v2 had NO
+  // global error capture at all except Sentry — so a runtime error on the live
+  // product reached the first-party rail nowhere, which is a direct hole in
+  // "the telemetry catches everything". Forcing such an error into one of the
+  // pipeline stages to avoid adding a value would have put a wrong value on the
+  // rail to save an enum entry.
   failure: {
-    stage: ['import', 'commit', 'export', 'compress', 'render'],
+    stage: ['import', 'commit', 'export', 'compress', 'render', 'runtime'],
     reason: ['encrypted', 'corrupt', 'out-of-memory', 'unsupported', 'timeout', 'unknown'],
   },
   // spec-edit-fidelity-instrumentation.md Increment C: the visual oracle —

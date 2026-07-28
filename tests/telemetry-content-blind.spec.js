@@ -126,6 +126,45 @@ test.describe('telemetry is content-blind', () => {
     }
   });
 
+  // Proves the v2 global capture actually FIRES — the coverage tests in
+  // tests/core/telemetry-coverage.test.mjs only prove the code is present.
+  // Doing it here is not a detour: an uncaught error's message is the single
+  // most likely thing to carry document text, so "does it fire" and "does it
+  // stay blind" are the same experiment.
+  test('an uncaught runtime error reaches the rail as failure{runtime} — carrying none of its message', async ({ page }) => {
+    await captureBodies(page);
+    await page.goto('/');
+    await page.setInputFiles('#file-input', NASTY('label-tebal.pdf'));
+    await expectFirstPage(page);
+
+    // A message shaped exactly like the dangerous case: a parse error quoting
+    // the user's own document back at us.
+    await page.evaluate(() => {
+      setTimeout(() => { throw new TypeError('parse failed near "Budi Santoso Wijaya" at offset 4211'); }, 0);
+    });
+    await page.evaluate(() => {
+      Promise.reject(new RangeError('bad stream in "Jalan Merdeka 17"'));
+    });
+
+    await expect.poll(async () => (await railBodies(page))
+      .flatMap((b) => JSON.parse(b.text).events || [])
+      .filter((e) => e.event === 'failure' && e.props.stage === 'runtime').length).toBeGreaterThan(1);
+
+    const bodies = await railBodies(page);
+    const runtime = bodies.flatMap((b) => JSON.parse(b.text).events || [])
+      .filter((e) => e.event === 'failure' && e.props.stage === 'runtime');
+    // Both the throw and the rejection were seen.
+    expect(runtime.length).toBeGreaterThan(1);
+    // Unrecognised names classify honestly rather than being invented.
+    for (const e of runtime) expect(e.props.reason).toBe('unknown');
+
+    // And not one word of either message made it out.
+    const all = bodies.map((b) => b.text).join('\n');
+    for (const secret of ['Budi', 'Santoso', 'Wijaya', 'Jalan Merdeka', 'offset 4211', 'parse failed', 'bad stream']) {
+      expect(all, `error text "${secret}" reached the rail`).not.toContain(secret);
+    }
+  });
+
   test('the envelope carries exactly session_id + app_version + events — nothing else', async ({ page }) => {
     await captureBodies(page);
     await page.goto('/');

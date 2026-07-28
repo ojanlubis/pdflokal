@@ -1,31 +1,35 @@
 /*
- * PDFLokal - lib/errors.js (ES Module)
- * Global error capture — funnels uncaught errors + promise rejections into
- * track('client_error', ...) so production failures surface in the analytics
- * dashboard. Bridge for now; swap destination to Sentry in Tier 2.
+ * PDFLokal - lib/errors.js (ES Module) — ⚠️ OLD WING ONLY
+ * ============================================================================
+ * Global error capture for the legacy app. Imported by `js/init.js`, which is
+ * loaded ONLY by `alat-gambar.html`. **It does not run on the live product.**
+ * Editor v2 (`index.html`) has its own capture at the bottom of js/v2/app.js,
+ * which reports to the first-party rail instead.
  *
- * WHY: Before this, runtime errors in production were silent. Only ESLint ran
- * in CI, and only the user's own browser console showed them. We have no
- * verification layer for "did this regression actually break things for users."
+ * That distinction was missed on 2026-07-28 and is written here so the next
+ * reader does not have to re-derive it: this file was reported as a live
+ * production issue, ruled on, and only then did anyone check what actually
+ * loads it. Finding a second instance of something is not the same as knowing
+ * either one's reach.
+ *
+ * WHAT CHANGED 2026-07-28 — free text removed (seat ruling):
+ * this used to send `message`, `source`, `line`, `col` and a 500-char `stack`
+ * to GA4 on every uncaught error. An error message is free text we do not
+ * control: `String(reason)` stringifies whatever a rejection happens to hold,
+ * and a PDF parse error can quote stream content. Nobody observed content
+ * leaving — the defect was the ASYMMETRY. On our own rail, content-blindness
+ * is enforced BY CONSTRUCTION (SCHEMA has no string-typed prop, so content
+ * cannot ride along even by accident); on this path nothing prevented it at all.
+ *
+ * The ruling was STOP, not sanitise: you cannot enumerate what an arbitrary
+ * error might quote, so a sanitiser is a guess wearing a guarantee's clothes.
+ * The count is kept — knowing THAT errors happen is most of the value, and the
+ * diagnostic detail for the live product lives in Sentry.
+ *
+ * Legacy hygiene, not a production fix: this wing dies at demolition.
  */
 
 import { track } from './analytics.js';
-
-// WHY: Cap stack to 500 chars — Vercel Analytics custom event values are
-// truncated past ~255 chars per field, and stacks are mostly redundant past
-// the top few frames. 500 gives headroom for the analytics dashboard's
-// own truncation while keeping the most relevant frames.
-function trimStack(stack) {
-  if (typeof stack !== 'string') return '';
-  return stack.length > 500 ? stack.slice(0, 500) : stack;
-}
-
-// WHY: Vercel Analytics rejects nested objects in event data. Flatten + coerce.
-function safe(value) {
-  if (value === undefined || value === null) return '';
-  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value;
-  return String(value);
-}
 
 let installed = false;
 
@@ -33,24 +37,13 @@ export function installErrorCapture() {
   if (installed) return;
   installed = true;
 
-  window.addEventListener('error', (event) => {
-    track('client_error', {
-      kind: 'error',
-      message: safe(event.message),
-      source: safe(event.filename),
-      line: safe(event.lineno),
-      col: safe(event.colno),
-      stack: trimStack(event.error?.stack),
-    });
+  // `kind` only. No message, no stack, no filename — see the header. The
+  // browser console still has everything for anyone debugging locally.
+  window.addEventListener('error', () => {
+    track('client_error', { kind: 'error' });
   });
 
-  window.addEventListener('unhandledrejection', (event) => {
-    const reason = event.reason;
-    const message = reason instanceof Error ? reason.message : String(reason);
-    track('client_error', {
-      kind: 'unhandledrejection',
-      message: safe(message),
-      stack: trimStack(reason?.stack),
-    });
+  window.addEventListener('unhandledrejection', () => {
+    track('client_error', { kind: 'unhandledrejection' });
   });
 }

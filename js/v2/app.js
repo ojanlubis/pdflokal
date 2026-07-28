@@ -97,6 +97,33 @@ const pill = document.getElementById('v2-pill');
 const toastEl = document.getElementById('toast');
 
 // ---- small helpers -----------------------------------------------------------
+
+// SINGLE SOURCE OF TRUTH for `failure.reason`. Used by the import path and by
+// the global runtime handler at the bottom of this file, so the two can never
+// classify the same error differently.
+//
+// ⚠️ READS `err.name` AND NEVER `err.message`. A name is a fixed identifier
+// ('PasswordException'); a message is free text that can quote the user's
+// document straight back to us — a PDF parse error can carry stream content.
+// This is the same discipline that keeps the export-failure branch off
+// err.message, and the reason the rail is content-blind BY CONSTRUCTION rather
+// than by remembering to be careful at each call site.
+//
+// Anything unrecognised is 'unknown', deliberately: an unclassified failure
+// must still be COUNTED, or the rail goes quiet exactly when something new
+// breaks. Most runtime errors will land here, and that is fine — the value is
+// knowing they happen and how often, not naming them.
+function failureReason(err) {
+  switch (err?.name) {
+    case 'PasswordException': return 'encrypted';
+    case 'InvalidPDFException': return 'corrupt';
+    case 'UnknownErrorException': return 'unsupported';
+    case 'TimeoutError': return 'timeout';
+    case 'QuotaExceededError': return 'out-of-memory';
+    default: return 'unknown';
+  }
+}
+
 let toastTimer = null;
 function toast(msg) {
   toastEl.textContent = msg;
@@ -2036,12 +2063,7 @@ async function loadFilesInner(files) {
       // Anything we cannot classify is 'unknown' — which must stay COUNTED,
       // because an unclassified failure is exactly when the rail needs to be
       // loud rather than silent.
-      const name = err?.name || '';
-      let reason = 'unknown';
-      if (name === 'PasswordException') reason = 'encrypted';
-      else if (name === 'InvalidPDFException') reason = 'corrupt';
-      else if (name === 'UnknownErrorException') reason = 'unsupported';
-      tel('failure', { stage: 'import', reason });
+      tel('failure', { stage: 'import', reason: failureReason(err) });
     }
   }
 
@@ -2341,6 +2363,43 @@ window.v2 = {
   getRasterizer: () => rasterizer, // tests: drive the real live-surgery raster path (tests/live-raster.spec.js)
   celebration, // tests: drive the post-download routing (install nudge vs share card)
 };
+
+// ---- Global error capture -> the first-party rail ---------------------------------------
+// WHY THIS EXISTS (2026-07-28, telemetry suite class D): Editor v2 had NO global
+// error capture of ANY kind. `js/lib/errors.js` looks like it covers this, but it
+// is imported only by `js/init.js`, which is loaded only by `alat-gambar.html` —
+// the OLD wing. So on the live product an uncaught error reached Sentry and
+// nothing else: not GA4, not the first-party rail. That is a direct hole in
+// "the telemetry catches everything", which is the precondition of the auto-push
+// policy — the rail could not answer "is it broken?" for the one class of
+// failure that means the app fell over.
+//
+// CONTENT-BLIND BY CONSTRUCTION, not by care: this sends a stage and a bucketed
+// reason, and `SCHEMA` has no string-typed prop anywhere, so an error message
+// CANNOT ride along even by accident. That is the property the GA4 path lacks —
+// it is why the fix is "emit an enum here" rather than "sanitise the message
+// there". We never read `err.message`; a name is a fixed identifier, a message
+// can quote the user's document back to us.
+//
+// CAPPED on purpose: one broken rAF or scroll handler can throw thousands of
+// times a second, and an unbounded handler would flood the batch queue and
+// evict real events. After the cap we stop reporting — the first few are what
+// tell us something broke; the rest tell us nothing new and cost us signal.
+const RUNTIME_FAILURE_CAP = 5;
+let runtimeFailures = 0;
+
+function reportRuntimeFailure(err) {
+  try {
+    if (runtimeFailures >= RUNTIME_FAILURE_CAP) return;
+    runtimeFailures += 1;
+    tel('failure', { stage: 'runtime', reason: failureReason(err) });
+  } catch {
+    // Error reporting must never itself throw into app code — same law as tel().
+  }
+}
+
+window.addEventListener('error', (e) => reportRuntimeFailure(e?.error));
+window.addEventListener('unhandledrejection', (e) => reportRuntimeFailure(e?.reason));
 
 // ---- PWA: register the service worker ---------------------------------------------------
 // Enhancement only — makes the app installable + offline. Silent-fail on purpose:
