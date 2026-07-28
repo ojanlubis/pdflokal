@@ -130,6 +130,78 @@ test.describe('ganti teks export — the honest-replacement proof (real UI + rea
     // that the text happens to be gone.
     expect(r.outCount).toBe(r.origCount);
   });
+
+  // -------------------------------------------------------------------------
+  // THE DASH-LEADER FORM ROW — the day-1 production defect, driven through the
+  // REAL UI so it exercises js/v2/app.js's own smartReplace.
+  //
+  // WHY this test has to exist, and why the core suite was not enough: the
+  // fix for that defect is one line, `js/v2/app.js`'s
+  //   replaceTargets: line.runs.map((r) => r.pdf)   (was: [line.pdf])
+  // and NOTHING executed it on a multi-run line. Both core tests
+  // (page-surgery-dashleader, page-surgery-mixedfonts) hand-BUILD the per-run
+  // target array themselves, so they prove "given per-run targets the cut is
+  // clean" — never that the app produces them. Playwright reached smartReplace
+  // only through single-run lines, where the fixed and buggy expressions are
+  // byte-identical by construction (text-lines.js's assembleLine derives a
+  // one-run Line's own pdf from that same run).
+  //
+  // Net effect before this test: revert that line and lint + every core test +
+  // all 266 Playwright tests stayed green while the production defect came
+  // back. A fix that survives its own revert isn't covered, it's coincidence.
+  // Verified red-on-revert in a detached worktree, never by mutating this tree.
+  // -------------------------------------------------------------------------
+  test('dash-leader form row: the real UI cuts EVERY run of the line, not just the widest', async ({ page }) => {
+    await openDoc(page, NASTY('formulir-garis.pdf'));
+    await armGanti(page);
+    // A form row: "Alamat : Pondok Sapi, " + a dashed leader to the right
+    // margin. Two show-ops on ONE baseline at materially different point
+    // sizes — text-lines.js clusters them into a single Line whose own
+    // pdf.size comes from the DOMINANT (widest) run, i.e. the leader.
+    await tapLine(page, { str: 'Pondok Sapi' });
+    // The editor opens prefilled with the WHOLE line and its content selected,
+    // so typing replaces it (same contract replaceMiddleLineAndDownload uses).
+    // Do NOT press Ctrl+A first: on macOS that is beginning-of-line, not
+    // select-all, so it silently turns the replace into a PREPEND and leaves
+    // "Pondok Sapi" inside the new text — which reads exactly like the
+    // production defect this test is here to detect. Asserting the editor's
+    // final content is what tells those two apart.
+    await expect(page.locator('.v2-text-edit')).toContainText('Pondok Sapi');
+    await page.keyboard.type('Alamat : Cibeber, ');
+    await expect(page.locator('.v2-text-edit')).toHaveText('Alamat : Cibeber, ');
+    await page.keyboard.press('Enter');
+
+    await page.click('#btn-download');
+    await expect(page.locator('#dl-sheet')).toBeVisible();
+    const dl = page.waitForEvent('download');
+    await page.click('#ds-cta');
+    const download = await dl;
+    const chunks = [];
+    for await (const c of await download.createReadStream()) chunks.push(c);
+    const outBuf = Buffer.concat(chunks);
+    expect(outBuf.subarray(0, 5).toString()).toBe('%PDF-');
+
+    const r = await page.evaluate(async (arr) => {
+      const out = await window.pdfjsLib.getDocument({ data: new Uint8Array(arr) }).promise;
+      const tc = await (await out.getPage(1)).getTextContent();
+      const all = tc.items.map((i) => i.str).join('');
+      return {
+        originalSurvives: all.includes('Pondok Sapi'),
+        replacementFound: all.includes('Cibeber'),
+        siblingsSurvive: all.includes('Warno Suryanto') && all.includes('19 Juli 2026'),
+      };
+    }, Array.from(outBuf));
+
+    // THE ASSERTION THAT FAILS ON REVERT: with one blended target the label/
+    // value op is rejected by planRunRemoval's per-target sizeOk gate and
+    // survives into the exported file, beside the replacement —
+    // ": Pondok Sapi, : Cibeber, ————" exactly as the user reported.
+    expect(r.originalSurvives).toBe(false);
+    expect(r.replacementFound).toBe(true);
+    // Surgery stayed scoped to this line — the neighbours are untouched, so a
+    // pass can't come from having nuked the page.
+    expect(r.siblingsSurvive).toBe(true);
+  });
 });
 
 // ---- core-level fallback proofs (core-export.spec.js pattern) ---------------
