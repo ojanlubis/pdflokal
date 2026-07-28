@@ -795,8 +795,24 @@ async function prepareDocFont(pageId, line, draft) {
     // export time, run here purely to look.
     const joined = readPageContents(pdfPage, PDFLib);
     const fonts = extractFontMetrics(pdfPage, PDFLib);
-    const { results } = planRunRemoval(joined, fonts, [line.pdf]);
-    const fontName = results[0]?.insert?.fontName;
+    // ONE TARGET PER CONSTITUENT RUN, not one blended target — the same
+    // correction 39e0b9f made to smartReplace's surgery geometry at the
+    // bottom of this file. This call site was missed by that fix.
+    //
+    // WHY it matters here: a blended target takes its `size` from the LINE
+    // (text-lines.js's dominant run), so planRunRemoval's per-target sizeOk
+    // gate silently rejects any run painted at a materially different size,
+    // and `insert` then describes only whichever ops survived that filter.
+    // With per-run targets each run keeps its own size and is matched on its
+    // own terms, so the answer is correct BY CONSTRUCTION rather than by
+    // luck — and, just as importantly, the per-run results make a
+    // multi-font line VISIBLE instead of collapsing it to one blended guess.
+    //
+    // Byte-identical no-op on a single-run line (the overwhelming common
+    // case): `line.runs` has one entry whose `.pdf` IS `line.pdf`.
+    const targets = line.runs?.length ? line.runs.map((r) => r.pdf) : [line.pdf];
+    const { results } = planRunRemoval(joined, fonts, targets);
+    const fontName = results.map((r) => r.insert?.fontName).find(Boolean);
     if (!fontName) return; // unmatched / declined run — no font to learn
 
     // BUG FIX (founder field test, 2026-07-19, bold Arial headings): pdf.js's
@@ -908,6 +924,19 @@ async function prepareDocFont(pageId, line, draft) {
     }
   } catch (err) {
     console.warn('prepareDocFont gagal:', err);
+  } finally {
+    // WHY this exists: prepareDocFont is fire-and-forget, and until now it had
+    // NO observable completion — which is precisely why the 2026-07-23 defect
+    // (an unawaited call baking thin on a lost race, decisions.md) was so hard
+    // to pin. A test could only budget a timeout and hope.
+    //
+    // This flag says "finished DECIDING", never "decided bold" — deliberately,
+    // so it stays true under any styling policy (apply / decline / defer) and
+    // a test waiting on it can't pass or hang because the policy changed. Set
+    // in `finally` so every early return and every throw still resolves it;
+    // a signal that only fires on the happy path is the kind of green that
+    // can't go red.
+    if (draft?.editorEl?.isConnected) draft.editorEl.dataset.stylePrepared = '1';
   }
 }
 
