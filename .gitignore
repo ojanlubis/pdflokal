@@ -38,3 +38,9 @@ node_modules/
 
 # Agent skills working dir (installed via skills CLI; lockfile is tracked instead)
 .agents/
+
+# Wild PDF corpus — REAL user documents, local only, NEVER committed.
+# Founder ruling 2026-07-28: "the disk is full of wild PDF. you can use those.
+# as long as the PDF file don't go to the public opensource repo".
+# The harness is committed; the documents are not.
+tests/fixtures/wild/
