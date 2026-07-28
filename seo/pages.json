@@ -607,8 +607,9 @@
       "howto": "Cara mengedit PDF",
       "steps": [
         "Seret PDF-mu ke kotak di atas.",
-        "Ketuk <strong>Teks</strong>, lalu ketuk tempat di halaman untuk mulai menulis. Ukuran, tebal, dan warna huruf bisa diatur.",
-        "Perlu menutup tulisan yang salah? Ketuk <strong>Tipe-X</strong>, lalu seret di atas bagian yang mau ditutup. Setelah beres, ketuk Unduh."
+        "Ada kata yang salah di teks yang sudah tercetak? Ketuk <strong>Edit</strong> (masih beta), lalu ketuk barisnya dan ketik penggantinya.",
+        "Mau menambahkan tulisan baru? Ketuk <strong>Teks</strong>, lalu ketuk tempat di halaman untuk mulai menulis. Ukuran, tebal, dan warna huruf bisa diatur.",
+        "Perlu menutup tulisan tanpa menggantinya? Ketuk <strong>Tipe-X</strong>, lalu seret di atas bagian yang mau ditutup. Setelah beres, ketuk Unduh."
       ],
       "sections": [
         {
@@ -627,7 +628,7 @@
         {
           "h2": "Yang tidak bisa (dan kami akan bilang terus terang)",
           "p": [
-            "PDFLokal tidak mengubah teks asli yang sudah tercetak di dalam PDF — kamu menambahkan teks baru di atasnya, bukan mengedit paragraf yang sudah ada seolah-olah ini Word. Untuk 9 dari 10 keperluan sehari-hari, itu justru yang kamu butuhkan.",
+            "Edit Teks Asli masih beta: baru jalan per baris, belum bisa menyusun ulang satu paragraf penuh seolah-olah ini Word — dan sesekali font penggantinya bukan yang persis sama, yang akan kami tandai terus terang kalau itu terjadi.",
             "Kami juga tidak menyediakan konversi PDF ke Word maupun OCR. Keduanya butuh server, dan server berarti file-mu harus diunggah — yang berarti janji privasi kami jadi bohong. Kami memilih menolak fiturnya daripada mengingkari janjinya."
           ]
         },
@@ -656,7 +657,7 @@
       "faq": [
         {
           "q": "Bisa mengubah tulisan yang sudah ada di PDF?",
-          "a": "Tidak secara langsung. Kamu menutupnya dengan Tipe-X lalu menulis ulang di atasnya dengan alat Teks. Untuk kebanyakan koreksi, hasilnya sama saja."
+          "a": "Bisa — lewat tombol Edit (masih beta). Ketuk barisnya, ketik penggantinya, dan PDFLokal mencari font yang paling mendekati aslinya. Kalau kamu perlu menyusun ulang satu paragraf penuh (bukan sekadar mengganti kata), itu belum tersedia — cara paling aman untuk itu masih Tipe-X lalu tulis ulang."
         },
         {
           "q": "Jenis hurufnya bisa dipilih?",
