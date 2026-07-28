@@ -1977,6 +1977,24 @@ async function loadFilesInner(files) {
       const docIntent = intentValue(pendingIntent);
       if (isPdf(f)) {
         const importedPages = await importPdf(doc, { name: f.name, bytes });
+        // A protected PDF opens and renders perfectly (PDF.js decrypts) but can
+        // NEVER be written back — pdf-lib has no decryption. Say so HERE, at
+        // import, rather than letting them edit a 444-page document and meet
+        // the failure at Unduh (founder field report, the KBLI table).
+        //
+        // Viewing is left completely alone on purpose: PDF.js renders these
+        // fine, and refusing the file outright would throw away real value for
+        // no reason. We warn about the edge, we don't build a wall.
+        //
+        // We CANNOT offer to remove the protection — no decrypt path exists
+        // anywhere in this stack (pdf-lib: none; pdf-encrypt-lite: RC4 encrypt
+        // only) — so this must never imply one.
+        //
+        // COPY IS PLACEHOLDER — client-facing words are Fauzan's, per the seat.
+        if (doc.sources.at(-1)?.encrypted) {
+          toast('PDF ini terkunci — bisa dibaca, tapi nggak bisa disimpan ulang'); // TODO(copy): his words
+          tel('failure', { stage: 'import', reason: 'encrypted' });
+        }
         // doc_open (spec-telemetry.md §3 — scan-vs-born-digital ratio). The
         // text-layer probe re-opens the PDF independently (probeTextLayer,
         // core/import.js) — NOT awaited: it must never slow down a multi-file

@@ -39,6 +39,9 @@ const VALID_PROPS = {
   insert: { path: 'native', reason: 'clean', style_source: 'pdf-name', glyph_shortfall: 0 },
   block_edit: { editable: true, reason: 'single-line', align: 'left' },
   commit_paint: { duration: 250, pages: '2-5', device: 'phone' },
+  // failure — the rail's export/commit blind spot, closed 2026-07-28 with its
+  // own first case (a protected PDF that views fine and can never be written).
+  failure: { stage: 'export', reason: 'encrypted' },
   // visual_oracle (spec-edit-fidelity-instrumentation.md Increment C):
   // core/visual-oracle.js's compareRegions() ratios, bucketed. ink_ratio
   // added 2026-07-28 (the "Pondok Sapi"/"Cibeber" incident) — a REQUIRED
@@ -98,6 +101,26 @@ test('enum value outside the declared list fails', () => {
 // say "I matched, and I could not clear what you asked me to." Without it the
 // enum could only express a lie ('clean') or a different thing ('no-match'),
 // and a rail that cannot express the finding is how the finding gets lost.
+// `failure` is the rail's oldest blind spot closed. Its enum has to be wider
+// than the case that motivated it, because an enum is hard to widen once
+// dashboards read it — and 'unknown' has to exist or an unclassified failure
+// goes UNCOUNTED, which is the rail going quiet exactly when something new
+// breaks.
+test('failure carries every stage/reason, and refuses invented ones', () => {
+  for (const stage of ['import', 'commit', 'export', 'compress', 'render']) {
+    assert.equal(validateEvent('failure', { stage, reason: 'unknown' }).ok, true, `stage ${stage}`);
+  }
+  for (const reason of ['encrypted', 'corrupt', 'out-of-memory', 'unsupported', 'timeout', 'unknown']) {
+    assert.equal(validateEvent('failure', { stage: 'export', reason }).ok, true, `reason ${reason}`);
+  }
+  // The gate still closes, so this test can fail rather than merely agree.
+  assert.equal(validateEvent('failure', { stage: 'download', reason: 'unknown' }).ok, false);
+  assert.equal(validateEvent('failure', { stage: 'export', reason: 'vibes' }).ok, false);
+  // Content-blind: no free-text escape hatch for an error message, which is the
+  // one field that can quote the user's document back to us.
+  assert.equal(validateEvent('failure', { stage: 'export', reason: 'unknown', message: 'boom' }).ok, false);
+});
+
 test("surgery.reason carries 'residual' — the rail can now see an incomplete cut", () => {
   assert.equal(validateEvent('surgery', { matched: true, reason: 'residual' }).ok, true);
   // Every declared value still validates, so adding one didn't narrow the rest.

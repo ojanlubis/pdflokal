@@ -17,6 +17,39 @@ import { ensurePdfJs } from './vendor.js';
 import { editSignature } from './page-surgery.js';
 
 // bytes → append a Source + its Pages (metadata only) to `doc`. Returns the pages.
+// SINGLE SOURCE OF TRUTH for "this PDF is password/permissions protected".
+//
+// WHY it matters: PDF.js implements the standard security handler and decrypts
+// for viewing, so a protected document opens and renders perfectly. pdf-lib
+// implements NO decryption — `PDFDocument.load` simply throws on it. So the
+// user reads and edits happily and only discovers the problem at Unduh, after
+// the work is done (founder field report: a 444-page government table).
+//
+// ⚠️ THE TEST IS THE VALUE, NOT THE KEY. `info.EncryptFilterName` is PRESENT on
+// every document PDF.js parses — it is `null` on an ordinary file and the
+// handler's name ('Standard') on a protected one. `'EncryptFilterName' in info`
+// would flag every PDF ever opened. Verified against both a plain fixture and
+// the real encrypted file before this shipped.
+//
+// ⚠️ `ignoreEncryption: true` IS NOT A FIX and must never be added to make this
+// "work". It only silences pdf-lib's throw; it does not decrypt. Measured on
+// the real file: the export then succeeds, the output re-loads cleanly and
+// reports 444 pages with encrypted=false — and every content stream is still
+// AES ciphertext ("Unknown compression method in flate stream"). It renders
+// NOTHING. That trades a loud honest failure for a silently corrupt file the
+// user discovers days later somewhere else.
+//
+// Never throws: a metadata read that fails means "we don't know", and not
+// knowing must not block an import that would otherwise work.
+async function detectEncrypted(pdf) {
+  try {
+    const { info } = await pdf.getMetadata();
+    return !!info?.EncryptFilterName;
+  } catch {
+    return false;
+  }
+}
+
 export async function importPdf(doc, { name, bytes }) {
   // WHY the ensure: pdf.js is no longer a <script> tag in index.html — it is
   // fetched on demand (core/vendor.js). This is the first moment it's genuinely
@@ -24,7 +57,9 @@ export async function importPdf(doc, { name, bytes }) {
   const pdfjsLib = await ensurePdfJs();
   // Defensive .slice(): PDF.js may detach the ArrayBuffer it's handed.
   const pdf = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
-  const source = addSource(doc, createSource({ name, bytes, numPages: pdf.numPages }));
+  const source = addSource(doc, createSource({
+    name, bytes, numPages: pdf.numPages, encrypted: await detectEncrypted(pdf),
+  }));
 
   const pages = [];
   for (let n = 1; n <= pdf.numPages; n += 1) {

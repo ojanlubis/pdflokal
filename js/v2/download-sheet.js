@@ -401,7 +401,23 @@ export function createDownloadSheet(deps) {
       modal.close();
     } catch (err) {
       console.error(err);
-      deps.toast('Waduh, gagal membuat file. Coba sekali lagi ya');
+      // WHY this branches: a protected PDF can NEVER be written back — pdf-lib
+      // has no decryption — so "Coba sekali lagi ya" tells the user to retry
+      // the one thing that cannot possibly work, after they may have edited a
+      // 444-page document. The generic message stays for genuinely transient
+      // failures, where retrying IS the right advice.
+      //
+      // The check is the SOURCE's own recorded fact (core/import.js read it
+      // from the document at import), never the thrown error's message — an
+      // error string can quote document content, and the rail is content-blind.
+      const encrypted = (deps.getDoc()?.sources || []).some((s) => s.encrypted);
+      // COPY IS PLACEHOLDER — client-facing words are Fauzan's, per the seat.
+      deps.toast(encrypted
+        ? 'PDF ini terkunci, jadi nggak bisa disimpan ulang' // TODO(copy): his words
+        : 'Waduh, gagal membuat file. Coba sekali lagi ya');
+      // The rail's failure event (spec: schema `failure`). Content-blind: the
+      // stage and a bucketed reason, never the error text or the file name.
+      tel('failure', { stage: 'export', reason: encrypted ? 'encrypted' : 'unknown' });
     } finally {
       state.exporting = false;
       render();

@@ -343,6 +343,29 @@ export const SCHEMA = {
     pages: PAGES_BUCKET,
     device: DEVICE,
   },
+  // failure — the rail's oldest named blind spot, closed 2026-07-28 with its
+  // own first case. Until now an export or commit that FAILED was invisible
+  // here: only Sentry saw it, and only if someone happened to look. The rail
+  // could say the feature was unloved or ugly, never that it was BROKEN — so
+  // "the telemetry catches everything" could not be true, and it is a hard
+  // precondition of the auto-push policy.
+  //
+  // We learned about the first instance (a 444-page AES-encrypted government
+  // table that opens fine and cannot be written back) only because a founder
+  // forwarded the file. With this event we know whether that is one user or a
+  // hundred.
+  //
+  // `stage` names WHERE it died, `reason` WHY — deliberately wider than this
+  // one case, because an enum is hard to widen once dashboards read it.
+  // 'unknown' is mandatory and is the honest default: a failure we could not
+  // classify must still be COUNTED, or the rail goes quiet exactly when
+  // something new breaks. Content-blind like everything else here — no file
+  // names, no document text, no error strings (a thrown message can quote the
+  // document).
+  failure: {
+    stage: ['import', 'commit', 'export', 'compress', 'render'],
+    reason: ['encrypted', 'corrupt', 'out-of-memory', 'unsupported', 'timeout', 'unknown'],
+  },
   // spec-edit-fidelity-instrumentation.md Increment C: the visual oracle —
   // core/visual-oracle.js's compareRegions() on the edited line's own region,
   // pristine (the rebake's PREVIOUS raster) vs stamped (the raster it just

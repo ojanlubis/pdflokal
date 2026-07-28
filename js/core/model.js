@@ -26,8 +26,13 @@ export function nextId(prefix) {
 export function _resetIds() { _seq = 0; }
 
 // A source file — the ONLY place raw bytes live. Pages reference it by id.
-export function createSource({ name, bytes, numPages = 0 }) {
-  return { id: nextId('src'), name, bytes, numPages };
+// `encrypted` — this source carries a PDF standard-security handler. PDF.js
+// decrypts for VIEWING, so these documents open and render perfectly; pdf-lib
+// has no decryption at all, so they can never be written back out. Recorded at
+// import so the app can say so BEFORE the user invests an edit, instead of
+// failing at the download (founder field report, the 444-page KBLI table).
+export function createSource({ name, bytes, numPages = 0, encrypted = false }) {
+  return { id: nextId('src'), name, bytes, numPages, encrypted };
 }
 
 // An annotation — stable id, referenced directly (never by {pageIndex,index}).
