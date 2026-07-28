@@ -41,7 +41,34 @@ function readAppVersion() {
     return 'dev';
   }
 }
-const appVersion = readAppVersion();
+let appVersion = readAppVersion();
+
+// ASK THE SERVER WHICH BUILD THIS IS. `readAppVersion()` above always returns
+// 'dev' in production: nothing stamps the meta tag, because there is no build
+// step. So api/t.js used to overwrite it with the server's deploy SHA AT THE
+// MOMENT THE BATCH ARRIVED — which made one 82-minute session on 2026-07-28
+// carry FOUR versions (four deploys landed while it flushed; nothing reloaded),
+// and made "did the build we just shipped break this?" unanswerable.
+//
+// /api/rev answers it once, here, pinned to THIS page load. Deliberately:
+//   - NOT awaited. The first batch or two may still go out as 'dev'; that is
+//     strictly better than delaying a flush, because a flush that loses its
+//     race with the tab closing loses the events entirely.
+//   - failure is silent and terminal. No retry: offline means the answer would
+//     describe a deploy this page never loaded (see api/rev.js), so 'dev'
+//     falling through to the server's stamp is the HONEST degradation.
+(function askRev() {
+  try {
+    if (typeof fetch !== 'function') return;
+    fetch('/api/rev', { cache: 'no-store', credentials: 'omit' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        const rev = d && typeof d.rev === 'string' ? d.rev : '';
+        if (/^[0-9a-f]{7,40}$/.test(rev)) appVersion = rev;
+      })
+      .catch(() => {});
+  } catch { /* telemetry can never throw into app code */ }
+}());
 
 // WHY localhost-only console.warn: an off-schema call site is a bug in OUR
 // code (a typo'd prop, a stale enum) — dev needs to see it loudly, but a

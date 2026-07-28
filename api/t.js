@@ -88,16 +88,27 @@ export default async function handler(req, res) {
       return;
     }
 
-    // Stamp the SERVER's own deployed commit SHA (Vercel system env) rather
-    // than the client's self-report. WHY: js/v2/telemetry.js reads its version
-    // from a <meta name="pdflokal-rev"> that nothing stamps (there is no build
-    // step to inject it — the moat), so the client ALWAYS sends 'dev'. This
-    // function, however, knows its own deploy SHA. Prefer it; fall back to the
-    // already-validated client value on local/preview where the env var is
-    // absent. (Requires Vercel "Automatically expose System Environment
-    // Variables" — default on.)
+    // ⚠️ THE CLIENT'S OWN ANSWER WINS NOW, AND THAT IS A REVERSAL (2026-07-29).
+    // This used to stamp the SERVER's deploy SHA unconditionally, because the
+    // client could only ever say 'dev'. The cost was invisible until a real
+    // incident: one 82-minute session on 2026-07-28 carried FOUR app_versions.
+    // Nothing had reloaded — four deploys had simply landed while it was
+    // flushing. The field described OUR deploy timeline, not the user's code,
+    // so no failure could be attributed to the build that caused it.
+    //
+    // /api/rev now lets the client name the build it actually loaded, pinned at
+    // page load. If it says a real SHA, believe it: it is closer to the running
+    // code than anything this function can know at arrival time. Fall back to
+    // the server SHA when the client still says 'dev' (first batches, offline,
+    // or an old cached client) — that is the previous behaviour, kept as the
+    // floor rather than the ceiling.
+    //
+    // Yes, a hostile client could post any 40-hex string. It is telemetry, it
+    // is already shape-validated, and it carries no user content; the trade is
+    // worth an answerable attribution question.
     const serverSha = String(process.env.VERCEL_GIT_COMMIT_SHA || '').toLowerCase();
-    const storedVersion = /^[0-9a-f]{7,40}$/.test(serverSha) ? serverSha : appVersion;
+    const clientSha = /^[0-9a-f]{7,40}$/.test(appVersion) ? appVersion : '';
+    const storedVersion = clientSha || (/^[0-9a-f]{7,40}$/.test(serverSha) ? serverSha : appVersion);
 
     // PER-EVENT TIMESTAMPS (2026-07-28). This used to be ONE `new Date()` for the
     // whole batch, so every event in a flush shared a `ts` to the millisecond.
