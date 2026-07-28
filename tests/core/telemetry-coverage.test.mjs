@@ -213,7 +213,16 @@ test('COVERAGE: no failure report hard-codes its reason', () => {
       //                         which is stronger than anything derived from a
       //                         throw. Allowed alone or as the ternary's branch.
       const classified = /failureReason\s*\(/.test(expr);
-      const documentFact = expr === "'encrypted'";
+      // A LITERAL IS ONLY OK WHEN THE CALL SITE DETERMINED IT ITSELF, rather
+      // than failing to classify something it caught. Both entries here are
+      // measurements, not guesses:
+      //   'encrypted'   read off the DOCUMENT at import (core/import.js)
+      //   'unsupported' computed from the TEXT at commit — we know exactly
+      //                 which characters cannot encode, there is no error yet
+      // Anything else must go through failureReason(err). Keep this list tiny;
+      // every addition is a place the rail can start asserting without knowing.
+      const DETERMINED = ["'encrypted'", "'unsupported'"];
+      const documentFact = DETERMINED.includes(expr);
       assert.ok(
         classified || documentFact,
         `hard-coded failure reason in js/${rel.join('/')} → reason: ${expr.slice(0, 60)}\n`

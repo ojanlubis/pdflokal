@@ -22,6 +22,28 @@ import { failureReason } from '../core/failure-reason.js';
 import { durationBucket } from '../core/telemetry-schema.js';
 import { showStamp } from './celebrate.js';
 
+// WHAT TO SAY WHEN IT FAILS, AND WHEN NOT TO SAY "TRY AGAIN".
+// Founder ruling via PM, 2026-07-29: advice that cannot work is worse than no
+// advice, because it converts OUR failure into THEIR wasted effort. On
+// 2026-07-28 one user pressed Unduh 41 times against a document that could
+// never export, because the toast told them to try again every single time.
+// Retry survives only where a retry can genuinely change the outcome.
+// COPY IS PLACEHOLDER - client-facing words are Fauzan's, per the seat.
+// Exported for tests: the rule is "which failures can a retry actually change",
+// and it has to be checkable, not just commented.
+export const RETRYABLE = new Set(['unknown', 'timeout', 'out-of-memory']);
+export function failMessage(reason) {
+  // The retry sentence is gated on the SET, never on a default branch, so a new
+  // reason added to the schema cannot quietly inherit "try again".
+  if (RETRYABLE.has(reason)) return 'Waduh, gagal membuat file. Coba sekali lagi ya'; // TODO(copy)
+  switch (reason) {
+    case 'encrypted': return 'PDF ini terkunci, jadi nggak bisa disimpan ulang'; // TODO(copy)
+    case 'corrupt': return 'File PDF ini rusak, jadi nggak bisa dibuat ulang'; // TODO(copy)
+    case 'unsupported': return 'Ada huruf yang nggak bisa disimpan. Cek teks yang kamu tulis ya'; // TODO(copy)
+    default: return 'Waduh, gagal membuat file'; // TODO(copy) - no retry advice for an unknown-to-us reason
+  }
+}
+
 const COMPRESS_QUALITY = 0.72; // the "Otomatis" preset — one sane default, still
 const COMPRESS_MAXDIM = 1600;  // the right answer when the user has no hard cap.
 
@@ -106,7 +128,9 @@ export function createDownloadSheet(deps) {
       // rescued them — by the time anything asked "why", the why was gone.
       if (seq === state.seq) {
         state.buildError = err;
-        deps.toast('Waduh, gagal menyiapkan PDF. Coba lagi ya'); // TODO(copy): see below
+        // Classify HERE too: this toast fires when the sheet opens, which is
+        // the first moment the user learns anything is wrong.
+        deps.toast(failMessage(failureReason(err)));
       }
     } finally {
       if (seq === state.seq) { state.building = false; render(); }
@@ -432,9 +456,8 @@ export function createDownloadSheet(deps) {
       // error string can quote document content, and the rail is content-blind.
       const encrypted = (deps.getDoc()?.sources || []).some((s) => s.encrypted);
       // COPY IS PLACEHOLDER — client-facing words are Fauzan's, per the seat.
-      deps.toast(encrypted
-        ? 'PDF ini terkunci, jadi nggak bisa disimpan ulang' // TODO(copy): his words
-        : 'Waduh, gagal membuat file. Coba sekali lagi ya');
+      const reason = encrypted ? 'encrypted' : failureReason(err);
+      deps.toast(failMessage(reason));
       // The rail's failure event (spec: schema `failure`). Content-blind: the
       // stage and a bucketed reason, never the error text or the file name.
       //
@@ -446,7 +469,7 @@ export function createDownloadSheet(deps) {
       // The document's OWN recorded fact still wins over anything derived from
       // the throw: core/import.js read `encrypted` off the document at import,
       // which is more reliable than matching a library's wording.
-      tel('failure', { stage: 'export', reason: encrypted ? 'encrypted' : failureReason(err) });
+      tel('failure', { stage: 'export', reason });
     } finally {
       state.exporting = false;
       render();

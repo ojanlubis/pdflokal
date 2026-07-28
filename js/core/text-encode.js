@@ -97,3 +97,55 @@ export function toStandardFontSafe(text) {
   for (const ch of s) out += LOOKALIKES.has(ch) ? LOOKALIKES.get(ch) : ch;
   return out;
 }
+
+// WinAnsi (cp1252) is what pdf-lib's STANDARD fonts can encode. Everything
+// else in that font throws at export — which core/export.js cannot survive,
+// because its annotation loop has no per-annotation guard.
+//
+// The set is DERIVED, not remembered: tests/core/text-encode.test.mjs walks
+// real codepoints through the real vendored pdf-lib and asserts this predicate
+// agrees with it exactly. A remembered table would drift silently and start
+// either crying wolf or missing the crash.
+const WINANSI_SPECIALS = new Set([
+  0x20ac, 0x201a, 0x0192, 0x201e, 0x2026, 0x2020, 0x2021, 0x02c6, 0x2030,
+  0x0160, 0x2039, 0x0152, 0x017d, 0x2018, 0x2019, 0x201c, 0x201d, 0x2022,
+  0x2013, 0x2014, 0x02dc, 0x2122, 0x0161, 0x203a, 0x0153, 0x017e, 0x0178,
+]);
+
+function encodableInStandardFont(cp) {
+  if (cp >= 0x20 && cp <= 0x7e) return true;   // ASCII
+  if (cp >= 0xa0 && cp <= 0xff) return true;   // Latin-1 supplement
+  if (cp === 0x0a || cp === 0x0d) return true; // newlines: the caller splits on them
+  return WINANSI_SPECIALS.has(cp);
+}
+
+// The pdf-lib standard families. The clone/custom families embed real font
+// files and do NOT throw on an unknown glyph, so they are deliberately not
+// warned about here (they paint .notdef, which is a different, quieter defect
+// and needs font introspection to detect honestly).
+const STANDARD_FAMILIES = new Set(['Helvetica', 'Times-Roman', 'Courier']);
+
+export function isStandardFamily(fontFamily) {
+  return STANDARD_FAMILIES.has(fontFamily || 'Helvetica');
+}
+
+/**
+ * Characters in `text` that a STANDARD font cannot paint, after the lookalike
+ * rescue above has done what it can. Returns a de-duplicated array, in the
+ * order they appear, so a warning can show the user what to look for.
+ *
+ * Emoji and CJK land here. They are NOT dropped: deleting something the user
+ * can see is worse than telling them about it (founder ruling via PM,
+ * 2026-07-29 — warn at commit, keep the export decline as the backstop).
+ */
+export function unencodableInStandardFont(text) {
+  const out = [];
+  const seen = new Set();
+  for (const ch of toStandardFontSafe(text)) {
+    const cp = ch.codePointAt(0);
+    if (encodableInStandardFont(cp) || seen.has(ch)) continue;
+    seen.add(ch);
+    out.push(ch);
+  }
+  return out;
+}

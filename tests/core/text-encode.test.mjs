@@ -17,7 +17,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { toStandardFontSafe } from '../../js/core/text-encode.js';
+import { toStandardFontSafe, unencodableInStandardFont, isStandardFamily } from '../../js/core/text-encode.js';
 import { failureReason } from '../../js/core/failure-reason.js';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -129,4 +129,46 @@ test('5. THE KNOWN LIMIT: an emoji still fails — but now it SAYS so', async ()
   assert.equal(r.name, 'Error', 'pdf-lib still gives us no usable error name');
   assert.equal(failureReason(r), 'unsupported');
   assert.notEqual(failureReason(r), 'unknown');
+});
+
+test('6. THE PREDICATE IS DERIVED, NOT REMEMBERED: it agrees with real pdf-lib', async () => {
+  // unencodableInStandardFont() decides whether to WARN the user at commit.
+  // If it drifts from what pdf-lib actually accepts it either cries wolf or
+  // misses the crash, and both are invisible without this check. So walk real
+  // codepoints through the real library and demand exact agreement.
+  const ranges = [[0x20, 0x7f], [0xa0, 0x180], [0x2000, 0x2070], [0x20a0, 0x20d0], [0x4e00, 0x4e10]];
+  const disagreements = [];
+  let checked = 0;
+  for (const [lo, hi] of ranges) {
+    for (let cp = lo; cp < hi; cp++) {
+      const ch = String.fromCodePoint(cp);
+      // Ask the library. Sanitise first: that is what export.js actually draws.
+      const drawn = await draws(toStandardFontSafe(ch));
+      const wePredict = unencodableInStandardFont(ch).length > 0;
+      const libRejects = !drawn.ok;
+      checked++;
+      if (wePredict !== libRejects) disagreements.push(`U+${cp.toString(16)} we=${wePredict} lib=${libRejects}`);
+    }
+  }
+  assert.ok(checked > 400, `only ${checked} codepoints checked — the sweep is too small to mean anything`);
+  assert.deepEqual(disagreements.slice(0, 12), [], `predicate disagrees with pdf-lib on ${disagreements.length}/${checked}`);
+});
+
+test('7. the standard-family list matches the families that actually throw', () => {
+  // Only pdf-lib's built-ins encode through WinAnsi. The embedded clones paint
+  // .notdef instead of throwing, so warning about them would be manufactured
+  // alarm about a different defect.
+  for (const f of ['Helvetica', 'Times-Roman', 'Courier']) assert.equal(isStandardFamily(f), true, f);
+  for (const f of ['Montserrat', 'Carlito', 'Arimo', 'Tinos', 'Cousine', 'Caladea']) {
+    assert.equal(isStandardFamily(f), false, f);
+  }
+  assert.equal(isStandardFamily(undefined), true, 'no family means the Helvetica default');
+});
+
+test('8. emoji and CJK are REPORTED, never silently removed', async () => {
+  // The ruling: warn at commit, never drop. Dropping deletes something the
+  // user can see; the sanitiser must not have quietly eaten it.
+  const txt = 'oke \u{1F44D} 中';
+  assert.deepEqual(unencodableInStandardFont(txt), ['\u{1F44D}', '中']);
+  assert.equal(toStandardFontSafe(txt), txt, 'sanitiser must leave visible characters alone');
 });

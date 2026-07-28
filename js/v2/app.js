@@ -18,6 +18,7 @@
 
 import { createDoc, createAnnotation, getPage, getSource } from '../core/model.js';
 import { failureReason } from '../core/failure-reason.js';
+import { isStandardFamily, unencodableInStandardFont } from '../core/text-encode.js';
 import {
   addAnnotation, removeAnnotation, updateAnnotation, clearSelection, selectAnnotation,
   moveAnnotation,
@@ -1677,6 +1678,32 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
       // out (taste-judge finding, night run 2026-07-19). A later deliberate
       // tap still selects it like any text object — one grammar, kept.
       if (!draft) selectAnnotation(doc, created.id);
+      // TELL THEM NOW, WHILE THE CURSOR IS STILL THERE. A standard font encodes
+      // through WinAnsi; an emoji or a CJK character in one makes pdf-lib throw
+      // at export, and core/export.js has no per-annotation guard, so the whole
+      // document fails to save. Discovering that at Unduh means discovering it
+      // after all the work is done (2026-07-28: 41 attempts, 82 minutes, zero
+      // exports). Here it costs one keystroke to fix.
+      //
+      // WARN, never DROP (founder ruling via PM, 2026-07-29): deleting a
+      // character the user can SEE is worse than telling them about it. The
+      // export decline stays as the backstop. Same shape as the encrypted-PDF
+      // warning at import.
+      // AUTHORED TEXT ONLY. A Ganti Teks replace has already run a real
+      // coverage check against the document's own font a few lines up, and
+      // says something more precise ("font pengganti yang mirip"). Warning
+      // here too would overwrite that with a blunter message, and would be a
+      // FALSE ALARM whenever the clone font can paint the glyph (Arimo has
+      // Cyrillic; the export would have been fine). Caught by
+      // tests/font-coverage.spec.js, which is exactly what it is there for.
+      if (!d.replaceCoverId && isStandardFamily(d.fontFamily)) {
+        const bad = unencodableInStandardFont(text);
+        if (bad.length) {
+          // COPY IS PLACEHOLDER - client-facing words are Fauzan's, per the seat.
+          toast(`Huruf ${bad.slice(0, 3).join(' ')} nggak bisa disimpan pakai font ini`); // TODO(copy): his words
+          tel('failure', { stage: 'commit', reason: 'unsupported' });
+        }
+      }
       track('editor_action', { action: 'text' });
       tel('tool_use', { tool: 'teks', action: 'text' });
       touchedEdit = !!d.replaceCoverId;
