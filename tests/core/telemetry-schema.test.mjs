@@ -94,6 +94,21 @@ test('enum value outside the declared list fails', () => {
   assert.equal(validateEvent('export', { ...VALID_PROPS.export, fallback: 'server' }).ok, false);
 });
 
+// surgery.reason gained 'residual' on 2026-07-28 — the value that lets the cut
+// say "I matched, and I could not clear what you asked me to." Without it the
+// enum could only express a lie ('clean') or a different thing ('no-match'),
+// and a rail that cannot express the finding is how the finding gets lost.
+test("surgery.reason carries 'residual' — the rail can now see an incomplete cut", () => {
+  assert.equal(validateEvent('surgery', { matched: true, reason: 'residual' }).ok, true);
+  // Every declared value still validates, so adding one didn't narrow the rest.
+  for (const reason of ['clean', 'residual', 'no-match', 'untrustworthy-run']) {
+    assert.equal(validateEvent('surgery', { matched: true, reason }).ok, true, `${reason} should validate`);
+  }
+  // And the gate still closes: an invented reason is refused, so this test is
+  // capable of failing rather than just agreeing with whatever the code emits.
+  assert.equal(validateEvent('surgery', { matched: true, reason: 'probably-fine' }).ok, false);
+});
+
 // ---- the "what did they come to do?" additions (intent + export choices) ------
 
 test('doc_open.intent accepts every declared job and rejects an off-list value', () => {

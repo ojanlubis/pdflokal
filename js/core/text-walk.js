@@ -248,9 +248,22 @@ export function planRunRemoval(src, fonts, targets) {
 
   // First matching target wins per record — only exact (trustworthy) records
   // are eligible; a record inside an untrustworthy run can't be matched at all.
+  //
+  // WHY we also track POSITIONAL-ONLY hits (`insideByTarget`): a record can
+  // pass both geometry tests and fail only `sizeOk`, and the old code dropped
+  // that fact on the floor. That is exactly the day-1 production defect
+  // (founder field report 2026-07-28): a form row's label/value op sat inside
+  // a blended target whose `size` came from the dash leader, failed sizeOk,
+  // was never cut — and `results[ti].matched` still went true off the leader,
+  // which page-surgery.js reported as `reason:'clean'`. The planner KNEW it had
+  // declined painted content inside the span it was told to clear. Keeping that
+  // knowledge is the difference between an instrument and a decoration.
   const matchesByTarget = targets.map(() => []);
+  const insideByTarget = targets.map(() => []);
+  const claimed = new Set(); // records some target actually matched
   for (const rec of records) {
     if (!rec.exact) continue;
+    let claimedBy = -1;
     for (let ti = 0; ti < targets.length; ti += 1) {
       const t = targets[ti];
       const vx = rec.x - t.x0;
@@ -258,13 +271,30 @@ export function planRunRemoval(src, fonts, targets) {
       const along = vx * t.ux + vy * t.uy;
       const perp = Math.abs(vx * t.uy - vy * t.ux);
       const alongOk = along >= -0.35 * t.size && along <= t.len - Math.min(1, t.size * 0.1);
+      if (perp > 0.4 * t.size || !alongOk) continue; // not inside this target at all
+      insideByTarget[ti].push(rec);
       const sizeOk = rec.size >= 0.55 * t.size && rec.size <= 1.8 * t.size;
-      if (perp <= 0.4 * t.size && alongOk && sizeOk) {
+      // First matching target still wins — behaviour is unchanged. We keep
+      // scanning only to finish collecting positional hits for the OTHER
+      // targets, never to re-assign a match.
+      if (sizeOk && claimedBy === -1) {
+        claimedBy = ti;
         matchesByTarget[ti].push(rec);
-        break;
       }
     }
+    if (claimedBy !== -1) claimed.add(rec);
   }
+
+  // Residual = painted content sitting inside this target that NO target
+  // claimed. Computed only after every record is assigned, because a record
+  // this target rejected on size may legitimately belong to the next one (the
+  // per-run target shape from 39e0b9f depends on exactly that).
+  //
+  // KNOWN LIMIT, stated rather than implied: this cannot see a survivor that
+  // lies OUTSIDE the target's own span. Counting those would fire on every
+  // ordinary line, since the next line's ops are always "somewhere else on the
+  // page" — so the honest scope is "inside what you asked me to clear".
+  const residualByTarget = insideByTarget.map((recs) => recs.filter((r) => !claimed.has(r)).length);
 
   // DECLINE rule: any target whose matches include a record from a text
   // object (btIndex) that ALSO contains an exact:false record can't be
@@ -273,7 +303,7 @@ export function planRunRemoval(src, fonts, targets) {
   const badBts = new Set();
   for (const rec of records) if (!rec.exact) badBts.add(rec.btIndex);
 
-  const results = targets.map(() => ({ matched: false, ops: 0 }));
+  const results = targets.map((_, ti) => ({ matched: false, ops: 0, residual: residualByTarget[ti] }));
   const cuts = [];
   for (let ti = 0; ti < targets.length; ti += 1) {
     const matches = matchesByTarget[ti];
@@ -289,6 +319,7 @@ export function planRunRemoval(src, fonts, targets) {
     results[ti] = {
       matched: true,
       ops: matches.length,
+      residual: residualByTarget[ti],
       insert: {
         fontName: first.fontName, fontSize: first.fontSize,
         x: first.x, y: first.y, ux: first.ux, uy: first.uy, size: first.size,

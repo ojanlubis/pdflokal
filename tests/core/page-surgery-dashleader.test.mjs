@@ -231,15 +231,21 @@ test('REGRESSION (was failing): Ganti Teks on a dash-leader form row must not le
   assert.ok(outContent.includes('19 Juli 2026'));
 });
 
-test('DOCUMENTS THE DEFECT: the old single-blended-target construction still reports a false clean match', async () => {
-  // core/text-walk.js/core/redact.js were NOT changed by this fix — the fix
-  // is entirely in WHAT GEOMETRY js/v2/app.js hands them (per-run targets,
-  // see the REGRESSION test above). This test proves that claim: replayed
-  // with the OLD single-blended-target shape, the exact same input still
-  // reproduces the exact same defect (matched:true/clean, original text
-  // survives) it always did. It's a permanent tripwire — if anyone ever
-  // wires app.js back to `replaceTargets: [line.pdf]`, this failure mode is
-  // still live and waiting.
+test('TRIPWIRE: the old single-blended-target construction still leaves the original — and now SAYS SO', async () => {
+  // Replayed with the OLD single-blended-target shape, the same input still
+  // fails to remove the original text. That half is unchanged and is pinned
+  // below: if anyone re-wires app.js back to `replaceTargets: [line.pdf]`,
+  // this failure mode is still live and waiting.
+  //
+  // WHAT CHANGED 2026-07-28: this test used to assert `reason: 'clean'` and
+  // its own name called that "a false clean match". It was documenting that
+  // our instrument lied. The seat's requirement was that surgery must stop
+  // reporting clean when it removed nothing, so the CODE changed and this
+  // assertion was re-pinned to the honest value rather than weakened — the
+  // tripwire got stronger, not looser. It now pins BOTH halves: the cut is
+  // still incomplete (the defect), and the outcome now admits it (the fix).
+  // A test asserting an instrument's known lie is a test that will one day be
+  // read as permission.
   const PDFLib = loadUmd('js/vendor/pdf-lib.min.js');
   const fontkit = loadUmd('js/vendor/fontkit.umd.min.js');
 
@@ -254,10 +260,13 @@ test('DOCUMENTS THE DEFECT: the old single-blended-target construction still rep
 
   const outPdfDoc = await PDFLib.PDFDocument.load(result.bytes);
   const outContent = readPageContents(outPdfDoc.getPages()[0], PDFLib);
-  // Documents the defect verbatim: 'clean' was reported...
-  assert.deepEqual(result.outcomes[0].surgery, { matched: true, reason: 'clean' });
-  // ...yet the original text is still right there in the export. This is the
-  // bug, pinned so nobody re-wires app.js back to the single-target shape
-  // without this test screaming about it.
-  assert.ok(outContent.includes('Pondok Sapi'), 'documents the pre-fix defect: original text survives despite a clean report');
+  // The original text IS still right there in the export — the blended target
+  // matched the dash leader and left the label/value op standing.
+  assert.ok(outContent.includes('Pondok Sapi'), 'the blended-target shape still fails to remove the original');
+  // ...and the instrument now reports that honestly. `matched` stays true (a
+  // match genuinely was found), but the reason is no longer the confident lie:
+  // 'residual' means "painted content we declined is still inside the span we
+  // were asked to clear." If this ever reads 'clean' again, the rail has gone
+  // back to guaranteeing something it never checked.
+  assert.deepEqual(result.outcomes[0].surgery, { matched: true, reason: 'residual' });
 });

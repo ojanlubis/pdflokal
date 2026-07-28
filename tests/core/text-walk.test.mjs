@@ -190,3 +190,86 @@ test('planRunRemoval reports the removed text\'s paint info for re-insert (Rung 
   assert.equal(results[0].insert.size, 12);
   assert.equal(results[0].insert.mixedFonts, false);
 });
+
+// ---------------------------------------------------------------------------
+// RESIDUAL — the honesty signal. Founder field report 2026-07-28 (the dash-
+// leader form row): a target can MATCH one op and silently leave another op,
+// sitting inside the very span it was asked to clear, completely untouched.
+// The planner already knows this happened — the rejected record passed both
+// POSITIONAL tests and failed only `sizeOk` — and used to throw that knowledge
+// away, so page-surgery.js reported `reason:'clean'` for a cut that removed
+// half a line. `residual` is that discarded knowledge, kept.
+//
+// This is the miniature of the production defect: two ops on ONE baseline at
+// materially different point sizes, and a single blended target whose `size`
+// came from the larger (dominant) one.
+// ---------------------------------------------------------------------------
+
+test('residual: a target that matches one op and leaves another INSIDE its own span reports it', () => {
+  const fonts = fontsWith({ F1: new Map([[65, 500], [66, 500], [67, 500], [68, 500]]) });
+  //  (AB) painted at 5pt from x=72  ->  advance 5, ends at x=77
+  //  (CD) painted at 12pt from x=77 ->  advance 12, ends at x=89
+  const src = 'BT /F1 5 Tf 72 700 Td (AB) Tj 5 0 Td /F1 12 Tf (CD) Tj ET';
+  // ONE blended target spanning the whole line, taking its size from the
+  // dominant run — exactly what text-lines.js's assembleLine produces and what
+  // js/v2/app.js used to hand over before 39e0b9f.
+  const blended = { x0: 72, y0: 700, ux: 1, uy: 0, len: 17, size: 12 };
+
+  const { results, content } = planRunRemoval(src, fonts, [blended]);
+
+  // It really did match — this is not a no-match case, which is precisely why
+  // it was able to lie.
+  assert.equal(results[0].matched, true);
+  assert.equal(results[0].ops, 1);
+
+  // The 5pt run is still painted: sizeOk ([0.55, 1.8] x 12 = [6.6, 21.6])
+  // rejected it, though it sits on the same baseline inside the target's span.
+  const survivors = walkShowOps(content, fonts).filter((r) => r.tokens.some((t) => t.t === 'str'));
+  assert.equal(survivors.length, 1);
+  assert.equal(survivors[0].tokens.find((t) => t.t === 'str').v, 'AB');
+
+  // THE ASSERTION THAT MAKES THE INSTRUMENT HONEST: one painted run remains
+  // inside the span we were told to clear, and the result says so.
+  assert.equal(results[0].residual, 1);
+});
+
+test('residual: the ordinary single-run cut reports 0 — no false alarm', () => {
+  const fonts = fontsWith({ F1: new Map([[65, 500], [66, 500]]) });
+  const src = 'BT /F1 12 Tf 72 700 Td (AB) Tj ET';
+  const { results } = planRunRemoval(src, fonts, [
+    { x0: 72, y0: 700, ux: 1, uy: 0, len: 12, size: 12 },
+  ]);
+  assert.equal(results[0].matched, true);
+  assert.equal(results[0].residual, 0);
+});
+
+test('residual: an adjacent run OUTSIDE the target span is not counted (test 12 must not start crying wolf)', () => {
+  const fonts = fontsWith({ F1: new Map([[65, 500], [66, 500]]) });
+  const src = 'BT /F1 12 Tf 0 0 Td (A) Tj (B) Tj ET';
+  const before = walkShowOps(src, fonts);
+  const first = before[0];
+  const target = { x0: first.x, y0: first.y, ux: first.ux, uy: first.uy, len: first.advanceText, size: first.size };
+  const { results } = planRunRemoval(src, fonts, [target]);
+  assert.equal(results[0].matched, true);
+  // B survives, but it lies BEYOND the target's own length — it was never part
+  // of what we claimed to clear, so counting it would be a false positive and
+  // would make `residual` useless by firing on every ordinary line.
+  assert.equal(results[0].residual, 0);
+});
+
+test('residual: per-run targets (the 39e0b9f shape) clear the whole line and report 0', () => {
+  const fonts = fontsWith({ F1: new Map([[65, 500], [66, 500], [67, 500], [68, 500]]) });
+  const src = 'BT /F1 5 Tf 72 700 Td (AB) Tj 5 0 Td /F1 12 Tf (CD) Tj ET';
+  // One target PER constituent run — each keeps its OWN size, so each op is
+  // matched by its own target and nothing is left behind.
+  const { results, content } = planRunRemoval(src, fonts, [
+    { x0: 72, y0: 700, ux: 1, uy: 0, len: 5, size: 5 },
+    { x0: 77, y0: 700, ux: 1, uy: 0, len: 12, size: 12 },
+  ]);
+  assert.equal(results[0].matched, true);
+  assert.equal(results[1].matched, true);
+  assert.equal(results[0].residual, 0);
+  assert.equal(results[1].residual, 0);
+  const survivors = walkShowOps(content, fonts).filter((r) => r.tokens.some((t) => t.t === 'str'));
+  assert.equal(survivors.length, 0);
+});

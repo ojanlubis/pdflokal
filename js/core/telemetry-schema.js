@@ -280,9 +280,16 @@ export const SCHEMA = {
   // candidate at all ('no-match'), or sits in a text object the walk marked
   // untrustworthy and declined out of caution ('untrustworthy-run' — the
   // literal word the code uses at the decline site).
+  // 'residual' (added 2026-07-28) is the honest middle the enum was missing:
+  // every target matched AND painted content we declined is still standing
+  // inside a span we were asked to clear. It is deliberately NOT folded into
+  // 'untrustworthy-run' — that names a different decline (badBts), and burying
+  // a new signal inside an existing bucket is exactly how weight_ratio 1.28999
+  // got quantized into 'near-parity' the same morning. A bucket that can't
+  // express the finding is how the finding gets lost.
   surgery: {
     matched: 'bool',
-    reason: ['clean', 'no-match', 'untrustworthy-run'],
+    reason: ['clean', 'residual', 'no-match', 'untrustworthy-run'],
   },
   // path/reason describe the Rung C STAMP step (core/stamp.js, rebuilt
   // 2026-07-22 per spec-edit-rebuild-composite.md — Path B, founder-ruled):

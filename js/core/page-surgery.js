@@ -80,10 +80,29 @@ export function runSurgery(pdfPage, PDFLib, annotations) {
   // Per-candidate surgery outcome for telemetry (spec-telemetry.md §3), kept
   // beside the working sets so the app layer can fire the `surgery` event
   // without re-deriving what runSurgery already decided. coverId -> {matched,
-  // reason}. reason is 'clean' when every fragment cut, else 'no-match': the
-  // code only knows matched:boolean per target (planRunRemoval), so the
-  // schema's finer 'untrustworthy-run' isn't distinguishable here — exactly
-  // the best-effort the schema author flagged for surgery.reason.
+  // reason}:
+  //   'no-match' — nothing cut for at least one of the cover's targets
+  //   'residual' — everything matched, AND painted content we declined still
+  //                sits inside a span we were asked to clear. We cut, but we
+  //                CANNOT claim the target is clear.
+  //   'clean'    — everything matched and nothing was left inside.
+  //
+  // WHY 'residual' exists (founder field report 2026-07-28): before it, the
+  // only outcomes were 'clean' and 'no-match', so a cut that removed a dash
+  // leader and left the actual text standing reported `matched:true,
+  // reason:'clean'` — a confident wrong value, the shape this project has been
+  // fighting all week (CC memory `plausible-answer-from-unchecked-data`), in
+  // the one instrument meant to catch it. `matched:true` only ever meant "a
+  // match was found", never "the target's content is gone"; 'residual' is how
+  // the difference finally reaches the rail.
+  //
+  // NOTE this is the TELEMETRY half only. A residual cover is still skipped
+  // below (matched === true), so output is byte-identical to before this
+  // change — whether a residual cut should KEEP its cover is a visible-pixels
+  // decision and is the founder's, not this module's.
+  //
+  // The schema's 'untrustworthy-run' remains unreachable from here: that names
+  // planRunRemoval's badBts decline, which surfaces as matched:false.
   const surgeryByCover = new Map();
   const candidates = annotations.filter(
     (a) => a.type === 'whiteout' && a.replaceTargets?.length && a.replaceBox && overlapsBirthBox(a),
@@ -106,7 +125,15 @@ export function runSurgery(pdfPage, PDFLib, annotations) {
       // hide the now-broken remainder. Never leave a half-removed line
       // uncovered.
       const matched = slice.length > 0 && slice.every((r) => r.matched);
-      surgeryByCover.set(a.id, { matched, reason: matched ? 'clean' : 'no-match' });
+      // Summed across the cover's targets, not any-of: two targets each leaving
+      // one run behind is worse than one, and the count is the only thing that
+      // can later tell "a stray footnote marker" from "half the line survived".
+      const residual = slice.reduce((n, r) => n + (r.residual || 0), 0);
+      let reason;
+      if (!matched) reason = 'no-match';
+      else if (residual > 0) reason = 'residual';
+      else reason = 'clean';
+      surgeryByCover.set(a.id, { matched, reason });
       if (matched) {
         skipCovers.add(a.id);
         // The line always STARTS at its first target — the honest entry
