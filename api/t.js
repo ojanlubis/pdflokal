@@ -119,8 +119,33 @@ export default async function handler(req, res) {
     // can be frozen the instant a response is sent, so an un-awaited insert
     // could silently never land. The extra Supabase round-trip (tens of ms)
     // is invisible to the browser — sendBeacon doesn't wait on this response.
+    // WHY THE RESPONSE IS CHECKED (2026-07-28 — telemetry suite class C):
+    // this used to be `await fetch(...)` with the result DISCARDED. `fetch`
+    // rejects only on a NETWORK failure, so a Supabase error RESPONSE — 401
+    // (bad key), 400 (schema/column mismatch), 409, 5xx, quota — resolved
+    // normally, fell straight through, and we 204'd. The single most likely
+    // failure mode was not merely unreported: it could not even reach the
+    // catch below.
+    //
+    // That is the Jul 7-11 blackout's shape (~97% of analytics lost for five
+    // days, every layer green). And it undermines our own instruments: the
+    // seat's wild-liveness check reads what is IN the table, so if writes can
+    // fail silently, a zero means "never emitted" OR "emitted and rejected"
+    // and NOTHING can tell them apart. Every liveness result and alarm
+    // threshold rests on arrival ≈ emission; this is what makes that
+    // assumption checkable.
+    //
+    // The 204 to the CLIENT is unchanged and must stay unchanged — telemetry
+    // may never break or delay the editor. What changed is that we are no
+    // longer blind to ourselves.
+    //
+    // CONTENT-BLIND, deliberately: status code, row count, and the error's
+    // NAME only. Never `err.message` and never the response body — a thrown
+    // message or a PostgREST error can quote row content back into the log,
+    // and a log is a place content must not reach either (same reasoning that
+    // kept the export-failure branch off `err.message`).
     try {
-      await fetch(`${url}/rest/v1/events`, {
+      const r = await fetch(`${url}/rest/v1/events`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -130,9 +155,11 @@ export default async function handler(req, res) {
         },
         body: JSON.stringify(rows),
       });
-    } catch {
-      // Insert failed (network, Supabase down, etc.) — still a fast 204;
-      // the client never learns telemetry failed (spec: never block/delay UX).
+      if (!r?.ok) {
+        console.error(`[telemetry] insert REJECTED status=${r?.status ?? 'none'} rows_dropped=${rows.length}`);
+      }
+    } catch (err) {
+      console.error(`[telemetry] insert FAILED error=${err?.name ?? 'Error'} rows_dropped=${rows.length}`);
     }
 
     res.status(204).end();

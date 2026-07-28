@@ -62,11 +62,14 @@ const VALID = {
 // Drive the handler with fetch stubbed, and report what the insert saw.
 async function run(payload, { fetchImpl } = {}) {
   const realFetch = globalThis.fetch;
+  const realErr = console.error;
   const calls = [];
+  const logged = [];
   globalThis.fetch = async (url, opts) => {
     calls.push({ url: String(url), body: opts?.body ? JSON.parse(opts.body) : null });
     return fetchImpl ? fetchImpl() : { ok: true, status: 201 };
   };
+  console.error = (...a) => { logged.push(a.join(' ')); };
   const saved = {};
   for (const [k, v] of Object.entries(ENV)) { saved[k] = process.env[k]; process.env[k] = v; }
   const res = mkRes();
@@ -74,9 +77,10 @@ async function run(payload, { fetchImpl } = {}) {
     await handler(mkReq(payload), res);
   } finally {
     globalThis.fetch = realFetch;
+    console.error = realErr;
     for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
   }
-  return { res, calls };
+  return { res, calls, logged };
 }
 
 test('CLIENT CONTRACT: 204 for everything a browser can send — telemetry never breaks the editor', async () => {
@@ -147,11 +151,53 @@ test('DELIVERY: a mixed batch inserts only the valid events (one bad event never
 // Marked `todo` so the gate stays a trustworthy signal while the gap stays
 // executable and visible. Flip it to a real test the day the seat rules the fix.
 // ---------------------------------------------------------------------------
-test('GAP: a rejected insert is detected (Supabase 401/400 is currently invisible)', { todo: 'exposed 2026-07-28, awaiting seat ruling — api/t.js discards the insert response' }, async () => {
-  const { calls } = await run(VALID, { fetchImpl: () => ({ ok: false, status: 401, text: async () => 'invalid api key' }) });
+test('a REJECTED insert is reported (Supabase 401/400 must not be silently lost)', async () => {
+  const { res, calls, logged } = await run(VALID, {
+    fetchImpl: () => ({ ok: false, status: 401, text: async () => 'invalid api key' }),
+  });
   assert.equal(calls.length, 1, 'the insert was attempted');
-  // There is no observable signal anywhere that this write failed. When the fix
-  // lands, assert it here — a console.error the Vercel logs capture, a Sentry
-  // breadcrumb, or a counter. The 204 to the client must NOT change.
-  assert.fail('api/t.js discards the insert response — a 401/400 from Supabase is silently lost');
+  const line = logged.find((l) => l.includes('[telemetry]'));
+  assert.ok(line, 'a rejected insert produced NO observable signal — this is the blackout shape');
+  assert.match(line, /REJECTED/);
+  assert.match(line, /status=401/);
+  assert.match(line, /rows_dropped=1/, 'the log must say HOW MUCH was lost, or it cannot size the damage');
+  // The client contract is untouched: telemetry never breaks the editor.
+  assert.equal(res.code, 204);
+});
+
+test('a NETWORK failure is reported too — the catch was silent before', async () => {
+  const boom = new TypeError('fetch failed: getaddrinfo ENOTFOUND supabase');
+  const { res, logged } = await run(VALID, { fetchImpl: () => { throw boom; } });
+  const line = logged.find((l) => l.includes('[telemetry]'));
+  assert.ok(line, 'a network failure produced no observable signal');
+  assert.match(line, /FAILED/);
+  assert.match(line, /error=TypeError/);
+  assert.equal(res.code, 204);
+});
+
+// The log is a place user content must not reach either — the same reasoning
+// that kept the export-failure branch off `err.message`. A thrown message or a
+// PostgREST error body can quote row content straight into a log line.
+test('the failure log is CONTENT-BLIND: no error message, no response body, no rows', async () => {
+  const leaky = new TypeError('parse failed near "Budi Santoso Wijaya" in stream 42');
+  const { logged } = await run(VALID, { fetchImpl: () => { throw leaky; } });
+  const all = logged.join('\n');
+  assert.ok(all.includes('[telemetry]'), 'expected a telemetry log line');
+  assert.equal(all.includes('Budi Santoso Wijaya'), false, 'the error MESSAGE reached the log');
+  assert.equal(all.includes('stream 42'), false, 'the error message reached the log');
+  // And the rows themselves never appear.
+  assert.equal(all.includes('doc_open'), false, 'row content reached the log');
+});
+
+// NOTE this one guards a DIFFERENT axis from the three above, and deliberately
+// agrees with both the fixed and the unfixed code — verified: reverting the fix
+// turns the three above red and leaves this green. That is correct, not a hole:
+// it exists to stop the signal becoming chatty (a log that always fires is one
+// nobody reads), which is the opposite failure from being silent. Do not read
+// it as coverage of the response check.
+test('a SUCCESSFUL insert stays quiet — the signal only fires on real trouble', async () => {
+  const { res, logged } = await run(VALID, { fetchImpl: () => ({ ok: true, status: 201 }) });
+  assert.deepEqual(logged.filter((l) => l.includes('[telemetry]')), [],
+    'a healthy insert must not log — a signal that always fires is one nobody reads');
+  assert.equal(res.code, 204);
 });

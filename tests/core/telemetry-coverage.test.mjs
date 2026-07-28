@@ -97,10 +97,42 @@ test('PARITY: the scan is finding things — this assertion cannot pass vacuousl
 //
 // `todo` so the gate stays a trustworthy signal while the gap stays executable.
 // ---------------------------------------------------------------------------
-test('GAP: every user-facing failure also reaches the first-party rail', { todo: 'exposed 2026-07-28, awaiting seat ruling — file_failed + client_error are GA4-only' }, () => {
-  const railBlind = ['file_failed', 'client_error'].filter((e) => names('track').has(e));
-  assert.deepEqual(
-    railBlind, [],
-    `these failures are reported to GA4 only and are invisible to the first-party rail: ${railBlind.join(', ')}`,
+// CLOSED for file_failed (2026-07-28): js/v2/app.js now emits
+// tel('failure', {stage:'import', reason}) beside the GA4 call, classifying the
+// reason from the error's NAME only — a name is a fixed identifier, a message
+// can quote the document back to us.
+//
+// STILL OPEN for client_error, and deliberately NOT forced: a global uncaught
+// error is not an import, commit, export, compress or render, and jamming it
+// into one of those to make this test green would put a wrong value on the rail
+// to satisfy a test. It needs a schema decision (a new stage, or its own
+// event). Tracked with the seat, not papered over here.
+test('COVERAGE: file-open failures reach the first-party rail, not just GA4', () => {
+  const emitted = names('tel');
+  assert.ok(emitted.has('failure'), 'the failure event is not emitted anywhere');
+  // The import stage specifically — the file-open path.
+  const app = fs.readFileSync(path.join(JS, 'v2', 'app.js'), 'utf8');
+  assert.match(
+    strip(app), /tel\('failure',\s*\{\s*stage:\s*'import'/,
+    'js/v2/app.js no longer reports a failed file open to the first-party rail',
+  );
+});
+
+// Position-independent on purpose. The first draft of this test sliced a window
+// before `indexOf("tel('failure', { stage: 'import'")` — and there are TWO such
+// call sites in app.js (the protected-PDF warning and the file-open failure),
+// so it measured the wrong one and failed for a reason that had nothing to do
+// with the code. A whole-file claim cannot pick the wrong occurrence.
+test('COVERAGE: failure reasons are classified from err.name — err.message is used NOWHERE', () => {
+  const app = strip(fs.readFileSync(path.join(JS, 'v2', 'app.js'), 'utf8'));
+  assert.match(app, /err\?\.name/, 'expected a failure reason derived from the error NAME');
+  // The strong claim: a thrown message can quote the user's document (a PDF
+  // parse error can carry stream content), so it must not reach a telemetry
+  // prop, a toast, or a log. Asserting its total absence is checkable in a way
+  // that "we were careful at the call site" is not.
+  assert.equal(
+    /err\?\.message|err\.message/.test(app), false,
+    'err.message appeared in js/v2/app.js — a thrown message can quote the document back to us. '
+    + 'Branch on err.name or a value the app recorded itself.',
   );
 });

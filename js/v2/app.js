@@ -2024,6 +2024,24 @@ async function loadFilesInner(files) {
       failed++;
       console.warn('Lewati file yang gagal dibuka:', f.name, err);
       track('file_failed', { tool: 'editor-v2', fileType: isPdf(f) ? 'pdf' : 'image' });
+      // ALSO on the first-party rail (telemetry suite class D, 2026-07-28).
+      // This used to be GA4-only, which meant the single clearest "is it
+      // broken?" signal we have — a file the user could not open at all — was
+      // invisible to the rail the auto-push policy leans on, and ad-blockers
+      // drop GA4 wholesale for a large share of our users.
+      //
+      // The reason is classified from the error's NAME, never its message: a
+      // name is a fixed identifier ('PasswordException'), a message can quote
+      // the document back to us. Same discipline as the export-failure branch.
+      // Anything we cannot classify is 'unknown' — which must stay COUNTED,
+      // because an unclassified failure is exactly when the rail needs to be
+      // loud rather than silent.
+      const name = err?.name || '';
+      let reason = 'unknown';
+      if (name === 'PasswordException') reason = 'encrypted';
+      else if (name === 'InvalidPDFException') reason = 'corrupt';
+      else if (name === 'UnknownErrorException') reason = 'unsupported';
+      tel('failure', { stage: 'import', reason });
     }
   }
 
