@@ -110,9 +110,29 @@ export function runSurgery(pdfPage, PDFLib, annotations) {
       if (matched) {
         skipCovers.add(a.id);
         // The line always STARTS at its first target — the honest entry
-        // point for where replacement text should paint, even on the (not
-        // yet produced, but architecturally allowed) multi-target line.
-        insertByCover.set(a.id, slice[0].insert);
+        // point for where replacement text should paint, on a multi-target
+        // line (js/v2/app.js's smartReplace now sends one target PER
+        // constituent run — founder field report 2026-07-28, the dash-leader
+        // form-row defect: a merged single target picked its size from the
+        // widest run and silently mismatched the rest).
+        //
+        // mixedFonts must be recomputed ACROSS every target here, not just
+        // trusted from slice[0]'s own per-target value: text-walk.js's
+        // planRunRemoval only ever compares fontNames WITHIN one target's own
+        // matched ops, so a genuinely mixed-font line (e.g. a bold heading
+        // fragment + a regular body fragment text-lines.js clusters into one
+        // Line — see text-lines.test.mjs's "dominant style" case) now reports
+        // mixedFonts:false on EVERY one of its single-run targets even though
+        // the LINE as a whole mixes fonts. Missing this would make stamp.js
+        // silently stamp the whole replacement in whichever run happened to
+        // be first — a confident wrong font, the same defect CLASS this fix
+        // exists to remove (see plausible-answer-from-unchecked-data in the
+        // seat's memory). Aggregating here is what keeps the "decline native
+        // stamp on a genuinely mixed-font line" guarantee true after
+        // switching to per-run targets.
+        const first = slice[0].insert;
+        const mixedAcrossTargets = slice.some((r) => r.insert.fontName !== first.fontName);
+        insertByCover.set(a.id, mixedAcrossTargets ? { ...first, mixedFonts: true } : first);
       }
     });
   } catch (err) {

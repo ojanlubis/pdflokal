@@ -1027,13 +1027,31 @@ async function smartReplace(pageId, x, y) {
     x: line.x, y: line.y, width: line.w, height: line.h,
     // Carries the surgery intent (Rung B honest-replacement — seat spec):
     // replaceTargets is an ARRAY of user-space geometry (core/redact.js's
-    // frame) — one whole-line target, spanning every fragment pdf.js split
-    // the line into; replaceBox is this cover's OWN creation-time page-space
-    // rect, so export can confirm the cover is still where it was born before
-    // cutting the original show-text ops — move the cover away and you've
-    // un-covered the text, so the surgery intent no longer holds (see
-    // core/export.js).
-    replaceTargets: [line.pdf],
+    // frame) — ONE TARGET PER CONSTITUENT RUN, not one blended target
+    // spanning the whole line (founder field report 2026-07-28: a form row
+    // shaped "Label : Value, " + a dashed leader running to the margin left
+    // the value's own text un-cut while `surgery` still reported
+    // matched:true/clean). core/text-lines.js's assembleLine derives the
+    // merged Line's OWN `pdf.size`/`ux`/`uy` from the DOMINANT run — the
+    // widest one, always the dash leader here — so feeding that ONE blended
+    // target into core/text-walk.js's per-target sizeOk gate silently
+    // rejected the label/value run (wrong size vs. the leader's) while
+    // matching the leader trivially: only the leader got cut, the real text
+    // survived, and the native re-insert's origin landed at the leader's own
+    // start (i.e. where the untouched original visually ENDS). Each run
+    // keeps its OWN size/position here, so the SAME per-target sizeOk gate
+    // correctly isolates and cuts every fragment individually — for a
+    // single-fragment line (the overwhelming common case) `line.runs` has
+    // exactly one entry whose `.pdf` is byte-identical to `line.pdf`
+    // (text-lines.js's own assembleLine sets both from the same single run),
+    // so this is a no-op there. replaceBox is this cover's OWN creation-time
+    // page-space rect, so export can confirm the cover is still where it was
+    // born before cutting the original show-text ops — move the cover away
+    // and you've un-covered the text, so the surgery intent no longer holds
+    // (see core/export.js). See core/page-surgery.js's runSurgery for the
+    // matching aggregation this multi-target shape requires (mixedFonts now
+    // checked ACROSS every target of one cover, not just within one).
+    replaceTargets: line.runs.map((r) => r.pdf),
     replaceBox: { x: line.x, y: line.y, w: line.w, h: line.h },
   }));
   syncPage(pageId);
