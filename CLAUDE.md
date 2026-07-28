@@ -13,9 +13,13 @@
 - **Design language is LAW**: red #dc2626 on warm stone, Plus Jakarta Sans, red-chrome-never-prints, paper-on-desk shadows, stempel-press buttons, the 5-stamp language ("cap = pernyataan status", never decoration). Never default signature ink to a colour — user content renders as the user made it. Design skills installed in `.agents/skills/` — load before UI work.
 - **Interaction model**: camera-first touch (selection commits at release); select-then-edit for text (first click/tap selects, the next one edits — no double-tap timing windows). Both founder-ratified.
 - **Tests**: `tests/mobile/**` (mobile-chrome project, the deep suite) + `tests/editor-v2-desktop.spec.js` target v2 at `/`. Old suites were repointed at `/alat-gambar.html` and die with the old wing. `tests/core/` runs headless via `npm run test:core`. Full sweep: `npm run lint` + `npx playwright test` (currently ~190 core + ~266 Playwright). `tests/fixtures/nasty/` is the corpus of real documents that have actually broken things — add to it whenever a real file finds a bug.
-- **Never run two Playwright invocations at once** — they fight over the dev-server port and produce phantom `ERR_CONNECTION_REFUSED` failures that look like real ones. Agents should run lint + core only and let one owner run the sweep.
+- **Never run two Playwright invocations at once** — they fight over the dev-server port and produce phantom `ERR_CONNECTION_REFUSED` failures that look like real ones. **A session rooted HERE owns the sweep and runs it in the FOREGROUND**; subagents it spawns run lint + core only and never Playwright (3/3 deadlocked backgrounding it — a backgrounded run waits on a notification that can only wake the parent). One owner, one invocation.
 - **Verify a green signal by asking what would look identical if broken.** Real examples from this repo: a telemetry endpoint that 204s whether or not it wrote (a week of data lost silently); tests asserting "no images sent" while watching only `sendBeacon` when the send went by `fetch`; two crops asserted "non-empty" when both were the same stale image. Assertions must be able to fail.
-- **Working rhythm**: branch → failing test → green → full sweep → PR → `gh pr merge --squash --admin --delete-branch` (authorized) → verify Vercel deploy via commit status → update the project seat (`../STATE.md` + `../TODO.md`). Screenshot every new UI surface (a broken dialog once passed all functional tests). **Squash-merging means `git branch --merged` will report the source branch as unmerged forever — audit with a three-dot diff (`git diff origin/main...$b`), never commit counts.**
+- **Working rhythm**: failing test → green → full sweep → local commit on `main` → update the project seat (`../STATE.md` + `../TODO.md`) → **hand the push to Fauzan.** Screenshot every new UI surface (a broken dialog once passed all functional tests).
+- **⛔ PUSH / MERGE / DEPLOY ARE FAUZAN'S OWN HAND. Never yours.** Authorization is **per-turn, in his own window, and does NOT carry forward** — a "yes push" last turn authorizes nothing this turn. _(Corrected 2026-07-28: this line previously read `gh pr merge --squash --admin --delete-branch` **(authorized)**, a standing blanket permission that contradicted the seat's oldest standing constraint. It was written when the repo worked on feature branches; it does not survive the 2026-07-27 tidy.)_
+- **There are no branches, by his explicit instruction** (2026-07-27): local `main` and remote `main`, nothing else. Work goes straight onto `main` locally. Preserved-but-unmerged work lives on **tags** (`archive/i18n-groundwork`, `archive/edit-ladder-preheal`), never branches. If you ever do audit a branch: **squash-merging makes `git branch --merged` report it unmerged forever — use a three-dot diff (`git diff origin/main...$b`), never commit counts.**
+- **`.mcp.json` here is PROJECT-SCOPED and that is load-bearing.** `playwright`, `sentry`, and `analytics-mcp` (GA4 — service account `pdflokal-ga4-reader@pdflokal-mcp`, property `properties/528550405`) load **only for sessions rooted in this directory**. They do NOT load at the seat one level up, and they do NOT load for subagents (subagents inherit the *parent's* cwd, so a seat-spawned agent lands in the seat, not here — every brief must `cd` explicitly). You have GA4 and Sentry; the seat does not. Check this file before telling anyone a capability is missing.
+- **Never `git add -A`** — stage explicit paths. Other sessions have uncommitted work in this tree (currently `pdf-explained.html`, `pdf-xray.html` at the repo root); **never sweep another session's work**, in either direction.
 - **Gotchas (v2)**: `npx serve` cleanUrls 301 strips query strings (tests use extensionless URLs); the global `dialog` CSS rule IS the overlay — new dialogs must use a `.sheet` child; `history` is shadowed in app.js by the undo history (use `window.history`); no grid rebuilds mid-drag in page-manager (render parks on `dragActive`).
 
 ## Project Overview
@@ -30,6 +34,21 @@
 ## ★ North Star & product status → `../STATE.md` (project seat)
 
 The product vision, status, roadmap, and founder-desk log live at the project seat one level up (moved 2026-07-15, re-foldered 2026-07-27): **`../STATE.md`** (read first — current state only) → **`../TODO.md`** (the single queue) → `../decisions.md` (rulings + why). Reference docs are in `../reference/` (`product-definition.md` = the North Star, read before any product/design/architecture call · `roadmap.md` · `foundation-plan.md` · `backlog.md` = the ads/SEO log); build specs are in `../specs/`. This file is code-guidance for the repo only.
+
+### Who does what (founder ruling 2026-07-28 — `../decisions.md`)
+
+Two seats, on purpose. They want opposite things from a context window: judgment work needs the whole history (rulings, taste corpus, what was already tried and why); execution needs the file tree, the tests, and the MCPs. One session holding both is what made the PM's context unworkable twice in one week.
+
+| | **The seat** (`..`, PM) | **Here** (`app/`, head dev) |
+|---|---|---|
+| owns | the queue, rulings + why, specs, reading reality (Supabase rail · GA4 · Sentry · feedback table), founder-facing reporting, banking to disk | **all code execution** — build, test, refactor, the machine QA gate **end-to-end including the Playwright sweep**, `docs/`, this file, local commits on `main` |
+| does NOT | write product code, run the sweep | decide what's worth building, rule on taste, write client-facing copy |
+
+**Neither seat, ever:** push · merge to remote · deploy · client-facing copy · money · anything public-facing. Those are Fauzan's own hand, per-turn.
+
+**The interface is the disk, not a channel.** The seat hands over specs + verified diagnoses; you hand back a short "what shipped" into `../STATE.md` / `../TODO.md`. Don't let the two drift — a queue nobody updates is worse than no queue.
+
+**Read `~/.claude/projects/-Users-ojanlubis-fkd-pdflokal-app/memory/` — the developer memory bank, 35+ topic files** (`pdfjs-worker.md`, `pdf-lib-bitstability.md`, `ga4-shared-tag-carrier.md`…). It is not in this repo and you will not find it by searching. Consult it before any deep work in `js/core/`.
 
 One-line anchor kept here: **WinRAR × Excalidraw of PDF for Indonesia; 100% client-side IS the moat (private + fast + free-forever + offline); the editor is the product; refuse server-jobs (OCR, PDF↔Word).**
 
