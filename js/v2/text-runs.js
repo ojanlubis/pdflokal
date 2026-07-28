@@ -68,14 +68,22 @@ export function createTextRunIndex({ getDoc }) {
     // ROTATED frame the raster (and every annotation coordinate) lives in.
     const rotation = ((page.baseRotation || 0) + (page.rotation || 0)) % 360;
     const vp = pdfPage.getViewport({ scale: 1, rotation });
+    const tc = await pdfPage.getTextContent();
+
     // A SEARCHABLE SCAN IS STILL A SCAN. Its text layer is painted in render
     // mode 3 — invisible — over the image that carries the actual words. Left
     // unchecked, those items become runs, Edit opens on them, cuts show-ops
     // nobody could see, and stamps the replacement beside an untouched image
     // (tests/ocr-layer.spec.js). Empty here IS the router signal, exactly as it
-    // is for a bare scan two lines up, so this lands in the scan offer.
+    // is for a bare scan above, so this lands in the scan offer.
+    //
+    // ORDER IS DELIBERATE, and it is a phone-performance decision.
+    // getTextContent parses text operators only; getOperatorList builds the
+    // WHOLE page including decoding its images. A bare scan is one big JPEG
+    // and no text — the most expensive page to walk and the one with nothing
+    // to qualify — so it must exit on the cheap test, never the dear one.
+    if (!tc.items.some((it) => it.str && it.str.trim())) return [];
     if (!(await pageHasVisibleText(pdfPage, pdfjs))) return [];
-    const tc = await pdfPage.getTextContent();
 
     const runs = [];
     for (const item of tc.items) {
