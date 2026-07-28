@@ -812,8 +812,39 @@ async function prepareDocFont(pageId, line, draft) {
     // case): `line.runs` has one entry whose `.pdf` IS `line.pdf`.
     const targets = line.runs?.length ? line.runs.map((r) => r.pdf) : [line.pdf];
     const { results } = planRunRemoval(joined, fonts, targets);
-    const fontName = results.map((r) => r.insert?.fontName).find(Boolean);
+    const names = results.map((r) => r.insert?.fontName || null);
+
+    // WHICH run's font represents the line — and what that entitles us to say
+    // about it. Seat ruling 2026-07-28 (option C): the two halves of "the
+    // line's font" have DIFFERENT epistemic status, so they get different
+    // policies.
+    //
+    // FAMILY is answerable. The draft has to render in something, and the
+    // DOMINANT run (widest by pdf.len) is defensible: it is already what
+    // core/text-lines.js calls this line's font, it is what the hover glow
+    // implies, and it is most of the glyphs. Note it is a proxy — a dash
+    // leader can out-width the text it trails — but it is the same proxy the
+    // rest of the system already uses, so this stays consistent rather than
+    // inventing a third answer to a question that already had two.
+    //
+    // WEIGHT is NOT answerable on a line whose runs use different fonts. It
+    // was being taken from planRunRemoval's `insert`, which reports the FIRST
+    // run BY CONTENT-STREAM POSITION — a different selector from the dominant
+    // one, so on `Nama : Budi` (bold label painted first, regular value wider)
+    // the two disagreed and `draft.bold = draft.bold || fp.bold` bolded the
+    // ENTIRE replacement, value included. Since a mixed-font line also makes
+    // the native stamp decline, the twin fallback then RENDERED that wrong
+    // flag — a visible defect, not just a telemetry one.
+    //
+    // So: answer what's answerable, decline what isn't. One policy for both is
+    // what produced the defect.
+    let domIdx = 0;
+    for (let i = 1; i < targets.length; i += 1) {
+      if ((targets[i]?.len ?? 0) > (targets[domIdx]?.len ?? 0)) domIdx = i;
+    }
+    const fontName = names[domIdx] || names.find(Boolean);
     if (!fontName) return; // unmatched / declined run — no font to learn
+    const mixedFonts = new Set(names.filter(Boolean)).size > 1;
 
     // BUG FIX (founder field test, 2026-07-19, bold Arial headings): pdf.js's
     // OWN getTextContent() never exposes the real font name to the main
@@ -835,7 +866,7 @@ async function prepareDocFont(pageId, line, draft) {
     // name with no corroborating Flags/FontWeight) — never guessing "regular"
     // just because the WRAPPER stayed silent.
     const fp = resolveFontFingerprint(pdfPage, PDFLib, fontkit, fontName);
-    if (fp.ok && (fp.bold || fp.italic)) {
+    if (fp.ok && !mixedFonts && (fp.bold || fp.italic)) {
       draft.bold = draft.bold || fp.bold;
       draft.italic = draft.italic || fp.italic;
       // Live-restyle the open draft the same way docFontFamily does below —
@@ -848,7 +879,15 @@ async function prepareDocFont(pageId, line, draft) {
       // field (see commit() below) so stamp.js's clone rung can report WHICH
       // rung decided the weight it embeds, at commit time, without ever
       // re-deriving it (Increment B's `insert.style_source`).
-      draft.styleSource = fp.styleSource;
+      //
+      // On a mixed-font line we declined to decide a weight, so the honest
+      // value is 'none' — NOT the rung that would have decided it. 'none' is
+      // already in the schema's STYLE_SOURCE enum, so this needs no schema
+      // change and no migration, and from the first event the rail can tell
+      // "we read bold off the /BaseFont" apart from "we declined to guess".
+      // That distinction is also the only way we will ever learn how common
+      // mixed lines actually are in real documents — nothing measures it today.
+      draft.styleSource = mixedFonts ? 'none' : fp.styleSource;
     }
     // Font-fidelity tier 1 (core/font-decide.js, founder-ratified 2026-07-20):
     // the real /BaseFont routes the SUBSTITUTE tier to a metric-identical
