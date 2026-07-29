@@ -42,7 +42,10 @@ const CORPUS = rows.slice(1).map((r) => {
   return { id: c[iId], shape: c[iShape], file: path.join(WILD, c[iFile]) };
 }).filter((e) => e.id && fs.existsSync(e.file));
 
-const IN_PAGE = async (src) => {
+// `corrupt` is the CONTROL path: it deliberately paints over the exported page
+// before re-importing it. An oracle that has never disagreed with anything is
+// decoration, so the comparison must be shown to go red on demand.
+const IN_PAGE = async ({ src, corrupt }) => {
   const dec = (s) => {
     const bin = atob(s);
     const u = new Uint8Array(bin.length);
@@ -53,24 +56,78 @@ const IN_PAGE = async (src) => {
   const { importPdf, createPageRasterizer } = await import('/js/core/import.js');
   const { buildPdfBytes } = await import('/js/core/export.js');
   const { failureReason } = await import('/js/core/failure-reason.js');
+  const { compareRegions } = await import('/js/core/visual-oracle.js');
   const { ensurePdfLib } = await import('/js/core/vendor.js');
   const { PDFLib, fontkit } = await ensurePdfLib();
+
+  // dataUrl -> ImageData, so the oracle sees pixels rather than a string.
+  const toImageData = (dataUrl, w, h) => new Promise((res, rej) => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      const g = c.getContext('2d', { willReadFrequently: true });
+      g.drawImage(img, 0, 0, w, h);
+      res(g.getImageData(0, 0, w, h));
+    };
+    img.onerror = () => rej(new Error('raster decode failed'));
+    img.src = dataUrl;
+  });
+
+  const shoot = async (bytes) => {
+    const d = createDoc();
+    await importPdf(d, { name: 'w.pdf', bytes });
+    if (!d.pages.length) return null;
+    const r = createPageRasterizer(d);
+    const shot = await r.rasterize(d.pages[0], { scale: 1 });
+    if (!shot || !shot.dataUrl) return null;
+    return { pages: d.pages.length, img: await toImageData(shot.dataUrl, shot.width, shot.height) };
+  };
 
   const doc = createDoc();
   let stage = 'import';
   try {
     await importPdf(doc, { name: 'w.pdf', bytes: dec(src) });
     if (!doc.pages.length) return { ok: false, stage: 'import', reason: 'no-pages' };
+    const pagesIn = doc.pages.length;
+
     stage = 'render';
     const raster = createPageRasterizer(doc);
-    const shot = await raster.rasterize(doc.pages[0], { scale: 1 });
-    if (!shot || !shot.dataUrl) return { ok: false, stage: 'render', reason: 'no-raster' };
+    const before = await raster.rasterize(doc.pages[0], { scale: 1 });
+    if (!before || !before.dataUrl) return { ok: false, stage: 'render', reason: 'no-raster' };
+    const imgBefore = await toImageData(before.dataUrl, before.width, before.height);
+
     stage = 'export';
-    const out = await buildPdfBytes(doc, { PDFLib, fontkit });
+    let out = await buildPdfBytes(doc, { PDFLib, fontkit });
     if (!out || !out.length) return { ok: false, stage: 'export', reason: 'empty-output' };
-    return { ok: true, pages: doc.pages.length };
+
+    if (corrupt) {
+      // Paint a black bar across the middle. A no-op export must not look like
+      // this, so the oracle has to notice.
+      const cd = await PDFLib.PDFDocument.load(out);
+      const cp = cd.getPages()[0];
+      const { width, height } = cp.getSize();
+      cp.drawRectangle({ x: 0, y: height / 2 - height * 0.08, width, height: height * 0.16, color: PDFLib.rgb(0, 0, 0) });
+      out = await cd.save();
+    }
+
+    // ---- FIDELITY, not just liveness -------------------------------------
+    stage = 'roundtrip';
+    const after = await shoot(out);
+    if (!after) return { ok: false, stage: 'roundtrip', reason: 'reimport-failed' };
+
+    // 1. STRUCTURAL: a no-op export must not lose or invent pages.
+    if (after.pages !== pagesIn) {
+      return { ok: false, stage: 'roundtrip', reason: 'page-count-changed', pagesIn, pagesOut: after.pages };
+    }
+
+    // 2. VISUAL: a no-op export must look like its input. This is the check
+    // that would have caught the 2026-07-27 searchable-scan corruption on a
+    // REAL file, instead of only on a fixture we wrote ourselves.
+    const cmp = compareRegions(imgBefore, after.img);
+    if (!cmp) return { ok: true, pages: pagesIn, cmp: null }; // blank page: no ink to compare, not a failure
+    return { ok: true, pages: pagesIn, cmp: { ink: cmp.inkRatio, weight: cmp.weightRatio, height: cmp.heightRatio } };
   } catch (err) {
-    // Bucketed reason ONLY. An error message can quote the document.
     return { ok: false, stage, reason: failureReason(err) };
   }
 };
@@ -85,13 +142,13 @@ async function fresh() {
 }
 const b64 = (f) => fs.readFileSync(f).toString('base64');
 
-async function run(file) {
+async function run(file, opts = {}) {
   try {
-    return await page.evaluate(IN_PAGE, b64(file));
+    return await page.evaluate(IN_PAGE, { src: b64(file), corrupt: opts.corrupt });
   } catch {
     await fresh();
     try {
-      return await page.evaluate(IN_PAGE, b64(file));
+      return await page.evaluate(IN_PAGE, { src: b64(file), corrupt: opts.corrupt });
     } catch {
       await fresh();
       // Twice, alone, on a brand-new browser. That is a document that kills a
@@ -114,15 +171,46 @@ for (const n of ['terpotong.pdf', 'terkunci.pdf']) {
   if (v.ok) throw new Error(`${n} is known-broken and came back OK: the harness detects nothing`);
 }
 
+// ---- THE ORACLE MUST BE ABLE TO DISAGREE -----------------------------------
+// A visual comparison that has never objected to anything is decoration. Run a
+// known-good document twice: once clean, once with a black bar painted across
+// the exported page before re-import. The clean pass sets the noise floor; the
+// corrupted one must fall clearly outside it, or the comparison cannot see a
+// change the size of a black bar and has no business judging 154 documents.
+const clean = await run(path.join(NASTY, 'surat-word.pdf'));
+const dirty = await run(path.join(NASTY, 'surat-word.pdf'), { corrupt: true });
+const fmt = (c) => (c ? `ink=${c.ink.toFixed(3)} weight=${c.weight.toFixed(3)} height=${c.height.toFixed(3)}` : 'null');
+console.log(`\nORACLE CONTROL\n  clean      ${fmt(clean.cmp)}\n  corrupted  ${fmt(dirty.cmp)}`);
+if (!clean.cmp) throw new Error('the oracle returned null on a clean round trip: it cannot measure anything');
+if (!dirty.cmp) throw new Error('the oracle returned null on a corrupted export: it cannot measure anything');
+if (Math.abs(dirty.cmp.ink - 1) <= Math.abs(clean.cmp.ink - 1) * 3 + 0.05) {
+  throw new Error(
+    `the oracle barely noticed a black bar across the page (clean ink=${clean.cmp.ink.toFixed(3)}, `
+    + `corrupted ink=${dirty.cmp.ink.toFixed(3)}). It cannot distinguish a corrupted export from a `
+    + 'faithful one, so every "ok" below would be meaningless.',
+  );
+}
+// The clean pass also defines the tolerance: a no-op export is re-encoded, so
+// exact equality is not the bar. Anything outside this band is a real change.
+const INK_TOLERANCE = Math.max(0.05, Math.abs(clean.cmp.ink - 1) * 4);
+console.log(`  -> tolerance: ink within ${INK_TOLERANCE.toFixed(3)} of 1.000`);
+
 // ---- the sweep -------------------------------------------------------------
 const results = [];
 let since = 0;
 for (const e of CORPUS) {
   if (since >= BATCH) { await fresh(); since = 0; }
-  const v = await run(e.file);
+  let v = await run(e.file);
+  // Liveness passed; now judge FIDELITY against the measured tolerance.
+  if (v.ok && v.cmp && Math.abs(v.cmp.ink - 1) > INK_TOLERANCE) {
+    v = { ...v, ok: false, stage: 'roundtrip', reason: 'visual-drift' };
+  }
   since += 1;
   results.push({ ...e, ...v });
-  if (!v.ok) console.log(`  ${e.id} ${e.shape.padEnd(16)} ${v.stage}/${v.reason}`);
+  if (!v.ok) {
+    const extra = v.cmp ? ` ink=${v.cmp.ink.toFixed(3)}` : '';
+    console.log(`  ${e.id} ${e.shape.padEnd(16)} ${v.stage}/${v.reason}${extra}`);
+  }
 }
 try { await browser.close(); } catch { /* done */ }
 
