@@ -24,7 +24,7 @@
 import { buildExportPlan } from './operations.js';
 import { applyPageSurgery } from './page-surgery.js';
 import { CLONE_FONT_VARIANTS, CLONE_FONT_URLS } from './clone-fonts.js';
-import { toStandardFontSafe } from './text-encode.js';
+import { toStandardFontSafe, drawTextSafe } from './text-encode.js';
 
 // ---- fonts ------------------------------------------------------------------
 
@@ -213,7 +213,7 @@ async function drawText(pdfPage, anno, frame, env) {
   for (let i = 0; i < lines.length; i += 1) {
     const yV = anno.y + size * TEXT_BASELINE_RATIO + i * size * TEXT_LINE_HEIGHT;
     const { x, y } = transformAnnotationCoords(frame.rotation, anno.x, yV, frame.wU, frame.hU);
-    pdfPage.drawText(lines[i], { x, y, size, font, color, rotate });
+    drawTextSafe(pdfPage, lines[i], { x, y, size, font, color, rotate });
   }
 }
 
@@ -256,7 +256,7 @@ async function drawWatermark(pdfPage, anno, frame, env) {
   const halfW = font.widthOfTextAtSize(anno.text || '', size) / 2;
   const halfCap = size * 0.35;
   const { x: cx, y: cy } = transformAnnotationCoords(frame.rotation, anno.x, anno.y, frame.wU, frame.hU);
-  pdfPage.drawText(anno.text || '', {
+  drawTextSafe(pdfPage, anno.text || '', {
     x: cx - halfW * Math.cos(rad) + halfCap * Math.sin(rad),
     y: cy - halfW * Math.sin(rad) - halfCap * Math.cos(rad),
     size,
@@ -275,7 +275,7 @@ async function drawPageNumber(pdfPage, anno, frame, env) {
   const size = anno.fontSize || 12;
   const yV = anno.y + size * TEXT_BASELINE_RATIO;
   const { x, y } = transformAnnotationCoords(frame.rotation, anno.x, yV, frame.wU, frame.hU);
-  pdfPage.drawText(anno.text || '', {
+  drawTextSafe(pdfPage, anno.text || '', {
     x, y, size, font,
     color: parseHexColor(env.PDFLib, anno.color),
     rotate: env.PDFLib.degrees(frame.rotation),

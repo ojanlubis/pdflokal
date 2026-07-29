@@ -31,6 +31,7 @@
  */
 
 import { extractFontProgram, lookupFontObject } from './doc-fonts.js';
+import { drawTextSafe } from './text-encode.js';
 import { getFontStyleInfo } from './font-style.js';
 import { cloneFamilyFor } from './font-decide.js';
 import { CLONE_FONT_VARIANTS, CLONE_FONT_URLS } from './clone-fonts.js';
@@ -380,5 +381,9 @@ export function stampText(pdfPage, PDFLib, font, insert, text, color) {
   if (!(insert.ux === 1 && insert.uy === 0)) {
     opts.rotate = PDFLib.degrees((Math.atan2(insert.uy, insert.ux) * 180) / Math.PI);
   }
-  pdfPage.drawText(text, opts);
+  // Through the ONE door: a pasted thin space or ZWSP reaching pdf-lib's
+  // WinAnsi encoder throws and aborts the whole export. That is the
+  // 2026-07-29 live breakage, on a build that already "fixed" WinAnsi at a
+  // different call site. See text-encode.js's drawTextSafe.
+  drawTextSafe(pdfPage, text, opts);
 }

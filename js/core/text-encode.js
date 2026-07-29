@@ -149,3 +149,27 @@ export function unencodableInStandardFont(text) {
   }
   return out;
 }
+
+/**
+ * THE ONLY DOOR TO pdf-lib's drawText. Sanitises, then draws.
+ *
+ * WHY A WRAPPER RATHER THAN A CALL AT EACH SITE. On 2026-07-28 the WinAnsi
+ * crash was fixed by adding toStandardFontSafe() at the one call site where it
+ * had been observed, export.js's annotation path. There were FOUR sites. The
+ * Edit/ganti reinsert (core/stamp.js) was not one of them, so on 2026-07-29 a
+ * real user hit the identical crash from the identical cause, twice, six
+ * minutes apart, on a build that already contained the fix: 24 edits, 10
+ * failures, zero exports. The fix had made the failure legible and left it
+ * fatal.
+ *
+ * A guard placed where a bug was SEEN protects that place. A guard placed at
+ * the only door protects the class. tests/core/drawtext-chokepoint.test.mjs
+ * fails if a fifth site ever calls pdfPage.drawText directly.
+ *
+ * @param {object} pdfPage a pdf-lib PDFPage
+ * @param {string} text    user text, possibly carrying pasted invisibles
+ * @param {object} opts    passed straight through to drawText
+ */
+export function drawTextSafe(pdfPage, text, opts) {
+  return pdfPage.drawText(toStandardFontSafe(text), opts);
+}
