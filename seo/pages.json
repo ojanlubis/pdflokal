@@ -37,14 +37,14 @@
         {
           "h2": "Biasanya dipakai buat apa",
           "p": [
-            "Berkas lamaran kerja yang mintanya \"satu file PDF\": CV, ijazah, transkrip, KTP, sertifikat, semuanya harus jadi satu. Berkas CPNS dan pendaftaran kampus juga hampir selalu begitu.",
+            "Berkas lamaran kerja yang mintanya \"satu file PDF\": CV, ijazah, transkrip, KTP, sertifikat. Semuanya harus jadi satu. Berkas CPNS dan pendaftaran kampus juga hampir selalu begitu.",
             "Laporan yang bagiannya dikerjakan orang berbeda, lalu digabung jadi satu dokumen. Atau hasil scan yang keluar satu file per halaman dan perlu disatukan sebelum dikirim."
           ]
         },
         {
           "h2": "Kenapa lewat browser lebih aman",
           "p": [
-            "Ijazah, KTP, kontrak, dokumen yang kamu gabung biasanya bukan dokumen sembarangan. Situs lain memintamu mengunggahnya ke server mereka dan berjanji \"aman\". Kamu tidak punya cara membuktikannya.",
+            "Ijazah, KTP, kontrak. Dokumen yang kamu gabung biasanya bukan dokumen sembarangan. Situs lain memintamu mengunggahnya ke server mereka dan berjanji \"aman\". Kamu tidak punya cara membuktikannya.",
             "PDFLokal tidak bisa membocorkan filemu karena PDFLokal tidak pernah menerimanya. Setelah halaman ini terbuka, kamu bahkan bisa mematikan internet dan penggabungan tetap jalan. Kodenya terbuka di GitHub, silakan periksa sendiri, jangan percaya begitu saja."
           ]
         },
@@ -132,7 +132,7 @@
         {
           "h2": "Kenapa selalu soal batas unggah",
           "p": [
-            "Pendaftaran CPNS, SNBP, SNBT, beasiswa, e-filing pajak, portal kepegawaian, hampir semuanya menetapkan batas ukuran berkas yang ketat, dan hampir semuanya menolak file-mu tanpa penjelasan kalau kelewat.",
+            "Pendaftaran CPNS, SNBP, SNBT, beasiswa, e-filing pajak, portal kepegawaian. Hampir semuanya menetapkan batas ukuran berkas yang ketat, dan hampir semuanya menolak file-mu tanpa penjelasan kalau kelewat.",
             "Alat kompres buatan luar negeri melayani \"perkecil filenya\". Yang sebenarnya kamu butuhkan adalah \"muat dalam batas ini\". Itu masalah yang berbeda, dan itu masalah yang kami pedulikan."
           ]
         },
@@ -160,14 +160,14 @@
         {
           "h2": "Kalau masih kelewat batas juga",
           "p": [
-            "Buang halaman yang tidak diminta. Berkas persyaratan sering ikut membawa halaman kosong dari hasil scan, atau lampiran yang sebenarnya tidak dipinta. Buka Kelola Halaman, buang halamannya, lalu kompres lagi, ini sering menyelesaikan masalah lebih cepat daripada kompresi apa pun.",
+            "Buang halaman yang tidak diminta. Berkas persyaratan sering ikut membawa halaman kosong dari hasil scan, atau lampiran yang sebenarnya tidak dipinta. Buka Kelola Halaman, buang halamannya, lalu kompres lagi. Ini sering menyelesaikan masalah lebih cepat daripada kompresi apa pun.",
             "Kalau dokumenmu hasil foto, potret ulang di ruangan yang terang. Foto gelap memaksa kamera menaikkan ISO, dan bintik-bintik kecil hasil ISO tinggi justru membuat file makin sulit dikompres, sedikit cahaya sering lebih ampuh daripada alat mana pun."
           ]
         },
         {
           "h2": "Aman buat dokumen penting?",
           "p": [
-            "Berkas yang kamu kompres biasanya ijazah, KTP, kartu keluarga, atau transkrip, dokumen yang identitasmu melekat padanya. Situs lain memintamu mengunggahnya ke server mereka, lalu berjanji akan menghapusnya dalam satu jam. Kamu tidak punya cara untuk memeriksanya.",
+            "Berkas yang kamu kompres biasanya ijazah, KTP, kartu keluarga, atau transkrip. Dokumen yang identitasmu melekat padanya. Situs lain memintamu mengunggahnya ke server mereka, lalu berjanji akan menghapusnya dalam satu jam. Kamu tidak punya cara untuk memeriksanya.",
             "Di PDFLokal tidak ada yang perlu dihapus, karena tidak ada yang pernah dikirim. Buka tab Network di browser-mu kalau kamu paham teknis, kamu tidak akan melihat satu pun unggahan file. Dan kalau kamu tidak paham teknis: matikan internetmu, dan lihat kompresinya tetap jalan."
           ]
         },
@@ -182,7 +182,7 @@
       "faq": [
         {
           "q": "Bisa kompres sampai ukuran tertentu, misalnya 500KB?",
-          "a": "Bisa. Pilih target, 2MB, 1MB, 500KB, 200KB, atau 100KB, dan PDFLokal akan mencari kualitas tertinggi yang masih muat di bawah batas itu. Kalau ternyata tidak tercapai, kami bilang terus terang berapa ukuran terkecil yang bisa kami dapat, bukan diam-diam memberimu file yang kelewat batas."
+          "a": "Bisa. Pilih target (2MB, 1MB, 500KB, 200KB, atau 100KB) dan PDFLokal akan mencari kualitas tertinggi yang masih muat di bawah batas itu. Kalau ternyata tidak tercapai, kami bilang terus terang berapa ukuran terkecil yang bisa kami dapat, bukan diam-diam memberimu file yang kelewat batas."
         },
         {
           "q": "Tulisannya jadi buram nggak?",
@@ -283,7 +283,7 @@
       "faq": [
         {
           "q": "Bisa ambil halaman yang tidak berurutan?",
-          "a": "Bisa. Centang halaman mana pun, misalnya 1, 4, dan 9, dan ketiganya jadi satu PDF baru sesuai urutan aslinya."
+          "a": "Bisa. Centang halaman mana pun (misalnya 1, 4, dan 9) dan ketiganya jadi satu PDF baru sesuai urutan aslinya."
         },
         {
           "q": "Dokumen aslinya berubah nggak?",
@@ -510,7 +510,7 @@
         {
           "h2": "Biasanya dipakai buat apa",
           "p": [
-            "Berkas lamaran dan pendaftaran: KTP, KK, ijazah, sertifikat, difoto pakai HP, lalu harus dikumpulkan sebagai satu PDF.",
+            "Berkas lamaran dan pendaftaran: KTP, KK, ijazah, sertifikat. Semuanya difoto pakai HP, lalu harus dikumpulkan sebagai satu PDF.",
             "Bukti transaksi, nota, atau surat yang difoto dan perlu dikirim rapi ke kantor atau klien."
           ]
         },
@@ -572,7 +572,7 @@
       "faq": [
         {
           "q": "Format foto apa saja yang bisa?",
-          "a": "JPG, PNG, dan WebP, praktisnya semua yang keluar dari kamera HP atau aplikasi scan."
+          "a": "JPG, PNG, dan WebP. Praktisnya semua yang keluar dari kamera HP atau aplikasi scan."
         },
         {
           "q": "Urutan fotonya bisa diatur?",
@@ -600,7 +600,7 @@
       "slug": "edit-pdf",
       "intent": "teks",
       "title": "Edit PDF Online Gratis - Tambah Teks & Tutup Tulisan | PDFLokal",
-      "description": "Tambahkan teks, tutup tulisan yang salah, tanda tangani PDF, langsung di browser. Gratis, tanpa akun, tanpa upload.",
+      "description": "Tambahkan teks, tutup tulisan yang salah, tanda tangani PDF. Semua langsung di browser. Gratis, tanpa akun, tanpa upload.",
       "h1": "Edit PDF langsung di browser",
       "sub": "Tambah teks, tutup tulisan yang salah, isi formulir. Tanpa aplikasi, tanpa akun.",
       "intro": "Kebanyakan orang tidak mau \"mengedit PDF\" secara utuh. Mereka mau memperbaiki satu hal: mengisi kolom nama, menutup angka yang keliru, menambahkan tanggal. PDFLokal memberimu alat untuk itu, langsung di browser, tanpa memasang aplikasi, dan tanpa dokumenmu pernah dikirim ke server siapa pun.",
@@ -699,7 +699,7 @@
         {
           "h2": "Semua di satu layar",
           "p": [
-            "Menghapus, mengurutkan, memutar, dan memisahkan halaman itu pekerjaan yang saling berkaitan, orang jarang cuma melakukan satu. Situs lain memecahnya jadi empat alat terpisah, dan kamu harus mengunggah ulang filemu di setiap langkah.",
+            "Menghapus, mengurutkan, memutar, dan memisahkan halaman itu pekerjaan yang saling berkaitan. Orang jarang cuma melakukan satu. Situs lain memecahnya jadi empat alat terpisah, dan kamu harus mengunggah ulang filemu di setiap langkah.",
             "Di PDFLokal semuanya ada di layar yang sama, pada dokumen yang sama, tanpa unggah ulang apa pun."
           ]
         },
