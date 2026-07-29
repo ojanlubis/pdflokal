@@ -56,20 +56,60 @@ export function createSignatureModal({ modal, onReady, toast }) {
   modal.querySelector('#sig-clear').addEventListener('click', () => pad?.clear());
 
   // ---- upload pane ---------------------------------------------------------------
-  fileInput.addEventListener('change', () => {
-    const f = fileInput.files?.[0];
-    fileInput.value = '';
+  // SINGLE SOURCE OF TRUTH for "an image arrived, make it the signature".
+  // Two roads reach it — the file picker and the clipboard — and they must land
+  // in exactly the same place, including the background-removal step and the
+  // ink trim. When these were separate code paths in the old wing, paste and
+  // upload could disagree about what a signature was.
+  function acceptImageFile(f, { switchTab = false } = {}) {
     if (!f || !f.type.startsWith('image/')) { toast('Pilih file gambar ya'); return; }
     const img = new Image();
     img.onload = () => {
       URL.revokeObjectURL(img.src); // decoded — the blob URL has done its job
       uploadedImg = img;
+      if (switchTab) showTab('upload');
       renderUploadPreview();
     };
     img.onerror = () => { URL.revokeObjectURL(img.src); toast('Gagal membaca gambar'); };
     img.src = URL.createObjectURL(f);
+  }
+
+  fileInput.addEventListener('change', () => {
+    const f = fileInput.files?.[0];
+    fileInput.value = '';
+    acceptImageFile(f);
   });
   removeBgCheck.addEventListener('change', renderUploadPreview);
+
+  /*
+   * ---- paste (Ctrl/Cmd+V) --------------------------------------------------
+   * ⚠️ THIS IS A RESTORATION, NOT A NEW FEATURE. The changelog has promised it
+   * to users: "Pas jendela tanda tangan kebuka, tinggal tempel (Ctrl/Cmd+V),
+   * langsung masuk tanpa perlu simpan file dulu." v2 shipped with NO
+   * ClipboardEvent handling anywhere in js/v2/, so the product has been claiming
+   * a feature it does not have. docs/test-suite-audit.md found it from the other
+   * end: signature-paste.spec.js reads as coverage but drives the dead old wing.
+   *
+   * Restoring is the honest option and the cheap one — retracting the claim
+   * would mean rewriting client-facing copy, which is not ours to write.
+   *
+   * Listener is on `document` because the sheet's own elements are rarely
+   * focused (the user has just come from another app with an image on the
+   * clipboard), and a paste with nothing focused never reaches the dialog.
+   */
+  document.addEventListener('paste', (e) => {
+    if (!modal.open) return; // only while the signature sheet is up
+    for (const item of e.clipboardData?.items || []) {
+      if (item.kind !== 'file' || !item.type.startsWith('image/')) continue;
+      const f = item.getAsFile();
+      if (!f) continue;
+      e.preventDefault();
+      acceptImageFile(f, { switchTab: true });
+      return;
+    }
+    // No image on the clipboard: do NOT preventDefault, and do NOT toast.
+    // Pasting text while the sheet happens to be open is not an error.
+  });
 
   function processUpload() {
     if (!uploadedImg) return null;

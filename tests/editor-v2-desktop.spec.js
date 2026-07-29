@@ -7,6 +7,7 @@ import { test, expect } from '@playwright/test';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { expectFirstPage } from './helpers/render.js';
+import { downloadBytes, expectRealPdf } from './helpers/download-bytes.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE = path.join(__dirname, 'fixtures', 'sample-2pages.pdf');
@@ -39,12 +40,18 @@ test.describe('editor v2 — desktop', () => {
     expect(after).toBeGreaterThan(before);
 
     // Download goes through the Unduh sheet: open → big button → real PDF.
+    //
+    // ⚠️ THIS USED TO ASSERT ONLY suggestedFilename(). docs/test-suite-audit.md
+    // proved what that is worth: `core/export.js` was mutated to drop every text
+    // annotation and 39 tests passed, this one among them. A filename comes from
+    // the code that NAMES the file, never from the code that BUILDS it.
     await page.click('#btn-download');
     await expect(page.locator('#dl-sheet')).toBeVisible();
-    const dl = page.waitForEvent('download');
-    await page.click('#ds-cta');
-    const download = await dl;
-    expect(download.suggestedFilename()).toMatch(/pdflokal\.pdf$/);
+    const { buf, filename } = await downloadBytes(page, () => page.click('#ds-cta'));
+    expect(filename).toMatch(/pdflokal\.pdf$/);
+
+    // Both pages, and the text the user actually typed, in the real bytes.
+    await expectRealPdf(page, buf, { pages: 2, text: ['Dari desktop'] });
   });
 
   test('page manager works with a mouse (click select, bulk rotate)', async ({ page }) => {

@@ -7,6 +7,7 @@ import { test, expect } from '@playwright/test';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { expectFirstPage } from '../helpers/render.js';
+import { downloadBytes, expectRealPdf } from '../helpers/download-bytes.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE = path.join(__dirname, '..', 'fixtures', 'sample-2pages.pdf');
@@ -221,10 +222,16 @@ test.describe('page manager — mobile', () => {
   test('extract downloads the selected pages as a PDF', async ({ page }) => {
     await openSheet(page);
     await page.tap('.pm-tile >> nth=0');
-    const dl = page.waitForEvent('download');
-    await page.tap('[data-act="extract"]');
-    const download = await dl;
-    expect(download.suggestedFilename()).toMatch(/halaman-1\.pdf$/);
+    const { buf, filename } = await downloadBytes(page, () => page.tap('[data-act="extract"]'));
+    expect(filename).toMatch(/halaman-1\.pdf$/);
+
+    // ⚠️ THE FILENAME WAS THE ENTIRE ASSERTION HERE, and the audit named the
+    // exact hole it leaves: extracting the WRONG pages under the RIGHT name.
+    // `halaman-1.pdf` containing page 2 would have passed. So: one page, and it
+    // has to be page ONE — the `absent` check is the half that discriminates.
+    await expectRealPdf(page, buf, {
+      pages: 1, text: ['Test Page 1'], absent: ['Test Page 2'],
+    });
   });
 
   test('grid re-render during the long-press wait does not crash armDrag', async ({ page }) => {

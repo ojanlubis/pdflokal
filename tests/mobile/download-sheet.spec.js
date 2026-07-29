@@ -8,6 +8,7 @@ import { test, expect } from '@playwright/test';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { expectFirstPage } from '../helpers/render.js';
+import { downloadBytes, expectRealPdf } from '../helpers/download-bytes.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE = path.join(__dirname, '..', 'fixtures', 'sample-2pages.pdf');
@@ -32,10 +33,13 @@ test.describe('unduh sheet — mobile', () => {
 
   test('the 90% path: two taps produce the PDF', async ({ page }) => {
     await openSheet(page);
-    const dl = page.waitForEvent('download');
-    await page.tap('#ds-cta'); // tap immediately — the sheet waits for its own build
-    const download = await dl;
-    expect(download.suggestedFilename()).toMatch(/pdflokal\.pdf$/);
+    // ⚠️ THIS FILE HAD FIVE DOWNLOAD ASSERTIONS AND OPENED THE BYTES ZERO TIMES
+    // (docs/test-suite-audit.md, Class 1). It could not have told the difference
+    // between the mobile output pipeline working and it emitting 0-byte,
+    // truncated, or blank files — on the surface that most users are on.
+    const { buf, filename } = await downloadBytes(page, () => page.tap('#ds-cta'));
+    expect(filename).toMatch(/pdflokal\.pdf$/);
+    await expectRealPdf(page, buf, { pages: 2, text: ['Test Page 1', 'Test Page 2'] });
     await expect(page.locator('#dl-sheet')).toBeHidden();
   });
 

@@ -204,9 +204,44 @@ test('COVERAGE: no failure report hard-codes its reason', () => {
     const calls = src.match(/tel\('failure',\s*\{[^}]*\}/g) || [];
     assert.ok(calls.length > 0, `no failure reports found in js/${rel.join('/')} — the scan broke`);
     for (const call of calls) {
+      // ⚠️ A MISSING `reason` IS A FAILURE, NOT A SKIP. This block was
+      // `const m = ...; if (!m) continue;` — so a `tel('failure', {...})` call
+      // site that omits `reason` entirely produced m === null, hit the continue,
+      // and was never asserted against. docs/test-suite-audit.md Class 5 called
+      // it the sharpest finding in the audit, and it was a defect in this guard.
+      //
+      // It is worse than a silent skip: telemetry-schema.js's validateEvent
+      // requires every declared key, so such an event is DROPPED AT THE EDGE —
+      // not sent with a wrong value, sent not at all. That is the exact
+      // "telemetry looks fine and is blind" shape this file exists to prevent,
+      // and this test was green through it.
+      //
+      // ⚠️ AND IT MUST UNDERSTAND ES6 SHORTHAND. Tightening this to "a colon or
+      // it fails" immediately red-flagged `tel('failure', { stage: 'export',
+      // reason })` in download-sheet.js — a call site that is entirely correct
+      // (`const reason = encrypted ? 'encrypted' : failureReason(err)`), just
+      // written shorthand. A guard that cannot read the code it polices trades
+      // a false negative for a false positive; both end with someone editing
+      // the guard instead of the bug.
+      let expr;
       const m = /reason:\s*([^}]*)/.exec(call);
-      if (!m) continue;
-      const expr = m[1].trim().replace(/,$/, '').trim();
+      if (m) {
+        expr = m[1].trim().replace(/,$/, '').trim();
+      } else if (/\breason\s*[,}]/.test(call)) {
+        const bind = /\b(?:const|let|var)\s+reason\s*=\s*([^;]+);/.exec(src);
+        assert.ok(
+          bind,
+          `js/${rel.join('/')} passes \`reason\` shorthand but declares no local \`reason\` binding:\n`
+          + `  ${call.slice(0, 120)}\nSo what reaches the rail cannot be checked from here.`,
+        );
+        expr = bind[1].trim();
+      } else {
+        assert.fail(
+          `a failure report in js/${rel.join('/')} has no reason key at all:\n  ${call.slice(0, 120)}\n`
+          + 'validateEvent requires every declared key, so this event is dropped at the edge and never '
+          + 'reaches the rail. The failure becomes invisible rather than mis-labelled.',
+        );
+      }
       // Two acceptable shapes, and nothing else:
       //   failureReason(err)  — the classifier actually ran
       //   'encrypted'         — a fact the app read off the DOCUMENT at import,
