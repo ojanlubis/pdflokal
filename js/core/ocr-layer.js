@@ -67,6 +67,21 @@ const MIN_FONT_SIZE = 1;
 // approximate width lands on the box's actual width. Being invisible is what
 // makes this acceptable: no reader ever sees the glyphs, only whether the
 // SELECTED region roughly tracks the word underneath.
+// PDF 32000-1 Table 106. 3 = neither fill nor stroke: the whole point.
+const INVISIBLE_MODE = 3;
+
+// ⚠️ TESTABILITY SEAM, NOT A FEATURE. The product ALWAYS writes mode 3.
+// `renderMode` exists so a test can write the VISIBLE TWIN of a layer and
+// prove the "this file stays invisible" assertions have power: an
+// invisible-by-default writer plus a probe that can only say false would pass
+// every such test while protecting nothing.
+// tests/core/ocr-render-mode-guard.test.mjs fails if any product file passes
+// it. Never pass it from js/v2, js/render, or a lab page.
+function modeFrom(opts) {
+  const m = opts && opts.renderMode;
+  return Number.isInteger(m) ? m : INVISIBLE_MODE;
+}
+
 const AVG_GLYPH_WIDTH_EM = 0.5;
 
 // Guard rails on the computed Tz percentage — never 0 (a valid but
@@ -167,7 +182,7 @@ function opsForWord(word, fontRes) {
 // Builds both the joined ops string AND the written/skipped counts in one
 // pass over `words` — the single source both exported entry points read
 // from, per opsForWord's own header note.
-function buildOpsAndCounts(words, fontRes) {
+function buildOpsAndCounts(words, fontRes, renderMode = INVISIBLE_MODE) {
   const list = Array.isArray(words) ? words : [];
   let written = 0;
   let skipped = 0;
@@ -176,7 +191,7 @@ function buildOpsAndCounts(words, fontRes) {
     const block = fontRes ? opsForWord(word, fontRes) : null;
     if (block) { blocks.push(block); written += 1; } else { skipped += 1; }
   }
-  const ops = blocks.length ? `q\n3 Tr\n${blocks.join('\n')}\nQ` : '';
+  const ops = blocks.length ? `q\n${renderMode} Tr\n${blocks.join('\n')}\nQ` : '';
   return { ops, written, skipped };
 }
 
@@ -195,7 +210,7 @@ function buildOpsAndCounts(words, fontRes) {
  */
 export function buildInvisibleTextOps(words, opts) {
   const fontRes = opts && opts.fontRes;
-  return buildOpsAndCounts(words, fontRes).ops;
+  return buildOpsAndCounts(words, fontRes, modeFrom(opts)).ops;
 }
 
 // ---- content-stream append (same read/write shape as redact.js) -----------
@@ -235,8 +250,9 @@ function appendToPageContents(pdfPage, PDFLib, ops) {
  * @param {{PDFLib: object}} deps
  * @returns {Promise<{bytes: Uint8Array, written: number, skipped: number}>}
  */
-export async function writeInvisibleTextLayer(pdfBytes, pages, deps) {
+export async function writeInvisibleTextLayer(pdfBytes, pages, deps, opts) {
   const { PDFLib } = deps;
+  const renderMode = modeFrom(opts);
   const { PDFDocument, StandardFonts } = PDFLib;
 
   const doc = await PDFDocument.load(pdfBytes);
@@ -264,7 +280,7 @@ export async function writeInvisibleTextLayer(pdfBytes, pages, deps) {
     const fontKey = pdfPage.node.newFontDictionary(font.name, font.ref);
     const fontRes = fontKey.toString().replace(/^\//, '');
 
-    const { ops, written: pageWritten, skipped: pageSkipped } = buildOpsAndCounts(entry && entry.words, fontRes);
+    const { ops, written: pageWritten, skipped: pageSkipped } = buildOpsAndCounts(entry && entry.words, fontRes, renderMode);
     written += pageWritten;
     skipped += pageSkipped;
     if (!ops) continue; // nothing survived for this page -- leave its Contents untouched
