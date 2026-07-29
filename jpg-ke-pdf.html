@@ -115,6 +115,15 @@
     the old wing (alat-gambar.html) and dies with it at demolition.
   -->
   <link rel="stylesheet" href="/css/tokens.css">
+  <!-- THEME BOOT. Applies an EXPLICIT choice before first paint, so a user who
+       picked the theme opposite to their OS does not see a flash of the other
+       one. It deliberately does NOT resolve the system preference: that is
+       css/tokens.css's job, and a page with no stored choice must reach the
+       browser with no data-theme attribute at all so the media query can win.
+       Kept inline and tiny because an external file cannot beat first paint.
+       ⚠️ Byte-identical in index.html, privasi.html and dukung.html —
+       tests/core/theme-boot-parity.test.mjs fails if they drift. -->
+  <script>try{var t=localStorage.getItem('pdflokal_theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
   <style>
     :root {
       /* ⚠️ THE DESIGN TOKENS ARE NOT HERE. They live in /css/tokens.css — one
@@ -1474,6 +1483,11 @@
        see js/sentry-init.js. -->
   <script defer src="js/vendor/sentry.min.js"></script>
   <script defer src="js/sentry-init.js"></script>
+  <!-- Theme: keeps meta[theme-color] on the real token and follows the OS live
+       while the user has expressed no preference. v2 has no theme toggle in its
+       navbar (the pill is Github / Privasi / Dukung, ruled), so on this page the
+       module's job is the system-follow and the chrome colour, not a control. -->
+  <script type="module" src="js/theme.js"></script>
   <script type="module" src="js/v2/app.js"></script>
 </body>
 </html>

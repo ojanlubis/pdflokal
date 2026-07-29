@@ -1,0 +1,108 @@
+/* ============================================================================
+ * LEGACY BRIDGE — privasi.html and dukung.html only.
+ *
+ * ⚠️ THIS FILE IS SCAFFOLDING AND IT IS MEANT TO BE DELETED.
+ *
+ * WHAT IT IS FOR. Those two pages were built against the OLD WING's token
+ * vocabulary (`--text-secondary`, `--space-xl`, `--radius-xl`, `--shadow-md`,
+ * `--accent-primary`) and they still borrow style.css's structural classes for
+ * their header, footer, buttons and theme toggle. The design system says they
+ * "have never been aligned to anything" and should inherit — but a full port
+ * means rebuilding both pages' chrome, which is a job of its own and not one to
+ * bury inside a redesign pass.
+ *
+ * So this maps the old names onto the real tokens. The two pages get the new
+ * palette, the new radii and D2 dark mode for free, from ONE home, without
+ * their markup being touched. That is the substance of "onto tokens"; the
+ * remaining work is structural and is stated rather than hidden.
+ *
+ * ⚠️ LOAD ORDER IS LOAD-BEARING: this must come AFTER style.css, which defines
+ * the same names. Equal specificity, later wins. If a future edit moves the
+ * style.css link below this one, both pages silently revert to the old palette
+ * and nothing throws.
+ *
+ * AT DEMOLITION: port the two pages onto the real tokens and delete this file.
+ * ==========================================================================*/
+
+/*
+ * ⚠️ THE SELECTOR LIST IS NOT DECORATION. style.css re-declares every one of
+ * these names inside `html[data-theme="dark"]`, which is specificity (0,1,1) —
+ * higher than a bare `:root` at (0,1,0). A bridge written only as `:root` is
+ * silently overridden the moment a user makes an explicit dark choice, and they
+ * get the old wing's WARM dark instead of D2 neutral. Matching the selector
+ * shape ties the specificity, and this file loads later, so it wins.
+ *
+ * ⚠️ AND THE LIST BELOW MUST STAY COMPLETE. The first version of this file was
+ * built by grepping `var(--…)` inside privasi.html and dukung.html — which
+ * misses every variable style.css applies through its OWN rules (body, headings,
+ * .header, .footer). `--bg-primary` was missed exactly that way and the result
+ * was a LIGHT page carrying DARK cards. Enumerate from style.css's :root, not
+ * from the pages.
+ */
+:root,
+html[data-theme="dark"],
+html[data-theme="light"] {
+  /* ---- colour ---- */
+  --bg-primary: var(--bg);
+  --bg-hover: var(--dzbg);
+  --text-inverse: var(--on-accent);
+  --accent-secondary: var(--accent-down);
+  --accent-light: var(--dzbg);
+  --border-medium: var(--line);
+  --surface-white: var(--surface);
+  --canvas-bg: var(--dzbg);
+  --shadow-sm: none;
+  --shadow-paper: none;
+  --space-3xl: var(--sp-64);
+  --radius-sm: var(--r-control);
+
+  /* Status colours: same reasoning as --accent-success below. */
+  --color-success: var(--ink);
+  --color-error: var(--accent);
+
+  --text-primary: var(--ink);
+  --text-secondary: var(--muted);
+  --text-tertiary: var(--muted);
+  --bg-secondary: var(--surface);
+  --bg-tertiary: var(--dzbg);
+  --border-light: var(--line);
+  --accent-primary: var(--accent);
+
+  /* ⚠️ THE GREEN IS DELIBERATELY GONE. `--accent-success: #22c55e` drew the ✓
+   * marks in the privacy list. Green is not in this system, and the one grammar
+   * law is that RED means touchable and has no other job — a second accent
+   * colour that means "good" quietly teaches a second meaning for colour on the
+   * one page whose entire purpose is to be believed. The marks now take --ink:
+   * they are punctuation, not status. If a status colour is ever genuinely
+   * needed, it is a ruling, not a default. */
+  --accent-success: var(--ink);
+
+  /* ---- spacing: the old t-shirt ramp onto the base-4 ramp ---- */
+  --space-xs: var(--sp-4);
+  --space-sm: var(--sp-8);
+  --space-md: var(--sp-16);
+  --space-lg: var(--sp-24);
+  --space-xl: var(--sp-32);
+  --space-2xl: var(--sp-48);
+
+  /* ---- shape ---- */
+  --radius-md: var(--r-control);
+  --radius-lg: var(--r-button);
+  --radius-xl: var(--r-panel);
+
+  /* ⚠️ ELEVATION IS NEARLY BANNED. He removed the navbar's shadow within
+   * minutes of seeing it: "it makes things unclean." Surfaces separate by line
+   * and by ground. The shadows are neutralised here rather than at each call
+   * site, and the affected cards get their line back below. */
+  --shadow-md: none;
+  --shadow-lg: none;
+}
+
+/* The cards lost their shadow above, so they need the line that replaces it —
+ * otherwise a --surface card on a --bg page has no edge at all in light mode,
+ * where both are white. */
+.privacy-section,
+.support-card,
+.donation-card {
+  border: 1px solid var(--line);
+}
