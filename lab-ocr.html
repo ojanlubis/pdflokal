@@ -55,6 +55,8 @@
   <label for="file">PDF hasil scan:</label>
   <input type="file" id="file" accept="application/pdf">
   <button id="run-ocr" disabled>Jalankan OCR</button>
+  <button id="check-eval" type="button">Cek eval()</button>
+  <span id="eval-result"></span>
   <span id="status">pilih file PDF dulu.</span>
 </div>
 
@@ -68,6 +70,23 @@
 <script type="module">
 import { ensurePdfJs, ensurePdfLib } from '/js/core/vendor.js';
 import { writeInvisibleTextLayer } from '/js/core/ocr-layer.js';
+
+// CONTROL for the CSP demo: 'wasm-unsafe-eval' does NOT grant eval(). The two
+// directive names are confusingly similar, so this is shown rather than
+// claimed. Under scripts/ocr-demo.mjs --allow-wasm, OCR works and THIS must
+// still be blocked.
+document.getElementById('check-eval').addEventListener('click', () => {
+  const out = document.getElementById('eval-result');
+  try {
+    // eslint-disable-next-line no-eval
+    const v = eval('1+1');
+    out.textContent = `eval() DIIZINKAN, hasilnya ${v}. CSP tidak memblokir eval.`;
+    out.style.color = '#b45309';
+  } catch (err) {
+    out.textContent = `eval() DIBLOKIR oleh CSP (${err.name}). Ini yang kita mau.`;
+    out.style.color = '#15803d';
+  }
+});
 
 const fileInput = document.getElementById('file');
 const runBtn = document.getElementById('run-ocr');
