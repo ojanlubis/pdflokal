@@ -59,3 +59,4 @@ js/vendor/tesseract/
 # laptop describes their hardware, not this run. Written after the fingerprint
 # watcher stops, so it can never move the tree under a run.
 .gate-baseline.json
+review-shots/
