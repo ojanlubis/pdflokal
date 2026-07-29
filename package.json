@@ -25,7 +25,8 @@
     "seo": "node scripts/gen-seo-pages.js",
     "seo:check": "node scripts/gen-seo-pages.js --check",
     "seo:sample": "node scripts/gen-seo-pages.js --sample",
-    "seo:approve": "node scripts/gen-seo-pages.js --approve"
+    "seo:approve": "node scripts/gen-seo-pages.js --approve",
+    "review": "npx serve -p 3000 --no-clipboard --no-port-switching ."
   },
   "repository": {
     "type": "git",

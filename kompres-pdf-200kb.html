@@ -461,7 +461,7 @@
        THIS FILE. The generator anchors on the first match of that tag in the
        whole document, and a mention inside a CSS comment IS a match: it once
        replaced everything from this comment down to the real closing tag,
-       deleting <body data-intent="kompres" data-target="204800">, the header and the app's scroll container from all 12
+       deleting <body>, the header and the app's scroll container from all 12
        generated pages. They rendered blank, and seo:check still passed. */
     .ld h1:has(+ .ld-sub) { margin-bottom: var(--sp-16); }
     .ld-sub { font-size: var(--fs-1); color: var(--muted); margin: 0 auto var(--sp-48); max-width: var(--measure); }
@@ -961,7 +961,7 @@
     #toast.show { opacity: 1; }
   </style>
 </head>
-<body class="is-empty">
+<body class="is-empty" data-intent="kompres" data-target="204800">
   <header>
     <button class="brand" id="btn-home" aria-label="Kembali ke beranda">PDF<span class="brand-red">Lokal</span></button>
     <div class="file-menu-wrap">

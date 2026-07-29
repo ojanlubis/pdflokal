@@ -312,7 +312,36 @@ for (const page of data.pages) {
   // this line clobbered the whole tag. The pages still RENDERED, because browsers
   // synthesise a missing <body>, so nothing looked broken. Only the intent test
   // caught it. Assume a template edit here fails silently.)
-  const bodyTag = html.match(/<body(\s[^>]*)?>/);
+  /*
+   * ⚠️⚠️ EVERYTHING FROM HERE DOWN TEMPLATES THE BODY HALF ONLY, AND THIS SPLIT
+   * IS THE FIX FOR A WHOLE CLASS OF DEFECT — not for one bug.
+   *
+   * These substitutions are regexes over the document, and their anchors are
+   * ordinary HTML that also occurs as PROSE inside index.html's <style> block.
+   * It has now happened twice in one day:
+   *
+   *   1. a CSS comment mentioning the headline's tag matched the h1 anchor, and
+   *      the replacement ate everything down to the real closing tag. All 12
+   *      pages rendered BLANK.
+   *   2. the comment WARNING about (1) contained the literal body tag. The
+   *      intent hook was appended to that sentence instead of to the real
+   *      element, so `data-intent`/`data-target` never reached the document and
+   *      /kompres-pdf-500kb silently stopped applying its size cap.
+   *
+   * The second one got past the shell guard added for the first, because that
+   * guard asks "is there a body tag?" and a body tag inside a comment answers
+   * yes. Presence is not the same as landing on the right node.
+   *
+   * Splitting at </head> makes the whole class impossible: no comment, no
+   * inline script and no stylesheet can be reached by a body substitution,
+   * because they are not in the string being substituted.
+   */
+  const headEnd = html.indexOf('</head>');
+  if (headEnd === -1) throw new Error('gen-seo-pages: no </head> in index.html — cannot separate head from body');
+  const head = html.slice(0, headEnd);
+  let body = html.slice(headEnd);
+
+  const bodyTag = body.match(/<body(\s[^>]*)?>/);
   if (!bodyTag) throw new Error('gen-seo-pages: no <body> tag in index.html');
   if (bodyTag[0].includes('data-intent')) throw new Error('gen-seo-pages: index.html already declares data-intent, the template must stay intent-free');
   // data-target: the hard size cap for /kompres-pdf-500kb and friends. This is the
@@ -320,7 +349,7 @@ for (const page of data.pages) {
   // download-sheet validates the number against its own TARGETS list, so a bad
   // value degrades to "Otomatis" rather than becoming a bogus cap.
   const attrs = ` data-intent="${page.intent}"${page.target ? ` data-target="${page.target}"` : ''}`;
-  html = html.replace(bodyTag[0], bodyTag[0].replace(/>$/, `${attrs}>`));
+  body = body.replace(bodyTag[0], bodyTag[0].replace(/>$/, `${attrs}>`));
 
   // ⚠️ THE SUB IS INSERTED HERE, NOT REPLACED, AND THAT IS THE WHOLE POINT.
   // The landing's subhead was ruled away on 2026-07-29, so index.html — the
@@ -328,8 +357,8 @@ for (const page of data.pages) {
   // pages still need one: the landing's sub was competing with an 82.6px
   // headline for the same glance, whereas here it is the line that PROVES the
   // claim the search query arrived with. Two surfaces, two jobs.
-  html = sub(
-    html, /<h1>[\s\S]*?<\/h1>/,
+  body = sub(
+    body, /<h1>[\s\S]*?<\/h1>/,
     `<h1>${esc(page.h1)}</h1>\n            <p class="ld-sub">${esc(page.sub)}</p>`,
     '<h1>',
   );
@@ -342,9 +371,12 @@ for (const page of data.pages) {
   // stripping is no longer justified by its own comment.
   // Kept anyway, because turning the stamp ON across 12 marketing surfaces is a
   // taste call and belongs to Fauzan, not to a redesign pass. OPEN.
-  html = html.replace(/<div class="ld-stamp"[^>]*>[\s\S]*?<\/div>\s*/, '');
+  body = body.replace(/<div class="ld-stamp"[^>]*>[\s\S]*?<\/div>\s*/, '');
 
-  html = sub(html, /<section class="ld-faq">[\s\S]*?<\/section>/, `${copyBlock(page)}\n        ${faqBlock(page)}`, '.ld-faq');
+  body = sub(body, /<section class="ld-faq">[\s\S]*?<\/section>/, `${copyBlock(page)}\n        ${faqBlock(page)}`, '.ld-faq');
+
+  // Rejoin. From here `html` is the finished document again.
+  html = head + body;
 
   // ⚠️ THE SHELL MUST SURVIVE THE TEMPLATING. Every substitution above is a
   // REGEX OVER THE WHOLE DOCUMENT, and the anchors are ordinary HTML that can
@@ -368,6 +400,34 @@ for (const page of data.pages) {
     ['the dropzone', /class="dropzone"/],
     ['the app module script', /<script type="module" src="js\/v2\/app\.js">/],
   ];
+  /*
+   * ⚠️ PRESENCE IS NOT LANDING, and this is the assertion whose absence let the
+   * second incident through. The `shell` list below asks "is there a body tag?"
+   * — and a body tag written inside a CSS comment answers yes. That is exactly
+   * what happened: `data-intent`/`data-target` were appended to a sentence in a
+   * comment, the guard was satisfied, and /kompres-pdf-500kb quietly stopped
+   * applying its size cap. Only the gate's compress-target specs caught it.
+   *
+   * So check the REAL element — the one after </head> — and check that the
+   * attributes are actually ON it.
+   */
+  const emittedBody = /<body(\s[^>]*)?>/.exec(html.slice(html.indexOf('</head>')));
+  if (!emittedBody) throw new Error(`gen-seo-pages: ${page.slug}.html has no real <body> after </head>`);
+  if (!emittedBody[0].includes(`data-intent="${page.intent}"`)) {
+    throw new Error(
+      `gen-seo-pages: ${page.slug}.html's real <body> did not receive data-intent="${page.intent}".\n`
+      + `  got: ${emittedBody[0].slice(0, 120)}\n`
+      + 'The intent hook is what makes arriving on a tool page open that tool. Without it the page '
+      + 'still looks perfect and behaves like the generic homepage.',
+    );
+  }
+  if (page.target && !emittedBody[0].includes(`data-target="${page.target}"`)) {
+    throw new Error(
+      `gen-seo-pages: ${page.slug}.html's real <body> did not receive data-target="${page.target}".\n`
+      + 'That number is the hard size cap and the ONLY reason this page is allowed to exist.',
+    );
+  }
+
   for (const [label, re] of shell) {
     if (!re.test(html)) {
       throw new Error(

@@ -14,7 +14,12 @@ const FIXTURE = path.join(__dirname, '..', 'fixtures', 'sample-2pages.pdf');
 test.describe('landing — mobile', () => {
   test('shows landing content, hides editor chrome until a file loads', async ({ page }) => {
     await page.goto('/');
-    await expect(page.locator('.ld h1')).toContainText('PDF beres dalam hitungan detik');
+    // H1 ruled 2026-07-29: "Buat ngurus PDF." The subhead that used to sit under
+    // it was CUT, not reworded, so `.ld-sub` must not exist on the landing —
+    // asserting its absence is what stops it drifting back in. It still exists,
+    // deliberately, on the 12 generated tool pages.
+    await expect(page.locator('.ld h1')).toContainText('Buat ngurus PDF.');
+    await expect(page.locator('.ld-sub')).toHaveCount(0);
     await expect(page.locator('#toolbar')).toBeHidden();
     await expect(page.locator('.ld-card')).toHaveCount(14);
     await expect(page.locator('#ld-more')).toBeHidden(); // 10 behind the accordion

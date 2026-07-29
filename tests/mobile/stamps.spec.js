@@ -13,10 +13,16 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE = path.join(__dirname, '..', 'fixtures', 'sample-2pages.pdf');
 
 test.describe('stamp moments — mobile', () => {
-  test('TAMPILAN BARU is a PERMANENT landing element (founder call Jul 4)', async ({ page }) => {
+  test('the stamp is a PERMANENT landing element (founder call Jul 4)', async ({ page }) => {
     await page.goto('/');
     await expect(page.locator('.ld-stamp')).toBeVisible();
-    await expect(page.locator('.ld-stamp')).toContainText('Tampilan baru');
+    // Copy ruled 2026-07-29: "Tampilan baru" → "Gratis!" (specs/design-system.md
+    // §6). PERMANENCE is what this test guards, not the string — but the string
+    // is pinned too, because the stamp is the one closed motif the system owns
+    // and a silent edit to it is a brand change nobody reviewed.
+    await expect(page.locator('.ld-stamp')).toContainText('Gratis!');
+    // One per page. The motif stops meaning anything the moment there are two.
+    await expect(page.locator('.ld-stamp')).toHaveCount(1);
     // Permanent means permanent: still there after a reload.
     await page.reload();
     await page.waitForTimeout(1200);
