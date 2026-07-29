@@ -407,29 +407,44 @@
     .ld-hd {
       display: flex; align-items: center; justify-content: space-between; gap: var(--sp-16);
       padding: var(--sp-12) 0;
+      /* KOP SURAT — the letterhead double rule. KEPT, and it is structure, not
+         decoration: a double line under the masthead is this system's own
+         "surfaces separate by line, never by shadow" rule doing its job, and an
+         Indonesian letterhead reference is the opposite of the sameness that
+         "screams AI". It was briefly dropped on the premise that it competed
+         with a navbar pill; there is no pill (see .ld-nav), so there is nothing
+         to compete with. */
+      border-bottom: 3px double var(--ink);
     }
     .ld-mark { font-weight: 700; font-size: var(--fs-2); letter-spacing: -.02em; }
     .ld-mark em { font-style: normal; color: var(--accent); }
-    /* The nav is a LIFTED PILL, and it has NO SHADOW — he removed the navbar's
-       shadow within minutes of seeing it: "it makes things unclean." Surfaces
-       separate by line and by ground here, never by elevation. */
-    .ld-nav {
-      display: flex; align-items: center; gap: var(--sp-4);
-      background: var(--surface); border: 1px solid var(--line);
-      border-radius: var(--r-pill); padding: var(--sp-4);
-    }
+    /* A PLAIN FLEX ROW. There is NO wrapper — no background, no border, no
+       radius, no shadow. He killed it on sight: "the shadow wrapper is... bad it
+       makes things unclean let's drop the shadow wrapper, keep everything else."
+       An earlier build here made it a bordered pill on the reading that removing
+       the SHADOW was the whole instruction. It was not: the wrapper went, the
+       links stayed. */
+    .ld-nav { display: flex; align-items: center; gap: var(--sp-4); }
     .ld-nav a {
       font-size: var(--fs-n1); color: var(--muted); text-decoration: none; font-weight: 500;
-      min-height: 36px; padding: 0 var(--sp-12); display: inline-flex; align-items: center;
-      border-radius: var(--r-pill);
+      min-height: 44px; padding: 0 var(--sp-8); display: inline-flex; align-items: center;
     }
     .ld-nav a:hover { color: var(--ink); }
-    /* WHY: as the pill narrows it sheds items from the LEFT, so the last thing
-       standing is "Dukung" — the ask, and the only one of the three that is not
-       also reachable from the footer four screens down. Order in the DOM is the
-       order of sacrifice; do not reorder these without re-reading this. */
-    @media (max-width: 560px) { .ld-nav a:nth-child(1) { display: none; } }
-    @media (max-width: 400px) { .ld-nav a:nth-child(2) { display: none; } }
+    /*
+     * As the row narrows it sheds items from the LEFT, so the last one standing
+     * is "Dukung" — the ask, and the one whose absence costs most.
+     *
+     * ⚠️ THESE BREAKPOINTS ARE DELIBERATELY BELOW THE COMMON PHONE WIDTH, and
+     * that is a correction. When the nav was a padded pill it overflowed at
+     * 390px, so the first version shed "Privasi" there — on a 390px-class
+     * screen, which is roughly half our traffic, and Privasi is in the nav on
+     * purpose. Dropping the pill chrome reclaimed enough width that all three
+     * now fit at 390 (measured: 321px used of 358 available). So the rule stays
+     * as a safety valve for genuinely tiny screens and no longer fires on the
+     * phone most users hold. Re-measure before moving these.
+     */
+    @media (max-width: 349px) { .ld-nav a:nth-child(1) { display: none; } }
+    @media (max-width: 300px) { .ld-nav a:nth-child(2) { display: none; } }
     /* Centered hero (founder, Jul 5) — the document opens like a letter's
        title block, with the stamp pressed on its top-right corner. */
     /* padding-top (not h1 margin): a margin would collapse through the wrapper
