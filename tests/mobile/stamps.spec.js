@@ -45,6 +45,78 @@ test.describe('stamp moments — mobile', () => {
     // And the superseded string must be gone from the surface entirely, not
     // merely out-ranked by a second stamp somewhere further down.
     await expect(page.locator('body')).not.toContainText('Tampilan baru');
+
+    /*
+     * ⚠️ POSITION AND SIZE ARE ASSERTED BECAUSE PINNING THE TEXT ALONE IS WHAT
+     * LET THE RULING GO UNSHIPPED.
+     *
+     * On 2026-07-30 the new string was swapped into the OLD element — 12.5px,
+     * welded to the title block — instead of the ruled stamp being built at 37px
+     * on the dropzone's corner. Both of the two things he explicitly said to keep
+     * were the two things that changed, and THIS TEST WAS GREEN THE WHOLE TIME,
+     * because the only thing it checked was the word.
+     *
+     * A test that pins the cheapest attribute of a ruled element gives the
+     * feeling of coverage and none of it. The founder found it by looking.
+     */
+    const stamp = page.locator('.ld-stamp');
+    await expect(stamp).toHaveCSS('font-size', '37px');
+
+    // Sentence case: the old element uppercased its text. "GRATIS!" at 37px
+    // shouts where "Gratis!" states, and text-transform is invisible in the DOM
+    // text — only the computed style shows it.
+    await expect(stamp).toHaveCSS('text-transform', 'none');
+
+    // Welded to the DROPZONE, not to the headline. Measured rather than
+    // asserted from the DOM tree: what matters is where it lands, and an
+    // element can be a descendant of the right box and still be positioned
+    // somewhere else entirely.
+    /*
+     * ⚠️ WAIT FOR THE THUNK TO FINISH BEFORE MEASURING ANYTHING.
+     * `.ld-stamp` enters with `ld-thunk`, whose first keyframe is
+     * `rotate(-16deg) scale(2)`. Measured mid-flight the bounding box is twice
+     * its real size and spills well outside the dropzone — so the geometry
+     * assertions below failed against a CORRECT build, and the number they
+     * reported was real. Nothing was wrong with the page; the ruler was moving.
+     * (`toHaveCSS` auto-retries and hid this; `evaluate` does not.)
+     */
+    await page.waitForFunction(
+      () => document.querySelector('.ld-stamp').getAnimations().every((a) => a.playState === 'finished'),
+      null, { timeout: 5000 },
+    );
+
+    const geom = await page.evaluate(() => {
+      const s = document.querySelector('.ld-stamp').getBoundingClientRect();
+      const d = document.querySelector('.dropzone').getBoundingClientRect();
+      const h = document.querySelector('.ld h1').getBoundingClientRect();
+      return {
+        overhangsDropzoneTop: s.top < d.top && s.bottom > d.top,
+        gapRight: Math.round(d.right - s.right),
+        gapLeft: Math.round(s.left - d.left),
+        withinDropzoneWidth: s.left >= d.left && s.right <= d.right,
+        clearOfHeadline: s.top >= h.bottom - 4,
+      };
+    });
+    expect(geom.overhangsDropzoneTop, 'the stamp does not straddle the dropzone\'s top edge — it is not pressed ONTO the corner').toBe(true);
+
+    /*
+     * ⚠️ RIGHT-ANCHORED, NOT "PAST THE MIDPOINT". The first version asserted
+     * `s.left > d.left + d.width/2` and failed on the phone for a correct build:
+     * the stamp is a fixed 37px, so on a 358px dropzone it is wide enough to
+     * start before the midpoint while still being anchored to the right corner.
+     * That assertion had encoded a desktop coordinate instead of the intent.
+     * The intent is "pressed on the top-RIGHT corner", which is a statement
+     * about which edge it is tied to — so compare the two gaps.
+     */
+    expect(
+      geom.gapRight,
+      `the stamp sits ${geom.gapRight}px from the dropzone's right edge and ${geom.gapLeft}px from `
+      + 'its left. It is meant to be pressed on the top-RIGHT corner.',
+    ).toBeLessThan(geom.gapLeft);
+    expect(geom.gapRight, 'the stamp has drifted away from the right edge').toBeLessThan(80);
+
+    expect(geom.withinDropzoneWidth, 'the stamp hangs outside the dropzone horizontally').toBe(true);
+    expect(geom.clearOfHeadline, 'the stamp has drifted back up into the headline — that is the pre-ruling position').toBe(true);
     // Permanent means permanent: still there after a reload.
     await page.reload();
     await page.waitForTimeout(1200);
