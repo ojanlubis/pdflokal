@@ -112,6 +112,14 @@
    * things unclean." Surfaces separate BY LINE AND BY GROUND, not by shadow.
    * The one exception is the editor's floating sheets, where a shadow answers
    * "what is on top of what" and nothing else can. */
+  /* ⚠️ THE STAMP'S SIZE IS AN EXCEPTION TO THE SCALE, AND IT IS HIS OWN NUMBER.
+   * Step 4 rounds to 33.2px; he tuned this by eye in the studio and landed on
+   * 37, and specs/design-system.md names 37. The stamp is the one closed motif
+   * the system owns — it is not type setting text, it is a mark — so it does not
+   * pick a step. Documented here rather than left loose in a component, because
+   * a raw 37px in the stylesheet reads as an oversight and would get "fixed". */
+  --stamp: 37px;
+
   --r-control: 8px;
   --r-button: 12px;
   --r-panel: 16px;

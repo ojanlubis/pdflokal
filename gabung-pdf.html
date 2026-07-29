@@ -449,11 +449,12 @@
        title block, with the stamp pressed on its top-right corner. */
     /* padding-top (not h1 margin): a margin would collapse through the wrapper
        and drag the absolute stamp down onto the headline text */
-    /* The hero sits on the WORKING COLUMN too, and that is load-bearing for the
-       stamp: .ld-stamp is positioned against this box, so if the hero spans the
-       full 1360 container the stamp lands ~500px from the headline and reads as
-       an unrelated mark floating in the corner. On the column it presses against
-       the same right edge as the dropzone below it. */
+    /* The hero sits on the WORKING COLUMN, like everything else on the page, so
+       the headline is centred over the dropzone rather than over the container.
+       (This block used to host the stamp and said so; the stamp now belongs to
+       .dz-wrap — see .ld-stamp — and `position: relative` is kept here only
+       because removing it is not worth the risk of an unrelated absolute child
+       escaping to the viewport.) */
     .ld-hero-copy {
       position: relative; text-align: center;
       max-width: var(--column); margin: 0 auto; padding-top: var(--sp-48);
@@ -480,13 +481,28 @@
        generated pages. They rendered blank, and seo:check still passed. */
     .ld h1:has(+ .ld-sub) { margin-bottom: var(--sp-16); }
     .ld-sub { font-size: var(--fs-1); color: var(--muted); margin: 0 auto var(--sp-48); max-width: var(--measure); }
-    /* the permanent revamp stamp — thunks once per page view, then just IS.
-       Pressed on the title block's top-right corner, tilted left (founder, Jul 5). */
+    /* THE STAMP — thunks once per page view, then just IS.
+     * ⚠️ IT IS PRESSED ON THE DROPZONE'S TOP-RIGHT CORNER, NOT ON THE TITLE
+     * BLOCK, and it is 37px, not 12.5. Both of those were ruled and both were
+     * missed once: the string was swapped into the old title-block element
+     * instead of the ruled stamp being built, so it read as a faint watermark
+     * beside the headline. His words were "keep the positioning, keep the size,
+     * but tone down on the boldness — use the same colour and pattern as the old
+     * one" — i.e. position and size from the option he picked, colour and
+     * turbulence pattern from the element this rule grew out of.
+     *
+     * "Tone down the boldness" is why the border stays at 3px instead of scaling
+     * with the type: 3px against 12.5px text is a heavy frame, 3px against 37px
+     * is a fine one. The weight comes off by NOT scaling it.
+     *
+     * Sentence case, deliberately — the old element uppercased its text, and
+     * "GRATIS!" at 37px shouts where "Gratis!" states. */
+    .dz-wrap { position: relative; }
     .ld-stamp {
-      position: absolute; top: 3px; right: 0; padding: 5px 11px;
+      position: absolute; top: -24px; right: 34px; padding: 6px 16px;
       border: 3px solid var(--accent); border-radius: 7px; color: var(--accent);
-      font-weight: 700; font-size: 12.5px; letter-spacing: .09em; text-transform: uppercase;
-      transform: rotate(-8deg);
+      font-weight: 700; font-size: var(--stamp); letter-spacing: .02em;
+      transform: rotate(-8deg); pointer-events: none; white-space: nowrap;
       /* Distinct filter ids (nw / ns) on purpose. They are identical grain masks,
          but both SVGs used id='n', and a linter scanning the HTML text sees two
          id="n" and calls it a duplicate DOM id. It is NOT one — each id lives
@@ -623,7 +639,9 @@
          did exactly that for one build and it was visible in the screenshot. The
          stamp is the one closed motif the system owns; it is exempt until its
          alpha curve is re-derived, and that is a separate job. */
-      .ld-stamp { font-size: 14px; padding: 6px 13px; border-width: 3.5px; top: var(--sp-64); }
+      /* No desktop size override any more. The stamp is --stamp (37px) at every
+         width: it belongs to the dropzone, which is the same 920 column on both
+         form factors, so there is nothing for it to respond to. */
       /* 920 x 300 — the working column, at the height he set. */
       .dropzone { min-height: 300px; }
       .ld-grid { grid-template-columns: repeat(4, 1fr); } /* top-4 = one featured row */
@@ -1067,21 +1085,24 @@
                  privacy promise further down, where content is free. -->
             <h1>Gabungkan PDF jadi satu file</h1>
             <p class="ld-sub">Seret semua filemu ke sini. Urutkan, lalu unduh. Tanpa upload, tanpa akun, tanpa watermark.</p>
-            <!-- PERMANENT for the revamp era (founder call, Jul 4): the stamp
-                 marks the page on every visit, mobile and desktop. One per page
-                 — it is the only flourish either system owns. -->
-            </div>
+          </div>
         <!-- ⭐ THE WORKING COLUMN. Everything inside shares one 920 width — the
              dropzone and the tool cards read as a single column because they
              ARE one. Splitting them to different widths is the defect this
              wrapper exists to prevent. -->
         <div class="ld-col">
+        <!-- The stamp is welded to the DROPZONE, not to the headline (ruled).
+             .dz-wrap exists only to be its positioning context: top is negative,
+             so the stamp overhangs the dropzone's top edge and reads as pressed
+             onto the corner rather than placed inside it. One per page. -->
+        <div class="dz-wrap">
         <button class="dropzone" id="btn-open">
           <svg class="dz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
           <span class="dz-title">Seret file ke sini, atau</span>
           <span class="dz-buka">Buka File</span>
           <span class="dz-hint">PDF atau foto, boleh banyak sekaligus</span>
         </button>
+        </div>
         <!-- Install chip: quiet, below the dropzone. Shown only to RETURNING users
              (js/v2/install-prompt.js); tap opens the adaptive install card. Never
              on the download moment — install must not compete with the share ask. -->
