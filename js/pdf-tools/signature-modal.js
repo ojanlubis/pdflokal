@@ -265,7 +265,7 @@ export function useParaf() {
     ueState.pendingSignatureWidth = PARAF_DEFAULT_WIDTH;
     ueState.pendingSubtype = 'paraf';
     const msg = ueState.pendingApplyToAllPages
-      ? 'Klik di halaman pertama — paraf akan disalin ke semua halaman'
+      ? 'Klik di halaman pertama, paraf akan disalin ke semua halaman'
       : 'Klik pada PDF untuk menempatkan paraf';
     showToast(msg, 'success');
   } else {

@@ -184,7 +184,7 @@ async function removeRun(pageNum, item) {
     wrap.scrollIntoView({ behavior: 'smooth' });
 
     out.textContent = gone
-      ? ` ✓ ${removed} op dihapus — teks HILANG dari file (${outBytes.length} bytes). Halaman hasil (hijau) ditambahkan di bawah.`
+      ? ` ✓ ${removed} op dihapus, teks HILANG dari file (${outBytes.length} bytes). Halaman hasil (hijau) ditambahkan di bawah.`
       : ` ✗ ${removed} op dihapus tapi teks masih di text layer (sebelum ${beforeCount}, sesudah ${afterCount})`;
   } catch (err) {
     console.error(err);

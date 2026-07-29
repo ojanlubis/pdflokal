@@ -90,7 +90,7 @@ async function embedCustomFont(env, fontName, bold) {
   // fetch-capable environment. A headless caller injecting only PDFLib still
   // gets a valid PDF — the text falls back to Helvetica instead of throwing.
   if (!env.fontkit || typeof fetch !== 'function') {
-    console.warn('[core/export] fontkit/fetch unavailable — Helvetica fallback for', fontName);
+    console.warn('[core/export] fontkit/fetch unavailable, Helvetica fallback for', fontName);
     return cacheFallbackFont(env, fontName, bold);
   }
   try {

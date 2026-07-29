@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PDF X-Ray — local, uploads nothing</title>
+<title>PDF X-Ray, local, uploads nothing</title>
 <style>
   :root {
     --bg: #faf7f2; --ink: #1c1917; --muted: #79726a; --accent: #dc2626;
@@ -77,7 +77,7 @@
   <header>
     <div class="kicker">PDFLokal · internal tool · nothing here is uploaded, ever</div>
     <h1>PDF X-Ray</h1>
-    <p class="lede">Drop a PDF in. It never leaves this tab — the same vendored pdf-lib this repo
+    <p class="lede">Drop a PDF in. It never leaves this tab, the same vendored pdf-lib this repo
     ships is doing the parsing, in your browser, from a local file. Shows exactly what our own
     editor sees: every font's real <code>/BaseFont</code>, whether its program is actually
     embedded, and the raw, decompressed content-stream operators for any page.</p>
@@ -92,15 +92,15 @@
     <div class="summary" id="summary"></div>
     <div class="meta" id="meta"></div>
 
-    <h2>Fonts — per page</h2>
+    <h2>Fonts, per page</h2>
     <p class="note">"Embedded" means a real glyph program (FontFile/FontFile2/FontFile3) is packed
     inside this file. When it says <span class="pill no">no</span>, the shapes you see on screen are
-    on loan from whatever's installed on the viewing device — not from the file at all.</p>
+    on loan from whatever's installed on the viewing device, not from the file at all.</p>
     <div id="fonts"></div>
 
-    <h2>Images — per page</h2>
+    <h2>Images, per page</h2>
     <p class="note">Every <code>/XObject</code> of <code>/Subtype /Image</code> the page paints, with
-    its real compression <code>/Filter</code> — this is what actually decides whether a "photo" on
+    its real compression <code>/Filter</code>, this is what actually decides whether a "photo" on
     the page is a JPEG, a raw/Flate pixel array (PNG-shaped), or a fax-style scan compressor
     (<code>CCITTFaxDecode</code>/<code>JBIG2Decode</code>, the two you'll see most on scanned government
     documents). A page with no rows here paints nothing but vector/text content.</p>
@@ -109,13 +109,13 @@
     <h2>Raw content stream</h2>
     <p class="note">The literal recorded instructions for the page: <code>BT</code>/<code>ET</code>
     brackets a text object, <code>Tf</code> sets the font + size, <code>Tm</code> positions it,
-    <code>Tj</code>/<code>TJ</code> paints the string. Decompressed straight off the bytes — this is
+    <code>Tj</code>/<code>TJ</code> paints the string. Decompressed straight off the bytes, this is
     what <code>core/redact.js</code>'s own reader sees, byte for byte.</p>
     <div class="page-tabs" id="page-tabs"></div>
     <pre id="stream"></pre>
   </div>
 
-  <footer>Local dev tool, not part of the shipped app — uses <code>js/vendor/pdf-lib.min.js</code>
+  <footer>Local dev tool, not part of the shipped app, uses <code>js/vendor/pdf-lib.min.js</code>
   and this repo's own <code>core/redact.js</code> / <code>core/font-style.js</code> directly.</footer>
 </main>
 

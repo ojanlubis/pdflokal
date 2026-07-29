@@ -86,7 +86,7 @@ async function loadDoc(name, bytes) {
   });
 
   rasterizer = createPageRasterizer(doc);
-  setStatus(`${pages.length} halaman — dibuka langsung, isi mengalir saat scroll`);
+  setStatus(`${pages.length} halaman, dibuka langsung, isi mengalir saat scroll`);
   stream.refresh(0);
 }
 

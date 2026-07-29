@@ -156,7 +156,7 @@ function el(tag, cls, text) {
 
 function renderThanks() {
   clear();
-  body.appendChild(el('span', 'ef-q', 'Makasih — masukanmu ngebantu kami 🙏'));
+  body.appendChild(el('span', 'ef-q', 'Makasih, masukanmu ngebantu kami 🙏'));
   clearTimer();
   hideTimer = setTimeout(hide, 1700);
 }

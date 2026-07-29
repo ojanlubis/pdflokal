@@ -162,12 +162,12 @@ async function sample(slug) {
     process.exit(1);
   }
 
-  console.log(`\n  📄 TASTE SAMPLE — 1 of ${pages.length}\n`);
+  console.log(`\n  📄 TASTE SAMPLE, 1 of ${pages.length}\n`);
   console.log(`     ${out}`);
   console.log(`\n     h1:       ${page.h1}`);
   console.log(`     sub:      ${page.sub}`);
   console.log(`     intent:   ${page.intent}${page.target ? ` (target ${Math.round(page.target / 1024)} KB)` : ''}`);
-  console.log(`\n     LOOK AT THE PNG. Not the JSON — the JSON is where the last two`);
+  console.log(`\n     LOOK AT THE PNG. Not the JSON, the JSON is where the last two`);
   console.log(`     taste errors hid in plain sight and passed every test.`);
   console.log(`\n     Then: npm run seo:approve\n`);
 }
@@ -194,11 +194,11 @@ if (!CHECK) {
   const now = copyHash();
   const ok = approvedHash();
   if (ok !== now) {
-    console.error('\n  🔒 REFUSING TO GENERATE — the copy changed and nobody has LOOKED at it.\n');
+    console.error('\n  🔒 REFUSING TO GENERATE, the copy changed and nobody has LOOKED at it.\n');
     console.error(`     seo/pages.json  ${now}`);
     console.error(`     last approved   ${ok ?? '(never)'}\n`);
     console.error('     This script writes 12 pages at once. On Jul 12 a wording error sat ONE run');
-    console.error('     away from hardening into all twelve — and no test would have caught it,');
+    console.error('     away from hardening into all twelve, and no test would have caught it,');
     console.error('     because the pages were CORRECT, just written in the wrong language for the');
     console.error('     user. Fauzan found it in ninety seconds BY LOOKING at a rendered page.\n');
     console.error('     Render one, look at it, then approve:');
@@ -224,17 +224,17 @@ const { origin, brand } = data.site;
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 // Replace exactly once, and SHOUT if the anchor vanished. A silent no-op here
-// would ship a page with the homepage's <title> — the single worst failure mode
+// would ship a page with the homepage's <title>, the single worst failure mode
 // this script has, and one no test would notice.
 function sub(html, re, replacement, label) {
-  if (!re.test(html)) throw new Error(`gen-seo-pages: anchor not found in index.html: ${label}. The template changed — fix the regex, don't ship a page with the homepage's ${label}.`);
+  if (!re.test(html)) throw new Error(`gen-seo-pages: anchor not found in index.html: ${label}. The template changed, fix the regex, don't ship a page with the homepage's ${label}.`);
   return html.replace(re, () => replacement);
 }
 
 function copyBlock(page) {
   const parts = [`<p>${page.intro}</p>`];
   // `howto` is written out longhand in pages.json, NOT derived from the h1. Deriving
-  // it gave "Cara kompres pdf biar lolos batas upload" — lowercased PDF, clumsy
+  // it gave "Cara kompres pdf biar lolos batas upload", lowercased PDF, clumsy
   // Indonesian. It also happens to be a real query shape ("cara kompres pdf"), so
   // it's worth writing by hand rather than generating badly.
   if (!page.howto) throw new Error(`gen-seo-pages: ${page.slug} has no "howto" heading`);
@@ -262,7 +262,7 @@ function schema(page, url) {
     '@graph': [
       {
         '@type': 'SoftwareApplication',
-        name: `${page.h1} — ${brand}`,
+        name: `${page.h1}, ${brand}`,
         url,
         description: page.description,
         applicationCategory: 'UtilitiesApplication',
@@ -284,7 +284,7 @@ function schema(page, url) {
   }, null, 2);
 }
 
-const banner = `<!-- GENERATED FILE — DO NOT EDIT BY HAND.
+const banner = `<!-- GENERATED FILE, DO NOT EDIT BY HAND.
      Source: seo/pages.json (copy) + index.html (the app shell template).
      Regenerate with: npm run seo
      Hand edits are destroyed on the next run, and "npm run seo:check" fails CI. -->\n`;
@@ -307,16 +307,16 @@ for (const page of data.pages) {
 
   // The intent hook: app.js reads document.body.dataset.intent, so landing on
   // /kompres-pdf and dropping a file opens the compress sheet with no click.
-  // NOTE: append the attribute, never rebuild the tag — index.html's <body> carries
+  // NOTE: append the attribute, never rebuild the tag, index.html's <body> carries
   // class="is-empty", which the landing state depends on. (An earlier version of
   // this line clobbered the whole tag. The pages still RENDERED, because browsers
-  // synthesise a missing <body> — so nothing looked broken. Only the intent test
+  // synthesise a missing <body>, so nothing looked broken. Only the intent test
   // caught it. Assume a template edit here fails silently.)
   const bodyTag = html.match(/<body(\s[^>]*)?>/);
   if (!bodyTag) throw new Error('gen-seo-pages: no <body> tag in index.html');
-  if (bodyTag[0].includes('data-intent')) throw new Error('gen-seo-pages: index.html already declares data-intent — the template must stay intent-free');
+  if (bodyTag[0].includes('data-intent')) throw new Error('gen-seo-pages: index.html already declares data-intent, the template must stay intent-free');
   // data-target: the hard size cap for /kompres-pdf-500kb and friends. This is the
-  // ONLY reason those pages are allowed to exist — they change what the tool DOES.
+  // ONLY reason those pages are allowed to exist, they change what the tool DOES.
   // download-sheet validates the number against its own TARGETS list, so a bad
   // value degrades to "Otomatis" rather than becoming a bogus cap.
   const attrs = ` data-intent="${page.intent}"${page.target ? ` data-target="${page.target}"` : ''}`;
@@ -325,7 +325,7 @@ for (const page of data.pages) {
   html = sub(html, /<h1>[\s\S]*?<\/h1>/, `<h1>${esc(page.h1)}</h1>`, '<h1>');
   html = sub(html, /<p class="ld-sub">[\s\S]*?<\/p>/, `<p class="ld-sub">${esc(page.sub)}</p>`, '.ld-sub');
 
-  // "Tampilan baru" means nothing to someone arriving cold from Google — it's a
+  // "Tampilan baru" means nothing to someone arriving cold from Google, it's a
   // message for returning users of the OLD site. Drop it on the tool pages.
   html = html.replace(/<div class="ld-stamp"[^>]*>[\s\S]*?<\/div>\s*/, '');
 
@@ -348,7 +348,7 @@ const urls = [
 ];
 
 const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
-<!-- GENERATED by scripts/gen-seo-pages.js — do not edit by hand. Run: npm run seo
+<!-- GENERATED by scripts/gen-seo-pages.js, do not edit by hand. Run: npm run seo
      alat-gambar.html and lab.html are deliberately absent: both are noindex. -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${urls.map((u) => `  <url>\n    <loc>${u.loc}</loc>\n    <changefreq>${u.changefreq}</changefreq>\n    <priority>${u.priority}</priority>\n  </url>`).join('\n')}
@@ -356,12 +356,12 @@ ${urls.map((u) => `  <url>\n    <loc>${u.loc}</loc>\n    <changefreq>${u.changef
 `;
 emit('sitemap.xml', sitemap);
 
-// TWO thresholds, because there are two different SERPs — not because the lower
+// TWO thresholds, because there are two different SERPs, not because the lower
 // one is a convenient excuse for a thin page.
 //   HEAD terms (gabung/kompres/edit…) fight iLovePDF, Smallpdf, PDF24, Adobe.
 //   The ranking sites WITHOUT domain authority carry 693–925 words there.
 //   LONG-TAIL size terms (kompres pdf 500kb…) fight pdf.pi7.org and
-//   bigpdf.11zon.com — thin, low-authority pages. 450 clears that field.
+//   bigpdf.11zon.com, thin, low-authority pages. 450 clears that field.
 // If you find yourself padding a page to beat a number, you have misunderstood
 // this check: it exists to stop us shipping a page too thin to compete, not to
 // be satisfied with filler. Filler is how a page cluster becomes a doorway farm.
@@ -371,7 +371,7 @@ const thin = written.filter((w) => w.words < (w.target ? FLOOR_TAIL : FLOOR_HEAD
 if (!CHECK) console.log(`  ✓ sitemap.xml (${urls.length} URLs)`);
 if (thin.length && !CHECK) {
   console.log(`\n  ⚠️  THIN PAGES: ${thin.map((t) => `${t.slug} (${t.words}w, floor ${t.target ? FLOOR_TAIL : FLOOR_HEAD})`).join(', ')}`);
-  console.log('     Add real content, not filler. iLovePDF ranks #1 on 109 words — that is');
+  console.log('     Add real content, not filler. iLovePDF ranks #1 on 109 words, that is');
   console.log('     domain authority, and it is not a page feature we can copy.');
 }
 

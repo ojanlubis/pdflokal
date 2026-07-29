@@ -2057,7 +2057,7 @@ async function loadFilesInner(files) {
         //
         // COPY IS PLACEHOLDER — client-facing words are Fauzan's, per the seat.
         if (doc.sources.at(-1)?.encrypted) {
-          toast('PDF ini terkunci — bisa dibaca, tapi nggak bisa disimpan ulang'); // TODO(copy): his words
+          toast('PDF ini terkunci, bisa dibaca, tapi nggak bisa disimpan ulang'); // TODO(copy): his words
           tel('failure', { stage: 'import', reason: 'encrypted' });
         }
         // doc_open (spec-telemetry.md §3 — scan-vs-born-digital ratio). The

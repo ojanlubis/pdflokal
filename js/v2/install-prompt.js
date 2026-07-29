@@ -131,7 +131,7 @@ export function initInstallPrompt() {
   const screen = isMobile() ? 'layar HP' : 'desktop';  // where the icon lands
   chipLabel.textContent = `Install PDFLokal di ${where}`;
   cardTitle.textContent = `Install PDFLokal di ${where}`;
-  cardSub.textContent = `Biar besok nggak usah nyari lagi — langsung ada di ${screen}, tetap jalan walau lagi offline.`;
+  cardSub.textContent = `Biar besok nggak usah nyari lagi, langsung ada di ${screen}, tetap jalan walau lagi offline.`;
 
   function hideCard() { card.classList.remove('show'); }
   function openCard() {
