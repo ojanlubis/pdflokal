@@ -114,12 +114,16 @@
     editor's empty state. Self-contained CSS on purpose — style.css belongs to
     the old wing (alat-gambar.html) and dies with it at demolition.
   -->
+  <link rel="stylesheet" href="/css/tokens.css">
   <style>
     :root {
-      /* Brand tokens (redesign Jul 2026): PDFLokal red on warm stone, matching
-         the site identity the blue-on-cool skeleton never inherited. */
-      --bg: #f1ede7; --surface: #ffffff; --ink: #211d1a; --muted: #79716b;
-      --accent: #dc2626; --accent-down: #b91c1c; --line: rgba(63,49,35,.12);
+      /* ⚠️ THE DESIGN TOKENS ARE NOT HERE. They live in /css/tokens.css — one
+         home, shared by this page, the 12 generated SEO pages, privasi and
+         dukung. See ../specs/design-system.md.
+
+         What stays here is EDITOR CHROME, and that is deliberate: the editor is
+         its own mode and page values must not be ported into it. A toolbar at
+         --sp-48 is a toolbar that wastes the document's room. */
       --header-h: 44px; --toolbar-h: 52px;
     }
     /* Self-hosted fonts (preview parity with the PDF export) */
@@ -160,7 +164,11 @@
     html, body { height: 100%; overflow: hidden; }
     body {
       font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: var(--bg); color: var(--ink);
+      /* THE EDITOR SURROUND IS --dzbg, NOT WHITE (ruled 2026-07-29). A scanned
+         document on pure white reads as dirty, and ~half of all uploads are
+         scans. The landing overrides this to --bg on #empty — that surface is
+         a PAGE, and the page ground is white. */
+      background: var(--dzbg); color: var(--ink);
       display: flex; flex-direction: column; position: relative;
     }
 
@@ -376,27 +384,78 @@
     body.is-empty header, body.is-empty #toolbar, body.is-empty #zoom-ctl { display: none; }
     #empty {
       position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain;
-      background: #faf9f7; -webkit-overflow-scrolling: touch;
+      /* The PAGE ground is white (ruled 2026-07-29). The body underneath is
+         --dzbg, which is the EDITOR's surround — two surface classes, two
+         grounds, and this is the seam between them. */
+      background: var(--bg); -webkit-overflow-scrolling: touch;
     }
-    .ld { max-width: 620px; margin: 0 auto; padding: 0 22px 8px; }
+    .ld { max-width: var(--container); margin: 0 auto; padding: 0 var(--gutter) var(--sp-8); }
+    /* ⭐ THE WORKING COLUMN. The dropzone and the tool cards share it EXACTLY,
+       and that shared width is what made the composition read as one column
+       instead of two unrelated blocks. If you ever give one of them a different
+       max-width, you have undone the fix — see specs/design-system.md §3. */
+    .ld-col { max-width: var(--column); margin: 0 auto; }
     .ld-hd {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 15px 0 10px;
-      border-bottom: 3px double var(--ink); /* kop surat: the letterhead double rule */
+      display: flex; align-items: center; justify-content: space-between; gap: var(--sp-16);
+      padding: var(--sp-12) 0;
     }
-    .ld-mark { font-weight: 700; font-size: 17px; letter-spacing: -.02em; }
+    .ld-mark { font-weight: 700; font-size: var(--fs-2); letter-spacing: -.02em; }
     .ld-mark em { font-style: normal; color: var(--accent); }
-    .ld-hd a { font-size: 13px; color: var(--muted); text-decoration: none; font-weight: 500; min-height: 44px; display: inline-flex; align-items: center; }
+    /* The nav is a LIFTED PILL, and it has NO SHADOW — he removed the navbar's
+       shadow within minutes of seeing it: "it makes things unclean." Surfaces
+       separate by line and by ground here, never by elevation. */
+    .ld-nav {
+      display: flex; align-items: center; gap: var(--sp-4);
+      background: var(--surface); border: 1px solid var(--line);
+      border-radius: var(--r-pill); padding: var(--sp-4);
+    }
+    .ld-nav a {
+      font-size: var(--fs-n1); color: var(--muted); text-decoration: none; font-weight: 500;
+      min-height: 36px; padding: 0 var(--sp-12); display: inline-flex; align-items: center;
+      border-radius: var(--r-pill);
+    }
+    .ld-nav a:hover { color: var(--ink); }
+    /* WHY: as the pill narrows it sheds items from the LEFT, so the last thing
+       standing is "Dukung" — the ask, and the only one of the three that is not
+       also reachable from the footer four screens down. Order in the DOM is the
+       order of sacrifice; do not reorder these without re-reading this. */
+    @media (max-width: 560px) { .ld-nav a:nth-child(1) { display: none; } }
+    @media (max-width: 400px) { .ld-nav a:nth-child(2) { display: none; } }
     /* Centered hero (founder, Jul 5) — the document opens like a letter's
        title block, with the stamp pressed on its top-right corner. */
     /* padding-top (not h1 margin): a margin would collapse through the wrapper
        and drag the absolute stamp down onto the headline text */
-    .ld-hero-copy { position: relative; text-align: center; padding-top: 34px; }
-    .ld h1 {
-      font-size: clamp(28px, 7.5vw, 38px); line-height: 1.12; letter-spacing: -.035em;
-      font-weight: 700; margin: 0 auto; max-width: 19ch; text-wrap: balance;
+    /* The hero sits on the WORKING COLUMN too, and that is load-bearing for the
+       stamp: .ld-stamp is positioned against this box, so if the hero spans the
+       full 1360 container the stamp lands ~500px from the headline and reads as
+       an unrelated mark floating in the corner. On the column it presses against
+       the same right edge as the dropzone below it. */
+    .ld-hero-copy {
+      position: relative; text-align: center;
+      max-width: var(--column); margin: 0 auto; padding-top: var(--sp-48);
     }
-    .ld-sub { font-size: 15px; color: var(--muted); margin: 12px auto 22px; max-width: 44ch; }
+    /* STRONGEST WHERE CALMEST: the headline anchors alone. The subhead that used
+       to sit under it was ruled away (2026-07-29) — not reworded, cut. */
+    .ld h1 {
+      font-size: var(--fs-5); line-height: 1.05; letter-spacing: -.035em;
+      font-weight: 700; margin: 0 auto var(--sp-48); max-width: 16ch; text-wrap: balance;
+    }
+    @media (min-width: 640px) { .ld h1 { font-size: var(--fs-7); } }
+    /* ⚠️ .ld-sub IS NOT USED ON THE LANDING. Its subhead was ruled away
+       (2026-07-29) and the rule below must never be re-attached here.
+       It exists for the 12 GENERATED pages, where the sub is a different job on
+       a different surface: someone arrives cold from a search query, and the
+       sub is the line that PROVES the claim the query came with. Deleting it
+       there would have been a silent SEO and copy loss on twelve pages, ruled
+       nowhere. scripts/gen-seo-pages.js inserts it after the headline.
+       ⚠️ DO NOT WRITE THE HEADLINE'S TAG NAME IN ANGLE BRACKETS ANYWHERE IN
+       THIS FILE. The generator anchors on the first match of that tag in the
+       whole document, and a mention inside a CSS comment IS a match: it once
+       replaced everything from this comment down to the real closing tag,
+       deleting <body data-intent="kompres" data-target="102400">, the header and the app's scroll container from all 12
+       generated pages. They rendered blank, and seo:check still passed. */
+    .ld h1:has(+ .ld-sub) { margin-bottom: var(--sp-16); }
+    .ld-sub { font-size: var(--fs-1); color: var(--muted); margin: 0 auto var(--sp-48); max-width: var(--measure); }
     /* the permanent revamp stamp — thunks once per page view, then just IS.
        Pressed on the title block's top-right corner, tilted left (founder, Jul 5). */
     .ld-stamp {
@@ -419,108 +478,143 @@
       100% { transform: rotate(-8deg) scale(1); opacity: 1; }
     }
     @media (prefers-reduced-motion: reduce) { .ld-stamp { animation: none; } }
+    /* The dropzone owns the working column: 920 wide, 300 tall at desktop.
+       It is a --dzbg ground on a white page — the faint grey exists precisely
+       so a surface stays readable on white without a shadow. */
     .dropzone {
-      display: block; width: 100%; cursor: pointer; text-align: center;
-      border: 2px dashed #d8d0c4; border-radius: 16px; background: var(--surface);
-      padding: 30px 20px 26px; font: inherit; color: inherit;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      width: 100%; min-height: 200px; cursor: pointer; text-align: center;
+      border: 2px dashed var(--line); border-radius: var(--r-panel); background: var(--dzbg);
+      padding: var(--sp-32) var(--sp-16); font: inherit; color: inherit;
       transition: border-color .15s ease, background .15s ease;
     }
     .dropzone.over { border-color: var(--accent); background: rgba(220,38,38,.05); }
     .dropzone:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
-    .dz-icon { width: 38px; height: 38px; color: #b3a99b; margin: 0 auto 8px; display: block; }
-    .dz-title { display: block; font-size: 15.5px; font-weight: 700; margin: 0 0 14px; letter-spacing: -.01em; }
+    .dz-icon { width: 38px; height: 38px; color: var(--muted); margin: 0 auto var(--sp-8); display: block; }
+    .dz-title { display: block; font-size: var(--fs-0); font-weight: 700; margin: 0 0 var(--sp-16); letter-spacing: -.01em; }
     .dz-buka {
       display: inline-flex; align-items: center; pointer-events: none;
-      background: var(--accent); color: #fff; font-weight: 700; font-size: 15px;
-      padding: 13px 28px; border-radius: 12px; box-shadow: 0 2px 0 var(--accent-down);
+      background: var(--accent); color: var(--on-accent); font-weight: 700; font-size: var(--fs-1);
+      padding: var(--sp-12) var(--sp-32); border-radius: var(--r-button); box-shadow: 0 2px 0 var(--accent-down);
     }
     .dropzone:active .dz-buka { transform: translateY(1px); box-shadow: 0 1px 0 var(--accent-down); }
-    .dz-hint { display: block; font-size: 12.5px; color: var(--muted); margin: 12px 0 0; }
-    .ld-label { font-size: 13px; color: var(--muted); margin: 26px 0 10px; font-weight: 500; }
-    .ld-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .ld-grid.more, #ld-more { margin-top: 10px; }
+    .dz-hint { display: block; font-size: var(--fs-n1); color: var(--muted); margin: var(--sp-12) 0 0; }
+    .ld-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-12); margin-top: var(--sp-16); }
+    .ld-grid.more, #ld-more { margin-top: var(--sp-12); }
     #ld-more[hidden] { display: none; }
     .ld-card {
-      display: flex; flex-direction: column; gap: 7px; cursor: pointer; text-decoration: none;
-      background: #faf9f7; border: 1px solid #e3dcd1; border-radius: 12px;
-      padding: 13px 14px; text-align: left; font: inherit; color: var(--ink);
-      box-shadow: 0 1px 2px rgba(63,49,35,.04); transition: transform .1s ease;
+      display: flex; flex-direction: column; gap: var(--sp-8); cursor: pointer; text-decoration: none;
+      background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-button);
+      padding: var(--sp-16); text-align: left; font: inherit; color: var(--ink);
+      transition: transform .1s ease, border-color .15s ease;
     }
     .ld-card:active { transform: scale(.98); }
     .ld-card:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     .ld-card svg { width: 20px; height: 20px; color: var(--ink); }
-    .ld-card b { font-size: 14px; font-weight: 700; letter-spacing: -.01em; }
-    .ld-card span { font-size: 11.5px; color: var(--muted); line-height: 1.45; margin-top: -3px; }
+    .ld-card b { font-size: var(--fs-0); font-weight: 700; letter-spacing: -.01em; }
+    .ld-card span { font-size: var(--fs-n1); color: var(--muted); line-height: 1.45; }
     .ld-lihat {
-      display: flex; align-items: center; justify-content: center; gap: 7px; width: 100%;
-      margin-top: 12px; padding: 12px; font-weight: 700; font-size: 13.5px;
-      color: #7f1d1d; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center; gap: var(--sp-8); width: 100%;
+      margin-top: var(--sp-12); padding: var(--sp-12); font-weight: 700; font-size: var(--fs-n1);
+      color: var(--accent); border-radius: var(--r-control);
     }
     .ld-lihat svg { width: 16px; height: 16px; transition: transform .18s ease; }
     .ld-lihat[aria-expanded="true"] svg { transform: rotate(180deg); }
     .ld-janji {
-      margin: 34px 0 0; padding: 18px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
-      display: flex; gap: 13px; align-items: flex-start;
+      margin: var(--sp-64) auto 0; max-width: var(--column);
+      padding: var(--sp-24) 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+      display: flex; gap: var(--sp-16); align-items: flex-start;
     }
     .ld-janji svg { width: 22px; height: 22px; color: var(--accent); margin-top: 2px; flex: none; }
-    .ld-janji b { font-size: 15px; display: block; letter-spacing: -.01em; }
-    .ld-janji p { font-size: 13.5px; color: var(--muted); margin: 3px 0 0; max-width: 46ch; }
-    .ld-janji a { color: #7f1d1d; font-weight: 500; }
-    .ld-faq { padding: 32px 0 0; }
-    .ld-faq h2 { font-size: 19px; letter-spacing: -.02em; margin: 0 0 6px; }
+    .ld-janji b { font-size: var(--fs-1); display: block; letter-spacing: -.01em; }
+    .ld-janji p { font-size: var(--fs-0); color: var(--muted); margin: var(--sp-4) 0 0; max-width: var(--measure); }
+    .ld-janji a { color: var(--accent); font-weight: 500; }
+    /* EVERYTHING BELOW THE HERO STAYS ON THE WORKING COLUMN, so the page reads
+       as one column under a full-width masthead. The promise was the first
+       section to join it and the rest disagreed with it immediately — which is
+       cause (1) of the "feels off" note in specs/design-system.md §0, just
+       moved down the page.
+       ⚠️ OPEN, AND HIS CALL, NOT MINE: whether the privacy promise instead
+       earns FULL WIDTH as the moat's own statement. Joining the column is the
+       conservative default — it makes the promise match something, which is
+       what was actually wrong. Flipping it back is one line. */
+    .ld-faq { padding: var(--sp-64) 0 0; max-width: var(--column); margin-inline: auto; }
+    .ld-faq h2 { font-size: var(--fs-3); letter-spacing: -.02em; margin: 0 0 var(--sp-8); }
     .ld-faq details { border-bottom: 1px solid var(--line); }
     .ld-faq summary {
-      cursor: pointer; list-style: none; font-weight: 700; font-size: 14.5px;
-      padding: 14px 0; display: flex; justify-content: space-between; align-items: center;
+      cursor: pointer; list-style: none; font-weight: 700; font-size: var(--fs-0);
+      padding: var(--sp-16) 0; display: flex; justify-content: space-between; align-items: center; gap: var(--sp-16);
     }
     .ld-faq summary::-webkit-details-marker { display: none; }
-    .ld-faq summary::after { content: "+"; color: var(--muted); font-weight: 400; font-size: 18px; }
+    .ld-faq summary::after { content: "+"; color: var(--muted); font-weight: 400; font-size: var(--fs-1); }
     .ld-faq details[open] summary::after { content: "–"; }
-    .ld-faq details p { font-size: 13.5px; color: #57504a; margin: 0 0 14px; max-width: 52ch; }
+    .ld-faq details p { font-size: var(--fs-0); color: var(--muted); margin: 0 0 var(--sp-16); max-width: var(--measure); }
     /* The internal-link mesh. Every page links to every tool — the incumbents all
        do this (Smallpdf's merge page links out to all ~40 of its tools) and it is
        how crawl equity flows. The 6 cards in #ld-more are `hidden`, so their links
        can't be leaned on; these are always in visible markup. */
-    .ld-tools { padding: 30px 0 0; border-top: 1px solid #e7e2dc; }
-    .ld-tools h2 { font-size: 13px; font-weight: 700; margin: 0 0 12px; color: var(--muted); letter-spacing: .02em; }
-    .ld-tools nav { display: flex; flex-wrap: wrap; gap: 6px 18px; }
-    .ld-tools nav a { font-size: 13.5px; color: #57504a; text-decoration: none; min-height: 32px; display: inline-flex; align-items: center; }
-    .ld-tools nav a:hover { color: var(--red); text-decoration: underline; }
+    .ld-tools { padding: var(--sp-64) 0 0; border-top: 1px solid var(--line); max-width: var(--column); margin-inline: auto; }
+    .ld-tools h2 { font-size: var(--fs-n1); font-weight: 700; margin: 0 0 var(--sp-12); color: var(--muted); letter-spacing: .02em; }
+    .ld-tools nav { display: flex; flex-wrap: wrap; gap: var(--sp-4) var(--sp-24); }
+    .ld-tools nav a { font-size: var(--fs-0); color: var(--muted); text-decoration: none; min-height: 32px; display: inline-flex; align-items: center; }
+    /* var(--red) never existed — this rule had been dead since it was written,
+       so the links had no hover at all. --accent is the token. */
+    .ld-tools nav a:hover { color: var(--accent); text-decoration: underline; }
     /* Long-form SEO copy, injected into the tool pages by scripts/gen-seo-pages.js.
        Absent from index.html itself — the homepage keeps its short, punchy hero. */
-    .ld-copy { padding: 34px 0 0; max-width: 62ch; }
-    .ld-copy h2 { font-size: 19px; margin: 26px 0 10px; letter-spacing: -.01em; }
-    .ld-copy p { font-size: 14.5px; line-height: 1.65; color: #57504a; margin: 0 0 12px; }
-    .ld-copy ol { margin: 0 0 12px; padding-left: 20px; }
-    .ld-copy li { font-size: 14.5px; line-height: 1.65; color: #57504a; margin: 0 0 8px; }
+    /* Structure may go full width. TEXT MAY NOT — prose caps at --measure.
+       The BLOCK takes the column so its left edge lines up with the FAQ and the
+       cards; the paragraphs inside cap at the measure. Capping the block itself
+       and centring it would put the prose's left edge 120px right of every
+       other section. */
+    .ld-copy { padding: var(--sp-64) 0 0; max-width: var(--column); margin-inline: auto; }
+    .ld-copy > * { max-width: var(--measure); }
+    .ld-copy h2 { font-size: var(--fs-3); margin: var(--sp-32) 0 var(--sp-12); letter-spacing: -.01em; }
+    .ld-copy p { font-size: var(--fs-0); line-height: 1.65; color: var(--muted); margin: 0 0 var(--sp-12); }
+    .ld-copy ol { margin: 0 0 var(--sp-12); padding-left: var(--sp-24); }
+    .ld-copy li { font-size: var(--fs-0); line-height: 1.65; color: var(--muted); margin: 0 0 var(--sp-8); }
     .ld-copy strong { color: var(--ink); }
-    .ld-foot { padding: 30px 0 40px; display: flex; gap: 18px; align-items: baseline; flex-wrap: wrap; }
-    .ld-foot a { font-size: 13px; color: var(--muted); text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
-    .ld-foot span { margin-left: auto; font-size: 12px; color: var(--muted); }
+    .ld-foot {
+      margin-top: var(--sp-64); padding: var(--sp-24) 0 var(--sp-48);
+      border-top: 1px solid var(--line); max-width: var(--column); margin-inline: auto;
+      display: flex; gap: var(--sp-24); align-items: baseline; flex-wrap: wrap;
+    }
+    .ld-foot a { font-size: var(--fs-n1); color: var(--muted); text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
+    .ld-foot span { margin-left: auto; font-size: var(--fs-n2); color: var(--muted); }
     /* desktop composition (founder, Jul 5 rd4+rd5: fill the width with CONTENT,
        on a flat page). The toolbox IS the content — all 14 tools visible, no
        accordion (that's a mobile pattern; hiding 10 tools on a 1440px screen
        was what made the sides feel empty). Paper-on-desk was tried live and
        CUT by the founder — one continuous surface, no floating sheet. */
     @media (min-width: 900px) {
-      .ld { max-width: 1140px; padding: 0 56px 8px; }
-      .ld-hero-copy { padding-top: 40px; }
-      .ld h1 { font-size: 40px; }
-      .ld-sub { font-size: 16px; }
-      /* wide h1 leaves clear corner space — stamp hovers beside line 1 */
-      .ld-stamp { font-size: 14px; padding: 6px 13px; border-width: 3.5px; top: 46px; }
-      .dropzone { padding: 46px 24px 40px; }
+      .ld-mark { font-size: var(--fs-4); }
+      .ld-nav a { font-size: var(--fs-1); min-height: 44px; padding: 0 var(--sp-16); }
+      .ld-hero-copy { padding-top: var(--sp-64); }
+      .ld h1 { font-size: var(--fs-9); }
+      /* wide h1 leaves clear corner space — stamp hovers beside line 1.
+         ⚠️ THESE FOUR NUMBERS ARE DELIBERATELY NOT TOKENS. specs/design-system.md
+         §6: "The mask does not survive scaling. Tuned at 12.5px; reused at 38px
+         it renders a ghost until the alpha curve is corrected." Rounding 14px to
+         a type step re-tunes the mask and the stamp fades to a pink smudge — I
+         did exactly that for one build and it was visible in the screenshot. The
+         stamp is the one closed motif the system owns; it is exempt until its
+         alpha curve is re-derived, and that is a separate job. */
+      .ld-stamp { font-size: 14px; padding: 6px 13px; border-width: 3.5px; top: var(--sp-64); }
+      /* 920 x 300 — the working column, at the height he set. */
+      .dropzone { min-height: 300px; }
       .ld-grid { grid-template-columns: repeat(4, 1fr); } /* top-4 = one featured row */
-      /* the full toolbox, always open: 10 more tools in two 5-across rows
-         (slightly narrower cards than the top-4 = quiet hierarchy) */
+      /* The full toolbox, always open: 10 more tools in two 5-across rows
+         (slightly narrower cards than the top-4 = quiet hierarchy). KEPT on
+         purpose — the studio rig showed only the featured four, and per
+         specs/design-system.md §0 the rig's absences are not decisions. The
+         founder's rd4/rd5 ruling was "all 14 tools visible, no accordion"; what
+         changed today is the WIDTH they sit on, not how many there are. */
       #ld-more[hidden] { display: grid; grid-template-columns: repeat(5, 1fr); }
       .ld-lihat { display: none; }
-      .ld-card { background: var(--surface); } /* lifts off the page bg */
-      .ld-card:hover { border-color: rgba(220,38,38,.45); }
+      .ld-card:hover { border-color: var(--accent); }
       .dropzone:hover { border-color: var(--accent); background: rgba(220,38,38,.04); }
-      .ld-janji p { max-width: 72ch; }
       /* FAQ reads as a broadsheet: two columns under one heading */
-      .ld-faq { display: grid; grid-template-columns: 1fr 1fr; gap: 0 44px; align-items: start; }
+      .ld-faq { display: grid; grid-template-columns: 1fr 1fr; gap: 0 var(--sp-48); align-items: start; }
       .ld-faq h2 { grid-column: 1 / -1; }
       #format-bar, #sig-bar { justify-content: center; }
     }
@@ -858,7 +952,7 @@
     #toast.show { opacity: 1; }
   </style>
 </head>
-<body class="is-empty" data-intent="kompres" data-target="102400">
+<body class="is-empty">
   <header>
     <button class="brand" id="btn-home" aria-label="Kembali ke beranda">PDF<span class="brand-red">Lokal</span></button>
     <div class="file-menu-wrap">
@@ -933,18 +1027,31 @@
       <div class="ld">
         <div class="ld-hd">
           <span class="ld-mark">PDF<em>Lokal</em></span>
-          <a href="/dukung">Dukung Kami</a>
+          <!-- Leftmost-first is the order of sacrifice as the pill narrows, so
+               "Dukung" is the last one standing. See .ld-nav in the stylesheet
+               before reordering these. -->
+          <nav class="ld-nav" aria-label="Navigasi utama">
+            <a href="https://github.com/ojanlubis/pdflokal" rel="noopener">Github</a>
+            <a href="/privasi">Privasi</a>
+            <a href="/dukung">Dukung</a>
+          </nav>
         </div>
-        <div class="ld-hero">
-          <div class="ld-hero-copy">
-            <!-- One h1 both form factors (founder, Jul 5): value prop = fast + gratis,
-                 both consequences of no-upload. The sub says WHY it's believable —
-                 a sentence server-dependent competitors can't write. -->
+        <div class="ld-hero-copy">
+            <!-- The headline anchors ALONE (ruled 2026-07-29). The subhead that
+                 used to sit here was cut, not reworded — subtraction beats
+                 softening, and the claims it made now live in the FAQ and the
+                 privacy promise further down, where content is free. -->
             <h1>Kompres PDF sampai di bawah 100KB</h1>
             <p class="ld-sub">Target 100KB sudah disetel. Ini batas paling ketat, kami akan jujur soal hasilnya.</p>
             <!-- PERMANENT for the revamp era (founder call, Jul 4): the stamp
-                 marks the new look on every visit, mobile and desktop. -->
+                 marks the page on every visit, mobile and desktop. One per page
+                 — it is the only flourish either system owns. -->
             </div>
+        <!-- ⭐ THE WORKING COLUMN. Everything inside shares one 920 width — the
+             dropzone and the tool cards read as a single column because they
+             ARE one. Splitting them to different widths is the defect this
+             wrapper exists to prevent. -->
+        <div class="ld-col">
         <button class="dropzone" id="btn-open">
           <svg class="dz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
           <span class="dz-title">Seret file ke sini, atau</span>
@@ -961,8 +1068,9 @@
             <svg class="ip-chip-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
           </button>
         </div>
-        </div>
-        <p class="ld-label">Mau ngapain hari ini?</p>
+        <!-- "Mau ngapain hari ini?" was here and was RULED AWAY (2026-07-29).
+             The cards say what they do; a label asking the question the cards
+             already answer was one more thing competing for the same glance. -->
         <div class="ld-grid">
           <a class="ld-card" href="/gabung-pdf" data-intent="gabung">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>
@@ -1026,6 +1134,7 @@
         <button class="ld-lihat" id="ld-lihat" aria-expanded="false" aria-controls="ld-more">Lihat semua alat
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
         </button>
+        </div><!-- /.ld-col — the 920 column ends here, after the cards -->
         <div class="ld-janji">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
           <div>

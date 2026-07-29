@@ -322,14 +322,67 @@ for (const page of data.pages) {
   const attrs = ` data-intent="${page.intent}"${page.target ? ` data-target="${page.target}"` : ''}`;
   html = html.replace(bodyTag[0], bodyTag[0].replace(/>$/, `${attrs}>`));
 
-  html = sub(html, /<h1>[\s\S]*?<\/h1>/, `<h1>${esc(page.h1)}</h1>`, '<h1>');
-  html = sub(html, /<p class="ld-sub">[\s\S]*?<\/p>/, `<p class="ld-sub">${esc(page.sub)}</p>`, '.ld-sub');
+  // ⚠️ THE SUB IS INSERTED HERE, NOT REPLACED, AND THAT IS THE WHOLE POINT.
+  // The landing's subhead was ruled away on 2026-07-29, so index.html — the
+  // template — no longer contains a .ld-sub to substitute into. The 12 tool
+  // pages still need one: the landing's sub was competing with an 82.6px
+  // headline for the same glance, whereas here it is the line that PROVES the
+  // claim the search query arrived with. Two surfaces, two jobs.
+  html = sub(
+    html, /<h1>[\s\S]*?<\/h1>/,
+    `<h1>${esc(page.h1)}</h1>\n            <p class="ld-sub">${esc(page.sub)}</p>`,
+    '<h1>',
+  );
 
-  // "Tampilan baru" means nothing to someone arriving cold from Google, it's a
-  // message for returning users of the OLD site. Drop it on the tool pages.
+  // Drop the stamp on the tool pages.
+  // ⚠️ THE ORIGINAL REASON FOR THIS EXPIRED. It read: "'Tampilan baru' means
+  // nothing to someone arriving cold from Google, it's a message for returning
+  // users of the OLD site." True of that string. The stamp now says "Gratis!",
+  // which means a great deal to a cold arrival from a search query — so the
+  // stripping is no longer justified by its own comment.
+  // Kept anyway, because turning the stamp ON across 12 marketing surfaces is a
+  // taste call and belongs to Fauzan, not to a redesign pass. OPEN.
   html = html.replace(/<div class="ld-stamp"[^>]*>[\s\S]*?<\/div>\s*/, '');
 
   html = sub(html, /<section class="ld-faq">[\s\S]*?<\/section>/, `${copyBlock(page)}\n        ${faqBlock(page)}`, '.ld-faq');
+
+  // ⚠️ THE SHELL MUST SURVIVE THE TEMPLATING. Every substitution above is a
+  // REGEX OVER THE WHOLE DOCUMENT, and the anchors are ordinary HTML that can
+  // also occur inside a CSS comment or a <script>. On 2026-07-30 a comment
+  // added to index.html's stylesheet contained the headline's tag name in
+  // angle brackets; the h1 substitution matched THAT first and replaced
+  // everything from the comment down to the real closing tag, deleting <body>,
+  // the header and the scroll container from all 12 pages. Every page rendered
+  // BLANK.
+  //
+  // ⚠️ AND seo:check PASSED THROUGHOUT, because it compares generator output
+  // against files written by the same generator — both were equally broken.
+  // Agreement between two copies of one bug is not verification. This is the
+  // check that has to exist instead: does the emitted page still contain the
+  // application?
+  const shell = [
+    ['<body', /<body[\s>]/],
+    ['the scroll container (main#v2-scroll)', /<main id="v2-scroll">/],
+    ['the landing container (#empty)', /id="empty"/],
+    ['the landing wrapper (.ld)', /<div class="ld">/],
+    ['the dropzone', /class="dropzone"/],
+    ['the app module script', /<script type="module" src="js\/v2\/app\.js">/],
+  ];
+  for (const [label, re] of shell) {
+    if (!re.test(html)) {
+      throw new Error(
+        `gen-seo-pages: ${page.slug}.html lost ${label} during templating. A substitution regex `
+        + 'matched something other than the element it was aimed at — check whether an anchor '
+        + "string (a tag name in angle brackets) now also appears inside index.html's CSS "
+        + 'comments or inline scripts. Do NOT ship: the page renders blank.',
+      );
+    }
+  }
+  // Exactly one headline and one sub, or the substitution hit the wrong node.
+  for (const [label, re, want] of [['headline', /<h1[\s>]/g, 1], ['.ld-sub', /<p class="ld-sub">/g, 1]]) {
+    const n = (html.match(re) || []).length;
+    if (n !== want) throw new Error(`gen-seo-pages: ${page.slug}.html has ${n} ${label} elements, expected ${want}.`);
+  }
 
   emit(`${page.slug}.html`, banner + html);
   const words = [page.intro, ...page.steps, ...page.sections.flatMap((s) => s.p), ...page.faq.flatMap((f) => [f.q, f.a])]

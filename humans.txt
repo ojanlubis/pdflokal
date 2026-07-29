@@ -11,6 +11,7 @@ pdf-lib by Andrew Dillon
 PDF.js by Mozilla
 Signature Pad by Szymon Nowak
 fontkit by Foliojs
+Jon Yablonski - Laws of UX, Humane by Design. The design system stands on it.
 
 /* SITE */
 Last update: 2026-01-18

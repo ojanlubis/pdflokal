@@ -209,6 +209,12 @@ Terima kasih kepada semua yang telah berkontribusi:
 - [Signature Pad](https://github.com/szimek/signature_pad) by Szymon Nowak
 - Inspired by [iLovePDF](https://www.ilovepdf.com/), [Smallpdf](https://smallpdf.com/), and [Squoosh](https://squoosh.app/)
 
+### Terima kasih, Jon Yablonski
+
+[Laws of UX](https://lawsofux.com/) gave us the vocabulary, and [Humane by Design](https://humanebydesign.com/) gave us the ethic: attention is finite, so spend
+the user's honestly. PDFLokal's design system is built on that idea, down to its type scale.
+He has no involvement here and has never heard of us. The debt is ours.
+
 ---
 
 **Made with love in Indonesia**

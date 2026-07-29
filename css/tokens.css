@@ -1,0 +1,186 @@
+/* ============================================================================
+ * pdflokal — THE TOKENS. One place, both modes.
+ * Source of truth: ../specs/design-system.md (PM proposal, 2026-07-29).
+ *
+ * ⚠️ EVERY VALUE HERE COMES FROM THE SPEC. Where a hand-tuned number disagreed
+ * with the scale, THE SCALE WON — his standing instruction: "I DONT WANT YOU TO
+ * TAKE MY EXACT VALUES JUST BCS I SAY IT. I TRUST YOUR DISCIPLINE." Every such
+ * move is under 5% and none is visible.
+ *
+ * ⚠️ THIS FILE IS LOADED BY: index.html (and therefore, via
+ * scripts/gen-seo-pages.js, all 12 generated SEO pages), privasi.html,
+ * dukung.html. It is deliberately NOT loaded by alat-gambar.html — the old wing
+ * keeps style.css until demolition, and porting page values into it would be
+ * work thrown away.
+ *
+ * WHY A LINKED FILE rather than more inline CSS in index.html: fifteen pages
+ * share these values. Inlined, every one of them re-downloads the tokens and
+ * fourteen of them can drift. Linked, there is one home and one cache entry.
+ * The cost is one small same-origin request; style-src is 'self', so it loads.
+ * ==========================================================================*/
+
+:root {
+  /* ⚠️ DECLARE THE SCHEME, OR THE BROWSER REPAINTS YOUR CONTROLS BEHIND YOU.
+   * This is not a nicety. Without `color-scheme`, Chrome applies its own
+   * auto-dark treatment to UA-rendered surfaces — form controls, scrollbars,
+   * default backgrounds. The dropzone is a <button>, and on the dark landing it
+   * rendered as a LIGHT GREY SLAB with unreadable hint text.
+   *
+   * ⚠️ AND THE INSTRUMENT LIED. `getComputedStyle(dropzone).backgroundColor`
+   * returned `rgb(18, 18, 18)` — exactly right — while the screenshot showed
+   * grey. A test asserting the computed background would have passed on a
+   * visibly broken page. Only the screenshot caught it. If you are ever tempted
+   * to verify a colour by reading the computed value alone, this is the
+   * counter-example. */
+  color-scheme: light;
+
+  /* ---- TYPE — ratio 1.2, base 16 ------------------------------------------
+   * Measured off humanebydesign.com, the reference he named: its nav link is
+   * 23.04px = 16 x 1.2^2 exactly. His own hand-tuned H1 was 83; 16 x 1.2^9 is
+   * 82.56. He picked one step below his reference's headline, on his
+   * reference's scale, by feel, without computing anything.
+   *
+   * The point of naming them by STEP: a future page never invents a size, it
+   * picks one. --fs-n1 is step MINUS one (CSS custom properties cannot start a
+   * segment with a digit-and-minus without reading badly, hence the `n`). */
+  --fs-n2: 11.1px;   /* legal, credit */
+  --fs-n1: 13.3px;   /* caption, hint, card label */
+  --fs-0:  16px;     /* body, dropzone title */
+  --fs-1:  19.2px;   /* nav link, lead paragraph */
+  --fs-2:  23px;     /* sub-head — AND THE EDITOR'S CEILING, see below */
+  --fs-3:  27.6px;   /* section heading */
+  --fs-4:  33.2px;   /* wordmark, page H2 */
+  --fs-5:  40px;
+  --fs-6:  48px;
+  --fs-7:  57px;
+  --fs-8:  69px;     /* H1 on inner pages lives in 5..8 */
+  --fs-9:  82.6px;   /* landing H1 */
+  /* step 10 (99px) is RESERVED. Nothing on this product earns it yet, and a
+   * token that exists will get used. It is named here so the next person knows
+   * it was considered and withheld, not forgotten. */
+
+  /* ---- SPACING — base 4, ramp 8 -------------------------------------------
+   * Named by value, not by index: `var(--sp-24)` reads at the call site,
+   * `var(--sp-5)` needs a lookup table. His own values land on it almost
+   * untouched — navtop 12, pad 16, navpad 32, tools margin 64 were already on
+   * the ramp; navgap 36->32 and hero gap 44->48 are the only two that moved.
+   *
+   * PAGE breathes in 48/64/96. EDITOR works in 4/8/12/16 — a toolbar at 48 is
+   * a toolbar that wastes the document's room. */
+  --sp-4: 4px;
+  --sp-8: 8px;
+  --sp-12: 12px;
+  --sp-16: 16px;
+  --sp-24: 24px;
+  --sp-32: 32px;
+  --sp-48: 48px;
+  --sp-64: 64px;
+  --sp-96: 96px;
+  --sp-128: 128px;
+
+  /* ---- MEASURE AND CONTAINER ---------------------------------------------- */
+  --container: 1360px;                    /* his 1370 -> 8 x 170, on the grid */
+  --gutter: clamp(16px, 5vw, 96px);
+  /* ⭐ THE WORKING COLUMN, and it is the system's most useful discovery: the
+   * dropzone and the tool cards share it EXACTLY. Two blocks at one width read
+   * as one column, which is why centring the cards fixed what he saw. If you
+   * ever set one of them to something else, you have undone the fix. */
+  --column: 920px;
+  --measure: 62ch;                        /* prose caps here, never at container */
+
+  /* ---- COLOUR — one grammar, learned once ---------------------------------
+   * ⭐ RED MEANS TOUCHABLE. IT HAS NO OTHER JOB. Not decoration, not emphasis,
+   * not a section marker. This is the single rule most likely to be broken by
+   * a future page. */
+  --ink: #211d1a;                         /* warm near-black, never pure */
+  --muted: #79716b;
+  --line: rgba(63,49,35,.14);
+  --accent: #dc2626;
+  --accent-down: #b91c1c;
+  --on-accent: #fff;                      /* text ON the accent, both modes */
+  --bg: #fff;                             /* PAGE ground (RULED 2026-07-29) */
+  --surface: #fff;                        /* raised paper */
+  --dzbg: #f6f5f3;                        /* the faint grey that keeps a
+                                           * surface readable on white — AND
+                                           * the editor surround (ruled): a
+                                           * scanned document on pure white
+                                           * reads as dirty, and ~half of all
+                                           * uploads are scans. */
+
+  /* ---- SHAPE — elevation is nearly banned ---------------------------------
+   * He removed the navbar's shadow within minutes of seeing it: "it makes
+   * things unclean." Surfaces separate BY LINE AND BY GROUND, not by shadow.
+   * The one exception is the editor's floating sheets, where a shadow answers
+   * "what is on top of what" and nothing else can. */
+  --r-control: 8px;
+  --r-button: 12px;
+  --r-panel: 16px;
+  --r-pill: 999px;
+}
+
+/* ============================================================================
+ * DARK — D2, NEUTRAL (ruled 2026-07-29)
+ *
+ * Not warm. The light theme is white now, and a warm dark would introduce a
+ * temperature the light side no longer has.
+ *
+ * ⚠️ THREE STATES, AND ALL THREE ARE DELIBERATE:
+ *   no data-theme attribute  -> follow the system (the first-visit case)
+ *   data-theme="dark"        -> he chose dark, and it wins over a light system
+ *   data-theme="light"       -> he chose light, and it wins over a dark system
+ * An explicit choice MUST win in BOTH directions. A dark block written only as
+ * `@media (prefers-color-scheme: dark)` cannot be turned off by a user who
+ * chose light, which is the usual way this gets shipped broken.
+ *
+ * ⚠️ AND THE PALETTE IS DEFINED ONCE, ABOVE THE TWO SELECTORS THAT APPLY IT.
+ * Two selectors must carry the same theme, so the naive form writes every
+ * colour twice — and a hex changed in one block and not the other is invisible
+ * until someone toggles. Here the two blocks only re-point at `--d-*`, so a
+ * VALUE cannot drift; only a whole missing line could, and
+ * tests/core/tokens.test.mjs fails on exactly that.
+ * ==========================================================================*/
+
+:root {
+  --d-ink: #ededed;
+  --d-muted: #a1a1a1;
+  --d-line: rgba(255,255,255,.13);
+  /* ⚠️ THE ACCENT LIGHTENS, AND IT IS NOT A TASTE CALL — IT IS CONTRAST.
+   * #dc2626 on #171717 measures 3.71:1, under the 4.5:1 floor for text. Red is
+   * THE touchable colour and it lands on links, so it has to stay readable.
+   * #ef4444 on #171717 measures 4.77:1. The grammar is unchanged: still red,
+   * still the only touchable colour. */
+  --d-accent: #ef4444;
+  --d-accent-down: #dc2626;
+  --d-bg: #171717;
+  --d-surface: #1f1f1f;
+  /* dzbg stays RECESSED relative to the ground, the same direction as light
+   * (#f6f5f3 sits below #fff). Flipping the direction in dark would make the
+   * editor surround lighter than its own page and read as a panel. */
+  --d-dzbg: #121212;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ink: var(--d-ink);
+    --muted: var(--d-muted);
+    --line: var(--d-line);
+    --accent: var(--d-accent);
+    --accent-down: var(--d-accent-down);
+    --bg: var(--d-bg);
+    --surface: var(--d-surface);
+    --dzbg: var(--d-dzbg);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ink: var(--d-ink);
+  --muted: var(--d-muted);
+  --line: var(--d-line);
+  --accent: var(--d-accent);
+  --accent-down: var(--d-accent-down);
+  --bg: var(--d-bg);
+  --surface: var(--d-surface);
+  --dzbg: var(--d-dzbg);
+}
