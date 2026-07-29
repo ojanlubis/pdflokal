@@ -44,18 +44,28 @@ July 2026 before anyone noticed. Verify the rail by querying for rows, never by 
 
 ## Content Security Policy (CSP)
 
-⚠️ **This block is a COPY of the live policy in `vercel.json`, and it drifted.** Until 2026-07-30 it
-showed `'unsafe-eval'` in `script-src`, which the live policy has never had. A security document that
+⚠️ **This block is a COPY of the live policy in `vercel.json`, and it has drifted before.** Until
+2026-07-30 it showed `'unsafe-eval'`, which the live policy has never had. A security document that
 overstates what is permitted is the dangerous direction: it tells you a capability works when the
-browser will refuse it. `tests/core/csp-doc-parity.test.mjs` now fails if this copy and `vercel.json`
-disagree, so the drift cannot come back silently.
+browser will refuse it. `tests/core/csp-doc-parity.test.mjs` fails if this copy and `vercel.json`
+disagree, so that drift cannot come back silently.
 
 **`vercel.json` is the source of truth. This is documentation of it.**
 
+**2026-07-30 — two directives added for OCR** (ruled by Fauzan, security assessment by the PM,
+recorded in the seat's `decisions.md`):
+
+- **`script-src 'wasm-unsafe-eval'`** — WebAssembly cannot compile without it. It does NOT grant
+  `eval()`; that is asserted by a real in-page test, not assumed, because the names are similar
+  enough to be mistaken for each other.
+- **`worker-src blob:`** — tesseract.js builds its worker from a Blob URL. **`'self'` is retained
+  and must stay.** Dropping it would kill the service worker, and therefore offline mode, and
+  therefore a shipped and announced feature, with nothing throwing and the page looking fine.
+
 ```
 default-src 'self';
-script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://googleads.g.doubleclick.net blob:;
-worker-src 'self';
+script-src 'self' 'wasm-unsafe-eval' 'unsafe-inline' https://www.googletagmanager.com https://googleads.g.doubleclick.net blob:;
+worker-src 'self' blob:;
 manifest-src 'self';
 style-src 'self' 'unsafe-inline';
 img-src 'self' data: blob: https://www.google.com https://www.google.co.id https://www.googleadservices.com https://googleads.g.doubleclick.net;

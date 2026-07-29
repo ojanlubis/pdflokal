@@ -80,17 +80,46 @@ test('1. the documented CSP matches the CSP vercel.json actually serves', () => 
   );
 });
 
-test('2. the claim that started this: no eval permission is granted today', () => {
-  // Pinned explicitly because it is the specific thing the doc got wrong, and
-  // because granting it is a real security decision that must be deliberate.
-  // If someone adds 'wasm-unsafe-eval' to ship OCR, this test goes red and the
-  // change has to be acknowledged rather than slipped in.
+test('2. eval() is still forbidden, and wasm is now deliberately allowed', () => {
+  // 2026-07-30: 'wasm-unsafe-eval' was ADDED by ruling (Fauzan delegated the
+  // security call to the PM; recorded in the seat's decisions.md). This test
+  // previously asserted NEITHER token was present, and it went red on the
+  // change - which is the guard working, not a problem. It is updated
+  // deliberately rather than deleted.
   const script = parse(liveCsp()).get('script-src') || '';
-  for (const token of ["'unsafe-eval'", "'wasm-unsafe-eval'"]) {
-    assert.equal(
-      script.includes(token), false,
-      `script-src now grants ${token}. That is a deliberate security decision (WebAssembly needs it), `
-      + 'so update this test and docs/security.md together, and say so in the commit.',
-    );
-  }
+
+  // Still forbidden, and the distinction is the whole point: 'wasm-unsafe-eval'
+  // permits WebAssembly compilation ONLY. Full 'unsafe-eval' would re-open
+  // eval()/new Function() across the entire product.
+  assert.equal(
+    /(^|\s)'unsafe-eval'/.test(script), false,
+    "script-src grants full 'unsafe-eval'. WebAssembly does not need it - "
+    + "'wasm-unsafe-eval' is the narrow grant. This would re-open eval() product-wide.",
+  );
+  assert.ok(
+    script.includes("'wasm-unsafe-eval'"),
+    "script-src lost 'wasm-unsafe-eval'. OCR cannot compile its engine without it "
+    + '(scripts/ocr-demo.mjs demonstrates the failure).',
+  );
 });
+
+test('3. worker-src keeps BOTH self and blob: - dropping self kills offline', () => {
+  // ⚠️ THE TRAP THIS EXISTS FOR. OCR needs blob: because tesseract.js builds
+  // its worker from a Blob URL. Writing `worker-src blob:` instead of
+  // `worker-src 'self' blob:` still makes OCR work, so it LOOKS correct - and
+  // silently kills the SERVICE WORKER, and with it offline mode, which is a
+  // shipped and announced feature ("TETAP JALAN when the connection drops").
+  // Nothing throws. The page looks fine. A feature stops existing.
+  const worker = parse(liveCsp()).get('worker-src') || '';
+  assert.ok(
+    /(^|\s)'self'/.test(worker),
+    `worker-src is "${worker}" and has lost 'self'. The service worker cannot register, so offline `
+    + 'mode is gone with no error anywhere. Use "worker-src \'self\' blob:".',
+  );
+  assert.ok(
+    worker.includes('blob:'),
+    `worker-src is "${worker}" and has lost blob:. tesseract.js builds its worker from a Blob URL, `
+    + 'so OCR fails before any wasm is compiled.',
+  );
+});
+
