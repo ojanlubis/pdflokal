@@ -264,9 +264,45 @@ function stage(name, cmd, args) {
  * human one — distrust this verdict and re-run — exactly as exit 90 says the
  * tree moved rather than trying to recover from it.
  *
- * The baseline is the MEDIAN of recent GREEN runs only: a red run is often
- * short (it stops early) or long (it was starved), and either would poison a
- * mean. Only green runs describe what a healthy full sweep costs.
+ * ⭐ THE BASELINE TAKES ANY RUN THAT EXECUTED EVERY STAGE, RED OR GREEN.
+ * The first version took GREEN runs only, and that was wrong in the one way an
+ * instrument must never be wrong: it deserted you at the first sign of trouble.
+ * On a machine that has started misbehaving, the runs you need to compare
+ * against are exactly the ones going red, so a green-only baseline goes silent
+ * during the window it exists for. (PM's correction, 2026-07-30.)
+ *
+ * The real discriminator is not the verdict, it is whether every stage RAN. A
+ * run that stopped early contributes a meaningless four-second "total" and
+ * drags the median through the floor; a run where all four stages executed and
+ * playwright merely ended on a failing assertion is a perfectly good duration
+ * sample. Today's 13.3m RED read `lint 1s · seo 0s · core 2s · playwright
+ * 795s` — every stage ran, and it was the most informative sample of the day.
+ *
+ * MEDIAN, not mean, so one odd outlier cannot move it far.
+ */
+/*
+ * ⚠️ ESTABLISHED BEHAVIOUR OF THIS MACHINE, not an anecdote. Recorded here
+ * because it is the first thing to check, and because the natural instinct on
+ * a red gate is to bisect a change that is not the cause.
+ *
+ *   A SLOW RUN GOES SPURIOUSLY RED. Three for three on 2026-07-30: a run at
+ *   roughly 2x baseline failed one or two tests that then passed in isolation,
+ *   on a tree that had already gated green.
+ *
+ * Two causes have been traced, and both are fixable rather than facts of life:
+ *   - the gate re-hashing 564 MB of wild-corpus fixtures every 4 seconds
+ *     (fixed: IGNORED_PATHS above)
+ *   - a second browser competing for the machine, from an MCP screenshot pass
+ *     or leftover `serve` processes from a sweep
+ *
+ * SO: on a RED at materially over baseline, RE-RUN BEFORE INVESTIGATING. If it
+ * goes green on a quiet machine, the first run gated nothing. If it fails the
+ * same way twice, it is real and worth the bisect.
+ *
+ * The danger this note exists to hold off: once "probably contention" becomes
+ * the reflex, a genuine failure buried in a slow run gets waved through. The
+ * SLOW suffix is deliberately loud so the judgement is made from a number
+ * rather than from irritation.
  */
 const BASELINE_FILE = path.join(REPO, '.gate-baseline.json');
 const BASELINE_KEEP = 10;
@@ -286,7 +322,10 @@ function median(xs) {
   return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
 }
 
-function recordGreen(total) {
+// Only called once every stage has a recorded duration. A VOID run never gets
+// here (it exits first), and a run missing a stage timing is not a sample.
+function recordSample(total) {
+  if (Object.keys(TIMINGS).length < 4) return;
   try {
     const next = [...readBaseline(), total].slice(-BASELINE_KEEP);
     writeFileSync(BASELINE_FILE, JSON.stringify({ greenTotals: next }, null, 1));
@@ -375,14 +414,16 @@ async function main() {
     process.exit(90);
   }
 
+  // A RED run still executed all four stages, so its duration is a valid
+  // sample. Recording it is what keeps the SLOW signal alive on a machine that
+  // has started going red.
+  recordSample(total);
+
   if (lint || seo || core || pw) {
     console.error(`\nVERDICT=RED (lint=${lint} seo=${seo} core=${core} playwright=${pw}) on stable tree ${last.head}${slow}`);
     process.exit(1);
   }
 
-  // Only GREEN runs feed the baseline (see DURATIONS): a red run stopped early
-  // or was starved, and either would poison it.
-  recordGreen(total);
   console.log(`\nVERDICT=GREEN on stable tree ${last.head}${slow}`);
   process.exit(0);
 }

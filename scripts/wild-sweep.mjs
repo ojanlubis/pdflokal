@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 /*
  * The wild-corpus sweep: 154 real documents through import -> render -> export.
- *   npx serve -l 5050 .   (in another shell)
  *   node scripts/wild-sweep.mjs
+ *
+ * Starts its own static server if one is not already up, and ALWAYS kills what
+ * it started (see ensureServer/stopServer).
  *
  * WHY A SCRIPT AND NOT A PLAYWRIGHT TEST. Some of these documents kill the
  * BROWSER PROCESS, not just the page. Inside the test runner the browser is a
@@ -24,6 +26,7 @@
  * never extracted text, never producer strings.
  */
 import { chromium } from '@playwright/test';
+import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -32,6 +35,48 @@ const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const WILD = path.join(ROOT, 'tests/fixtures/wild');
 const NASTY = path.join(ROOT, 'tests/fixtures/nasty');
 const ORIGIN = process.env.SWEEP_ORIGIN || 'http://localhost:5050';
+
+/*
+ * ⚠️ THIS SCRIPT OWNS ITS SERVER AND MUST KILL IT.
+ * It used to say "run `npx serve` yourself" in the header. The servers that
+ * left behind then outlived the sweep and starved the QA GATE: an isolated
+ * re-run died on `Timed out waiting 60000ms from config.webServer`, and part
+ * of a day's worth of "machine contention" was this script's litter. A harness
+ * that degrades the instrument judging it is a bug in the harness.
+ */
+let server = null;
+async function reachable() {
+  try {
+    const r = await fetch(ORIGIN + '/', { method: 'HEAD' });
+    return r.ok || r.status < 500;
+  } catch { return false; }
+}
+async function ensureServer() {
+  if (await reachable()) return; // someone else's server: not ours to kill
+  // detached:true puts it in its OWN PROCESS GROUP so the whole group can be
+  // killed. `npx serve` spawns a CHILD; killing the npx wrapper alone leaves
+  // the real server orphaned, which is exactly what happened on the first
+  // attempt at this cleanup: the sweep finished, reported success, and left
+  // two processes holding port 5050.
+  server = spawn('npx', ['serve', '-l', '5050', '.'], { cwd: ROOT, stdio: 'ignore', detached: true });
+  for (let i = 0; i < 40; i++) {
+    await new Promise((r) => setTimeout(r, 500));
+    if (await reachable()) return;
+  }
+  throw new Error(`could not reach ${ORIGIN} after starting a server`);
+}
+function stopServer() {
+  if (!server) return;
+  const pid = server.pid;
+  server = null;
+  // Negative pid = the whole process group, which is the only way to take the
+  // real server down with its npx wrapper.
+  try { process.kill(-pid, 'SIGTERM'); } catch { /* already gone */ }
+}
+// Every exit path, including Ctrl-C and an uncaught throw.
+for (const sig of ['exit', 'SIGINT', 'SIGTERM', 'uncaughtException']) {
+  process.on(sig, () => { stopServer(); if (sig !== 'exit') process.exit(1); });
+}
 const BATCH = Number(process.env.SWEEP_BATCH || 12);
 
 const rows = fs.readFileSync(path.join(WILD, 'MANIFEST.tsv'), 'utf8').trim().split('\n');
@@ -158,6 +203,7 @@ async function run(file, opts = {}) {
   }
 }
 
+await ensureServer();
 await fresh();
 
 // ---- controls, before anything is believed ---------------------------------
