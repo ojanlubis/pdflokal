@@ -98,6 +98,28 @@ const WATCHED_ROOT_FILES = (root) => [
 // them would void every run on its own artifacts.
 const IGNORED = new Set(['node_modules', '.git', 'test-results', 'playwright-report', '.DS_Store']);
 
+/*
+ * ⚠️ THE WILD CORPUS IS EXCLUDED, AND IT IS A PERFORMANCE FIX WITH TEETH.
+ *
+ * `tests/fixtures/wild` is 564 MB of real documents (one file alone is 83 MB).
+ * The sampler re-fingerprints every 4 SECONDS, so a 10-minute run was hashing
+ * roughly 85 GB. The gate went from a ~6.5m baseline to 10-13m the moment that
+ * corpus landed, and three runs were misread as machine contention — including
+ * one RED that re-ran clean and cost a round of "did my change break this".
+ *
+ * ⭐ THE MISDIAGNOSIS IS THE POINT: the slow runs were blamed on other browsers
+ * competing for CPU. They were the gate competing with ITSELF. The duration
+ * line added minutes earlier is what made the size of the gap visible enough
+ * to go looking, which is exactly what a signal is for.
+ *
+ * Excluding it is safe, not a compromise: the corpus is GITIGNORED, no test
+ * writes to it, and the guard's question is "did the code under test move" —
+ * to which a bag of read-only fixtures can only ever answer no. A corpus that
+ * DID change mid-run would be a person adding files by hand, which the file
+ * COUNT in the verdict line still surfaces.
+ */
+const IGNORED_PATHS = ['tests/fixtures/wild'];
+
 function walk(dir, out = []) {
   let entries;
   try {
@@ -108,6 +130,7 @@ function walk(dir, out = []) {
   for (const e of entries) {
     if (IGNORED.has(e.name)) continue;
     const full = path.join(dir, e.name);
+    if (IGNORED_PATHS.some((p) => full.endsWith(path.sep + p.split('/').join(path.sep)))) continue;
     if (e.isDirectory()) walk(full, out);
     else if (e.isFile()) out.push(full);
   }
@@ -199,19 +222,86 @@ function selfTest() {
 // ---------------------------------------------------------------------------
 // the gate
 // ---------------------------------------------------------------------------
+// Stage durations are recorded, not just exit codes. See DURATIONS below for
+// why a slow run is a signal in its own right.
+const TIMINGS = {};
+
 function stage(name, cmd, args) {
   console.log(`\n=== ${name} ===`);
+  const t0 = Date.now();
   return new Promise((resolve) => {
+    const done = (code) => {
+      TIMINGS[name] = (Date.now() - t0) / 1000;
+      console.log(`${name}: exit ${code} (${TIMINGS[name].toFixed(1)}s)`);
+      resolve(code);
+    };
     const child = spawn(cmd, args, { cwd: REPO, stdio: 'inherit', shell: false });
-    child.on('close', (code) => {
-      console.log(`${name}: exit ${code ?? 1}`);
-      resolve(code ?? 1);
-    });
+    child.on('close', (code) => done(code ?? 1));
     child.on('error', (err) => {
       console.error(`${name}: failed to launch — ${err.message}`);
-      resolve(1);
+      done(1);
     });
   });
+}
+
+/*
+ * DURATIONS — "was this machine starved while the gate ran?"
+ * ==========================================================================
+ * The fingerprint guard answers "did the TREE move under this run" and voids
+ * the verdict when it did. It cannot see the other way a run gets corrupted:
+ * the MACHINE being oversubscribed. Twice now a run has gone RED at ~10.6m
+ * against a ~6.5m baseline with no change to the tree, and passed clean on
+ * re-run, while a second browser was being driven alongside it.
+ *
+ * ⚠️ WHY THIS IS NOT COSMETIC. A spurious RED is not a harmless false alarm.
+ * It costs a re-run and a paragraph of reasoning about whether the change
+ * broke something — and the third time, with a REAL failure buried inside a
+ * slow run, the natural move is "probably contention, re-run". A flaky red
+ * trains you to ignore reds. Naming the suspicion in the verdict line is what
+ * stops that from being a judgement call made under annoyance.
+ *
+ * DELIBERATELY: it does not fail, and it does not auto-retry. The action is a
+ * human one — distrust this verdict and re-run — exactly as exit 90 says the
+ * tree moved rather than trying to recover from it.
+ *
+ * The baseline is the MEDIAN of recent GREEN runs only: a red run is often
+ * short (it stops early) or long (it was starved), and either would poison a
+ * mean. Only green runs describe what a healthy full sweep costs.
+ */
+const BASELINE_FILE = path.join(REPO, '.gate-baseline.json');
+const BASELINE_KEEP = 10;
+const SLOW_FACTOR = 1.5;
+
+function readBaseline() {
+  try {
+    const j = JSON.parse(readFileSync(BASELINE_FILE, 'utf8'));
+    return Array.isArray(j.greenTotals) ? j.greenTotals.filter((n) => Number.isFinite(n) && n > 0) : [];
+  } catch { return []; }
+}
+
+function median(xs) {
+  if (!xs.length) return null;
+  const a = [...xs].sort((x, y) => x - y);
+  const m = Math.floor(a.length / 2);
+  return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
+}
+
+function recordGreen(total) {
+  try {
+    const next = [...readBaseline(), total].slice(-BASELINE_KEEP);
+    writeFileSync(BASELINE_FILE, JSON.stringify({ greenTotals: next }, null, 1));
+  } catch { /* never let bookkeeping break a verdict */ }
+}
+
+// Returns a suffix for the verdict line, or '' when there is nothing to say.
+// Silent until there is enough history to have an opinion: a baseline of one
+// run is not a baseline, it is the previous run.
+function slowSuffix(total) {
+  const base = median(readBaseline());
+  if (base === null || readBaseline().length < 3) return '';
+  if (total <= base * SLOW_FACTOR) return '';
+  return ` (SLOW: ${(total / 60).toFixed(1)}m vs ${(base / 60).toFixed(1)}m baseline`
+    + ' — the machine was likely starved. RE-RUN BEFORE BELIEVING THIS)';
 }
 
 // Watches the tree for the WHOLE run, not just its endpoints. Records every
@@ -266,7 +356,11 @@ async function main() {
   const pw = await stage('PLAYWRIGHT', 'npx', ['playwright', 'test']);
 
   const { states, last } = watcher.stop();
+  const total = Object.values(TIMINGS).reduce((a, b) => a + b, 0);
+  const slow = slowSuffix(total);
+
   console.log('\n=== GATE END ===');
+  console.log(`duration    ${(total / 60).toFixed(1)}m  (${Object.entries(TIMINGS).map(([k, v]) => `${k.toLowerCase()} ${v.toFixed(0)}s`).join(' · ')})`);
   console.log(`HEAD        ${last.head ?? '(no git)'}`);
   console.log(`fingerprint ${last.digest} (${last.count} files watched)`);
 
@@ -282,11 +376,14 @@ async function main() {
   }
 
   if (lint || seo || core || pw) {
-    console.error(`\nVERDICT=RED (lint=${lint} seo=${seo} core=${core} playwright=${pw}) on stable tree ${last.head}`);
+    console.error(`\nVERDICT=RED (lint=${lint} seo=${seo} core=${core} playwright=${pw}) on stable tree ${last.head}${slow}`);
     process.exit(1);
   }
 
-  console.log(`\nVERDICT=GREEN on stable tree ${last.head}`);
+  // Only GREEN runs feed the baseline (see DURATIONS): a red run stopped early
+  // or was starved, and either would poison it.
+  recordGreen(total);
+  console.log(`\nVERDICT=GREEN on stable tree ${last.head}${slow}`);
   process.exit(0);
 }
 

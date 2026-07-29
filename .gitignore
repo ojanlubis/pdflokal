@@ -53,3 +53,9 @@ tests/fixtures/wild/
 # licence is fine; the PAYLOAD is the open question and it is Fauzan's.
 # Fetch with scripts/fetch-ocr-engine.sh. Delete these two lines to ship it.
 js/vendor/tesseract/
+
+# Rolling median of recent GREEN gate durations, used to flag a run that was
+# starved by machine contention. MACHINE-LOCAL: a baseline from someone else's
+# laptop describes their hardware, not this run. Written after the fingerprint
+# watcher stops, so it can never move the tree under a run.
+.gate-baseline.json
