@@ -44,9 +44,19 @@ July 2026 before anyone noticed. Verify the rail by querying for rows, never by 
 
 ## Content Security Policy (CSP)
 
+⚠️ **This block is a COPY of the live policy in `vercel.json`, and it drifted.** Until 2026-07-30 it
+showed `'unsafe-eval'` in `script-src`, which the live policy has never had. A security document that
+overstates what is permitted is the dangerous direction: it tells you a capability works when the
+browser will refuse it. `tests/core/csp-doc-parity.test.mjs` now fails if this copy and `vercel.json`
+disagree, so the drift cannot come back silently.
+
+**`vercel.json` is the source of truth. This is documentation of it.**
+
 ```
 default-src 'self';
-script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://googleads.g.doubleclick.net blob:;
+script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://googleads.g.doubleclick.net blob:;
+worker-src 'self';
+manifest-src 'self';
 style-src 'self' 'unsafe-inline';
 img-src 'self' data: blob: https://www.google.com https://www.google.co.id https://www.googleadservices.com https://googleads.g.doubleclick.net;
 font-src 'self';
@@ -54,7 +64,7 @@ connect-src 'self' https://www.google-analytics.com https://analytics.google.com
 frame-ancestors 'none';
 base-uri 'self';
 form-action 'self';
-object-src 'none'
+object-src 'none';
 ```
 
 **Why 'unsafe-inline' and 'unsafe-eval':**

@@ -44,3 +44,12 @@ node_modules/
 # as long as the PDF file don't go to the public opensource repo".
 # The harness is committed; the documents are not.
 tests/fixtures/wild/
+
+# OCR engine — vendored locally, NOT committed while the OCR spec is unruled.
+# MEASURED runtime payload 5.01 MB (tesseract.min.js 0.06 + worker.min.js 0.12
+# + tesseract-core-simd-lstm.wasm.js 3.76 + ind.traineddata 1.07), read off the
+# network on a real run, not from the docs. That is +10% on the 4.55 MB the OCR
+# spec quotes, and it nearly doubles js/vendor/. Apache-2.0 throughout, so the
+# licence is fine; the PAYLOAD is the open question and it is Fauzan's.
+# Fetch with scripts/fetch-ocr-engine.sh. Delete these two lines to ship it.
+js/vendor/tesseract/

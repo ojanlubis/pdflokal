@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>lab, OCR lapisan teks tak terlihat</title>
+<style>
+  :root {
+    --ink: #1c1917; --paper: #fafaf9; --line: #d6d3d1; --red: #dc2626;
+    --warn-bg: #fffbeb; --warn-line: #d97706; --warn-ink: #92400e;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.5 system-ui, sans-serif; background: var(--paper); color: var(--ink); padding-bottom: 130px; }
+  header { padding: 10px 16px; border-bottom: 1px solid var(--line); display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  header strong { color: var(--red); }
+  header .note { color: #78716c; font-size: 12px; }
+  .warn-banner {
+    margin: 12px 16px 0; padding: 10px 14px; background: var(--warn-bg); border: 1px solid var(--warn-line);
+    border-left-width: 4px; border-radius: 4px; color: var(--warn-ink); font-size: 13px; line-height: 1.5;
+  }
+  .toolbar { padding: 10px 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .toolbar button { font: inherit; padding: 6px 12px; border: 1px solid var(--line); border-radius: 4px; background: #fff; cursor: pointer; }
+  .toolbar button:disabled { opacity: .5; cursor: not-allowed; }
+  #status { font-size: 12px; color: #57534e; }
+  #pages { display: flex; flex-direction: column; gap: 20px; align-items: center; padding: 16px; }
+  .page-wrap { box-shadow: 0 1px 6px rgba(0,0,0,.15); max-width: 100%; }
+  .page-wrap canvas { display: block; max-width: 100%; height: auto; }
+  #panel {
+    position: fixed; left: 0; right: 0; bottom: 0; background: #fff; border-top: 2px solid var(--red);
+    padding: 10px 16px; font-family: ui-monospace, monospace; font-size: 12px; min-height: 70px;
+    display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
+  }
+  #panel b { color: var(--red); font-family: system-ui, sans-serif; }
+  #download {
+    font-family: system-ui, sans-serif; font-weight: 600; text-decoration: none; color: #fff;
+    background: var(--red); padding: 6px 14px; border-radius: 4px;
+  }
+  #download[hidden] { display: none; }
+</style>
+</head>
+<body>
+<header>
+  <strong>lab · OCR lapisan teks tak terlihat</strong>
+  <span class="note">Menulis lapisan teks TAK TERLIHAT ke PDF hasil scan supaya bisa dicari &amp; diseleksi, tanpa mengubah satu piksel gambarnya. Halaman internal, noindex, bukan produk.</span>
+</header>
+
+<div class="warn-banner">
+  <strong>Peringatan:</strong> menekan "Jalankan OCR" mengunduh mesin OCR (Tesseract) berukuran
+  sekitar 4,55 MB dari origin ini sendiri (bukan CDN pihak ketiga, tapi tetap berat). Halaman ini
+  cuma alat uji internal, bukan bagian dari produk PDFLokal, dan tidak tertaut dari mana pun.
+</div>
+
+<div class="toolbar">
+  <label for="file">PDF hasil scan:</label>
+  <input type="file" id="file" accept="application/pdf">
+  <button id="run-ocr" disabled>Jalankan OCR</button>
+  <span id="status">pilih file PDF dulu.</span>
+</div>
+
+<div id="pages"></div>
+
+<aside id="panel">
+  <span id="result">belum ada hasil.</span>
+  <a id="download" hidden>Unduh PDF hasil</a>
+</aside>
+
+<script type="module">
+import { ensurePdfJs, ensurePdfLib } from '/js/core/vendor.js';
+import { writeInvisibleTextLayer } from '/js/core/ocr-layer.js';
+
+const fileInput = document.getElementById('file');
+const runBtn = document.getElementById('run-ocr');
+const statusEl = document.getElementById('status');
+const pagesEl = document.getElementById('pages');
+const resultEl = document.getElementById('result');
+const downloadEl = document.getElementById('download');
+
+// state.bytes must survive the OCR pass untouched: writeInvisibleTextLayer
+// re-loads the ORIGINAL bytes for surgery, same reason lab.js keeps its own
+// copy (pdf.js's getDocument() detaches the buffer it's handed -- see
+// core/import.js's comment on the same trap).
+const state = { bytes: null, name: '', canvas: null, scale: 1, pageHeightPt: 0, resultUrl: null };
+
+// Loaded lazily, on the first "Jalankan OCR" click, not at page load -- the
+// warning banner above says the engine only lands when asked for, and that
+// has to stay true. Mirrors core/vendor.js's ensureX() shape (one fetch no
+// matter how many callers), but Tesseract ships as a plain global via a
+// classic <script>, not an ES module, so it can't reuse that loader directly.
+let tesseractLoad = null;
+function ensureTesseract() {
+  if (window.Tesseract) return Promise.resolve(window.Tesseract);
+  if (tesseractLoad) return tesseractLoad;
+  tesseractLoad = new Promise((resolve, reject) => {
+    const el = document.createElement('script');
+    el.src = '/js/vendor/tesseract/tesseract.min.js';
+    el.onload = () => resolve(window.Tesseract);
+    el.onerror = () => {
+      tesseractLoad = null; // let a retry re-fetch instead of caching the failure forever
+      reject(new Error('gagal memuat mesin OCR (tesseract.min.js)'));
+    };
+    document.head.appendChild(el);
+  });
+  return tesseractLoad;
+}
+
+fileInput.addEventListener('change', async (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  runBtn.disabled = true;
+  downloadEl.hidden = true;
+  resultEl.textContent = 'belum ada hasil.';
+  statusEl.textContent = 'membuka & merender halaman 1…';
+  try {
+    const bytes = new Uint8Array(await f.arrayBuffer());
+    await renderFirstPage(bytes);
+    state.bytes = bytes;
+    state.name = f.name;
+    runBtn.disabled = false;
+    statusEl.textContent = `siap · ${f.name}`;
+  } catch (err) {
+    console.error(err);
+    statusEl.textContent = `✗ gagal membuka PDF: ${err.message}`;
+  }
+});
+
+async function renderFirstPage(bytes) {
+  const pdfjs = await ensurePdfJs();
+  // Defensive slice: pdf.js's getDocument() detaches the ArrayBuffer it's fed,
+  // and `bytes` is the same array the OCR write path reuses afterward.
+  const doc = await pdfjs.getDocument({ data: bytes.slice() }).promise;
+  const page = await doc.getPage(1);
+
+  // Render bigger than a normal lab preview on purpose: OCR accuracy tracks
+  // pixel density, not screen size. The CSS (max-width:100%, height:auto on
+  // .page-wrap canvas) shrinks it back down for display.
+  const base = page.getViewport({ scale: 1 });
+  const scale = Math.min(3, 1800 / base.width);
+  const viewport = page.getViewport({ scale });
+
+  pagesEl.textContent = '';
+  const wrap = document.createElement('div');
+  wrap.className = 'page-wrap';
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.floor(viewport.width);
+  canvas.height = Math.floor(viewport.height);
+  wrap.appendChild(canvas);
+  pagesEl.appendChild(wrap);
+  await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+
+  state.canvas = canvas;
+  state.scale = scale;
+  // base.height, not viewport.height: the PDF-points conversion needs the
+  // page's height in PDF user space, not the render's scaled-up pixel space.
+  // Assumption this lab does NOT handle: a page with /Rotate set -- the
+  // content stream's coordinate space stays unrotated even though the visual
+  // viewport pdf.js hands back for painting already applied the rotation.
+  state.pageHeightPt = base.height;
+}
+
+runBtn.addEventListener('click', async () => {
+  if (!state.bytes || !state.canvas) return;
+  runBtn.disabled = true;
+  fileInput.disabled = true;
+  downloadEl.hidden = true;
+  const t0 = performance.now();
+  let worker = null;
+  try {
+    statusEl.textContent = 'memuat mesin OCR (~4,55 MB, sekali saja)…';
+    await ensureTesseract();
+
+    statusEl.textContent = 'mengenali teks (bahasa Indonesia)…';
+    worker = await Tesseract.createWorker('ind', 1, {
+      workerPath: '/js/vendor/tesseract/worker.min.js',
+      corePath: '/js/vendor/tesseract/',
+      langPath: '/js/vendor/tesseract/',
+      // We vendor the RAW ind.traineddata, not the .gz tesseract.js expects by
+      // default. Without this it requests ind.traineddata.gz, gets a 404, and
+      // reports "gagal: undefined" with the real cause only in the console.
+      gzip: false,
+    });
+    const { data } = await worker.recognize(state.canvas);
+    const words = (data.words || []).filter((w) => w.text && w.text.trim());
+
+    statusEl.textContent = `menulis lapisan teks tak terlihat (${words.length} kata)…`;
+    const { PDFLib } = await ensurePdfLib();
+    const ocrWords = words.map((w) => bboxToPdfPoint(w, state.scale, state.pageHeightPt));
+    const { bytes, written, skipped } = await writeInvisibleTextLayer(
+      state.bytes,
+      [{ pageIndex: 0, words: ocrWords }],
+      { PDFLib },
+    );
+
+    const elapsed = ((performance.now() - t0) / 1000).toFixed(1);
+    if (state.resultUrl) URL.revokeObjectURL(state.resultUrl); // don't leak the previous run's blob
+    state.resultUrl = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+    downloadEl.href = state.resultUrl;
+    downloadEl.download = state.name.replace(/\.pdf$/i, '') + '-ocr.pdf';
+    downloadEl.hidden = false;
+
+    resultEl.textContent =
+      `kata ditemukan: ${words.length} · ditulis: ${written} · dilewati: ${skipped} · waktu: ${elapsed} detik`;
+    statusEl.textContent = `✓ selesai · ${state.name}`;
+  } catch (err) {
+    console.error(err);
+    statusEl.textContent = `✗ gagal: ${err.message}`;
+  } finally {
+    if (worker) await worker.terminate();
+    runBtn.disabled = false;
+    fileInput.disabled = false;
+  }
+});
+
+// Tesseract's bbox lives in CANVAS PIXEL space (origin top-left, y down). The
+// content stream needs PDF POINT space (origin bottom-left, y up), scaled
+// back down by the same `scale` the page was rendered at -- this is the one
+// place that conversion happens.
+function bboxToPdfPoint(word, scale, pageHeightPt) {
+  const { x0, y0, x1, y1 } = word.bbox;
+  const yTop = pageHeightPt - (y0 / scale);
+  const yBottom = pageHeightPt - (y1 / scale);
+  return {
+    text: word.text,
+    x: x0 / scale,
+    y: yBottom, // box bottom, bottom-left origin -- matches buildInvisibleTextOps' contract
+    w: (x1 - x0) / scale,
+    h: yTop - yBottom,
+  };
+}
+</script>
+</body>
+</html>
