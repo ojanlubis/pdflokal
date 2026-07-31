@@ -102,11 +102,19 @@
       margin: 0;
     }
 
+    /* ⚠️ NOT display:flex, AND THE REASON IS THE MARKUP. These items read
+       `<li><strong>Term</strong>, description</li>` — ONE sentence. Under flex
+       the <strong> becomes its own flex item and the text node becomes a
+       second one, so the comma started a separate column: the term sat in a
+       ~229px box and its own comma floated at the far edge of it, and the one
+       term long enough to wrap ("Tidak Ada Penyimpanan") tore a hole through
+       the paragraph. Pre-existing, inherited from style.css, and invisible in
+       the sibling list below because those items have no <strong> — a single
+       text node is a single flex item and looks fine. Hanging indent keeps the
+       ✓ marker without ever splitting the sentence. */
     .privacy-list li {
-      padding: var(--sp-8) 0;
-      display: flex;
-      align-items: flex-start;
-      gap: var(--sp-8);
+      position: relative;
+      padding: var(--sp-8) 0 var(--sp-8) var(--sp-24);
       color: var(--muted);
       line-height: 1.6;
     }
@@ -116,9 +124,11 @@
          touchable colour this system has, so a second accent meaning "good"
          is not reintroduced here. These are punctuation, --ink, not status. */
       content: "✓";
+      position: absolute;
+      left: 0;
+      top: var(--sp-8);
       color: var(--ink);
       font-weight: 600;
-      flex-shrink: 0;
     }
 
     .privacy-highlight {
