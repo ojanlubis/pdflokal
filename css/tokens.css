@@ -86,7 +86,14 @@
    * as one column, which is why centring the cards fixed what he saw. If you
    * ever set one of them to something else, you have undone the fix. */
   --column: 920px;
-  --measure: 62ch;                        /* prose caps here, never at container */
+  /* ⚠️ NOT `62ch`, AND THE UNIT IS WHY. The design system says prose caps at 62
+     characters and the CSS said `62ch` — but `ch` is the width of the ZERO
+     glyph, and in Plus Jakarta Sans that is 11.71px, so 62ch resolved to 726px,
+     which actually holds ~91 characters. The rule was written correctly, the
+     unit quietly disagreed, and the privacy promise ran a third longer than
+     specified. 32rem = 512px ≈ 64 characters in this face, measured. If the
+     typeface ever changes, re-measure this rather than trusting the number. */
+  --measure: 32rem;                       /* prose caps here, never at container */
 
   /* ---- COLOUR — one grammar, learned once ---------------------------------
    * ⭐ RED MEANS TOUCHABLE. IT HAS NO OTHER JOB. Not decoration, not emphasis,
@@ -100,12 +107,22 @@
   --on-accent: #fff;                      /* text ON the accent, both modes */
   --bg: #fff;                             /* PAGE ground (RULED 2026-07-29) */
   --surface: #fff;                        /* raised paper */
-  --dzbg: #f6f5f3;                        /* the faint grey that keeps a
-                                           * surface readable on white — AND
-                                           * the editor surround (ruled): a
-                                           * scanned document on pure white
+  --dzbg: #f6f5f3;                        /* THE EDITOR SURROUND ONLY (ruled):
+                                           * a scanned document on pure white
                                            * reads as dirty, and ~half of all
-                                           * uploads are scans. */
+                                           * uploads are scans. It must RECEDE
+                                           * behind the document. */
+  /* ⚠️ SPLIT OUT OF --dzbg 2026-07-31, because one token was doing two jobs
+     that want OPPOSITE things, and in dark mode they finally contradicted.
+     The editor surround must RECEDE behind the document. The landing dropzone
+     must READ AS A SURFACE on the page — the founder ruled "the dropzone needs
+     a little grey". In light both directions happen to work, because anything
+     off-white is visible against #fff. In dark, recessed meant #121212 on a
+     #171717 ground: 1.09:1, and the dropzone's fill simply vanished, leaving a
+     dashed outline around nothing. Same token, same rule, opposite outcome —
+     the light theme was hiding the conflict. Landing = raised, editor = sunken,
+     two tokens, and neither has to lose. */
+  --dzfill: #f6f5f3;                      /* the LANDING dropzone's fill */
 
   /* ---- SHAPE — elevation is nearly banned ---------------------------------
    * He removed the navbar's shadow within minutes of seeing it: "it makes
@@ -165,6 +182,13 @@
    * (#f6f5f3 sits below #fff). Flipping the direction in dark would make the
    * editor surround lighter than its own page and read as a panel. */
   --d-dzbg: #121212;
+  /* The landing dropzone goes the OTHER way in dark, and that is the point of
+   * the split — see --dzfill above. Recessed on a near-black ground is not a
+   * faint surface, it is no surface. Raised to #212121 it separates from
+   * #171717 the way #f6f5f3 separates from #fff in light: barely, deliberately,
+   * but visibly. Contrast ratio is a poor instrument for two large adjacent
+   * darks — check this one on a screen, not in a calculator. */
+  --d-dzfill: #212121;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -178,6 +202,7 @@
     --bg: var(--d-bg);
     --surface: var(--d-surface);
     --dzbg: var(--d-dzbg);
+    --dzfill: var(--d-dzfill);
   }
 }
 
@@ -191,4 +216,5 @@
   --bg: var(--d-bg);
   --surface: var(--d-surface);
   --dzbg: var(--d-dzbg);
+    --dzfill: var(--d-dzfill);
 }

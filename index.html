@@ -72,6 +72,47 @@
   "screenshot": "https://www.pdflokal.id/images/screenshot-preview.jpg"
 }
 </script>
+  <!-- FAQPage — the landing has shown a visible FAQ for months with no markup for
+       it. Added 2026-07-31 under specs/design-system.md §6b: a visual
+       simplification may never remove a machine-readable claim, and the same
+       logic makes an unclaimed one free to add, because structured data is not
+       in the visual flow and costs a reader nothing.
+       ⚠️ THE THREE Q&A PAIRS BELOW MUST STAY WORD-FOR-WORD IDENTICAL to the
+       visible FAQ in the body. Google treats schema that does not match visible
+       content as spam, and the failure is invisible from here — it shows up in
+       Search Console weeks later. If you edit one, edit both. -->
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Beneran gratis? Batasnya apa?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Gratis. Nggak ada batas jumlah file, nggak ada watermark, nggak perlu bikin akun. PDFLokal hidup dari dukungan pengguna, bukan dari data kamu."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Filenya diupload ke mana?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Nggak ke mana-mana. Semua diproses di HP atau laptopmu. Setelah halamannya kebuka, internetmu dimatikan pun tetap jalan."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "HP-ku kentang, kuat nggak?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Kuat. PDFLokal memang dibuat supaya tetap lancar di HP murah dan internet lambat."
+      }
+    }
+  ]
+}
+</script>
   <meta name="theme-color" content="#faf9f7">
   <link rel="icon" href="/images/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/images/apple-touch-icon.png">
@@ -404,47 +445,193 @@
        instead of two unrelated blocks. If you ever give one of them a different
        max-width, you have undone the fix — see specs/design-system.md §3. */
     .ld-col { max-width: var(--column); margin: 0 auto; }
+    /* HEADER — REBUILT 2026-07-31, full-bleed (founder ruling; reference
+       measured off lawsofux.com at 1440). It now lives OUTSIDE .ld, as a
+       direct sibling inside #empty (see the markup) — #empty is already 100%
+       of the viewport, so .ld-hd's own box IS the full width with no
+       width:100vw / negative-margin trick needed. Everything else on the page
+       stays inside .ld's 1360 container; the header is the one full-bleed
+       exception, on purpose — content is one column under a full-width
+       masthead. */
     .ld-hd {
+      position: relative; /* positioning context for .ld-nav's viewport centring, below */
       display: flex; align-items: center; justify-content: space-between; gap: var(--sp-16);
-      padding: var(--sp-12) 0;
+      padding: var(--sp-12) var(--sp-24);
       /* KOP SURAT — the letterhead double rule. KEPT, and it is structure, not
          decoration: a double line under the masthead is this system's own
          "surfaces separate by line, never by shadow" rule doing its job, and an
          Indonesian letterhead reference is the opposite of the sameness that
-         "screams AI". It was briefly dropped on the premise that it competed
-         with a navbar pill; there is no pill (see .ld-nav), so there is nothing
-         to compete with. */
+         "screams AI". It spans the full viewport width along with the header now. */
       border-bottom: 3px double var(--ink);
     }
-    .ld-mark { font-weight: 700; font-size: var(--fs-2); letter-spacing: -.02em; }
+    .ld-hd-left { display: flex; align-items: center; gap: var(--sp-8); }
+    .ld-mark { font-weight: 700; font-size: var(--fs-2); letter-spacing: -.02em; color: var(--ink); text-decoration: none; }
+    .ld-mark:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; border-radius: var(--r-control); }
     .ld-mark em { font-style: normal; color: var(--accent); }
+
+    /* Burger — MOBILE ONLY (hidden in the desktop media query below).
+       Snapped hard left beside the logo, like lawsofux's mobile MENU pill —
+       not centred, not right-aligned. A real button element, kept in sync with
+       #ld-burger-menu by js/v2/app.js: aria-expanded flips, Escape closes it,
+       a click outside closes it, and the three lines morph into an X off the
+       aria-expanded attribute alone (no JS class needed for that part). */
+    .ld-burger {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 44px; height: 44px; background: none; border: none; padding: 0;
+      color: var(--ink); cursor: pointer; border-radius: var(--r-control);
+    }
+    .ld-burger-icon { width: 22px; height: 22px; }
+    .ld-burger-icon line {
+      transform-box: fill-box; transform-origin: center;
+      transition: transform .18s ease, opacity .18s ease;
+    }
+    .ld-burger[aria-expanded="true"] .ld-burger-l1 { transform: translateY(6px) rotate(45deg); }
+    .ld-burger[aria-expanded="true"] .ld-burger-l2 { opacity: 0; }
+    .ld-burger[aria-expanded="true"] .ld-burger-l3 { transform: translateY(-6px) rotate(-45deg); }
+    .ld-burger:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+    /* The burger's drawer: Github, Dukung, Bahasa — the three items that don't
+       fit in the mobile bar itself. Desktop force-hides it outright below,
+       regardless of the `hidden` attribute's state.
+       ⚠️ IT IS AN OVERLAY, NOT AN ACCORDION (founder, 2026-07-31). It first
+       shipped in flow, pushing the headline and dropzone down the page — which
+       is the accordion mechanism, and ojan-ui-taste §3 puts accordion and
+       drawer at different points on the same context-cost axis. Navigation
+       replaces your context; it does not rearrange the page under you.
+       Anchored to .ld-hd (which takes position:relative for exactly this) so it
+       opens directly beneath the kop-surat rule, and full-height so there is no
+       half-covered page behind it needing a scrim. NO SHADOW — he removed the
+       navbar's within minutes of seeing it; surfaces here separate by line and
+       by ground. */
+    .ld-burger-menu[hidden] { display: none; }
+    .ld-burger-menu {
+      /* ⚠️ THE +3px IS THE KOP SURAT'S OWN BORDER, and it is not a fudge.
+         `top: 100%` resolves against the header's PADDING box, which excludes
+         its 3px double bottom rule — so the overlay opened 3px high and covered
+         the letterhead line, deleting the one brand element the header owns
+         every time the menu opened. Clearing the border keeps the rule visible
+         and makes the overlay read as hanging FROM the masthead. If that border
+         width ever changes, this changes with it. */
+      position: absolute; top: calc(100% + 3px); left: 0; right: 0; z-index: 60;
+      height: calc(100dvh - 100% - 3px);
+      background: var(--bg); overflow-y: auto; overscroll-behavior: contain;
+      display: flex; flex-direction: column; gap: var(--sp-4);
+      padding: var(--sp-16) var(--sp-24) var(--sp-24);
+      border-bottom: 1px solid var(--line);
+    }
+    .ld-burger-menu a {
+      min-height: 44px; display: flex; align-items: center;
+      font-size: var(--fs-1); font-weight: 500; color: var(--ink); text-decoration: none;
+      padding: 0 var(--sp-8); border-radius: var(--r-control);
+    }
+    .ld-burger-menu a:hover { background: var(--dzfill); }
+    .ld-burger-lang { margin-top: var(--sp-8); padding-top: var(--sp-8); border-top: 1px solid var(--line); }
+    .ld-burger-lang-label {
+      display: block; font-size: var(--fs-n1); font-weight: 700; color: var(--muted);
+      margin: 0 var(--sp-8) var(--sp-8);
+    }
+    .ld-burger-lang-opts { display: flex; flex-direction: column; gap: var(--sp-4); }
+
     /* A PLAIN FLEX ROW. There is NO wrapper — no background, no border, no
        radius, no shadow. He killed it on sight: "the shadow wrapper is... bad it
        makes things unclean let's drop the shadow wrapper, keep everything else."
        An earlier build here made it a bordered pill on the reading that removing
        the SHADOW was the whole instruction. It was not: the wrapper went, the
-       links stayed. */
-    .ld-nav { display: flex; align-items: center; gap: var(--sp-4); }
+       links stayed.
+       DESKTOP ONLY, RULED 2026-07-31 — see the media query below for both the
+       display:flex swap-in and the centring math. Below 900px the burger
+       replaces this entirely, so the old "shed items narrowest-first" fallback
+       (which used to live here as two breakpoints) is deleted, not just hidden. */
+    .ld-nav {
+      display: none; align-items: center; gap: var(--sp-4);
+      /* Centred on the VIEWPORT, not on the leftover flex space between the
+         mark and the right-side controls — those two groups are different
+         widths, so justify-content:space-between would NOT land the nav on
+         720/1440. .ld-hd is full-bleed, so centring against ITS OWN box
+         (position:relative, above) is centring against the viewport. */
+      position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    }
     .ld-nav a {
       font-size: var(--fs-n1); color: var(--muted); text-decoration: none; font-weight: 500;
       min-height: 44px; padding: 0 var(--sp-8); display: inline-flex; align-items: center;
     }
     .ld-nav a:hover { color: var(--ink); }
-    /*
-     * As the row narrows it sheds items from the LEFT, so the last one standing
-     * is "Dukung" — the ask, and the one whose absence costs most.
-     *
-     * ⚠️ THESE BREAKPOINTS ARE DELIBERATELY BELOW THE COMMON PHONE WIDTH, and
-     * that is a correction. When the nav was a padded pill it overflowed at
-     * 390px, so the first version shed "Privasi" there — on a 390px-class
-     * screen, which is roughly half our traffic, and Privasi is in the nav on
-     * purpose. Dropping the pill chrome reclaimed enough width that all three
-     * now fit at 390 (measured: 321px used of 358 available). So the rule stays
-     * as a safety valve for genuinely tiny screens and no longer fires on the
-     * phone most users hold. Re-measure before moving these.
-     */
-    @media (max-width: 349px) { .ld-nav a:nth-child(1) { display: none; } }
-    @media (max-width: 300px) { .ld-nav a:nth-child(2) { display: none; } }
+
+    .ld-hd-right { display: flex; align-items: center; gap: var(--sp-8); }
+
+    /* Dark-mode toggle. WIRING LIVES IN js/theme.js — it binds a `change`
+       listener to #theme-toggle-checkbox and reads .theme-toggle only for the
+       aria-label; nothing here duplicates that. The checkbox is the real
+       control, stretched invisibly over the whole hit area; the moon glyph is
+       decoration that tints on state. */
+    .ld-theme-toggle {
+      position: relative; display: inline-flex; align-items: center; justify-content: center;
+      width: 44px; height: 44px; border-radius: var(--r-control); color: var(--muted); cursor: pointer;
+    }
+    .ld-theme-toggle:hover { color: var(--ink); }
+    .ld-theme-toggle:has(:focus-visible) { outline: 3px solid var(--accent); outline-offset: 2px; }
+    .ld-theme-toggle-input {
+      position: absolute; inset: 0; margin: 0; opacity: 0; appearance: none; cursor: pointer;
+    }
+    .ld-theme-toggle-icon { width: 19px; height: 19px; pointer-events: none; }
+    .ld-theme-toggle-input:checked ~ .ld-theme-toggle-icon { color: var(--accent); }
+
+    /* The mobile-only Privasi link riding beside the toggle in the bar itself
+       (toggle first, founder-specified — Github and Dukung live in the burger
+       drawer instead). Desktop hides this in favour of the full .ld-nav. */
+    .ld-hd-privasi-mobile {
+      font-size: var(--fs-n1); color: var(--muted); text-decoration: none; font-weight: 500;
+      min-height: 44px; padding: 0 var(--sp-8); display: inline-flex; align-items: center;
+    }
+    .ld-hd-privasi-mobile:hover { color: var(--ink); }
+
+    /* Language control — PLACEHOLDER, desktop only (mobile's equivalent lives
+       inside the burger drawer, above). Globe + "ID" + a dropdown offering
+       Indonesia (selected) and English (disabled, "segera"). Choosing nothing
+       changes anything: no lang attribute write on the root element, no
+       persistence, no translation wired up. WHY it is built this way: a
+       language switch that silently does
+       nothing is a false promise, and the founder rejects manufactured
+       reassurance — so this is built to visibly NOT function (English is
+       disabled, not just cosmetically greyed) rather than to quietly pretend
+       to work. */
+    .ld-lang { position: relative; display: none; }
+    .ld-lang-btn {
+      display: inline-flex; align-items: center; gap: var(--sp-4); list-style: none; cursor: pointer;
+      min-height: 44px; padding: 0 var(--sp-8); border-radius: var(--r-control);
+      font-size: var(--fs-n1); font-weight: 500; color: var(--muted);
+    }
+    .ld-lang-btn::-webkit-details-marker { display: none; }
+    .ld-lang-btn:hover { color: var(--ink); }
+    .ld-lang-btn svg { width: 16px; height: 16px; }
+    .ld-lang-chev { transition: transform .18s ease; }
+    .ld-lang[open] .ld-lang-chev { transform: rotate(180deg); }
+    .ld-lang-menu {
+      position: absolute; top: calc(100% + var(--sp-4)); right: 0; z-index: 20; min-width: 168px;
+      background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-button);
+      padding: var(--sp-4); box-shadow: 0 3px 14px rgba(0,0,0,.16);
+      display: flex; flex-direction: column; gap: 2px;
+    }
+    .ld-lang-opt {
+      display: flex; align-items: center; justify-content: space-between; gap: var(--sp-8);
+      width: 100%; min-height: 40px; padding: 0 var(--sp-8); border: none; background: none;
+      border-radius: var(--r-control); font: inherit; font-size: var(--fs-n1); color: var(--ink);
+      text-align: left; cursor: pointer;
+    }
+    .ld-lang-opt:hover:not(:disabled) { background: var(--dzfill); }
+    /* ⚠️ ACTIVE IS NOT ACCENT. This read `color: var(--accent)` and it broke the
+       one rule specs/design-system.md §4 calls the most likely to be broken:
+       RED MEANS TOUCHABLE, and nothing else. "Indonesia" here is the CURRENT
+       state, not a control, and it is the one option in the list you cannot
+       usefully press. Colouring it red teaches the opposite of the grammar
+       every other red thing on the page teaches. Weight carries selection;
+       colour stays reserved. */
+    .ld-lang-opt.is-active { font-weight: 700; color: var(--ink); }
+    .ld-lang-opt:disabled { color: var(--muted); cursor: not-allowed; }
+    .ld-lang-soon {
+      font-size: var(--fs-n2); color: var(--muted); border: 1px solid var(--line);
+      border-radius: var(--r-pill); padding: 0 var(--sp-8);
+    }
     /* Centered hero (founder, Jul 5) — the document opens like a letter's
        title block, with the stamp pressed on its top-right corner. */
     /* padding-top (not h1 margin): a margin would collapse through the wrapper
@@ -464,6 +651,14 @@
     .ld h1 {
       font-size: var(--fs-5); line-height: 1.05; letter-spacing: -.035em;
       font-weight: 700; margin: 0 auto var(--sp-48); max-width: 16ch; text-wrap: balance;
+      /* ⚠️ WORD-SPACING EXISTS TO UNDO THE TRACKING, and without it the headline
+         reads "Buatngurus PDF." Negative letter-spacing applies to the SPACE
+         glyph too. This font's space is already narrow (.18em); -.035em tracking
+         cut it to .143em, a further 20%, so the word gap fell below the gap
+         between letters and the eye stopped seeing two words. Measured at
+         82.6px: space 14.7px, tracking -2.89px, leaving 11.8px. This adds the
+         tracking straight back, and ONLY to the spaces. */
+      word-spacing: .035em;
     }
     @media (min-width: 640px) { .ld h1 { font-size: var(--fs-7); } }
     /* ⚠️ .ld-sub IS NOT USED ON THE LANDING. Its subhead was ruled away
@@ -477,8 +672,14 @@
        THIS FILE. The generator anchors on the first match of that tag in the
        whole document, and a mention inside a CSS comment IS a match: it once
        replaced everything from this comment down to the real closing tag,
-       deleting <body>, the header and the app's scroll container from all 12
-       generated pages. They rendered blank, and seo:check still passed. */
+       deleting the body element, the header and the app's scroll container from
+       all 12 generated pages. They rendered blank, and seo:check still passed.
+       ⚠️ AND THIS COMMENT BROKE THE SAME RULE IT STATES. It said "deleting"
+       followed by the body tag in angle brackets, which is exactly the match
+       the generator hunts for; that literal caused the SECOND incident, where
+       the intent hook landed inside a comment and /kompres-pdf-500kb silently
+       lost its size cap. Removed 2026-07-31. Name tags in PROSE here, never in
+       brackets, including when the sentence is a warning about doing so. */
     .ld h1:has(+ .ld-sub) { margin-bottom: var(--sp-16); }
     .ld-sub { font-size: var(--fs-1); color: var(--muted); margin: 0 auto var(--sp-48); max-width: var(--measure); }
     /* THE STAMP — thunks once per page view, then just IS.
@@ -518,13 +719,46 @@
       100% { transform: rotate(-8deg) scale(1); opacity: 1; }
     }
     @media (prefers-reduced-motion: reduce) { .ld-stamp { animation: none; } }
+
+    /* ⚠️ THE STAMP NEEDS MORE INK IN DARK, AND ONLY IN DARK.
+       specs/design-system.md §6 predicted this exactly: "the mask does not
+       survive scaling; tuned at 12.5px, reused at 38px it renders a ghost until
+       the alpha curve is corrected." The curve was never corrected, and 37px
+       shipped. Raw feTurbulence has a mean alpha near .5, so the stamp paints at
+       roughly half strength. On white that is the faint rubber-stamp look the
+       founder ACCEPTED and it is deliberately left alone. On #171717 the same
+       half-strength red blends to about (131,45,45) — near 2.2:1 against the
+       ground, a maroon smudge rather than a mark.
+       feFuncA lifts the low tail so the ink lands around .85 and the gaps stay
+       gaps: measured blend about (207,58,58), roughly 4.3:1. Same motif, same
+       grain, enough pigment to read.
+       ⚠️ Distinct filter ids (nd / nsd) for the same reason the light pair has
+       them: two identical ids in one document read as a duplicate to a linter,
+       even though each lives inside its own data URI. */
+    :root[data-theme="dark"] .ld-stamp {
+      -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='nd'><feTurbulence baseFrequency='.75'/><feComponentTransfer><feFuncA type='linear' slope='1.9' intercept='.18'/></feComponentTransfer></filter><rect width='120' height='120' filter='url(%23nd)' opacity='.9'/></svg>");
+      mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='nsd'><feTurbulence baseFrequency='.75'/><feComponentTransfer><feFuncA type='linear' slope='1.9' intercept='.18'/></feComponentTransfer></filter><rect width='120' height='120' filter='url(%23nsd)' opacity='.9'/></svg>");
+    }
+    /* ⚠️ AND THE SAME RULE FOR THE SYSTEM DEFAULT, INSIDE THE MEDIA QUERY.
+       This was first written as `:root:not([data-theme="light"])` to match how
+       tokens.css expresses "dark unless overridden" — but that selector is only
+       half the condition. Outside a prefers-color-scheme block it also matches a
+       plain LIGHT visit, where no data-theme attribute exists at all, and it
+       would have pushed the dark ink curve onto the white page the founder
+       already signed off. The attribute says what the user CHOSE; only the media
+       query says what the machine PREFERS. Both are needed, neither alone. */
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) .ld-stamp {      -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='nd'><feTurbulence baseFrequency='.75'/><feComponentTransfer><feFuncA type='linear' slope='1.9' intercept='.18'/></feComponentTransfer></filter><rect width='120' height='120' filter='url(%23nd)' opacity='.9'/></svg>");
+      mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='nsd'><feTurbulence baseFrequency='.75'/><feComponentTransfer><feFuncA type='linear' slope='1.9' intercept='.18'/></feComponentTransfer></filter><rect width='120' height='120' filter='url(%23nsd)' opacity='.9'/></svg>");
+      }
+    }
     /* The dropzone owns the working column: 920 wide, 300 tall at desktop.
        It is a --dzbg ground on a white page — the faint grey exists precisely
        so a surface stays readable on white without a shadow. */
     .dropzone {
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       width: 100%; min-height: 200px; cursor: pointer; text-align: center;
-      border: 2px dashed var(--line); border-radius: var(--r-panel); background: var(--dzbg);
+      border: 2px dashed var(--line); border-radius: var(--r-panel); background: var(--dzfill);
       padding: var(--sp-32) var(--sp-16); font: inherit; color: inherit;
       transition: border-color .15s ease, background .15s ease;
     }
@@ -544,15 +778,20 @@
     #ld-more[hidden] { display: none; }
     .ld-card {
       display: flex; flex-direction: column; gap: var(--sp-8); cursor: pointer; text-decoration: none;
+      align-items: center; justify-content: center;
       background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-button);
-      padding: var(--sp-16); text-align: left; font: inherit; color: var(--ink);
+      padding: var(--sp-16); text-align: center; font: inherit; color: var(--ink);
       transition: transform .1s ease, border-color .15s ease;
     }
     .ld-card:active { transform: scale(.98); }
     .ld-card:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
-    .ld-card svg { width: 20px; height: 20px; color: var(--ink); }
+    .ld-card svg { width: 20px; height: 20px; color: var(--accent); }
     .ld-card b { font-size: var(--fs-0); font-weight: 700; letter-spacing: -.01em; }
-    .ld-card span { font-size: var(--fs-n1); color: var(--muted); line-height: 1.45; }
+    /* The description line was REMOVED 2026-07-30 (founder, on the live page).
+       The card is icon + name, which is what the studio rig always was — and
+       per specs/design-system.md §0 a rig's absence only becomes a decision
+       when HE rules it. He ruled it. Do not restore descriptions without him;
+       the copy is in git, not lost. */
     .ld-lihat {
       display: flex; align-items: center; justify-content: center; gap: var(--sp-8); width: 100%;
       margin-top: var(--sp-12); padding: var(--sp-12); font-weight: 700; font-size: var(--fs-n1);
@@ -597,6 +836,9 @@
     .ld-tools h2 { font-size: var(--fs-n1); font-weight: 700; margin: 0 0 var(--sp-12); color: var(--muted); letter-spacing: .02em; }
     .ld-tools nav { display: flex; flex-wrap: wrap; gap: var(--sp-4) var(--sp-24); }
     .ld-tools nav a { font-size: var(--fs-0); color: var(--muted); text-decoration: none; min-height: 32px; display: inline-flex; align-items: center; }
+    /* was an inline style="margin-top:18px" — 18 is not on the ramp, and an
+       inline style is unreachable by the theme and by any future lint. */
+    .ld-tools-h2-gap { margin-top: var(--sp-24); }
     /* var(--red) never existed — this rule had been dead since it was written,
        so the links had no hover at all. --accent is the token. */
     .ld-tools nav a:hover { color: var(--accent); text-decoration: underline; }
@@ -622,12 +864,22 @@
     .ld-foot a { font-size: var(--fs-n1); color: var(--muted); text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
     .ld-foot span { margin-left: auto; font-size: var(--fs-n2); color: var(--muted); }
     /* desktop composition (founder, Jul 5 rd4+rd5: fill the width with CONTENT,
-       on a flat page). The toolbox IS the content — all 14 tools visible, no
-       accordion (that's a mobile pattern; hiding 10 tools on a 1440px screen
-       was what made the sides feel empty). Paper-on-desk was tried live and
-       CUT by the founder — one continuous surface, no floating sheet. */
+       on a flat page). Paper-on-desk was tried live and CUT by the founder —
+       one continuous surface, no floating sheet.
+       ⚠️ REVERSED 2026-07-31: the founder's rd4+rd5 call was "all 14 visible,
+       no accordion on desktop" — that read is gone. New ruling: max 4 columns
+       at every width from here up, same accordion as mobile. See .ld-grid /
+       #ld-more below; .ld-toolbox (the flex wrap that bridged the two grids
+       into one 5/5/4 flow) is deleted, markup and CSS, because that flow no
+       longer exists — each grid is its own real CSS grid now. */
     @media (min-width: 900px) {
       .ld-mark { font-size: var(--fs-4); }
+      /* Header swap: burger + its drawer + the mobile Privasi link give way to
+         the full centred nav and the language control. See .ld-hd's own rules
+         above for why .ld-nav's centring math doesn't need anything here. */
+      .ld-nav { display: flex; }
+      .ld-burger, .ld-hd-privasi-mobile, .ld-burger-menu { display: none; }
+      .ld-lang { display: block; }
       .ld-nav a { font-size: var(--fs-1); min-height: 44px; padding: 0 var(--sp-16); }
       .ld-hero-copy { padding-top: var(--sp-64); }
       .ld h1 { font-size: var(--fs-9); }
@@ -644,15 +896,20 @@
          form factors, so there is nothing for it to respond to. */
       /* 920 x 300 — the working column, at the height he set. */
       .dropzone { min-height: 300px; }
-      .ld-grid { grid-template-columns: repeat(4, 1fr); } /* top-4 = one featured row */
-      /* The full toolbox, always open: 10 more tools in two 5-across rows
-         (slightly narrower cards than the top-4 = quiet hierarchy). KEPT on
-         purpose — the studio rig showed only the featured four, and per
-         specs/design-system.md §0 the rig's absences are not decisions. The
-         founder's rd4/rd5 ruling was "all 14 tools visible, no accordion"; what
-         changed today is the WIDTH they sit on, not how many there are. */
-      #ld-more[hidden] { display: grid; grid-template-columns: repeat(5, 1fr); }
-      .ld-lihat { display: none; }
+      /* MAX 4 COLUMNS, RULED 2026-07-31 — the founder reversed the "all 14
+         visible" call above. Only the first 4 cards (the same 4 mobile shows)
+         are on the page by default; the other 10 sit behind #ld-more, same as
+         mobile. .ld-toolbox — the flex wrap that used display:contents to
+         bridge .ld-grid and #ld-more into one 5/5/4 flow — is gone: there is
+         no shared flow to bridge any more, each grid renders as its own grid.
+         ⚠️ .ld-toolbox also carried .ld-grid's margin-top, because
+         display:contents discards an element's own margin. That margin moves
+         back onto .ld-grid itself below, or the cards weld to the install chip
+         above it — that bug already happened once here. */
+      /* #ld-more carries class="ld-grid" too (see markup), so this one rule
+         gives both grids the same 4 columns and the same card width. */
+      .ld-grid { grid-template-columns: repeat(4, 1fr); margin-top: var(--sp-24); }
+      .ld-lihat { display: flex; }
       .ld-card:hover { border-color: var(--accent); }
       .dropzone:hover { border-color: var(--accent); background: rgba(220,38,38,.04); }
       /* FAQ reads as a broadsheet: two columns under one heading */
@@ -904,7 +1161,12 @@
     #sc-share { border-color: var(--accent); background: var(--accent); color: #fff; }
     #ic-install { border-color: var(--accent); background: var(--accent); color: #fff; }
     /* install chip — quiet, below the dropzone; shown to returning users only */
-    .ip-chip-wrap { display: flex; justify-content: center; margin-top: 14px; }
+    /* 14px was here and is not on the ramp (4·8·12·16·24·32·48·64·96·128). It
+       was the studio rig's `gap: 14px` carried out of the rig as a literal.
+       24 both sits on the ramp and matches the space below the chip, so the
+       chip reads as its own band instead of being crammed against the
+       dropzone. specs/design-system.md §2. */
+    .ip-chip-wrap { display: flex; justify-content: center; margin-top: var(--sp-24); }
     .ip-chip {
       display: inline-flex; align-items: center; gap: 8px;
       padding: 8px 13px 8px 9px; border: 1px solid var(--line); background: var(--surface);
@@ -1066,18 +1328,93 @@
          Real content in static HTML on purpose: Google reads a normal content
          page; humans get a tool that's ready before they finish the headline. -->
     <div id="empty">
-      <div class="ld">
-        <div class="ld-hd">
-          <span class="ld-mark">PDF<em>Lokal</em></span>
-          <!-- Leftmost-first is the order of sacrifice as the pill narrows, so
-               "Dukung" is the last one standing. See .ld-nav in the stylesheet
-               before reordering these. -->
-          <nav class="ld-nav" aria-label="Navigasi utama">
-            <a href="https://github.com/ojanlubis/pdflokal" rel="noopener">Github</a>
-            <a href="/privasi">Privasi</a>
-            <a href="/dukung">Dukung</a>
-          </nav>
+      <!-- HEADER — full-bleed, REBUILT 2026-07-31 (see .ld-hd in the
+           stylesheet for the why). It sits OUTSIDE .ld on purpose: .ld is the
+           1360 container everything else lives in, and the header is the one
+           deliberate exception to that. -->
+      <div class="ld-hd">
+        <div class="ld-hd-left">
+          <!-- ⚠️ A LINK, NOT A SPAN. On the landing itself this looks pointless
+               (you are already home) and that is exactly why it stayed a dead
+               span for so long. But scripts/gen-seo-pages.js copies this header
+               into all 12 generated pages, and those are where people ARRIVE
+               from Google — a wordmark that does nothing is the single most
+               obvious thing a stranger will try. Same defect the founder found
+               on privasi/dukung, one layer upstream and twelve times over. -->
+          <a class="ld-mark" href="/" aria-label="PDFLokal, ke beranda">PDF<em>Lokal</em></a>
+          <button class="ld-burger" id="ld-burger" type="button" aria-expanded="false" aria-controls="ld-burger-menu" aria-label="Buka menu navigasi">
+            <svg class="ld-burger-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+              <line class="ld-burger-l1" x1="3" y1="6" x2="21" y2="6"/>
+              <line class="ld-burger-l2" x1="3" y1="12" x2="21" y2="12"/>
+              <line class="ld-burger-l3" x1="3" y1="18" x2="21" y2="18"/>
+            </svg>
+          </button>
         </div>
+
+        <!-- Desktop only (<900px hides this via the media query) — mobile's
+             equivalent is the burger + #ld-burger-menu below. -->
+        <nav class="ld-nav" aria-label="Navigasi utama">
+          <a href="https://github.com/ojanlubis/pdflokal" rel="noopener">Github</a>
+          <a href="/privasi">Privasi</a>
+          <a href="/dukung">Dukung</a>
+        </nav>
+
+        <div class="ld-hd-right">
+          <!-- Dark-mode toggle. #theme-toggle-checkbox and .theme-toggle are
+               the exact hooks js/theme.js already binds to — see that file
+               for the "change" listener and the aria-label swap. Nothing here
+               reimplements it; this is markup + styling only. -->
+          <label class="ld-theme-toggle theme-toggle" for="theme-toggle-checkbox" aria-label="Ganti tema" title="Ganti tema">
+            <input type="checkbox" id="theme-toggle-checkbox" class="ld-theme-toggle-input">
+            <svg class="ld-theme-toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
+          </label>
+
+          <!-- Mobile only — desktop hides this in favour of .ld-nav's Privasi link. -->
+          <a href="/privasi" class="ld-hd-privasi-mobile">Privasi</a>
+
+          <!-- Language control — PLACEHOLDER. Desktop only; mobile's
+               equivalent lives inside the burger drawer. Indonesia is
+               selected, English is disabled ("segera") and inert on purpose —
+               see .ld-lang in the stylesheet for why it is built to visibly
+               NOT function rather than to quietly do nothing. -->
+          <details class="ld-lang">
+            <summary class="ld-lang-btn" aria-label="Pilih bahasa">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+              <span>ID</span>
+              <svg class="ld-lang-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+            </summary>
+            <div class="ld-lang-menu">
+              <button type="button" class="ld-lang-opt is-active">Indonesia</button>
+              <button type="button" class="ld-lang-opt" disabled aria-disabled="true">English <span class="ld-lang-soon">segera</span></button>
+            </div>
+          </details>
+        </div>
+
+      <!-- Burger drawer — mobile only. Desktop force-hides it via CSS even
+           though JS never opens it there (the burger itself is display:none
+           and unreachable).
+           ⚠️ IT LIVES INSIDE .ld-hd ON PURPOSE. As a SIBLING of the header its
+           `top: 100%` resolved against #empty, the full-height scroll
+           container, so the overlay rendered at y=844 — one viewport below the
+           fold, invisible, while every other assertion about it still passed.
+           .ld-hd is the positioning context it needs. Being absolute, it is out
+           of flow and does not disturb the header's flex layout. -->
+      <div class="ld-burger-menu" id="ld-burger-menu" hidden>
+        <a href="https://github.com/ojanlubis/pdflokal" rel="noopener">Github</a>
+        <a href="/dukung">Dukung</a>
+        <div class="ld-burger-lang">
+          <span class="ld-burger-lang-label">Bahasa</span>
+          <div class="ld-burger-lang-opts">
+            <span class="ld-lang-opt is-active">Indonesia</span>
+            <span class="ld-lang-opt" aria-disabled="true">English <span class="ld-lang-soon">segera</span></span>
+          </div>
+        </div>
+      </div>
+      </div><!-- /.ld-hd -->
+
+      <div class="ld">
         <div class="ld-hero-copy">
             <!-- The headline anchors ALONE (ruled 2026-07-29). The subhead that
                  used to sit here was cut, not reworded — subtraction beats
@@ -1116,64 +1453,70 @@
         <!-- "Mau ngapain hari ini?" was here and was RULED AWAY (2026-07-29).
              The cards say what they do; a label asking the question the cards
              already answer was one more thing competing for the same glance. -->
+        <!-- The 4/10 split is now the rule at every width, not just mobile
+             (RULED 2026-07-31 — max 4 columns on desktop too): the first grid
+             is the 4 always-visible cards, #ld-more is the 10 behind "Lihat
+             semua alat". They used to be bridged into one flex flow by a
+             .ld-toolbox wrapper for the old "all 14 visible" desktop layout;
+             that layout is gone, so the wrapper is too. -->
         <div class="ld-grid">
           <a class="ld-card" href="/gabung-pdf" data-intent="gabung">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>
-            <b>Gabung PDF</b><span>Beberapa file jadi satu</span>
+            <b>Gabung PDF</b>
           </a>
           <a class="ld-card" href="/tanda-tangan-pdf" data-intent="ttd">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
-            <b>Tanda Tangan</b><span>Gambar atau foto ttd-mu</span>
+            <b>Tanda Tangan</b>
           </a>
           <a class="ld-card" href="/kompres-pdf" data-intent="kompres">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
-            <b>Kompres PDF</b><span>Biar lolos batas upload</span>
+            <b>Kompres PDF</b>
           </a>
           <a class="ld-card" href="/jpg-ke-pdf" data-intent="foto">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
-            <b>Foto jadi PDF</b><span>Hasil scan rapi jadi satu file</span>
+            <b>Foto jadi PDF</b>
           </a>
         </div>
         <div class="ld-grid" id="ld-more" hidden>
           <a class="ld-card" href="/pisah-pdf" data-intent="split">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/><circle cx="6" cy="18" r="3"/><path d="M14.8 14.8 20 20"/></svg>
-            <b>Split PDF</b><span>Ambil halaman yang perlu aja</span>
+            <b>Split PDF</b>
           </a>
           <a class="ld-card" href="/pdf-ke-jpg" data-intent="gambar">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
-            <b>PDF jadi Gambar</b><span>Tiap halaman jadi JPG/PNG</span>
+            <b>PDF jadi Gambar</b>
           </a>
           <a class="ld-card" href="/edit-pdf" data-intent="teks">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
-            <b>Tambah Teks</b><span>Isi formulir atau beri catatan</span>
+            <b>Tambah Teks</b>
           </a>
           <a class="ld-card" href="/tanda-tangan-pdf" data-intent="paraf">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16c2-4 4-6 6-3s3 1 5-4"/><path d="M4 20h16"/></svg>
-            <b>Paraf</b><span>Inisial cepat di tiap halaman</span>
+            <b>Paraf</b>
           </a>
           <a class="ld-card" href="/edit-pdf" data-intent="tipex">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="8" rx="2"/></svg>
-            <b>Tip-Ex</b><span>Tutup bagian yang nggak perlu</span>
+            <b>Tip-Ex</b>
           </a>
           <a class="ld-card" href="/hapus-halaman-pdf" data-intent="halaman">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-            <b>Atur Halaman</b><span>Urutkan, putar, hapus halaman</span>
+            <b>Atur Halaman</b>
           </a>
           <a class="ld-card" href="/alat-gambar">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m14 10 4-4"/><path d="M18 10V6h-4"/><path d="m10 14-4 4"/><path d="M6 14v4h4"/></svg>
-            <b>Kompres Gambar</b><span>Foto jadi ringan dikirim</span>
+            <b>Kompres Gambar</b>
           </a>
           <a class="ld-card" href="/alat-gambar">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 3 9 15"/><path d="M21 8V3h-5"/><path d="M3 21l6-6"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
-            <b>Ubah Ukuran Gambar</b><span>Pas buat syarat unggahan</span>
+            <b>Ubah Ukuran Gambar</b>
           </a>
           <a class="ld-card" href="/alat-gambar">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>
-            <b>Konversi Gambar</b><span>JPG, PNG, atau WebP</span>
+            <b>Konversi Gambar</b>
           </a>
           <a class="ld-card" href="/alat-gambar">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/></svg>
-            <b>Hapus Background</b><span>Foto ttd atau produk jadi bersih</span>
+            <b>Hapus Background</b>
           </a>
         </div>
         <button class="ld-lihat" id="ld-lihat" aria-expanded="false" aria-controls="ld-more">Lihat semua alat
@@ -1217,7 +1560,7 @@
           <!-- Separate group on purpose: these are the same compressor with a hard
                cap pre-set, not different tools. Listing them as "alat" would be a
                lie to the user; hiding them would be a dead end for the crawler. -->
-          <h2 style="margin-top:18px">Kompres ke ukuran tertentu</h2>
+          <h2 class="ld-tools-h2-gap">Kompres ke ukuran tertentu</h2>
           <nav aria-label="Kompres ke ukuran tertentu">
             <a href="/kompres-pdf-1mb">Kompres PDF 1MB</a>
             <a href="/kompres-pdf-500kb">Kompres PDF 500KB</a>
@@ -1228,7 +1571,10 @@
         <footer class="ld-foot">
           <a href="/dukung">Dukung Kami</a>
           <a href="/privasi">Privasi</a>
-          <a href="https://github.com/ojanlubis/pdflokal" rel="noopener">GitHub</a>
+          <!-- "Github", not "GitHub" — the founder ruled the capitalization for
+               the navbar (2026-07-29) and the footer said the other thing, so one
+               page carried two spellings of one word. -->
+          <a href="https://github.com/ojanlubis/pdflokal" rel="noopener">Github</a>
           <span>Dibuat di Indonesia</span>
         </footer>
       </div>

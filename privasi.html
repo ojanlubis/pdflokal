@@ -25,14 +25,20 @@
   <title>Kebijakan Privasi - PDFLokal</title>
   <meta name="description" content="Kebijakan privasi PDFLokal. Semua file diproses 100% di browser kamu, tidak ada yang diupload ke server.">
 
-  <!-- Fonts (self-hosted in style.css via @font-face) -->
+  <!-- Fonts (self-hosted in css/page-base.css via @font-face) -->
 
   <!-- Styles -->
-  <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="/css/tokens.css">
-  <!-- Maps the old wing's token names onto the real ones. MUST load after
-       style.css. Scaffolding: delete at demolition. See the file header. -->
-  <link rel="stylesheet" href="/css/legacy-bridge.css">
+  <!-- Base typography (font-face, reset, body/h1-h3/p/a) on tokens — the last
+       tie to style.css, cut 2026-07-31. See the file header for what it
+       replaces and why. style.css and css/legacy-bridge.css no longer load
+       here; alat-gambar.html (the old wing) is the only remaining reader of
+       style.css. -->
+  <link rel="stylesheet" href="/css/page-base.css">
+  <!-- The ported landing navbar + footer chrome. See the file header for what
+       is and isn't ported, and why it lives here rather than in style.css or
+       css/page-base.css. -->
+  <link rel="stylesheet" href="/css/chrome.css">
   <!-- THEME BOOT. Applies an EXPLICIT choice before first paint, so a user who
        picked the theme opposite to their OS does not see a flash of the other
        one. It deliberately does NOT resolve the system preference: that is
@@ -63,24 +69,31 @@
     .privacy-intro {
       font-size: 1.0625rem;
       line-height: 1.7;
-      color: var(--text-secondary);
-      margin-bottom: var(--space-2xl);
+      color: var(--muted);
+      margin-bottom: var(--sp-48);
     }
 
     .privacy-section {
-      background: var(--bg-secondary);
-      padding: var(--space-xl);
-      border-radius: var(--radius-xl);
-      box-shadow: var(--shadow-md);
-      margin-bottom: var(--space-xl);
+      background: var(--surface);
+      padding: var(--sp-32);
+      border-radius: var(--r-panel);
+      box-shadow: none;
+      /* ⚠️ THE LINE REPLACES THE SHADOW — legacy-bridge.css used to add this
+         for exactly this class (its own note: "the cards lost their shadow
+         above, so they need the line that replaces it, otherwise a --surface
+         card on a --bg page has no edge at all in light mode, where both are
+         white"). Ported directly rather than left to a shared rule, since
+         .privacy-section is the only class here that needs it. */
+      border: 1px solid var(--line);
+      margin-bottom: var(--sp-32);
     }
 
     .privacy-section h2 {
-      margin-bottom: var(--space-lg);
+      margin-bottom: var(--sp-24);
       font-size: 1.25rem;
       display: flex;
       align-items: center;
-      gap: var(--space-sm);
+      gap: var(--sp-8);
     }
 
     .privacy-list {
@@ -90,61 +103,64 @@
     }
 
     .privacy-list li {
-      padding: var(--space-sm) 0;
+      padding: var(--sp-8) 0;
       display: flex;
       align-items: flex-start;
-      gap: var(--space-sm);
-      color: var(--text-secondary);
+      gap: var(--sp-8);
+      color: var(--muted);
       line-height: 1.6;
     }
 
     .privacy-list li::before {
+      /* ⚠️ NOT GREEN — legacy-bridge.css's own ruling: red is the only
+         touchable colour this system has, so a second accent meaning "good"
+         is not reintroduced here. These are punctuation, --ink, not status. */
       content: "✓";
-      color: var(--accent-success, #22c55e);
+      color: var(--ink);
       font-weight: 600;
       flex-shrink: 0;
     }
 
     .privacy-highlight {
-      background: var(--bg-tertiary);
-      padding: var(--space-lg);
-      border-radius: var(--radius-lg);
-      border-left: 4px solid var(--accent-primary);
-      margin: var(--space-lg) 0;
+      background: var(--dzbg);
+      padding: var(--sp-24);
+      border-radius: var(--r-button);
+      border-left: 4px solid var(--accent);
+      margin: var(--sp-24) 0;
     }
 
     .privacy-highlight p {
       margin: 0;
-      color: var(--text-secondary);
+      color: var(--muted);
       line-height: 1.6;
     }
 
     .storage-table {
       width: 100%;
       border-collapse: collapse;
-      margin-top: var(--space-md);
+      margin-top: var(--sp-16);
     }
 
     .storage-table th,
     .storage-table td {
-      padding: var(--space-sm) var(--space-md);
+      padding: var(--sp-8) var(--sp-16);
       text-align: left;
-      border-bottom: 1px solid var(--border-light);
+      border-bottom: 1px solid var(--line);
     }
 
     .storage-table th {
       font-weight: 600;
-      color: var(--text-primary);
+      color: var(--ink);
       font-size: 0.875rem;
     }
 
     .storage-table td {
-      color: var(--text-secondary);
+      color: var(--muted);
       font-size: 0.875rem;
     }
 
     .storage-table code {
-      background: var(--bg-tertiary);
+      background: var(--dzbg);
       padding: 2px 6px;
       border-radius: 4px;
       font-size: 0.8125rem;
@@ -152,61 +168,94 @@
 
     @media (max-width: 480px) {
       .privacy-section {
-        padding: var(--space-lg);
+        padding: var(--sp-24);
       }
 
       .storage-table th,
       .storage-table td {
-        padding: var(--space-xs) var(--space-sm);
+        padding: var(--sp-4) var(--sp-8);
         font-size: 0.8125rem;
       }
     }
   </style>
 </head>
 <body>
-  <!-- Header -->
-  <header class="header">
-    <div class="container header-inner">
-      <a href="/" class="logo">
-        <div class="logo-icon">P</div>
-        <span>PDFLokal</span>
-      </a>
-      <div class="header-actions">
-        <label class="theme-toggle" for="theme-toggle-checkbox" aria-label="Ganti tema" title="Ganti tema">
-          <input type="checkbox" id="theme-toggle-checkbox" class="theme-toggle-checkbox" />
-          <div class="theme-toggle-slider">
-            <svg class="theme-toggle-icon theme-toggle-icon-sun" width="14" height="14" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="5" />
-              <line x1="12" y1="1" x2="12" y2="3" />
-              <line x1="12" y1="21" x2="12" y2="23" />
-              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-              <line x1="1" y1="12" x2="3" y2="12" />
-              <line x1="21" y1="12" x2="23" y2="12" />
-              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-            </svg>
-            <svg class="theme-toggle-icon theme-toggle-icon-moon" width="14" height="14" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-            </svg>
-            <div class="theme-toggle-thumb"></div>
-          </div>
-        </label>
-        <a href="https://github.com/ojanlubis/pdflokal" target="_blank" class="btn btn-ghost">
-          <svg width="30" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round">
-            <path
-              d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22" />
-          </svg>
-        </a>
+  <!-- Header — ported from index.html's landing navbar (locked this session);
+       see css/chrome.css for the full note. -->
+  <div class="ld-hd">
+    <div class="ld-hd-left">
+      <!-- A link, not a span (founder, 2026-07-31) — from privasi/dukung
+           there was no way back to the homepage by clicking the logo. -->
+      <a class="ld-mark" href="/" aria-label="PDFLokal, ke beranda">PDF<em>Lokal</em></a>
+      <button class="ld-burger" id="ld-burger" type="button" aria-expanded="false" aria-controls="ld-burger-menu" aria-label="Buka menu navigasi">
+        <svg class="ld-burger-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+          <line class="ld-burger-l1" x1="3" y1="6" x2="21" y2="6"/>
+          <line class="ld-burger-l2" x1="3" y1="12" x2="21" y2="12"/>
+          <line class="ld-burger-l3" x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Desktop only (<900px hides this via the media query) — mobile's
+         equivalent is the burger + #ld-burger-menu below. -->
+    <nav class="ld-nav" aria-label="Navigasi utama">
+      <a href="https://github.com/ojanlubis/pdflokal" rel="noopener">Github</a>
+      <a href="/privasi">Privasi</a>
+      <a href="/dukung">Dukung</a>
+    </nav>
+
+    <div class="ld-hd-right">
+      <!-- Dark-mode toggle. #theme-toggle-checkbox and .theme-toggle are the
+           exact hooks js/theme.js already binds to. -->
+      <label class="ld-theme-toggle theme-toggle" for="theme-toggle-checkbox" aria-label="Ganti tema" title="Ganti tema">
+        <input type="checkbox" id="theme-toggle-checkbox" class="ld-theme-toggle-input">
+        <svg class="ld-theme-toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+      </label>
+
+      <!-- Mobile only — desktop hides this in favour of .ld-nav's Privasi link. -->
+      <a href="/privasi" class="ld-hd-privasi-mobile">Privasi</a>
+
+      <!-- Language control — PLACEHOLDER. Desktop only; mobile's equivalent
+           lives inside the burger drawer. Indonesia selected, English
+           disabled ("segera") and inert on purpose. -->
+      <details class="ld-lang">
+        <summary class="ld-lang-btn" aria-label="Pilih bahasa">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          <span>ID</span>
+          <svg class="ld-lang-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+        </summary>
+        <div class="ld-lang-menu">
+          <button type="button" class="ld-lang-opt is-active">Indonesia</button>
+          <button type="button" class="ld-lang-opt" disabled aria-disabled="true">English <span class="ld-lang-soon">segera</span></button>
+        </div>
+      </details>
+    </div>
+
+    <!-- Burger drawer — mobile only. Desktop force-hides it via CSS even
+         though JS never opens it there.
+         ⚠️ IT LIVES INSIDE .ld-hd ON PURPOSE. As a sibling of the header its
+         `top: 100%` resolved against the page's own scroll container, so the
+         overlay rendered one viewport below the fold — invisible, while
+         every other assertion about it still passed. .ld-hd is the
+         positioning context it needs (position:relative). Being absolute, it
+         is out of flow and does not disturb the header's flex layout. -->
+    <div class="ld-burger-menu" id="ld-burger-menu" hidden>
+      <a href="https://github.com/ojanlubis/pdflokal" rel="noopener">Github</a>
+      <a href="/dukung">Dukung</a>
+      <div class="ld-burger-lang">
+        <span class="ld-burger-lang-label">Bahasa</span>
+        <div class="ld-burger-lang-opts">
+          <span class="ld-lang-opt is-active">Indonesia</span>
+          <span class="ld-lang-opt" aria-disabled="true">English <span class="ld-lang-soon">segera</span></span>
+        </div>
       </div>
     </div>
-  </header>
+  </div>
 
   <!-- Main Content -->
-  <main class="container">
+  <main class="pg-wrap">
     <div class="privacy-page">
       <h1>Kebijakan Privasi</h1>
 
@@ -248,7 +297,7 @@
       <!-- Analytics -->
       <div class="privacy-section">
         <h2>Tentang Analytics</h2>
-        <p style="color: var(--text-secondary); line-height: 1.6; margin-bottom: var(--space-md);">
+        <p style="color: var(--muted); line-height: 1.6; margin-bottom: var(--sp-16);">
           Kami menggunakan Vercel Web Analytics untuk memahami berapa banyak orang yang menggunakan PDFLokal.
           Analytics ini bersifat:
         </p>
@@ -263,7 +312,7 @@
       <!-- Telemetri Produk -->
       <div class="privacy-section">
         <h2>Telemetri Produk</h2>
-        <p style="color: var(--text-secondary); line-height: 1.6; margin-bottom: var(--space-md);">
+        <p style="color: var(--muted); line-height: 1.6; margin-bottom: var(--sp-16);">
           Selain analytics kunjungan di atas, PDFLokal juga mengirim data teknis kecil ke server kami
           sendiri (bukan pihak ketiga) tentang bagaimana fitur-fitur dipakai, supaya kami tahu alat
           mana yang berguna dan mana yang perlu diperbaiki. Datanya sengaja dibuat sesempit mungkin:
@@ -281,13 +330,13 @@
             APA isi dokumenmu.
           </p>
         </div>
-        <p style="color: var(--text-secondary); line-height: 1.6;">
+        <p style="color: var(--muted); line-height: 1.6;">
           Nggak ada cookie, nggak ada ID yang mengikuti kamu antar kunjungan, setiap sesi cuma dapat
           ID acak yang hilang begitu tab ditutup. Datanya kami simpan sendiri di infrastruktur kami
           sendiri, nggak dijual atau dibagikan ke siapa pun, justru ini lebih privat dibanding Google
           Analytics yang dipakai kebanyakan situs lain, karena datanya nggak pernah keluar dari server kami.
         </p>
-        <p style="color: var(--text-secondary); line-height: 1.6; margin-top: var(--space-md);">
+        <p style="color: var(--muted); line-height: 1.6; margin-top: var(--sp-16);">
           Khusus fitur Edit (masih beta): kalau kamu kasih rating 👎, kami akan tanya dulu, <em>"Boleh
           kami minta dua potongan ini?"</em>, sebelum apa pun terkirim. Ini nggak otomatis sama sekali:
           cuma jalan kalau kamu sendiri yang tap "Kirim". Yang kami minta juga cuma satu baris teks yang
@@ -304,7 +353,7 @@
       <!-- Local Storage -->
       <div class="privacy-section">
         <h2>Penyimpanan Lokal (Local Storage)</h2>
-        <p style="color: var(--text-secondary); line-height: 1.6; margin-bottom: var(--space-md);">
+        <p style="color: var(--muted); line-height: 1.6; margin-bottom: var(--sp-16);">
           PDFLokal menyimpan beberapa preferensi di browser kamu menggunakan Local Storage.
           Data ini <strong>hanya tersimpan di perangkat kamu</strong> dan tidak pernah dikirim ke server.
         </p>
@@ -342,7 +391,7 @@
       <!-- Kontak -->
       <div class="privacy-section">
         <h2>Pertanyaan?</h2>
-        <p style="color: var(--text-secondary); line-height: 1.6;">
+        <p style="color: var(--muted); line-height: 1.6;">
           Kalau kamu punya pertanyaan tentang privasi atau keamanan PDFLokal,
           <a href="https://forms.gle/KPDWVAuc91pVjuWq6" target="_blank">hubungi kami</a> atau buka issue di
           <a href="https://github.com/ojanlubis/pdflokal/issues" target="_blank">GitHub repository</a> kami.
@@ -352,43 +401,30 @@
       </div>
 
       <!-- Back Button -->
-      <div style="text-align: center; padding: var(--space-2xl) 0;">
-        <p style="font-size: 1rem; color: var(--text-tertiary); margin-bottom: var(--space-md);">
+      <div style="text-align: center; padding: var(--sp-48) 0;">
+        <p style="font-size: 1rem; color: var(--muted); margin-bottom: var(--sp-16);">
           Terakhir diupdate: 18 Januari 2026
         </p>
-        <a href="/" class="btn btn-primary btn-lg">
+        <a href="/" class="pg-btn">
           Balik ke Tools
         </a>
       </div>
     </div>
   </main>
 
-  <!-- Footer -->
-  <footer class="footer">
-    <div class="container">
-      <div class="footer-inner">
-        <div class="footer-brand">
-          <a href="/" class="logo">
-            <div class="logo-icon">P</div>
-            <span>PDFLokal</span>
-          </a>
-          <p class="footer-tagline">Urus dokumen langsung di browser. Gratis, offline, dan file kamu nggak kemana-mana.</p>
-        </div>
-        <div class="footer-links">
-          <a href="https://forms.gle/KPDWVAuc91pVjuWq6" target="_blank">Hubungi Kami</a>
-          <a href="/dukung">Dukung Kami</a>
-          <a href="/privasi">Kebijakan Privasi</a>
-          <a href="https://github.com/ojanlubis/pdflokal" target="_blank">Repository GitHub</a>
-        </div>
-      </div>
-      <div class="footer-bottom">
-        <p>100% gratis · Open source · Made with ❤️ in Indonesia</p>
-      </div>
-    </div>
-  </footer>
+  <!-- Footer — ported from index.html's .ld-foot; see css/chrome.css. -->
+  <div class="pg-wrap">
+    <footer class="ld-foot">
+      <a href="/dukung">Dukung Kami</a>
+      <a href="/privasi">Privasi</a>
+      <a href="https://github.com/ojanlubis/pdflokal" rel="noopener">GitHub</a>
+      <span>Dibuat di Indonesia</span>
+    </footer>
+  </div>
 
   <!-- Theme management -->
   <script type="module" src="js/theme.js"></script>
+  <script type="module" src="/js/chrome-nav.js"></script>
 
 </body>
 </html>

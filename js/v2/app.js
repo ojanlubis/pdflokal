@@ -2117,7 +2117,15 @@ async function loadFilesInner(files) {
 
   if (!rasterizer) rasterizer = createPageRasterizer(doc, { editedPageProvider });
   emptyEl.style.display = 'none';
+  // Capture BEFORE clearing: this is the real "editor becomes active" transition,
+  // and it must fire exactly once. `firstLoad` (pagesBefore === 0) is NOT the same
+  // signal — Buka Baru (resetDoc) also produces pagesBefore === 0 on the very next
+  // loadFilesInner call, but is-empty was already removed and never re-added, so
+  // gating on firstLoad here would push a second, orphaned back-button guard entry
+  // every time someone starts over. See wireDialogHistory below for the other half.
+  const wasEmpty = document.body.classList.contains('is-empty');
   document.body.classList.remove('is-empty'); // landing yields, editor chrome returns
+  if (wasEmpty) pushEditorHistoryState();
 
   if (firstLoad) {
     zoom = Math.min(1, (scrollEl.clientWidth - 16) / doc.pages[0].width);
@@ -2242,6 +2250,37 @@ lihatBtn.addEventListener('click', () => {
   lihatBtn.firstChild.textContent = open ? 'Sembunyikan' : 'Lihat semua alat';
 });
 
+// Mobile navbar burger — Github / Dukung / Bahasa live behind it below 900px.
+// CSS hides the button and the drawer above that width; the listeners below
+// cost nothing to keep attached at desktop widths, same as lihatBtn above.
+const burgerBtn = document.getElementById('ld-burger');
+const burgerMenu = document.getElementById('ld-burger-menu');
+if (burgerBtn && burgerMenu) {
+  const closeBurger = () => {
+    burgerMenu.hidden = true;
+    burgerBtn.setAttribute('aria-expanded', 'false');
+  };
+  const openBurger = () => {
+    burgerMenu.hidden = false;
+    burgerBtn.setAttribute('aria-expanded', 'true');
+  };
+  burgerBtn.addEventListener('click', () => {
+    if (burgerMenu.hidden) openBurger(); else closeBurger();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !burgerMenu.hidden) {
+      closeBurger();
+      burgerBtn.focus();
+    }
+  });
+  // Click outside the open drawer (and not on the button that opened it) closes it.
+  document.addEventListener('click', (e) => {
+    if (burgerMenu.hidden) return;
+    if (burgerMenu.contains(e.target) || burgerBtn.contains(e.target)) return;
+    closeBurger();
+  });
+}
+
 // The dropzone welcomes an incoming drag (border + tint via .over).
 const dropzoneEl = document.getElementById('btn-open');
 for (const ev of ['dragenter', 'dragover']) {
@@ -2345,11 +2384,24 @@ document.getElementById('hc-go').addEventListener('click', () => {
   window.location.assign('/');
 });
 
-// ---- Android back button: closes the open sheet, never leaves the app -----------------
+// ---- Android back button: closes the open sheet OR asks before leaving, never
+// leaves the app silently ----------------------------------------------------------
 // Every dialog open pushes one history entry; the hardware/gesture back pops it
 // and we close the dialog. UI-initiated closes (✕, backdrop, Escape, success)
 // consume their entry with history.back() — guarded so our own back() doesn't
 // cascade into closing the next dialog underneath (nested pm-over-download case).
+//
+// Below ALL of that sits one more entry, pushed once when a document loads
+// (loadFilesInner, `pushEditorHistoryState` below) — every dialog entry stacks on
+// TOP of it, never replaces it. Without this entry, back with no sheet open popped
+// straight out of the site with no confirmation, silently discarding an unsaved
+// document. With it, back with no sheet open lands here and the popstate handler
+// below offers #home-confirm instead — the same dialog the wordmark (`#btn-home`)
+// already uses, so cancel/confirm are not duplicated, just reused.
+function pushEditorHistoryState() {
+  window.history.pushState({ v2doc: true }, '');
+}
+
 (function wireDialogHistory() {
   // NOTE: window.history everywhere — plain `history` is SHADOWED in this
   // module by the undo history (const history = createHistory()).
@@ -2386,6 +2438,22 @@ document.getElementById('hc-go').addEventListener('click', () => {
     const keepIdx = cur ? stack.findIndex((d) => d.id === cur) : -1;
     const toClose = stack.slice(keepIdx + 1).reverse();
     for (const d of toClose) if (d.open) d.close();
+
+    // Landed on neither a dialog entry NOR our own guard entry, with the editor
+    // still active → back walked (or was coalesced) straight past the guard
+    // toward leaving the app. Ask, don't leave. Re-push the guard FIRST, so it
+    // sits beneath the dialog entry showModal() is about to push — cancelling
+    // #home-confirm then lands back on a guarded entry (its `close` handler
+    // above just calls history.back(), same as any other dialog), and a second
+    // real back reaches this exact branch again instead of exiting straight
+    // through. Skipped when `cur` is set (a dialog is still open, handled by
+    // the cascade above) or when we're already sitting on the guard entry
+    // itself (nothing to do — this is the normal "sheets closed, doc open" rest
+    // state, e.g. after the nested-sheet peel-back above).
+    if (!cur && !window.history.state?.v2doc && !document.body.classList.contains('is-empty')) {
+      pushEditorHistoryState();
+      document.getElementById('home-confirm').showModal();
+    }
   });
 }());
 

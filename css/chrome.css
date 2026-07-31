@@ -1,0 +1,223 @@
+/* ============================================================================
+ * CHROME — the ported landing navbar + footer, for privasi.html and
+ * dukung.html only.
+ *
+ * SOURCE OF TRUTH IS index.html's inline <style> (.ld-hd / .ld-nav /
+ * .ld-burger* / .ld-theme-toggle* / .ld-lang* / .ld-foot), rebuilt there
+ * 2026-07-31. index.html is locked this session (another agent is editing
+ * it), so this is a faithful port, not a reinvention — same class names, same
+ * rules, so a future landing-navbar change is easy to diff against this file.
+ * If the landing chrome changes again, re-diff against index.html and update
+ * both this file's rules and its markup in privasi.html / dukung.html.
+ *
+ * Loaded AFTER css/tokens.css (needs its vars) and css/legacy-bridge.css
+ * (order doesn't matter relative to the bridge — no selector overlap: the old
+ * wing's .header/.footer/.btn/.logo/.container are gone from both pages'
+ * markup, replaced by what's below).
+ *
+ * Two things NOT ported from index.html on purpose:
+ *  - .ld / .ld-col (the 1360 container + 920 working column that wraps the
+ *    landing's hero/dropzone/cards) — these two pages don't have that
+ *    content, so .pg-wrap below is a simpler equivalent for wrapping the
+ *    header/footer only.
+ *  - Everything under the hero (dropzone, cards, FAQ, stamp) — out of scope,
+ *    privasi/dukung have their own prose sections, untouched.
+ * ==========================================================================*/
+
+/* ---- HEADER — full-bleed. As a direct child of <body> (no wrapping
+   container), its own box already spans the viewport; no width:100vw trick
+   needed, same reasoning as index.html's #empty > .ld-hd. ---- */
+.ld-hd {
+  position: relative; /* positioning context for .ld-nav's viewport centring, below */
+  display: flex; align-items: center; justify-content: space-between; gap: var(--sp-16);
+  padding: var(--sp-12) var(--sp-24);
+  /* KOP SURAT — the letterhead double rule. Structure, not decoration: see
+     specs/design-system.md §6. Spans the full viewport width with the header. */
+  border-bottom: 3px double var(--ink);
+}
+.ld-hd-left { display: flex; align-items: center; gap: var(--sp-8); }
+/* ⚠️ A LINK, NOT A SPAN (founder, 2026-07-31) — from privasi/dukung there was
+   no way back to the homepage by clicking the logo, the first thing anyone
+   tries. Matches the same fix in index.html the same day. */
+.ld-mark { font-weight: 700; font-size: var(--fs-2); letter-spacing: -.02em; color: var(--ink); text-decoration: none; }
+.ld-mark:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; border-radius: var(--r-control); }
+.ld-mark em { font-style: normal; color: var(--accent); }
+
+/* Burger — MOBILE ONLY (hidden in the desktop media query below). Snapped
+   hard left beside the wordmark. Wiring (aria-expanded, Escape, click
+   outside) lives in js/chrome-nav.js — the CSS here is presentation only. */
+.ld-burger {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px; background: none; border: none; padding: 0;
+  color: var(--ink); cursor: pointer; border-radius: var(--r-control);
+}
+.ld-burger-icon { width: 22px; height: 22px; }
+.ld-burger-icon line {
+  transform-box: fill-box; transform-origin: center;
+  transition: transform .18s ease, opacity .18s ease;
+}
+.ld-burger[aria-expanded="true"] .ld-burger-l1 { transform: translateY(6px) rotate(45deg); }
+.ld-burger[aria-expanded="true"] .ld-burger-l2 { opacity: 0; }
+.ld-burger[aria-expanded="true"] .ld-burger-l3 { transform: translateY(-6px) rotate(-45deg); }
+.ld-burger:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+/* The burger's drawer: Github, Dukung, Bahasa — desktop force-hides it below,
+   regardless of the `hidden` attribute's state.
+   ⚠️ IT IS AN OVERLAY, NOT AN ACCORDION (founder, 2026-07-31, matching the
+   same-day fix in index.html). It first shipped in flow, pushing the page
+   content down when opened — the accordion mechanism, which ojan-ui-taste §3
+   puts at a different point on the context-cost axis than a drawer.
+   Navigation replaces your context; it does not rearrange the page under you.
+   NO SHADOW — surfaces here separate by line and by ground, same as the rest
+   of this file. */
+.ld-burger-menu[hidden] { display: none; }
+.ld-burger-menu {
+  /* ⚠️ THE +3px IS THE KOP SURAT'S OWN BORDER (.ld-hd's 3px double
+     border-bottom), not a fudge. `top: 100%` resolves against .ld-hd's
+     padding box, which excludes that border — without the offset the overlay
+     opens 3px high and covers the letterhead rule, deleting the header's one
+     brand element every time the menu opens.
+     ⚠️ AND .ld-hd MUST BE THIS ELEMENT'S PARENT, NOT A SIBLING — see the
+     markup comment in privasi.html / dukung.html. As a sibling, `top: 100%`
+     resolves against the page's own scroll container instead of the header,
+     and the overlay renders a full viewport below the fold: invisible, while
+     every functional check on it still passes. */
+  position: absolute; top: calc(100% + 3px); left: 0; right: 0; z-index: 60;
+  height: calc(100dvh - 100% - 3px);
+  background: var(--bg); overflow-y: auto; overscroll-behavior: contain;
+  display: flex; flex-direction: column; gap: var(--sp-4);
+  padding: var(--sp-16) var(--sp-24) var(--sp-24);
+  border-bottom: 1px solid var(--line);
+}
+.ld-burger-menu a {
+  min-height: 44px; display: flex; align-items: center;
+  font-size: var(--fs-1); font-weight: 500; color: var(--ink); text-decoration: none;
+  padding: 0 var(--sp-8); border-radius: var(--r-control);
+}
+.ld-burger-menu a:hover { background: var(--dzbg); }
+.ld-burger-lang { margin-top: var(--sp-8); padding-top: var(--sp-8); border-top: 1px solid var(--line); }
+.ld-burger-lang-label {
+  display: block; font-size: var(--fs-n1); font-weight: 700; color: var(--muted);
+  margin: 0 var(--sp-8) var(--sp-8);
+}
+.ld-burger-lang-opts { display: flex; flex-direction: column; gap: var(--sp-4); }
+
+/* A plain flex row, no wrapper, no shadow — he killed the shadow wrapper on
+   sight on the landing ("it makes things unclean"). DESKTOP ONLY: below
+   900px the burger replaces this entirely. */
+.ld-nav {
+  display: none; align-items: center; gap: var(--sp-4);
+  /* Centred on the VIEWPORT: .ld-hd is full-bleed and position:relative, so
+     centring against its own box is centring against the viewport — see
+     index.html's .ld-nav comment for why space-between would not land this. */
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+}
+.ld-nav a {
+  font-size: var(--fs-n1); color: var(--muted); text-decoration: none; font-weight: 500;
+  min-height: 44px; padding: 0 var(--sp-8); display: inline-flex; align-items: center;
+}
+.ld-nav a:hover { color: var(--ink); }
+
+.ld-hd-right { display: flex; align-items: center; gap: var(--sp-8); }
+
+/* Dark-mode toggle. WIRING LIVES IN js/theme.js (already loaded by both
+   pages) — it binds to #theme-toggle-checkbox and reads .theme-toggle only
+   for the aria-label. Nothing here duplicates that; presentation only. */
+.ld-theme-toggle {
+  position: relative; display: inline-flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px; border-radius: var(--r-control); color: var(--muted); cursor: pointer;
+}
+.ld-theme-toggle:hover { color: var(--ink); }
+.ld-theme-toggle:has(:focus-visible) { outline: 3px solid var(--accent); outline-offset: 2px; }
+.ld-theme-toggle-input {
+  position: absolute; inset: 0; margin: 0; opacity: 0; appearance: none; cursor: pointer;
+}
+.ld-theme-toggle-icon { width: 19px; height: 19px; pointer-events: none; color: var(--muted); }
+.ld-theme-toggle-input:checked ~ .ld-theme-toggle-icon { color: var(--accent); }
+
+/* Mobile-only Privasi link riding beside the toggle (toggle first, founder
+   order). Desktop hides this in favour of the full .ld-nav. */
+.ld-hd-privasi-mobile {
+  font-size: var(--fs-n1); color: var(--muted); text-decoration: none; font-weight: 500;
+  min-height: 44px; padding: 0 var(--sp-8); display: inline-flex; align-items: center;
+}
+.ld-hd-privasi-mobile:hover { color: var(--ink); }
+
+/* Language control — PLACEHOLDER, desktop only (mobile's equivalent lives in
+   the burger drawer). Chooses nothing, changes nothing — see .ld-lang-opt's
+   disabled state below. Built to visibly NOT function rather than to
+   quietly do nothing; see specs/design-system.md and index.html's own
+   comment on .ld-lang for the why. */
+.ld-lang { position: relative; display: none; }
+.ld-lang-btn {
+  display: inline-flex; align-items: center; gap: var(--sp-4); list-style: none; cursor: pointer;
+  min-height: 44px; padding: 0 var(--sp-8); border-radius: var(--r-control);
+  font-size: var(--fs-n1); font-weight: 500; color: var(--muted);
+}
+.ld-lang-btn::-webkit-details-marker { display: none; }
+.ld-lang-btn:hover { color: var(--ink); }
+.ld-lang-btn svg { width: 16px; height: 16px; }
+.ld-lang-chev { transition: transform .18s ease; }
+.ld-lang[open] .ld-lang-chev { transform: rotate(180deg); }
+.ld-lang-menu {
+  position: absolute; top: calc(100% + var(--sp-4)); right: 0; z-index: 20; min-width: 168px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-button);
+  padding: var(--sp-4); box-shadow: 0 3px 14px rgba(0,0,0,.16);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.ld-lang-opt {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--sp-8);
+  width: 100%; min-height: 40px; padding: 0 var(--sp-8); border: none; background: none;
+  border-radius: var(--r-control); font: inherit; font-size: var(--fs-n1); color: var(--ink);
+  text-align: left; cursor: pointer;
+}
+.ld-lang-opt:hover:not(:disabled) { background: var(--dzbg); }
+.ld-lang-opt.is-active { font-weight: 700; color: var(--accent); }
+.ld-lang-opt:disabled { color: var(--muted); cursor: not-allowed; }
+.ld-lang-soon {
+  font-size: var(--fs-n2); color: var(--muted); border: 1px solid var(--line);
+  border-radius: var(--r-pill); padding: 0 var(--sp-8);
+}
+
+@media (min-width: 900px) {
+  .ld-mark { font-size: var(--fs-4); }
+  /* Header swap: burger + its drawer + the mobile Privasi link give way to
+     the full centred nav and the language control. */
+  .ld-nav { display: flex; }
+  .ld-burger, .ld-hd-privasi-mobile, .ld-burger-menu { display: none; }
+  .ld-lang { display: block; }
+  .ld-nav a { font-size: var(--fs-1); min-height: 44px; padding: 0 var(--sp-16); }
+}
+
+/* ---- PAGE WRAP — the .container replacement. Same shape as index.html's
+   .ld (1360 container, clamped gutter), generous PAGE-mode vertical rhythm
+   (48/64 sit on the ramp, see specs/design-system.md §2). Each page's own
+   .privacy-page / .donate-page caps the actual prose measure further inside
+   this; that cap is untouched, it is page-local and predates this file. ---- */
+.pg-wrap {
+  max-width: var(--container);
+  margin: 0 auto;
+  padding: var(--sp-48) var(--gutter) var(--sp-64);
+}
+
+/* ---- FOOTER — ported from index.html's .ld-foot, wrapped in .pg-wrap the
+   same way the landing wraps it in .ld. ---- */
+.ld-foot {
+  padding: var(--sp-24) 0 var(--sp-48);
+  border-top: 1px solid var(--line); max-width: var(--column); margin-inline: auto;
+  display: flex; gap: var(--sp-24); align-items: baseline; flex-wrap: wrap;
+}
+.ld-foot a { font-size: var(--fs-n1); color: var(--muted); text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
+.ld-foot span { margin-left: auto; font-size: var(--fs-n2); color: var(--muted); }
+
+/* ---- BUTTON — the .btn.btn-primary.btn-lg replacement. Ported from
+   index.html's .dz-buka (the "stempel-press" accent button, docs/design-language.md). ---- */
+.pg-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--accent); color: var(--on-accent); font-weight: 700; font-size: var(--fs-1);
+  min-height: 44px; padding: var(--sp-12) var(--sp-32); border-radius: var(--r-button);
+  box-shadow: 0 2px 0 var(--accent-down); text-decoration: none;
+  transition: transform .1s ease;
+}
+.pg-btn:active { transform: translateY(1px); box-shadow: 0 1px 0 var(--accent-down); }
+.pg-btn:hover { color: var(--on-accent); }
