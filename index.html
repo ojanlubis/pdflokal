@@ -232,6 +232,67 @@
     .brand-red { color: var(--accent); }
     /* home confirm: rides the standard dialog/.sheet system (the global
        dialog rule IS the dark overlay — a bespoke dialog fights it and loses) */
+    /* ---- the general feedback form (opened from the footer) ---------------
+     * Sits with .hc-sheet because it is the same object: a dialog + .sheet
+     * child. Slightly wider, because it holds a textarea rather than one line.
+     * RED IS TOUCHABLE ONLY — the chosen thumb is marked by INK and weight, not
+     * by colour, so "Kurang" never renders as a warning and "Suka" never
+     * renders as a success. This system has one meaning for red and a second
+     * colour meaning "good" is not being introduced here. */
+    .fb-sheet { max-width: 380px; }
+    .fb-thumbs { display: flex; gap: var(--sp-8); }
+    .fb-thumbs button {
+      flex: 1 1 0;
+      display: flex; align-items: center; justify-content: center; gap: var(--sp-8);
+      padding: var(--sp-12) var(--sp-8);
+      border: 1px solid var(--line); border-radius: var(--r-control);
+      background: var(--bg); color: var(--muted);
+      font: inherit; font-size: 13px; cursor: pointer;
+    }
+    .fb-thumbs button svg { width: 17px; height: 17px; }
+    .fb-thumbs button:hover { background: var(--dzfill); }
+    .fb-thumbs button[aria-pressed="true"] {
+      color: var(--ink); font-weight: 600; border-color: var(--ink);
+    }
+    #fb-note {
+      width: 100%; resize: vertical; min-height: 68px;
+      padding: var(--sp-8) var(--sp-12);
+      border: 1px solid var(--line); border-radius: var(--r-control);
+      background: var(--bg); color: var(--ink);
+      font: inherit; font-size: 13px; line-height: 1.5;
+    }
+    #fb-note::placeholder { color: var(--muted); }
+    /* ⚠️ 3px at offset 2, matching every other focusable thing on this page.
+       At `2px` with `outline-offset: 1px` the ring hugged the field's own
+       border and read as a VALIDATION ERROR rather than focus — red on a text
+       input carries that convention everywhere else on the web. Same colour,
+       same grammar as the rest of the page ("red = touchable"); it just has to
+       sit far enough out to read as a ring. */
+    #fb-note:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    .fb-row { display: flex; gap: var(--sp-8); justify-content: flex-end; }
+    .fb-row button {
+      padding: var(--sp-8) var(--sp-16);
+      border-radius: var(--r-control); border: 1px solid var(--line);
+      background: var(--bg); color: var(--ink);
+      font: inherit; font-size: 13px; cursor: pointer;
+    }
+    #fb-send {
+      background: var(--accent); border-color: var(--accent); color: var(--on-accent);
+      font-weight: 600;
+    }
+    #fb-send:disabled { opacity: .45; cursor: not-allowed; }
+    #fb-send:not(:disabled):hover { background: var(--accent-down); border-color: var(--accent-down); }
+    /* ⚠️ `:not([hidden])` IS LOAD-BEARING, not tidiness. A bare
+       `.fb-done { display: flex }` BEATS the UA stylesheet's `[hidden] {
+       display: none }` on specificity, so the thank-you panel rendered
+       underneath the live form — the user saw "Makasih, kebaca kok." before
+       they had sent anything. Any author `display` on an element that also uses
+       the `hidden` attribute has to exempt it, or the attribute silently stops
+       working. Caught by looking at the page; no test asserted it. */
+    .fb-body:not([hidden]), .fb-done:not([hidden]) {
+      display: flex; flex-direction: column; gap: var(--sp-12);
+    }
+
     .hc-sheet { max-width: 340px; }
     .hc-sheet p { font-size: 13px; color: var(--muted); margin: -6px 0 2px; }
     .hc-row { display: flex; gap: 8px; }
@@ -1575,6 +1636,11 @@
                the navbar (2026-07-29) and the footer said the other thing, so one
                page carried two spellings of one word. -->
           <a href="https://github.com/ojanlubis/pdflokal" rel="noopener">Github</a>
+          <!-- The general feedback channel. An <a> rather than a <button> so it
+               reads as part of the footer's link row and keeps keyboard
+               semantics; js/v2/feedback-form.js preventDefaults it. Copy is
+               PLACEHOLDER — TODO(copy), the founder's own hand. -->
+          <a href="#fb-form" id="fb-open">Ada masukan?</a>
           <span>Dibuat di Indonesia</span>
         </footer>
       </div>
@@ -1595,6 +1661,37 @@
     <button id="z-out" aria-label="Perkecil">−</button>
   </div>
   <div id="toast" role="status" aria-live="polite"></div>
+
+  <!-- The general feedback channel, opened from the footer's "Ada masukan?".
+       Mirrors #home-confirm: a dialog with a .sheet child, because the global
+       `dialog` rule IS the overlay. ONE screen, rating and note together, since
+       the user clicked a feedback link and has already declared their intent.
+       ALL COPY HERE IS PLACEHOLDER — TODO(copy), the founder's own hand. -->
+  <dialog id="fb-form" aria-label="Kirim masukan">
+    <div class="sheet fb-sheet">
+      <div class="fb-body">
+        <h2>Gimana PDFLokal?</h2>
+        <div class="fb-thumbs" role="group" aria-label="Penilaian">
+          <button type="button" id="fb-up" aria-pressed="false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/></svg>
+            <span>Suka</span>
+          </button>
+          <button type="button" id="fb-down" aria-pressed="false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"/></svg>
+            <span>Kurang</span>
+          </button>
+        </div>
+        <textarea id="fb-note" rows="3" placeholder="Ceritain aja, apa yang kurang atau apa yang udah pas (boleh dikosongin)"></textarea>
+        <div class="fb-row">
+          <button type="button" id="fb-cancel">Batal</button>
+          <button type="button" id="fb-send" disabled>Kirim</button>
+        </div>
+      </div>
+      <div class="fb-done" hidden>
+        <h2>Makasih, kebaca kok.</h2>
+      </div>
+    </div>
+  </dialog>
 
   <dialog id="home-confirm" aria-label="Kembali ke beranda">
     <div class="sheet hc-sheet">
