@@ -32,9 +32,10 @@
  * because the table's `rating` column is a NOT NULL check-constrained enum
  * (up|down) and a note with no rating cannot be stored.
  *
- * ⚠️ EVERY USER-VISIBLE STRING BELOW IS A PLACEHOLDER — TODO(copy). Client
- * facing words are the founder's own hand, always. These exist so the surface
- * can be built and looked at, not because they were approved.
+ * COPY: ratified by the founder 2026-08-03, string by string, and it lives in
+ * index.html rather than here. He kept four as drafted and rewrote two in his
+ * own words. Do not tidy his lowercase or his spelling of "terimakasih" — they
+ * are his. Any change to a user-visible word here needs him again.
  */
 import { feedback } from './telemetry.js';
 

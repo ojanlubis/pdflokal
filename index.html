@@ -285,8 +285,8 @@
     /* ⚠️ `:not([hidden])` IS LOAD-BEARING, not tidiness. A bare
        `.fb-done { display: flex }` BEATS the UA stylesheet's `[hidden] {
        display: none }` on specificity, so the thank-you panel rendered
-       underneath the live form — the user saw "Makasih, kebaca kok." before
-       they had sent anything. Any author `display` on an element that also uses
+       underneath the live form — the user saw the thank-you line before they
+       had sent anything. Any author `display` on an element that also uses
        the `hidden` attribute has to exempt it, or the attribute silently stops
        working. Caught by looking at the page; no test asserted it. */
     .fb-body:not([hidden]), .fb-done:not([hidden]) {
@@ -1666,7 +1666,14 @@
        Mirrors #home-confirm: a dialog with a .sheet child, because the global
        `dialog` rule IS the overlay. ONE screen, rating and note together, since
        the user clicked a feedback link and has already declared their intent.
-       ALL COPY HERE IS PLACEHOLDER — TODO(copy), the founder's own hand. -->
+
+       ⚠️ EVERY STRING HERE IS RATIFIED FOUNDER COPY (2026-08-03), not a
+       placeholder. He read the six strings and ruled them one at a time: 1, 2,
+       3 and 5 kept as drafted; the note placeholder and the thank-you REWRITTEN
+       IN HIS OWN WORDS and pasted verbatim. His lowercase and his spelling of
+       "terimakasih" are HIS, deliberately preserved, not a typo to tidy. Client
+       copy is his hand alone: do not "fix", shorten, sentence-case or
+       re-translate any of it. Changing a word here needs him, again. -->
   <dialog id="fb-form" aria-label="Kirim masukan">
     <div class="sheet fb-sheet">
       <div class="fb-body">
@@ -1681,14 +1688,14 @@
             <span>Kurang</span>
           </button>
         </div>
-        <textarea id="fb-note" rows="3" placeholder="Ceritain aja, apa yang kurang atau apa yang udah pas (boleh dikosongin)"></textarea>
+        <textarea id="fb-note" rows="3" placeholder="boleh minta feedbacknya di sini, supaya kita bisa improve terus pdflokal. (boleh dikosongin juga kok)"></textarea>
         <div class="fb-row">
           <button type="button" id="fb-cancel">Batal</button>
           <button type="button" id="fb-send" disabled>Kirim</button>
         </div>
       </div>
       <div class="fb-done" hidden>
-        <h2>Makasih, kebaca kok.</h2>
+        <h2>terimakasih udah bantu pdflokal improve terus</h2>
       </div>
     </div>
   </dialog>

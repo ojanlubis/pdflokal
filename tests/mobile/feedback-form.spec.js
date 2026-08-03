@@ -97,6 +97,24 @@ test.describe('general feedback form — mobile', () => {
     expect(sent.length).toBe(0); // dismissing sent nothing at all
   });
 
+  test('the founder-ratified copy is exactly what ships (his words, 2026-08-03)', async ({ page }) => {
+    // He ruled these six strings one at a time and rewrote two of them himself.
+    // A ruling nobody checks is a green that cannot go red, so this asserts the
+    // two he authored VERBATIM — including the lowercase and his spelling of
+    // "terimakasih", which are his and not typos to tidy. If a future pass
+    // sentence-cases or "improves" them, this fails, which is the point.
+    await openForm(page);
+    await expect(page.locator('#fb-note')).toHaveAttribute(
+      'placeholder',
+      'boleh minta feedbacknya di sini, supaya kita bisa improve terus pdflokal. (boleh dikosongin juga kok)',
+    );
+    await expect(page.locator('#fb-open')).toHaveText('Ada masukan?');
+    await expect(page.locator('.fb-body h2')).toHaveText('Gimana PDFLokal?');
+    await page.tap('#fb-up');
+    await page.tap('#fb-send');
+    await expect(page.locator('.fb-done h2')).toHaveText('terimakasih udah bantu pdflokal improve terus');
+  });
+
   test('⭐ NO DOCUMENT CONTENT CAN RIDE THIS PATH, over a full open-edit-send cycle', async ({ page }) => {
     const sent = await captureFeedback(page);
     // Load a real document and touch it, so anything that COULD leak content
