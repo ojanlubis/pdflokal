@@ -16,7 +16,7 @@
  *   node scripts/android-verify.mjs /editor-v2.html v2-loaded
  */
 import { chromium } from '@playwright/test';
-import { execSync } from 'child_process';
+import { spawnSync } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -26,7 +26,11 @@ const urlPath = process.argv[2] || '/editor-v2.html';
 const shotName = process.argv[3] || 'android-verify';
 const OUT = process.env.SHOT_DIR || '/tmp';
 
-function adb(cmd) { return execSync(`"${ADB}" ${cmd}`, { encoding: 'utf8' }).trim(); }
+function adb(...args) {
+  const result = spawnSync(ADB, args, { encoding: 'utf8' });
+  if (result.error) throw result.error;
+  return result.stdout.trim();
+}
 
 // Plumb: app server into the device, DevTools socket out of it.
 adb('reverse tcp:5050 tcp:5050');
