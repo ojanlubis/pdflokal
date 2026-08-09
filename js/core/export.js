@@ -457,7 +457,15 @@ export async function buildPdfBytes(doc, deps = {}) {
       // BEFORE the scale below, so it is the native frame the annotations are
       // being expressed in.
       const { width: wU, height: hU } = pdfPage.getSize();
-      const frame = { rotation: page.rotation || 0, wU, hU };
+      // base + user, the SAME sum written to /Rotate above (core/page-rotation.js)
+      // — not page.rotation alone. The page and its annotations must be
+      // expressed in ONE frame: the reader applies /Rotate to the whole page,
+      // annotations included, so a frame built from the user's rotation alone
+      // transforms them for a page that is not the page being written. On a
+      // source carrying an inherited /Rotate 90 that put a 40x20 bar drawn at
+      // (10,10) into the file as 20x40 at x=812 — the far edge, turned. The
+      // 2026-08-09 /Rotate fix corrected the line above and stopped here.
+      const frame = { rotation: totalRotation, wU, hU };
       // PAINT ORDER (core/annotation-order.js, founder ruling 2026-08-09):
       // Tip-Ex is a GROUND, not a layer. The SAME helper the screen uses, so
       // the two can't drift. It returns a COPY — `annotations` itself must
