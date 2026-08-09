@@ -393,20 +393,28 @@ export const SCHEMA = {
     font_path: ['doc-font', 'twin'],
   },
   // matched/reason describe ONLY the Rung B match/cut step (text-walk.js's
-  // planRunRemoval): a target is either matched cleanly, has NO geometric
-  // candidate at all ('no-match'), or sits in a text object the walk marked
-  // untrustworthy and declined out of caution ('untrustworthy-run' — the
-  // literal word the code uses at the decline site).
+  // planRunRemoval): a target is either matched cleanly or has no geometric
+  // candidate at all ('no-match').
+  //
+  // ⚠️ 'untrustworthy-run' was DELETED 2026-08-09. It named planRunRemoval's
+  // badBts decline — but that decline surfaces as matched:false and is reported
+  // as 'no-match', so runSurgery could only ever emit 'clean', 'residual' or
+  // 'no-match'. page-surgery.js:105 said so in a comment while this enum went
+  // on advertising the value. A query for it returns zero rows forever, which
+  // reads as "that decline never happens" rather than "the code cannot say it."
+  // Same law as block_edit: anything not emitted by code does not enter an enum.
+  // If badBts is ever worth separating from a plain no-match, the fix is to make
+  // runSurgery SAY so and re-add the value with an emitter behind it.
+  //
   // 'residual' (added 2026-07-28) is the honest middle the enum was missing:
   // every target matched AND painted content we declined is still standing
-  // inside a span we were asked to clear. It is deliberately NOT folded into
-  // 'untrustworthy-run' — that names a different decline (badBts), and burying
-  // a new signal inside an existing bucket is exactly how weight_ratio 1.28999
-  // got quantized into 'near-parity' the same morning. A bucket that can't
+  // inside a span we were asked to clear. It was deliberately NOT folded into
+  // an existing bucket — burying a new signal inside one is exactly how
+  // weight_ratio 1.28999 got quantized into 'near-parity' the same morning. A bucket that can't
   // express the finding is how the finding gets lost.
   surgery: {
     matched: 'bool',
-    reason: ['clean', 'residual', 'no-match', 'untrustworthy-run'],
+    reason: ['clean', 'residual', 'no-match'],
   },
   // path/reason describe the Rung C STAMP step (core/stamp.js, rebuilt
   // 2026-07-22 per spec-edit-rebuild-composite.md — Path B, founder-ruled):

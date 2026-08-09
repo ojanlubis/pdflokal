@@ -102,8 +102,11 @@ export function runSurgery(pdfPage, PDFLib, annotations) {
   // change — whether a residual cut should KEEP its cover is a visible-pixels
   // decision and is the founder's, not this module's.
   //
-  // The schema's 'untrustworthy-run' remains unreachable from here: that names
-  // planRunRemoval's badBts decline, which surfaces as matched:false.
+  // planRunRemoval's badBts decline surfaces here as matched:false and is
+  // reported as 'no-match'. The schema used to carry a separate
+  // 'untrustworthy-run' for it, which nothing here could ever emit — deleted
+  // 2026-08-09. If that decline is worth telling apart from a plain no-match,
+  // this is the function that has to start saying so first.
   const surgeryByCover = new Map();
   const candidates = annotations.filter(
     (a) => a.type === 'whiteout' && a.replaceTargets?.length && a.replaceBox && overlapsBirthBox(a),

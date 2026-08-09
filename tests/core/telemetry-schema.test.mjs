@@ -127,7 +127,9 @@ test('failure carries every stage/reason, and refuses invented ones', () => {
 test("surgery.reason carries 'residual' — the rail can now see an incomplete cut", () => {
   assert.equal(validateEvent('surgery', { matched: true, reason: 'residual' }).ok, true);
   // Every declared value still validates, so adding one didn't narrow the rest.
-  for (const reason of ['clean', 'residual', 'no-match', 'untrustworthy-run']) {
+  // 'untrustworthy-run' left this list 2026-08-09 — runSurgery could never emit
+  // it, so looping over it proved only that the schema agreed with itself.
+  for (const reason of ['clean', 'residual', 'no-match']) {
     assert.equal(validateEvent('surgery', { matched: true, reason }).ok, true, `${reason} should validate`);
   }
   // And the gate still closes: an invented reason is refused, so this test is
