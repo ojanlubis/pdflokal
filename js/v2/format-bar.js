@@ -23,6 +23,14 @@ const COLORS = ['#000000', '#d33131', '#1d6fdc', '#1d8a44', '#ffffff'];
 //   getDoc, history
 //   getTarget: () => text annotation currently selected/being edited (or null)
 //   onStyled:  (anno) => void — re-render after a committed style change
+//   onDefaults:(defaults) => void — restyle an OPEN, UNCOMMITTED draft. Taken
+//     whenever getTarget() returns null, i.e. while the user is styling text
+//     they are still typing, which is the majority path for the action this
+//     bar exists for. It was missing from this list until 2026-08-09, and the
+//     call at line ~126 is optional-chained — so a caller that wired itself
+//     from this comment would get no error, just a format bar that silently
+//     stops affecting the draft under the cursor. Documented because the
+//     failure is silence, not a throw.
 // }
 export function createFormatBar(deps) {
   const { el } = deps;
