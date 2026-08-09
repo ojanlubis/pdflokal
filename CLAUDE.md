@@ -69,8 +69,8 @@ glyph operators (why: `decisions.md`). Two laws from that, both load-bearing:
 
 ## The QA gate
 
-**`npm run gate` (`scripts/qa-gate.mjs`) is the only sweep you may report from.** Lint → core →
-Playwright. It fingerprints every file the dev server can serve, before and after, and exits
+**`npm run gate` (`scripts/qa-gate.mjs`) is the only sweep you may report from.** Lint → seo → core
+→ Playwright. It fingerprints every file the dev server can serve, before and after, and exits
 **90 = VOID** if the tree moved under the run rather than claiming a pass.
 
 - **Its stage list MIRRORS CI, including `seo:check`.** If CI grows a check, the gate grows it the same
