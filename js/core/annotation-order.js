@@ -37,10 +37,6 @@
 export const ANNOTATION_RANK = Object.freeze({ whiteout: 0 });
 export const DEFAULT_RANK = 1;
 
-// Rank count — the band width the z-index helper below reserves per rank.
-// Exported so the render layer cannot drift from this file's own arithmetic.
-export const RANK_COUNT = 2;
-
 export function annotationRank(anno) {
   const r = ANNOTATION_RANK[anno?.type];
   return Number.isInteger(r) ? r : DEFAULT_RANK;
