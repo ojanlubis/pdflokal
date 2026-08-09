@@ -250,3 +250,117 @@ test('totalPageRotation: normalises, and an image page has no inherited rotation
   assert.equal(totalPageRotation({}), 0);
   assert.equal(totalPageRotation(null), 0);
 });
+
+// ---------------------------------------------------------------------------
+// THE ANNOTATION FRAME — the half the 2026-08-09 fix missed.
+//
+// buildPdfBytes writes the page's /Rotate from totalPageRotation (base + user)
+// but built the annotation drawing frame from `page.rotation` ALONE. Those two
+// lines are 57 apart in the same loop. Before that commit both read
+// page.rotation and were at least CONSISTENT; after it they contradict each
+// other, and on a page carrying an inherited /Rotate the annotation is
+// transformed in a frame it was never authored in.
+//
+// WHY NO EXISTING TEST HERE COULD SEE IT: every case above builds its pages
+// with ZERO annotations, and export.js only enters the drawing branch on
+// `annotations.length > 0`. The suite was structurally blind — putar-90.pdf
+// existed precisely to distinguish the two implementations and was never given
+// anything to draw. [[fixture-must-distinguish]]
+//
+// THE ORACLE IS NOT THE FORMULA (same doctrine as the header). We do not assert
+// the transform's output. We put a rectangle where the USER sees it, read back
+// where it actually landed in the file, map that into the DISPLAY frame using
+// the exported page's OWN /Rotate, and require the two to agree. The display
+// mapping below is derived from PDF /Rotate semantics (§7.7.3.3 — the page is
+// rotated clockwise when displayed), not from core/export.js, so the verifier
+// does not share a parent with the verified.
+
+// A PDF-space rect (bottom-left origin, y-up) as the READER sees it
+// (top-left origin, y-down), for a page of MediaBox wU x hU at /Rotate `rot`.
+// Each branch is the inverse of the rotation the reader applies; all four were
+// checked by hand against a corner of the MediaBox.
+function toDisplayRect(rot, { x, y, w, h }, wU, hU) {
+  switch (((rot % 360) + 360) % 360) {
+    case 90:  return { x: y, y: x, w: h, h: w };
+    case 180: return { x: wU - (x + w), y, w, h };
+    case 270: return { x: hU - (y + h), y: wU - (x + w), w: h, h: w };
+    default:  return { x, y: hU - (y + h), w, h };
+  }
+}
+
+// pdf-lib draws a rectangle as a TRANSLATED PATH, not an `re` operator:
+//   q  <color> rg  1 0 0 1 <tx> <ty> cm  ...  0 0 m  0 H l  W H l  W 0 l  h  f  Q
+// Verified by dumping a real export rather than assumed — an `re`-shaped regex
+// would have matched nothing and quietly asserted over an empty set.
+// Consecutive `cm`s compose; for pure translations that is addition, so the
+// origin is the SUM of every translate since the enclosing `q`.
+function lastDrawnRect(stream) {
+  const at = stream.lastIndexOf('0 0 m');
+  assert.notEqual(at, -1, 'no drawn path found in the exported content stream — the whiteout never got drawn, so nothing below is being tested');
+  const before = stream.slice(0, at);
+  const scope = before.slice(before.lastIndexOf('q'));
+  let x = 0, y = 0;
+  for (const m of scope.matchAll(/1 0 0 1 (-?[\d.]+) (-?[\d.]+) cm/g)) {
+    x += Number(m[1]); y += Number(m[2]);
+  }
+  const path = /0 0 m\s+0 (-?[\d.]+) l\s+(-?[\d.]+) (?:-?[\d.]+) l/.exec(stream.slice(at));
+  assert.ok(path, 'the drawn path did not have the expected m/l/l shape');
+  return { x, y, w: Number(path[2]), h: Number(path[1]) };
+}
+
+const VIEW_RECT = { x: 10, y: 10, w: 40, h: 20 }; // deliberately NOT square: a
+// missing width/height swap is invisible on a square rect, and 90/270 is
+// exactly where the swap lives.
+
+test('buildPdfBytes: an annotation on a page with an inherited /Rotate lands where the user put it', async () => {
+  const PDFLib = loadUmd('js/vendor/pdf-lib.min.js');
+  const fontkit = loadUmd('js/vendor/fontkit.umd.min.js');
+  const { readPageContents } = await import('../../js/core/redact.js');
+
+  for (const user of [0, 90, 180, 270]) {
+    const { doc, pages } = await buildDoc(PDFLib, { pageIndexes: [0], userRotations: [user] });
+    ops.addAnnotation(doc, pages[0].id, model.createAnnotation('whiteout', {
+      ...{ x: VIEW_RECT.x, y: VIEW_RECT.y, width: VIEW_RECT.w, height: VIEW_RECT.h },
+      color: '#ff00ff',
+    }));
+
+    const [outPage] = await exportedPages(PDFLib, fontkit, doc);
+    const { width: wU, height: hU } = outPage.getSize();
+    const drawn = lastDrawnRect(readPageContents(outPage, PDFLib));
+    const onScreen = toDisplayRect(outPage.getRotation().angle, drawn, wU, hU);
+
+    assert.deepEqual(
+      onScreen, VIEW_RECT,
+      `user rotation ${user} on a /Rotate 90 page: the user drew `
+      + `${VIEW_RECT.w}x${VIEW_RECT.h} at (${VIEW_RECT.x},${VIEW_RECT.y}) and the exported file `
+      + `shows ${onScreen.w}x${onScreen.h} at (${onScreen.x},${onScreen.y}). `
+      + 'export.js builds the annotation frame from page.rotation alone, dropping baseRotation — '
+      + 'so the page is written at base+user while its annotations are transformed at user only.',
+    );
+  }
+});
+
+test('CONTROL: an annotation on a page with NO inherited /Rotate is unmoved', async () => {
+  const PDFLib = loadUmd('js/vendor/pdf-lib.min.js');
+  const fontkit = loadUmd('js/vendor/fontkit.umd.min.js');
+  const { readPageContents } = await import('../../js/core/redact.js');
+
+  // Page 1 carries no /Rotate, so base+user and user are the SAME NUMBER and
+  // both implementations agree. Without this half, a "fix" that simply rotated
+  // every annotation would pass the test above and break every ordinary
+  // document — which is the entire corpus.
+  for (const user of [0, 90, 180, 270]) {
+    const { doc, pages } = await buildDoc(PDFLib, { pageIndexes: [1], userRotations: [user] });
+    ops.addAnnotation(doc, pages[0].id, model.createAnnotation('whiteout', {
+      x: VIEW_RECT.x, y: VIEW_RECT.y, width: VIEW_RECT.w, height: VIEW_RECT.h, color: '#ff00ff',
+    }));
+
+    const [outPage] = await exportedPages(PDFLib, fontkit, doc);
+    const { width: wU, height: hU } = outPage.getSize();
+    const drawn = lastDrawnRect(readPageContents(outPage, PDFLib));
+    assert.deepEqual(
+      toDisplayRect(outPage.getRotation().angle, drawn, wU, hU), VIEW_RECT,
+      `control page, user rotation ${user}: an ordinary page's annotation moved. The fix is wrong.`,
+    );
+  }
+});
