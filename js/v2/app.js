@@ -33,6 +33,7 @@ import { compareRegions } from '../core/visual-oracle.js';
 import { validateSample } from '../core/feedback-sample.js';
 import { createPageSlot, syncOverlay, textFontCss } from '../render/page-view.js';
 import { createViewportStream } from '../render/viewport.js';
+import { RASTER_BASE, sharpenScale, maxPixelsFor } from '../render/sharpen.js';
 import { createInteraction } from '../render/interaction.js';
 import { createFormatBar } from './format-bar.js';
 import { createTextRunIndex, mapRunFont, MIN_HIT } from './text-runs.js';
@@ -220,6 +221,9 @@ function applyZoom() {
   sizer.style.width = Math.ceil(stage.offsetWidth * zoom) + 'px';
   sizer.style.height = Math.ceil(stage.offsetHeight * zoom) + 'px';
   stream.refresh(0);
+  // Zoom itself still does NOT render — this only arms a timer. See the
+  // focused-page sharpening block below for why that distinction is the point.
+  scheduleSharpen();
 }
 document.getElementById('z-in').onclick = () => { zoom = Math.min(zoom + 0.25, 3); applyZoom(); };
 document.getElementById('z-out').onclick = () => { zoom = Math.max(zoom - 0.25, 0.3); applyZoom(); };
@@ -283,18 +287,216 @@ scrollEl.addEventListener('wheel', (e) => {
 
 // ---- streaming viewport --------------------------------------------------------
 let pillTimer = null;
+// Declared HERE, above the stream, not down in the sharpening block where the
+// rest of it lives: the rasterize adapter below closes over it, so it must be
+// initialized before anything can call that adapter. See the long note on
+// focusedPageId in the focused-page sharpening section.
+let focusedPageId = null;
 const stream = createViewportStream({
   scrollEl,
   slots: () => slots,
-  rasterize: (page) => rasterizer.rasterize(page, { scale: 2 }),
+  rasterize: (page) => rasterizer.rasterize(page, { scale: rasterScaleFor(page) }),
   onPosition: (current, total) => {
     pill.textContent = `${current} / ${total}`;
     pill.classList.add('show');
     clearTimeout(pillTimer);
     pillTimer = setTimeout(() => pill.classList.remove('show'), 750);
+    // Free ride: onPosition already walked the slots to find `current`, so the
+    // focused page is known here without a second sweep. See focusedPageId.
+    focusedPageId = slots[current - 1] ? slots[current - 1].page.id : null;
+    // The focus moved. Debounced, so a fling costs one pass at the end of it,
+    // not one per frame — and the pass is a no-op scan unless something is
+    // actually sitting above the baseline.
+    scheduleSharpen();
   },
 });
 stream.attach();
+
+// ---- focused-page sharpening ---------------------------------------------------
+// WHY: zoom is a single CSS transform on the stage (applyZoom above) and that
+// stays — it is atomic, GPU composited, flicker-free, and keeps annotation
+// registration exact at any zoom. But scale(3) over a RASTER_BASE raster is
+// showing 6× the page out of 2× the pixels, so the paper goes soft. (Export is
+// untouched and vector — export.js copyPages. We preview lossily, never ship
+// lossily.)
+//
+// So: zoom renders NOTHING. When it SETTLES, we re-bake the ONE page under the
+// viewport midline at the resolution the screen is actually painting, and we
+// put it back to RASTER_BASE the moment it stops being that page or the zoom
+// comes back down. Three properties this must never trade away:
+//
+//   1. pages stay <img> — we swap the raster inside the same tag (slot.reattach
+//      → swapPageRaster), never move to a live <canvas>, which mobile browsers
+//      blank under memory pressure (page-view.js header).
+//   2. zoom never triggers a render — only SHARPEN_SETTLE_MS after the last
+//      zoom or scroll event does.
+//   3. memory stays bounded — ONCE SETTLED, at most one page holds a raster
+//      above RASTER_BASE. Enforced by SCANNING every slot each pass rather than
+//      by remembering an id: history.js's restore() spread-copies doc.pages into
+//      fresh objects, so a remembered id survives an undo while the object it
+//      named does not. The scan reads the artifact (page.raster.scale), which
+//      cannot go stale.
+//      ⚠️ "Settled" is not a weasel word, it is the honest bound. During a focus
+//      handoff at high zoom the old page's downgrade and the new page's upgrade
+//      are both in flight (deliberately — see reRasterAt), so TWO high-scale
+//      rasters coexist for the length of one render. Transient, self-clearing,
+//      and one extra page; it is not the unbounded case and it is worth naming
+//      rather than implying an absolute the code does not deliver.
+//      The fleet raster budget tests/mobile/bigdoc-stress.spec.js measures is
+//      unchanged: nothing here fires unless the user zooms (sharpen.js's
+//      DPR_CAP is what guarantees that), and it changes exactly one page.
+//
+// KNOWN, PRE-EXISTING, NOT FIXED HERE: history.js's snapshot() spread-copies
+// each page, so `raster` rides into the undo stack BY REFERENCE. A Ganti commit
+// made while zoomed therefore pins that commit's high-scale dataUrl in the undo
+// stack (limit 50) even after the live page downgrades. This was already true at
+// RASTER_BASE; sharpening multiplies the per-entry worst case by (scale/2)².
+// Live/fleet memory is untouched — the undo stack is a separate budget nobody
+// has ever bounded by bytes. Flagged for the seat, not fixed in this change.
+const SHARPEN_SETTLE_MS = 200; // > viewport.js's settleMs (130): let the stream catch up first
+
+let sharpenTimer = null;
+// Test hooks, and the honest kind: `superseded` counts ONLY the branch where
+// core/import.js's renderSeq guard discarded our render because a later one
+// won. A spec asserting it can prove the supersede fired, not merely that
+// nothing broke.
+const sharpenStats = { issued: 0, applied: 0, superseded: 0, standDown: 0 };
+
+// page.id -> the scale of the last rasterize WE issued that has not resolved.
+//
+// NOT a second cancellation mechanism — renderSeq (core/import.js) is still the
+// only thing that discards a loser, and this map never cancels anything. It
+// answers a different question: "where is this page HEADED?" A pass that read
+// `page.raster.scale` alone would see the OLD value while a render is in flight,
+// conclude there is nothing to do, issue nothing — and then the in-flight render
+// would land and install a raster nobody wants any more. That is precisely the
+// orphan the rapid-zoom case produces. Knowing what we asked for lets the later
+// pass ISSUE the overriding call, which is what arms renderSeq.
+//
+// It can still go stale (a page released mid-flight, a rasterize from another
+// path). That is why the pass ALSO scans `page.raster.scale`: the map catches
+// what the scan cannot see yet, the scan catches what the map got wrong. Each
+// covers the other's blind spot, and the scan is the one that is always
+// eventually right, because it reads the artifact.
+const sharpenIntent = new Map();
+
+// The page under the viewport midline, held as an ID — not an index (pages get
+// inserted and deleted) and not an object (history.js's restore() spread-copies
+// doc.pages into fresh objects on undo, so a held reference goes stale in
+// silence while an id does not).
+//
+// Updated in exactly two places, both of which already know the answer: the
+// stream's onPosition, which is handed `current` for free on every scroll, and
+// the start of each sharpen pass, which covers zoom, load and stage rebuilds.
+//
+// WHY IT IS CACHED AT ALL: rasterScaleFor sits on the STREAMING hot path — the
+// stream calls it for every page entering the window. Recomputing the focus
+// there would run stream.currentIndex()'s getBoundingClientRect walk once per
+// entering page, inside a loop that dirties layout by swapping placeholders for
+// images, i.e. a forced synchronous reflow each time. On a 120-page document
+// that is the difference between linear and quadratic, on precisely the path
+// tests/mobile/bigdoc-stress.spec.js exists to protect.
+//
+// (The `let` itself is up beside the stream — the rasterize adapter closes over
+// it and would hit the temporal dead zone if it were declared here.)
+
+function refreshFocus() {
+  const i = stream.currentIndex();
+  focusedPageId = i >= 0 && slots[i] ? slots[i].page.id : null;
+}
+
+function focusedSlot() {
+  if (focusedPageId === null) return null;
+  return slots.find((s) => s.page.id === focusedPageId) || null;
+}
+
+// The scale a given page should be rastered at RIGHT NOW. Baseline for the
+// whole fleet; the sharpened scale only for the focused page. Every rasterize
+// call in this file goes through here — the two hardcoded `{ scale: 2 }`s this
+// replaced are exactly how the softness survived: the streaming entry path and
+// the Ganti re-bake path each had their own copy of the number.
+function rasterScaleFor(page) {
+  if (page.id !== focusedPageId) return RASTER_BASE;
+  return sharpenScale({
+    pageWidth: page.width,
+    pageHeight: page.height,
+    zoom,
+    dpr: window.devicePixelRatio,
+    maxPixels: maxPixelsFor(deviceClass()),
+  });
+}
+
+function scheduleSharpen() {
+  clearTimeout(sharpenTimer);
+  sharpenTimer = setTimeout(() => { runSharpen(); }, SHARPEN_SETTLE_MS);
+}
+
+// Where a page is HEADED: the scale of our last outstanding request if there is
+// one, else the scale actually installed, else null (no raster at all — a
+// released or not-yet-streamed page, which holds no memory and needs nothing).
+function targetScaleOf(slot) {
+  const intent = sharpenIntent.get(slot.page.id);
+  if (intent !== undefined) return intent;
+  return slot.page.raster ? slot.page.raster.scale : null;
+}
+
+// Re-bake ONE slot at an explicit scale and swap it in. Fire-and-forget: the
+// ordering guarantee is renderSeq's, not a queue's.
+async function reRasterAt(slot, scale) {
+  const page = slot.page;
+  sharpenIntent.set(page.id, scale);
+  sharpenStats.issued += 1;
+  let raster;
+  try {
+    raster = await rasterizer.rasterize(page, { scale });
+  } catch {
+    // A render can fail (a broken page, or the rasterizer destroyed under us by
+    // "Buka Baru"). Nothing to show and nothing to fix — the page keeps the
+    // raster it already had, which is always a valid one. Swallowed rather than
+    // left to reject: these are fire-and-forget, so an unhandled rejection here
+    // would surface in Sentry as an app error for something that is cosmetic.
+    sharpenIntent.delete(page.id);
+    return false;
+  }
+  if (sharpenIntent.get(page.id) === scale) sharpenIntent.delete(page.id); // settled
+
+  // SUPERSEDE — core/import.js's renderSeq, reused rather than reinvented. It
+  // already tags every rasterize with a per-page monotonic seq and lets the last
+  // ISSUED win; the loser gets back the WINNER's raster and never wrote its own.
+  // So we detect our loss by reading that artifact — the scale that came back is
+  // not the scale we asked for — instead of keeping a flag of our own. This is
+  // the whole rapid-zoom story: a 6× render still in flight when the user zooms
+  // back out must not land on top of the 2× that replaced it.
+  if (!raster || raster.scale !== scale) { sharpenStats.superseded += 1; return false; }
+  // Stage rebuilt under us (undo/redo, page delete) — same law as rebakePage:
+  // stand down rather than clobber newer state.
+  if (slots.find((s) => s.page.id === page.id) !== slot) { sharpenStats.standDown += 1; return false; }
+  await slot.reattach(raster);
+  sharpenStats.applied += 1;
+  return true;
+}
+
+function runSharpen() {
+  if (!rasterizer || slots.length === 0) return;
+  refreshFocus(); // once per pass — the only place the gBCR walk is affordable
+  const focus = focusedSlot();
+  const want = focus ? rasterScaleFor(focus.page) : RASTER_BASE;
+
+  // DOWNGRADE FIRST. This is the whole memory guarantee: a user who zooms in and
+  // back out, or zooms in and scrolls on, must not leave a 6× raster resident.
+  for (const slot of slots) {
+    if (slot === focus && want > RASTER_BASE) continue; // re-targeted just below
+    const cur = targetScaleOf(slot);
+    if (cur === null || cur <= RASTER_BASE) continue;
+    reRasterAt(slot, RASTER_BASE);
+  }
+
+  // UPGRADE the focused page. Skipped when it holds no raster at all — it is
+  // mid-stream, and the stream's own rasterize already asks rasterScaleFor.
+  if (focus && want > RASTER_BASE && focus.page.raster && targetScaleOf(focus) !== want) {
+    reRasterAt(focus, want);
+  }
+}
 
 // ---- stage sync ----------------------------------------------------------------
 // Full rebuild from the model. Cheap in practice: rasters ride on page objects
@@ -551,7 +753,10 @@ async function rebakePage(pageId) {
   const page = slot.page;
   rasterizer.invalidateEditedPage(page.id); // reuse inc.2's invalidate (spec §8.2)
   if (!editSignature(page)) page.editApplied = null; // no edits left — nothing to suppress
-  const raster = await rasterizer.rasterize(page, { scale: 2 });
+  // rasterScaleFor, not a hardcoded 2: committing a Ganti edit on the page you
+  // are zoomed into must not SOFTEN it. Baking at the baseline here would undo
+  // the sharpen at exactly the moment the user is staring at the result.
+  const raster = await rasterizer.rasterize(page, { scale: rasterScaleFor(page) });
   // Stale guard: a fast undo/redo (or page delete) may have rebuilt the stage
   // while this rasterize() was in flight — only swap if this slot is still
   // the page's current, live one. syncEditedRasters below re-derives from
@@ -2523,6 +2728,11 @@ window.v2 = {
   pageManager, // tests: force a grid re-render mid-drag (Sentry fee8a76e repro)
   getRasterizer: () => rasterizer, // tests: drive the real live-surgery raster path (tests/live-raster.spec.js)
   celebration, // tests: drive the post-download routing (install nudge vs share card)
+  // tests/zoom-sharpen.spec.js. `superseded` is the honest one: it counts ONLY
+  // renders that core/import.js's renderSeq guard threw away because a later
+  // render for the same page won. A spec can therefore prove the supersede
+  // fired, rather than proving nothing visibly broke.
+  getSharpenStats: () => ({ ...sharpenStats, base: RASTER_BASE }),
 };
 
 // ---- The scan dead end -------------------------------------------------------------------

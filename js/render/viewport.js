@@ -61,16 +61,28 @@ export function createViewportStream({
     }
   }
 
+  // SINGLE SOURCE OF TRUTH for "which page is the user looking at" — the last
+  // slot whose top has crossed the viewport midline. Zero-based; -1 when empty.
+  // WHY it is exported rather than inlined twice: the position pill (below) and
+  // app.js's focused-page sharpening must name the SAME page. If they drifted,
+  // the pill would say "42 / 340" while page 43 was the one that got the
+  // high-resolution raster — a screen that lies about what it is showing.
+  function currentIndex() {
+    const list = slots();
+    if (list.length === 0) return -1;
+    const mid = scrollEl.getBoundingClientRect().top + scrollEl.clientHeight / 2;
+    let current = 0;
+    for (let i = 0; i < list.length; i += 1) {
+      if (list[i].view.getBoundingClientRect().top <= mid) current = i; else break;
+    }
+    return current;
+  }
+
   function reportPosition() {
     if (!onPosition) return;
-    const list = slots();
-    if (list.length === 0) return;
-    const mid = scrollEl.getBoundingClientRect().top + scrollEl.clientHeight / 2;
-    let current = 1;
-    for (let i = 0; i < list.length; i += 1) {
-      if (list[i].view.getBoundingClientRect().top <= mid) current = i + 1; else break;
-    }
-    onPosition(current, list.length);
+    const i = currentIndex();
+    if (i < 0) return;
+    onPosition(i + 1, slots().length);
   }
 
   function onScroll() {
@@ -106,5 +118,5 @@ export function createViewportStream({
     clearTimeout(settleTimer);
   }
 
-  return { refresh, attach, detach, reportPosition };
+  return { refresh, attach, detach, reportPosition, currentIndex };
 }
