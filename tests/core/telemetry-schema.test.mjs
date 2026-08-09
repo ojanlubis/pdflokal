@@ -20,11 +20,11 @@ import {
 const VALID_PROPS = {
   doc_open: { text_layer: true, pages: '1', device: 'desktop', intent: 'none', display_mode: 'browser' },
   tool_use: { tool: 'teks', action: 'text' },
-  // export carries BOTH the edit-ladder fields (surgery_used/fallback/duration)
-  // and the intent fields (format/size/pages_scope) — the two branches taught
-  // this event different halves of the same question; the merge keeps both.
+  // export carries the timing field and the intent fields. surgery_used and
+  // fallback were removed 2026-08-09: they were emitted as constants, so this
+  // fixture agreed with the defect instead of distinguishing it.
   export: {
-    surgery_used: false, fallback: 'none', duration: 100,
+    duration: 100,
     format: 'pdf', size: 'asli', pages_scope: 'all',
   },
   // font_seen/insert widened spec-edit-fidelity-instrumentation.md Increment
@@ -97,7 +97,11 @@ test('missing a required prop fails', () => {
 test('enum value outside the declared list fails', () => {
   assert.equal(validateEvent('doc_open', { ...VALID_PROPS.doc_open, device: 'smart-fridge' }).ok, false);
   assert.equal(validateEvent('tool_use', { ...VALID_PROPS.tool_use, tool: 'scissors' }).ok, false);
-  assert.equal(validateEvent('export', { ...VALID_PROPS.export, fallback: 'server' }).ok, false);
+  // Was `fallback: 'server'` until 2026-08-09. When `fallback` left the schema
+  // this line kept passing — but for the UNRELATED reason that the prop had
+  // become unknown, under a test named for enum violations. Re-pointed at an
+  // enum the event still declares, so it fails for the reason it claims.
+  assert.equal(validateEvent('export', { ...VALID_PROPS.export, size: 'jumbo' }).ok, false);
 });
 
 // surgery.reason gained 'residual' on 2026-07-28 — the value that lets the cut

@@ -495,12 +495,14 @@ export function createDownloadSheet(deps) {
         size: state.size,
         pages: state.picked ? 'some' : 'all',
       });
-      // surgery_used/fallback are hardcoded for now — Rung B/C (the ladder)
-      // don't exist on this branch yet; those props start carrying real
-      // values the moment the ladder merges (spec-telemetry.md §6 step 5).
+      // surgery_used/fallback used to be sent here as the literals false/'none',
+      // justified by "Rung B/C don't exist on this branch yet". They do —
+      // core/export.js runs applyPageSurgery on every non-image page. So the
+      // rail was recording a measured-looking FALSE for a thing that had been
+      // happening for weeks. Deleted rather than faked (PM ruling 2026-08-09,
+      // the block_edit precedent); they return when buildPdfBytes can report
+      // what surgery actually did, which it cannot today — it returns bytes.
       tel('export', {
-        surgery_used: false,
-        fallback: 'none',
         duration: durationBucket(performance.now() - t0),
         // The CHOICES — same values the GA4 event above carries, now first-party
         // too: what they came to DO (compress? to image? extract pages?) instead

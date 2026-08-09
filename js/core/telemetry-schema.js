@@ -328,12 +328,19 @@ export const SCHEMA = {
     action: ['select', 'whiteout', 'text', 'text_inline', 'signature', 'paraf', 'delete', 'pages_open', 'merge'],
   },
   export: {
-    // surgery_used/fallback are always false/'none' from call sites on this
-    // branch (Rung B/C don't exist here yet) — the props still ship now so
-    // the ladder branch only has to start SENDING true values, never add a
-    // new prop (spec §6 step 5: "the ladder props land later").
-    surgery_used: 'bool',
-    fallback: ['none', 'cover', 'twin'],
+    // ⚠️ surgery_used/fallback are DELETED, not forgotten (PM ruling
+    // 2026-08-09). They were declared here and emitted as the literals
+    // false/'none' on the reasoning that Rung B/C did not exist yet — which
+    // stopped being true: core/export.js runs applyPageSurgery unconditionally
+    // and core/stamp.js returns real missing-glyph/unsupported-font declines.
+    // So the rail recorded "surgery never ran, nothing ever fell back" on every
+    // single export, for the newest and riskiest subsystem we have.
+    //
+    // This is the block_edit ruling applied a second time: anything not emitted
+    // by code does not enter this schema. An ABSENT field reads as unknown; a
+    // hardcoded false reads as MEASURED false, which is worse, because a gap is
+    // visible and a lie is not. They come back the day buildPdfBytes can report
+    // what surgery actually did — that plumbing is its own piece of work.
     duration: 'duration',
     // The user's Unduh-sheet choices — the mirror of GA4's download event, the
     // signal the rail used to throw away. This is what lets a plain download,
