@@ -82,6 +82,23 @@ const EXPORT_FORMAT = ['pdf', 'png', 'jpg'];
 const EXPORT_SIZE = ['asli', 'kompres', 'sedang', 'kecil'];
 const PAGES_SCOPE = ['all', 'some'];
 
+// WHICH KIND of character a standard font refused (failure.class, 2026-08-09).
+// core/text-encode.js's own header already names the two populations that
+// reach this decline — "an emoji, or CJK" — and the product answer is
+// different for each: emoji means "offer a font that has them or accept the
+// warn", CJK means an entire script we cannot serve at all. On the rail today
+// they are one undifferentiated `reason: 'unsupported'`, so the count cannot
+// tell "a few people put a 🙂 in a form" apart from "Chinese users cannot use
+// the text tool".
+//
+// ⚠️ THREE VALUES AND A NEUTRAL, NEVER THE CHARACTER. The rail is string-free
+// by design and that is the moat: a character IS document content (someone's
+// name, a number, a symbol from their file), and one leaked codepoint is the
+// same breach as a leaked string. unsupportedCharClass() below is the ONLY
+// door — it takes a character and can return nothing but a member of this
+// list, so no call site is in a position to pass text through even by mistake.
+const UNSUPPORTED_CLASS = ['emoji', 'cjk', 'other', 'none'];
+
 const DURATION_MAX_MS = 600000;
 const DURATION_STEP_MS = 10;
 
@@ -197,6 +214,69 @@ export function inkRatioBucket(v) {
   if (n < 1.1) return 'near-parity';
   if (n < 1.3) return 'higher';
   return 'much-higher';
+}
+
+// CJK codepoint ranges — Han, the two kana, Hangul, and the CJK punctuation /
+// fullwidth blocks that always travel with them. Deliberately generous at the
+// block level rather than precise at the codepoint level: the question this
+// answers is "is there a population we cannot serve at all", and a fullwidth
+// comma pasted out of a Chinese document is evidence of exactly that.
+const CJK_RANGES = [
+  [0x1100, 0x11ff], // Hangul Jamo
+  [0x2e80, 0x2eff], // CJK Radicals Supplement
+  [0x3000, 0x303f], // CJK Symbols and Punctuation (、。「」 …)
+  [0x3040, 0x30ff], // Hiragana + Katakana
+  [0x3100, 0x312f], // Bopomofo
+  [0x3130, 0x318f], // Hangul Compatibility Jamo
+  [0x31f0, 0x31ff], // Katakana Phonetic Extensions
+  [0x3400, 0x4dbf], // CJK Unified Ideographs Extension A
+  [0x4e00, 0x9fff], // CJK Unified Ideographs
+  [0xa960, 0xa97f], // Hangul Jamo Extended-A
+  [0xac00, 0xd7af], // Hangul Syllables
+  [0xd7b0, 0xd7ff], // Hangul Jamo Extended-B
+  [0xf900, 0xfaff], // CJK Compatibility Ideographs
+  [0xfe30, 0xfe4f], // CJK Compatibility Forms
+  [0xff00, 0xffef], // Halfwidth and Fullwidth Forms
+  [0x20000, 0x3ffff], // CJK Unified Ideographs Extensions B and beyond
+];
+
+// EMOJI / pictograph ranges. Not a Unicode property lookup (no Intl or regex
+// property escapes needed, and no table to fall out of date): the blocks below
+// are where every pictograph a user can type from a phone keyboard lives.
+// U+FE0F (variation selector-16) is included because a keycap or a
+// text-default pictograph arrives as BASE + FE0F, and a first-offender that
+// happens to be the selector must still read 'emoji'.
+const EMOJI_RANGES = [
+  [0x2190, 0x21ff], // Arrows (⬅️➡️ bases)
+  [0x2300, 0x23ff], // Miscellaneous Technical (⌚⏰⏳)
+  [0x25a0, 0x25ff], // Geometric Shapes (▪️🔺 bases)
+  [0x2600, 0x27bf], // Misc Symbols + Dingbats (☀️❤️✅✨)
+  [0x2b00, 0x2bff], // Misc Symbols and Arrows (⭐⬛)
+  [0xfe0f, 0xfe0f], // VARIATION SELECTOR-16 — the emoji-presentation marker
+  [0x1f000, 0x1faff], // the emoji planes proper (🙂🎉🇮🇩🧑)
+];
+
+const inRanges = (cp, ranges) => ranges.some(([lo, hi]) => cp >= lo && cp <= hi);
+
+// A single CHARACTER → one of UNSUPPORTED_CLASS. THE ONLY DOOR between a
+// refused character and the rail (see UNSUPPORTED_CLASS's own warning above):
+// it takes text and returns an enum, so the character itself structurally
+// cannot travel. Anything falsy, or any input that is not a single-codepoint
+// string, collapses to 'none' — the same defensive stance as pagesBucket, and
+// it matters here for the same reason: an off-schema value would fail the
+// WHOLE failure event and lose its stage and reason too.
+//
+// Order matters: emoji is checked FIRST because the pictograph blocks and the
+// CJK blocks do not overlap, but the intent does — 🈯 (U+1F22F) is an
+// ideograph drawn as a pictograph, and it arrives from an emoji keyboard, not
+// from someone writing Chinese.
+export function unsupportedCharClass(ch) {
+  if (typeof ch !== 'string' || ch.length === 0) return 'none';
+  const cp = ch.codePointAt(0);
+  if (!Number.isInteger(cp)) return 'none';
+  if (inRanges(cp, EMOJI_RANGES)) return 'emoji';
+  if (inRanges(cp, CJK_RANGES)) return 'cjk';
+  return 'other';
 }
 
 // ms (a raw duration) → clamped to [0, 600000] and rounded to the nearest
@@ -426,9 +506,53 @@ export const SCHEMA = {
   // "the telemetry catches everything". Forcing such an error into one of the
   // pipeline stages to avoid adding a value would have put a wrong value on the
   // rail to save an enum entry.
+  //
+  // ---- two props added 2026-08-09, both ADDITIVE ----
+  //
+  // ⚠️ NEITHER CHANGES AN EXISTING FIELD'S MEANING. `stage` and `reason` carry
+  // exactly the values they carried yesterday, so every dashboard and every
+  // view in scripts/telemetry-migration.sql keeps reading what it always read.
+  // Redefining a live field is the founder's own hand; adding beside it is not.
+  // (validateEvent has no optional props by design — see its "missing a
+  // required prop" check — so both props are supplied at ALL FIVE call sites,
+  // with a neutral value where the axis does not apply. That is the cost of
+  // the no-optionals law and it is the right cost: a prop that is sometimes
+  // absent is a prop no query can trust.)
+  //
+  // `class` — WHICH KIND of character a standard font refused, for the
+  // `commit`/`unsupported` decline only ('none' everywhere else). Derived from
+  // the FIRST offending codepoint via unsupportedCharClass() above, which is
+  // the only door and can return nothing but the enum. NEVER the character,
+  // never the string. Why it earns a field: "someone put an emoji in a form"
+  // and "an entire script we cannot serve" are the same event today, and they
+  // are not the same product problem.
+  //
+  // `blocked` — DID THIS ACTUALLY STOP THE USER, or is it a forewarning on
+  // something that SUCCEEDED? Two of our five call sites report a failure for
+  // a thing that worked fine:
+  //   - the protected-PDF notice at import (js/v2/app.js) fires for a file
+  //     that OPENED and is fully editable; only the eventual PDF export will
+  //     refuse it. blocked: false.
+  //   - the unencodable-character warning at commit (js/v2/app.js) fires for
+  //     text we then COMMIT anyway — WARN, never DROP (founder ruling
+  //     2026-07-29). blocked: false.
+  // and three report a genuine dead end: the file that could not be opened at
+  // all, the export that produced no bytes, and an uncaught runtime error.
+  // blocked: true.
+  //
+  // Before this prop the ONLY way to tell a protected-PDF NOTICE from a
+  // protected-PDF DECLINE on the rail was whether a `doc_open` happened to
+  // arrive alongside it — a per-session join that is unreliable by
+  // construction (same session, same stage, same reason, and a doc_open can be
+  // dropped or arrive in a different batch). So "how many people can't open
+  // their files" was being answered with a number that included people whose
+  // files opened perfectly. Counting a success as a failure makes the rail
+  // pessimistic in exactly the place the push policy trusts it most.
   failure: {
     stage: ['import', 'commit', 'export', 'compress', 'render', 'runtime'],
     reason: ['encrypted', 'corrupt', 'out-of-memory', 'unsupported', 'timeout', 'unknown'],
+    class: UNSUPPORTED_CLASS,
+    blocked: 'bool',
   },
   // spec-edit-fidelity-instrumentation.md Increment C: the visual oracle —
   // core/visual-oracle.js's compareRegions() on the edited line's own region,

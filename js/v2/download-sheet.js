@@ -100,6 +100,46 @@ export function createDownloadSheet(deps) {
     return doc.pages.filter((p) => state.picked.includes(p.id));
   }
 
+  // ---- the image path's fallback source (2026-08-09) ---------------------------
+  //
+  // THE BUG THIS EXISTS FOR. `buildBase()` runs pdf-lib's buildPdfBytes the
+  // moment the sheet opens, whatever format is selected. pdf-lib throws on an
+  // encrypted source and has no decrypt path anywhere in this stack, so
+  // `state.base` stays null — and the IMAGE branch of doExport then threw
+  // `state.buildError` before it ever reached renderPdfToImages, which is pure
+  // PDF.js and contains no pdf-lib at all. PDF.js implements the standard
+  // security handler, so it rasterizes these files perfectly: measured against
+  // a plain control, an owner-locked RC4 file and an owner-locked AES-256
+  // file, renderPdfToImages on the RAW BYTES returned byte-identical output for
+  // all three. We were refusing an export we can perform, and saying "PDF ini
+  // terkunci, jadi nggak bisa disimpan ulang" — true of the PDF format, false
+  // of images.
+  //
+  // ⚠️ WHY THIS IS NOT SIMPLY "rasterize the source bytes on the image path".
+  // The normal image export rasterizes the BUILT pdf, which carries every
+  // annotation, signature and baked edit. Falling back to the source bytes
+  // unconditionally would silently drop all of them from every image export —
+  // trading a loud honest refusal for quiet data loss, which is the same trade
+  // `ignoreEncryption` offers and the same one we refused there. So the
+  // fallback is used ONLY when the build actually failed, and only when the
+  // source bytes are provably the whole truth for the selected pages:
+  //   - exactly ONE source, and it is a PDF (nothing to compose);
+  //   - NO annotations on any selected page (nothing to lose);
+  //   - NO user rotation on any selected page (renderPdfToImages honours the
+  //     intrinsic /Rotate, and has no way to apply a further turn).
+  // Anything else keeps throwing the real build error, which is the honest
+  // answer. Returns { bytes, pageNumbers } or null.
+  function imageFallbackSource() {
+    const doc = deps.getDoc();
+    if (!doc || doc.sources?.length !== 1) return null;
+    const pages = selectedPages();
+    if (!pages.length) return null;
+    if (pages.some((p) => p.isFromImage || p.annotations?.length || (p.rotation || 0) !== 0)) return null;
+    const bytes = doc.sources[0].bytes;
+    if (!bytes?.length) return null;
+    return { bytes, pageNumbers: pages.map((p) => p.sourcePageNum + 1) };
+  }
+
   async function buildBase() {
     const seq = ++state.seq;
     state.base = null;
@@ -130,7 +170,15 @@ export function createDownloadSheet(deps) {
         state.buildError = err;
         // Classify HERE too: this toast fires when the sheet opens, which is
         // the first moment the user learns anything is wrong.
-        deps.toast(failMessage(failureReason(err)));
+        //
+        // ...but ONLY when the failure actually blocks the format in front of
+        // the user. Arriving from /pdf-ke-gambar with a locked file opens this
+        // sheet on Gambar, where the export will succeed from the source bytes
+        // — telling them it "can't be saved" would be a lie about the very
+        // thing they are about to do successfully.
+        if (state.format === 'pdf' || !imageFallbackSource()) {
+          deps.toast(failMessage(failureReason(err)));
+        }
       }
     } finally {
       if (seq === state.seq) { state.building = false; render(); }
@@ -393,7 +441,13 @@ export function createDownloadSheet(deps) {
         // No success toast: the BERES stamp (download chokepoint) is the one voice.
         deps.download(new Blob([src.bytes], { type: 'application/pdf' }), `${baseName}-pdflokal.pdf`);
       } else {
-        if (!state.base) throw state.buildError || new Error('build missing');
+        // The built PDF when we have it (it carries the annotations); the raw
+        // source otherwise, but only where that is provably the whole truth —
+        // see imageFallbackSource's own WHY. A locked PDF lands here: pdf-lib
+        // refused to build, PDF.js rasterizes it fine.
+        const fallback = state.base ? null : imageFallbackSource();
+        if (!state.base && !fallback) throw state.buildError || new Error('build missing');
+        const imgBytes = state.base ? state.base.bytes : fallback.bytes;
         // renderPdfToImages rasterizes with pdf.js; zipFiles zips with fflate.
         // Both come off globalThis, so both must be up before we call in.
         const [{ renderPdfToImages, zipFiles }] = await Promise.all([
@@ -403,13 +457,26 @@ export function createDownloadSheet(deps) {
         // on the CTA so "working" never looks like "hung". Surgical text update,
         // never a full render() mid-export.
         const main = el('#ds-cta-main');
-        const files = await renderPdfToImages(state.base.bytes, {
+        const files = await renderPdfToImages(imgBytes, {
           format: state.imgfmt, maxDim: IMG_DIMS[state.size], baseName: `${baseName}-hal`,
+          // Only the fallback needs this: the built PDF already contains just
+          // the selected pages, in order, so its own 1..n IS the selection.
+          pageNumbers: fallback ? fallback.pageNumbers : null,
           onProgress: ({ done, total }) => {
             main.textContent = `Menyiapkan gambar ${done}/${total}…`;
           },
         });
         if (seq !== state.seq) return;
+        // renderPdfToImages names each file after its page number in the
+        // document it was handed. On the built-PDF path that is already the
+        // display position; on the fallback it is the SOURCE page number, so
+        // extracting pages 5 and 9 would hand the user "…-hal-5" and
+        // "…-hal-9". Renumber so both paths produce identical filenames —
+        // a fallback the user can SEE they were given is a fallback that
+        // needs explaining.
+        if (fallback) {
+          files.forEach((f, i) => { f.name = f.name.replace(/-\d+(\.[a-z]+)$/, `-${i + 1}$1`); });
+        }
         if (files.length === 1) {
           const mime = state.imgfmt === 'png' ? 'image/png' : 'image/jpeg';
           deps.download(new Blob([files[0].bytes], { type: mime }), files[0].name);
@@ -469,7 +536,11 @@ export function createDownloadSheet(deps) {
       // The document's OWN recorded fact still wins over anything derived from
       // the throw: core/import.js read `encrypted` off the document at import,
       // which is more reliable than matching a library's wording.
-      tel('failure', { stage: 'export', reason });
+      // class:'none' — no character was refused here; the axis is the commit
+      // path's. blocked:true — reaching this catch means no file was produced,
+      // which is the definition of stopped. (Both props added 2026-08-09; see
+      // the failure event in core/telemetry-schema.js.)
+      tel('failure', { stage: 'export', reason, class: 'none', blocked: true });
     } finally {
       state.exporting = false;
       render();

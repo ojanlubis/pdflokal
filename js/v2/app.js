@@ -27,6 +27,7 @@ import { createHistory, record, undo, redo, canUndo, canRedo } from '../core/his
 import { importPdf, importImage, createPageRasterizer, probeTextLayer } from '../core/import.js';
 import {
   pagesBucket, durationBucket, ratioBucket, inkRatioBucket, intentValue,
+  unsupportedCharClass,
 } from '../core/telemetry-schema.js';
 import { compareRegions } from '../core/visual-oracle.js';
 import { validateSample } from '../core/feedback-sample.js';
@@ -1706,7 +1707,18 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
         if (bad.length) {
           // COPY IS PLACEHOLDER - client-facing words are Fauzan's, per the seat.
           toast(`Huruf ${bad.slice(0, 3).join(' ')} nggak bisa disimpan pakai font ini`); // TODO(copy): his words
-          tel('failure', { stage: 'commit', reason: 'unsupported' });
+          // `class` from the FIRST offending character only, through
+          // unsupportedCharClass — which returns an enum and nothing else, so
+          // the character cannot ride along. 'emoji' and 'cjk' are entirely
+          // different product problems and were indistinguishable here until
+          // 2026-08-09. blocked:false because this is a WARN, not a DROP: the
+          // text below is committed either way (founder ruling 2026-07-29).
+          tel('failure', {
+            stage: 'commit',
+            reason: 'unsupported',
+            class: unsupportedCharClass(bad[0]),
+            blocked: false,
+          });
         }
       }
       track('editor_action', { action: 'text' });
@@ -2063,7 +2075,14 @@ async function loadFilesInner(files) {
         // COPY IS PLACEHOLDER — client-facing words are Fauzan's, per the seat.
         if (doc.sources.at(-1)?.encrypted) {
           toast('PDF ini terkunci, bisa dibaca, tapi nggak bisa disimpan ulang'); // TODO(copy): his words
-          tel('failure', { stage: 'import', reason: 'encrypted' });
+          // blocked:FALSE — this file OPENED and is fully editable. It shares
+          // its stage and reason with the genuine decline further down (the
+          // file that could not be opened at all), and until 2026-08-09 the
+          // only thing telling them apart on the rail was whether a `doc_open`
+          // happened to arrive alongside — a per-session join, unreliable by
+          // construction. See the failure event's own note in
+          // core/telemetry-schema.js.
+          tel('failure', { stage: 'import', reason: 'encrypted', class: 'none', blocked: false });
         }
         // doc_open (spec-telemetry.md §3 — scan-vs-born-digital ratio). The
         // text-layer probe re-opens the PDF independently (probeTextLayer,
@@ -2107,7 +2126,10 @@ async function loadFilesInner(files) {
       // Anything we cannot classify is 'unknown' — which must stay COUNTED,
       // because an unclassified failure is exactly when the rail needs to be
       // loud rather than silent.
-      tel('failure', { stage: 'import', reason: failureReason(err) });
+      // blocked:TRUE — the genuine decline. This file did not open at all, so
+      // the user is standing still. Its twin above (the protected-PDF notice)
+      // carries the same stage and reason and blocked:false.
+      tel('failure', { stage: 'import', reason: failureReason(err), class: 'none', blocked: true });
     }
   }
 
@@ -2579,7 +2601,8 @@ function reportRuntimeFailure(err) {
   try {
     if (runtimeFailures >= RUNTIME_FAILURE_CAP) return;
     runtimeFailures += 1;
-    tel('failure', { stage: 'runtime', reason: failureReason(err) });
+    // blocked:true — an uncaught throw is a real failure, never a forewarning.
+    tel('failure', { stage: 'runtime', reason: failureReason(err), class: 'none', blocked: true });
   } catch {
     // Error reporting must never itself throw into app code — same law as tel().
   }

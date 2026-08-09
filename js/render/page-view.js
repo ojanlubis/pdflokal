@@ -26,6 +26,7 @@
  * (declined edits, ordinary annotations) renders exactly as before
  * (Decision 2).
  */
+import { orderedForPaint, annotationZIndex } from '../core/annotation-order.js';
 
 // Render a full page view (background + annotation overlay).
 // opts.activeId = id of the currently-active annotation → rendered on top.
@@ -54,7 +55,11 @@ export function renderPageView(page, opts = {}) {
   const overlay = document.createElement('div');
   overlay.className = 'pv-overlay';
   overlay.style.cssText = 'position:absolute;inset:0';
-  for (const anno of page.annotations) {
+  // PAINT ORDER (core/annotation-order.js, founder ruling 2026-08-09): Tip-Ex
+  // is a GROUND, not a layer. orderedForPaint returns a COPY — page.annotations
+  // itself must stay in creation order, because page-surgery.js pairs Ganti
+  // covers to their replacement text by walking that same array.
+  for (const anno of orderedForPaint(page.annotations)) {
     // spec-live-surgery.md §5/§8.3 (increment 3, Decision 1/2): a SUCCESSFUL
     // committed Ganti edit's cover+text are baked into the raster — drawing
     // them ALSO as a DOM overlay would double-paint. A DECLINED edit's cover
@@ -62,7 +67,10 @@ export function renderPageView(page, opts = {}) {
     // see the editApplied skip below.
     if (page.editApplied?.has(anno.id)) continue;
     const el = renderAnnotationEl(anno);
-    el.style.zIndex = anno.id === activeId ? '1000' : '1'; // active always on top
+    // Top of its OWN band, never top of everything — a held Tip-Ex used to get
+    // z-index 1000 and so appeared above the text it belongs under, then
+    // dropped behind on deselect. The screen lied while you were editing.
+    el.style.zIndex = String(annotationZIndex(anno, { selected: anno.id === activeId }));
     overlay.appendChild(el);
   }
   view.appendChild(overlay);
@@ -236,14 +244,16 @@ export function syncOverlay(page, view, opts = {}) {
   const overlay = view.querySelector('.pv-overlay');
   if (!overlay) return;
   overlay.innerHTML = '';
-  for (const anno of page.annotations) {
+  // Same paint order as renderPageView and as core/export.js — one contract
+  // (core/annotation-order.js), and a COPY, never a reorder of the model.
+  for (const anno of orderedForPaint(page.annotations)) {
     // See renderPageView's identical skip — same suppression signal, kept in
     // lockstep so a resync (undo/redo, format bar, drag) never re-draws a
     // baked edit's overlay back into existence.
     if (page.editApplied?.has(anno.id)) continue;
     const el = renderAnnotationEl(anno);
     const active = anno.id === activeId;
-    el.style.zIndex = active ? '1000' : '1';
+    el.style.zIndex = String(annotationZIndex(anno, { selected: active }));
     if (active) decorateSelected(el, anno);
     overlay.appendChild(el);
   }
@@ -278,11 +288,19 @@ export function decorateSelected(el, anno) {
   el.appendChild(h);
 }
 
+// ⚠️ THE TYPE COMES OFF THE ELEMENT because that is all the caller has —
+// interaction.js holds a DOM node, not the model object, when it drops a
+// selection. renderAnnotationEl writes `pv-anno-<type>`, so the class IS the
+// record of what this element is. Getting it wrong would put a deselected
+// Tip-Ex back into the text band, which is the very defect this change
+// removes; annotationRank falls back to the default for anything unreadable,
+// so the worst case is a whiteout drawn one band too high rather than a throw.
 export function undecorateSelected(el) {
+  const type = /pv-anno-([a-zA-Z]+)/.exec(el.className)?.[1];
   el.classList.remove('pv-selected');
   el.style.outline = '';
   el.style.outlineOffset = '';
-  el.style.zIndex = '1';
+  el.style.zIndex = String(annotationZIndex({ type }, { selected: false }));
   el.style.touchAction = ''; // back to camera-first (see decorateSelected)
   el.querySelector('.pv-handle')?.remove();
 }

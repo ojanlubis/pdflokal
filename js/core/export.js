@@ -25,6 +25,8 @@ import { buildExportPlan } from './operations.js';
 import { applyPageSurgery } from './page-surgery.js';
 import { CLONE_FONT_VARIANTS, CLONE_FONT_URLS } from './clone-fonts.js';
 import { toStandardFontSafe, drawTextSafe } from './text-encode.js';
+import { totalPageRotation } from './page-rotation.js';
+import { orderedForPaint } from './annotation-order.js';
 
 // ---- fonts ------------------------------------------------------------------
 
@@ -391,7 +393,21 @@ export async function buildPdfBytes(doc, deps = {}) {
       const [copied] = await newDoc.copyPages(srcDoc, [page.sourcePageNum]);
       pdfPage = newDoc.addPage(copied);
     }
-    if (page.rotation) pdfPage.setRotation(PDFLib.degrees(page.rotation));
+    // /Rotate — SINGLE SOURCE OF TRUTH for "how is this page turned"
+    // (core/page-rotation.js). This used to be `setRotation(page.rotation)`,
+    // and setRotation is ABSOLUTE: a source PDF's own inherited /Rotate was
+    // thrown away. A document already carrying /Rotate 90, rotated once in the
+    // editor, showed 180 on screen (import.js rasterizes at baseRotation +
+    // rotation) and exported at 90. Screen and file disagreed, and the user
+    // only found out after they had the file. Fixed 2026-08-09.
+    const totalRotation = totalPageRotation(page);
+    // Write only when it differs from what the copy already carries: every
+    // base-0 page (the overwhelming majority, and every image page) keeps
+    // byte-identical output, and a copy that DID lose an inherited /Rotate
+    // still gets corrected.
+    if (totalRotation !== pdfPage.getRotation().angle) {
+      pdfPage.setRotation(PDFLib.degrees(totalRotation));
+    }
 
     // WHY this runs HERE, before any drawing: applyPageSurgery's two rungs
     // must cut/append into the copied page's content stream before pdf-lib's
@@ -442,7 +458,13 @@ export async function buildPdfBytes(doc, deps = {}) {
       // being expressed in.
       const { width: wU, height: hU } = pdfPage.getSize();
       const frame = { rotation: page.rotation || 0, wU, hU };
-      for (const anno of annotations) {
+      // PAINT ORDER (core/annotation-order.js, founder ruling 2026-08-09):
+      // Tip-Ex is a GROUND, not a layer. The SAME helper the screen uses, so
+      // the two can't drift. It returns a COPY — `annotations` itself must
+      // stay in creation order, because applyPageSurgery above was handed that
+      // very array and pairs each Ganti cover to its replacement text by
+      // walking it in creation order.
+      for (const anno of orderedForPaint(annotations)) {
         if (skipCovers.has(anno.id)) continue; // surgery succeeded — true background shows through
         if (skipDraw.has(anno.id)) continue; // Rung C wrote this one natively — don't double-paint
         const draw = ANNOTATION_DRAWERS[anno.type];

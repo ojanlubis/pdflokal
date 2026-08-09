@@ -194,4 +194,82 @@ test.describe('telemetry client', () => {
     // A plain, unmodified PDF download: the defaults the sheet opens with.
     expect(exp.props).toMatchObject({ format: 'pdf', size: 'asli', pages_scope: 'all' });
   });
+
+  /*
+   * failure.class (2026-08-09) — WHICH KIND of character a standard font
+   * refused. tests/core/telemetry-unsupported-class.test.mjs proves the
+   * classifier and sweeps every codepoint through it; these two prove the
+   * WIRING, which is the half a unit test cannot see. It matters more here
+   * than usual: validateEvent requires every declared prop, so a call site
+   * that fed `class` something off-enum would not send a wrong value — it
+   * would send NOTHING, silently, and the commit failure would vanish from
+   * the rail entirely while every unit test stayed green.
+   */
+  async function typeAndCommit(page, text) {
+    await page.click('[data-tool="text"]');
+    await page.click('.pv-page >> nth=0', { position: { x: 120, y: 180 } });
+    // insertText, not keyboard.type: astral-plane emoji are surrogate PAIRS
+    // and a synthesised keypress-per-character cannot produce one.
+    await page.keyboard.insertText(text);
+    await page.keyboard.press('Enter');
+  }
+
+  for (const [label, text, expected] of [
+    ['emoji', 'Terima kasih 🙂', 'emoji'],
+    ['CJK', 'Nama: 中文', 'cjk'],
+    ['another script', 'Привет', 'other'],
+  ]) {
+    test(`(h) a refused ${label} reaches the rail as failure.class='${expected}' — and the character does not`, async ({ page }) => {
+      await captureBeacons(page);
+      await page.goto('/');
+      await page.setInputFiles('#file-input', SAMPLE_PDF);
+      await expectFirstPage(page);
+
+      await typeAndCommit(page, text);
+      await fakeTabHidden(page);
+
+      await expect.poll(async () => (await beaconBodies(page))
+        .flatMap((b) => b.events)
+        .some((e) => e.event === 'failure' && e.props.stage === 'commit')).toBe(true);
+
+      const bodies = await beaconBodies(page);
+      const f = bodies.flatMap((b) => b.events).find((e) => e.event === 'failure' && e.props.stage === 'commit');
+      expect(f.props).toMatchObject({
+        stage: 'commit', reason: 'unsupported', class: expected, blocked: false,
+      });
+
+      // THE MOAT. Not one character of what they typed may appear anywhere in
+      // the payload — the rail is string-free by design, and a refused
+      // character IS document content.
+      const raw = JSON.stringify(bodies);
+      // ASCII is skipped because the envelope is JSON: braces, quotes, colons
+      // and the letters of every prop NAME are structurally present and mean
+      // nothing about the user's text. Every NON-ASCII character in what they
+      // typed is the part that could only have come from them, and none of it
+      // may be in there — including, specifically, the one that was refused.
+      const foreign = [...text].filter((ch) => ch.codePointAt(0) > 0x7f);
+      expect(foreign.length, 'the input has nothing non-ASCII to leak').toBeGreaterThan(0);
+      for (const ch of foreign) {
+        expect(raw, `the character ${JSON.stringify(ch)} reached the rail`).not.toContain(ch);
+      }
+    });
+  }
+
+  test('(h) CONTROL: text a standard font CAN paint reports no commit failure at all', async ({ page }) => {
+    // Without this the three tests above are satisfied by an implementation
+    // that fires `failure` on every commit. The negative case is the one
+    // carrying the information.
+    await captureBeacons(page);
+    await page.goto('/');
+    await page.setInputFiles('#file-input', SAMPLE_PDF);
+    await expectFirstPage(page);
+
+    await typeAndCommit(page, 'Surat keterangan');
+    await fakeTabHidden(page);
+
+    await expect.poll(async () => (await beaconBodies(page))
+      .flatMap((b) => b.events).some((e) => e.event === 'tool_use')).toBe(true);
+    const events = (await beaconBodies(page)).flatMap((b) => b.events);
+    expect(events.filter((e) => e.event === 'failure')).toEqual([]);
+  });
 });

@@ -224,7 +224,20 @@ test('COVERAGE: no failure report hard-codes its reason', () => {
       // a false negative for a false positive; both end with someone editing
       // the guard instead of the bug.
       let expr;
-      const m = /reason:\s*([^}]*)/.exec(call);
+      // ⚠️ ONE KEY, NOT THE REST OF THE OBJECT. This was `([^}]*)` — everything
+      // up to the closing brace — which was correct only while `reason` was the
+      // LAST prop on every failure call. On 2026-08-09 `class` and `blocked`
+      // were added after it and this guard went red on
+      // `reason: 'unsupported', class: unsupportedCharClass(bad[0]), …`,
+      // because the captured "expression" was three props long and matched
+      // neither DETERMINED nor failureReason(). The guard could not read the
+      // code it polices — the exact defect its own ES6-shorthand note warns
+      // about, one prop later.
+      //
+      // Stopping at the first comma reads exactly one key's value. A future
+      // `reason: f(a, b)` would truncate to `f(a` and fail the check below —
+      // loud, not silent, which is the correct direction for this guard.
+      const m = /reason:\s*([^,}]*)/.exec(call);
       if (m) {
         expr = m[1].trim().replace(/,$/, '').trim();
       } else if (/\breason\s*[,}]/.test(call)) {

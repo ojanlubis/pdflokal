@@ -34,6 +34,7 @@
 import { removeRunsFromPdfPage } from './redact.js';
 import { resolveStampFont, stampText } from './stamp.js';
 import { glyphShortfallBucket } from './telemetry-schema.js';
+import { totalPageRotation } from './page-rotation.js';
 
 // ---- Rung B: honest replacement (surgery) ------------------------------------
 
@@ -358,10 +359,20 @@ export async function buildEditedPageBytes(srcDoc, page, annotations, deps = {})
   // than a whole-doc save on large files, identical on small ones.
   const [copiedPage] = await newDoc.copyPages(srcDoc, [page.sourcePageNum]);
   const pdfPage = newDoc.addPage(copiedPage);
-  // Same rotation handling as buildPdfBytes' own copyPages path, exactly:
-  // the copy already carries the source page's inherited /Rotate; only an
-  // explicit page.rotation (a user-applied in-editor rotate) overrides it.
-  if (page.rotation) pdfPage.setRotation(PDFLib.degrees(page.rotation));
+  // Same rotation handling as buildPdfBytes' own copyPages path, exactly —
+  // and that is load-bearing here, not merely tidy: core/import.js's
+  // rasterizer treats an EDITED page's baked bytes as authoritative and reads
+  // their /Rotate straight back, where a plain page is rendered at
+  // baseRotation + rotation. So if these two disagree, an edited page and an
+  // unedited page of the SAME document face different ways ON SCREEN.
+  //
+  // Until 2026-08-09 this was `if (page.rotation) setRotation(page.rotation)`,
+  // which is ABSOLUTE and discarded the source's inherited /Rotate — see
+  // core/page-rotation.js for the whole story.
+  const totalRotation = totalPageRotation(page);
+  if (totalRotation !== pdfPage.getRotation().angle) {
+    pdfPage.setRotation(PDFLib.degrees(totalRotation));
+  }
 
   const { skipCovers, skipDraw, surgeryByCover, insertOutcomes } = await applyPageSurgery(pdfPage, PDFLib, fontkit, annotations);
 

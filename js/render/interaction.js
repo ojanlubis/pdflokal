@@ -21,6 +21,7 @@
 import { selectAnnotation, clearSelection, moveAnnotation, resizeAnnotation, updateAnnotation } from '../core/operations.js';
 import { record } from '../core/history.js';
 import { decorateSelected, undecorateSelected } from './page-view.js';
+import { annotationZIndex } from '../core/annotation-order.js';
 
 const TAP_SLOP = 12; // px of finger movement beyond which a press is not a tap
 
@@ -58,7 +59,11 @@ export function createInteraction(ctx) {
     if (anno) {
       selectAnnotation(doc, anno.id);
       if (annoEl) {
-        annoEl.style.zIndex = '1000'; // active object is ALWAYS top-most (§6.2)
+        // Top of its OWN band, not of everything (core/annotation-order.js,
+        // founder ruling 2026-08-09). §6.2's "active object is ALWAYS
+        // top-most" predates the Tip-Ex-is-a-ground rule and was the reason
+        // a held Tip-Ex appeared above text and dropped behind on release.
+        annoEl.style.zIndex = String(annotationZIndex(anno, { selected: true }));
         if (!annoEl.classList.contains('pv-selected')) decorateSelected(annoEl, anno);
       }
     } else {
@@ -82,7 +87,7 @@ export function createInteraction(ctx) {
     selectedEl = el;
     const found = findAnno(doc, id);
     if (found && !el.classList.contains('pv-selected')) {
-      el.style.zIndex = '1000';
+      el.style.zIndex = String(annotationZIndex(found.anno, { selected: true }));
       decorateSelected(el, found.anno);
     }
   }
