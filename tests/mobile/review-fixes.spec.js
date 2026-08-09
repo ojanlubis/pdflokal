@@ -7,6 +7,7 @@ import { test, expect } from '@playwright/test';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { expectFirstPage } from '../helpers/render.js';
+import { downloadBytes, expectRealPdf } from '../helpers/download-bytes.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE = path.join(__dirname, '..', 'fixtures', 'sample-2pages.pdf');
@@ -31,9 +32,28 @@ test.describe('review fixes', () => {
 
     // The wedge would leave the spinner forever; recovery = a result lands.
     await expect(page.locator('#ds-size [data-v="kompres"]')).toContainText(/hemat|optimal/, { timeout: 60000 });
-    const dl = page.waitForEvent('download');
-    await page.tap('#ds-cta');
-    expect((await dl).suggestedFilename()).toMatch(/\.pdf$/);
+
+    // ⚠️ RECOVERY USED TO MEAN "a .pdf eventually downloaded" — the audit's
+    // Class 1 named exactly what that misses: recovery handing back a STALE or
+    // WRONG page subset. A superseded compress run that quietly won the race
+    // ships the 120-page build under the same name. So: two pages, and they
+    // have to be the two that were picked.
+    //
+    // core/compress.js returns the input verbatim when the rebuild doesn't win
+    // ("sudah optimal"); when it does win every page becomes a JPEG and there
+    // is no text left to extract. Page count and ink hold either way.
+    const label = await page.locator('#ds-size [data-v="kompres"]').innerText();
+    const kept = /optimal/i.test(label);
+    const { buf, filename } = await downloadBytes(page, () => page.tap('#ds-cta'));
+    expect(filename).toMatch(/\.pdf$/);
+    await expectRealPdf(page, buf, {
+      pages: 2,
+      // bigdoc-120.pdf paints "Halaman N / 120" on every page (see
+      // tests/fixtures/generate-bigdoc.mjs) — that caption is the page's own
+      // identity, so it is what tells the right subset from a stale one.
+      text: kept ? ['Halaman 1 / 120', 'Halaman 2 / 120'] : [],
+      absent: kept ? ['Halaman 3 / 120'] : [],
+    });
   });
 
   test('H2: selection chrome survives rebuildStage (Semua Hal. + undo keep it draggable)', async ({ page }) => {

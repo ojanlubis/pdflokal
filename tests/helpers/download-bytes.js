@@ -24,6 +24,22 @@
  * Usage:
  *   const buf = await downloadBytes(page, () => page.click('#ds-cta'));
  *   await expectRealPdf(page, buf, { pages: 2, text: ['Dari desktop'] });
+ *
+ * ---------------------------------------------------------------------------
+ * THE IMAGE HALF (added for the Unduh sheet's gambar paths, which were the two
+ * remaining filename-only downloads in tests/mobile/download-sheet.spec.js).
+ *
+ * A rasterised page CANNOT carry extractable text, so `text` has no equivalent
+ * here and pretending otherwise would be the same mistake in a new costume.
+ * What a raster CAN be asked is: are these real image bytes, do they decode,
+ * are the pixel dimensions the page's own aspect ratio, and is there ink on
+ * them. That is the honest ceiling for this path and it is stated out loud so
+ * nobody later reads "the images are tested" as "the right page was exported".
+ *
+ *   expectRealJpeg  decodes with the browser's own decoder — catches 0-byte,
+ *                   truncated and valid-but-blank output
+ *   unzipInPage     unzips with the SAME fflate the export just used, so the
+ *                   entry list is the product's, not a second implementation's
  */
 import { expect } from '@playwright/test';
 
@@ -141,4 +157,110 @@ export async function expectRealPdf(page, buf, opts = {}) {
   }
 
   return info;
+}
+
+/**
+ * Decode image bytes with the BROWSER'S own decoder and measure them. Same
+ * reasoning as inspectPdf: the question is "would the user's own viewer show
+ * this", so we ask a viewer rather than a second node-side implementation.
+ * Mirrors tests/core-export-images.spec.js's createImageBitmap → canvas →
+ * getImageData shape, which is where this repo already decodes exported images.
+ */
+export async function inspectImage(page, buf, mime = 'image/jpeg') {
+  return page.evaluate(async ({ arr, mime: m }) => {
+    const bmp = await window.createImageBitmap(new Blob([new Uint8Array(arr)], { type: m }));
+    const canvas = document.createElement('canvas');
+    canvas.width = bmp.width;
+    canvas.height = bmp.height;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    // Paper-white first: a decoder that produced nothing then reads as blank
+    // rather than as transparent-black "ink".
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(bmp, 0, 0);
+    const d = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    let inked = 0;
+    for (let j = 0; j < d.length; j += 4) {
+      if (d[j] < 245 || d[j + 1] < 245 || d[j + 2] < 245) inked++;
+    }
+    return { width: bmp.width, height: bmp.height, inkRatio: inked / (canvas.width * canvas.height) };
+  }, { arr: Array.from(buf), mime });
+}
+
+/**
+ * The image-side equivalent of expectRealPdf.
+ *
+ * @param {object} opts
+ *   aspect   expected width/height ratio (the source page's), ±`aspectTol`
+ *   minInk   minimum ink ratio. Default 0.0001 — LOWER than the PDF helper's
+ *            0.0005, on purpose. A uniformly white JPEG measures exactly 0, so
+ *            the threshold only has to clear zero to separate "blank" from
+ *            "rendered", and a full-page raster spreads a sparse page's ink
+ *            over ~2 megapixels, which would drag a 0.0005 bar into false reds.
+ *   minBytes floor under which the file cannot be a real page render
+ */
+export async function expectRealJpeg(page, buf, opts = {}) {
+  const {
+    aspect = null, aspectTol = 0.02, minInk = 0.0001, minBytes = 1000,
+  } = opts;
+
+  expect(buf.length, 'the image download produced ZERO bytes').toBeGreaterThan(0);
+  // SOI marker. A filename ending .jpg proves only that something named it .jpg.
+  expect(
+    [buf[0], buf[1]],
+    `not a JPEG at all (first bytes: ${JSON.stringify(buf.subarray(0, 8).toString('hex'))})`,
+  ).toEqual([0xff, 0xd8]);
+  // EOI marker: the one cheap check that separates a complete file from a
+  // truncated one, which is exactly what the filename could never see.
+  expect(
+    [buf[buf.length - 2], buf[buf.length - 1]],
+    'the JPEG has no end-of-image marker — the download is TRUNCATED',
+  ).toEqual([0xff, 0xd9]);
+  expect(buf.length, `the JPEG is ${buf.length} bytes — too small to be a rendered page`).toBeGreaterThan(minBytes);
+
+  const info = await inspectImage(page, buf, 'image/jpeg');
+  expect(info.width, 'the JPEG decoded to zero width').toBeGreaterThan(0);
+  expect(info.height, 'the JPEG decoded to zero height').toBeGreaterThan(0);
+
+  if (aspect !== null) {
+    const got = info.width / info.height;
+    expect(
+      Math.abs(got - aspect),
+      `the exported image is ${info.width}x${info.height} (ratio ${got.toFixed(3)}), `
+      + `but the page it claims to be is ratio ${aspect.toFixed(3)} — this is not that page`,
+    ).toBeLessThan(aspectTol);
+  }
+
+  expect(
+    info.inkRatio,
+    `the exported image renders BLANK (ink ratio ${info.inkRatio.toFixed(5)}). It is a valid `
+    + 'JPEG of the right size that shows the user nothing.',
+  ).toBeGreaterThan(minInk);
+
+  return info;
+}
+
+/**
+ * Unzip in the page with the SAME fflate the export just loaded, and hand the
+ * entries back as node Buffers. Returns [{ name, buf }] sorted by name.
+ *
+ * WHY in-page: tests/core-export-images.spec.js already round-trips zipFiles
+ * through window.fflate.unzipSync. Adding a node-side unzipper would be a
+ * second implementation, and a disagreement between the two is
+ * indistinguishable from an export bug.
+ */
+export async function unzipInPage(page, buf) {
+  expect(
+    buf.subarray(0, 4).toString('hex'),
+    `not a ZIP at all (first bytes: ${JSON.stringify(buf.subarray(0, 8).toString('hex'))})`,
+  ).toBe('504b0304'); // "PK\x03\x04" local file header
+  expect(await page.evaluate(() => !!window.fflate), 'window.fflate is not loaded — the ZIP export path never ran').toBe(true);
+
+  const entries = await page.evaluate((arr) => {
+    const back = window.fflate.unzipSync(new Uint8Array(arr));
+    return Object.keys(back).sort().map((name) => ({ name, bytes: Array.from(back[name]) }));
+  }, Array.from(buf));
+
+  expect(entries.length, 'the ZIP unzipped to ZERO entries, so anything asserted about it is vacuous').toBeGreaterThan(0);
+  return entries.map((e) => ({ name: e.name, buf: Buffer.from(e.bytes) }));
 }
