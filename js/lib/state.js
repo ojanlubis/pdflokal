@@ -126,9 +126,26 @@ export const mobileState = {
 // ============================================================
 // DEVICE CAPABILITY — populated by detectMobile() in init.js
 // ============================================================
-// WHY: Rendering pipeline needs device-class awareness (not just screen width).
-// Inspired by PDF.js maxCanvasPixels, Excalidraw formFactor, tldraw coarsePointer.
-// Used as a read-only reference for rendering decisions (pixel budget, etc.).
+// WHY it was added: rendering wants device-class awareness, not just screen
+// width. Inspired by PDF.js maxCanvasPixels, Excalidraw formFactor, tldraw
+// coarsePointer.
+//
+// ⚠️ NO RENDERING DECISION READS IT. Corrected 2026-08-09 — this block used to
+// say it was "used as a read-only reference for rendering decisions (pixel
+// budget, etc.)", and a reader would reasonably conclude device-aware pixel
+// budgeting exists. It does not.
+//
+// What actually consumes it, all in js/init.js, all DIAGNOSTIC: the startup
+// console line (:115), two Sentry tags (:121-122) and a breadcrumb (:128).
+// `formFactor` and `isTouch` therefore do real reporting work. `maxCanvasPixels`
+// has no reader at all — outside the writer, the only mentions are a comment in
+// js/render/sharpen.js citing this object for context and an unimplemented TODO
+// in the legacy renderer. The live wing does not import this file (see the
+// banner at the top), so none of it reaches v2 either way.
+//
+// Kept rather than deleted because the intent is sound and v2 will want a pixel
+// budget eventually — but it is an unbuilt idea, not infrastructure, and the
+// comment should not have said otherwise.
 
 export const deviceCapability = {
   isTouch: false,           // 'ontouchstart' in window || maxTouchPoints > 0
