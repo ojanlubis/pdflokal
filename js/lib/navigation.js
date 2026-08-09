@@ -2,6 +2,20 @@
  * ============================================================
  * PDFLokal - js/lib/navigation.js
  * Navigation & History Management
+ * ⚠️ OLD WING ONLY — dies with js/editor/ + js/pdf-tools/ at demolition.
+ * Verified 2026-08-09 by import graph: NOTHING in js/v2/, js/core/ or js/render/
+ * imports this file. Every consumer is the legacy wing (js/editor/, js/pdf-tools/,
+ * js/init*.js, js/image-tools.js, js/img-to-pdf.js, js/keyboard.js, js/mobile-ui.js),
+ * reachable only from alat-gambar.html. `js/lib/analytics.js` is the ONE module in
+ * this directory the live product still imports.
+ *
+ * WHY THIS BANNER: the folder name says "lib" and CLAUDE.md lists these as the
+ * project's SSOT helpers, so a session doing v2 work reaches for them on the
+ * strength of that and gets either silent failure (they touch ueState, which v2
+ * has no equivalent of) or the dying wing dragged into v2's module graph.
+ * js/theme.js's own header records that happening once already. Do not import
+ * this from the live wing; the v2 equivalent is what you want.
+ *
  * ============================================================
  *
  * Handles workspace switching, browser back button, modals,
