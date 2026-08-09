@@ -1,414 +1,199 @@
-# CLAUDE.MD - PDFLokal Project Guide
-
-## ⚡ STATUS (updated July 27, 2026): V2 IS THE PRODUCT — pdflokal.id runs the clean rebuild
-
-**Read this section first.** Sections below marked as describing the OLD wing (`js/editor/`, `js/pdf-tools/`, `ueState`) are kept only because that wing still serves the image tools at `alat-gambar.html`; it dies at demolition. Their detail docs now live in [docs/legacy/](docs/legacy/) behind a warning banner. Current product status/priorities live at the project seat: `../STATE.md` → `../TODO.md`.
-
-**Since the July 3 v2 swap, all live:** 12 SEO pages (`seo/pages.json` + generator — never hand-edit the output) · installable PWA · a first-party content-blind telemetry rail (`api/t.js`, the repo's only server code besides `api/feedback.js`) · **Edit Teks Asli (beta)** — editing the text already printed in a PDF.
-
-**The Edit engine, in one paragraph** (it is the newest and least obvious subsystem): a PDF has no text, only instructions to paint glyphs. So editing means cut + stamp — `js/core/text-walk.js` interprets the content stream to find and remove the original show-ops, then `js/core/stamp.js` picks a font it can *prove* is right (the document's own embedded program → a bundled metric clone → a generic twin) and lets **pdf-lib** lay the replacement out. We do not hand-write glyph operators; that approach was built, shipped, and deleted (−1118 LOC) because its bug class was unbounded. Two laws came out of that and both are load-bearing: **read the artifact, not its label** (a font wrapper claiming `CIDFont+F1` can *be* `Arial-BoldMT`), and **the export path derives from the document, never inherits from UI state that may not have loaded.**
-
-- **`index.html` is Editor v2**: the landing page IS the editor's empty state (kop-surat header, dropzone, tool cards with `?buat=` intent hook, FAQ). Architecture: headless core (`js/core/` — model, operations, history, import, export, compress, export-images), render layer (`js/render/` — page-view, viewport, interaction; pages are `<img>`, one overlay, one pointer path), app shell (`js/v2/` — app, download-sheet, page-manager, signature-modal, format-bar, celebrate). Self-contained CSS inside index.html — style.css belongs to the old wing.
-- **The old app lives at `alat-gambar.html`** (renamed old index.html, noindexed) solely to keep the image tools alive until absorption. It still uses `js/editor/`, `js/pdf-tools/`, `style.css`, the old init files. **All of that dies at demolition** (after the post-launch bake) along with most of this file's "Core Architecture" section.
-- **Design language is LAW**: red #dc2626 on warm stone, Plus Jakarta Sans, red-chrome-never-prints, paper-on-desk shadows, stempel-press buttons, the 5-stamp language ("cap = pernyataan status", never decoration). Never default signature ink to a colour — user content renders as the user made it. Design skills installed in `.agents/skills/` — load before UI work.
-- **Interaction model**: camera-first touch (selection commits at release); select-then-edit for text (first click/tap selects, the next one edits — no double-tap timing windows). Both founder-ratified.
-- **Tests**: `tests/mobile/**` (mobile-chrome project, the deep suite) + `tests/editor-v2-desktop.spec.js` target v2 at `/`. Old suites were repointed at `/alat-gambar.html` and die with the old wing. `tests/core/` runs headless via `npm run test:core`. **The full gate is `npm run gate`** (`scripts/qa-gate.mjs` — lint → core → Playwright, currently 202 core + 266 Playwright), and it is the only sweep you should report from: it fingerprints every file the dev server can serve, before and after, and exits **90 = VOID** if the tree moved under the run instead of claiming a pass. That guard exists because on 2026-07-28 an unguarded sweep returned a perfect `266 passed, exit 0` while another session committed into the tree 65 seconds before it ended — half the run tested different code than the other half. `npm run gate:self-test` proves the guard can still go red; run it if you touch the fingerprint. `tests/fixtures/nasty/` is the corpus of real documents that have actually broken things — add to it whenever a real file finds a bug.
-- **The gate's stage list MIRRORS CI.** Anything CI runs that `npm run gate` does not is a way for the gate to lie — and for the SEO pages, a way for a feature to HALF-SHIP. On 2026-07-28 `24f54a7` added a `<dialog>` to `index.html`; the generator embeds the app shell into all twelve SEO pages, so every one was left stale. **Three gate runs reported GREEN over that tree**, CI Lint was red, and for about an hour the scan offer worked on `/` and did not exist on `/edit-pdf` — the page a scan user arriving from Google actually lands on. **A generated artifact is part of the deployed product**; a gate that never regenerates cannot see that class of defect at all. `seo:check` is a stage for this reason; if CI grows a check, the gate grows it the same day.
-- **`scripts/gen-seo-pages.js` templates the BODY HALF ONLY — it splits at `</head>` — and that split is load-bearing.** Its anchors are ordinary HTML, and the same strings occur as PROSE inside `index.html`'s `<style>` block. This collided twice on 2026-07-30. First a CSS comment mentioning the h1's tag matched the h1 anchor and the replacement ate everything down to the real closing tag: **all 12 pages rendered BLANK, and `seo:check` stayed green the whole time** — because it compares generator output against files written by the same generator, so both sides were wrong identically. **Agreement between two copies of one bug is not verification.** Then the comment warning about *that* contained the literal `<body>`, so `data-intent`/`data-target` were appended to a sentence in a comment and `/kompres-pdf-500kb` silently stopped applying its size cap — while the guard added for the first incident said fine, because it asked *is there a body tag?* and a body tag inside a comment answers yes. **Presence is not landing.** Never write an HTML tag name in angle brackets inside `index.html`'s CSS comments, and never move a body substitution back onto the whole document.
-- **Design tokens live in `css/tokens.css`, one home for 15 pages** — type by STEP (`--fs-n2…--fs-9`, ratio 1.2), spacing by VALUE (`--sp-24` is 24px), and **`--column: 920px`, which the dropzone, the cards and every section below them share exactly.** Dark is D2 neutral and **`color-scheme` must be declared in all three theme states** or Chrome repaints form controls behind you (the dropzone rendered as a light grey slab while `getComputedStyle` reported the correct dark token — only the screenshot caught it). `css/tokens.css` owns the SYSTEM default; `js/theme.js` owns an EXPLICIT override and expresses "no choice" by **removing** `data-theme`, never by writing `light`. `css/legacy-bridge.css` maps the old wing's names for `privasi`/`dukung` and **must load after `style.css`** — 🔴 **those two pages still borrow `style.css`'s header and footer, so demolition is no longer free-standing.**
-- **Never run two Playwright invocations at once** — they fight over the dev-server port and produce phantom `ERR_CONNECTION_REFUSED` failures that look like real ones. **A session rooted HERE owns the sweep and runs it in the FOREGROUND**; subagents it spawns run lint + core only and never Playwright (3/3 deadlocked backgrounding it — a backgrounded run waits on a notification that can only wake the parent). One owner, one invocation.
-- **Verify a green signal by asking what would look identical if broken.** Real examples from this repo: a telemetry endpoint that 204s whether or not it wrote (a week of data lost silently); tests asserting "no images sent" while watching only `sendBeacon` when the send went by `fetch`; two crops asserted "non-empty" when both were the same stale image. Assertions must be able to fail.
-- **Working rhythm**: failing test → green → full sweep → local commit on `main` → update the project seat (`../STATE.md` + `../TODO.md`) → **hand the push to Fauzan.** Screenshot every new UI surface (a broken dialog once passed all functional tests).
-- **⛔ PUSH / MERGE / DEPLOY — TODAY: FAUZAN'S OWN HAND. Never yours, and never the PM's either.**
-  - **The ruling (2026-07-28, `../decisions.md`): push authority belongs to the POLICY, not to anyone's word.** Once (1) the telemetry test suite exists and (2) a low-risk **inclusion list** is ruled item by item, anything on that list ships automatically the moment `npm run gate` is green. Everything off the list stays his own hand. **Per-turn verbal authorization is RETIRED as a mechanism** — a relayed "he said yes" is a carry, and carries are what this repo keeps getting wrong.
-  - **INTERIM, i.e. right now: strictest reading — his own hand.** Neither precondition exists yet, so there is nothing to ship automatically *against*. Do not push. Do not ask to push.
-  - **The low-risk list IS the push authority**, not a description of habits — which is why it gets ruled example by example, not defined. Precondition chain, in order: telemetry suite → close the rail's blind spots (`failure {stage, reason}`, `events.ts` batch-flush time, image tools off GA4) → the list → auto-push arms.
-  - _(History, kept because both errors are instructive: this line once read `gh pr merge --squash --admin --delete-branch` **(authorized)** — a standing blanket permission, deleted 2026-07-28. It was then rewritten as "neither seat ever, his own hand, per-turn", which was **stricter than the constraint the PM was actually operating under** and produced a live conflict the same afternoon when the PM pushed on a relayed yes. The bench caught it against the disk. The ruling above is what resolved it.)_
-- **There are no branches, by his explicit instruction** (2026-07-27): local `main` and remote `main`, nothing else. Work goes straight onto `main` locally. Preserved-but-unmerged work lives on **tags** (`archive/i18n-groundwork`, `archive/edit-ladder-preheal`), never branches. If you ever do audit a branch: **squash-merging makes `git branch --merged` report it unmerged forever — use a three-dot diff (`git diff origin/main...$b`), never commit counts.**
-- **`.mcp.json` here is PROJECT-SCOPED and that is load-bearing.** `playwright`, `sentry`, and `analytics-mcp` (GA4 — service account `pdflokal-ga4-reader@pdflokal-mcp`, property `properties/528550405`) load **only for sessions rooted in this directory**. They do NOT load at the seat one level up, and they do NOT load for subagents (subagents inherit the *parent's* cwd, so a seat-spawned agent lands in the seat, not here — every brief must `cd` explicitly). You have GA4 and Sentry; the seat does not. Check this file before telling anyone a capability is missing.
-- **Never `git add -A`** — stage explicit paths. Other sessions have uncommitted work in this tree (currently `pdf-explained.html`, `pdf-xray.html` at the repo root); **never sweep another session's work**, in either direction.
-- **`npm run review` serves the whole product on `localhost:3000`. That is the review server, and it is deliberately NOT the test port.** The suite is wired to **5050** in three places — `.claude/launch.json`, `playwright.config.js`'s `webServer`, and the gate. Repointing any one of them without the others gives you the worst possible outcome: the sweep testing one server while a human reviews another, both green, neither the same code. A second command on its own port costs nothing and cannot drift. **Never run `npm run review` and a Playwright sweep at the same time either** — same one-owner rule as the sweep itself.
-- **Gotchas (v2)**: `npx serve` cleanUrls 301 strips query strings (tests use extensionless URLs); the global `dialog` CSS rule IS the overlay — new dialogs must use a `.sheet` child; `history` is shadowed in app.js by the undo history (use `window.history`); no grid rebuilds mid-drag in page-manager (render parks on `dragActive`).
-
-## Project Overview
-
-**PDFLokal** is a 100% client-side PDF and image manipulation tool for Indonesian users. All processing happens in the browser - no files are ever uploaded to a server.
-
-- **Language**: Indonesian (UI text, all copy) - informal "kamu" tone
-- **Key Principle**: Privacy first - everything client-side
-- **Tech**: Vanilla JS, native ES modules, no build step, no frameworks
-- **Libraries**: pdf-lib, PDF.js, Signature Pad, pdf-encrypt-lite, Canvas API — all self-hosted in `js/vendor/`, zero CDN deps (see [docs/security.md](docs/security.md))
-
-## ★ North Star & product status → `../STATE.md` (project seat)
-
-The product vision, status, roadmap, and founder-desk log live at the project seat one level up (moved 2026-07-15, re-foldered 2026-07-27): **`../STATE.md`** (read first — current state only) → **`../TODO.md`** (the single queue) → `../decisions.md` (rulings + why). Reference docs are in `../reference/` (`product-definition.md` = the North Star, read before any product/design/architecture call · `roadmap.md` · `foundation-plan.md` · `backlog.md` = the ads/SEO log); build specs are in `../specs/`. This file is code-guidance for the repo only.
-
-### Who does what (founder ruling 2026-07-28 — `../decisions.md`)
-
-Two seats, on purpose. They want opposite things from a context window: judgment work needs the whole history (rulings, taste corpus, what was already tried and why); execution needs the file tree, the tests, and the MCPs. One session holding both is what made the PM's context unworkable twice in one week.
-
-| | **The seat** (`..`, PM) | **Here** (`app/`, head dev) |
-|---|---|---|
-| owns | the queue, rulings + why, specs, reading reality (Supabase rail · GA4 · Sentry · feedback table), founder-facing reporting, banking to disk | **all code execution** — build, test, refactor, the machine QA gate **end-to-end including the Playwright sweep**, `docs/`, this file, local commits on `main` |
-| does NOT | write product code, run the sweep | decide what's worth building, rule on taste, write client-facing copy |
-
-**Neither seat, ever:** push · merge to remote · deploy · client-facing copy · money · anything public-facing. Those are Fauzan's own hand, per-turn.
-
-**The interface is the disk, not a channel.** The seat hands over specs + verified diagnoses; you hand back a short "what shipped" into `../STATE.md` / `../TODO.md`. Don't let the two drift — a queue nobody updates is worse than no queue.
-
-**Read `~/.claude/projects/-Users-ojanlubis-fkd-pdflokal-app/memory/` — the developer memory bank, 35+ topic files** (`pdfjs-worker.md`, `pdf-lib-bitstability.md`, `ga4-shared-tag-carrier.md`…). It is not in this repo and you will not find it by searching. Consult it before any deep work in `js/core/`.
-
-One-line anchor kept here: **WinRAR × Excalidraw of PDF for Indonesia; 100% client-side IS the moat (private + fast + free-forever + offline); the editor is the product; refuse server-jobs (OCR, PDF↔Word).**
-
-## Reference Projects
-
-Before making architectural decisions, check how mature open-source projects solve the same problem. Don't fly blind — learn from projects that have already solved similar challenges at scale.
-
-- **Excalidraw** ([github.com/excalidraw/excalidraw](https://github.com/excalidraw/excalidraw)) — Canvas-based drawing app. Similar: canvas rendering, annotations, tools, undo/redo. React/TS, 103K lines. Patterns: actions-per-file, separate renderer module, extensive tests.
-- **PDF.js** ([github.com/nicedoc/pdf.js](https://github.com/nicedoc/pdf.js)) — Mozilla's PDF renderer (we use it as a dep). Vanilla JS, Web Workers, canvas rendering. Patterns: viewer/core separation, worker-based processing.
-- **tldraw** ([github.com/tldraw/tldraw](https://github.com/tldraw/tldraw)) — Another canvas drawing app. React/TS. Patterns: state machine for tools, command pattern for undo/redo.
-- **Stirling-PDF** ([github.com/Stirling-Tools/Stirling-PDF](https://github.com/Stirling-Tools/Stirling-PDF)) — PDF manipulation tool (server-side Java, but similar feature set). Patterns: tool-per-module, clean separation of concerns.
-- **pdf-lib** ([github.com/Hopding/pdf-lib](https://github.com/Hopding/pdf-lib)) — We use this as a dep. Pure JS, no native deps. Patterns: builder pattern, immutable document model.
-
-When facing a design question ("how should we structure X?"), check how these projects handle it first.
-
-## Planned Improvements
-
-Read **[docs/strengths.md](docs/strengths.md)** first — explains WHY vanilla JS, WHY no framework, and WHY AI as primary developer is the core architectural decision.
-
-See **[docs/legacy/future-architecture.md](docs/legacy/future-architecture.md)** before starting any major refactor.
-Key ideas captured there:
-1. **Reactive state layer** — COMPLETED (Mar 2026). `js/lib/events.js` pub/sub emitter
-1b. **PageRenderer class** — COMPLETED (Mar 2026). Render pipeline encapsulated in `page-rendering.js`
-2. **Web Workers** — offload PDF export + compression off the main thread (future)
-
-## Core Architecture
-
-### File Structure
-
-```
-pdflokal/
-├── index.html          # Main application - all PDF/image tools
-├── dukung.html         # Donation/support page
-├── privasi.html        # Privacy policy page
-├── style.css           # All styles (includes @font-face)
-├── vercel.json         # Security headers, CSP, rewrites
-├── js/
-│   ├── init.js               # Entry point: bootstrap, compat check, mobile detection
-│   ├── init-file-handling.js  # Dropzone, file inputs, paste handler, setupFileInput factory
-│   ├── init-ui.js            # Tool cards, signature pads, modal backdrop close
-│   ├── keyboard.js           # Keyboard shortcuts + modal
-│   ├── mobile-ui.js          # Mobile nav, page picker, tools dropdown
-│   ├── changelog.js          # Changelog notification system
-│   ├── theme.js              # Theme toggle (light/dark)
-│   ├── image-tools.js        # Image tools (compress, resize, convert, remove-bg)
-│   ├── img-to-pdf.js         # Images-to-PDF tool (add, reorder, generate)
-│   ├── lib/
-│   │   ├── state.js          # State objects, constants, SSOT helpers, annotation factories
-│   │   ├── utils.js          # showToast, downloadBlob, isPDF, isImage, loadPdfDocument, etc.
-│   │   └── navigation.js     # showHome, showTool, openModal, closeModal, closeAllModals (MODAL_IDS array)
-│   ├── editor/               # Unified Editor (~15 modules)
-│   │   ├── index.js          # Barrel re-exports + window bridges
-│   │   ├── canvas-utils.js   # ueGetCurrentCanvas, ueGetCoords, ueGetResizeHandle, getThumbnailSource, drawRotatedThumbnail
-│   │   ├── annotations.js    # ueRedrawAnnotations, draw helpers, hit testing
-│   │   ├── canvas-events.js  # Mouse/touch event delegation on pages container
-│   │   ├── inline-editor.js  # Inline text editing overlay (double-click to edit)
-│   │   ├── file-loading.js   # ueAddFiles, handlePdfFile, handleImageFile
-│   │   ├── lifecycle.js      # initUnifiedEditor, ueReset, signature hints
-│   │   ├── page-manager.js   # Gabungkan modal (uePm* functions)
-│   │   ├── page-rendering.js # PageRenderer class — slots, rendering, observer, scroll sync
-│   │   ├── pdf-export.js     # ueBuildFinalPDF, ueDownload, font embedding
-│   │   ├── sidebar.js        # Thumbnails, drag-drop reorder, toggle
-│   │   ├── signatures.js     # Signature placement, preview, confirm, delete
-│   │   ├── tools.js          # ueSetTool, modal openers, more-tools dropdown
-│   │   ├── undo-redo.js      # Both undo stacks (page ops + annotation edits)
-│   │   └── zoom-rotate.js    # Zoom in/out/reset, rotate page
-│   ├── pdf-tools/            # PDF tool modals (~7 modules)
-│   │   ├── index.js          # Barrel re-exports + window bridges
-│   │   ├── signature-modal.js
-│   │   ├── text-modal.js
-│   │   ├── watermark-modal.js
-│   │   ├── pagenum-modal.js
-│   │   ├── standalone-tools.js  # PDF-to-Image, Compress PDF, Protect PDF only
-│   │   └── drag-reorder.js
-│   └── vendor/               # Self-hosted libs (2.6 MB), zero CDN deps
-├── fonts/              # Self-hosted fonts (268KB, Latin charset)
-├── docs/               # CURRENT docs only — the old wing's five moved to legacy/ (2026-07-27)
-│   ├── security.md           # Security headers, CSP, library details
-│   ├── strengths.md          # WHY vanilla JS / WHY no framework / AI-first
-│   ├── android-verification.md
-│   ├── spec-font-fidelity-engine.md
-│   └── legacy/               # ⚠️ OLD WING, banner'd, not current: architecture.md ·
-│                             #    patterns.md · system-flow.md · future-architecture.md ·
-│                             #    editor-redesign.md
-└── images/
-```
-
-**Product docs are NOT here.** `product-definition.md` (the North Star), `roadmap.md`,
-`foundation-plan.md` and `backlog.md` live at the seat in `../reference/`; build specs in
-`../specs/`. There is no `backlog.md` or `roadmap-2.md` at this level — both were pointed at by the
-memory bank's index until the 2026-07-28 audit, and neither ever existed here.
-
-### Single-Page Architecture
-
-Everything lives in `index.html`. Vendor libs load as global `<script>` tags, then a single `<script type="module" src="js/init.js">` imports all app modules. See [docs/security.md](docs/security.md) for library loading order.
-
-### ES Module Architecture
-
-- All app code uses native `import`/`export` - no bundler
-- `js/init.js` is the root that imports everything transitively
-- Each directory has a barrel `index.js` with re-exports + `window.*` bridges
-- Window bridges are required for HTML `onclick` handlers
-- Vendor libs accessed via `window.*` in modules
-- Circular deps resolved by using `window.*` for one direction of each cycle
-
-See [docs/legacy/patterns.md](docs/legacy/patterns.md) for import conventions, window bridge pattern, and circular dependency list.
-
-### State Management
-
-State objects live in `js/lib/state.js`. Key objects:
-
-- **`ueState`** - Unified Editor state (pages, annotations, tools, undo stacks, rendering, guards)
-- **`uePmState`** - Gabungkan Modal state (merge/split mode, selection, drag)
-
-**SSOT helpers** (Single Source of Truth — see [docs/legacy/architecture.md](docs/legacy/architecture.md)):
-- **`getDefaultUeState()`** (state.js) — returns all default ueState values. Used by initial definition + `ueReset()`. Adding a new field here automatically gets it reset.
-- **`createPageInfo()`** (state.js) — factory for page objects. All code paths that create pages must use this (file-loading, undo-redo). Guarantees consistent shape.
-- **`getThumbnailSource(pageIndex)`** (canvas-utils.js) — resolves best canvas for thumbnails. Used by sidebar and mobile picker. **Exception**: Gabungkan modal uses `page.thumbCanvas` directly (pageCanvases stale while modal open).
-- **Annotation factories** (state.js) — `createWhiteoutAnnotation`, `createTextAnnotation`, `createSignatureAnnotation`, `createWatermarkAnnotation`, `createPageNumberAnnotation`. All annotation creation must use these.
-- **`openModal(id)` / `closeModal(id, skipHistoryBack)`** (navigation.js) — standard modal open/close with history management. Use for all modals except signature-bg-modal (custom replaceState).
-- **`isPDF(file)` / `isImage(file)`** (utils.js) — file type checks. Use instead of inline `file.type ===` comparisons.
-- **`loadPdfDocument(bytes)`** (utils.js) — loads PDF.js document with defensive `.slice()`. Use instead of raw `pdfjsLib.getDocument()`.
-
-Refer to `js/lib/state.js` for full shape and comments on each field.
-
-## Key Features
-
-### Unified Editor (Primary Tool)
-
-The flagship multi-document PDF editor. When users drop a PDF on the homepage, it opens here.
-
-**Architecture:** Multi-canvas continuous vertical scroll. Each page gets its own `<canvas>` in `#ue-pages-container`. Body scroll with IntersectionObserver (`root: null`) for lazy rendering. Render pipeline owned by `PageRenderer` class (singleton in `page-rendering.js`), created/destroyed by `lifecycle.js`. See [docs/legacy/patterns.md](docs/legacy/patterns.md) for full function reference.
-
-**Editor Layout:**
-- **Header** (40px, sticky top:0): `[File v] PDFLokal [moon] [Download PDF]`
-- **Floating toolbar** (sticky top:40px, frosted glass): `[Sign | Text | Whiteout | Pilih | Rotate | More v]`
-- **Sidebar** (160px, sticky): "Kelola Halaman" button + thumbnails (drag-drop reorderable)
-- **Bottom bar** (30px, fixed bottom): `[Dukung Kami] ... [- Zoom +] Hal 2/5 [?]`
-- **Mobile bottom bar** (60px, fixed bottom, <=900px): `[< Hal 2/5 >] [More v] [Zoom -/+] [Sign]`
-- Mobile (<=900px): sidebar hidden, toolbar icon-only + fixed, header 36px, desktop bottom bar hidden, mobile bottom bar shown
-
-**Features:** Multi-file merge, page reorder/rotate/delete, annotations (whiteout, text, signatures), Gabungkan modal with split mode, zoom, undo/redo (separate stacks for page ops vs annotations), keyboard shortcuts.
-
-**Text annotations:** Font family (Helvetica, Times, Courier, Montserrat, Carlito + the metric clones Arimo/Tinos/Cousine/Caladea — labelled with their familiar equivalents, e.g. "Arimo (Arial)"), bold/italic, size 6-120pt, color presets.
-
-**Signatures:** Upload images (with background removal), draw, auto-lock after placement, double-click to unlock, delete button.
-
-**Paraf (Initials):** Draw-only modal (no upload tab), smaller default size (80px vs 150px signature). Uses `type: 'signature'` with `subtype: 'paraf'` — zero changes needed in annotations/export/undo. "Semua Hal." button copies paraf to all pages at same position. Functions in `signature-modal.js` (openParafModal, useParaf, etc.) + `signatures.js` (ueApplyToAllPages).
-
-**Keyboard Shortcuts:**
-| Key | Action |
-|-----|--------|
-| V | Select/Edit | W | Whiteout | T | Text | S | Signature |
-| P | Paraf | R | Rotate 90 CW | Delete | Delete annotation |
-| Ctrl+Z/Y | Undo/Redo | Ctrl+S | Download PDF |
-| Arrow L/R | Navigate pages | ? | Shortcuts help | Escape | Close/Home |
-
-### Other PDF Tools
-
-- **PDF to Image** - Convert pages to PNG/JPG with batch export
-- **Compress PDF** - Compress embedded images within PDFs
-- **Protect PDF** - Add password protection (also in editor via "Kunci PDF")
-
-Legacy standalone tools (Merge, Split, Rotate, Watermark, Page Numbers) were removed Feb 2026 - all consolidated into Unified Editor.
-
-### Image Tools
-
-Compress, Resize, Convert Format (JPG/PNG/WebP), Image to PDF, Remove Background.
-
-### Homepage
-
-Hero + dropzone (opens editor), PDF tool cards (Editor, Merge, Split, PDF-to-Image, Compress, Protect), Image tool cards. Merge/Split cards use file-picker-first pattern (see [docs/legacy/patterns.md](docs/legacy/patterns.md)).
-
-### Navigation & UX
-
-- `body.editor-active` class hides site chrome, removes `.container` max-width
-- History API for back button support
-- File size warnings: info toast >20MB, block >100MB
-- Fullscreen loading overlay for async operations
-- Modal click-outside-to-close via `initModalBackdropClose()` in `js/init.js`
-- Changelog notification badge at bottom-right (see `js/changelog.js`)
-
-### PDF File Size Optimization
-
-- **Unmodified PDFs:** Detects no edits -> downloads original bytes (no re-encoding bloat)
-- **Signatures:** `optimizeSignatureImage()` resizes >1500px, JPEG 85% for photos, PNG only for transparency
-- **Export:** `useObjectStreams: true`, format-aware embedding (`embedJpg`/`embedPng`)
-
-## Maintainability (MUST READ)
-
-> Every Claude session starts with total amnesia. Maintainability = "can a future Claude with zero memory work on any file safely?"
-
-**The 3-question test** (before modifying any file):
-1. Can I understand it in one read?
-2. If I modify one behavior, how much unrelated code must I understand?
-3. Can I break something unrelated by touching it?
-
-**Principles:**
-1. **One rule, one home.** Search before creating. Mark with `// SINGLE SOURCE OF TRUTH` comment. Never reimplement inline what a helper already does.
-2. **WHY comments, not WHAT.** Every non-obvious function gets a `// WHY:` comment explaining what breaks if changed and who decided. Future Claude can't ask "why is this here?" — the comment answers preemptively.
-3. **Operation functions own mutation + sync.** Never mutate `ueState.pages` or `ueState.annotations` directly from UI code. Use SSOT operation helpers that bundle the mutation with all required render/sync calls. This prevents the class of bugs where a caller forgets to call `rebuildAnnotationMapping()` or `ueCreatePageSlots()`.
-4. **Files are self-contained.** Imports for functionality: fine. Imports for understanding: problem. If you need to read 3 other files to understand one function, refactor.
-5. **Parallel arrays are a liability.** `ueState.pages` and `ueState.pageCanvases` must stay in sync — any splice on one must be reflected in the other. Prefer structures that travel together (e.g., `thumbCanvas` on the page object) over parallel arrays.
-
-## Development Guidelines
-
-### Critical Rules
-
-1. **All UI text in Indonesian** (Bahasa Indonesia, "kamu" not "anda")
-2. **100% client-side** - never add server dependencies or external API calls with user data
-3. **Vanilla JS ES6+** with native modules - no npm dependencies unless absolutely necessary
-4. **New exports** must go in barrel `index.js` + `window.*` bridge if used in HTML `onclick`
-5. **Privacy first** - files never leave the user's device (see [docs/security.md](docs/security.md))
-
-### Performance
-
-- Target: files up to 50MB comfortably
-- Test on mobile + desktop browsers (Chrome, Firefox, Safari, Edge)
-- Consider memory usage for batch operations
-
-### Extending the Unified Editor
-
-1. Add annotation factory to `js/lib/state.js` (e.g. `createMyAnnotation()`) and use it everywhere
-2. Add tool button in toolbar or "Lainnya" dropdown
-3. Implement logic in relevant `js/editor/` module (events delegated on `#ue-pages-container`)
-4. Add rendering in `pdf-export.js` (`ueBuildFinalPDF`)
-5. Ensure undo/redo works (`undo-redo.js`)
-6. Export from module -> barrel `index.js` -> window bridge if needed
-7. Test across multiple pages and files
-
-**When adding new state fields:** Add to `getDefaultUeState()` in state.js — `ueReset()` will automatically clear it.
-
-**When adding new page properties:** Add to `createPageInfo()` in state.js — all page creation paths get the field automatically.
-
-**Multi-canvas notes:**
-- Use `ueGetCurrentCanvas()` (never `getElementById('ue-canvas')`)
-- Use `ueGetCoords(e, canvas, dpr)` for coordinate conversion
-- Touch: only `preventDefault` when tool active or annotation hit (preserves scroll)
-
-### Adding to "Lainnya" Dropdown
-
-1. Add button in `#more-tools-dropdown` in index.html
-2. Create modal HTML following `editor-*-modal` pattern
-3. Add JS: use `openModal(id)` / `closeModal(id)` from navigation.js for open/close
-4. Add `applyEditor[Tool]()` logic using annotation factories from state.js
-5. Dropdown uses `position: fixed` for overflow handling
-
-### Common Helpers
-
-| Helper | Location | Purpose |
-|--------|----------|---------|
-| `createPageInfo({...})` | state.js | **SSOT** factory for page objects — all page creation must use this |
-| `getDefaultUeState()` | state.js | **SSOT** default state values — used by init + ueReset() |
-| `create*Annotation({...})` | state.js | **SSOT** annotation factories (Whiteout, Text, Signature, Watermark, PageNumber) |
-| `getThumbnailSource(pageIndex)` | canvas-utils.js | **SSOT** resolve best canvas for thumbnail (rendered or thumbCanvas) |
-| `drawRotatedThumbnail(src, rot)` | canvas-utils.js | Draw thumbnail with rotation baked in (swaps dimensions for 90/270°) — use instead of CSS `transform: rotate()` |
-| `openModal(id)` / `closeModal(id)` | navigation.js | **SSOT** modal open/close with history management |
-| `isPDF(file)` / `isImage(file)` | utils.js | **SSOT** file type validation |
-| `loadPdfDocument(bytes)` | utils.js | **SSOT** PDF.js document loading with defensive .slice() |
-| `ueAddAnnotation(pageIndex, anno)` | annotations.js | **SSOT** add annotation to page, returns index |
-| `ueRemoveAnnotation(pageIndex, annoIndex)` | annotations.js | **SSOT** remove annotation + clear selection |
-| `ueReorderPages(fromIndex, insertAt)` | page-manager.js | **SSOT** reorder pages with annotation mapping rebuild |
-| `ueGetCurrentCanvas()` | canvas-utils.js | Get selected page's canvas |
-| `ueGetCoords(e, canvas, dpr)` | canvas-utils.js | Mouse/touch -> canvas coords |
-| `makeWhiteTransparent(canvas, threshold)` | utils.js | White pixels -> transparent |
-| `setupCanvasDPR(canvas)` | utils.js | Scale canvas for devicePixelRatio |
-| `createPageRenderer()` | page-rendering.js | **SSOT** create PageRenderer singleton (called by initUnifiedEditor) |
-| `destroyPageRenderer()` | page-rendering.js | **SSOT** destroy PageRenderer + cleanup (called by ueReset) |
-| `setupFileInput(inputId, opts)` | init-file-handling.js (internal) | DRY file input handler factory used by `initFileInputs()` |
-| `safeLocalGet(key)` / `safeLocalSet(key, val)` | utils.js | Private browsing-safe localStorage |
-| `trapFocus(modalEl)` / `releaseFocus(modalEl)` | utils.js | Modal focus trap + restore on close |
-| `registerImage(dataUrl)` / `getRegisteredImage(id)` | state.js | Shared image registry (undo optimization) |
-| `CSS_FONT_MAP` | state.js | Font-family mapping constant |
-
-### Named Constants (js/lib/state.js)
-
-`UNDO_STACK_LIMIT` (50), `SIGNATURE_DEFAULT_WIDTH` (150px), `PARAF_DEFAULT_WIDTH` (80px), `OBSERVER_ROOT_MARGIN` ('200px 0px'), `DOUBLE_TAP_DELAY` (300ms), `DOUBLE_TAP_DISTANCE` (30px), `MAX_CANVAS_DPR` (2 — clamps devicePixelRatio for canvas rendering, prevents GPU memory exhaustion at high zoom). `deviceCapability` object — `isTouch`, `isCoarsePointer`, `formFactor`, `maxCanvasPixels` (populated by init.js).
-
-### Reliability Patterns
-
-**Race condition guards:**
-- `isLoadingFiles` (file-loading.js), `isDownloading` (pdf-export.js), `isRestoring` (ueState), `_renderingPages` Set (PageRenderer instance), `saved` closure (inline text editor), `isGenerating` (img-to-pdf.js), `isProcessingDrop` (init-file-handling.js)
-
-**Resource lifecycle:**
-- `_pdfDocCache` Map (PageRenderer) caches PDF.js docs, `.destroy()` on reset
-- `imageRegistry` Map in state.js deduplicates base64 signature data across undo snapshots
-- `ueRemoveScrollSync()` cleans up window scroll listener
-- IntersectionObserver disconnected during Gabungkan modal, reconnected on close
-- **No canvas eviction** — pages render once and stay. Eviction caused white flash flicker on mobile (canvas.width assignment clears content). Memory tradeoff: ~4MB per page stays allocated
-
-**Accessibility:**
-- All modals have `role="dialog" aria-modal="true"` + auto focus trap via MutationObserver in `initModalBackdropClose()`
-- Tool cards: `tabindex="0" role="button"` with Enter/Space keyboard handlers
-- Floating toolbar: `role="toolbar"`, dropdowns: `role="menu"`, signature tabs: `role="tablist"`
-- Toast container: `aria-live="polite" role="status"`
-
-**Performance:**
-- PDF.js uses real Web Worker (`workerSrc` points to self-hosted file, falls back to fake worker offline)
-- Page loading is lazy: `handlePdfFile` stores dimensions + pre-renders 300px thumbnail (`page.thumbCanvas`) for instant sidebar/modal previews. Full rendering via IntersectionObserver. Debounced `ueRenderThumbnails()` after each lazy render upgrades thumbnails to full-res
-- Undo stack uses `imageRegistry` to avoid cloning base64 strings (stores `imageId` references)
-- **Device capability detection:** `deviceCapability` object in state.js — `isTouch`, `isCoarsePointer`, `formFactor` ('phone'/'tablet'/'desktop'), `maxCanvasPixels` (5MP/10MP/16MP). Populated by `detectMobile()` in init.js. Foundation for future pixel-budget rendering.
-- Pinch-to-zoom supported via 2-finger touch detection in `canvas-events.js`
-
-**Key patterns:** `rebuildAnnotationMapping(oldPages)` for reference-based reindex, `requestAnimationFrame` guard before `ueCreatePageSlots()` for layout reflow. See [docs/legacy/patterns.md](docs/legacy/patterns.md) for code examples.
-
-## Important Gotchas
-
-- `npx serve` aggressively caches - always Cmd+Shift+R (macOS) / Ctrl+Shift+R (Windows) after changes
-- Canvas `.width`/`.height` (buffer) vs `.style.width`/`.style.height` (display) - both must be set
-- Touch events: blocking `preventDefault` breaks scroll on mobile
-- `scrollIntoView` triggers scroll sync loops - use `scrollSyncEnabled` flag
-- IntersectionObserver root is `null` (viewport), NOT the wrapper element
-- Merge/Split card flow bypasses `showTool()` - must manually add `body.editor-active`
-- Layout race condition: `showTool()` makes workspace visible but browser hasn't reflowed - use rAF
-- **Lazy rendering**: `ueState.pages[i].canvas` is a `{width, height}` placeholder, NOT an HTMLCanvasElement. Real canvases live in `ueState.pageCanvases[i].canvas`. Pre-rendered thumbnails (300px) live in `page.thumbCanvas`. For sidebar/main thumbnails, use `getThumbnailSource(index)`. For Gabungkan modal, use `page.thumbCanvas` directly (pageCanvases stale during modal). Never access page.canvas directly for drawing
-- **Mobile canvas flicker**: Mobile browsers silently purge offscreen canvas GPU backing stores. Canvas eviction was removed because the evict→re-render cycle caused worse flicker than keeping all canvases alive. **Do NOT re-add canvas eviction** — it was tried extensively in Mar 2026 and every approach (debounced eviction, background-image fallback, img sibling fallback) made things worse. Tradeoff: ~4MB per page stays allocated — accepted over the flicker.
-- **Empty state flash**: `#ue-empty-state` must be hidden BEFORE `showTool()` when files are being loaded. Three code paths do this: `routeDroppedFile` (init-file-handling.js), `ueAddFiles` (file-loading.js), merge/split handler (init-ui.js). If `ueAddFiles` produces zero pages (corrupt PDF), empty state is restored.
-- **Scroll sync must NOT call ueSelectPage()**: `ueSelectPage()` triggers `scrollIntoView()` which fights user momentum scroll on mobile. Scroll sync only updates highlight + page indicator.
-- **No active-page outline on the main canvas**: the old red `.ue-page-slot.selected canvas` outline was removed (Jul 2026, PR #78) — it added noise without info. Active page is shown by the sidebar `.ue-thumbnail.selected` highlight + the `Hal X/Y` indicator. `ueHighlightThumbnail()` still skips DOM class toggling on mobile to avoid repaints during scroll sync.
-- **Known limitation**: Edge-scroll flicker (overscroll recomposition) is a browser-level issue. Fix requires switching from body scroll to container scroll (`overflow-y: auto` + `overscroll-behavior: contain`).
-- **`<dialog>` elements need explicit sizing**: Browser UA stylesheet sets `width: fit-content; height: fit-content; max-width: calc(100% - 2em)` on `<dialog>`. This overrides `right: 0; bottom: 0` stretch. All modal overlay classes (`.edit-modal`, `.signature-modal`, `.shortcuts-modal`) must set `width: 100%; height: 100%; max-width: none; max-height: none` to fill viewport. Without this, modals render top-left at content size instead of centered.
-- **`showToast()` and `showFullscreenLoading()` use DOM construction, not innerHTML**: Prevents XSS from user-controlled filenames. Never revert to innerHTML for these functions.
-
-## Changelog System — ⚠️ OLD WING ONLY, not a v2 surface
-
-**`js/changelog.js` is referenced 15 times in `alat-gambar.html` and ZERO times in `index.html`** (verified 2026-07-28). The changelog badge does not exist on the live product; this section describes a surface that dies at demolition. Do not add v2 release notes here expecting anyone to see them.
-
-Edit `changelogData` array in `js/changelog.js`. Add new entries at the beginning.
-
-```javascript
-{ title: "User-Friendly Title", description: "Benefit for users in Indonesian", date: "DD MMMM YYYY" }
-```
-
-**Rules:** Indonesian, benefit-focused (not technical), casual "kamu" tone. Credit contributors with `<a href>` links.
-
-## Git Workflow
-
-**One rule, one home: the working rhythm and the push/branch rules live at the top of this file (⚡ STATUS, the "Working rhythm" and ⛔ bullets). Read them there.** This section used to restate them and drifted into contradicting them — it still said *"Feature branches from `main`, push for Vercel preview, merge when ready"*, *"Implement on feature branch"*, and *"Never commit without explicit user permission"* on 2026-07-28, three hundred lines below the corrected rules saying there are no branches and that this seat owns local commits on `main`. A fresh session reads both and picks one. Deleted rather than re-synced, because two copies drift again.
-
-Still true and not stated elsewhere:
-- `main` auto-deploys to pdflokal.id — which is why the push is Fauzan's own hand, not a formality.
-- Server-dependent features (PDF↔Word, server OCR) are **permanently** out of scope. In-browser OCR is sanctioned.
-- Document after the work is approved, in this order: README.md → CLAUDE.md → the project seat (`../STATE.md` + `../TODO.md`).
-
-## Quick Reference
-
-**Main files:** `index.html`, `style.css`, `js/init.js`, `js/editor/*.js`, `js/pdf-tools/*.js`, `js/image-tools.js`, `js/lib/state.js`, `js/lib/utils.js`, `js/lib/navigation.js`
-
-**Don't modify without good reason:** `vercel.json`, vendor libs, privacy promises, Indonesian UI language
-
-**Detailed references:** [docs/legacy/patterns.md](docs/legacy/patterns.md) (code examples), [docs/security.md](docs/security.md) (CSP, headers, libraries), [docs/legacy/architecture.md](docs/legacy/architecture.md) (SSOT patterns)
+# PDFLokal — `app/` (the bench: all code execution)
+
+100% client-side PDF + image tool for Indonesian users. Nothing is ever uploaded. `main` auto-deploys
+to pdflokal.id.
+
+## Hard constraints
+
+- **Vanilla JS, native ES modules, no build step, no bundler, no framework** — that constraint is the
+  moat. No npm runtime deps.
+- **All vendor libs self-hosted in `js/vendor/`, zero CDN.** pdf-lib, PDF.js, Signature Pad,
+  pdf-encrypt-lite, Canvas API. See `docs/security.md` for CSP, headers, load order.
+- **No server-dependent features, permanently** — no PDF↔Word, no server OCR. In-browser OCR is
+  sanctioned. `api/t.js` (telemetry) and `api/feedback.js` are the only server code in the repo.
+- **All UI text in Indonesian**, informal "kamu". English tech terms (tap, scroll, install) are fine
+  inside step-by-step instructions. **No em-dashes in user-visible text** — use `, `.
+- Never add an external API call carrying user data. Privacy is the product.
+- Target files up to 50 MB comfortably. Test Chrome, Firefox, Safari, Edge, phone and desktop.
+
+## The tree
+
+- **`index.html` is Editor v2 — the live product.** The landing page IS the editor's empty state.
+  Headless core `js/core/` (model, operations, history, import, export, compress, export-images,
+  `text-walk.js`, `stamp.js`) · render layer `js/render/` (page-view, viewport, interaction; pages are
+  `<img>`, one overlay, one pointer path) · app shell `js/v2/` (app, download-sheet, page-manager,
+  signature-modal, format-bar, celebrate). CSS is self-contained inside `index.html`.
+- **12 SEO pages** are generated: `seo/pages.json` + `scripts/gen-seo-pages.js`, run via `npm run seo`.
+  **Never hand-edit generated output.** Copy changes go through Fauzan.
+- **`alat-gambar.html` is the OLD wing** (noindexed) — `js/editor/`, `js/pdf-tools/`, `style.css`, the
+  old `init*.js`, `ueState`, `js/changelog.js`. It exists only to keep the image tools alive until
+  absorption, and dies at demolition. Detail: `../reference/old-wing-code-reference.md` and the
+  banner'd `docs/legacy/`. Do not build new surfaces on it.
+- **⚠ Demolition is not free-standing:** `privasi` and `dukung` are on tokens but still borrow
+  `style.css`'s header/footer/`.btn`. `css/legacy-bridge.css` maps the old names and **must load after
+  `style.css`**.
+
+### The SEO generator's split is load-bearing
+
+`scripts/gen-seo-pages.js` templates the **BODY HALF ONLY** — it splits at `</head>`. Its anchors are
+ordinary HTML strings, and the same strings occur as prose inside `index.html`'s `<style>` block.
+
+- **Never write an HTML tag name in angle brackets inside `index.html`'s CSS comments.**
+- **Never move a body substitution back onto the whole document.**
+- **`seo:check` cannot catch a bug in the generator** — it compares generator output against files the
+  same generator wrote. Render a page before believing it.
+
+### Tokens and theming
+
+- `css/tokens.css` is the single home for all 15 pages: **type by STEP** (`--fs-n2…--fs-9`, ratio
+  1.2), **spacing by VALUE** (`--sp-24` is 24px), and **`--column: 920px`**, which the dropzone, the
+  cards and every section below them share exactly.
+- **`color-scheme` must be declared in all three theme states** or Chrome repaints form controls
+  behind you — `getComputedStyle` will report the correct token while the screenshot shows grey.
+- `css/tokens.css` owns the **system default**; `js/theme.js` owns an **explicit override** and
+  expresses "no choice" by **removing** `data-theme`, never by writing `light`.
+
+### UI work? Stop and read first
+
+**Before any UI, design, or copy change: read `docs/design-language.md`** (founder taste, ratified — design language + interaction model) and load the design skills in `.agents/skills/`. Taste is law here.
+
+### Edit Teks Asli
+
+Editing text already printed in a PDF is **cut + stamp**: `text-walk.js` removes the original
+show-ops, `stamp.js` picks a font it can *prove* is right (the document's own embedded program → a
+bundled metric clone → a generic twin) and pdf-lib lays out the replacement. We do not hand-write
+glyph operators (why: `decisions.md`). Two laws from that, both load-bearing:
+
+- **Read the artifact, not its label.** A font wrapper claiming `CIDFont+F1` can *be* `Arial-BoldMT`.
+- **The export path derives from the document, never inherits from UI state that may not have loaded.**
+
+## The QA gate
+
+**`npm run gate` (`scripts/qa-gate.mjs`) is the only sweep you may report from.** Lint → core →
+Playwright. It fingerprints every file the dev server can serve, before and after, and exits
+**90 = VOID** if the tree moved under the run rather than claiming a pass.
+
+- **Its stage list MIRRORS CI, including `seo:check`.** If CI grows a check, the gate grows it the same
+  day — anything CI runs that the gate does not is a way for the gate to lie.
+- `npm run gate:self-test` proves the guard can still go red — run it if you touch the fingerprint.
+- **A session rooted HERE owns the sweep and runs it in the FOREGROUND.** Never two Playwright
+  invocations at once (they fight over the port and produce phantom `ERR_CONNECTION_REFUSED`).
+  Subagents run lint + core only, never Playwright — a backgrounded run waits on a notification that
+  can only wake the parent.
+- **Test port is 5050, wired in three places** — `.claude/launch.json`, `playwright.config.js`'s
+  `webServer`, the gate. Repointing one without the others gives a sweep and a human reviewing
+  different servers, both green.
+- **`npm run review` serves the whole product on `localhost:3000`** — the review server, deliberately
+  not the test port. Never run it during a sweep either.
+- **Keep large static assets out of the watched tree** (or exclude them from the fingerprint). The
+  sampler re-hashes every 4s; gitignored wild PDFs in `tests/` once starved the gate.
+- Suites: `tests/mobile/**` (the deep suite) + `tests/editor-v2-desktop.spec.js` target v2 at `/`;
+  `tests/core/` runs headless via `npm run test:core`. `tests/fixtures/nasty/` is the corpus of real
+  documents that have actually broken things — **add to it whenever a real file finds a bug.**
+- **Wild corpus: cite files as `w001`–`w154`, never by filename** — they carry real client names.
+
+## Verification law
+
+**Before believing a green signal, ask what would look identical if broken.** Full corpus:
+`when-the-instrument-is-the-bug.md` in the bank — read it before writing any guard.
+
+- **A verifier must not share a parent with the verified.** **Presence is not landing.**
+- **An assertion over an empty or `NaN` set passes for free.** Validate the instrument against a
+  known-positive before believing any zero. **A pass COUNT is not a verdict.**
+- **A guard placed where a bug was seen protects that place, not the class.**
+- Assert the **behaviour**, never the vocabulary.
+- **Screenshot every new UI surface.** A broken dialog once passed every functional test.
+
+## What is never yours
+
+**⛔ Push · merge to remote · deploy · client-facing copy · money · anything public-facing — Fauzan's
+own hand.** Not the PM's either, and **per-turn verbal authorization is retired as a mechanism** — a
+relayed "he said yes" is a carry. Push authority lives in a written artifact,
+`../specs/spec-low-risk-list.md`, and arms only once the telemetry suite exists and that list has been
+ruled item by item. **Until then: do not push, do not ask to push.**
+
+Also the seat's, not yours: deciding what is worth building, ruling on taste, client-facing words. You
+own build, test, refactor, the gate end-to-end, `docs/`, this file, and local commits on `main`.
+
+Permanent refusals: never attach GA4 to Ads tag `AW-17538923405` · no fabricated AggregateRating ·
+no server-dependent features · never hand-edit generated SEO pages.
+
+## Git
+
+- **There are no branches** (founder instruction 2026-07-27): local `main` and remote `main`, nothing
+  else. Preserved-but-unmerged work lives on **tags** (`archive/i18n-groundwork`,
+  `archive/edit-ladder-preheal`).
+- **Never `git add -A`** — stage explicit paths. Other sessions have uncommitted work in this tree.
+  **Never sweep another session's work, in either direction.**
+- **Always `git -C <absolute path>`.** Bash cwd is session-dependent.
+- Several sessions run on this repo at once: `git worktree add --detach`, never `git checkout` the
+  shared tree.
+- If you ever audit a branch: squash-merging makes `git branch --merged` report it unmerged forever —
+  use a three-dot diff (`git diff origin/main...$b`), never commit counts.
+
+**Rhythm:** failing test → green → `npm run gate` → local commit on `main` → update `../STATE.md` +
+`../TODO.md` → **hand the push to Fauzan.** Document after approval: `README.md` → `CLAUDE.md` →
+the seat.
+
+## Where things live
+
+- **The seat** (`..`, the PM) — `../STATE.md` (current state) → `../TODO.md` (the single queue) →
+  `../decisions.md` (rulings + why) · `../reference/` (`product-definition.md` = the North Star) ·
+  `../specs/` (build specs). The interface between the two seats is the disk, not a channel.
+- **`decisions.md` here** — code-level WHY that has no other home. Founder rulings go to the seat's.
+- **The bench memory bank:
+  `~/.claude/projects/-Users-ojanlubis-machine-fkd-pdflokal-app/memory/`** — 50 topic files
+  (`pdfjs-worker.md`, `pdf-lib-bitstability.md`, `when-the-instrument-is-the-bug.md`,
+  `mobile-rendering.md`, `ga4-shared-tag-carrier.md`…). It is **not in this repo and you will not find
+  it by searching.** Read `MEMORY.md` there before any deep work in `js/core/`, any guard, any test,
+  or anything touching fonts, rendering or measurement.
+- **Before writing any durable fact, check whether it is already on disk** — if it is, update it
+  there. Do not create a second copy; two copies of one rule drift, and the wrong one gets read.
+- `docs/security.md` (CSP, headers, libraries) · `docs/strengths.md` (why vanilla, why no framework) ·
+  `docs/legacy/` = old wing, banner'd, not current.
+
+## `.mcp.json` is project-scoped, and that is load-bearing
+
+`playwright`, `sentry` and `analytics-mcp` (GA4 — service account
+`pdflokal-ga4-reader@pdflokal-mcp`, property `properties/528550405`) load **only for sessions rooted in
+this directory.** They do not load at the seat, and they do not load for subagents — a subagent
+inherits the *parent's* cwd, so a seat-spawned agent lands at the seat. Every brief must `cd`
+explicitly. Load the `google-measurement` skill before touching GA4, Ads or GTM.
+
+## Repo conventions
+
+> Every session starts with total amnesia. Maintainability here means: **can a future session with
+> zero memory work on this file safely?** Three questions before you modify anything — can I
+> understand it in one read · if I change one behaviour, how much unrelated code must I understand ·
+> can I break something unrelated by touching it?
+
+- **One rule, one home.** Search before creating; mark with `// SINGLE SOURCE OF TRUTH`. Never
+  reimplement inline what a helper already does.
+- **WHY comments, not WHAT.** Non-obvious functions get a `// WHY:` saying what breaks if changed and
+  who decided. Nobody can ask you later.
+- **Operation functions own mutation + sync.** Never mutate model state directly from UI code; use the
+  helper that bundles the mutation with its required render/sync calls.
+- **Files are self-contained.** Importing for functionality is fine; importing for *understanding* is
+  the problem. If you must read three other files to understand one function, refactor.
+- **Parallel arrays are a liability.** Two lists that must stay index-aligned will drift the first
+  time one is spliced without the other. Prefer structures that travel together — a field on the
+  object over a second array beside it. (The old wing's `ueState.pages` / `pageCanvases` pair is the
+  cautionary instance; v2's model already avoids it, and should keep avoiding it.)
+
+## Gotchas (v2)
+
+- `npx serve` caches aggressively — hard-reload (Cmd/Ctrl+Shift+R) after changes.
+- `npx serve` cleanUrls 301 **strips query strings** (tests use extensionless URLs).
+- The global `dialog` CSS rule **is** the overlay — new dialogs must use a `.sheet` child.
+- `history` is shadowed in `app.js` by the undo history — use `window.history`.
+- No grid rebuilds mid-drag in page-manager (render parks on `dragActive`).
+- `showToast()` / `showFullscreenLoading()` build DOM, never `innerHTML` — filenames are
+  user-controlled. Do not revert.
+- Never re-add canvas eviction (see `mobile-rendering.md` in the bank).
+- Don't modify without good reason: `vercel.json`, vendor libs, privacy promises, Indonesian UI.
 
 ---
 
-**Remember**: PDFLokal exists to give Indonesian users a private, free, easy-to-use PDF tool. Every change should support that mission.
+**PDFLokal exists to give Indonesian users a private, free, easy PDF tool. Every change serves that.**
+
+*Cited as doctrine: [Delivery & the write/read asymmetry](../../../engine/wiki/machine/delivery-pull-surfaces.md) · [Gate design](../../../engine/wiki/machine/gate-design.md) · [Taste governance](../../../engine/wiki/machine/taste-governance.md). This document is one of the instances that earned it.*
