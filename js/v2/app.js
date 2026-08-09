@@ -1495,12 +1495,23 @@ const pageManager = createPageManager({
   },
   toast,
 });
-document.getElementById('btn-pages').addEventListener('click', () => {
+// THE ONLY WAY THE KELOLA-HALAMAN SHEET OPENS. Two affordances reach it — the
+// toolbar `Halaman` button and the File menu's `Atur Halaman` (his ruling
+// 2026-08-09: the double is fine because one of them sits inside a closed
+// dropdown and does not compete for attention). A second call site that
+// re-implemented "open + tel" would drift: the telemetry would silently stop
+// counting one of the two routes. So there is one function, and both listeners
+// call it.
+function openPagesSheet() {
   pageManager.open();
   // Discoverability signal (spec-telemetry.md §6.2) — armIntent()'s own note
   // above explains why this never existed before: card clicks fired NOTHING.
+  // The payload stays route-agnostic on purpose: `pages_open` is pinned by
+  // tests/core/telemetry-schema.test.mjs, and "which button" is not a question
+  // anyone has asked of the rail.
   tel('tool_use', { tool: 'halaman', action: 'pages_open' });
-});
+}
+document.getElementById('btn-pages').addEventListener('click', openPagesSheet);
 document.getElementById('pm-close').addEventListener('click', () => pageManager.close());
 
 // ---- inline text editing ------------------------------------------------------------
@@ -2350,6 +2361,10 @@ document.getElementById('fm-new').addEventListener('click', () => {
   toggleFileMenu(false);
   pendingReplace = true; // applied when the picker actually returns files
   fileInput.click();
+});
+document.getElementById('fm-pages').addEventListener('click', () => {
+  toggleFileMenu(false);
+  openPagesSheet(); // the SAME opener the toolbar button uses — never a second one
 });
 
 // Start over: a FRESH doc + history. The signature stays (it's the user's,

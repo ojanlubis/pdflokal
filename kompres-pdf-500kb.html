@@ -319,7 +319,6 @@
       min-height: 44px;
     }
     #file-menu button:active { background: var(--bg); }
-    .fm-note { font-size: 10.5px; color: var(--muted); margin-left: 4px; }
     .spacer { flex: 1; }
     button {
       font: inherit; border: none; background: none; cursor: pointer; color: var(--ink);
@@ -1323,13 +1322,25 @@
     <div class="file-menu-wrap">
       <button id="btn-file" disabled aria-haspopup="menu" aria-expanded="false">File ▾</button>
       <div id="file-menu" role="menu" hidden>
-        <button role="menuitem" id="fm-add">
+        <!-- WHY title= and not a custom tooltip: `title` is already this page's
+             tooltip idiom (#btn-undo, #btn-redo, the ganti tool), and it reaches a
+             screen reader as the button's DESCRIPTION while the visible text stays
+             its accessible NAME. A CSS-only bubble would need aria-describedby to
+             match that, i.e. a second mechanism for the same job.
+             KNOWN AND ACCEPTED (decisions.md, 2026-08-09, N2(b)): hover does not
+             exist on touch, so phones lose these notes outright. Ruled, with the
+             cost stated. Do not "fix" it with a mobile fallback. -->
+        <button role="menuitem" id="fm-add" title="gabung">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M15 2v5h5"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
-          Tambah File <span class="fm-note">gabung</span>
+          Tambah File
         </button>
-        <button role="menuitem" id="fm-new">
+        <button role="menuitem" id="fm-new" title="ganti semua">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M15 2v5h5"/></svg>
-          Buka Baru <span class="fm-note">ganti semua</span>
+          Buka Baru
+        </button>
+        <button role="menuitem" id="fm-pages" title="Kelola halaman: urutkan, putar, hapus, ekstrak">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          Atur Halaman
         </button>
       </div>
     </div>
