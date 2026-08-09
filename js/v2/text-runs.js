@@ -67,7 +67,15 @@ export function createTextRunIndex({ getDoc }) {
     // Same absolute-rotation rule as the rasterizer: the runs must land in the
     // ROTATED frame the raster (and every annotation coordinate) lives in.
     const rotation = ((page.baseRotation || 0) + (page.rotation || 0)) % 360;
-    const vp = pdfPage.getViewport({ scale: 1, rotation });
+    // MERGE WIDTH NORMALISATION (core/operations.js normalizePageWidths): a
+    // merged page's view frame is no longer its native point size, and these
+    // boxes ARE view coordinates (they become cover/overlay rects). Project
+    // through the same factor the raster and the page div use, or every hit
+    // box on a merged page sits at the wrong scale. The `pdf:` field below is
+    // read straight off item.transform — raw, unprojected, content-stream
+    // space — so it stays native, which is exactly what redact.js/text-walk.js
+    // need. Do not "fix" that to match.
+    const vp = pdfPage.getViewport({ scale: page.baseWidth > 0 ? page.width / page.baseWidth : 1, rotation });
     const tc = await pdfPage.getTextContent();
 
     // A SEARCHABLE SCAN IS STILL A SCAN. Its text layer is painted in render

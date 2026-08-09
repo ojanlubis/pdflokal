@@ -265,6 +265,18 @@ export function createPageRasterizer(doc, opts = {}) {
     const editedDoc = await getEditedDoc(page);
     const pdf = editedDoc || await getPdf(page.sourceId);
     const pdfPage = editedDoc ? await pdf.getPage(1) : await pdf.getPage(page.sourcePageNum + 1);
+    // MERGE WIDTH NORMALISATION (core/operations.js normalizePageWidths): the
+    // source document — and the edited-page bytes built from it — are still at
+    // the page's NATIVE size, but page.width is what the view lays out and
+    // stretches this raster into. Without this factor a page scaled up on merge
+    // renders at native pixel count and is then stretched, i.e. blurred by
+    // exactly the merge factor, and rasterizeThumb (which derives its scale
+    // FROM page.width) would produce a thumb of the wrong size outright.
+    // The image branch below already multiplies by page.width for the same
+    // reason; this is the PDF branch catching up. Factor 1 on every unmerged
+    // page, so the arithmetic is a no-op there.
+    const norm = page.baseWidth > 0 ? page.width / page.baseWidth : 1;
+    const px = scale * norm;
     // Edited docs are a single already-baked page — buildEditedPageBytes sets
     // its /Rotate exactly the way buildPdfBytes does (see page-surgery.js),
     // so its OWN metadata is authoritative and pdf.js should just read it —
@@ -274,8 +286,8 @@ export function createPageRasterizer(doc, opts = {}) {
     // Plain path: intrinsic /Rotate + the user's rotation (PDF.js
     // `rotation:` is absolute, not additive over the intrinsic value).
     const vp = editedDoc
-      ? pdfPage.getViewport({ scale })
-      : pdfPage.getViewport({ scale, rotation: ((page.baseRotation || 0) + (page.rotation || 0)) % 360 });
+      ? pdfPage.getViewport({ scale: px })
+      : pdfPage.getViewport({ scale: px, rotation: ((page.baseRotation || 0) + (page.rotation || 0)) % 360 });
     const canvas = document.createElement('canvas');
     canvas.width = Math.ceil(vp.width);
     canvas.height = Math.ceil(vp.height);

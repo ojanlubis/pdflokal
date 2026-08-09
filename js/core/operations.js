@@ -28,6 +28,86 @@ export function addPages(doc, pages) {
   return pages;
 }
 
+// SINGLE SOURCE OF TRUTH for WHICH page's width every other page adopts.
+//
+// Founder ruling 2026-08-09, verbatim:
+//   "no, make it descending priority. width is determined by the first
+//    non-image file. then image"
+//
+// Descending priority, and the order is the whole rule: the FIRST PDF page in
+// the document sets the width. An image page sets it only when the document
+// contains no PDF page at all.
+//
+// WHY it is not simply "page 1" (which is what shipped first and he corrected):
+// image pages are sized pixels-as-points (core/import.js), so a phone photo is
+// a ~3024pt page — about 107cm. Anchoring on page 1 meant a photo dropped in
+// front of an A4 contract dragged the CONTRACT up to 107cm wide. Descending
+// priority kills that at the root instead of with a magic maximum: the photo
+// comes down to A4, the document stays a document. He rejected the clamp
+// framing and gave this rule instead, so there is no constant to tune here.
+//
+// Note the consequence, which is intent and not a side effect: when page 1 is
+// an image it gets RESIZED like any other page. Pages follow the anchor, and
+// the anchor is not necessarily page 1.
+export function anchorPage(pages) {
+  return pages.find((p) => !p.isFromImage) || pages[0] || null;
+}
+
+// Apply the anchor's width to every page, ratio kept. Returns the pages that
+// actually moved.
+//
+// The rulings this encodes (PM seat, 2026-08-09 — decisions live there, not
+// here; this comment only says what the code does and why it does not do more):
+//   - MERGE ONLY. A document assembled from a single file is never reflowed.
+//     That is the `contributing < 2` bail: a lone PDF's own mixed page sizes
+//     are the author's, not ours to rewrite.
+//   - Every page follows the ANCHOR (see anchorPage above), including the
+//     anchor file's own later pages, and including page 1 when it is an image.
+//   - The anchor width is a DISPLAYED width, so an intrinsic /Rotate (already
+//     baked into width/height by import.js's rotate-honouring viewport) and a
+//     user rotate are both honoured BEFORE normalising, never after.
+//   - Scaling is UNIFORM — height follows width, ratio kept. Every downstream
+//     reader (export.js, the rasterizer, text-runs.js) relies on
+//     width/baseWidth == height/baseHeight; do not make this anisotropic.
+//   - No clamp, anywhere. Descending priority is what makes one unnecessary.
+//
+// Idempotent: a page already at the anchor width gets factor 1 and is untouched.
+// Callers: the merge path only (js/v2/app.js's loadFilesInner). Reorder and
+// rotate deliberately do NOT call this — re-anchoring under the user's finger
+// would resize the document mid-gesture.
+export function normalizePageWidths(doc) {
+  if (doc.pages.length < 2) return [];
+  // Count sources that actually CONTRIBUTED a page: a failed import can leave
+  // a Source behind with no pages (js/v2/app.js's per-file try/catch), and
+  // that must not make a single-file document look like a merge.
+  const contributing = new Set(doc.pages.map((p) => p.sourceId));
+  if (contributing.size < 2) return [];
+
+  const displayedWidth = (p) => ((p.rotation || 0) % 180 !== 0 ? p.height : p.width);
+  const anchor = displayedWidth(anchorPage(doc.pages));
+  if (!(anchor > 0)) return []; // a degenerate anchor must not zero the document
+
+  const changed = [];
+  for (const page of doc.pages) {
+    const dw = displayedWidth(page);
+    if (!(dw > 0)) continue;
+    const factor = anchor / dw;
+    if (factor === 1) continue;
+    page.width *= factor;
+    page.height *= factor;
+    // Drop the cached raster: it was rendered at the OLD point size. The view
+    // stretches a raster to fit, so a stale one is geometrically right and
+    // merely soft — but on a page scaled up several times over (a photo
+    // anchoring a PDF) "merely soft" is unreadable, and the streaming layer
+    // has no other signal that this page needs re-rendering. null is exactly
+    // what a not-yet-rasterized page carries, so every reader already handles
+    // it. Only pages that actually MOVED lose their raster.
+    page.raster = null;
+    changed.push(page);
+  }
+  return changed;
+}
+
 export function removePage(doc, pageId) {
   const i = doc.pages.findIndex((p) => p.id === pageId);
   if (i === -1) return null;

@@ -57,6 +57,17 @@ export function createPage({
     sourcePageNum,
     width,
     height,
+    // WHY a second copy of the same numbers: `width`/`height` are the LIVE
+    // display size and normalizePageWidths (core/operations.js) rewrites them
+    // when files are merged. `baseWidth`/`baseHeight` are what the source
+    // artifact actually measured, recorded once and never mutated, so the
+    // export/raster layers can recover the scale factor (width / baseWidth)
+    // instead of re-deriving it from a vendor object that may disagree —
+    // a copied pdf-lib page reports its UNROTATED MediaBox, which is not the
+    // frame these dims live in. Ratio is uniform by construction: the
+    // normalizer only ever scales both by the same factor.
+    baseWidth: width,
+    baseHeight: height,
     rotation,
     isFromImage,
     raster: null,          // Phase 1: rasterized page image (render-time artifact)

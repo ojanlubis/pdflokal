@@ -119,7 +119,7 @@ test.describe('editor v2 — mobile', () => {
     expect(sources).toBe(2);
   });
 
-  test('adding an image appends it as one page (isFromImage)', async ({ page }) => {
+  test('adding an image appends it as one page, normalised to the first PDF page\'s width', async ({ page }) => {
     await openWithFixture(page);
     // 1×1 red PNG — the smallest possible image-as-page.
     const redPixel = Buffer.from(
@@ -130,11 +130,26 @@ test.describe('editor v2 — mobile', () => {
     await expect(page.locator('.pv-page')).toHaveCount(3);
     const last = await page.evaluate(() => {
       const p = window.v2.getDoc().pages.at(-1);
-      return { isFromImage: p.isFromImage, w: p.width, h: p.height };
+      return { isFromImage: p.isFromImage, w: p.width, h: p.height, baseW: p.baseWidth, baseH: p.baseHeight };
     });
+    // ⚠️ THESE NUMBERS ARE THE RULING, NOT A READ-BACK. Founder note 6 Aug
+    // 2026, ruled by the seat 2026-08-09: on merge every page takes the width
+    // of the FIRST page, ratio preserved. sample-2pages.pdf is 595 x 842, so a
+    // 1 x 1 image becomes 595 x 595 — written as literals on purpose, because
+    // deriving them from the document under test would make this assertion
+    // agree with whatever the code happens to do.
+    //
+    // This test previously pinned the OPPOSITE contract (w === 1, h === 1:
+    // image pages keep their native pixel dimensions). That was the ragged
+    // behaviour the founder reported; it is deliberately gone. Do not "fix"
+    // this back.
     expect(last.isFromImage).toBe(true);
-    expect(last.w).toBe(1);
-    expect(last.h).toBe(1);
+    expect(last.w).toBe(595);
+    expect(last.h).toBe(595);
+    // The record of what the artifact actually measured must survive
+    // normalisation — export and the rasterizer recover the scale factor from it.
+    expect(last.baseW).toBe(1);
+    expect(last.baseH).toBe(1);
   });
 
   test('text tool survives a rangeless selection (iOS WebKit caret guard)', async ({ page }) => {

@@ -21,7 +21,7 @@ import { failureReason } from '../core/failure-reason.js';
 import { isStandardFamily, unencodableInStandardFont } from '../core/text-encode.js';
 import {
   addAnnotation, removeAnnotation, updateAnnotation, clearSelection, selectAnnotation,
-  moveAnnotation,
+  moveAnnotation, normalizePageWidths,
 } from '../core/operations.js';
 import { createHistory, record, undo, redo, canUndo, canRedo } from '../core/history.js';
 import { importPdf, importImage, createPageRasterizer, probeTextLayer } from '../core/import.js';
@@ -2119,6 +2119,18 @@ async function loadFilesInner(files) {
       : 'Nggak ada file yang bisa dibuka, mungkin kosong atau rusak');
     return;
   }
+
+  // Every page takes the width of the first page (founder note 6 Aug 2026).
+  // The rule and all its edge cases live in core/operations.js — this is only
+  // the trigger, and it is HERE rather than inside importPdf/importImage on
+  // purpose: normalising per-file would re-run mid-loop and anchor on a
+  // document that isn't finished assembling yet. It runs after the whole batch,
+  // once, and no-ops unless two or more files actually contributed pages.
+  //
+  // Placed BEFORE the rasterizer and rebuildStage below: both read page.width,
+  // and a raster taken at the pre-normalisation size would have to be thrown
+  // away immediately.
+  normalizePageWidths(doc);
 
   if (!rasterizer) rasterizer = createPageRasterizer(doc, { editedPageProvider });
   emptyEl.style.display = 'none';

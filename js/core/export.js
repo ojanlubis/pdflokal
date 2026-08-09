@@ -189,6 +189,19 @@ function parseHexColor(PDFLib, hex) {
 const TEXT_BASELINE_RATIO = 0.9;
 const TEXT_LINE_HEIGHT = 1.2; // must match page-view.js CSS line-height
 
+// SINGLE SOURCE OF TRUTH for each drawer's fallback font size, hoisted out of
+// the drawers so scaleAnnotationGeometry can reach them.
+//
+// WHY that matters: a default is expressed in the annotation's OWN frame,
+// which after a merge is the NORMALISED frame. If the default were left to be
+// applied inside the drawer, it would be applied to a page that is about to be
+// scaled by `factor`, and would paint `factor`× too large — a footgun that
+// only appears on merged documents, i.e. never in a single-file test. v2 always
+// sets `fontSize` on the text annotations it creates (js/v2/app.js), and
+// watermark/pageNumber are not reachable from v2 at all today, so this closes
+// the class rather than a live bug. Keep the numbers here and nowhere else.
+const DEFAULT_FONT_SIZE = { text: 16, watermark: 48, pageNumber: 12 };
+
 function drawWhiteout(pdfPage, anno, frame, env) {
   const r = whiteoutCornerAndDims(frame.rotation, anno, frame.wU, frame.hU);
   // Color-matched Tip-Ex: anno.color is sampled from the page background at
@@ -201,7 +214,7 @@ async function drawText(pdfPage, anno, frame, env) {
   const font = await env.getFont(anno.fontFamily, anno.bold, anno.italic);
   const color = parseHexColor(env.PDFLib, anno.color);
   const rotate = env.PDFLib.degrees(frame.rotation);
-  const size = anno.fontSize || 16;
+  const size = anno.fontSize || DEFAULT_FONT_SIZE.text;
   // Normalise the invisible half of pasted text BEFORE pdf-lib sees it. A
   // standard font encodes through WinAnsi, and one codepoint outside it throws
   // a bare Error that aborts the ENTIRE export — there is no per-annotation
@@ -243,7 +256,7 @@ async function drawSignature(pdfPage, anno, frame, env) {
 
 async function drawWatermark(pdfPage, anno, frame, env) {
   const font = await env.getFont('Helvetica', false, false);
-  const size = anno.fontSize || 48;
+  const size = anno.fontSize || DEFAULT_FONT_SIZE.watermark;
   // Watermark has its own user-specified tilt; combine with the page rotation
   // so the visible tilt matches what the user saw in the editor.
   const totalDeg = frame.rotation + (anno.rotation || 0);
@@ -272,7 +285,7 @@ async function drawPageNumber(pdfPage, anno, frame, env) {
   // text (y = top of the line box). The old export silently DROPPED this type
   // (missing branch in embedAnnotationsOnPage) — fixed in this port.
   const font = await env.getFont('Helvetica', false, false);
-  const size = anno.fontSize || 12;
+  const size = anno.fontSize || DEFAULT_FONT_SIZE.pageNumber;
   const yV = anno.y + size * TEXT_BASELINE_RATIO;
   const { x, y } = transformAnnotationCoords(frame.rotation, anno.x, yV, frame.wU, frame.hU);
   drawTextSafe(pdfPage, anno.text || '', {
@@ -314,6 +327,31 @@ async function addImagePage(env, page, source) {
   const pdfPage = env.newDoc.addPage([page.width, page.height]);
   pdfPage.drawImage(img, { x: 0, y: 0, width: page.width, height: page.height });
   return pdfPage;
+}
+
+// ---- merge width normalisation ------------------------------------------------
+
+// The geometric fields every drawer above reads, scaled by `k`. Used to express
+// annotation coordinates — which live in the page's NORMALISED display frame —
+// back in the source page's NATIVE frame, so they can be drawn alongside the
+// original content and then scaled up with it in one uniform move (see the
+// ordering argument in buildPdfBytes).
+//
+// ⚠️ Deliberately NOT applied to `replaceBox`/`replaceTargets`. Those are
+// surgery inputs, and surgery reads content-stream geometry, which is native
+// already — applyPageSurgery runs on the untouched annotation list, before any
+// of this. Scaling them here would send a doubly-transformed target into
+// text-walk.js and silently lose the match.
+//
+// Undefined fields stay undefined: drawSignature derives a missing `height`
+// from the embedded image's own ratio, and multiplying `undefined` would turn
+// that into NaN and drop the signature off the page.
+function scaleAnnotationGeometry(anno, k) {
+  const out = { ...anno };
+  for (const key of ['x', 'y', 'width', 'height', 'fontSize']) {
+    if (Number.isFinite(out[key])) out[key] *= k;
+  }
+  return out;
 }
 
 // ---- the adapter ---------------------------------------------------------------
@@ -367,21 +405,56 @@ export async function buildPdfBytes(doc, deps = {}) {
       ? { skipCovers: new Set(), skipDraw: new Set() }
       : await applyPageSurgery(pdfPage, PDFLib, fontkit, annotations);
 
-    if (annotations.length === 0) continue;
-    // wU/hU: UNROTATED page dims (MediaBox) — setRotation is metadata only,
-    // drawing happens in this frame. See transformAnnotationCoords.
-    const { width: wU, height: hU } = pdfPage.getSize();
-    const frame = { rotation: page.rotation || 0, wU, hU };
-    for (const anno of annotations) {
-      if (skipCovers.has(anno.id)) continue; // surgery succeeded — true background shows through
-      if (skipDraw.has(anno.id)) continue; // Rung C wrote this one natively — don't double-paint
-      const draw = ANNOTATION_DRAWERS[anno.type];
-      if (!draw) {
-        console.warn('[core/export] Unknown annotation type, skipping:', anno.type);
-        continue;
+    // MERGE WIDTH NORMALISATION (core/operations.js normalizePageWidths).
+    // After a merge the model's display width is the FIRST page's width, but
+    // copyPages above brought the source's own MediaBox across verbatim — so
+    // this page is still its native size and has to be scaled to catch up.
+    // Image pages need nothing: addImagePage already builds the box at
+    // page.width/height, so they arrive normalised.
+    //
+    // WHY THE ORDER IS SURGERY → DRAW-AT-NATIVE-SCALE → SCALE, and not the
+    // more obvious scale-then-draw. Two hard constraints, measured not assumed:
+    //   1. Surgery must see the ORIGINAL content stream (page-surgery.js's own
+    //      ordering WHY), and its targets are content-stream geometry, so it
+    //      must run before anything rescales the page.
+    //   2. pdf-lib's scaleContent wraps the page's content in `q <cm> … Q` and
+    //      KEEPS WRITING INTO THAT SAME STREAM afterwards. Probed against the
+    //      vendored build: a rectangle drawn AFTER scale(2,2) came back inside
+    //      the wrapper, i.e. scaled a second time. So "scale, then draw the
+    //      annotations" silently doubles every annotation's coordinates.
+    // Drawing at native scale and scaling last is exact instead of merely
+    // close: the scale is uniform and about the origin, and every term in
+    // transformAnnotationCoords is linear in (x, y, wU, hU), so dividing the
+    // annotation and the frame by the same factor and multiplying the finished
+    // page back up lands on identical numbers.
+    //
+    // A page at factor 1 — every page of an unmerged document, and every page
+    // that already matched the anchor — takes NO new call at all. That is
+    // deliberate: the single-file case must stay on the path it has always
+    // been on.
+    const pageScale = page.baseWidth > 0 ? page.width / page.baseWidth : 1;
+    const needsScale = !page.isFromImage && Number.isFinite(pageScale) && pageScale !== 1;
+
+    if (annotations.length > 0) {
+      // wU/hU: UNROTATED page dims (MediaBox) — setRotation is metadata only,
+      // drawing happens in this frame. See transformAnnotationCoords. Read
+      // BEFORE the scale below, so it is the native frame the annotations are
+      // being expressed in.
+      const { width: wU, height: hU } = pdfPage.getSize();
+      const frame = { rotation: page.rotation || 0, wU, hU };
+      for (const anno of annotations) {
+        if (skipCovers.has(anno.id)) continue; // surgery succeeded — true background shows through
+        if (skipDraw.has(anno.id)) continue; // Rung C wrote this one natively — don't double-paint
+        const draw = ANNOTATION_DRAWERS[anno.type];
+        if (!draw) {
+          console.warn('[core/export] Unknown annotation type, skipping:', anno.type);
+          continue;
+        }
+        await draw(pdfPage, needsScale ? scaleAnnotationGeometry(anno, 1 / pageScale) : anno, frame, env);
       }
-      await draw(pdfPage, anno, frame, env);
     }
+
+    if (needsScale) pdfPage.scale(pageScale, pageScale);
   }
 
   return newDoc.save({ useObjectStreams: true, addDefaultPage: false });
