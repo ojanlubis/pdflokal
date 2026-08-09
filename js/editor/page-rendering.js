@@ -609,7 +609,6 @@ export function ueRenderVisiblePages() { renderer?.renderVisiblePages(); }
 export function ueRenderSelectedPage() { renderer?.renderSelectedPage(); }
 export function ueSetupIntersectionObserver() { renderer?.setupIntersectionObserver(); }
 export function ueSetupScrollSync() { renderer?.setupScrollSync(); }
-export function ueRemoveScrollSync() { renderer?.removeScrollSync(); }
 export function clearPdfDocCache() { renderer?.clearPdfDocCache(); }
 export function ueDeletePage(index) { renderer?.deletePage(index); }
 export function ueUpdatePageCount() { renderer?.updatePageCount(); }

@@ -72,21 +72,6 @@ export function ueOpenPageNumModal() {
 }
 
 // More Tools Dropdown
-export function toggleMoreTools(e) {
-  e.stopPropagation();
-  const btn = document.getElementById('more-tools-btn');
-  const dropdown = document.getElementById('more-tools-dropdown');
-
-  if (dropdown.classList.contains('active')) {
-    dropdown.classList.remove('active');
-  } else {
-    const rect = btn.getBoundingClientRect();
-    dropdown.style.top = (rect.bottom + 4) + 'px';
-    dropdown.style.left = rect.left + 'px';
-    dropdown.classList.add('active');
-  }
-}
-
 export function closeMoreTools() {
   document.getElementById('more-tools-dropdown').classList.remove('active');
 }

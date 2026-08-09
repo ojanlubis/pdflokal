@@ -64,8 +64,6 @@ export function isImage(file) {
   return file.type.startsWith('image/');
 }
 
-export const ACCEPTED_FILE_TYPES = '.pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/*';
-
 // ============================================================
 // PDF.js DOCUMENT LOADING
 // SINGLE SOURCE OF TRUTH — never use raw pdfjsLib.getDocument().
