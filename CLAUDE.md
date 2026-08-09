@@ -106,11 +106,27 @@ Playwright. It fingerprints every file the dev server can serve, before and afte
 
 ## What is never yours
 
-**⛔ Push · merge to remote · deploy · client-facing copy · money · anything public-facing — Fauzan's
-own hand.** Not the PM's either, and **per-turn verbal authorization is retired as a mechanism** — a
-relayed "he said yes" is a carry. Push authority lives in a written artifact,
-`../specs/spec-low-risk-list.md`, and arms only once the telemetry suite exists and that list has been
-ruled item by item. **Until then: do not push, do not ask to push.**
+**⛔ Client-facing copy · money · anything public-facing · anything user-visible — Fauzan's own hand**,
+and **per-turn verbal authorization is retired as a mechanism**: a relayed "he said yes" is a carry.
+
+**Push authority is `../specs/spec-low-risk-list.md`. Read it before pushing — it is the authority,
+not this file, which only points at it.** Both preconditions are now met (the telemetry suite exists;
+the list was ruled item by item), so as of **2026-08-09 INCLUDE 9a is ARMED**: the changes that list
+names — comment/doc fixes with zero executable lines, renames of module-private names, deletion of
+code with zero references and no dynamic-dispatch path, new tests each shown RED against a broken
+variant — **ship on a green `npm run gate`, no hand needed.** Conditions travel with it: **one
+concern per commit** (clean revert is the whole safety argument) and every shipped item reported to
+the PM with how to revert.
+
+**9b — moving code rather than describing it** (restructuring, extracting, de-duplicating,
+re-layering, changing any signature or module boundary) is still batched, and the seat rules those
+batches under Fauzan's 2026-08-09 delegation. The route from 9b to 9a is evidence, not assertion:
+byte-identical output over the wild corpus, red-on-revert on a test that covers the touched
+behaviour, or a characterisation test written *before* the refactor. *"Zero behaviour change" was
+struck from the list on 2026-07-29 because it is a claim, not a check.*
+
+**The list binds him too — a release grants pace, never scope.** If this file and the spec ever
+disagree, the spec wins and this paragraph is the bug; stop and reconcile before shipping.
 
 Also the seat's, not yours: deciding what is worth building, ruling on taste, client-facing words. You
 own build, test, refactor, the gate end-to-end, `docs/`, this file, and local commits on `main`.
@@ -132,8 +148,12 @@ no server-dependent features · never hand-edit generated SEO pages.
   use a three-dot diff (`git diff origin/main...$b`), never commit counts.
 
 **Rhythm:** failing test → green → `npm run gate` → local commit on `main` → update `../STATE.md` +
-`../TODO.md` → **hand the push to Fauzan.** Document after approval: `README.md` → `CLAUDE.md` →
-the seat.
+`../TODO.md` → **push if the change is on the 9a list, otherwise hand it to Fauzan.** Document after
+approval: `README.md` → `CLAUDE.md` → the seat.
+
+**Before any push, confirm the tree you gated is the tree the push sends** — `git log
+origin/main..main`. A verdict binds the tree it hashed and says nothing about reachability; a fix
+gated on a worktree branch while `main` sat behind it would have shipped nothing and looked ready.
 
 ## Where things live
 
