@@ -495,9 +495,13 @@ export function createDownloadSheet(deps) {
         size: state.size,
         pages: state.picked ? 'some' : 'all',
       });
-      // surgery_used/fallback are hardcoded for now — Rung B/C (the ladder)
-      // don't exist on this branch yet; those props start carrying real
-      // values the moment the ladder merges (spec-telemetry.md §6 step 5).
+      // surgery_used/fallback are DELIBERATE CONSTANTS, not placeholders: the
+      // ladder (core/page-surgery.js) shipped long ago and its real per-edit
+      // signal flows through the `surgery`/`insert` events instead. Deleting
+      // these two fields is HELD by seat ruling (commit 7c2a064, refused
+      // 2026-08-09): removing a prop from the shared SCHEMA blanks the whole
+      // event for cached PWA clients — a silent data hole traded for a
+      // cosmetic one. Until that trade changes, they ship as false/'none'.
       tel('export', {
         surgery_used: false,
         fallback: 'none',

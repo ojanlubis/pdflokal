@@ -328,10 +328,12 @@ export const SCHEMA = {
     action: ['select', 'whiteout', 'text', 'text_inline', 'signature', 'paraf', 'delete', 'pages_open', 'merge'],
   },
   export: {
-    // surgery_used/fallback are always false/'none' from call sites on this
-    // branch (Rung B/C don't exist here yet) — the props still ship now so
-    // the ladder branch only has to start SENDING true values, never add a
-    // new prop (spec §6 step 5: "the ladder props land later").
+    // surgery_used/fallback are DELIBERATE CONSTANTS (false/'none') — not
+    // placeholders. The ladder shipped (core/page-surgery.js) and its real
+    // per-edit signal is the `surgery`/`insert` events below; deleting these
+    // two props is HELD by seat ruling (commit 7c2a064, refused 2026-08-09):
+    // a prop REMOVAL from this shared schema blanks the whole export event
+    // for cached PWA clients. Until that trade changes, they stay, constant.
     surgery_used: 'bool',
     fallback: ['none', 'cover', 'twin'],
     duration: 'duration',
