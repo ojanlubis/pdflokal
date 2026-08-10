@@ -10,7 +10,10 @@ to pdflokal.id.
 - **All vendor libs self-hosted in `js/vendor/`, zero CDN.** pdf-lib, PDF.js, Signature Pad,
   pdf-encrypt-lite, Canvas API. See `docs/security.md` for CSP, headers, load order.
 - **No server-dependent features, permanently** — no PDF↔Word, no server OCR. In-browser OCR is
-  sanctioned. `api/t.js` (telemetry) and `api/feedback.js` are the only server code in the repo.
+  sanctioned. The only server code in the repo is `api/`: `t.js` (telemetry sink), `feedback.js`
+  (thumbs + consent-gated sample), `rev.js` (deploy SHA for build attribution, no input at all),
+  and `sentry-tunnel.js` (proxies Sentry envelopes past ad blockers — the one endpoint that
+  forwards data to a third party, DSN-allowlisted).
 - **All UI text in Indonesian**, informal "kamu". English tech terms (tap, scroll, install) are fine
   inside step-by-step instructions. **No em-dashes in user-visible text** — use `, `.
 - Never add an external API call carrying user data. Privacy is the product.

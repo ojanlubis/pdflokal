@@ -1796,6 +1796,14 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
         tel('tool_use', { tool: 'teks', action: 'text_inline' });
         touchedEdit = !!anno.replaceCoverId;
         if (anno.replaceCoverId) {
+          // ⚠️ KNOWN ASYMMETRY (audit 2026-08-09, finding 9): here font_path's
+          // 'doc-font' means only "a doc FontFace was loaded" (presence) —
+          // the fresh-commit branch below runs a real per-glyph coverage
+          // check (textCoveredBy). The committed annotation carries no
+          // docFontkitFont to re-check against, and changing what an EXISTING
+          // telemetry field means is EXCLUDE 4 (his hand) — so this stays,
+          // stated rather than silent. Rail readers: re-typed edits are the
+          // weaker population.
           gantiOutcome = 'commit'; gantiCoverId = anno.replaceCoverId; gantiDocFont = !!anno.docFontFamily;
         }
       } else if (!text) {
