@@ -264,12 +264,15 @@ test('COVERAGE: no failure report hard-codes its reason', () => {
       // A LITERAL IS ONLY OK WHEN THE CALL SITE DETERMINED IT ITSELF, rather
       // than failing to classify something it caught. Both entries here are
       // measurements, not guesses:
-      //   'encrypted'   read off the DOCUMENT at import (core/import.js)
-      //   'unsupported' computed from the TEXT at commit — we know exactly
-      //                 which characters cannot encode, there is no error yet
+      //   'encrypted'     read off the DOCUMENT at import (core/import.js)
+      //   'unsupported'   computed from the TEXT at commit — we know exactly
+      //                   which characters cannot encode, there is no error yet
+      //   'font-fallback' witnessed by buildPdfBytes' own onFontFallback
+      //                   callback (core/export.js substituted a font and said
+      //                   so) — a direct observation, no error was ever thrown
       // Anything else must go through failureReason(err). Keep this list tiny;
       // every addition is a place the rail can start asserting without knowing.
-      const DETERMINED = ["'encrypted'", "'unsupported'"];
+      const DETERMINED = ["'encrypted'", "'unsupported'", "'font-fallback'"];
       const documentFact = DETERMINED.includes(expr);
       assert.ok(
         classified || documentFact,
