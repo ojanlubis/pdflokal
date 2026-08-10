@@ -90,6 +90,11 @@ export async function convertPDFtoImages() {
   document.getElementById('pdf-img-btn').disabled = true;
 
   try {
+    // A null toBlob (canvas too large / out of memory on a weak phone) used
+    // to skip that page's download SILENTLY and still toast "Semua halaman
+    // berhasil dikonversi!" — a success message over an incomplete result
+    // (maintenance audit 2026-08-09, finding 7). Count the misses and say so.
+    let failed = 0;
     for (let i = 0; i < selectedPages.length; i++) {
       const pageNum = selectedPages[i].page;
       progressText.textContent = `Mengkonversi halaman ${pageNum}...`;
@@ -112,6 +117,8 @@ export async function convertPDFtoImages() {
         canvas.toBlob((blob) => {
           if (blob) {
             downloadBlob(blob, getDownloadFilename({originalName: state.currentPDFName, suffix: `page${pageNum}`, extension: format}));
+          } else {
+            failed++;
           }
           resolve();
         }, mimeType, quality);
@@ -121,7 +128,12 @@ export async function convertPDFtoImages() {
     }
 
     track('download', { tool: 'pdf-to-img' });
-    showToast('Semua halaman berhasil dikonversi!', 'success');
+    if (failed > 0) {
+      // COPY IS PLACEHOLDER — client-facing words are Fauzan's, per the seat.
+      showToast(`${failed} halaman gagal dikonversi, sisanya berhasil diunduh`, 'error'); // TODO(copy): his words
+    } else {
+      showToast('Semua halaman berhasil dikonversi!', 'success');
+    }
 
   } catch (error) {
     console.error('Error converting PDF to images:', error);
