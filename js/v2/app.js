@@ -1946,6 +1946,25 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
       gantiOutcome = 'cancel';
       gantiCoverId = draft.replaceCoverId ?? draft.reEdit?.coverId ?? null;
       gantiDocFont = !!draft.docFontFamily;
+    } else if (draft?.reEdit) {
+      // EMPTY RE-EDIT COMMIT = DELETE THE EDIT (founder ok, 2026-08-09 —
+      // maintenance audit finding 1). Same grammar as the `anno` branch above:
+      // committing empty removes the thing being edited — here, the edit pair
+      // itself, so the ORIGINAL printed text returns on the next bake. Before
+      // this branch existed, an empty re-edit fell through every case and
+      // silently did nothing: the user deleted the text, blurred, and watched
+      // the baked replacement come back — with no way to reach the edit via
+      // Hapus either (a baked edit's cover+text are suppressed from the
+      // overlay, so they are untappable). Escape does NOT land here — the
+      // keydown handler restores the prefill first, which the no-op guard
+      // absorbs.
+      record(history, doc);
+      removeAnnotation(doc, draft.reEdit.coverId);
+      if (draft.reEdit.textId) removeAnnotation(doc, draft.reEdit.textId);
+      touchedEdit = true;
+      gantiOutcome = 'commit';
+      gantiCoverId = null; // the pair is gone — no post-bake outcome to read
+      gantiDocFont = false;
     }
     syncPage(pageId);
     setTool('select');
@@ -2045,7 +2064,14 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
   ed.addEventListener('blur', commit);
   ed.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ed.blur(); }
-    if (e.key === 'Escape') { ed.textContent = anno?.text || ''; ed.blur(); }
+    // Escape = back out. Restore what the editor OPENED with, so commit()'s
+    // no-op guards absorb it: the annotation's own text, or a RE-EDIT's
+    // prefill (draft.text). Restoring '' on a re-edit would read as a
+    // deliberate empty commit — which now DELETES the edit (the
+    // `draft.reEdit` empty branch below) — the opposite of backing out.
+    // A fresh Ganti draft keeps '' on purpose: its empty commit is the
+    // cancel that takes the cover back.
+    if (e.key === 'Escape') { ed.textContent = anno?.text ?? (draft?.reEdit ? draft.text : '') ?? ''; ed.blur(); }
     e.stopPropagation(); // don't trigger app shortcuts while typing
   });
   ed.addEventListener('pointerdown', (e) => e.stopPropagation());

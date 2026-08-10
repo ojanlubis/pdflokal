@@ -144,6 +144,71 @@ test.describe('ganti teks — RE-EDIT an already-edited line (Decision 3: drop-a
     expect(afterSecondUndo).toBe(originalRaster);
   });
 
+  test('EMPTY re-edit commit DELETES the edit — the original printed text returns; ' +
+    'one undo brings the edit back', async ({ page }) => {
+    // Audit 2026-08-09, finding 1 (founder ok'd): before the `draft.reEdit`
+    // empty branch existed, deleting all text in a re-edit and blurring fell
+    // through every commit() case and silently did nothing — the user watched
+    // the baked replacement come back, and Hapus could not reach the edit
+    // either (a baked edit's cover+text are suppressed from the overlay).
+    // Empty commit now means "remove the thing being edited" — the same
+    // grammar the plain-anno branch has always had — so the edit pair goes
+    // and the pristine original text returns on the rebake.
+    await openDoc(page, NASTY('undangan-cid.pdf'));
+    const originalRaster = await rasterizeFirstPage(page);
+
+    await armGanti(page);
+    await tapLine(page, { str: 'Rapat Anggota Tahunan 2026', nth: 1 });
+    await page.keyboard.type('Rapat Luar Biasa');
+    await page.keyboard.press('Enter');
+    await expect(page.locator('.v2-text-edit')).toHaveCount(0);
+    const afterFirst = await rasterizeFirstPage(page);
+    expect(afterFirst).not.toBe(originalRaster);
+
+    // Re-open the edit; the prefill arrives SELECTED (typing-over is the
+    // gesture), so Backspace clears it — then commit empty.
+    await armGanti(page);
+    await tapLine(page, { str: 'Rapat Anggota Tahunan 2026', nth: 1 });
+    await expect(page.locator('.v2-text-edit')).toHaveText('Rapat Luar Biasa');
+    await page.keyboard.press('Backspace');
+    await expect(page.locator('.v2-text-edit')).toHaveText('');
+    await page.keyboard.press('Enter');
+    await expect(page.locator('.v2-text-edit')).toHaveCount(0);
+
+    // The edit pair is GONE from the model…
+    expect(await page.evaluate(() => window.v2.getDoc().pages[0].annotations.length)).toBe(0);
+    // …the raster reverts to the pristine original…
+    const afterDelete = await rasterizeFirstPage(page);
+    expect(afterDelete).toBe(originalRaster);
+    // …and the edited-bytes pipeline agrees there is nothing left to bake:
+    // buildEditedPageBytes returns bytes:null for a page with no committed
+    // edits, which is the render layer's own signal to show the PRISTINE
+    // source — exactly the restoration this deletion means. (Parsing a text
+    // layer here would assert nothing: the source always carried all three
+    // repeats.)
+    const editedBytesAreNull = await page.evaluate(async () => {
+      const { ensurePdfLib } = await import('/js/core/vendor.js');
+      const { buildEditedPageBytes } = await import('/js/core/page-surgery.js');
+      const { PDFLib, fontkit } = await ensurePdfLib();
+      const d = window.v2.getDoc();
+      const pg = d.pages[0];
+      const source = d.sources.find((s) => s.id === pg.sourceId);
+      const srcDoc = await PDFLib.PDFDocument.load(source.bytes);
+      const result = await buildEditedPageBytes(srcDoc, pg, pg.annotations, { PDFLib, fontkit });
+      return result.bytes === null && result.applied.size === 0;
+    });
+    expect(editedBytesAreNull).toBe(true);
+
+    // The deletion is ONE undo step: undo restores the first edit whole.
+    await page.click('#btn-undo');
+    const annosAfterUndo = await page.evaluate(() => window.v2.getDoc().pages[0].annotations
+      .map((a) => ({ t: a.type, text: a.text })));
+    expect(annosAfterUndo).toHaveLength(2);
+    expect(annosAfterUndo.find((a) => a.t === 'text').text).toBe('Rapat Luar Biasa');
+    const afterUndo = await rasterizeFirstPage(page);
+    expect(afterUndo).toBe(afterFirst);
+  });
+
   test('re-edit backs out cleanly: Escape / no-op-retype leaves the existing edit untouched', async ({ page }) => {
     await openDoc(page, NASTY('undangan-cid.pdf'));
     await armGanti(page);
