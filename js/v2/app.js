@@ -2604,6 +2604,11 @@ async function resetDoc() {
   doc = createDoc();
   history.undoStack.length = 0;
   history.redoStack.length = 0;
+  // Page ids are module-global monotonic (core/model.js's _seq) — the old
+  // doc's thumbnail cache entries can never be hit again OR evicted, so
+  // without this they are pure retained garbage, megabytes per Buka Baru on
+  // a large document (maintenance audit 2026-08-09, finding 3).
+  pageManager.invalidateThumbs();
   if (rasterizer) { await rasterizer.destroy(); rasterizer = null; }
   await textRuns.destroy(); // fresh doc = fresh sources; cached pdf.js docs die with the old one
   // Rung C live-font-preview: the doc-font caches are keyed by sourceId — a

@@ -447,5 +447,15 @@ export function createPageManager(deps) {
   // caller flushes us wholesale; thumbs regenerate lazily on next open.
   function invalidateThumbs() { thumbs.clear(); }
 
-  return { open, openPick, close, render, invalidateThumbs };
+  return {
+    open,
+    openPick,
+    close,
+    render,
+    invalidateThumbs,
+    // Test hook only (tests/buka-baru-thumbs.spec.js): the thumb cache is
+    // otherwise unobservable, and its leak-on-Buka-Baru regression needs a
+    // way to go red. Never used by product code.
+    thumbCount: () => thumbs.size,
+  };
 }
