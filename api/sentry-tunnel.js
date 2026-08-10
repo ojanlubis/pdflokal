@@ -53,7 +53,11 @@ export default async function handler(request) {
       status: upstreamResponse.status,
       headers: { 'Content-Type': upstreamResponse.headers.get('Content-Type') ?? 'application/json' },
     });
-  } catch (err) {
-    return new Response(`Tunnel error: ${err.message}`, { status: 500 });
+  } catch {
+    // Static string, never err.message: a JSON.parse or URL error can quote
+    // the client's own envelope back into the response — the one place in the
+    // repo that broke the content-blind law (audit 2026-08-09, finding 8).
+    // The Sentry SDK's transport only reacts to the status code anyway.
+    return new Response('Tunnel error', { status: 500 });
   }
 }
