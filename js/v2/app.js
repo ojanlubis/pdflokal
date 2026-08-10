@@ -16,7 +16,7 @@
  *   - nothing hover-only; touch targets ≥44px
  */
 
-import { createDoc, createAnnotation, getPage, getSource } from '../core/model.js';
+import { createDoc, createAnnotation, getPage, getSource, findAnnotation } from '../core/model.js';
 import { failureReason } from '../core/failure-reason.js';
 import { isStandardFamily, unencodableInStandardFont } from '../core/text-encode.js';
 import {
@@ -547,12 +547,8 @@ function refreshChrome() {
 // Teks tool armed. Sticky defaults feed new annotations.
 function selectedTextAnno() {
   const id = doc.selection.annotationId;
-  if (!id) return null;
-  for (const page of doc.pages) {
-    const a = page.annotations.find((x) => x.id === id);
-    if (a) return a.type === 'text' ? a : null;
-  }
-  return null;
+  const found = id ? findAnnotation(doc, id) : null;
+  return found && found.annotation.type === 'text' ? found.annotation : null;
 }
 
 const formatBar = createFormatBar({
@@ -1662,9 +1658,10 @@ const interaction = createInteraction({
     return anno;
   },
   onEditText: (annoId) => {
-    for (const page of doc.pages) {
-      const anno = page.annotations.find((a) => a.id === annoId);
-      if (anno) { openTextEditor({ pageId: page.id, x: anno.x, y: anno.y, anno }); return; }
+    const found = findAnnotation(doc, annoId);
+    if (found) {
+      const { page, annotation: anno } = found;
+      openTextEditor({ pageId: page.id, x: anno.x, y: anno.y, anno });
     }
   },
   onGantiSteer,
@@ -2130,12 +2127,10 @@ const signatureModal = createSignatureModal({
 // ---- "Semua Hal." — copy the selected signature/paraf to every page ----------------------
 function selectedSignatureAnno() {
   const id = doc.selection.annotationId;
-  if (!id) return null;
-  for (const page of doc.pages) {
-    const a = page.annotations.find((x) => x.id === id);
-    if (a) return a.type === 'signature' ? { page, anno: a } : null;
-  }
-  return null;
+  const found = id ? findAnnotation(doc, id) : null;
+  return found && found.annotation.type === 'signature'
+    ? { page: found.page, anno: found.annotation }
+    : null;
 }
 
 // The strip serves two moments: a selected signature (→ Semua Hal.) and the
@@ -2179,10 +2174,7 @@ document.getElementById('btn-all-pages').addEventListener('click', () => {
 function deleteSelected() {
   const id = doc.selection.annotationId;
   if (!id) return;
-  let pageId = null;
-  for (const page of doc.pages) {
-    if (page.annotations.some((a) => a.id === id)) { pageId = page.id; break; }
-  }
+  const pageId = findAnnotation(doc, id)?.page.id ?? null;
   record(history, doc);
   removeAnnotation(doc, id);
   tel('tool_use', { tool: 'hapus', action: 'delete' }); // spec-telemetry.md §6.2
