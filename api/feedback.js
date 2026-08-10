@@ -149,11 +149,16 @@ export default async function handler(req, res) {
     // note above are already extracted and land regardless.
     const sample = validateSample(body);
 
-    // Stamp the SERVER's own deploy SHA (same reasoning as api/t.js: the client
-    // can't stamp a real version — no build step — so it sends 'dev'; prefer
-    // the env SHA, fall back to the already-validated client value locally).
+    // THE CLIENT'S OWN ANSWER WINS — mirroring api/t.js's 2026-07-29 reversal,
+    // which this file missed until the 2026-08-09 audit (finding 4). The same
+    // js/v2/telemetry.js sends the same /api/rev-pinned SHA here as to /api/t;
+    // preferring the server's arrival-time SHA instead named whatever deploy
+    // happened to be live when the 👎 arrived, not the build the user ran —
+    // the exact attribution defect t.js's reversal removed. Server SHA stays
+    // as the floor for 'dev' (first seconds, offline, old cached clients).
     const serverSha = String(process.env.VERCEL_GIT_COMMIT_SHA || '').toLowerCase();
-    const storedVersion = /^[0-9a-f]{7,40}$/.test(serverSha) ? serverSha : appVersion;
+    const clientSha = /^[0-9a-f]{7,40}$/.test(appVersion) ? appVersion : '';
+    const storedVersion = clientSha || (/^[0-9a-f]{7,40}$/.test(serverSha) ? serverSha : appVersion);
 
     const url = process.env.TELEMETRY_SUPABASE_URL;
     const key = process.env.TELEMETRY_SUPABASE_SERVICE_KEY;
