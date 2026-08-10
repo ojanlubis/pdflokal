@@ -560,7 +560,13 @@ export const SCHEMA = {
   // pessimistic in exactly the place the push policy trusts it most.
   failure: {
     stage: ['import', 'commit', 'export', 'compress', 'render', 'runtime'],
-    reason: ['encrypted', 'corrupt', 'out-of-memory', 'unsupported', 'timeout', 'unknown'],
+    // 'font-fallback' (added 2026-08-09, audit finding 2): a custom/clone font
+    // fetch failed at export and core/export.js substituted Helvetica in the
+    // kept file. Always blocked:false — the export SUCCEEDED, wrongly; this is
+    // the forewarning shape the encrypted-import notice already uses. Enum
+    // ADDITION only: old cached clients never send it, so nothing blanks
+    // (removals are the two-release hazard, not additions).
+    reason: ['encrypted', 'corrupt', 'out-of-memory', 'unsupported', 'timeout', 'font-fallback', 'unknown'],
     class: UNSUPPORTED_CLASS,
     blocked: 'bool',
   },

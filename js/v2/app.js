@@ -1687,9 +1687,22 @@ const pageManager = createPageManager({
         ensurePdfLib(), // pdf-lib + fontkit: export-only, fetched at the moment of intent
       ]);
       const subset = { sources: doc.sources, pages, selection: { pageId: null, annotationId: null } };
-      const bytes = await buildPdfBytes(subset, { PDFLib, fontkit });
+      // Same font-fallback witness the Unduh sheet carries (download-sheet.js,
+      // audit finding 2): a failed font fetch substitutes Helvetica in the
+      // kept file, and the user must hear about it — the warn toast outranks
+      // the success one (same "skips take priority" law as the load loop).
+      let fontFallback = false;
+      const bytes = await buildPdfBytes(subset, {
+        PDFLib, fontkit, onFontFallback: () => { fontFallback = true; },
+      });
       download(new Blob([bytes], { type: 'application/pdf' }), `${baseName}-halaman-${pages.length}.pdf`);
-      toast(`Selesai! ${pages.length} halaman diekstrak jadi PDF baru`);
+      if (fontFallback) {
+        // COPY IS PLACEHOLDER — client-facing words are Fauzan's, per the seat.
+        toast('Sebagian teks memakai font pengganti di file hasil'); // TODO(copy): his words
+        tel('failure', { stage: 'export', reason: 'font-fallback', class: 'none', blocked: false });
+      } else {
+        toast(`Selesai! ${pages.length} halaman diekstrak jadi PDF baru`);
+      }
     } catch (err) {
       console.error(err);
       toast('Waduh, gagal mengekstrak. Coba sekali lagi ya');

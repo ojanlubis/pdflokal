@@ -73,6 +73,15 @@ function resolveFontName(fontFamily, bold, italic) {
 }
 
 async function cacheFallbackFont(env, fontName, bold) {
+  // SAY SO, DON'T JUST DO IT (maintenance audit 2026-08-09, finding 2): this
+  // fallback changes the typeface in the file the user KEEPS — glyphs and
+  // widths differ from the preview — and until now its only witness was the
+  // user's own console. Core is headless, so it cannot toast; the caller
+  // injects deps.onFontFallback and owns the user-facing signal
+  // (download-sheet toasts + fires the rail's failure{reason:'font-fallback',
+  // blocked:false} forewarning). Fires once per font name per export: later
+  // annotations hit the fontCache directly and never re-enter this function.
+  try { env.onFontFallback?.(fontName); } catch { /* reporting must never break the export */ }
   // WHY 'HelveticaBold' (no hyphen): PDFLib.StandardFonts KEYS are camel-case
   // ('HelveticaBold'); the hyphenated form is the enum VALUE. The old export
   // used the value as a key here, silently getting `undefined` for bold
@@ -371,7 +380,10 @@ export async function buildPdfBytes(doc, deps = {}) {
   // fonts work without it — see the guard in embedCustomFont.
   if (fontkit) newDoc.registerFontkit(fontkit);
 
-  const env = { PDFLib, fontkit, newDoc, fontCache: {}, imageCache: new Map() };
+  const env = {
+    PDFLib, fontkit, newDoc, fontCache: {}, imageCache: new Map(),
+    onFontFallback: deps.onFontFallback || null, // see cacheFallbackFont
+  };
   env.getFont = (family, bold, italic) => getFont(env, family, bold, italic);
 
   // WHY cache: the old exporter re-parsed the source PDF for EVERY page

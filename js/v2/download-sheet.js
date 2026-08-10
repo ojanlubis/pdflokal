@@ -153,9 +153,17 @@ export function createDownloadSheet(deps) {
       // pdf-lib + fontkit are export-only, so they're fetched here rather than at
       // page load. Opening the sheet is what signals the intent to download.
       const { PDFLib, fontkit } = await ensurePdfLib();
-      const bytes = await buildPdfBytes(subset, { PDFLib, fontkit });
+      // A failed font fetch mid-build silently substitutes Helvetica in the
+      // FILE (core/export.js's cacheFallbackFont) — the one witness is this
+      // callback. Collected on a local so a superseded build can never flag
+      // the current one; surfaced at the CTA (doExport), the moment the user
+      // actually takes the bytes, not here (the build may still be discarded).
+      let fontFallback = false;
+      const bytes = await buildPdfBytes(subset, {
+        PDFLib, fontkit, onFontFallback: () => { fontFallback = true; },
+      });
       if (seq !== state.seq) return; // selection changed mid-build
-      state.base = { bytes, size: bytes.length };
+      state.base = { bytes, size: bytes.length, fontFallback };
     } catch (err) {
       console.error(err);
       // ⚠️ KEEP THE ERROR. This is where an export ACTUALLY fails — the build,
@@ -487,6 +495,18 @@ export function createDownloadSheet(deps) {
           deps.download(new Blob([zip], { type: 'application/zip' }), `${baseName}-gambar.zip`);
           deps.toast(`Selesai! ${n} gambar dibungkus jadi satu ZIP`);
         }
+      }
+      // A font fell back to Helvetica during the base build — the kept file's
+      // text does not look like the preview. Tell the user AFTER the download
+      // (the file is already right-or-wrong; the message is a heads-up, not a
+      // gate) and count it on the rail as a forewarning, blocked:false — the
+      // export succeeded, same shape as the encrypted-import notice. Applies
+      // to the compressed and image paths too: both derive from state.base's
+      // bytes, so the substitution rides along.
+      // COPY IS PLACEHOLDER — client-facing words are Fauzan's, per the seat.
+      if (state.base?.fontFallback) {
+        deps.toast('Sebagian teks memakai font pengganti di file hasil'); // TODO(copy): his words
+        tel('failure', { stage: 'export', reason: 'font-fallback', class: 'none', blocked: false });
       }
       // Richer than the old event: the CHOICES are the product signal now.
       track('download', {
