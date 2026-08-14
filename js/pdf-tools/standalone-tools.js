@@ -129,8 +129,8 @@ export async function convertPDFtoImages() {
 
     track('download', { tool: 'pdf-to-img' });
     if (failed > 0) {
-      // COPY IS PLACEHOLDER — client-facing words are Fauzan's, per the seat.
-      showToast(`${failed} halaman gagal dikonversi, sisanya berhasil diunduh`, 'error'); // TODO(copy): his words
+      // Ratified by Fauzan 2026-08-14 (PM STATE.md "RATIFIED 2026-08-14").
+      showToast(`${failed} halaman gagal dikonversi, sisanya berhasil diunduh`, 'error');
     } else {
       showToast('Semua halaman berhasil dikonversi!', 'success');
     }
