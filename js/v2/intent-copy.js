@@ -53,7 +53,7 @@ export const INTENT_COPY = {
     dzTitle: 'Seret PDF yang halamannya mau dirapikan',
     dzHint: 'Buang halaman kosong, urutkan ulang, putar yang miring',
     pmTitle: 'Kelola Halaman',
-    pmHint: 'Centang halaman yang mau dibuang · tahan lalu geser buat mengurutkan',
+    pmHint: 'Centang halaman yang mau dibuang',
   },
 
   kompres: {
