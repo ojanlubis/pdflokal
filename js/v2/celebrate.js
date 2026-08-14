@@ -19,7 +19,10 @@ import { createPlaystoreVote } from './playstore-vote.js';
 // drive, the download moment shows the binary VOTE card instead of share/tip —
 // the peak-enthusiasm slot is spent, on purpose, on the go/no-go signal. Flip
 // this to false to end the drive; the share/tip card returns, nothing else.
-const PLAYSTORE_CAMPAIGN = true;
+// ENDED (PM ruling, per bench brief 2026-08-14): the drive was scoped to two
+// weeks on 19 Jul and expired 2 Aug. The vote card no longer shows; the
+// share/tip card is what the download moment offers now.
+const PLAYSTORE_CAMPAIGN = false;
 
 const OPTOUT_KEY = 'pdflokal-support-optout';
 const LAST_SHOWN_KEY = 'pdflokal-support-last';
