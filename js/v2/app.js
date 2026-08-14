@@ -2285,6 +2285,7 @@ async function loadFilesInner(files) {
   // onunhandledrejection — the user saw a silent broken load. Now we skip the bad
   // one, keep the good ones, and say so plainly. Honest failure is still feedback.
   let failed = 0;
+  let lastFailureReason = null; // see the catch block below and the toast after the loop
   for (let i = 0; i < usable.length; i++) {
     const f = usable[i];
     updateProcessing(i, usable.length); // i files done, working on i+1
@@ -2371,6 +2372,20 @@ async function loadFilesInner(files) {
       // blocked:TRUE — the genuine decline. This file did not open at all, so
       // the user is standing still. Its twin above (the protected-PDF notice)
       // carries the same stage and reason and blocked:false.
+      // lastFailureReason feeds the single-file toast below (STATE.md
+      // "RATIFIED 2026-08-14"): a user-password-protected PDF (PDF.js itself
+      // throws PasswordException, unlike terkunci.pdf's empty-user-password
+      // shape which opens fine) deserves "dikunci sandi", not "kosong atau
+      // rusak". Only meaningful when usable.length === 1 below — a multi-file
+      // batch has no single reason to report and keeps the generic wording.
+      // Calls failureReason(err) again rather than reusing a shared variable
+      // in the tel() call below: tests/core/telemetry-coverage.test.mjs's
+      // COVERAGE guard only accepts `failureReason(err)` or the DETERMINED
+      // literals as the `reason` VALUE EXPRESSION at each tel('failure', …)
+      // call site, so it can prove nothing hard-codes a rail value — an
+      // indirection through an unrelated-looking variable is exactly what it
+      // exists to catch.
+      lastFailureReason = failureReason(err);
       tel('failure', { stage: 'import', reason: failureReason(err), class: 'none', blocked: true });
     }
   }
@@ -2378,9 +2393,12 @@ async function loadFilesInner(files) {
   // Every file failed → leave the landing untouched, say it plainly, bail. Also
   // guards the doc.pages[0] read below, which would throw on an empty document.
   if (doc.pages.length === 0) {
-    toast(usable.length === 1
-      ? 'File itu nggak bisa dibuka, mungkin kosong atau rusak'
-      : 'Nggak ada file yang bisa dibuka, mungkin kosong atau rusak');
+    const singleLocked = usable.length === 1 && lastFailureReason === 'encrypted';
+    toast(singleLocked
+      ? 'File itu dikunci sandi, jadi nggak bisa dibuka di sini'
+      : usable.length === 1
+        ? 'File itu nggak bisa dibuka, mungkin kosong atau rusak'
+        : 'Nggak ada file yang bisa dibuka, mungkin kosong atau rusak');
     return;
   }
 
