@@ -1697,8 +1697,8 @@ const pageManager = createPageManager({
       });
       download(new Blob([bytes], { type: 'application/pdf' }), `${baseName}-halaman-${pages.length}.pdf`);
       if (fontFallback) {
-        // COPY IS PLACEHOLDER — client-facing words are Fauzan's, per the seat.
-        toast('Sebagian teks memakai font pengganti di file hasil'); // TODO(copy): his words
+        // Ratified by Fauzan 2026-08-14 (PM STATE.md "RATIFIED 2026-08-14").
+        toast('Sebagian teks memakai font pengganti yang mirip di file hasil');
         tel('failure', { stage: 'export', reason: 'font-fallback', class: 'none', blocked: false });
       } else {
         toast(`Selesai! ${pages.length} halaman diekstrak jadi PDF baru`);

@@ -503,9 +503,9 @@ export function createDownloadSheet(deps) {
       // export succeeded, same shape as the encrypted-import notice. Applies
       // to the compressed and image paths too: both derive from state.base's
       // bytes, so the substitution rides along.
-      // COPY IS PLACEHOLDER — client-facing words are Fauzan's, per the seat.
+      // Ratified by Fauzan 2026-08-14 (PM STATE.md "RATIFIED 2026-08-14").
       if (state.base?.fontFallback) {
-        deps.toast('Sebagian teks memakai font pengganti di file hasil'); // TODO(copy): his words
+        deps.toast('Sebagian teks memakai font pengganti yang mirip di file hasil');
         tel('failure', { stage: 'export', reason: 'font-fallback', class: 'none', blocked: false });
       }
       // Richer than the old event: the CHOICES are the product signal now.
