@@ -3,6 +3,21 @@
 100% client-side PDF + image tool for Indonesian users. Nothing is ever uploaded. `main` auto-deploys
 to pdflokal.id.
 
+> ⛔ **`vercel` WITH NO ARGUMENTS MEANS DEPLOY.** It is not a status command. Deploys happen by
+> pushing `main`; the CLI is never the route. **Read-only commands are `vercel ls`, `vercel inspect`,
+> `vercel project ls`** — those are safe. `vercel` and `vercel deploy` ship.
+>
+> **The hazard is running it in the WRONG DIRECTORY.** On 2026-08-17 a bare `vercel` in the seat
+> (`../`, a sibling repo of markdown with no `package.json` and no `index.html`) linked the SEAT to
+> this project and began uploading 512 MB before being cancelled. **Nothing deployed, but it would
+> not have failed:** no framework to detect and no build command means Vercel serves the upload as
+> plain static files. `/` would 404 for want of an `index.html` and every doc would still be live at
+> its own path. **A wrong-directory deploy does not error, it succeeds and serves the wrong tree.**
+>
+> It also writes `.vercel/project.json` pointing at the production project, which is the part that
+> outlives the mistake: a later `vercel --prod` there would replace pdflokal.id with a folder of
+> markdown. **If you ever find a `.vercel/` outside this directory, delete it.**
+
 ## Hard constraints
 
 - **Vanilla JS, native ES modules, no build step, no bundler, no framework** — that constraint is the
