@@ -15,15 +15,50 @@ import { ensureSignaturePad } from '../core/vendor.js';
 
 const WHITE_THRESHOLD = 235; // r,g,b all above this → transparent
 
+/*
+ * ---- opt-in device save (spec-signature-save.md, ruled 2026-08-13) ---------
+ * ONE key, holding ONE trimmed PNG dataURL, overwritten. A collection of
+ * signatures would walk into the ~5MB origin quota; one artifact cannot.
+ * Underscore form matches `pdflokal_theme` (the codebase is already
+ * inconsistent — `pdflokal-ps-voted` uses hyphens — do not sweep it here).
+ *
+ * WHY opt-in and off by default: the case that decides it is the shared
+ * machine — warnet, kantor, a borrowed laptop. Saving automatically there puts
+ * one person's signature on someone else's computer with no moment at which
+ * they agreed to it. Documented to users in privasi.html's storage table.
+ *
+ * The three helpers are module-local ON PURPOSE, matching playstore-vote.js
+ * and install-prompt.js: private mode and QuotaExceededError land in the same
+ * catch and neither is an error the user should ever see.
+ */
+const SIG_KEY = 'pdflokal_signature';
+
+function safeGet(k) { try { return localStorage.getItem(k); } catch { return null; } }
+function safeSet(k, v) { try { localStorage.setItem(k, v); } catch { /* private mode / quota */ } }
+function safeRemove(k) { try { localStorage.removeItem(k); } catch { /* private mode */ } }
+
+function decodeImage(dataUrl) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null); // corrupt stored value → behave as if none
+    img.src = dataUrl;
+  });
+}
+
 export function createSignatureModal({ modal, onReady, toast }) {
   const canvas = modal.querySelector('#sig-canvas');
   const fileInput = modal.querySelector('#sig-file');
   const preview = modal.querySelector('#sig-preview');
   const parafCheck = modal.querySelector('#sig-paraf');
   const removeBgCheck = modal.querySelector('#sig-removebg');
+  const saveCheck = modal.querySelector('#sig-save');
   const tabs = modal.querySelectorAll('.sig-tab');
   let pad = null;
   let uploadedImg = null; // HTMLImageElement of the chosen file
+  // The signature read back off the device this open, still untouched:
+  // { dataUrl, width, height }. Cleared the moment the user redraws.
+  let restored = null;
 
   // ---- tabs -----------------------------------------------------------------
   function showTab(name) {
@@ -53,7 +88,29 @@ export function createSignatureModal({ modal, onReady, toast }) {
     const SignaturePad = await ensureSignaturePad();
     pad = new SignaturePad(canvas, { minWidth: 1, maxWidth: 2.4 });
   }
-  modal.querySelector('#sig-clear').addEventListener('click', () => pad?.clear());
+  // "Ulangi" is also how a restored signature is discarded — without dropping
+  // `restored` the confirm handler would hand back the stored bytes the user
+  // just wiped off the pad.
+  modal.querySelector('#sig-clear').addEventListener('click', () => { pad?.clear(); restored = null; });
+
+  /*
+   * Paint the saved signature straight onto the pad canvas, so on open it is
+   * simply THERE — no second surface and no new visual language, and "Ulangi"
+   * already reads as start-over.
+   *
+   * WHY not pad.fromDataURL(): that helper stretches the image to the whole
+   * canvas, ignoring aspect ratio, and decodes a second time. The pad's context
+   * already carries initPad()'s DPR scale (assigning canvas.width resets the
+   * transform, so it is applied exactly once), so this draws in CSS pixels.
+   */
+  function paintRestored(img) {
+    const boxW = canvas.offsetWidth;
+    const boxH = canvas.offsetHeight;
+    const fit = Math.min(boxW / img.naturalWidth, boxH / img.naturalHeight, 1);
+    const w = img.naturalWidth * fit;
+    const h = img.naturalHeight * fit;
+    canvas.getContext('2d').drawImage(img, (boxW - w) / 2, (boxH - h) / 2, w, h);
+  }
 
   // ---- upload pane ---------------------------------------------------------------
   // SINGLE SOURCE OF TRUTH for "an image arrived, make it the signature".
@@ -170,22 +227,40 @@ export function createSignatureModal({ modal, onReady, toast }) {
   }
 
   // ---- confirm -------------------------------------------------------------------
+  const fromCanvas = (c) => (c
+    ? { dataUrl: c.toDataURL('image/png'), width: c.width, height: c.height }
+    : null);
+
   modal.querySelector('#sig-use').addEventListener('click', () => {
     const drawVisible = modal.querySelector('.sig-pane-draw').style.display !== 'none';
-    let source = null;
-    if (drawVisible) {
+    let art = null;
+    if (drawVisible && restored && pad?.toData().length === 0) {
+      // A restored signature nobody has drawn over: hand back the STORED bytes.
+      // WHY: re-reading it off the pad would re-scale it to pad resolution on
+      // every open→Pakai cycle, quietly shrinking an uploaded photo signature
+      // (capped at 1200px by processUpload) down to a ~460px box, for good.
+      // pad.toData() is the discriminator — fromDataURL/paintRestored never
+      // touch the stroke data, a real stroke always does.
+      art = restored;
+    } else if (drawVisible) {
       if (!pad || pad.isEmpty()) { toast('Gambar tanda tanganmu dulu ya'); return; }
-      source = trimToInk(canvas);
+      art = fromCanvas(trimToInk(canvas));
     } else {
-      source = processUpload();
-      if (!source) { toast('Upload gambar tanda tanganmu dulu ya'); return; }
+      art = fromCanvas(processUpload());
+      if (!art) { toast('Upload gambar tanda tanganmu dulu ya'); return; }
     }
-    if (!source) { toast('Tanda tangan kosong'); return; }
+    if (!art) { toast('Tanda tangan kosong'); return; }
+    // The checkbox IS the consent moment, and unchecking it is also the delete
+    // control — that is what avoids inventing a second button and a second
+    // string. Written only here, past every empty-source check, so Batal and a
+    // backdrop click never touch the device.
+    if (saveCheck.checked) safeSet(SIG_KEY, art.dataUrl);
+    else safeRemove(SIG_KEY);
     modal.close();
     onReady({
-      dataUrl: source.toDataURL('image/png'),
-      width: source.width,
-      height: source.height,
+      dataUrl: art.dataUrl,
+      width: art.width,
+      height: art.height,
       subtype: parafCheck.checked ? 'paraf' : null,
     });
   });
@@ -193,12 +268,27 @@ export function createSignatureModal({ modal, onReady, toast }) {
   modal.addEventListener('click', (e) => { if (e.target === modal) modal.close(); });
 
   return {
-    open() {
+    // async so the restore can wait for the pad: SignaturePad's constructor
+    // clear()s the canvas, so painting before it exists paints into nothing.
+    // Callers do not await — the sheet is already up and interactive.
+    async open() {
       modal.showModal();
       showTab('draw');
-      initPad();
       uploadedImg = null;
       preview.innerHTML = '';
+      restored = null;
+      const saved = safeGet(SIG_KEY);
+      // Set synchronously: a stored signature means the box reads as already
+      // kept, so leaving it alone keeps it and unchecking it deletes it.
+      saveCheck.checked = !!saved;
+      await initPad();
+      if (!saved || !modal.open) return; // closed while the pad was fetched
+      const img = await decodeImage(saved);
+      // Re-check: the user may have closed the sheet or started drawing while
+      // the pad and the image were loading. Never paint over a live stroke.
+      if (!img || !modal.open || pad?.toData().length) return;
+      paintRestored(img);
+      restored = { dataUrl: saved, width: img.naturalWidth, height: img.naturalHeight };
     },
   };
 }

@@ -10,10 +10,12 @@
  * copy 2026-08-14 (STATE.md "RATIFIED 2026-08-14"); this pins his exact
  * words so a future edit can't quietly drop a row back out.
  *
- * `pdflokal_signature` is DELIBERATELY NOT covered here — spec-signature-save.md
- * still marks that feature "scoped, not built" (no #sig-save checkbox, no write
- * site anywhere in js/), so a row claiming the page "menyimpan tanda tangan"
- * would describe a capability the code does not have. See the bench report.
+ * `pdflokal_signature` joined them 2026-08-17, when the opt-in device save was
+ * built (`#sig-save` → js/v2/signature-modal.js). Its Fungsi string is his too,
+ * ratified in the same eleven — spec-signature-save.md §5. The row and the
+ * feature ship and revert together: a row without the write site documents a key
+ * nothing writes, and a write site without the row under-reports storage on the
+ * one page that must not be approximately right.
  */
 import { test, expect } from '@playwright/test';
 
@@ -38,5 +40,18 @@ test.describe('privasi.html — Local Storage table, ratified rows', () => {
     // Pre-existing rows are untouched — this change only adds.
     await expect(table.locator('code:text-is("pdflokal_theme")')).toHaveCount(1);
     await expect(table.locator('code:text-is("pdflokal_changelog_last_closed")')).toHaveCount(1);
+  });
+
+  test('pdflokal_signature carries his ratified wording, character for character', async ({ page }) => {
+    await page.goto('/privasi.html');
+    const table = page.locator('.storage-table');
+    await expect(table).toBeVisible();
+
+    // `text-is` on the <code> is exact, so it cannot match the longer
+    // `pdflokal_signature_hint_shown` key sitting in the next row.
+    const row = table.locator('tr', { has: page.locator('code:text-is("pdflokal_signature")') });
+    await expect(row).toHaveCount(1);
+    await expect(row.locator('td').nth(1))
+      .toHaveText('Menyimpan tanda tangan di perangkat ini agar tidak perlu digambar ulang');
   });
 });
