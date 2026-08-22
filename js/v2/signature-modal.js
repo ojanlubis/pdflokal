@@ -50,6 +50,20 @@ export function createSignatureModal({ modal, onReady, toast }) {
   const canvas = modal.querySelector('#sig-canvas');
   const fileInput = modal.querySelector('#sig-file');
   const preview = modal.querySelector('#sig-preview');
+  // WHY EVERY CHECKBOX REF IS OPTIONAL (Sentry JAVASCRIPT-X / JAVASCRIPT-W,
+  // 2026-08-22): open() threw `Cannot set properties of null (setting
+  // 'checked')` twice in production, two days AFTER the 2026-08-17 tandatangan
+  // ship, one event each, and it does NOT reproduce — all 21 shipped pages were
+  // scanned in a real browser and every one has #sig-save, #sig-paraf and
+  // #sig-removebg correctly inside #sig-modal.
+  // The explanation that fits the shape is DEPLOY SKEW: a browser holding
+  // index.html cached from before the ship, then fetching the new app.js. New
+  // code, old markup. STATED AS THE BEST FIT, NOT AS PROVEN — the reproduction
+  // was never obtained, and a comment that overstates its evidence is how the
+  // next session trusts the wrong thing.
+  // The fix is correct under EVERY candidate cause, which is why it ships
+  // without the root cause being settled: a modal must not die because optional
+  // chrome is absent. Missing box = feature not offered, not a dead dialog.
   const parafCheck = modal.querySelector('#sig-paraf');
   const removeBgCheck = modal.querySelector('#sig-removebg');
   const saveCheck = modal.querySelector('#sig-save');
@@ -177,7 +191,7 @@ export function createSignatureModal({ modal, onReady, toast }) {
     c.height = Math.round(uploadedImg.naturalHeight * scale);
     const ctx = c.getContext('2d');
     ctx.drawImage(uploadedImg, 0, 0, c.width, c.height);
-    if (removeBgCheck.checked) whiteToTransparent(c);
+    if (removeBgCheck?.checked) whiteToTransparent(c);
     return trimToInk(c);
   }
 
@@ -254,14 +268,14 @@ export function createSignatureModal({ modal, onReady, toast }) {
     // control — that is what avoids inventing a second button and a second
     // string. Written only here, past every empty-source check, so Batal and a
     // backdrop click never touch the device.
-    if (saveCheck.checked) safeSet(SIG_KEY, art.dataUrl);
+    if (saveCheck?.checked) safeSet(SIG_KEY, art.dataUrl);
     else safeRemove(SIG_KEY);
     modal.close();
     onReady({
       dataUrl: art.dataUrl,
       width: art.width,
       height: art.height,
-      subtype: parafCheck.checked ? 'paraf' : null,
+      subtype: parafCheck?.checked ? 'paraf' : null,
     });
   });
   modal.querySelector('#sig-cancel').addEventListener('click', () => modal.close());
@@ -280,7 +294,7 @@ export function createSignatureModal({ modal, onReady, toast }) {
       const saved = safeGet(SIG_KEY);
       // Set synchronously: a stored signature means the box reads as already
       // kept, so leaving it alone keeps it and unchecking it deletes it.
-      saveCheck.checked = !!saved;
+      if (saveCheck) saveCheck.checked = !!saved;
       await initPad();
       if (!saved || !modal.open) return; // closed while the pad was fetched
       const img = await decodeImage(saved);
