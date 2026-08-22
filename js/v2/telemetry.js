@@ -26,7 +26,15 @@ const FLUSH_AT = 10;
 // enough to join events into one funnel (this open → this download), useless
 // for tracking a person across visits (spec §2 — no cookies, no
 // localStorage id, no fingerprinting).
-const sessionId = crypto.randomUUID();
+// WHY THE FALLBACK, and why it is not optional: randomUUID is absent on iOS
+// Safari < 15.4 and in any NON-SECURE context (LAN http). This line runs at
+// module TOP LEVEL and app.js imports this module, so an unguarded throw here
+// takes the entire import graph with it — page renders, every button dead
+// (Sentry JAVASCRIPT-T; js/lib/analytics.js took the identical fix in July and
+// this sibling was missed). A session id needs UNIQUENESS, not cryptography.
+const sessionId = typeof crypto?.randomUUID === 'function'
+  ? crypto.randomUUID()
+  : `s-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
 // <meta name="pdflokal-rev"> is stamped at deploy time (commit SHA) when
 // present; local dev and any page that doesn't carry it are honestly 'dev'
