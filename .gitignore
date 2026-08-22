@@ -45,14 +45,15 @@ node_modules/
 # The harness is committed; the documents are not.
 tests/fixtures/wild/
 
-# OCR engine — vendored locally, NOT committed while the OCR spec is unruled.
-# MEASURED runtime payload 5.01 MB (tesseract.min.js 0.06 + worker.min.js 0.12
-# + tesseract-core-simd-lstm.wasm.js 3.76 + ind.traineddata 1.07), read off the
-# network on a real run, not from the docs. That is +10% on the 4.55 MB the OCR
-# spec quotes, and it nearly doubles js/vendor/. Apache-2.0 throughout, so the
-# licence is fine; the PAYLOAD is the open question and it is Fauzan's.
-# Fetch with scripts/fetch-ocr-engine.sh. Delete these two lines to ship it.
-js/vendor/tesseract/
+# OCR engine — COMMITTED 2026-08-22. Both blockers named in db452ef are cleared:
+# the payload was ruled acceptable by Fauzan (TODO.md, "5.01 MB OCR: acceptable
+# — 0 KB for the ~98% who never ask"), and the live CSP now carries
+# 'wasm-unsafe-eval' (grant 4567704, confirmed an ancestor of origin/main AND
+# read off the production response header). The note that used to sit here
+# outlived both conditions by ~3 weeks while sessions kept re-quoting it.
+# MEASURED 5.01 MB (tesseract.min.js 0.06 + worker.min.js 0.12 +
+# tesseract-core-simd-lstm.wasm.js 3.76 + ind.traineddata 1.07), off the network
+# on a real run. Apache-2.0 throughout. Re-fetch: scripts/fetch-ocr-engine.sh.
 
 # Rolling median of recent GREEN gate durations, used to flag a run that was
 # starved by machine contention. MACHINE-LOCAL: a baseline from someone else's
