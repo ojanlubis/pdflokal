@@ -60,10 +60,20 @@ export function hexToRgb01(hex) {
 // from the hasGlyphForCodePoint check itself: if the subset has no space
 // entry at all, pdf-lib has nothing to encode that codepoint with, so this
 // still declines (spec §3 rung 1's own space carve-out, stated the same way).
+// WHY hasGlyphForCodePoint IS INSIDE THE try (Sentry JAVASCRIPT-S, Aug 2026):
+// it used to sit one line above it, and fontkit parses LAZILY — a wild font
+// whose tables only fault when a cmap is first consulted threw
+// `undefined is not an object (evaluating 'e.tables')` from INSIDE this call,
+// straight past a catch that only ever covered the two lines below. It
+// surfaced on app.js's commit-time notice prediction, which is not armored,
+// so commit() died and the user's replacement silently never applied.
+// Declining (false) is the correct answer to a fault, not a rethrow: it makes
+// rung 1 fall through to clone/twin, and a font we cannot interrogate is by
+// definition one we cannot PROVE is right.
 function glyphPaints(font, cp) {
-  if (!font.hasGlyphForCodePoint(cp)) return false;
-  if (cp === 32) return true;
   try {
+    if (!font.hasGlyphForCodePoint(cp)) return false;
+    if (cp === 32) return true;
     const g = font.glyphForCodePoint(cp);
     if (!g || g.id === 0) return false; // .notdef
     const cmds = g.path && g.path.commands;
