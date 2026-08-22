@@ -412,7 +412,10 @@
        size so the scroll container is always correct. transform (not CSS zoom):
        zoom's coordinate reporting was quirky before Chrome 128 — a real
        old-Android problem for this market. transform is standardized everywhere. */
-    #v2-sizer { position: relative; margin: 0 auto; padding: 16px 0 90px; }
+    /* 104px, not 90: zoom overlays 102px from the viewport bottom (bottom:14 +
+       h:88), so 90 left the page's bottom-right corner unreachable by scroll.
+       The contact bookmark needs the same clearance on the left. */
+    #v2-sizer { position: relative; margin: 0 auto; padding: 16px 0 104px; }
     #v2-stage {
       position: absolute; top: 16px; left: 0;
       display: flex; flex-direction: column; align-items: center; gap: 16px;
@@ -489,9 +492,39 @@
     #zoom-ctl button { width: 44px; height: 44px; font-size: 20px; color: var(--muted); border-radius: 0; }
     #zoom-ctl button:first-child { border-bottom: 1px solid var(--line); }
 
+    /* contact bookmark (floating, bottom-left; mirrors #zoom-ctl's quiet
+       register on purpose — furniture, not a promotion). The tab and the
+       panel are two separate fixed-position elements, not nested: keeps the
+       collapsed tab's own rendered box exactly button-sized (measurable,
+       small) instead of a wrapper that stays tall while invisible. */
+    #contact-tab-btn {
+      position: fixed; left: 10px; bottom: 14px; z-index: 30;
+      height: 44px; padding: 0 16px; border-radius: 12px;
+      background: var(--surface); box-shadow: 0 3px 14px rgba(0,0,0,.16);
+      color: var(--muted); font: inherit; font-size: 13px; font-weight: 600;
+    }
+    #contact-tab-panel {
+      position: fixed; left: 10px; bottom: 66px; z-index: 30;
+      width: max-content; max-width: min(72vw, 240px);
+      background: var(--surface); box-shadow: 0 3px 14px rgba(0,0,0,.16);
+      border-radius: 12px; padding: 12px 14px;
+      /* visibility (not just opacity): same reasoning as #support-card — a
+         dismissed panel must be GONE to hit-testing and screen readers. */
+      opacity: 0; visibility: hidden; pointer-events: none;
+      transform: translateY(10px); /* rests slightly low → reads as "slides up" on open */
+      transition: opacity .22s ease, transform .22s ease, visibility 0s linear .22s;
+    }
+    #contact-tab-panel.show {
+      opacity: 1; visibility: visible; pointer-events: auto;
+      transform: translateY(0); transition-delay: 0s;
+    }
+    #contact-tab-panel a { color: var(--accent); font-size: 13px; font-weight: 600; }
+    @media (prefers-reduced-motion: reduce) { #contact-tab-panel { transition: none; } }
+
     /* ---- the landing (= the editor's empty state; design: draf 3b) ---- */
     /* Editor chrome yields while the landing is up; it has its own header. */
-    body.is-empty header, body.is-empty #toolbar, body.is-empty #zoom-ctl { display: none; }
+    body.is-empty header, body.is-empty #toolbar, body.is-empty #zoom-ctl,
+    body.is-empty #contact-tab-btn, body.is-empty #contact-tab-panel { display: none; }
     #empty {
       position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain;
       /* The PAGE ground is white (ruled 2026-07-29). The body underneath is
@@ -1320,7 +1353,7 @@
   <header>
     <button class="brand" id="btn-home" aria-label="Kembali ke beranda">PDF<span class="brand-red">Lokal</span></button>
     <div class="file-menu-wrap">
-      <button id="btn-file" disabled aria-haspopup="menu" aria-expanded="false">File ▾</button>
+      <button id="btn-file" disabled aria-haspopup="menu" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;vertical-align:-3px;margin-right:2px"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M15 2v5h5"/></svg>File ▾</button>
       <div id="file-menu" role="menu" hidden>
         <!-- WHY title= and not a custom tooltip: `title` is already this page's
              tooltip idiom (#btn-undo, #btn-redo, the ganti tool), and it reaches a
@@ -1694,8 +1727,10 @@
           <a href="https://github.com/ojanlubis/pdflokal" rel="noopener">Github</a>
           <!-- The general feedback channel. An <a> rather than a <button> so it
                reads as part of the footer's link row and keeps keyboard
-               semantics; js/v2/feedback-form.js preventDefaults it. Copy is
-               PLACEHOLDER — TODO(copy), the founder's own hand. -->
+               semantics; js/v2/feedback-form.js preventDefaults it. Copy
+               RULED 2026-08-22: the string stays as-is, alongside the TikTok
+               DM (#contact-tab-btn) — the in-page form is an anonymous act,
+               the DM is a conversation, and the two channels coexist. -->
           <a href="#fb-form" id="fb-open">Ada masukan?</a>
           <span>Dibuat di Indonesia</span>
         </footer>
@@ -1715,6 +1750,13 @@
   <div id="zoom-ctl">
     <button id="z-in" aria-label="Perbesar">+</button>
     <button id="z-out" aria-label="Perkecil">−</button>
+  </div>
+  <!-- Contact bookmark: quiet furniture tab, bottom-left, mirrors #zoom-ctl.
+       Two separate elements (button + panel), not one wrapper — see the CSS
+       comment for why. -->
+  <button id="contact-tab-btn" aria-expanded="false" aria-controls="contact-tab-panel">Kontak saya</button>
+  <div id="contact-tab-panel">
+    <a href="https://tiktok.com/@okeojan" target="_blank" rel="noopener">@okeojan di TikTok</a>
   </div>
   <div id="toast" role="status" aria-live="polite"></div>
 

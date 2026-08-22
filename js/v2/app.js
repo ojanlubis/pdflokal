@@ -228,6 +228,42 @@ function applyZoom() {
 document.getElementById('z-in').onclick = () => { zoom = Math.min(zoom + 0.25, 3); applyZoom(); };
 document.getElementById('z-out').onclick = () => { zoom = Math.max(zoom - 0.25, 0.3); applyZoom(); };
 
+// ---- contact bookmark: tap the tab, the panel slides up; tap again or tap
+// outside to close. Same toggle + outside-pointerdown-close idiom as the
+// File menu below (fileBtn/fileMenu) — kept local since it has no other
+// dependency on this block. ---------------------------------------------
+// ⚠️ THE GUARD IS THE LOAD-BEARING PART, not the toggle. THIRTEEN pages import
+// this module (every page carrying #zoom-ctl), and only index.html has the
+// bookmark markup — the editor chrome is hand-copied inline per page, so the
+// other twelve have z-in, btn-file and toast but NOT this tab. Unguarded, the
+// addEventListener below threw `Cannot read properties of null` at MODULE TOP
+// LEVEL on all twelve, which kills the whole import graph: page renders, every
+// button dead, file-input never wired. Caught by tests/compress-target.spec.js
+// (.pv-bg never appears → 30s timeout ×3) — measured RED here, GREEN on the
+// clean tree, so the gate earned its keep.
+// This is the SAME defect class fixed in js/v2/telemetry.js in this very commit.
+// Fixing it in one module and re-introducing it in a sibling, in one sitting, is
+// why the rule is structural and not a reminder: A TOP-LEVEL LOOKUP OF AN
+// INDEX-ONLY ELEMENT IS ALWAYS GUARDED.
+const contactTabBtn = document.getElementById('contact-tab-btn');
+const contactTabPanel = document.getElementById('contact-tab-panel');
+if (contactTabBtn && contactTabPanel) {
+  const toggleContactTab = (show) => {
+    contactTabPanel.classList.toggle('show', show);
+    contactTabBtn.setAttribute('aria-expanded', String(show));
+  };
+  contactTabBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleContactTab(!contactTabPanel.classList.contains('show'));
+  });
+  document.addEventListener('pointerdown', (e) => {
+    if (contactTabPanel.classList.contains('show') &&
+        !e.target.closest('#contact-tab-btn, #contact-tab-panel')) {
+      toggleContactTab(false);
+    }
+  });
+}
+
 // ---- camera: pinch-zoom + pan (the Google-Maps feel, founder ask) ----------------
 // One-finger pan = NATIVE container scroll (overflow auto on both axes — free,
 // smooth, momentum included). Two fingers = our pinch: preventDefault on the
