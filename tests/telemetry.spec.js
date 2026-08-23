@@ -9,7 +9,7 @@
  * locally, PR #123). Overriding the exact API the client calls
  * (navigator.sendBeacon) is deterministic: no network round-trip, no
  * interception race, we read the payload the client actually built. api/t.js's
- * own logic (validation, caps, the Supabase insert) is Node code with zero
+ * own logic (validation, caps, the database insert) is Node code with zero
  * browser surface and lives in tests/core/telemetry-schema.test.mjs.
  */
 import { test, expect } from '@playwright/test';

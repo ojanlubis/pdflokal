@@ -8,12 +8,20 @@
  * an otherwise-good batch for one bad event, or an error the client has to
  * handle. This endpoint responds 204 in every case except a non-POST method.
  *
- * No npm dependencies at all (task law: the client stays no-build-step; this
- * function is server code Vercel deploys, but it stays equally dependency-
- * free) — inserts go straight to Supabase's PostgREST endpoint via plain
- * fetch with the service-role key, which bypasses RLS (the migration leaves
- * the `events` table RLS-on-with-no-policies: service key in, anon/
- * authenticated get nothing).
+ * ON NEON SINCE 2026-08-23 (seat `specs/spec-rail-to-neon.md`). It used to POST
+ * to Supabase's PostgREST endpoint with a service-role key. PostgREST is a front
+ * door built so BROWSERS can reach a database safely; pdflokal's browser never
+ * went there and never will — this function is the only writer. So the door and
+ * the RLS lock on it were paid for and never used, and the rail now speaks
+ * plain SQL to Neon over HTTP.
+ *
+ * THE ZERO-DEPENDENCY LAW IS RELAXED HERE, and only here. `@neondatabase/
+ * serverless` is pdflokal's first production dependency. The alternative was
+ * Neon's raw HTTP endpoint, which would have kept plain `fetch` — but Neon
+ * documents only the npm package, not the wire contract underneath it, and the
+ * rail's whole failure mode is going quiet. A documented dependency beats an
+ * undocumented protocol on the one path that must never break silently. The
+ * CLIENT is untouched: still no build step, still no dependencies.
  *
  * Never stores IP or UA raw (spec §2) — neither is read from the request at
  * all; the client already sends a coarse, typed `device` prop where relevant.
@@ -27,7 +35,25 @@
 // functions as Next.js API routes (@vercel/node implements the same bridge).
 export const config = { runtime: 'nodejs', api: { bodyParser: false } };
 
+import { neon } from '@neondatabase/serverless';
 import { validateEvent } from '../js/core/telemetry-schema.js';
+
+// ⚠️ TEST SEAM, and the ONLY reason anything but `handler` is exported here.
+// tests/core/*.mjs swap in a recorder so the delivery tests assert on the SQL
+// and its parameters — OUR contract — instead of on the driver's HTTP wire
+// format, which is Neon's and undocumented. Stubbing global fetch would have
+// worked and would have pinned us to a protocol we do not own. Pass null to
+// restore the real driver.
+let queryOverride = null;
+export function __setQueryForTests(fn) { queryOverride = fn; }
+
+// Returns (text, params) => node-postgres-shaped result. fullResults is on so
+// the caller can read `rowCount` — see the SHORT-write check below, which is
+// the positive control that makes "no error" mean something.
+function makeQuery(dsn) {
+  const sql = neon(dsn);
+  return (text, params) => sql.query(text, params, { fullResults: true });
+}
 
 const MAX_EVENTS = 50;
 const MAX_BODY_BYTES = 32 * 1024;
@@ -141,55 +167,64 @@ export default async function handler(req, res) {
 
     if (rows.length === 0) { res.status(204).end(); return; }
 
-    const url = process.env.TELEMETRY_SUPABASE_URL;
-    const key = process.env.TELEMETRY_SUPABASE_SERVICE_KEY;
-    if (!url || !key) { res.status(204).end(); return; } // rail dark (env not configured yet), never broken
+    // ⚠️ THE DARK BRANCH. No DATABASE_URL means every event is dropped and
+    // NOTHING anywhere goes red — by design ("rail dark, never broken"), and
+    // therefore the one thing a deploy order can get catastrophically wrong.
+    // The env var must exist BEFORE the code that reads it ships. Vercel
+    // injects it from the linked Neon store, so in practice it is present or
+    // the store is gone.
+    const dsn = process.env.DATABASE_URL;
+    if (!dsn && !queryOverride) { res.status(204).end(); return; }
 
     // Awaited on purpose (not true fire-and-forget): a Vercel Node invocation
     // can be frozen the instant a response is sent, so an un-awaited insert
-    // could silently never land. The extra Supabase round-trip (tens of ms)
-    // is invisible to the browser — sendBeacon doesn't wait on this response.
-    // WHY THE RESPONSE IS CHECKED (2026-07-28 — telemetry suite class C):
-    // this used to be `await fetch(...)` with the result DISCARDED. `fetch`
-    // rejects only on a NETWORK failure, so a Supabase error RESPONSE — 401
-    // (bad key), 400 (schema/column mismatch), 409, 5xx, quota — resolved
-    // normally, fell straight through, and we 204'd. The single most likely
-    // failure mode was not merely unreported: it could not even reach the
-    // catch below.
+    // could silently never land. The round-trip (tens of ms) is invisible to
+    // the browser — sendBeacon doesn't wait on this response.
     //
-    // That is the Jul 7-11 blackout's shape (~97% of analytics lost for five
-    // days, every layer green). And it undermines our own instruments: the
-    // seat's wild-liveness check reads what is IN the table, so if writes can
-    // fail silently, a zero means "never emitted" OR "emitted and rejected"
-    // and NOTHING can tell them apart. Every liveness result and alarm
-    // threshold rests on arrival ≈ emission; this is what makes that
-    // assumption checkable.
+    // WHY A FAILED WRITE IS LOGGED AT ALL (2026-07-28 — telemetry suite class
+    // C): this used to `await fetch(...)` and DISCARD the result. `fetch`
+    // rejects only on a NETWORK failure, so an error RESPONSE — 401, 400,
+    // 409, 5xx, quota — resolved normally, fell through, and we 204'd. The
+    // single most likely failure mode could not even reach the catch. That is
+    // the Jul 7-11 blackout's shape (~97% of analytics lost for five days,
+    // every layer green), and it poisons our own instruments: the seat's
+    // wild-liveness check reads what is IN the table, so if writes can fail
+    // silently, a zero means "never emitted" OR "emitted and rejected" and
+    // nothing can tell them apart.
     //
-    // The 204 to the CLIENT is unchanged and must stay unchanged — telemetry
-    // may never break or delay the editor. What changed is that we are no
-    // longer blind to ourselves.
+    // The driver removes that trap BY CONSTRUCTION — a rejected statement is a
+    // thrown NeonDbError, not a resolved response — but the trap is not what
+    // this catch is for. It is for being able to SAY how much was lost.
     //
-    // CONTENT-BLIND, deliberately: status code, row count, and the error's
-    // NAME only. Never `err.message` and never the response body — a thrown
-    // message or a PostgREST error can quote row content back into the log,
-    // and a log is a place content must not reach either (same reasoning that
-    // kept the export-failure branch off `err.message`).
+    // ⭐ AND THE ROW COUNT IS CHECKED, which the PostgREST version could not do:
+    // "no error" is only worth something next to "and it wrote what I gave it".
+    // A silent partial write is the same blackout one layer smaller.
+    //
+    // CONTENT-BLIND, deliberately: counts, the error's NAME, and its SQLSTATE
+    // only. Never `err.message` — a driver or Postgres error quotes the
+    // offending VALUE back at you, and a log is a place row content must not
+    // reach (same reasoning that kept the export-failure branch off
+    // `err.message`). The 204 to the CLIENT is unchanged and must stay
+    // unchanged: telemetry may never break or delay the editor.
+    //
+    // One statement, one round trip, up to 50 rows — parameterized, never
+    // interpolated. Only the placeholder skeleton is built from the row count.
+    const placeholders = rows
+      .map((_, i) => `($${i * 5 + 1}::timestamptz,$${i * 5 + 2}::uuid,$${i * 5 + 3},$${i * 5 + 4},$${i * 5 + 5}::jsonb)`)
+      .join(',');
+    const params = rows.flatMap((r) => [r.ts, r.session_id, r.app_version, r.event, JSON.stringify(r.props)]);
     try {
-      const r = await fetch(`${url}/rest/v1/events`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          apikey: key,
-          Authorization: `Bearer ${key}`,
-          Prefer: 'return=minimal',
-        },
-        body: JSON.stringify(rows),
-      });
-      if (!r?.ok) {
-        console.error(`[telemetry] insert REJECTED status=${r?.status ?? 'none'} rows_dropped=${rows.length}`);
+      const query = queryOverride || makeQuery(dsn);
+      const out = await query(
+        `insert into events (ts, session_id, app_version, event, props) values ${placeholders}`,
+        params,
+      );
+      const written = out?.rowCount;
+      if (written !== rows.length) {
+        console.error(`[telemetry] insert SHORT written=${written ?? 'unknown'} rows_expected=${rows.length}`);
       }
     } catch (err) {
-      console.error(`[telemetry] insert FAILED error=${err?.name ?? 'Error'} rows_dropped=${rows.length}`);
+      console.error(`[telemetry] insert FAILED error=${err?.name ?? 'Error'} code=${err?.code ?? 'none'} rows_dropped=${rows.length}`);
     }
 
     res.status(204).end();

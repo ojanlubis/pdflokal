@@ -14,7 +14,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import feedbackHandler from '../../api/feedback.js';
+import feedbackHandler, { __setQueryForTests } from '../../api/feedback.js';
 
 const SESSION = '3f1c9a52-0b6e-4a7d-9c11-2f7e5d8a4b30';
 
@@ -31,30 +31,28 @@ function mkReq(bodyObj) {
   };
 }
 
-// Returns the app_version actually written to the feedback insert.
+// Returns the app_version actually written to the feedback insert — the second
+// statement parameter since the Neon move (2026-08-23). Same reasoning as its
+// sibling in app-version-attribution.test.mjs: assert on our SQL, not on the
+// driver's wire format.
 async function stored(clientVersion, serverSha) {
-  const realFetch = globalThis.fetch;
   const saved = { ...process.env };
-  process.env.TELEMETRY_SUPABASE_URL = 'https://example.test';
-  process.env.TELEMETRY_SUPABASE_SERVICE_KEY = 'k';
+  process.env.DATABASE_URL = 'postgresql://user:pw@example.test/neondb';
   if (serverSha === undefined) delete process.env.VERCEL_GIT_COMMIT_SHA;
   else process.env.VERCEL_GIT_COMMIT_SHA = serverSha;
-  let rows = null;
-  globalThis.fetch = async (url, opts) => {
-    if (String(url).includes('/rest/v1/feedback')) rows = JSON.parse(opts.body);
-    return { ok: true, status: 201 };
-  };
+  let params = null;
+  __setQueryForTests(async (_text, p) => { params = p; return { rowCount: 1 }; });
   const res = { code: null, status(c) { this.code = c; return this; }, end() { return this; } };
   try {
     await feedbackHandler(mkReq({ session_id: SESSION, app_version: clientVersion, rating: 'down' }), res);
   } finally {
-    globalThis.fetch = realFetch;
-    for (const k of ['TELEMETRY_SUPABASE_URL', 'TELEMETRY_SUPABASE_SERVICE_KEY', 'VERCEL_GIT_COMMIT_SHA']) {
+    __setQueryForTests(null);
+    for (const k of ['DATABASE_URL', 'VERCEL_GIT_COMMIT_SHA']) {
       if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k];
     }
   }
-  assert.ok(rows && rows.length, 'the insert must have happened, or this asserts nothing');
-  return rows[0].app_version;
+  assert.ok(params && params.length, 'the insert must have happened, or this asserts nothing');
+  return params[1];
 }
 
 test('1. THE MIRRORED REVERSAL: a real client SHA wins over the server arrival stamp', async () => {

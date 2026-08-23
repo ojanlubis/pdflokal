@@ -15,7 +15,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import tHandler from '../../api/t.js';
+import tHandler, { __setQueryForTests } from '../../api/t.js';
 import revHandler from '../../api/rev.js';
 
 // ---- /api/rev ----------------------------------------------------------------
@@ -91,29 +91,29 @@ function mkReq(bodyObj) {
 }
 
 // Returns the app_version actually written to the insert.
+//
+// Reads it out of the STATEMENT PARAMETERS since the Neon move (2026-08-23) —
+// app_version is the third of the five columns per row. Stubbing fetch and
+// parsing a PostgREST body would now mean asserting on the driver's private
+// wire format; see tests/core/telemetry-delivery.test.mjs for the full why.
 async function stored(clientVersion, serverSha) {
-  const realFetch = globalThis.fetch;
   const saved = { ...process.env };
-  process.env.TELEMETRY_SUPABASE_URL = 'https://example.test';
-  process.env.TELEMETRY_SUPABASE_SERVICE_KEY = 'k';
+  process.env.DATABASE_URL = 'postgresql://user:pw@example.test/neondb';
   if (serverSha === undefined) delete process.env.VERCEL_GIT_COMMIT_SHA;
   else process.env.VERCEL_GIT_COMMIT_SHA = serverSha;
-  let rows = null;
-  globalThis.fetch = async (url, opts) => {
-    if (String(url).includes('/rest/v1/events')) rows = JSON.parse(opts.body);
-    return { ok: true, status: 201 };
-  };
+  let params = null;
+  __setQueryForTests(async (_text, p) => { params = p; return { rowCount: p.length / 5 }; });
   const res = { code: null, status(c) { this.code = c; return this; }, end() { return this; } };
   try {
     await tHandler(mkReq({ session_id: SESSION, app_version: clientVersion, events: [EVENT] }), res);
   } finally {
-    globalThis.fetch = realFetch;
-    for (const k of ['TELEMETRY_SUPABASE_URL', 'TELEMETRY_SUPABASE_SERVICE_KEY', 'VERCEL_GIT_COMMIT_SHA']) {
+    __setQueryForTests(null);
+    for (const k of ['DATABASE_URL', 'VERCEL_GIT_COMMIT_SHA']) {
       if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k];
     }
   }
-  assert.ok(rows && rows.length, 'the insert must have happened, or this asserts nothing');
-  return rows[0].app_version;
+  assert.ok(params && params.length, 'the insert must have happened, or this asserts nothing');
+  return params[2];
 }
 
 test('6. THE REVERSAL: a real client SHA wins over the server arrival stamp', async () => {

@@ -22,7 +22,10 @@ endpoints are the only code that runs off-device, and neither ever receives a PD
 - **`api/t.js`** — typed, content-blind telemetry. Every event is validated against
   `js/core/telemetry-schema.js` and **dropped if off-schema**. The schema has no free-string field,
   so it cannot carry document content even by accident. Always answers 204, so it never reveals
-  whether a write happened. Writes to Supabase with a service key held only in env.
+  whether a write happened. Writes to **Neon** (Postgres, `DATABASE_URL` held only in env) since
+  2026-08-23 — previously Supabase. The database has **no HTTP front door at all**: no PostgREST, no
+  Data API, no anon role. The only credential is the connection string, and only these two functions
+  hold it.
 - **`api/feedback.js`** — the beta Edit 👍/👎, plus an **opt-in** image crop of the one edited line.
   Sent only when the user rates 👎, *sees the exact crops*, and taps Kirim. Size-capped client-side,
   re-checked server-side (never trust the client), and constrained again by DB check constraints.

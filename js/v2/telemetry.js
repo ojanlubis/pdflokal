@@ -170,7 +170,7 @@ export function tel(event, props = {}) {
 // A DELIBERATE exception to this file's string-free law: the thumbs pill lets a
 // user TYPE a note. That note is the ONE user-authored free field in the whole
 // telemetry surface — so it does NOT ride tel()/the typed events table. It goes
-// to its OWN endpoint (/api/feedback) and its OWN Supabase table, keeping the
+// to its OWN endpoint (/api/feedback) and its OWN table, keeping the
 // `events` rail's "no string field ever" invariant intact (spec-telemetry.md
 // §2 — the boundary law is about the MACHINE filling a free field; a human
 // consciously writing feedback is the inverse case, and it stays walled off).

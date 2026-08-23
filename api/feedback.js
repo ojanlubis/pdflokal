@@ -8,13 +8,16 @@
  * — and writes its OWN `feedback` table, so the events rail's "no string field
  * ever" invariant is never touched (spec-telemetry.md §2).
  *
- * Same discipline as api/t.js otherwise: POST-only, ZERO npm deps, we count raw
- * body bytes ourselves (bodyParser off), and EVERY case except a non-POST is a
- * fast 204 — a bad/oversized/misconfigured request is silently dropped, never a
- * 4xx/5xx the client has to handle (feedback must never degrade the editor).
- * Reuses the SAME Supabase project + service-role env vars api/t.js uses
- * (service key bypasses the feedback table's RLS; anon/authenticated get
- * nothing). Never stores IP or UA — neither is read from the request at all.
+ * Same discipline as api/t.js otherwise: POST-only, we count raw body bytes
+ * ourselves (bodyParser off), and EVERY case except a non-POST is a fast 204 —
+ * a bad/oversized/misconfigured request is silently dropped, never a 4xx/5xx
+ * the client has to handle (feedback must never degrade the editor). Never
+ * stores IP or UA — neither is read from the request at all.
+ *
+ * ON NEON SINCE 2026-08-23, alongside api/t.js and for the same reasons (seat
+ * `specs/spec-rail-to-neon.md`): the browser never reached this database, so
+ * PostgREST's whole job was work nobody asked for. Same `DATABASE_URL`, same
+ * Neon project, its own table.
  *
  * Increment D (spec-edit-fidelity-instrumentation.md, decisions.md
  * 2026-07-23/2026-07-27): optionally accepts TWO small PNG data URLs —
@@ -31,6 +34,20 @@
  * cross-import); keep the two constant sets in sync by hand if caps change.
  */
 export const config = { runtime: 'nodejs', api: { bodyParser: false } };
+
+import { neon } from '@neondatabase/serverless';
+
+// ⚠️ TEST SEAM — same one api/t.js carries, and duplicated for the same reason
+// readBody() below is: each function stays a single self-contained file. Tests
+// assert on the SQL and its parameters (ours) rather than the driver's HTTP
+// wire format (Neon's, undocumented).
+let queryOverride = null;
+export function __setQueryForTests(fn) { queryOverride = fn; }
+
+function makeQuery(dsn) {
+  const sql = neon(dsn);
+  return (text, params) => sql.query(text, params, { fullResults: true });
+}
 
 // Notes are short reactions, not essays — a much smaller cap than telemetry's
 // 32KB batch. NOTE_MAX bounds the stored string; MAX_BODY_BYTES bounds the raw
@@ -160,31 +177,33 @@ export default async function handler(req, res) {
     const clientSha = /^[0-9a-f]{7,40}$/.test(appVersion) ? appVersion : '';
     const storedVersion = clientSha || (/^[0-9a-f]{7,40}$/.test(serverSha) ? serverSha : appVersion);
 
-    const url = process.env.TELEMETRY_SUPABASE_URL;
-    const key = process.env.TELEMETRY_SUPABASE_SERVICE_KEY;
-    if (!url || !key) { res.status(204).end(); return; } // rail dark (env not set), never broken
+    const dsn = process.env.DATABASE_URL;
+    if (!dsn && !queryOverride) { res.status(204).end(); return; } // rail dark, never broken
 
+    // ⭐ THIS BRANCH USED TO BE BLIND, and it was blind for three weeks after
+    // api/t.js stopped being (2026-07-28): `await fetch(...)` with the result
+    // discarded, inside an EMPTY catch. A rejected insert resolved normally and
+    // vanished; a network throw was swallowed without a word. The fix never
+    // travelled from the sibling file, which is what happens when two files
+    // hold one lesson by hand.
+    //
+    // It matters more here than for events, not less: a 👎 is rarer than a
+    // doc_open by three orders of magnitude, so losing them is invisible in
+    // aggregate — a dead feedback loop looks exactly like a well-liked
+    // product. Content-blind for the same reason as api/t.js, and more
+    // pointedly: this row carries a note the user TYPED. Never `err.message`.
     try {
-      await fetch(`${url}/rest/v1/feedback`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          apikey: key,
-          Authorization: `Bearer ${key}`,
-          Prefer: 'return=minimal',
-        },
-        body: JSON.stringify([{
-          session_id: sessionId,
-          app_version: storedVersion,
-          rating,
-          note,
-          sample_before: sample?.before ?? null,
-          sample_after: sample?.after ?? null,
-        }]),
-      });
-    } catch {
-      // Insert failed (network, Supabase down) — still a fast 204; the client
-      // never learns, exactly like api/t.js.
+      const query = queryOverride || makeQuery(dsn);
+      const out = await query(
+        `insert into feedback (session_id, app_version, rating, note, sample_before, sample_after)
+         values ($1::uuid,$2,$3,$4,$5,$6)`,
+        [sessionId, storedVersion, rating, note, sample?.before ?? null, sample?.after ?? null],
+      );
+      if (out?.rowCount !== 1) {
+        console.error(`[feedback] insert SHORT written=${out?.rowCount ?? 'unknown'} rows_expected=1`);
+      }
+    } catch (err) {
+      console.error(`[feedback] insert FAILED error=${err?.name ?? 'Error'} code=${err?.code ?? 'none'} rows_dropped=1`);
     }
 
     res.status(204).end();

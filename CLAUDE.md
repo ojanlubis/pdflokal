@@ -21,7 +21,14 @@ to pdflokal.id.
 ## Hard constraints
 
 - **Vanilla JS, native ES modules, no build step, no bundler, no framework** — that constraint is the
-  moat. No npm runtime deps.
+  moat. **The CLIENT has no npm runtime deps and never will**; that is the half that is load-bearing,
+  because it is what makes the product a folder of files a browser runs.
+  **`api/` is not the client, and since 2026-08-23 it has exactly one dependency:**
+  `@neondatabase/serverless`, the rail's Postgres driver (seat `../specs/spec-rail-to-neon.md`). It
+  was taken deliberately, over Neon's undocumented raw HTTP endpoint, because the write path that
+  must never fail silently is the wrong place to own an unspecified protocol. **The bar for the
+  second one is the same: name what breaks without it.** `npm audit --omit=dev` is the check that
+  this stays honest.
 - **All vendor libs self-hosted in `js/vendor/`, zero CDN.** pdf-lib, PDF.js, Signature Pad,
   pdf-encrypt-lite, Canvas API. See `docs/security.md` for CSP, headers, load order.
 - **No server-dependent features, permanently** — no PDF↔Word, no server OCR. In-browser OCR is

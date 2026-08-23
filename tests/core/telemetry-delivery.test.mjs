@@ -10,7 +10,7 @@
  * mistaken for an end-to-end guarantee:
  *   CAN  — the endpoint attempts a write for valid events, drops off-schema
  *          ones, and never breaks the client. All local, deterministic.
- *   CANNOT — that a row actually landed in Supabase. That is a read against the
+ *   CANNOT — that a row actually landed in Neon. That is a read against the
  *          live rail and belongs to the SEAT (reading reality is seat-owned).
  *          A local test that implied end-to-end delivery would be the 204
  *          failure wearing a new costume, so it is not attempted here.
@@ -27,9 +27,31 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import handler from '../../api/t.js';
+import handler, { __setQueryForTests } from '../../api/t.js';
 
-const ENV = { TELEMETRY_SUPABASE_URL: 'https://example.test', TELEMETRY_SUPABASE_SERVICE_KEY: 'k' };
+const ENV = { DATABASE_URL: 'postgresql://user:pw@example.test/neondb' };
+
+// THE SEAM, AND WHY IT IS NOT A STUBBED `fetch` (2026-08-23, the Neon move).
+// The old version of these tests replaced globalThis.fetch and read the
+// PostgREST request body — which worked because the wire format WAS our
+// contract. Under the Neon driver it would not be: the body is the driver's
+// own JSON envelope, undocumented and Neon's to change. A test asserting on it
+// would go red on their release notes and green on our bugs.
+//
+// So the handler hands us the statement and its parameters, and we assert on
+// those. Every row assertion below still reads `rows[0].event` etc, because
+// paramsToRows re-assembles what the SQL would have written — the parameters
+// ARE the row, in the order the placeholder skeleton names them.
+const COLS = ['ts', 'session_id', 'app_version', 'event', 'props'];
+function paramsToRows(params) {
+  const rows = [];
+  for (let i = 0; i < params.length; i += COLS.length) {
+    const row = {};
+    COLS.forEach((c, j) => { row[c] = c === 'props' ? JSON.parse(params[i + j]) : params[i + j]; });
+    rows.push(row);
+  }
+  return rows;
+}
 
 // Minimal Vercel-ish req/res. The body arrives as a stream, matching how the
 // handler reads it (it does its own size-capped read).
@@ -59,16 +81,19 @@ const VALID = {
   events: [{ event: 'doc_open', props: { text_layer: true, pages: '1', device: 'desktop', intent: 'none', display_mode: 'browser' } }],
 };
 
-// Drive the handler with fetch stubbed, and report what the insert saw.
-async function run(payload, { fetchImpl } = {}) {
-  const realFetch = globalThis.fetch;
+// Drive the handler with the database stubbed, and report what the insert saw.
+// `queryImpl` overrides the result (or throws) for the failure-path tests; by
+// default the stub reports having written exactly what it was handed, which is
+// what a healthy insert looks like.
+async function run(payload, { queryImpl } = {}) {
   const realErr = console.error;
   const calls = [];
   const logged = [];
-  globalThis.fetch = async (url, opts) => {
-    calls.push({ url: String(url), body: opts?.body ? JSON.parse(opts.body) : null });
-    return fetchImpl ? fetchImpl() : { ok: true, status: 201 };
-  };
+  __setQueryForTests(async (text, params) => {
+    calls.push({ text: String(text), params, body: paramsToRows(params) });
+    if (queryImpl) return queryImpl();
+    return { rowCount: params.length / COLS.length };
+  });
   console.error = (...a) => { logged.push(a.join(' ')); };
   const saved = {};
   for (const [k, v] of Object.entries(ENV)) { saved[k] = process.env[k]; process.env[k] = v; }
@@ -76,7 +101,7 @@ async function run(payload, { fetchImpl } = {}) {
   try {
     await handler(mkReq(payload), res);
   } finally {
-    globalThis.fetch = realFetch;
+    __setQueryForTests(null);
     console.error = realErr;
     for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
   }
@@ -99,8 +124,10 @@ test('CLIENT CONTRACT: 204 for everything a browser can send — telemetry never
 
 test('DELIVERY: a valid event actually reaches the insert, with its props intact', async () => {
   const { calls } = await run(VALID);
-  assert.equal(calls.length, 1, 'expected exactly one Supabase insert call');
-  assert.match(calls[0].url, /\/rest\/v1\/events$/);
+  assert.equal(calls.length, 1, 'expected exactly one insert statement');
+  assert.match(calls[0].text, /insert into events\b/i, 'the statement must target the events table');
+  // Parameterized, never interpolated: no row value may appear in the SQL text.
+  assert.equal(calls[0].text.includes('doc_open'), false, 'a value was interpolated into the SQL');
   const rows = calls[0].body;
   assert.ok(Array.isArray(rows) && rows.length === 1, 'expected one row');
   // The props must survive validation, or the row lands empty and the rail is
@@ -180,23 +207,28 @@ test('TIMESTAMPS: a missing or absurd dt degrades to now — never a garbage row
 // OR "emitted and rejected", indistinguishably. Every liveness result and alarm
 // threshold rests on arrival == emission. These tests are what make that hold.
 // ---------------------------------------------------------------------------
-test('a REJECTED insert is reported (Supabase 401/400 must not be silently lost)', async () => {
-  const { res, calls, logged } = await run(VALID, {
-    fetchImpl: () => ({ ok: false, status: 401, text: async () => 'invalid api key' }),
-  });
+test('a REJECTED statement is reported (a bad password or a column mismatch must not vanish)', async () => {
+  // Under PostgREST this was the dangerous case: an error RESPONSE resolved
+  // like a success. The driver throws instead, so the trap is gone by
+  // construction — but the REPORT is what sizes the damage, and that is still
+  // ours to get right. SQLSTATE 28P01 = invalid_password, the modern spelling
+  // of the 401 this test used to assert.
+  const err = Object.assign(new Error('password authentication failed'), { name: 'NeonDbError', code: '28P01' });
+  const { res, calls, logged } = await run(VALID, { queryImpl: () => { throw err; } });
   assert.equal(calls.length, 1, 'the insert was attempted');
   const line = logged.find((l) => l.includes('[telemetry]'));
   assert.ok(line, 'a rejected insert produced NO observable signal — this is the blackout shape');
-  assert.match(line, /REJECTED/);
-  assert.match(line, /status=401/);
+  assert.match(line, /FAILED/);
+  assert.match(line, /error=NeonDbError/);
+  assert.match(line, /code=28P01/, 'the SQLSTATE is the only thing that says WHICH failure this was');
   assert.match(line, /rows_dropped=1/, 'the log must say HOW MUCH was lost, or it cannot size the damage');
   // The client contract is untouched: telemetry never breaks the editor.
   assert.equal(res.code, 204);
 });
 
 test('a NETWORK failure is reported too — the catch was silent before', async () => {
-  const boom = new TypeError('fetch failed: getaddrinfo ENOTFOUND supabase');
-  const { res, logged } = await run(VALID, { fetchImpl: () => { throw boom; } });
+  const boom = new TypeError('fetch failed: getaddrinfo ENOTFOUND ep-curly-wind');
+  const { res, logged } = await run(VALID, { queryImpl: () => { throw boom; } });
   const line = logged.find((l) => l.includes('[telemetry]'));
   assert.ok(line, 'a network failure produced no observable signal');
   assert.match(line, /FAILED/);
@@ -204,12 +236,61 @@ test('a NETWORK failure is reported too — the catch was silent before', async 
   assert.equal(res.code, 204);
 });
 
+// ---------------------------------------------------------------------------
+// NEW WITH THE NEON MOVE (2026-08-23). PostgREST answered `Prefer: return=
+// minimal` with no row count, so "did it write all of them?" was unanswerable
+// and therefore unasked. The driver returns rowCount, which turns the absence
+// of an error into an actual claim: not "nothing complained" but "it wrote the
+// number I handed it". A partial write is the blackout one layer smaller — and
+// it is the shape that survives every check that only looks for errors.
+// ---------------------------------------------------------------------------
+test('a SHORT write is reported — "no error" is not "it landed"', async () => {
+  const { res, logged } = await run(
+    { ...VALID, events: [VALID.events[0], VALID.events[0], VALID.events[0]] },
+    { queryImpl: () => ({ rowCount: 1 }) },
+  );
+  const line = logged.find((l) => l.includes('[telemetry]'));
+  assert.ok(line, 'two of three rows vanished with nothing said');
+  assert.match(line, /SHORT/);
+  assert.match(line, /written=1/);
+  assert.match(line, /rows_expected=3/);
+  assert.equal(res.code, 204);
+});
+
+test('a driver that answers with no rowCount at all is reported, not assumed healthy', async () => {
+  // `undefined !== 1` is what makes this fire. If the check is ever loosened to
+  // a truthiness test, an answer that says nothing starts reading as success.
+  const { logged } = await run(VALID, { queryImpl: () => ({}) });
+  const line = logged.find((l) => l.includes('[telemetry]'));
+  assert.ok(line, 'an insert that reported nothing was treated as a success');
+  assert.match(line, /written=unknown/);
+});
+
+test('DARK RAIL: no DATABASE_URL means no insert and still a 204 — never a 500', async () => {
+  // The deploy-order hazard, pinned. This branch is correct and must stay, but
+  // it is why the env var has to exist BEFORE the code that reads it ships:
+  // every event is dropped here and nothing anywhere goes red.
+  const saved = process.env.DATABASE_URL;
+  delete process.env.DATABASE_URL;
+  __setQueryForTests(null);
+  const res = mkRes();
+  try {
+    await handler(mkReq(VALID), res);
+  } finally {
+    if (saved === undefined) delete process.env.DATABASE_URL; else process.env.DATABASE_URL = saved;
+  }
+  assert.equal(res.code, 204);
+});
+
 // The log is a place user content must not reach either — the same reasoning
 // that kept the export-failure branch off `err.message`. A thrown message or a
 // PostgREST error body can quote row content straight into a log line.
 test('the failure log is CONTENT-BLIND: no error message, no response body, no rows', async () => {
-  const leaky = new TypeError('parse failed near "Budi Santoso Wijaya" in stream 42');
-  const { logged } = await run(VALID, { fetchImpl: () => { throw leaky; } });
+  const leaky = Object.assign(
+    new Error('invalid input syntax for type jsonb: value "Budi Santoso Wijaya" in stream 42'),
+    { name: 'NeonDbError', code: '22P02' },
+  );
+  const { logged } = await run(VALID, { queryImpl: () => { throw leaky; } });
   const all = logged.join('\n');
   assert.ok(all.includes('[telemetry]'), 'expected a telemetry log line');
   assert.equal(all.includes('Budi Santoso Wijaya'), false, 'the error MESSAGE reached the log');
@@ -225,7 +306,7 @@ test('the failure log is CONTENT-BLIND: no error message, no response body, no r
 // nobody reads), which is the opposite failure from being silent. Do not read
 // it as coverage of the response check.
 test('a SUCCESSFUL insert stays quiet — the signal only fires on real trouble', async () => {
-  const { res, logged } = await run(VALID, { fetchImpl: () => ({ ok: true, status: 201 }) });
+  const { res, logged } = await run(VALID, { queryImpl: () => ({ rowCount: 1 }) });
   assert.deepEqual(logged.filter((l) => l.includes('[telemetry]')), [],
     'a healthy insert must not log — a signal that always fires is one nobody reads');
   assert.equal(res.code, 204);
