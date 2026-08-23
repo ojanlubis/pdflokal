@@ -62,6 +62,27 @@ recorded in the seat's `decisions.md`):
   and must stay.** Dropping it would kill the service worker, and therefore offline mode, and
   therefore a shipped and announced feature, with nothing throwing and the page looking fine.
 
+**2026-08-23 — a third directive, found in PRODUCTION after rung S2 shipped** (ruled by Fauzan the
+same day, same shape as the two above):
+
+- **`connect-src data:`** — tesseract's core is an emscripten SINGLE_FILE build: it carries the WASM
+  binary inline as base64 and fetches it back as a `data:` URI. Without this, every recognition
+  logged two errors, **the library fell back, and OCR worked anyway** — right text, right boxes,
+  green suite. A fallback that succeeds is indistinguishable from a path that was never blocked,
+  which is how it shipped.
+  **Security note:** a `data:` URL is self-contained and addresses nothing, so this opens no channel
+  for data to leave the device and does not touch the privacy claim. `img-src` has carried `data:`
+  since long before this, for the same reason.
+
+⚠️ **AND THE INSTRUMENT LESSON, which outlives this directive.** The violation happened inside the
+TESSERACT WORKER, and **Playwright's `page.on('console')` does not carry worker messages** — nor does
+a document-level `securitypolicyviolation` listener. Both reported zero on a page Chromium was
+logging two errors on, and a first version of the guard was written, passed, and deleted for passing
+that way. The working instrument is a CDP session: `Log.enable` + `Log.entryAdded`, where the entries
+arrive tagged `source: 'worker'` (`tests/csp-live-policy.spec.js`). **Every worker this product runs
+— Tesseract, pdf.js, the service worker — is invisible to the page console. Any "no errors" claim
+about worker code needs the CDP instrument, not that one.**
+
 ```
 default-src 'self';
 script-src 'self' 'wasm-unsafe-eval' 'unsafe-inline' https://www.googletagmanager.com https://googleads.g.doubleclick.net blob:;
@@ -70,7 +91,7 @@ manifest-src 'self';
 style-src 'self' 'unsafe-inline';
 img-src 'self' data: blob: https://www.google.com https://www.google.co.id https://www.googleadservices.com https://googleads.g.doubleclick.net;
 font-src 'self';
-connect-src 'self' https://www.google-analytics.com https://analytics.google.com https://www.googletagmanager.com https://www.google.com;
+connect-src 'self' data: https://www.google-analytics.com https://analytics.google.com https://www.googletagmanager.com https://www.google.com;
 frame-ancestors 'none';
 base-uri 'self';
 form-action 'self';
@@ -87,8 +108,10 @@ object-src 'none';
 
 **If adding new features that require external resources:**
 1. Test on Vercel preview first
-2. Check browser console for CSP violations
-3. Update CSP in vercel.json if needed
+2. Check browser console for CSP violations — **and if the feature uses a worker, check CDP's Log
+   domain too, because the page console cannot see worker violations** (see the 2026-08-23 note above)
+3. Update CSP in vercel.json if needed. `tests/core/csp-doc-parity.test.mjs` fails if this document
+   and `vercel.json` disagree, so the two cannot drift silently.
 
 ## Security Files
 
