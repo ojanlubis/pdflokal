@@ -348,6 +348,25 @@ export function createPageRasterizer(doc, opts = {}) {
       const canvas = await renderToCanvas(page, width / pageW);
       return { dataUrl: canvas.toDataURL('image/png'), width: canvas.width, height: canvas.height };
     },
+    // A raw canvas at an arbitrary scale, for a caller that needs PIXELS
+    // rather than a raster to display — today that is only OCR (rung S2,
+    // js/v2/ocr-runs.js), which needs far more pixel density than the screen
+    // does because recognition accuracy tracks density, not size.
+    //
+    // Does NOT touch `page.raster`, and does NOT take the renderSeq
+    // stale-guard: it installs nothing, so there is no state a late resolve
+    // could corrupt — the guard exists to stop an older render overwriting a
+    // newer one, and this render is never written anywhere. rasterizeThumb
+    // above is the same shape for the same reason.
+    //
+    // ⚠️ Everything a caller must NOT re-derive is already applied here:
+    // the intrinsic /Rotate plus the user's rotation, and the merge width
+    // normalisation. That is precisely why OCR runs on this and not on its
+    // own pdf.js render — /lab-ocr.html's own note records that its hand-
+    // rolled render does NOT handle a page with /Rotate set.
+    renderCanvas(page, { scale = 2 } = {}) {
+      return renderToCanvas(page, scale);
+    },
     invalidateEditedPage,
     async destroy() {
       for (const p of docCache.values()) { try { (await p).destroy(); } catch { /* already gone */ } }

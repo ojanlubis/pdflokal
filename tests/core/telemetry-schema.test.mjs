@@ -12,6 +12,7 @@ import assert from 'node:assert/strict';
 
 import {
   SCHEMA, validateEvent, pagesBucket, durationBucket, intentValue, ratioBucket, inkRatioBucket,
+  ocrLinesBucket,
 } from '../../js/core/telemetry-schema.js';
 
 // A minimal, schema-valid props object for each event — used to prove every
@@ -35,6 +36,10 @@ const VALID_PROPS = {
   },
   // scan_offer — the scan dead end's affordance (2026-07-28).
   scan_offer: { action: 'shown', tool: 'none' },
+  // ocr_run — one recognition pass over one page (2026-08-23, rung S2).
+  // `lines` uses OCR_LINES_BUCKET, which has a '0' the page bucket does not:
+  // "recognised nothing" is the outcome this event exists to be able to see.
+  ocr_run: { lines: '6-20', duration: 1200, engine_cached: false },
   ganti_tap: { hit: true },
   ganti_commit: { outcome: 'commit', font_path: 'doc-font' },
   surgery: { matched: true, reason: 'clean' },
@@ -170,13 +175,38 @@ test('scan_offer: every action/tool pair validates, and invented ones are refuse
   for (const action of ['shown', 'accepted', 'dismissed']) {
     assert.equal(validateEvent('scan_offer', { action, tool: 'none' }).ok, true, action);
   }
-  for (const tool of ['tipex', 'teks', 'none']) {
+  // 'ocr' joined this enum on 2026-08-23 when rung S2 gave the sheet a fourth
+  // option. It used to be pinned here as the REFUSED example, which was right
+  // while OCR had no entry point; the pin moves to a value that is still
+  // invented rather than being deleted, so the enum keeps a live negative.
+  for (const tool of ['tipex', 'teks', 'ocr', 'none']) {
     assert.equal(validateEvent('scan_offer', { action: 'accepted', tool }).ok, true, tool);
   }
   assert.equal(validateEvent('scan_offer', { action: 'ignored', tool: 'none' }).ok, false);
-  assert.equal(validateEvent('scan_offer', { action: 'shown', tool: 'ocr' }).ok, false);
+  assert.equal(validateEvent('scan_offer', { action: 'shown', tool: 'tandatangan' }).ok, false);
   // Both props required — a shown-without-tool would be untyped at the sink.
   assert.equal(validateEvent('scan_offer', { action: 'shown' }).ok, false);
+});
+
+test('ocrLinesBucket keeps ZERO visible — the outcome that would retire rung S2', () => {
+  // THE POINT OF THE WHOLE BUCKET. pagesBucket collapses 0 into '1' (a
+  // document always has a page), so reusing it would make "this scan was too
+  // poor to recognise anything" read identically to "one line found" — the
+  // single reading that decides whether a 5 MB engine is worth shipping,
+  // erased by the metric meant to report it.
+  assert.equal(ocrLinesBucket(0), '0');
+  assert.notEqual(ocrLinesBucket(0), pagesBucket(0));
+  assert.equal(ocrLinesBucket(1), '1-5');
+  assert.equal(ocrLinesBucket(5), '1-5');
+  assert.equal(ocrLinesBucket(6), '6-20');
+  assert.equal(ocrLinesBucket(60), '21-60');
+  assert.equal(ocrLinesBucket(61), '61+');
+  // Garbage collapses to the smallest bucket rather than emitting an
+  // off-schema string validateEvent would then silently drop the event over.
+  for (const junk of [NaN, undefined, null, -5, 'abc']) {
+    assert.equal(ocrLinesBucket(junk), '0', String(junk));
+    assert.equal(validateEvent('ocr_run', { lines: ocrLinesBucket(junk), duration: 0, engine_cached: true }).ok, true);
+  }
 });
 
 test('tool_use gains gabung/merge as the first-party merge signal', () => {

@@ -47,7 +47,7 @@
 
 <div class="warn-banner">
   <strong>Peringatan:</strong> menekan "Jalankan OCR" mengunduh mesin OCR (Tesseract) berukuran
-  sekitar 4,55 MB dari origin ini sendiri (bukan CDN pihak ketiga, tapi tetap berat). Halaman ini
+  sekitar 5 MB dari origin ini sendiri (bukan CDN pihak ketiga, tapi tetap berat). Halaman ini
   cuma alat uji internal, bukan bagian dari produk PDFLokal, dan tidak tertaut dari mana pun.
 </div>
 
@@ -70,6 +70,7 @@
 <script type="module">
 import { ensurePdfJs, ensurePdfLib } from '/js/core/vendor.js';
 import { writeInvisibleTextLayer } from '/js/core/ocr-layer.js';
+import { ensureOcrEngine, recognizeCanvas } from '/js/v2/ocr-engine.js';
 
 // CONTROL for the CSP demo: 'wasm-unsafe-eval' does NOT grant eval(). The two
 // directive names are confusingly similar, so this is shown rather than
@@ -101,27 +102,11 @@ const downloadEl = document.getElementById('download');
 // core/import.js's comment on the same trap).
 const state = { bytes: null, name: '', canvas: null, scale: 1, pageHeightPt: 0, resultUrl: null };
 
-// Loaded lazily, on the first "Jalankan OCR" click, not at page load -- the
-// warning banner above says the engine only lands when asked for, and that
-// has to stay true. Mirrors core/vendor.js's ensureX() shape (one fetch no
-// matter how many callers), but Tesseract ships as a plain global via a
-// classic <script>, not an ES module, so it can't reuse that loader directly.
-let tesseractLoad = null;
-function ensureTesseract() {
-  if (window.Tesseract) return Promise.resolve(window.Tesseract);
-  if (tesseractLoad) return tesseractLoad;
-  tesseractLoad = new Promise((resolve, reject) => {
-    const el = document.createElement('script');
-    el.src = '/js/vendor/tesseract/tesseract.min.js';
-    el.onload = () => resolve(window.Tesseract);
-    el.onerror = () => {
-      tesseractLoad = null; // let a retry re-fetch instead of caching the failure forever
-      reject(new Error('gagal memuat mesin OCR (tesseract.min.js)'));
-    };
-    document.head.appendChild(el);
-  });
-  return tesseractLoad;
-}
+// The engine loader lives in js/v2/ocr-engine.js — this page proved the
+// mechanism first (fase S1) and then the product needed the same loader for
+// rung S2. It is imported rather than re-inlined so `gzip:false`, the vendored
+// paths and the never-cache-a-failure rule have exactly one home; the day any
+// of them moves, one copy cannot silently keep working while the other breaks.
 
 fileInput.addEventListener('change', async (e) => {
   const f = e.target.files[0];
@@ -183,22 +168,12 @@ runBtn.addEventListener('click', async () => {
   fileInput.disabled = true;
   downloadEl.hidden = true;
   const t0 = performance.now();
-  let worker = null;
   try {
-    statusEl.textContent = 'memuat mesin OCR (~4,55 MB, sekali saja)…';
-    await ensureTesseract();
+    statusEl.textContent = 'memuat mesin OCR (~5 MB, sekali saja)…';
+    await ensureOcrEngine();
 
     statusEl.textContent = 'mengenali teks (bahasa Indonesia)…';
-    worker = await Tesseract.createWorker('ind', 1, {
-      workerPath: '/js/vendor/tesseract/worker.min.js',
-      corePath: '/js/vendor/tesseract/',
-      langPath: '/js/vendor/tesseract/',
-      // We vendor the RAW ind.traineddata, not the .gz tesseract.js expects by
-      // default. Without this it requests ind.traineddata.gz, gets a 404, and
-      // reports "gagal: undefined" with the real cause only in the console.
-      gzip: false,
-    });
-    const { data } = await worker.recognize(state.canvas);
+    const data = await recognizeCanvas(state.canvas);
     const words = (data.words || []).filter((w) => w.text && w.text.trim());
 
     statusEl.textContent = `menulis lapisan teks tak terlihat (${words.length} kata)…`;
@@ -224,7 +199,6 @@ runBtn.addEventListener('click', async () => {
     console.error(err);
     statusEl.textContent = `✗ gagal: ${err.message}`;
   } finally {
-    if (worker) await worker.terminate();
     runBtn.disabled = false;
     fileInput.disabled = false;
   }

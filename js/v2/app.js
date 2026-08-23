@@ -27,9 +27,10 @@ import { createHistory, record, undo, redo, canUndo, canRedo } from '../core/his
 import { importPdf, importImage, createPageRasterizer, probeTextLayer } from '../core/import.js';
 import {
   pagesBucket, durationBucket, ratioBucket, inkRatioBucket, intentValue,
-  unsupportedCharClass,
+  unsupportedCharClass, ocrLinesBucket,
 } from '../core/telemetry-schema.js';
 import { compareRegions } from '../core/visual-oracle.js';
+import { createOcrIndex, ocrEngineLoaded } from './ocr-runs.js';
 import { validateSample } from '../core/feedback-sample.js';
 import { createPageSlot, syncOverlay, textFontCss } from '../render/page-view.js';
 import { createViewportStream } from '../render/viewport.js';
@@ -672,6 +673,15 @@ for (const btn of document.querySelectorAll('#toolbar .tool[data-tool]')) {
 // words as an editable text object, pre-selected so typing replaces. One
 // gesture, ONE undo step (recorded here; the editor commit skips its own).
 const textRuns = createTextRunIndex({ getDoc: () => doc });
+
+// ---- Rung S2 — the same gesture on a SCAN (seat spec-edit-dokumen-foto.md) -------
+// text-runs.js coming back empty IS the router: no visible text objects means
+// the page is a photograph of words, and those words have to be RECOGNISED
+// before anything can be tapped. Same Line shape out, so everything below
+// this line — the cover, the prefilled editor, the color match — is the code
+// that already ships. Created lazily-empty: nothing here loads the 5 MB
+// engine until a user asks for it (js/v2/ocr-engine.js's header).
+const ocrIndex = createOcrIndex({ getDoc: () => doc, rasterizer: { renderCanvas: (page, o) => rasterizer.renderCanvas(page, o) } });
 
 // ---- Rung C — live doc-font preview (founder ruling, tonight 2026-07-19) ---------
 // core/export.js already writes the FINAL file with the document's own
@@ -1352,6 +1362,26 @@ async function smartReplace(pageId, x, y) {
   if (page) {
     const hit = hitTestEditedLine(page, x, y);
     if (hit) { tel('ganti_tap', { hit: true }); reEditLine(pageId, hit.cover, hit.replacement); return; }
+    // RUNG S2, same guard one ladder over, and it is NOT optional here: OCR
+    // reads the PRISTINE pixels, so a word already covered still recognises
+    // as its original text. Without this, a second tap on an edited word
+    // stacks a second cover and a second text object on top of the first —
+    // two replacements painted over each other, which is worse than the
+    // born-digital version of this bug because nothing on a scan visually
+    // says an edit is already there.
+    const ocrHit = hitTestOcrEdit(page, x, y);
+    if (ocrHit) { tel('ganti_tap', { hit: true }); reEditOcrLine(pageId, ocrHit.cover, ocrHit.replacement); return; }
+  }
+  // A page that has been recognised is a SCAN, and its tap targets are OCR
+  // boxes. Checked before the pdf.js path below because that path would do
+  // the expensive walk only to come back empty — empty is what routed the
+  // page here in the first place.
+  if (ocrIndex.hasLines(pageId)) {
+    const ocrLine = ocrIndex.hitTest(pageId, x, y);
+    if (!ocrLine) { tel('ganti_tap', { hit: false }); toast('Nggak kena tulisan, tap tepat di teksnya ya'); return; }
+    tel('ganti_tap', { hit: true });
+    ocrReplace(pageId, ocrLine);
+    return;
   }
   // Founder ruling 2026-07-19: the LINE is the editing primitive — hitTest
   // now resolves to a Line (core/text-lines.js), one or more fragments
@@ -1365,7 +1395,7 @@ async function smartReplace(pageId, x, y) {
       // The router (two-ladder ruling, seat decisions.md 2026-07-18): no text
       // layer = a scan/photo — that's the dokumen-foto ladder, not this one.
       track('ganti_no_text_layer');
-      showScanOffer();
+      showScanOffer(pageId);
     } else {
       toast('Nggak kena tulisan, tap tepat di teksnya ya');
     }
@@ -1430,6 +1460,155 @@ async function smartReplace(pageId, x, y) {
   toastEl.classList.remove('show');
   matchReplaceColors(cover, draft, pageId, line); // async; colors land live
   prepareDocFont(pageId, line, draft); // async; never blocks the editor opening
+}
+
+// ---- Rung S2: the same gesture on a scan (spec-edit-dokumen-foto.md §3) -------------
+//
+// Everything below reuses Ganti Teks's machinery and changes exactly one
+// thing: where the box came from. Born-digital, the box is a text object
+// pdf.js reported; on a scan it is a box an OCR engine recognised. The cover,
+// the prefilled editor, the color match, the one-undo-step discipline are all
+// the shipped code.
+//
+// ⚠️ THE PAIR CARRIES `ocrBox`/`ocrCoverId`, NEVER `replaceBox`/`replaceTargets`,
+// and the distinct names are the safety property, not a style choice. Those
+// two fields are SURGERY INTENT: core/page-surgery.js and core/export.js each
+// filter on `type === 'whiteout' && replaceTargets?.length && replaceBox` and
+// then CUT the matching show-ops out of the page's content stream. A scan has
+// no show-ops carrying its words — they are pixels — so a scan cover that
+// carried those fields would point the cutter at whatever text the page DOES
+// have (a header, a stamp, a searchable scan's own invisible layer) and delete
+// it. Naming the fields differently means the export path cannot see an S2
+// pair at all: it exports as what it is, a filled rect and a text object.
+
+// A tap inside an already-committed S2 edit. Mirrors hitTestEditedLine one
+// ladder over, including anchoring to the BIRTH box rather than to wherever
+// the cover currently sits.
+function hitTestOcrEdit(page, x, y) {
+  const covers = page.annotations.filter((a) => a.type === 'whiteout' && a.ocrBox);
+  if (covers.length === 0) return null;
+  const hit = resolveTap(
+    covers.map((c) => ({ x: c.ocrBox.x, y: c.ocrBox.y, w: c.ocrBox.w, h: c.ocrBox.h, cover: c })),
+    x, y, MIN_HIT,
+  );
+  if (!hit) return null;
+  return {
+    cover: hit.cover,
+    replacement: page.annotations.find((a) => a.type === 'text' && a.ocrCoverId === hit.cover.id) || null,
+  };
+}
+
+// Tap a recognised line → cover it → reopen its words as an editable draft.
+function ocrReplace(pageId, line) {
+  record(history, doc);
+  const cover = addAnnotation(doc, pageId, createAnnotation('whiteout', {
+    x: line.x, y: line.y, width: line.w, height: line.h,
+    ocrBox: { x: line.x, y: line.y, w: line.w, h: line.h },
+  }));
+  syncPage(pageId);
+  track('editor_action', { action: 'ganti_scan' });
+  const draft = {
+    text: line.str,
+    // core/ocr-lines.js already clamped this to the same 6..120 range a
+    // born-digital draft uses — taking it as given rather than re-deriving it
+    // keeps ONE rule for what the editor will accept.
+    fontSize: line.size,
+    // The honest default, and deliberately not a guess. A scan carries no
+    // embedded font program for core/stamp.js to prove anything against, and
+    // the engine cannot help either: Tesseract's LSTM recogniser dropped the
+    // font classifier its legacy engine had, so there is no serif/sans signal
+    // to read here — the spec's "serif/sans guess" would have to be
+    // reconstructed from stroke pixels, which is its own piece of work and is
+    // not this rung. Helvetica is what mapRunFont falls back to for the same
+    // reason one ladder over.
+    fontFamily: 'Helvetica',
+    recorded: true,
+    ocrCoverId: cover.id,
+    onCancel: () => { removeAnnotation(doc, cover.id); syncPage(pageId); },
+  };
+  openTextEditor({ pageId, x: line.x, y: line.y, anno: null, draft });
+  setTool('select'); // disarm now, not at commit — same founder ruling as smartReplace
+  toastEl.classList.remove('show');
+  // Paper and ink sampled off the raster. This matters MORE on a scan than on
+  // a born-digital page: paper in a photograph is never #fff, and a pure-white
+  // cover on a grey-white scan is a visible patch.
+  matchReplaceColors(cover, draft, pageId, line);
+}
+
+// Reopen a committed S2 edit. Same drop-and-reapply shape as reEditLine, and
+// for the same reason: one edit per original line, never two stacked on it.
+function reEditOcrLine(pageId, cover, replacement) {
+  const box = cover.ocrBox;
+  track('editor_action', { action: 'ganti_scan_reedit' });
+  const draft = {
+    text: replacement?.text ?? '',
+    fontSize: replacement?.fontSize ?? Math.min(120, Math.max(6, Math.round(box.h))),
+    fontFamily: replacement?.fontFamily,
+    bold: !!replacement?.bold,
+    italic: !!replacement?.italic,
+    color: replacement?.color,
+    ocrReEdit: {
+      coverId: cover.id,
+      textId: replacement?.id ?? null,
+      box: { x: box.x, y: box.y, w: box.w, h: box.h },
+      coverColor: cover.color,
+    },
+  };
+  openTextEditor({ pageId, x: box.x, y: box.y, anno: null, draft });
+  setTool('select');
+  toastEl.classList.remove('show');
+}
+
+// Recognise a page, then hand it to the tap gesture. The 5 MB engine is
+// fetched HERE and nowhere else — only ever from a user's explicit tap on the
+// scan sheet, never from a page-load or a render path (js/v2/ocr-engine.js).
+async function runOcrOnPage(pageId) {
+  if (ocrIndex.hasLines(pageId)) { armOcrTap(pageId); return; }
+  // Reuses the existing processing overlay verbatim ("Memproses…" + the
+  // privacy note that is true here too — recognition runs in the tab, and no
+  // pixel leaves it). A second progress vocabulary for the same idea would be
+  // a new surface to justify and new words to rule, for no gain.
+  const engineWasCached = ocrEngineLoaded();
+  showProcessing(1);
+  const t0 = performance.now();
+  try {
+    const lines = await ocrIndex.run(pageId);
+    hideProcessing();
+    tel('ocr_run', {
+      lines: ocrLinesBucket(lines.length),
+      duration: durationBucket(performance.now() - t0),
+      // Read BEFORE this run's own worker was torn down but AFTER the engine
+      // landed, so a first run reports false and every later one true — which
+      // is the split that makes the duration number readable at all.
+      engine_cached: engineWasCached,
+    });
+    if (lines.length === 0) { toast('Nggak ketemu tulisan di halaman ini'); return; }
+    armOcrTap(pageId);
+  } catch (err) {
+    hideProcessing();
+    console.warn('OCR gagal:', err);
+    // Distinct from "nothing found" on purpose: a failed engine and a blank
+    // page need different things said, and collapsing them would tell a user
+    // whose download broke that their document has no text on it.
+    // failureReason(err), never a literal: a hard-coded reason is
+    // indistinguishable from a real classification once it is on the rail, and
+    // that is precisely how 41 export failures all reported 'unknown' on
+    // 2026-07-28 (core/failure-reason.js's header). `stage:'ocr'` already
+    // isolates this population, so whatever the classifier can say about the
+    // error is pure added signal.
+    tel('failure', { stage: 'ocr', reason: failureReason(err), class: 'none', blocked: true });
+    toast('Mesin OCR gagal jalan, coba lagi ya');
+  }
+}
+
+// setTool('ganti') fires its own arm toast for the BORN-DIGITAL ladder
+// ("Edit teks asli, fitur beta…"), which names the wrong ladder for a scan.
+// Ours is raised after it, deliberately, so the message left standing is the
+// true one — one message at a time, the same rule showScanOffer's hideToast()
+// exists to keep.
+function armOcrTap() {
+  setTool('ganti');
+  toast('Tap tulisan yang mau kamu ubah');
 }
 
 // ---- Ganti Teks steering highlight (press→steer→release-commit, 2026-07-19) ------
@@ -1712,7 +1891,7 @@ const pageManager = createPageManager({
   getDoc: () => doc,
   history,
   getRasterizer: () => rasterizer,
-  onDocChanged: () => { textRuns.invalidateAll(); rebuildStage(); },
+  onDocChanged: () => { textRuns.invalidateAll(); ocrIndex.invalidateAll(); rebuildStage(); },
   onAddFiles: () => document.getElementById('file-input').click(),
   onExtract: async (pages) => {
     // Export ONLY the selected pages: a shallow Doc sharing the same sources.
@@ -1870,6 +2049,23 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
       // anything.
       if (!draft?.recorded) record(history, doc);
       let d = { ...formatBar.getDefaults(), ...(draft || {}) };
+      if (draft?.ocrReEdit) {
+        // Rung S2's mirror of the reEdit branch below. Drop the previous
+        // cover+text pair and rebuild against the SAME recognised box, so a
+        // page never accumulates two edits over one line. No surgery is
+        // involved on this ladder (there are no show-ops to cut), so unlike
+        // the born-digital branch there is no pristine-source target to
+        // re-anchor to — the recognised box IS the durable anchor.
+        removeAnnotation(doc, draft.ocrReEdit.coverId);
+        if (draft.ocrReEdit.textId) removeAnnotation(doc, draft.ocrReEdit.textId);
+        const newCover = addAnnotation(doc, pageId, createAnnotation('whiteout', {
+          x: draft.ocrReEdit.box.x, y: draft.ocrReEdit.box.y,
+          width: draft.ocrReEdit.box.w, height: draft.ocrReEdit.box.h,
+          color: draft.ocrReEdit.coverColor,
+          ocrBox: draft.ocrReEdit.box,
+        }));
+        d = { ...d, ocrCoverId: newCover.id };
+      }
       if (draft?.reEdit) {
         // spec-live-surgery.md §5 Decision 3 (increment 4): RE-EDIT commit =
         // drop-and-reapply from the pristine source, never surgery-on-
@@ -1897,6 +2093,11 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
       // replaceCoverId only ever comes from a Ganti Teks draft — omit the key
       // entirely for ordinary authored text rather than carry an undefined.
       const replaceProps = d.replaceCoverId ? { replaceCoverId: d.replaceCoverId } : {};
+      // Rung S2's pairing key. Same omit-if-absent shape, and deliberately NOT
+      // replaceCoverId: that name is what core/page-surgery.js looks for when
+      // it decides a text annotation should be stamped natively into a page
+      // whose original run it just cut. Nothing was cut here.
+      const ocrProps = d.ocrCoverId ? { ocrCoverId: d.ocrCoverId } : {};
       // docFontFamily only ever lands via prepareDocFont on a Ganti draft —
       // same omit-if-absent shape, so a committed annotation without a live
       // doc font carries no dead key. render/page-view.js's textFontCss reads
@@ -1944,6 +2145,7 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
         fontSize: d.fontSize, fontFamily: d.fontFamily,
         bold: d.bold, italic: d.italic, color: d.color,
         ...replaceProps,
+        ...ocrProps,
         ...docFontProps,
         ...styleSourceProps,
       }));
@@ -2000,6 +2202,21 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
       gantiOutcome = 'cancel';
       gantiCoverId = draft.replaceCoverId ?? draft.reEdit?.coverId ?? null;
       gantiDocFont = !!draft.docFontFamily;
+    } else if (draft?.ocrReEdit) {
+      // EMPTY RE-EDIT COMMIT = DELETE THE EDIT, rung S2's half. Identical
+      // grammar to the born-digital branch below, and identical reason: before
+      // this existed, clearing an S2 replacement and committing fell through
+      // every case and silently did nothing — the user deleted the text,
+      // blurred, and the old replacement was still sitting there.
+      // What "the original returns" MEANS differs by ladder, and the
+      // difference is why this is a separate branch rather than an extra
+      // condition on the next one: born-digital has to un-bake a surgery, so
+      // it sets touchedEdit and pays for a re-render. Here the original is
+      // simply the pixels under the cover — removing the pair uncovers them,
+      // and there is nothing to re-bake because nothing was ever cut.
+      record(history, doc);
+      removeAnnotation(doc, draft.ocrReEdit.coverId);
+      if (draft.ocrReEdit.textId) removeAnnotation(doc, draft.ocrReEdit.textId);
     } else if (draft?.reEdit) {
       // EMPTY RE-EDIT COMMIT = DELETE THE EDIT (founder ok, 2026-08-09 —
       // maintenance audit finding 1). Same grammar as the `anno` branch above:
@@ -2125,7 +2342,10 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
     // `draft.reEdit` empty branch below) — the opposite of backing out.
     // A fresh Ganti draft keeps '' on purpose: its empty commit is the
     // cancel that takes the cover back.
-    if (e.key === 'Escape') { ed.textContent = anno?.text ?? (draft?.reEdit ? draft.text : '') ?? ''; ed.blur(); }
+    // ocrReEdit sits beside reEdit here for the same reason it does in
+    // commit(): a rung S2 re-edit is a re-edit, and Escape must back out of
+    // one rather than empty-commit it into a deletion.
+    if (e.key === 'Escape') { ed.textContent = anno?.text ?? ((draft?.reEdit || draft?.ocrReEdit) ? draft.text : '') ?? ''; ed.blur(); }
     e.stopPropagation(); // don't trigger app shortcuts while typing
   });
   ed.addEventListener('pointerdown', (e) => e.stopPropagation());
@@ -2678,6 +2898,7 @@ async function resetDoc() {
   pageManager.invalidateThumbs();
   if (rasterizer) { await rasterizer.destroy(); rasterizer = null; }
   await textRuns.destroy(); // fresh doc = fresh sources; cached pdf.js docs die with the old one
+  ocrIndex.invalidateAll(); // recognised boxes belong to the OLD document's pixels
   // Rung C live-font-preview: the doc-font caches are keyed by sourceId — a
   // fresh doc means fresh (or reused-but-unrelated) source ids, and every
   // FontFace we registered on document.fonts belongs to the OLD document. Not
@@ -2819,6 +3040,11 @@ window.v2 = {
   getDoc: () => doc,
   getSlots: () => slots,
   textRuns, // tests: line geometry for string-addressed taps (quiet-page ruling removed the hint boxes specs used to click)
+  // tests: rung S2's recognised-line geometry, the scan-side twin of textRuns.
+  // Exposed for the same reason — a spec must address a line by its WORDS, not
+  // by a pixel guess, or the test only proves where we assumed the ink was.
+  ocrIndex,
+  runOcrOnPage, // tests: drive recognition without going through the sheet
   loadFiles,
   setTool,
   getTool: () => tool,
@@ -2851,7 +3077,7 @@ window.v2 = {
 // normal use (whiting out a signature line, filling a scanned form) and counting
 // it would import a population that never wanted OCR. The organic case is a rail
 // QUERY over the sequence, which per-event timestamps now make answerable.
-function showScanOffer() {
+function showScanOffer(pageId) {
   const dlg = document.getElementById('scan-offer');
   if (!dlg) { toast('Halaman ini hasil scan/foto, teksnya belum bisa diedit'); return; }
   // The arm-toast from arming Ganti is still on screen and says the opposite of
@@ -2882,6 +3108,22 @@ function showScanOffer() {
 
   dlg.querySelector('#so-tipex').onclick = take('tipex', 'tipex');
   dlg.querySelector('#so-teks').onclick = take('teks', 'teks');
+  // RUNG S2. Settles as `accepted` on the CLICK rather than on an armed tool,
+  // unlike the two above, and the difference is honest rather than sloppy:
+  // recognition takes seconds and can fail, so there is no synchronous "the
+  // tool armed" fact to read here. What this measures is that the user chose
+  // OCR; whether it then WORKED is `ocr_run` / `failure{stage:'ocr'}`, which
+  // is the pair a rail query joins. Folding the outcome into this event would
+  // reintroduce exactly the one-value-two-meanings problem the header warns
+  // about.
+  const ocrBtn = dlg.querySelector('#so-ocr');
+  if (ocrBtn) {
+    ocrBtn.onclick = () => {
+      settle({ action: 'accepted', tool: 'ocr' });
+      dlg.close();
+      runOcrOnPage(pageId);
+    };
+  }
   dlg.querySelector('#so-dismiss').onclick = () => { settle({ action: 'dismissed', tool: 'none' }); dlg.close(); };
   // Backdrop or Escape counts as a dismissal too: someone who closes without
   // choosing has rejected the offer just as much as one who taps "Nanti aja",

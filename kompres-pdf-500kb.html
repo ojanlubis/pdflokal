@@ -300,7 +300,14 @@
       flex: 1; min-height: 44px; border-radius: 10px; font-weight: 700; font-size: 13.5px;
       border: 1.5px solid var(--line); background: var(--bg);
     }
-    #hc-go { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 2px 0 var(--accent-down); }
+    /* The scan sheet's primary action. Same accent treatment as #hc-go — one
+       grammar for "this is the button the sheet is about", never a second. */
+    #hc-go, #so-ocr { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 2px 0 var(--accent-down); }
+    #so-ocr:active { transform: translateY(1px); box-shadow: 0 1px 0 var(--accent-down); }
+    /* The payload disclosure. Deliberately quieter than the sheet's own lead
+       paragraph and directly under the button it qualifies, so it reads as a
+       condition of tapping rather than as a second pitch. */
+    .hc-sheet p.so-note { font-size: 11.5px; margin: 0 0 2px; line-height: 1.45; }
     #hc-go:active { transform: translateY(1px); box-shadow: 0 1px 0 var(--accent-down); }
     .brand .beta { font-size: 10px; color: var(--accent); vertical-align: super; font-weight: 600; }
     .file-menu-wrap { position: relative; }
@@ -1791,12 +1798,27 @@
 
   <!-- Shown when Edit is tapped on a page with no text layer (a scan/photo).
        Mirrors #home-confirm: <dialog> + a .sheet child, because the global
-       `dialog` CSS rule IS the overlay. Copy is PLACEHOLDER — TODO(copy),
-       client-facing words are Fauzan's. It must NOT imply OCR is coming. -->
+       `dialog` CSS rule IS the overlay.
+
+       ⚠️ The old note here said the copy "must NOT imply OCR is coming; that
+       is an open founder call." That call was made — rung S2 ships, and #so-ocr
+       below IS the OCR entry point, so the note is retired rather than left to
+       be re-quoted by a session reading it as current (seat: stale-caution).
+
+       #so-ocr is the primary action and sits on its own row: the other three
+       are what you do INSTEAD of editing the words, and lining all four up
+       would read as four equal alternatives. The 5 MB line under it is not
+       decoration — the WASM ruling (seat decisions 2026-07-18) sanctions a
+       heavy engine ONLY on the condition the user is told what is downloading
+       and why, before it starts. -->
   <dialog id="scan-offer" aria-label="Halaman ini hasil scan">
     <div class="sheet hc-sheet">
       <h2>Halaman ini hasil scan</h2>
-      <p>Tulisannya cuma gambar, jadi nggak ada teks yang bisa diedit. Tapi kamu masih bisa menutupnya lalu menulis di atasnya.</p>
+      <p>Tulisannya cuma gambar, bukan teks. PDFLokal bisa mengenali tulisannya dulu, baru kamu tap dan ganti kata yang salah.</p>
+      <div class="hc-row">
+        <button id="so-ocr">Kenali tulisannya</button>
+      </div>
+      <p class="so-note">Sekali unduh mesin pengenal tulisan 5 MB, habis itu tersimpan di HP kamu.</p>
       <div class="hc-row">
         <button id="so-dismiss">Nanti aja</button>
         <button id="so-tipex">Tutup tulisan</button>

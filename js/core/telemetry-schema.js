@@ -37,6 +37,15 @@
 
 // ---- shared enum/bucket vocab (reused by more than one event) -----------------
 const PAGES_BUCKET = ['1', '2-5', '6-20', '21+'];
+
+// OCR line counts need their OWN bucket, and the reason is the whole point of
+// the event. pagesBucket() collapses 0 into '1' on purpose (a document always
+// has at least one page), but ZERO RECOGNISED LINES is the single most
+// important outcome rung S2 can report — it is what "this scan is too poor to
+// edit" looks like, and it is the number that would retire the rung. Reusing
+// PAGES_BUCKET would make that outcome indistinguishable from a page with one
+// line: a metric that cannot express the finding it exists to find.
+const OCR_LINES_BUCKET = ['0', '1-5', '6-20', '21-60', '61+'];
 const DEVICE = ['phone', 'tablet', 'desktop'];
 // spec-edit-fidelity-instrumentation.md Increment A/B: which rung of the
 // style/family ladder (core/font-fingerprint.js) decided bold/italic.
@@ -282,6 +291,18 @@ export function unsupportedCharClass(ch) {
 // ms (a raw duration) → clamped to [0, 600000] and rounded to the nearest
 // 10ms (spec §2). This is the ONLY place a 'duration' value should be
 // produced — validateEvent then just has to check the invariant holds.
+// n (recognised lines on one page) -> an OCR_LINES_BUCKET string. Same
+// defensive shape as pagesBucket: garbage collapses to the smallest bucket
+// rather than producing an off-schema value validateEvent would drop.
+export function ocrLinesBucket(n) {
+  const v = Number(n);
+  if (!Number.isFinite(v) || v <= 0) return '0';
+  if (v <= 5) return '1-5';
+  if (v <= 20) return '6-20';
+  if (v <= 60) return '21-60';
+  return '61+';
+}
+
 export function durationBucket(ms) {
   // NaN (incl. anything that doesn't coerce to a number, e.g. undefined)
   // can't be reasoned about as "too big" or "too small" — floor it. A real
@@ -375,6 +396,15 @@ export const SCHEMA = {
   // ⚠️ `accepted` fires when the tool is actually ARMED, never on the button
   // click — a click measures the button, and we need the behaviour (seat ruling).
   //
+  // ⚠️ ONE DOCUMENTED EXCEPTION, added with 'ocr' (2026-08-23): the OCR option
+  // settles on the CLICK, because there is no synchronous "armed" fact to read
+  // — recognition takes seconds and can fail. So `accepted{tool:'ocr'}` means
+  // THE USER CHOSE OCR, not that OCR worked. Whether it worked is `ocr_run`
+  // (with its line count) and `failure{stage:'ocr'}`, joined per session. Read
+  // an acceptance rate for 'ocr' as demand, never as success — folding the
+  // outcome in here would give one value two meanings, which is the exact
+  // defect the note below is about.
+  //
   // ⚠️ AND IT FIRES ONLY FROM THIS OFFER. Arming Tip-Ex on a scan WITHOUT having
   // hit the wall is normal use — whiting out a signature line, filling a scanned
   // form — and counting it here would import a population that never wanted OCR,
@@ -385,7 +415,33 @@ export const SCHEMA = {
   // meanings is how `matched:true` came to mean two things.
   scan_offer: {
     action: ['shown', 'accepted', 'dismissed'],
-    tool: ['tipex', 'teks', 'none'],
+    // 'ocr' (added 2026-08-23, rung S2): the offer's fourth option — recognise
+    // the page, then tap a line to replace it. ENUM ADDITION ONLY, and the
+    // distinction matters because EXCLUDE 4 (changing an existing field's
+    // meaning) is Fauzan's hand: 'tipex', 'teks' and 'none' still mean exactly
+    // what they meant on 2026-07-28, so every historical reading of this event
+    // stays valid and comparable. What changes is only that a new value can
+    // now appear from clients new enough to send it — the same shape
+    // failure.reason's 'font-fallback' addition already took.
+    tool: ['tipex', 'teks', 'ocr', 'none'],
+  },
+  // ocr_run (2026-08-23, rung S2): one recognition pass over one page. The
+  // question it answers is whether OCR is worth its 5.01 MB: `lines` is how
+  // many tap targets a real user's real scan actually yielded (zero is the
+  // outcome that would kill the rung), and `duration` is what they waited on
+  // the phone they own. `engine_cached` separates a first run — which paid for
+  // the download — from every later one, so the two populations are never
+  // averaged into a single misleading number.
+  //
+  // Deliberately NOT folded into scan_offer as extra props: that event fires
+  // once per OFFER and this one fires per RECOGNITION, and a page can be
+  // recognised without the offer ever being shown once the tool is armed.
+  // Overloading one event with two lifetimes is how a rate ends up dividing
+  // two different denominators.
+  ocr_run: {
+    lines: OCR_LINES_BUCKET,
+    duration: 'duration',
+    engine_cached: 'bool',
   },
   ganti_tap: {
     hit: 'bool',
@@ -559,7 +615,14 @@ export const SCHEMA = {
   // files opened perfectly. Counting a success as a failure makes the rail
   // pessimistic in exactly the place the push policy trusts it most.
   failure: {
-    stage: ['import', 'commit', 'export', 'compress', 'render', 'runtime'],
+    // 'ocr' (added 2026-08-23, rung S2): the engine failed to load or threw
+    // during recognition. Its own stage rather than 'runtime' because the
+    // remedy is different in kind — a 5 MB download over an Indonesian mobile
+    // connection is the likely cause, and burying that inside the generic
+    // runtime bucket would make the one number that could justify shrinking
+    // the payload impossible to read. Enum ADDITION only; see the note on
+    // `reason` below for why additions are the safe direction.
+    stage: ['import', 'commit', 'export', 'compress', 'render', 'runtime', 'ocr'],
     // 'font-fallback' (added 2026-08-09, audit finding 2): a custom/clone font
     // fetch failed at export and core/export.js substituted Helvetica in the
     // kept file. Always blocked:false — the export SUCCEEDED, wrongly; this is
