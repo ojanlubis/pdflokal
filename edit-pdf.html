@@ -501,18 +501,29 @@
        register on purpose — furniture, not a promotion). The tab and the
        panel are two separate fixed-position elements, not nested: keeps the
        collapsed tab's own rendered box exactly button-sized (measurable,
-       small) instead of a wrapper that stays tall while invisible. */
+       small) instead of a wrapper that stays tall while invisible.
+
+       ⚠️ ICON-ONLY, 40x40, RULED BY FAUZAN 2026-08-23: "chip kontak saya di
+       sini kegedean, kecilin lagi". The labelled pill was 44x131 — nearly
+       three times #zoom-ctl's footprint on the opposite corner, and on desktop
+       it sat on top of the document itself. Icon-only makes the two floating
+       controls the same size and the same weight, which is what "furniture"
+       above was always claiming. The words survive as aria-label + title, so
+       a screen reader and a desktop hover both still say "Kontak saya" — the
+       label moved, it was not deleted. */
     #contact-tab-btn {
       position: fixed; left: 10px; bottom: 14px; z-index: 30;
-      height: 44px; padding: 0 16px; border-radius: 12px;
+      width: 40px; height: 40px; border-radius: 12px;
+      display: grid; place-items: center;
       background: var(--surface); box-shadow: 0 3px 14px rgba(0,0,0,.16);
-      color: var(--muted); font: inherit; font-size: 13px; font-weight: 600;
+      color: var(--muted);
     }
+    #contact-tab-btn svg { width: 19px; height: 19px; display: block; }
     #contact-tab-panel {
-      position: fixed; left: 10px; bottom: 66px; z-index: 30;
-      width: max-content; max-width: min(72vw, 240px);
+      position: fixed; left: 10px; bottom: 62px; z-index: 30;
+      width: max-content; max-width: min(78vw, 260px);
       background: var(--surface); box-shadow: 0 3px 14px rgba(0,0,0,.16);
-      border-radius: 12px; padding: 12px 14px;
+      border-radius: 12px; padding: 8px;
       /* visibility (not just opacity): same reasoning as #support-card — a
          dismissed panel must be GONE to hit-testing and screen readers. */
       opacity: 0; visibility: hidden; pointer-events: none;
@@ -523,7 +534,22 @@
       opacity: 1; visibility: visible; pointer-events: auto;
       transform: translateY(0); transition-delay: 0s;
     }
-    #contact-tab-panel a { color: var(--accent); font-size: 13px; font-weight: 600; }
+    /* One row per channel. min-height 40, not 44: this is a LIST inside an
+       already-opened panel, where rows are separated and mis-taps are cheap —
+       the 44 law guards isolated targets a finger hunts for, and the opening
+       tab is the one that has to meet it. Same reasoning text-runs.js records
+       for inflating a HIT box rather than a visual one. */
+    #contact-tab-panel a {
+      display: flex; align-items: center; gap: 10px;
+      min-height: 40px; padding: 0 10px; border-radius: 9px;
+      color: var(--ink); font-size: 13px; font-weight: 600; text-decoration: none;
+    }
+    #contact-tab-panel a:hover { background: var(--bg); }
+    /* The handle is the quiet half: the platform is what you scan for, the
+       handle is what you check once you have found it. */
+    #contact-tab-panel a b { font-weight: 600; }
+    #contact-tab-panel a span { color: var(--muted); font-weight: 500; margin-left: auto; }
+    #contact-tab-panel a svg { width: 16px; height: 16px; flex: none; color: var(--muted); }
     @media (prefers-reduced-motion: reduce) { #contact-tab-panel { transition: none; } }
 
     /* ---- the landing (= the editor's empty state; design: draf 3b) ---- */
@@ -1752,10 +1778,34 @@
   </div>
   <!-- Contact bookmark: quiet furniture tab, bottom-left, mirrors #zoom-ctl.
        Two separate elements (button + panel), not one wrapper — see the CSS
-       comment for why. -->
-  <button id="contact-tab-btn" aria-expanded="false" aria-controls="contact-tab-panel">Kontak saya</button>
+       comment for why.
+
+       ⚠️ THE HANDLES ARE NOT INVENTED HERE AND MUST NOT BE. They come from
+       `engine/wiki/machine/public-identity.md`, which is the machine's one
+       home for them, and each is verified against fkd/loker's own shipped
+       Kontak dialog. A handle typed from memory is a live link to someone
+       else's account. If a channel is missing from the wiki it is missing
+       here too — that is the design, not an oversight.
+
+       ⚠️ THREADS AND X CAME FROM HIM, NOT FROM THE MACHINE (2026-08-23). He
+       asked for "semua sosmed gue... threads x instagram, cari aja" — and
+       they were not there: not in the wiki page, not in loker's dialog, not
+       anywhere under ~/machine. The Instagram handle made threads/@ojan.lubis
+       a good guess and it turned out correct, which is exactly why it was not
+       shipped as one: a guessed handle that happens to resolve is a live link
+       to a stranger's account until someone confirms whose it is. He supplied
+       both, they are now in the wiki, and the wiki is what a future session
+       reads. -->
+  <button id="contact-tab-btn" aria-expanded="false" aria-controls="contact-tab-panel"
+          aria-label="Kontak saya" title="Kontak saya">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9 9 0 0 1-3.9-.9L3 20.5l1.5-4.5a8.4 8.4 0 0 1-.9-3.9 8.4 8.4 0 0 1 8.4-9 8.4 8.4 0 0 1 9 8.4Z"/></svg>
+  </button>
   <div id="contact-tab-panel">
-    <a href="https://tiktok.com/@okeojan" target="_blank" rel="noopener">@okeojan di TikTok</a>
+    <a href="https://tiktok.com/@okeojan" target="_blank" rel="noopener"><b>TikTok</b><span>@okeojan</span></a>
+    <a href="https://instagram.com/ojan.lubis" target="_blank" rel="noopener"><b>Instagram</b><span>ojan.lubis</span></a>
+    <a href="https://www.threads.com/@ojan.lubis" target="_blank" rel="noopener"><b>Threads</b><span>ojan.lubis</span></a>
+    <a href="https://x.com/okeojan" target="_blank" rel="noopener"><b>X</b><span>@okeojan</span></a>
+    <a href="https://ojanlubis.id" target="_blank" rel="noopener"><b>Website</b><span>ojanlubis.id</span></a>
   </div>
   <div id="toast" role="status" aria-live="polite"></div>
 
