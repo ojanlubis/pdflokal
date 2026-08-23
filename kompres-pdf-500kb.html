@@ -304,10 +304,8 @@
        grammar for "this is the button the sheet is about", never a second. */
     #hc-go, #so-ocr { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 2px 0 var(--accent-down); }
     #so-ocr:active { transform: translateY(1px); box-shadow: 0 1px 0 var(--accent-down); }
-    /* The payload disclosure. Deliberately quieter than the sheet's own lead
-       paragraph and directly under the button it qualifies, so it reads as a
-       condition of tapping rather than as a second pitch. */
-    .hc-sheet p.so-note { font-size: 11.5px; margin: 0 0 2px; line-height: 1.45; }
+    /* The primary action needs air above the row of alternatives under it. */
+    #scan-offer .hc-row + .hc-row { margin-top: 2px; }
     #hc-go:active { transform: translateY(1px); box-shadow: 0 1px 0 var(--accent-down); }
     .brand .beta { font-size: 10px; color: var(--accent); vertical-align: super; font-weight: 600; }
     .file-menu-wrap { position: relative; }
@@ -1807,18 +1805,24 @@
 
        #so-ocr is the primary action and sits on its own row: the other three
        are what you do INSTEAD of editing the words, and lining all four up
-       would read as four equal alternatives. The 5 MB line under it is not
-       decoration — the WASM ruling (seat decisions 2026-07-18) sanctions a
-       heavy engine ONLY on the condition the user is told what is downloading
-       and why, before it starts. -->
+       would read as four equal alternatives.
+
+       ⚠️ THE 5 MB DISCLOSURE WAS HERE AND FAUZAN CUT IT (2026-08-23, "gausah
+       kasih tau 5mb bakal didownload, berisik"). It was the condition attached
+       to his own 2026-07-18 WASM ruling — a heavy engine is sanctioned if the
+       user is told what is downloading and why — so this is him relaxing his
+       own condition, in front of the trade, and it is recorded rather than
+       quietly dropped. WHAT STILL HOLDS, and no session may weaken it: the
+       engine downloads ONLY on an explicit tap of this button, NEVER from a
+       page-load or a render path (js/v2/ocr-engine.js). Opt-in was always the
+       larger half of that ruling. -->
   <dialog id="scan-offer" aria-label="Halaman ini hasil scan">
     <div class="sheet hc-sheet">
       <h2>Halaman ini hasil scan</h2>
-      <p>Tulisannya cuma gambar, bukan teks. PDFLokal bisa mengenali tulisannya dulu, baru kamu tap dan ganti kata yang salah.</p>
+      <p>File ini file gambar.</p>
       <div class="hc-row">
-        <button id="so-ocr">Kenali tulisannya</button>
+        <button id="so-ocr">Scan tulisannya</button>
       </div>
-      <p class="so-note">Sekali unduh mesin pengenal tulisan 5 MB, habis itu tersimpan di HP kamu.</p>
       <div class="hc-row">
         <button id="so-dismiss">Nanti aja</button>
         <button id="so-tipex">Tutup tulisan</button>

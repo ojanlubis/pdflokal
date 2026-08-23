@@ -1582,7 +1582,7 @@ async function runOcrOnPage(pageId) {
       // is the split that makes the duration number readable at all.
       engine_cached: engineWasCached,
     });
-    if (lines.length === 0) { toast('Nggak ketemu tulisan di halaman ini'); return; }
+    if (lines.length === 0) { toast('Nggak ada tulisan yang kebaca'); return; }
     armOcrTap(pageId);
   } catch (err) {
     hideProcessing();
@@ -1597,7 +1597,7 @@ async function runOcrOnPage(pageId) {
     // isolates this population, so whatever the classifier can say about the
     // error is pure added signal.
     tel('failure', { stage: 'ocr', reason: failureReason(err), class: 'none', blocked: true });
-    toast('Mesin OCR gagal jalan, coba lagi ya');
+    toast('Gagal scan, coba lagi ya');
   }
 }
 
@@ -1608,7 +1608,7 @@ async function runOcrOnPage(pageId) {
 // exists to keep.
 function armOcrTap() {
   setTool('ganti');
-  toast('Tap tulisan yang mau kamu ubah');
+  toast('Tap tulisan yang mau diubah');
 }
 
 // ---- Ganti Teks steering highlight (press→steer→release-commit, 2026-07-19) ------

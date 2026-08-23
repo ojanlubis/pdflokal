@@ -99,13 +99,14 @@ test.describe('rung S2 — tap-to-edit on a scan', () => {
 
     const sheet = page.locator('#scan-offer');
     await expect(sheet).toBeVisible();
-    // The payload disclosure is a CONDITION of the WASM ruling, not a nicety:
-    // a heavy engine is sanctioned only if the user is told before it starts.
-    // Asserted by behaviour — a visible notice next to the button — rather
-    // than by its exact words, which are Fauzan's to change without breaking
-    // this test.
     await expect(page.locator('#so-ocr')).toBeVisible();
-    await expect(page.locator('#scan-offer .so-note')).toBeVisible();
+    // WHAT REPLACED THE 5 MB NOTICE AS THE GUARANTEE (he cut the notice on
+    // 2026-08-23 as noise). Opt-in is now the whole of the WASM ruling that
+    // survives, so it is asserted rather than assumed: the engine must NOT be
+    // in the tab until this button is tapped. A regression that pre-warmed it
+    // on page load would be invisible on a laptop and expensive on the phones
+    // this product actually runs on.
+    expect(await page.evaluate(() => !!window.Tesseract)).toBe(false);
 
     await page.click('#so-ocr');
     await expect(sheet).toBeHidden();
