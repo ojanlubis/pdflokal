@@ -38,7 +38,8 @@
 -- that is the feedback table's territory, below.)
 
 create table if not exists events (
-  id bigint generated always as identity primary key,
+  -- START 1000000: see "identity sequences" below — the gap is deliberate.
+  id bigint generated always as identity (start with 1000000) primary key,
   ts timestamptz not null default now(),
   session_id uuid not null,
   app_version text not null,
@@ -61,7 +62,7 @@ create index if not exists events_event_idx on events (event);
 -- Never the page, never the file.
 
 create table if not exists feedback (
-  id bigint generated always as identity primary key,
+  id bigint generated always as identity (start with 1000) primary key,
   ts timestamptz not null default now(),
   session_id uuid not null,
   app_version text not null,
@@ -100,20 +101,30 @@ create index if not exists feedback_ts_idx on feedback (ts desc);
 create index if not exists feedback_rating_idx on feedback (rating);
 
 -- ---- identity sequences: leave room for the backfill --------------------------
--- ⚠️ THE ONE STEP THAT CANNOT BE DONE LATER WITHOUT PAIN. The 47,396 events and
+-- ⚠️ THE ONE STEP THAT CANNOT BE DONE LATER WITHOUT PAIN. The 47,540 events and
 -- 37 feedback rows carried over from Supabase keep their original ids (they are
 -- referenced by nothing, but a re-run of the backfill must be a no-op, and
--- `on conflict (id) do nothing` is what makes it one). Supabase's high-water
--- marks at port time: events 47529, feedback 38.
+-- `on conflict (id) do nothing` is what makes it one). Supabase's final
+-- high-water marks, measured: events 47551, feedback 38.
 --
 -- Starting new ids at 1,000,000 / 1,000 does two jobs: no new row can ever
 -- collide with a backfilled one, and the id itself says where the row came from
 -- — under a million means it lived on Supabase. Ordering across the boundary
 -- stays honest because every new row postdates every old one.
-alter table events alter column id restart with 1000000;
-alter table feedback alter column id restart with 1000;
+--
+-- ✅ BACKFILL DONE 2026-08-23: 47,540 events + 37 feedback rows copied, and the
+-- copy was verified by an md5 over every column of every row on both sides —
+-- ab913c9af5b1d88616f228c33f6d9a33 (events) and e4148a3c40d06768dec5758bfe05c635
+-- (feedback), identical. Counts alone would not have proven the CONTENT
+-- survived; a fingerprint does.
+-- Declared in the table definitions above as START WITH, deliberately, rather
+-- than as a RESTART applied afterwards. RESTART sets only the sequence's CURRENT
+-- value and leaves its declared start at 1 — so a later bare `ALTER TABLE ...
+-- RESTART` (no value, a normal thing to reach for) silently drops the counter
+-- back to 1 and the next insert collides with a backfilled row. Applied to the
+-- live database on 2026-08-23 after the backfill, for exactly that reason.
 
--- ---- read side: 4 views, so a PM session sees the shape in one SELECT ---------
+-- ---- read side: 5 views, so a PM session sees the shape in one SELECT ---------
 
 -- Daily volume per event — the first thing to look at before writing any spec:
 -- is the wild sending anything at all.
