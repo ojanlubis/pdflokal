@@ -75,6 +75,24 @@ Event shapes you will need:
 
 The live site is `https://pdflokal.id`.
 
+### 1.0 ⚠️ Install dependencies yourself — the setup script cannot
+
+**The environment's setup script runs BEFORE this repository is checked out.** Measured 2026-08-25:
+`npm ci` there fails with `EUSAGE — can only install with an existing package-lock.json`, in
+`/root`, because there is no repo yet. The lockfile is on `origin/main`; the script simply is not
+standing in it.
+
+So the setup script only pre-warms the Playwright browser cache. **Anything needing `node_modules` is
+yours to install, inside the run, before you use it:**
+
+```bash
+npm ci
+```
+
+Do this once, early, before §5's gate or §6.2's audit. If the browser cache is missing or the wrong
+build, `npx playwright install --with-deps chromium` fixes it and is a fast no-op when it is already
+right — the run is root, so `--with-deps` works here even though it needs apt.
+
 ### 1.1 Read your last run first
 
 ```sql
