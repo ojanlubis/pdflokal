@@ -107,10 +107,26 @@ test.describe('client build pin', () => {
     expect(revHits, 'the /api/rev stub was never reached, so nothing here is under test').toBeGreaterThan(0);
     const hitsBefore = revHits;
 
-    // More activity, more flushes.
+    // More activity, more flushes — and the activity has to be an event source
+    // that actually FIRES, which re-importing the fixture is not.
+    //
+    // WHY NOT setInputFiles here: with a document already open, feeding the same
+    // file to #file-input emits nothing at all. Instrumenting the rail through
+    // this loop showed the batch count flat at 1 across the first iteration; the
+    // second batch only appeared when some incidental event happened to fire, so
+    // the assertion below was really polling on luck and failed ~2 runs in 3.
+    // Clearing input.value and restoring visibilityState were both tried and
+    // neither brought doc_open back — the app does not re-open a document it is
+    // already showing, which is correct behaviour and not the thing under test.
+    //
+    // Opening the page manager is a real user action carrying a guaranteed event
+    // (tool_use/pages_open — the single openPagesSheet() in js/v2/app.js, which
+    // that function's own comment explains is deliberately the only call site),
+    // so every iteration now has something real to flush. The property under
+    // test is untouched: still >1 batch, still every batch pinned to SHA_A.
     for (let i = 0; i < 2; i++) {
-      await page.setInputFiles('#file-input', FIXTURE);
-      await expectFirstPage(page);
+      await page.click('#btn-pages');
+      await page.click('#pm-close');
       await flush(page);
       await page.waitForTimeout(200);
     }
