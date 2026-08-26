@@ -183,6 +183,30 @@ export function textFontCss(anno) {
   return `${anno.italic ? 'italic ' : ''}${anno.bold ? '700 ' : '400 '}${anno.fontSize || 24}px ${stack}`;
 }
 
+// SINGLE SOURCE OF TRUTH for how WIDE a text annotation paints, in page-space
+// px — the same question renderAnnotationEl answers by letting the element
+// auto-size under `white-space: pre`, asked without needing the element.
+//
+// WHY it has to exist: a committed Ganti replacement is BAKED into the page
+// raster a beat after commit, and its overlay element is then removed. Anything
+// that needs the painted extent after that — hit-testing a tap on an
+// already-edited line, above all — has no DOM left to measure and must derive
+// it. Measuring through textFontCss() is what keeps this honest: same font
+// stack, same size, same weight the overlay paints with, including the
+// docFontFamily FontFace when one loaded. A second, independently-written
+// measurement would drift from what the user actually sees, which is the whole
+// thing the caller is trying to hit.
+//
+// Page-space, not viewport: fontSize and x/y are page-space px (that is how
+// renderAnnotationEl positions), so measureText returns page-space px too.
+let measureCtx = null;
+export function measureTextAnnoWidth(anno) {
+  if (!anno || anno.type !== 'text' || !anno.text) return 0;
+  measureCtx = measureCtx || document.createElement('canvas').getContext('2d');
+  measureCtx.font = textFontCss(anno);
+  return measureCtx.measureText(anno.text).width;
+}
+
 // One annotation as a positioned DOM element (page-space px).
 export function renderAnnotationEl(anno) {
   const el = document.createElement('div');

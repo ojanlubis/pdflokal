@@ -32,7 +32,7 @@ import {
 import { compareRegions } from '../core/visual-oracle.js';
 import { createOcrIndex, ocrEngineLoaded } from './ocr-runs.js';
 import { validateSample } from '../core/feedback-sample.js';
-import { createPageSlot, syncOverlay, textFontCss } from '../render/page-view.js';
+import { createPageSlot, syncOverlay, textFontCss, measureTextAnnoWidth } from '../render/page-view.js';
 import { createViewportStream } from '../render/viewport.js';
 import { RASTER_BASE, sharpenScale, maxPixelsFor } from '../render/sharpen.js';
 import { createInteraction } from '../render/interaction.js';
@@ -1289,11 +1289,36 @@ async function prepareDocFont(pageId, line, draft) {
 function hitTestEditedLine(page, x, y) {
   const edits = pageEdits(page);
   if (edits.length === 0) return null;
-  const boxes = edits.map((edit) => ({
-    x: edit.cover.replaceBox.x, y: edit.cover.replaceBox.y,
-    w: edit.cover.replaceBox.w, h: edit.cover.replaceBox.h,
-    edit,
-  }));
+  const boxes = edits.map((edit) => {
+    const b = edit.cover.replaceBox;
+    // FIELD REPORT 2026-08-26: the birth box ALONE is not the whole target.
+    // Everything above is still true — the box is the honest ANCHOR, and a
+    // committed edit never drags — but the REPLACEMENT is free to be longer
+    // than the words it replaced, and then it paints past the box that
+    // birthed it. Hit-testing the anchor alone left the visible overflow
+    // dead: a tap there missed here, then fell through to the fresh
+    // textRuns.hitTest against the PRISTINE source, where the original line
+    // had already ended — so neither branch matched and the tap did nothing
+    // at all. A user with a replacement wider than its original simply could
+    // not reopen their own edit ("tidak bisa di edit lagi"), with no toast
+    // and nothing in the rail to say so.
+    //
+    // So: anchor UNION painted extent. Union, never replace — the box stays
+    // the floor, so this can only ever grow the target, never move or shrink
+    // one that already worked. Width comes from render/page-view.js's own
+    // measurer, i.e. the same font stack the overlay paints with, because the
+    // region has to match what the user SEES to be worth tapping.
+    const painted = measureTextAnnoWidth(edit.replacement);
+    if (!painted) return { x: b.x, y: b.y, w: b.w, h: b.h, edit };
+    const r = edit.replacement;
+    // 1.2 is renderAnnotationEl's own line-height for a text annotation.
+    const rh = (r.fontSize || 24) * 1.2;
+    const x0 = Math.min(b.x, r.x);
+    const y0 = Math.min(b.y, r.y);
+    const x1 = Math.max(b.x + b.w, r.x + painted);
+    const y1 = Math.max(b.y + b.h, r.y + rh);
+    return { x: x0, y: y0, w: x1 - x0, h: y1 - y0, edit };
+  });
   const hit = resolveTap(boxes, x, y, MIN_HIT);
   return hit ? hit.edit : null;
 }

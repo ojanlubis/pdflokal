@@ -245,4 +245,64 @@ test.describe('ganti teks — RE-EDIT an already-edited line (Decision 3: drop-a
       .map((a) => ({ id: a.id, t: a.type, text: a.text })));
     expect(afterNoOp).toEqual(before);
   });
+
+  // FIELD REPORT 2026-08-26 (a real user, via Fauzan): "yang sudah di edit
+  // tulisannya terus tidak bisa di edit lagi". Reproduced: hitTestEditedLine
+  // built its boxes from cover.replaceBox ALONE — the PRISTINE line's geometry,
+  // captured at the edit's birth. A replacement longer than the words it
+  // replaced paints past that box, so tapping the text the user can actually
+  // SEE fell outside the edit's hit region, then fell through to a fresh
+  // hitTest against the pristine source where the original line had already
+  // ended. Neither branch matched: no editor, no toast, nothing. Measured on
+  // this fixture, taps at 100%..260% of the original width all did nothing
+  // while the replacement painted to ~197px past it.
+  //
+  // The tap here is deliberately BEYOND the original box and INSIDE the painted
+  // replacement — the exact region that was dead. The vacuity guard below is
+  // load-bearing: if the fixture ever stops overflowing, this test would pass
+  // for free while proving nothing.
+  test('a replacement longer than the original stays tappable where it PAINTS', async ({ page }) => {
+    await openDoc(page, NASTY('undangan-cid.pdf'));
+    await armGanti(page);
+    await tapLine(page, { str: 'Rapat Anggota Tahunan 2026', nth: 1 });
+
+    const LONGER = 'Rapat Anggota Tahunan Luar Biasa Yang Panjang Sekali 2026';
+    await page.keyboard.type(LONGER);
+    await page.keyboard.press('Enter');
+    await expect(page.locator('.v2-text-edit')).toHaveCount(0);
+
+    // Where the replacement actually paints, versus where the original ended.
+    // Measured through render/page-view.js's OWN textFontCss, so this asks the
+    // same question the overlay answers when it paints the annotation.
+    const geo = await page.evaluate(async () => {
+      const pg = window.v2.getDoc().pages[0];
+      const cover = pg.annotations.find((a) => a.type === 'whiteout' && a.replaceBox);
+      const text = pg.annotations.find((a) => a.type === 'text' && a.replaceCoverId === cover.id);
+      const { textFontCss } = await import('/js/render/page-view.js');
+      const ctx = document.createElement('canvas').getContext('2d');
+      ctx.font = textFontCss(text);
+      const paintedW = ctx.measureText(text.text).width;
+      const view = document.querySelector(`.pv-page[data-page-id="${pg.id}"]`);
+      const r = view.getBoundingClientRect();
+      const sx = r.width / view.offsetWidth;
+      const sy = r.height / view.offsetHeight;
+      return {
+        originalRight: r.left + (cover.replaceBox.x + cover.replaceBox.w) * sx,
+        paintedRight: r.left + (text.x + paintedW) * sx,
+        y: r.top + (cover.replaceBox.y + cover.replaceBox.h / 2) * sy,
+      };
+    });
+
+    // VACUITY GUARD: the whole point is a tap in the overflow region. If there
+    // is no overflow there is no region and the assertion below is free.
+    expect(geo.paintedRight,
+      'fixture no longer overflows its original box — this test would prove nothing')
+      .toBeGreaterThan(geo.originalRight + 20);
+
+    // Tap the visible replacement, PAST where the original line ended.
+    await armGanti(page);
+    await page.mouse.click((geo.originalRight + geo.paintedRight) / 2, geo.y);
+    await expect(page.locator('.v2-text-edit')).toBeVisible();
+    await expect(page.locator('.v2-text-edit')).toHaveText(LONGER);
+  });
 });
