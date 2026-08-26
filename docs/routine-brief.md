@@ -376,6 +376,41 @@ Once a run records `green`, later runs **skip this step and carry the value forw
 pushing a fix — a push runs the gate on its own tree, per §5.3.1. It is a full Playwright suite and
 it is not free.
 
+### 6.5 A RED gate here is not the same claim as a red gate on his machine
+
+**Measured 2026-08-26, and it cost most of a run to learn — do not re-derive it.** The cloud
+container is a starved 4-vCPU VM with no GPU (Chromium falls back to SwiftShader software
+rendering). The same commit that this environment reported RED, `ee8af7f`, went **GREEN on a healthy
+machine: 386 passed in 7.5 minutes** (see 0f5af18). So:
+
+- **A RED gate here is a claim about this container until you have ruled out the environment.** Name
+  the failing tests in your report; do not report "main is broken" on this evidence alone.
+- **Timing-sensitive specs flake here and pass there.** Seen so far: `ganti-teks-reedit.spec.js:212`
+  (the re-edit tap — `.v2-text-edit` never opens), `mobile/back-button.spec.js:48` (passes in
+  isolation, fails in a full run). The cast **rotates between runs**, which is the tell that it is
+  starvation and not a defect.
+- **Do not try to fix these by adding waits.** It was tried: a MutationObserver quiescence wait in
+  `tests/helpers/lines.js` moved the failure rate not at all (2 in 3 before, 4 in 6 after) and was
+  reverted. Worse, the flake rate of one identical spec swung between 20% and 67% across batches on
+  an idle box, so **n=3 here cannot tell a fix from luck.** Measure a change 10+ times or do not
+  claim it.
+
+**One thing that WAS real and is now fixed** (`88b6b81`, on main): `index.html` loads two `gtag.js`
+tags, and Chromium inherits `HTTPS_PROXY` from this environment, so those subresources HUNG rather
+than failing fast — **~12.5s on every `page.goto()`**, because `goto` waits for `load`. Specs that
+load a page three or four times simply ran out of their 30s budget and surfaced as "page.goto
+timeout", which reads like a product bug and is not one. The config now launches Chromium with
+`--proxy-server=direct:// --proxy-bypass-list=*` plus a NOTFOUND host-resolver rule, so the browser
+reaches localhost and nothing else. Page loads went 12,500ms → ~200ms and the suite 98min → 20min.
+**The DNS rule alone did nothing** — it is the proxy flags that matter here.
+
+> ⚠️ **The gate and CI do not agree on retries, and the gate is the STRICTER one.**
+> `playwright.config.js` sets `retries: process.env.CI ? 1 : 0`. GitHub Actions sets `CI=true`, so it
+> retries once and swallows exactly the single-run flakes above; `scripts/qa-gate.mjs` does not set
+> `CI`, so the gate gets no retry. **CI can therefore be green while the gate is red on the same
+> tree** — the inverse of the hazard `qa-gate.mjs`'s own header warns about. Which way to reconcile
+> them changes what "green" means, so it is a founder call, not a routine's. Report it; leave it.
+
 ---
 
 ## 7 · Write exactly one row
