@@ -88,6 +88,16 @@ test.describe('Ctrl+Z inside the signature modal', () => {
     await page.evaluate(() => window.ueOpenSignatureModal());
     await page.waitForSelector('#signature-modal.active');
 
+    // WHY: openSignatureModal() schedules TWO deferred canvas-DPR setups at 100ms
+    // (one directly, one via switchSignatureTab('draw')), and each one ends in
+    // signaturePad.clear(). They are scheduled at OPEN time, so drawing before
+    // they land means both timers fire mid-test and wipe the pad — the rewind
+    // under test runs correctly, then a timer clears what it left behind, and the
+    // assertion below reads 0 instead of 1. That is a race in the instrument, not
+    // a bug in the Ctrl+Z path: waiting the timers out makes the test measure the
+    // code it names. (js/pdf-tools/signature-modal.js:24 and :80)
+    await page.waitForTimeout(250);
+
     // Draw two strokes on the signature pad.
     await page.evaluate(() => {
       const c = document.getElementById('signature-canvas');
