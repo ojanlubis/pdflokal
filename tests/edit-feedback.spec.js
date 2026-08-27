@@ -222,9 +222,9 @@ test.describe('edit beta: Increment D consent-gated sample', () => {
 
     // Capture is deferred (requestIdleCallback) — poll for the ask block.
     await expect.poll(() => pill.locator('.ef-crop-item').count(), { timeout: 5000 }).toBe(2);
-    await expect(pill.locator('.ef-ask-q')).toHaveText('Boleh kami minta dua potongan ini?');
+    await expect(pill.locator('.ef-ask-q')).toHaveText('Boleh saya minta dua potongan ini?');
     await expect(pill.locator('.ef-ask-sub')).toHaveText(
-      'Sebelum dan sesudahnya, biar kami bisa analisis fiturnya kurang di mana. Nggak ada isi file lain.',
+      'Sebelum dan sesudahnya, biar saya bisa analisis fiturnya kurang di mana. Nggak ada isi file lain.',
     );
     await expect(pill.locator('.ef-crop-label').nth(0)).toHaveText('Asli');
     await expect(pill.locator('.ef-crop-label').nth(1)).toHaveText('Hasil');

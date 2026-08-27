@@ -24,7 +24,7 @@
 const changelogData = [
   {
     title: "PDFLokal Baru!",
-    description: "Tampilan baru, mesin baru, rasa baru. PDFLokal dirombak total supaya makin ngebut di HP: buka file langsung dari beranda, semua alat (gabung, split, kompres, tanda tangan, ekspor gambar) sekarang jadi satu di editor, dan ada tombol Unduh baru yang bisa langsung kompres atau ubah PDF jadi gambar. Halaman juga bisa kamu susun kayak megang kertas beneran. Coba deh, terus kabari kami rasanya!",
+    description: "Tampilan baru, mesin baru, rasa baru. PDFLokal dirombak total supaya makin ngebut di HP: buka file langsung dari beranda, semua alat (gabung, split, kompres, tanda tangan, ekspor gambar) sekarang jadi satu di editor, dan ada tombol Unduh baru yang bisa langsung kompres atau ubah PDF jadi gambar. Halaman juga bisa kamu susun kayak megang kertas beneran. Coba deh, terus kabari saya rasanya!",
     date: "3 Juli 2026"
   },
   {
@@ -43,7 +43,7 @@ const changelogData = [
     date: "30 Mei 2026"
   },
   {
-    title: "Hubungi Kami! 💬",
+    title: "Hubungi Saya! 💬",
     description: "Sekarang kamu bisa langsung ngobrol sama developer PDFLokal! Mau lapor bug, minta fitur baru, atau cuma mau bilang hai, tulis aja di <a href=\"https://forms.gle/KPDWVAuc91pVjuWq6\" target=\"_blank\">sini</a>. Anonim, gak perlu login.",
     date: "11 Maret 2026"
   },
@@ -69,7 +69,7 @@ const changelogData = [
   },
   {
     title: "File PDF Kamu Jadi Lebih enteng!",
-    description: "Sebelumnya ukuran PDF setelah ditambah tanda tangan sangat besar. Kami implementasi auto-compression biar tetap enteng. Download lebih cepat, hemat ruang penyimpanan.",
+    description: "Sebelumnya ukuran PDF setelah ditambah tanda tangan sangat besar. Saya implementasi auto-compression biar tetap enteng. Download lebih cepat, hemat ruang penyimpanan.",
     date: "12 Januari 2026"
   },
   {
@@ -89,7 +89,7 @@ const changelogData = [
   },
   {
     title: "Editor PDF Lebih Stabil",
-    description: "Tidak ada lagi error saat export PDF atau pindah halaman. Kami perbaiki bug yang bikin aplikasi crash. Sekarang lebih lancar!",
+    description: "Tidak ada lagi error saat export PDF atau pindah halaman. Saya perbaiki bug yang bikin aplikasi crash. Sekarang lebih lancar!",
     date: "11 Januari 2026"
   },
   {

@@ -3,7 +3,7 @@
  * On Vercel, an internal link to "/x.html" 308-redirects to "/x". When that
  * redirect passes through the service worker's navigate handler, the browser
  * refuses the redirected response and the navigation SILENTLY FAILS in an
- * installed PWA — the "Dukung Kami does nothing" field report (Jul 2026, a
+ * installed PWA — the "Dukung Saya does nothing" field report (Jul 2026, a
  * friend's Lenovo). Clean URLs (no ".html") never redirect, so they navigate
  * everywhere: browser tab AND installed PWA.
  *
@@ -23,7 +23,7 @@ for (const path of PAGES) {
   });
 }
 
-test('"Dukung Kami" points at the clean URL', async ({ page }) => {
+test('"Dukung Saya" points at the clean URL', async ({ page }) => {
   await page.goto('/');
   const href = await page.locator('.ld-foot a', { hasText: 'Dukung' }).first().getAttribute('href');
   expect(href).toBe('/dukung');

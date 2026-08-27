@@ -64,7 +64,7 @@
         {
           "h2": "Kenapa gratis, dan apa jebakannya",
           "p": [
-            "Tidak ada jebakannya, dan alasannya sederhana: menggabungkan PDF di browser kamu tidak memakan biaya server kami sama sekali. Situs lain harus membayar server untuk menerima, memproses, dan menyimpan file-mu, jadi mereka butuh iklan, langganan, atau data kamu untuk menutupinya.",
+            "Tidak ada jebakannya, dan alasannya sederhana: menggabungkan PDF di browser kamu tidak memakan biaya server saya sama sekali. Situs lain harus membayar server untuk menerima, memproses, dan menyimpan file-mu, jadi mereka butuh iklan, langganan, atau data kamu untuk menutupinya.",
             "PDFLokal tidak menanggung biaya itu, jadi tidak perlu menagihnya kepadamu. Tidak ada batas harian, tidak ada watermark, tidak ada \"gratis untuk 3 file pertama\". Yang ada cuma tombol dukungan sukarela, yang boleh kamu abaikan sepenuhnya."
           ]
         },
@@ -79,7 +79,7 @@
           "h2": "Gabung PDF dan Word?",
           "p": [
             "Ini pertanyaan yang sering muncul, dan jawabannya jujur: file Word harus kamu ubah dulu jadi PDF, dan itu paling gampang dilakukan dari Word sendiri, pilih Simpan Sebagai, lalu format PDF. Setelah jadi PDF, seret ke sini bersama file lainnya.",
-            "Kami tidak menyediakan konversi Word ke PDF karena mengerjakannya dengan benar butuh server, dan server berarti dokumenmu harus diunggah. Itu membatalkan satu-satunya alasan orang memilih PDFLokal, jadi kami memilih menolaknya dan mengatakan alasannya."
+            "Saya tidak menyediakan konversi Word ke PDF karena mengerjakannya dengan benar butuh server, dan server berarti dokumenmu harus diunggah. Itu membatalkan satu-satunya alasan orang memilih PDFLokal, jadi saya memilih menolaknya dan mengatakan alasannya."
           ]
         }
       ],
@@ -110,7 +110,7 @@
         },
         {
           "q": "Kenapa gratis? Datanya dijual ya?",
-          "a": "Tidak. Filemu tidak pernah sampai ke kami, jadi tidak ada yang bisa dijual. Gratis karena penggabungan terjadi di perangkatmu, jadi kami tidak menanggung biaya server."
+          "a": "Tidak. Filemu tidak pernah sampai ke saya, jadi tidak ada yang bisa dijual. Gratis karena penggabungan terjadi di perangkatmu, jadi saya tidak menanggung biaya server."
         }
       ]
     },
@@ -121,7 +121,7 @@
       "description": "Perkecil ukuran PDF supaya lolos batas upload. Gratis, tanpa watermark, tanpa akun. Diproses di browser, filemu tidak pernah diupload.",
       "h1": "Kompres PDF biar enteng",
       "sub": "Perkecil ukuran file tanpa bikin tulisannya jadi buram. Gratis, tanpa akun, tanpa watermark.",
-      "intro": "Hampir semua orang yang mencari cara mengompres PDF sebenarnya sedang mengejar satu angka: batas unggah. \"Maksimal 500KB.\" \"Tidak lebih dari 1MB.\" Karena itu PDFLokal tidak cuma mengecilkan file, kamu bisa menyebutkan target ukurannya, dan kami akan mencari kualitas terbaik yang masih muat di bawah batas itu. Semuanya di dalam browser, tanpa file-mu pernah diunggah ke mana pun.",
+      "intro": "Hampir semua orang yang mencari cara mengompres PDF sebenarnya sedang mengejar satu angka: batas unggah. \"Maksimal 500KB.\" \"Tidak lebih dari 1MB.\" Karena itu PDFLokal tidak cuma mengecilkan file, kamu bisa menyebutkan target ukurannya, dan saya akan mencari kualitas terbaik yang masih muat di bawah batas itu. Semuanya di dalam browser, tanpa file-mu pernah diunggah ke mana pun.",
       "howto": "Cara mengompres PDF",
       "steps": [
         "Seret PDF-mu ke kotak di atas.",
@@ -133,7 +133,7 @@
           "h2": "Kenapa selalu soal batas unggah",
           "p": [
             "Pendaftaran CPNS, SNBP, SNBT, beasiswa, e-filing pajak, portal kepegawaian. Hampir semuanya menetapkan batas ukuran berkas yang ketat, dan hampir semuanya menolak file-mu tanpa penjelasan kalau kelewat.",
-            "Alat kompres buatan luar negeri melayani \"perkecil filenya\". Yang sebenarnya kamu butuhkan adalah \"muat dalam batas ini\". Itu masalah yang berbeda, dan itu masalah yang kami pedulikan."
+            "Alat kompres buatan luar negeri melayani \"perkecil filenya\". Yang sebenarnya kamu butuhkan adalah \"muat dalam batas ini\". Itu masalah yang berbeda, dan itu masalah yang saya pedulikan."
           ]
         },
         {
@@ -147,7 +147,7 @@
         {
           "h2": "Kualitasnya turun nggak?",
           "p": [
-            "Sedikit, dan itu memang tujuannya, file yang lebih kecil berarti data yang lebih sedikit. Yang kami jaga: dokumen tetap terbaca jelas di layar dan tetap rapi saat dicetak. Kalau hasilnya kurang pas, kamu bisa unduh versi aslinya tanpa kompresi."
+            "Sedikit, dan itu memang tujuannya, file yang lebih kecil berarti data yang lebih sedikit. Yang saya jaga: dokumen tetap terbaca jelas di layar dan tetap rapi saat dicetak. Kalau hasilnya kurang pas, kamu bisa unduh versi aslinya tanpa kompresi."
           ]
         },
         {
@@ -175,18 +175,18 @@
           "h2": "Kompres PDF di HP",
           "p": [
             "Kompresi PDF adalah pekerjaan berat: setiap gambar di dalam dokumen harus digambar ulang. Situs lain memindahkan beban itu ke server mereka, yang berarti kamu harus mengunggah dokumen puluhan megabita lewat sinyal seluler, lalu mengunduhnya lagi.",
-            "PDFLokal mengerjakannya di HP-mu. Di sinyal yang buruk, ini bukan cuma lebih aman, tapi juga jauh lebih cepat: tidak ada yang perlu naik dan turun lewat jaringan. Dan kami menahan diri untuk tidak menggambar terlalu banyak halaman sekaligus, supaya HP kelas menengah tidak kehabisan memori di tengah jalan."
+            "PDFLokal mengerjakannya di HP-mu. Di sinyal yang buruk, ini bukan cuma lebih aman, tapi juga jauh lebih cepat: tidak ada yang perlu naik dan turun lewat jaringan. Dan saya menahan diri untuk tidak menggambar terlalu banyak halaman sekaligus, supaya HP kelas menengah tidak kehabisan memori di tengah jalan."
           ]
         }
       ],
       "faq": [
         {
           "q": "Bisa kompres sampai ukuran tertentu, misalnya 500KB?",
-          "a": "Bisa. Pilih target (2MB, 1MB, 500KB, 200KB, atau 100KB) dan PDFLokal akan mencari kualitas tertinggi yang masih muat di bawah batas itu. Kalau ternyata tidak tercapai, kami bilang terus terang berapa ukuran terkecil yang bisa kami dapat, bukan diam-diam memberimu file yang kelewat batas."
+          "a": "Bisa. Pilih target (2MB, 1MB, 500KB, 200KB, atau 100KB) dan PDFLokal akan mencari kualitas tertinggi yang masih muat di bawah batas itu. Kalau ternyata tidak tercapai, saya bilang terus terang berapa ukuran terkecil yang bisa saya dapat, bukan diam-diam memberimu file yang kelewat batas."
         },
         {
           "q": "Tulisannya jadi buram nggak?",
-          "a": "Tetap terbaca, kami selalu memilih kualitas tertinggi yang masih muat di batas ukuranmu. Tapi jujur: halaman hasil kompresi menjadi gambar, jadi teksnya tidak bisa lagi diseleksi atau dicari. Untuk berkas hasil scan atau foto, ini tidak mengubah apa pun, karena teksnya memang sudah berupa gambar sejak awal."
+          "a": "Tetap terbaca, saya selalu memilih kualitas tertinggi yang masih muat di batas ukuranmu. Tapi jujur: halaman hasil kompresi menjadi gambar, jadi teksnya tidak bisa lagi diseleksi atau dicari. Untuk berkas hasil scan atau foto, ini tidak mengubah apa pun, karena teksnya memang sudah berupa gambar sejak awal."
         },
         {
           "q": "Kalau file-ku sudah kecil, apa yang terjadi?",
@@ -194,7 +194,7 @@
         },
         {
           "q": "Ada batas ukuran file yang boleh dikompres?",
-          "a": "Tidak ada batas dari kami. Batasnya cuma memori perangkatmu sendiri."
+          "a": "Tidak ada batas dari saya. Batasnya cuma memori perangkatmu sendiri."
         },
         {
           "q": "File-ku diupload ke server?",
@@ -255,7 +255,7 @@
           "h2": "Kenapa tidak perlu upload",
           "p": [
             "Memisahkan PDF berarti menyalin sebagian halaman ke dokumen baru. Ini pekerjaan ringan yang sudah lama bisa dilakukan browser sendiri. Tidak ada alasan teknis untuk mengirim rekening koran atau kontrakmu ke server orang lain hanya untuk mengambil satu lembar.",
-            "Situs lain melakukannya karena bisnis mereka memang dibangun di atas server, bukan karena pekerjaannya menuntut server. Perbedaan itu yang kami manfaatkan."
+            "Situs lain melakukannya karena bisnis mereka memang dibangun di atas server, bukan karena pekerjaannya menuntut server. Perbedaan itu yang saya manfaatkan."
           ]
         },
         {
@@ -275,8 +275,8 @@
         {
           "h2": "Kenapa gratis",
           "p": [
-            "Karena memisahkan halaman di browser kamu tidak memakan biaya server kami. Situs lain harus membayar untuk menerima, menyimpan, dan memproses file-mu, jadi mereka butuh langganan atau iklan untuk menutupinya.",
-            "Kami tidak menanggung biaya itu. Tidak ada batas harian, tidak ada watermark, tidak ada akun. Yang ada cuma tombol dukungan sukarela yang boleh kamu abaikan."
+            "Karena memisahkan halaman di browser kamu tidak memakan biaya server saya. Situs lain harus membayar untuk menerima, menyimpan, dan memproses file-mu, jadi mereka butuh langganan atau iklan untuk menutupinya.",
+            "Saya tidak menanggung biaya itu. Tidak ada batas harian, tidak ada watermark, tidak ada akun. Yang ada cuma tombol dukungan sukarela yang boleh kamu abaikan."
           ]
         }
       ],
@@ -291,7 +291,7 @@
         },
         {
           "q": "Ada batas jumlah halaman?",
-          "a": "Tidak ada batas dari kami. Kami menguji sampai dokumen ratusan halaman di HP kelas menengah."
+          "a": "Tidak ada batas dari saya. Saya menguji sampai dokumen ratusan halaman di HP kelas menengah."
         },
         {
           "q": "Hasilnya ada watermark?",
@@ -339,7 +339,7 @@
           "h2": "Ini sah nggak?",
           "p": [
             "PDFLokal menempelkan gambar tanda tanganmu ke dalam dokumen, sama seperti menandatangani hasil print lalu men-scan-nya, dan diterima di sebagian besar keperluan sehari-hari: surat pernyataan, formulir, kontrak kerja.",
-            "Yang PDFLokal <strong>tidak</strong> lakukan adalah tanda tangan digital bersertifikat (yang terikat identitas digital resmi). Kalau instansimu memintanya secara khusus, kamu butuh penyedia tersertifikasi. Kami lebih baik jujur soal ini daripada membiarkanmu salah kira."
+            "Yang PDFLokal <strong>tidak</strong> lakukan adalah tanda tangan digital bersertifikat (yang terikat identitas digital resmi). Kalau instansimu memintanya secara khusus, kamu butuh penyedia tersertifikasi. Saya lebih baik jujur soal ini daripada membiarkanmu salah kira."
           ]
         },
         {
@@ -353,11 +353,11 @@
           "h2": "Soal materai",
           "p": [
             "Beberapa dokumen di Indonesia meminta e-meterai. PDFLokal tidak menerbitkan e-meterai, itu diterbitkan lewat kanal resmi Peruri, dan siapa pun yang menawarkannya secara gratis lewat situs biasa patut kamu curigai.",
-            "Yang bisa kamu lakukan di sini: tempelkan gambar meterai yang sudah sah kamu peroleh, lalu tanda tangani di atasnya, persis seperti di kertas. Kami lebih memilih menjelaskan batasannya daripada membiarkanmu mengira sudah beres padahal belum."
+            "Yang bisa kamu lakukan di sini: tempelkan gambar meterai yang sudah sah kamu peroleh, lalu tanda tangani di atasnya, persis seperti di kertas. Saya lebih memilih menjelaskan batasannya daripada membiarkanmu mengira sudah beres padahal belum."
           ]
         },
         {
-          "h2": "Tanda tanganmu tidak kami simpan",
+          "h2": "Tanda tanganmu tidak saya simpan",
           "p": [
             "Tanda tangan adalah data yang paling sensitif di dokumenmu, dan situs lain memintamu mengunggahnya. Beberapa bahkan menyimpannya di akunmu \"supaya praktis dipakai lagi\", artinya, tanda tanganmu duduk di server orang.",
             "Di PDFLokal, tanda tanganmu ada di dalam browser selama kamu mengerjakan dokumen, dan lenyap saat kamu menutup tab. Tidak ada akun, jadi tidak ada tempat untuk menyimpannya."
@@ -584,7 +584,7 @@
         },
         {
           "q": "Ada batas jumlah foto?",
-          "a": "Tidak ada batas dari kami."
+          "a": "Tidak ada batas dari saya."
         },
         {
           "q": "Perlu aplikasi scanner dulu?",
@@ -626,10 +626,10 @@
           ]
         },
         {
-          "h2": "Yang tidak bisa (dan kami akan bilang terus terang)",
+          "h2": "Yang tidak bisa (dan saya akan bilang terus terang)",
           "p": [
-            "Edit Teks Asli masih beta: baru jalan per baris, belum bisa menyusun ulang satu paragraf penuh seolah-olah ini Word, dan sesekali font penggantinya bukan yang persis sama, yang akan kami tandai terus terang kalau itu terjadi.",
-            "Kami juga tidak menyediakan konversi PDF ke Word maupun OCR. Keduanya butuh server, dan server berarti file-mu harus diunggah, yang berarti janji privasi kami jadi bohong. Kami memilih menolak fiturnya daripada mengingkari janjinya."
+            "Edit Teks Asli masih beta: baru jalan per baris, belum bisa menyusun ulang satu paragraf penuh seolah-olah ini Word, dan sesekali font penggantinya bukan yang persis sama, yang akan saya tandai terus terang kalau itu terjadi.",
+            "Saya juga tidak menyediakan konversi PDF ke Word maupun OCR. Keduanya butuh server, dan server berarti file-mu harus diunggah, yang berarti janji privasi saya jadi bohong. Saya memilih menolak fiturnya daripada mengingkari janjinya."
           ]
         },
         {
@@ -647,10 +647,10 @@
           ]
         },
         {
-          "h2": "Kenapa kami menolak PDF ke Word",
+          "h2": "Kenapa saya menolak PDF ke Word",
           "p": [
-            "Ini fitur yang paling sering diminta, dan kami sengaja tidak membuatnya. Mengubah PDF jadi Word yang rapi butuh pemrosesan berat di server, artinya dokumenmu harus diunggah.",
-            "Begitu kami membangun satu fitur yang butuh unggahan, janji \"filemu tidak pernah pergi ke server\" jadi omong kosong, dan satu-satunya alasan memilih PDFLokal ikut hilang. Kami lebih baik kehilangan fiturnya daripada kehilangan alasannya."
+            "Ini fitur yang paling sering diminta, dan saya sengaja tidak membuatnya. Mengubah PDF jadi Word yang rapi butuh pemrosesan berat di server, artinya dokumenmu harus diunggah.",
+            "Begitu saya membangun satu fitur yang butuh unggahan, janji \"filemu tidak pernah pergi ke server\" jadi omong kosong, dan satu-satunya alasan memilih PDFLokal ikut hilang. Saya lebih baik kehilangan fiturnya daripada kehilangan alasannya."
           ]
         }
       ],
@@ -677,7 +677,7 @@
         },
         {
           "q": "Bisa convert PDF ke Word di sini?",
-          "a": "Tidak, dan itu keputusan yang kami ambil sadar-sadar. Fitur itu butuh server, dan server berarti dokumenmu harus diunggah, yang membatalkan satu-satunya alasan memakai PDFLokal."
+          "a": "Tidak, dan itu keputusan yang saya ambil sadar-sadar. Fitur itu butuh server, dan server berarti dokumenmu harus diunggah, yang membatalkan satu-satunya alasan memakai PDFLokal."
         }
       ]
     },
@@ -726,7 +726,7 @@
           "h2": "Hapus halaman di HP",
           "p": [
             "Halaman ditampilkan sebagai kartu yang cukup besar untuk disentuh jari, bukan daftar kecil yang harus diperbesar dulu. Menghapus, mengurutkan, dan memutar semuanya bisa dilakukan dengan jempol.",
-            "Ini yang paling sering perlu dilakukan orang saat sedang buru-buru mengejar tenggat pendaftaran, dan hampir selalu dari HP, jadi di situlah kami menghabiskan waktu terbanyak untuk mengujinya."
+            "Ini yang paling sering perlu dilakukan orang saat sedang buru-buru mengejar tenggat pendaftaran, dan hampir selalu dari HP, jadi di situlah saya menghabiskan waktu terbanyak untuk mengujinya."
           ]
         },
         {
@@ -746,8 +746,8 @@
         {
           "h2": "Kenapa gratis dan tanpa akun",
           "p": [
-            "Karena semuanya terjadi di perangkatmu, kami tidak menanggung biaya server, jadi tidak ada yang perlu kami tagih. Tidak ada batas harian, tidak ada watermark, dan tidak ada halaman pendaftaran yang menghalangi tombol unduh.",
-            "Kodenya juga terbuka di GitHub. Kalau kamu tidak percaya bahwa filemu benar-benar tidak dikirim ke mana pun, jangan percaya, periksa sendiri. Itulah gunanya kami membuka kodenya."
+            "Karena semuanya terjadi di perangkatmu, saya tidak menanggung biaya server, jadi tidak ada yang perlu saya tagih. Tidak ada batas harian, tidak ada watermark, dan tidak ada halaman pendaftaran yang menghalangi tombol unduh.",
+            "Kodenya juga terbuka di GitHub. Kalau kamu tidak percaya bahwa filemu benar-benar tidak dikirim ke mana pun, jangan percaya, periksa sendiri. Itulah gunanya saya membuka kodenya."
           ]
         }
       ],
@@ -785,7 +785,7 @@
       "title": "Kompres PDF 500KB Online Gratis - Pas Buat Syarat Unggah | PDFLokal",
       "description": "Kompres PDF sampai di bawah 500KB, langsung di browser. Gratis, tanpa akun, tanpa upload. Ukuran hasilnya ditunjukkan sebelum kamu mengunduh.",
       "h1": "Kompres PDF sampai di bawah 500KB",
-      "sub": "Target 500KB sudah disetel. Seret file-mu, dan kami cari kualitas terbaik yang masih muat.",
+      "sub": "Target 500KB sudah disetel. Seret file-mu, dan saya cari kualitas terbaik yang masih muat.",
       "howto": "Cara kompres PDF jadi 500KB",
       "intro": "500KB adalah batas yang paling sering muncul di portal pendaftaran Indonesia, dan portal-portal itu jarang menjelaskan kenapa berkasmu ditolak. Halaman ini sudah menyetel targetnya untuk kamu: seret PDF-mu, dan PDFLokal akan mencari kualitas setinggi mungkin yang masih muat di bawah 500KB, lalu menunjukkan ukuran akhirnya sebelum kamu mengunduh, supaya kamu tahu berkasmu lolos sebelum kamu mencobanya.",
       "steps": [
@@ -804,7 +804,7 @@
         {
           "h2": "Kalau 500KB tidak tercapai",
           "p": [
-            "Kami akan bilang terus terang. Kalau ukuran terkecil yang bisa kami capai adalah 640KB, tombolnya akan mengatakan 640KB, bukan membulatkannya jadi \"500KB ✓\". Berkas yang kamu kira lolos padahal tidak justru lebih merepotkan daripada berkas yang kamu tahu kebesaran.",
+            "Saya akan bilang terus terang. Kalau ukuran terkecil yang bisa saya capai adalah 640KB, tombolnya akan mengatakan 640KB, bukan membulatkannya jadi \"500KB ✓\". Berkas yang kamu kira lolos padahal tidak justru lebih merepotkan daripada berkas yang kamu tahu kebesaran.",
             "Kalau itu terjadi, langkah yang paling ampuh biasanya bukan mengompres lebih keras, tapi membuang halaman yang tidak diminta. Buka Kelola Halaman, buang halaman kosong dan lampiran yang tidak dipinta, lalu coba lagi."
           ]
         },
@@ -830,11 +830,11 @@
         },
         {
           "q": "Kalau tidak sampai 500KB gimana?",
-          "a": "Kami tampilkan ukuran terkecil yang berhasil dicapai, apa adanya. Kami tidak akan mengaku berkasmu lolos kalau kenyataannya tidak."
+          "a": "Saya tampilkan ukuran terkecil yang berhasil dicapai, apa adanya. Saya tidak akan mengaku berkasmu lolos kalau kenyataannya tidak."
         },
         {
           "q": "Tulisannya masih terbaca?",
-          "a": "Ya. Kami memilih kualitas tertinggi yang masih muat di bawah 500KB. Perlu diketahui: halaman hasil kompresi menjadi gambar, jadi teksnya tidak bisa lagi diseleksi, untuk berkas hasil scan, ini tidak mengubah apa pun."
+          "a": "Ya. Saya memilih kualitas tertinggi yang masih muat di bawah 500KB. Perlu diketahui: halaman hasil kompresi menjadi gambar, jadi teksnya tidak bisa lagi diseleksi, untuk berkas hasil scan, ini tidak mengubah apa pun."
         },
         {
           "q": "File-ku diupload ke server?",
@@ -894,7 +894,7 @@
         },
         {
           "q": "Kalau file-ku sudah di bawah 1MB?",
-          "a": "Tidak kami sentuh sama sekali. Mengompres file yang sudah memenuhi syarat hanya merusaknya tanpa alasan."
+          "a": "Tidak saya sentuh sama sekali. Mengompres file yang sudah memenuhi syarat hanya merusaknya tanpa alasan."
         },
         {
           "q": "Bisa ganti targetnya?",
@@ -906,7 +906,7 @@
         },
         {
           "q": "Prosesnya lama nggak?",
-          "a": "Untuk mencari kualitas terbaik yang muat, PDFLokal mencoba beberapa tingkat kompresi, biasanya tiga percobaan. Setiap percobaan menggambar ulang seluruh halaman, jadi dokumen tebal memang butuh waktu lebih lama, terutama di HP. Kami menunjukkan percobaan ke berapa yang sedang berjalan supaya kamu tahu prosesnya jalan, bukan macet."
+          "a": "Untuk mencari kualitas terbaik yang muat, PDFLokal mencoba beberapa tingkat kompresi, biasanya tiga percobaan. Setiap percobaan menggambar ulang seluruh halaman, jadi dokumen tebal memang butuh waktu lebih lama, terutama di HP. Saya menunjukkan percobaan ke berapa yang sedang berjalan supaya kamu tahu prosesnya jalan, bukan macet."
         },
         {
           "q": "Cocok buat dokumen banyak halaman?",
@@ -919,15 +919,15 @@
       "intent": "kompres",
       "target": 204800,
       "title": "Kompres PDF 200KB Online Gratis - Perkecil di Bawah 200KB | PDFLokal",
-      "description": "Kompres PDF sampai di bawah 200KB langsung di browser. Gratis, tanpa akun, tanpa upload. Kami bilang terus terang kalau tidak tercapai.",
+      "description": "Kompres PDF sampai di bawah 200KB langsung di browser. Gratis, tanpa akun, tanpa upload. Saya bilang terus terang kalau tidak tercapai.",
       "h1": "Kompres PDF sampai di bawah 200KB",
-      "sub": "Target 200KB sudah disetel. Batas yang ketat, tapi kami akan berusaha sejauh mungkin.",
+      "sub": "Target 200KB sudah disetel. Batas yang ketat, tapi saya akan berusaha sejauh mungkin.",
       "howto": "Cara kompres PDF jadi 200KB",
-      "intro": "200KB adalah batas yang ketat, dan jujur saja: tidak semua dokumen bisa mencapainya tanpa jadi susah dibaca. Halaman ini sudah menyetel targetnya, dan PDFLokal akan mencari kualitas terbaik yang masih muat. Kalau ternyata tidak tercapai, kami akan bilang apa adanya berapa ukuran terkecil yang bisa kami dapat.",
+      "intro": "200KB adalah batas yang ketat, dan jujur saja: tidak semua dokumen bisa mencapainya tanpa jadi susah dibaca. Halaman ini sudah menyetel targetnya, dan PDFLokal akan mencari kualitas terbaik yang masih muat. Kalau ternyata tidak tercapai, saya akan bilang apa adanya berapa ukuran terkecil yang bisa saya dapat.",
       "steps": [
         "Seret PDF-mu ke kotak di atas. Target 200KB sudah aktif.",
         "PDFLokal mencoba beberapa tingkat kompresi dan memilih yang terbaik yang masih muat.",
-        "Kalau 200KB tercapai, tombol unduh akan menunjukkannya. Kalau tidak, kami tampilkan ukuran terkecil yang berhasil."
+        "Kalau 200KB tercapai, tombol unduh akan menunjukkannya. Kalau tidak, saya tampilkan ukuran terkecil yang berhasil."
       ],
       "sections": [
         {
@@ -945,10 +945,10 @@
           ]
         },
         {
-          "h2": "Kami tidak akan berbohong soal ukurannya",
+          "h2": "Saya tidak akan berbohong soal ukurannya",
           "p": [
-            "Kalau ukuran terkecil yang bisa kami capai adalah 260KB, tombolnya akan mengatakan 260KB, bukan membulatkannya jadi \"200KB ✓\". Berkas yang kamu kira lolos padahal tidak akan membuatmu gagal unggah di detik-detik terakhir.",
-            "Ini prinsip yang sama dengan yang sudah lama ada di PDFLokal: kalau file-mu memang sudah optimal dan tidak bisa dikecilkan lagi, kami mengatakannya, bukan mengembalikan file yang sama sambil pura-pura sudah bekerja."
+            "Kalau ukuran terkecil yang bisa saya capai adalah 260KB, tombolnya akan mengatakan 260KB, bukan membulatkannya jadi \"200KB ✓\". Berkas yang kamu kira lolos padahal tidak akan membuatmu gagal unggah di detik-detik terakhir.",
+            "Ini prinsip yang sama dengan yang sudah lama ada di PDFLokal: kalau file-mu memang sudah optimal dan tidak bisa dikecilkan lagi, saya mengatakannya, bukan mengembalikan file yang sama sambil pura-pura sudah bekerja."
           ]
         },
         {
@@ -962,11 +962,11 @@
       "faq": [
         {
           "q": "200KB itu terlalu kecil ya?",
-          "a": "Untuk satu atau dua halaman hasil scan, biasanya masih bisa dan tetap terbaca. Untuk dokumen banyak halaman, sering tidak tercapai, dan kami akan bilang apa adanya."
+          "a": "Untuk satu atau dua halaman hasil scan, biasanya masih bisa dan tetap terbaca. Untuk dokumen banyak halaman, sering tidak tercapai, dan saya akan bilang apa adanya."
         },
         {
           "q": "Kalau tidak sampai 200KB?",
-          "a": "Kami tampilkan ukuran terkecil yang berhasil, bukan mengaku sudah lolos. Saran kami: buang halaman yang tidak diminta, itu jauh lebih ampuh daripada kompresi tambahan."
+          "a": "Saya tampilkan ukuran terkecil yang berhasil, bukan mengaku sudah lolos. Saran saya: buang halaman yang tidak diminta, itu jauh lebih ampuh daripada kompresi tambahan."
         },
         {
           "q": "Tulisannya masih kebaca?",
@@ -991,11 +991,11 @@
       "intent": "kompres",
       "target": 102400,
       "title": "Kompres PDF 100KB Online Gratis - Perkecil di Bawah 100KB | PDFLokal",
-      "description": "Kompres PDF sampai di bawah 100KB langsung di browser. Gratis, tanpa akun, tanpa upload. Batas paling ketat, kami jujur soal hasilnya.",
+      "description": "Kompres PDF sampai di bawah 100KB langsung di browser. Gratis, tanpa akun, tanpa upload. Batas paling ketat, saya jujur soal hasilnya.",
       "h1": "Kompres PDF sampai di bawah 100KB",
-      "sub": "Target 100KB sudah disetel. Ini batas paling ketat, kami akan jujur soal hasilnya.",
+      "sub": "Target 100KB sudah disetel. Ini batas paling ketat, saya akan jujur soal hasilnya.",
       "howto": "Cara kompres PDF jadi 100KB",
-      "intro": "100KB adalah batas paling ketat yang biasa diminta portal, dan biasanya muncul untuk berkas satu lembar, pas foto, KTP, atau lembar tanda tangan. Halaman ini sudah menyetel targetnya. Kami akan berusaha sejauh mungkin, dan mengatakan apa adanya kalau tidak tercapai.",
+      "intro": "100KB adalah batas paling ketat yang biasa diminta portal, dan biasanya muncul untuk berkas satu lembar, pas foto, KTP, atau lembar tanda tangan. Halaman ini sudah menyetel targetnya. Saya akan berusaha sejauh mungkin, dan mengatakan apa adanya kalau tidak tercapai.",
       "steps": [
         "Seret PDF-mu ke kotak di atas. Target 100KB sudah aktif.",
         "PDFLokal mencari kompresi paling ringan yang masih muat di bawah 100KB.",
@@ -1017,10 +1017,10 @@
           ]
         },
         {
-          "h2": "Kenapa kami tidak memaksakan angkanya",
+          "h2": "Kenapa saya tidak memaksakan angkanya",
           "p": [
-            "Kami bisa saja memampatkan dokumenmu sampai benar-benar 100KB dengan mengorbankan keterbacaan sepenuhnya. Tapi berkas yang tidak terbaca tetap akan ditolak, cuma dengan alasan yang berbeda, dan setelah kamu terlanjur merasa aman.",
-            "Jadi kami berhenti di kualitas terendah yang masih masuk akal, lalu mengatakan apa adanya. Kalau hasilnya 130KB, tombolnya akan mengatakan 130KB."
+            "Saya bisa saja memampatkan dokumenmu sampai benar-benar 100KB dengan mengorbankan keterbacaan sepenuhnya. Tapi berkas yang tidak terbaca tetap akan ditolak, cuma dengan alasan yang berbeda, dan setelah kamu terlanjur merasa aman.",
+            "Jadi saya berhenti di kualitas terendah yang masih masuk akal, lalu mengatakan apa adanya. Kalau hasilnya 130KB, tombolnya akan mengatakan 130KB."
           ]
         },
         {
@@ -1034,11 +1034,11 @@
       "faq": [
         {
           "q": "100KB itu mungkin nggak sih?",
-          "a": "Untuk satu lembar hasil scan atau pas foto, biasanya bisa. Untuk dokumen banyak halaman, hampir tidak mungkin tanpa membuatnya tidak terbaca, dan kami akan bilang apa adanya."
+          "a": "Untuk satu lembar hasil scan atau pas foto, biasanya bisa. Untuk dokumen banyak halaman, hampir tidak mungkin tanpa membuatnya tidak terbaca, dan saya akan bilang apa adanya."
         },
         {
           "q": "Kalau gagal 100KB, terus gimana?",
-          "a": "Kami tampilkan ukuran terkecil yang berhasil. Kalau berkasmu banyak halaman, periksa lagi persyaratannya, batas 100KB hampir selalu untuk berkas satu lembar."
+          "a": "Saya tampilkan ukuran terkecil yang berhasil. Kalau berkasmu banyak halaman, periksa lagi persyaratannya, batas 100KB hampir selalu untuk berkas satu lembar."
         },
         {
           "q": "Kenapa hasil foto-ku susah dikecilkan?",

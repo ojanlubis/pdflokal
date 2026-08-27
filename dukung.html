@@ -22,8 +22,8 @@
     }
   </script>
 
-  <title>Dukung PDFLokal - Bantu Kami Tetap Gratis</title>
-  <meta name="description" content="Dukung PDFLokal agar tetap gratis dan bebas iklan untuk semua orang Indonesia.">
+  <title>Dukung PDFLokal - Bantu Saya Tetap Gratis</title>
+  <meta name="description" content="PDFLokal dibuat sendirian oleh Ojan (Fauzan Ahladzikri). Gratis, tanpa iklan. Kalau kepakai, boleh traktir kopi lewat QRIS.">
 
   <!-- Fonts (self-hosted in css/page-base.css via @font-face) -->
 
@@ -63,6 +63,70 @@
     .donate-page {
       max-width: 900px;
       margin: 0 auto;
+    }
+
+    /* ---- THE HAT (2026-08-27, founder brief: "a street performer that has
+       done performance and is now receiving donations in his hat"). The
+       person stands on the THEMED ground; the white card below is the hat he
+       is holding out. Face, name and the QR are one destination, in that
+       reading order — his ruling 2026-08-22 is that the face, the name and a
+       contact channel travel together, so none of the three ships alone. */
+    .performer {
+      text-align: center;
+      margin-bottom: var(--sp-24);
+    }
+
+    .performer-face {
+      width: 88px;
+      height: 88px;
+      border-radius: 50%;
+      object-fit: cover;
+      /* A ring, not a shadow: at 88px on two different grounds a shadow reads
+         as a smudge in dark mode. */
+      border: 2px solid var(--line);
+      display: block;
+      margin: 0 auto var(--sp-16);
+    }
+
+    .performer-name {
+      font-size: 1.125rem;
+      font-weight: 700;
+      color: var(--ink);
+      line-height: 1.2;
+    }
+
+    /* The full legal name is the falsifiable half — it is the name on the
+       LICENSE and on GitHub, so a stranger can check it. "Ojan" alone is
+       warmth with nothing to check. */
+    .performer-real {
+      font-size: var(--fs-n1);
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .performer-role {
+      font-size: var(--fs-n1);
+      color: var(--muted);
+      margin-top: var(--sp-8);
+    }
+
+    .performer-line {
+      max-width: 30rem;
+      margin: var(--sp-16) auto 0;
+      font-size: 1rem;
+      color: var(--ink);
+      line-height: 1.6;
+    }
+
+    /* The hat itself. Sized so it reads as an object above the card rather
+       than as punctuation in a sentence. */
+    .hat {
+      font-size: 2.5rem;
+      line-height: 1;
+      margin-bottom: calc(var(--sp-8) * -1);
+      /* Sits ON the card's top edge — the QR is what's inside the hat. */
+      position: relative;
+      z-index: 1;
     }
 
     /* ⚠️ THIS CARD IS WHITE IN BOTH THEMES, ON PURPOSE. A QR code has to keep
@@ -258,16 +322,30 @@
       <h1>Dukung PDFLokal</h1>
 
       <p class="donate-intro">
-        PDFLokal dibuat biar kamu bisa urus dokumen tanpa ribet, tanpa bayar, dan tanpa khawatir file kamu kemana-mana.
+        PDFLokal saya bikin biar kamu bisa urus dokumen tanpa ribet, tanpa bayar, dan tanpa khawatir file kamu kemana-mana.
         <br><br>
         Nggak ada iklan. Nggak ada paywall. File kamu nggak pernah diupload kemana-mana.
         <br><br>
-        Kalau PDFLokal ngebantu kamu, boleh banget traktir kami kopi sebagai bentuk dukungan.
+        Kalau PDFLokal ngebantu kamu, boleh banget traktir saya kopi sebagai bentuk dukungan.
       </p>
 
-      <!-- Traktir Kopi Section -->
+      <!-- Traktir Kopi Section — the hat. See .performer / .hat in the style
+           block for why the person sits outside the white card. -->
       <div class="donate-section">
-        <h2>Traktir Kopi</h2>
+        <h2>Traktir Kopi 🎩</h2>
+
+        <div class="performer">
+          <img src="images/ojan.jpg" alt="Foto Fauzan Ahladzikri (Ojan), yang bikin PDFLokal" class="performer-face" width="88" height="88">
+          <div class="performer-name">Ojan</div>
+          <div class="performer-real">Fauzan Ahladzikri</div>
+          <div class="performer-role">yang bikin PDFLokal, sendirian</div>
+          <p class="performer-line">
+            Makasih udah mampir. Kalau tadi PDFLokal beneran ngebantu kamu,
+            topi saya ada di bawah, seikhlasnya aja.
+          </p>
+        </div>
+
+        <div class="hat" aria-hidden="true">🎩</div>
 
         <div class="qr-card">
           <img src="images/qris.png" alt="QRIS - Scan untuk traktir kopi" class="qr-image">
@@ -303,7 +381,7 @@
             <div>
               <strong>Kasih Star di GitHub</strong>
               <p style="color: var(--muted); font-size: 0.9375rem; margin-top: 4px;">
-                Bantu lebih banyak orang nemuin PDFLokal dengan kasih star di repo GitHub kita.
+                Bantu lebih banyak orang nemuin PDFLokal dengan kasih star di repo GitHub saya.
               </p>
             </div>
           </li>
@@ -321,7 +399,7 @@
             <div>
               <strong>Laporin Bug</strong>
               <p style="color: var(--muted); font-size: 0.9375rem; margin-top: 4px;">
-                Nemu error? <a href="https://tiktok.com/@okeojan" target="_blank" rel="noopener">DM saya di TikTok</a> atau buka issue di GitHub biar kita bisa benerin.
+                Nemu error? <a href="https://tiktok.com/@okeojan" target="_blank" rel="noopener">DM saya di TikTok</a> atau buka issue di GitHub biar saya bisa benerin.
               </p>
             </div>
           </li>
@@ -330,7 +408,7 @@
             <div>
               <strong>Kontribusi Kode</strong>
               <p style="color: var(--muted); font-size: 0.9375rem; margin-top: 4px;">
-                PDFLokal itu open source. Pull request selalu kita sambut!
+                PDFLokal itu open source. Pull request selalu saya sambut!
               </p>
             </div>
           </li>
@@ -344,7 +422,7 @@
         <div class="faq-item">
           <h3>Kenapa PDFLokal gratis?</h3>
           <p>
-            Menurut kami, tools buat urus dokumen itu harusnya gratis.
+            Menurut saya, tools buat urus dokumen itu harusnya gratis.
             Masa iya harus bayar cuma buat gabung PDF atau kompres gambar?
           </p>
         </div>
@@ -368,8 +446,8 @@
         <div class="faq-item">
           <h3>Bakal ada fitur premium?</h3>
           <p>
-            Nggak ada dan nggak akan pernah ada. PDFLokal ini proyek komunitas, bukan bisnis.
-            Kalau ada fitur yang butuh server (kayak konversi Word), kita bakal cari cara biar tetap gratis.
+            Nggak ada dan nggak akan pernah ada. PDFLokal ini proyek pribadi yang saya buka buat umum, bukan bisnis.
+            Kalau ada fitur yang butuh server (kayak konversi Word), saya bakal cari cara biar tetap gratis.
           </p>
         </div>
       </div>
@@ -389,7 +467,7 @@
   <!-- Footer — ported from index.html's .ld-foot; see css/chrome.css. -->
   <div class="pg-wrap">
     <footer class="ld-foot">
-      <a href="/dukung">Dukung Kami</a>
+      <a href="/dukung">Dukung Saya</a>
       <a href="/privasi">Privasi</a>
       <a href="https://github.com/ojanlubis/pdflokal" rel="noopener">GitHub</a>
       <span>Dibuat di Indonesia</span>

@@ -249,7 +249,7 @@ export function createDownloadSheet(deps) {
       }
     } catch (err) {
       console.error(err);
-      if (seq === state.seq) { state.size = 'asli'; deps.toast('Kompres gagal, kami pakai ukuran asli ya'); }
+      if (seq === state.seq) { state.size = 'asli'; deps.toast('Kompres gagal, saya pakai ukuran asli ya'); }
     } finally {
       // Clear the flag UNCONDITIONALLY (review H1): a run superseded by ++seq
       // must not leave `compressing` wedged true — that blocked every future

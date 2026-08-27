@@ -58,7 +58,7 @@ export const INTENT_COPY = {
 
   kompres: {
     dzTitle: 'Seret PDF yang mau dikompres',
-    dzHint: 'Ukuran hasilnya kami tunjukkan sebelum kamu unduh',
+    dzHint: 'Ukuran hasilnya saya tunjukkan sebelum kamu unduh',
   },
 
   ttd: {

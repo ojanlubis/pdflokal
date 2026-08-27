@@ -187,6 +187,38 @@
         font-size: 0.8125rem;
       }
     }
+
+    /* THE SIGNATURE — see the markup for why this page has a face on it. */
+    .privacy-signature {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-16);
+      max-width: 34rem;
+      margin: var(--sp-48) auto 0;
+      padding-top: var(--sp-24);
+      border-top: 1px solid var(--line);
+    }
+
+    .privacy-signature img {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 1px solid var(--line);
+      flex: none;
+    }
+
+    .privacy-signature .ps-name {
+      font-size: 1rem;
+      color: var(--ink);
+      line-height: 1.4;
+    }
+
+    .privacy-signature .ps-links {
+      font-size: var(--fs-n1);
+      color: var(--muted);
+      margin-top: var(--sp-8);
+    }
   </style>
 </head>
 <body>
@@ -276,12 +308,12 @@
 
       <!-- Prinsip Utama -->
       <div class="privacy-section">
-        <h2>Prinsip Utama Kami</h2>
+        <h2>Prinsip Utama Saya</h2>
         <ul class="privacy-list">
-          <li><strong>100% Client-Side Processing</strong>, Semua proses berjalan di browser kamu, bukan di server kami</li>
+          <li><strong>100% Client-Side Processing</strong>, Semua proses berjalan di browser kamu, bukan di server saya</li>
           <li><strong>Tidak Ada Upload</strong>, File PDF dan gambar kamu tidak pernah dikirim ke server manapun</li>
-          <li><strong>Tidak Ada Penyimpanan</strong>, Kami tidak menyimpan file kamu di manapun, setelah tab ditutup file hilang</li>
-          <li><strong>Open Source</strong>, Kode sumber terbuka, siapa saja bisa verifikasi klaim privasi kami</li>
+          <li><strong>Tidak Ada Penyimpanan</strong>, Saya tidak menyimpan file kamu di manapun, setelah tab ditutup file hilang</li>
+          <li><strong>Open Source</strong>, Kode sumber terbuka, siapa saja bisa verifikasi klaim privasi saya</li>
         </ul>
 
         <div class="privacy-highlight">
@@ -294,7 +326,7 @@
 
       <!-- Data yang Tidak Dikumpulkan -->
       <div class="privacy-section">
-        <h2>Data yang TIDAK Kami Kumpulkan</h2>
+        <h2>Data yang TIDAK Saya Kumpulkan</h2>
         <ul class="privacy-list">
           <li>File PDF atau gambar yang kamu proses</li>
           <li>Isi dokumen, teks, atau tanda tangan</li>
@@ -308,7 +340,7 @@
       <div class="privacy-section">
         <h2>Tentang Analytics</h2>
         <p style="color: var(--muted); line-height: 1.6; margin-bottom: var(--sp-16);">
-          Kami menggunakan Vercel Web Analytics untuk memahami berapa banyak orang yang menggunakan PDFLokal.
+          Saya menggunakan Vercel Web Analytics untuk memahami berapa banyak orang yang menggunakan PDFLokal.
           Analytics ini bersifat:
         </p>
         <ul class="privacy-list">
@@ -323,8 +355,8 @@
       <div class="privacy-section">
         <h2>Telemetri Produk</h2>
         <p style="color: var(--muted); line-height: 1.6; margin-bottom: var(--sp-16);">
-          Selain analytics kunjungan di atas, PDFLokal juga mengirim data teknis kecil ke server kami
-          sendiri (bukan pihak ketiga) tentang bagaimana fitur-fitur dipakai, supaya kami tahu alat
+          Selain analytics kunjungan di atas, PDFLokal juga mengirim data teknis kecil ke server saya
+          sendiri (bukan pihak ketiga) tentang bagaimana fitur-fitur dipakai, supaya saya tahu alat
           mana yang berguna dan mana yang perlu diperbaiki. Datanya sengaja dibuat sesempit mungkin:
         </p>
         <ul class="privacy-list">
@@ -334,7 +366,7 @@
         </ul>
         <div class="privacy-highlight">
           <p>
-            <strong>Yang TIDAK pernah kami kirim:</strong> isi dokumen, teks yang kamu tulis atau edit,
+            <strong>Yang TIDAK pernah saya kirim:</strong> isi dokumen, teks yang kamu tulis atau edit,
             nama file, gambar, atau nama font asli. Prinsip "<em>filenya tidak pernah diunggah</em>"
             tetap 100% berlaku, telemetri ini cuma menghitung APA yang sebuah fitur lakukan, bukan
             APA isi dokumenmu.
@@ -342,14 +374,14 @@
         </div>
         <p style="color: var(--muted); line-height: 1.6;">
           Nggak ada cookie, nggak ada ID yang mengikuti kamu antar kunjungan, setiap sesi cuma dapat
-          ID acak yang hilang begitu tab ditutup. Datanya kami simpan sendiri di infrastruktur kami
+          ID acak yang hilang begitu tab ditutup. Datanya saya simpan sendiri di infrastruktur saya
           sendiri, nggak dijual atau dibagikan ke siapa pun, justru ini lebih privat dibanding Google
-          Analytics yang dipakai kebanyakan situs lain, karena datanya nggak pernah keluar dari server kami.
+          Analytics yang dipakai kebanyakan situs lain, karena datanya nggak pernah keluar dari server saya.
         </p>
         <p style="color: var(--muted); line-height: 1.6; margin-top: var(--sp-16);">
-          Khusus fitur Edit (masih beta): kalau kamu kasih rating 👎, kami akan tanya dulu, <em>"Boleh
-          kami minta dua potongan ini?"</em>, sebelum apa pun terkirim. Ini nggak otomatis sama sekali:
-          cuma jalan kalau kamu sendiri yang tap "Kirim". Yang kami minta juga cuma satu baris teks yang
+          Khusus fitur Edit (masih beta): kalau kamu kasih rating 👎, saya akan tanya dulu, <em>"Boleh
+          saya minta dua potongan ini?"</em>, sebelum apa pun terkirim. Ini nggak otomatis sama sekali:
+          cuma jalan kalau kamu sendiri yang tap "Kirim". Yang saya minta juga cuma satu baris teks yang
           barusan kamu edit, dipotong jadi dua gambar kecil (sebelum dan sesudah diedit), dan kamu
           LIHAT SENDIRI dulu kedua potongan itu di layar, persis apa adanya, sebelum ada tombol "Kirim"
           buat ngirimnya. Kalau kamu pilih "Nggak usah" (atau nggak pilih apa-apa), potongan itu nggak
@@ -423,11 +455,31 @@
         <h2>Pertanyaan?</h2>
         <p style="color: var(--muted); line-height: 1.6;">
           Kalau kamu punya pertanyaan tentang privasi atau keamanan PDFLokal,
-          <a href="https://forms.gle/KPDWVAuc91pVjuWq6" target="_blank">hubungi kami</a> atau buka issue di
-          <a href="https://github.com/ojanlubis/pdflokal/issues" target="_blank">GitHub repository</a> kami.
+          <a href="https://forms.gle/KPDWVAuc91pVjuWq6" target="_blank">hubungi saya</a> atau buka issue di
+          <a href="https://github.com/ojanlubis/pdflokal/issues" target="_blank">GitHub repository</a> saya.
           <br><br>
           Kamu juga bisa langsung cek source code untuk memverifikasi semua klaim privasi di atas.
         </p>
+      </div>
+
+      <!-- THE SIGNATURE, 2026-08-27. This page makes the one claim the product
+           cannot be wrong about, and until today it made it anonymously.
+           ⚠️ IT SAYS NOTHING ABOUT ACCOUNTABILITY, ON HIS RULING THE SAME DAY.
+           A first draft opened with "Yang janji di atas, dan yang tanggung
+           jawab kalau salah:" and he struck it: "terlalu eksplisit... dengan
+           naro muka sama nama sama kontak gue udah cukup sebenernya."
+           The face, the name and the channels ARE the statement. Writing the
+           reason out loud is the machine explaining its own move. -->
+      <div class="privacy-signature">
+        <img src="images/ojan.jpg" alt="Foto Fauzan Ahladzikri (Ojan)" width="56" height="56" loading="lazy">
+        <div>
+          <p class="ps-name"><strong>Fauzan Ahladzikri</strong> (Ojan), yang bikin PDFLokal</p>
+          <p class="ps-links">
+            <a href="https://tiktok.com/@okeojan" target="_blank" rel="noopener">@okeojan</a> ·
+            <a href="https://github.com/ojanlubis" target="_blank" rel="noopener">github.com/ojanlubis</a> ·
+            <a href="https://ojanlubis.id" target="_blank" rel="noopener">ojanlubis.id</a>
+          </p>
+        </div>
       </div>
 
       <!-- Back Button -->
@@ -445,7 +497,7 @@
   <!-- Footer — ported from index.html's .ld-foot; see css/chrome.css. -->
   <div class="pg-wrap">
     <footer class="ld-foot">
-      <a href="/dukung">Dukung Kami</a>
+      <a href="/dukung">Dukung Saya</a>
       <a href="/privasi">Privasi</a>
       <a href="https://github.com/ojanlubis/pdflokal" rel="noopener">GitHub</a>
       <span>Dibuat di Indonesia</span>

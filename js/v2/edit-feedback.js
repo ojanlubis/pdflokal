@@ -156,7 +156,7 @@ function el(tag, cls, text) {
 
 function renderThanks() {
   clear();
-  body.appendChild(el('span', 'ef-q', 'Makasih, masukanmu ngebantu kami 🙏'));
+  body.appendChild(el('span', 'ef-q', 'Makasih, masukanmu ngebantu saya 🙏'));
   clearTimer();
   hideTimer = setTimeout(hide, 1700);
 }
@@ -198,9 +198,9 @@ function renderBottom() {
   if (pendingSample) {
     // Founder's copy, VERBATIM — do not improve it (spec-edit-fidelity-
     // instrumentation.md Increment D, decisions.md 2026-07-27).
-    bottomEl.appendChild(el('div', 'ef-ask-q', 'Boleh kami minta dua potongan ini?'));
+    bottomEl.appendChild(el('div', 'ef-ask-q', 'Boleh saya minta dua potongan ini?'));
     bottomEl.appendChild(el('div', 'ef-ask-sub',
-      'Sebelum dan sesudahnya, biar kami bisa analisis fiturnya kurang di mana. Nggak ada isi file lain.'));
+      'Sebelum dan sesudahnya, biar saya bisa analisis fiturnya kurang di mana. Nggak ada isi file lain.'));
     const crops = el('div', 'ef-crops');
     crops.appendChild(cropRow('Asli', pendingSample.before));
     crops.appendChild(cropRow('Hasil', pendingSample.after));
