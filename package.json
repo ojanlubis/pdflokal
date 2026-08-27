@@ -26,7 +26,8 @@
     "seo:check": "node scripts/gen-seo-pages.js --check",
     "seo:sample": "node scripts/gen-seo-pages.js --sample",
     "seo:approve": "node scripts/gen-seo-pages.js --approve",
-    "review": "npx serve -p 3000 --no-clipboard --no-port-switching ."
+    "review": "npx serve -p 3000 --no-clipboard --no-port-switching .",
+    "riwayat": "node scripts/gen-riwayat.js"
   },
   "repository": {
     "type": "git",

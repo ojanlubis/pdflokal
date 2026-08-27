@@ -76,16 +76,26 @@
       margin-bottom: var(--sp-24);
     }
 
+    /* SIDE BY SIDE, not stacked (his ruling 2026-08-28: "ini jangan atas
+       bawah, mending sebelahan"). The row is an inline-flex so it still
+       centres inside the card while the face and the name sit beside each
+       other. */
+    .performer-id {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--sp-16);
+      text-align: left;
+    }
+
     .performer-face {
-      width: 88px;
-      height: 88px;
+      width: 64px;
+      height: 64px;
       border-radius: 50%;
       object-fit: cover;
-      /* A ring, not a shadow: at 88px on two different grounds a shadow reads
-         as a smudge in dark mode. */
+      /* A ring, not a shadow: on two different grounds a shadow reads as a
+         smudge in dark mode. */
       border: 2px solid var(--line);
-      display: block;
-      margin: 0 auto var(--sp-16);
+      flex: none;
     }
 
     .performer-name {
@@ -102,12 +112,6 @@
       font-size: var(--fs-n1);
       color: var(--muted);
       margin-top: 2px;
-    }
-
-    .performer-role {
-      font-size: var(--fs-n1);
-      color: var(--muted);
-      margin-top: var(--sp-8);
     }
 
     .performer-line {
@@ -159,6 +163,126 @@
       /* Pinned, not tokenised — see .qr-card above. This text sits on a
          permanently white ground, so it needs a permanently dark ink. */
       color: #57504a;
+    }
+
+
+    /* ---- THE WORK LOG DRAWER (2026-08-28) ----
+       His brief, in three corrections: "put it somewhere bentuknya slider aja...
+       commit historynya by timeline. from most recent... nanti scrollnya bakal
+       banyak ke bawah terus dan itu yang bakal showing not telling", then
+       "harus slider interaksinya, cuma muncul kalo orang ngeklik", then
+       "make the click to NOT accordion. make it drawer slide or dialogue".
+
+       So: a <dialog> that SLIDES IN FROM THE RIGHT. An accordion was refused,
+       and it deserved to be — an accordion pushes the page down and the log
+       becomes something you scroll PAST on the way to the rest of the page. A
+       drawer takes the whole screen height, so the only thing you can do in it
+       is keep scrolling, which is the entire point: the length is the argument.
+       There is deliberately NO total anywhere. A count would let the reader
+       stop scrolling, and the scrolling IS the evidence. */
+    .rw-buka {
+      display: block;
+      margin: 0 auto var(--sp-48);
+      padding: 0 var(--sp-24);
+      min-height: 44px;
+      background: none;
+      border: 1px solid var(--line);
+      border-radius: var(--r-button);
+      color: var(--ink);
+      font: inherit;
+      font-size: var(--fs-n1);
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .rw-buka:hover { background: var(--surface); }
+
+    /* The dialog IS the drawer: full height, pinned right, no rounded page
+       corners on the outer edge. `margin` beats the UA centring. */
+    #rw-drawer {
+      position: fixed;
+      inset: 0 0 0 auto;
+      margin: 0;
+      width: min(560px, 100%);
+      max-width: 100%;
+      max-height: 100%;
+      height: 100%;
+      border: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--ink);
+      transform: translateX(100%);
+      transition: transform .28s ease;
+    }
+    #rw-drawer[open] { transform: translateX(0); }
+    #rw-drawer::backdrop { background: rgba(0, 0, 0, .45); }
+    @media (prefers-reduced-motion: reduce) { #rw-drawer { transition: none; } }
+
+    .rw-kepala {
+      position: sticky; top: 0; z-index: 1;
+      display: flex; align-items: center; gap: var(--sp-16);
+      padding: var(--sp-24);
+      background: var(--bg);
+      border-bottom: 1px solid var(--line);
+    }
+    .rw-kepala h2 { font-size: 1.125rem; margin: 0; }
+    .rw-kepala p { font-size: var(--fs-n1); color: var(--muted); margin-top: 2px; }
+    .rw-tutup {
+      margin-left: auto; flex: none;
+      width: 44px; height: 44px;
+      display: flex; align-items: center; justify-content: center;
+      background: none; border: 0; border-radius: 50%;
+      color: var(--muted); cursor: pointer;
+    }
+    .rw-tutup:hover { background: var(--surface); }
+    .rw-tutup svg { width: 20px; height: 20px; }
+
+    .rw-log {
+      list-style: none;
+      /* The page centres its sections; a log of hundreds of ragged sentences
+         must not inherit that. */
+      text-align: left;
+      /* The drawer scrolls, not an inner box: the whole screen is the runway. */
+      height: calc(100% - 89px);
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+      padding: 0 var(--sp-24) var(--sp-48);
+    }
+
+    .rw-log li {
+      display: grid;
+      grid-template-columns: 8.5rem auto 1fr;
+      gap: var(--sp-16);
+      align-items: baseline;
+      padding: var(--sp-16) 0;
+      border-top: 1px solid var(--line);
+      font-size: 0.9375rem;
+      line-height: 1.5;
+    }
+    .rw-log li:first-child { border-top: 0; }
+
+    /* EXPLICIT columns, not implicit placement. Rows without a kind tag have
+       only two children, so auto-placement dropped their text into the TAG
+       column, which then sized to the longest sentence (511px measured) and
+       squeezed the real text column to 100px. */
+    .rw-log time { grid-column: 1; color: var(--muted); font-size: var(--fs-n1); }
+    .rw-log .rw-jenis {
+      grid-column: 2;
+      font-size: var(--fs-n2); font-weight: 600; color: var(--muted);
+      border: 1px solid var(--line); border-radius: 999px;
+      padding: 1px 8px; white-space: nowrap;
+    }
+    .rw-log span { grid-column: 3; color: var(--ink); }
+
+    /* On a phone the columns cannot survive. Grid is dropped ENTIRELY rather
+       than narrowed: with a tag column still in play the entry text sat in a
+       ragged sliver, and rows without a tag started somewhere different from
+       rows with one. */
+    @media (max-width: 560px) {
+      .rw-log li { display: block; }
+      .rw-log time { grid-column: auto; display: block; margin-bottom: 4px; }
+      .rw-log .rw-jenis { grid-column: auto; margin-right: 6px; }
+      .rw-log span { grid-column: auto; display: inline; }
     }
 
     /* ⚠️ NO COMPENSATING BORDER, MATCHING CURRENT RENDERING — unlike
@@ -322,7 +446,7 @@
       <h1>Dukung PDFLokal</h1>
 
       <p class="donate-intro">
-        PDFLokal saya bikin biar kamu bisa urus dokumen tanpa ribet, tanpa bayar, dan tanpa khawatir file kamu kemana-mana.
+        PDFLokal saya bikin biar kamu bisa urus dokumen tanpa ribet.
         <br><br>
         Nggak ada iklan. Nggak ada paywall. File kamu nggak pernah diupload kemana-mana.
         <br><br>
@@ -335,10 +459,13 @@
         <h2>Traktir Kopi 🎩</h2>
 
         <div class="performer">
-          <img src="images/ojan.jpg" alt="Foto Fauzan Ahladzikri (Ojan), yang bikin PDFLokal" class="performer-face" width="88" height="88">
-          <div class="performer-name">Ojan</div>
-          <div class="performer-real">Fauzan Ahladzikri</div>
-          <div class="performer-role">yang bikin PDFLokal, sendirian</div>
+          <div class="performer-id">
+            <img src="images/ojan.jpg" alt="Foto Fauzan Ahladzikri (Ojan)" class="performer-face" width="64" height="64">
+            <div>
+              <div class="performer-name">Ojan</div>
+              <div class="performer-real">Fauzan Ahladzikri</div>
+            </div>
+          </div>
           <p class="performer-line">
             Makasih udah mampir. Kalau tadi PDFLokal beneran ngebantu kamu,
             topi saya ada di bawah, seikhlasnya aja.
@@ -354,23 +481,14 @@
 
         <div class="transfer-steps">
           <div class="transfer-step">
-            <div class="step-number">1</div>
-            <div class="step-text">Buka aplikasi <strong>Mobile Banking, GoPay, OVO, DANA, ShopeePay</strong></div>
-          </div>
-          <div class="transfer-step">
-            <div class="step-number">2</div>
-            <div class="step-text">Pilih menu <strong>Scan QR</strong> atau <strong>Bayar</strong></div>
-          </div>
-          <div class="transfer-step">
-            <div class="step-number">3</div>
-            <div class="step-text">Arahkan kamera ke QR code di atas</div>
-          </div>
-          <div class="transfer-step">
-            <div class="step-number">4</div>
             <div class="step-text">Masukin nominal sesuai keinginan, <strong>secangkir kopi aja udah bikin semangat!</strong></div>
           </div>
         </div>
       </div>
+
+      <!-- Opens the work-log drawer. Under the hat on purpose: it is the
+           performance the hat is asking to be paid for. -->
+      <button type="button" class="rw-buka" id="rw-buka">Development PDFLokal</button>
 
       <!-- Other Ways to Support -->
       <div class="other-ways">
@@ -454,9 +572,6 @@
 
       <!-- Thank You -->
       <div style="text-align: center; padding: var(--sp-48) 0;">
-        <p style="font-size: 1.125rem; color: var(--muted);">
-          Makasih udah pakai PDFLokal!
-        </p>
         <a href="/" class="pg-btn" style="margin-top: var(--sp-24);">
           Balik ke Tools
         </a>
@@ -473,6 +588,497 @@
       <span>Dibuat di Indonesia</span>
     </footer>
   </div>
+
+
+  <!-- THE WORK-LOG DRAWER. Slides in from the right; see .rw-buka in the style
+       block for why it is a drawer and not an accordion. -->
+  <dialog id="rw-drawer" aria-labelledby="rw-judul">
+    <div class="rw-kepala">
+      <div>
+        <h2 id="rw-judul">Development PDFLokal</h2>
+        <p>Setiap perubahan, dari yang paling baru.</p>
+      </div>
+      <button type="button" class="rw-tutup" id="rw-tutup" aria-label="Tutup">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <!-- riwayat:start -->
+      <!-- ⚠️ GENERATED by scripts/gen-riwayat.js (npm run riwayat). Everything
+           between these two markers is derived from git log and WILL BE
+           OVERWRITTEN. Copy lives outside the markers.
+           No totals here, and no time of day, both on his ruling. See the
+           script header. -->
+      <ol class="rw-log" tabindex="0" aria-label="Daftar semua perubahan PDFLokal, dari yang paling baru">
+      <li><time datetime="2026-08-28">28 Agustus 2026</time><span>the product speaks as one person now: his face, his name, saya not kami</span></li>
+      <li><time datetime="2026-08-26">26 Agustus 2026</time><b class="rw-jenis">Catatan</b><span>the Ganti commit/doc-font race, and why three fixes were rejected</span></li>
+      <li><time datetime="2026-08-26">26 Agustus 2026</time><b class="rw-jenis">Perbaikan</b><span>a re-edit is tappable where it PAINTS, not only where it was born</span></li>
+      <li><time datetime="2026-08-26">26 Agustus 2026</time><b class="rw-jenis">Catatan</b><span>a RED gate in the cloud container is not a claim about main</span></li>
+      <li><time datetime="2026-08-26">26 Agustus 2026</time><b class="rw-jenis">Tes</b><span>flush an event source that actually fires</span></li>
+      <li><time datetime="2026-08-26">26 Agustus 2026</time><b class="rw-jenis">Tes</b><span>wait out the modal's deferred clears before drawing</span></li>
+      <li><time datetime="2026-08-26">26 Agustus 2026</time><b class="rw-jenis">Tes</b><span>the browser under test reaches localhost and nothing else</span></li>
+      <li><time datetime="2026-08-26">26 Agustus 2026</time><b class="rw-jenis">Catatan</b><span>the setup script runs BEFORE the checkout — install deps in the run</span></li>
+      <li><time datetime="2026-08-25">25 Agustus 2026</time><b class="rw-jenis">Catatan</b><span>the cloud maintenance routine's standing brief</span></li>
+      <li><time datetime="2026-08-23">23 Agustus 2026</time><b class="rw-jenis">Teknis</b><span>the backfill tool, and reconcile the migration file with what is live</span></li>
+      <li><time datetime="2026-08-23">23 Agustus 2026</time><b class="rw-jenis">Teknis</b><span>move telemetry + feedback off Supabase onto Neon</span></li>
+      <li><time datetime="2026-08-23">23 Agustus 2026</time><b class="rw-jenis">Perbaikan</b><span>allow data: in connect-src — and the instrument that could see it</span></li>
+      <li><time datetime="2026-08-23">23 Agustus 2026</time><b class="rw-jenis">Fitur</b><span>shrink the tab to 40x40 and give it all five of his channels</span></li>
+      <li><time datetime="2026-08-23">23 Agustus 2026</time><b class="rw-jenis">Tulisan</b><span>his words on the scan sheet, and a test where a sentence used to be</span></li>
+      <li><time datetime="2026-08-23">23 Agustus 2026</time><b class="rw-jenis">Fitur</b><span>rung S2 — tap a word on a scan and replace it</span></li>
+      <li><time datetime="2026-08-23">23 Agustus 2026</time><b class="rw-jenis">Teknis</b><span>commit the engine — both blockers cleared weeks ago, nobody re-read the note</span></li>
+      <li><time datetime="2026-08-23">23 Agustus 2026</time><b class="rw-jenis">Perbaikan</b><span>open() survives missing optional chrome instead of dying</span></li>
+      <li><time datetime="2026-08-22">22 Agustus 2026</time><b class="rw-jenis">Fitur</b><span>a bookmark tab in the editor, DM @okeojan, bottom-left</span></li>
+      <li><time datetime="2026-08-22">22 Agustus 2026</time><b class="rw-jenis">Perbaikan</b><span>crypto.randomUUID fallback, so a module-scope throw stops killing the app</span></li>
+      <li><time datetime="2026-08-22">22 Agustus 2026</time><b class="rw-jenis">Perbaikan</b><span>glyphPaints declines a font it cannot interrogate, instead of dying</span></li>
+      <li><time datetime="2026-08-17">17 Agustus 2026</time><b class="rw-jenis">Fitur</b><span>an opt-in device-saved signature, and unchecking the box deletes it</span></li>
+      <li><time datetime="2026-08-17">17 Agustus 2026</time><b class="rw-jenis">Catatan</b><span>bare `vercel` deploys, and a wrong-directory deploy SUCCEEDS</span></li>
+      <li><time datetime="2026-08-14">14 Agustus 2026</time><b class="rw-jenis">Tulisan</b><span>&quot;Split PDF&quot; -&gt; &quot;Pisah PDF&quot; everywhere — one tool, one name</span></li>
+      <li><time datetime="2026-08-14">14 Agustus 2026</time><b class="rw-jenis">Fitur</b><span>Play Store demand-validation drive ends, PLAYSTORE_CAMPAIGN=false</span></li>
+      <li><time datetime="2026-08-14">14 Agustus 2026</time><b class="rw-jenis">Tes</b><span>PDF-&gt;images partial-failure toast gets its missing coverage</span></li>
+      <li><time datetime="2026-08-14">14 Agustus 2026</time><b class="rw-jenis">Perbaikan</b><span>PDF-to-images counts skipped pages instead of toasting success</span></li>
+      <li><time datetime="2026-08-14">14 Agustus 2026</time><b class="rw-jenis">Tulisan</b><span>font-substitution witness gets his ratified words, &quot;yang mirip&quot; added</span></li>
+      <li><time datetime="2026-08-14">14 Agustus 2026</time><b class="rw-jenis">Fitur</b><span>a silent font substitution now has a witness</span></li>
+      <li><time datetime="2026-08-14">14 Agustus 2026</time><b class="rw-jenis">Perbaikan</b><span>a locked-with-user-password PDF gets its own toast, not &quot;kosong atau rusak&quot;</span></li>
+      <li><time datetime="2026-08-14">14 Agustus 2026</time><b class="rw-jenis">Catatan</b><span>four more localStorage keys documented, his ratified wording</span></li>
+      <li><time datetime="2026-08-14">14 Agustus 2026</time><b class="rw-jenis">Tulisan</b><span>Kelola Halaman gets his ratified strings, Hapus Halaman splits from the toolbar's Hapus</span></li>
+      <li><time datetime="2026-08-10">10 Agustus 2026</time><b class="rw-jenis">Catatan</b><span>stale comments now describe the ruled world; CLAUDE.md maps all of api/</span></li>
+      <li><time datetime="2026-08-10">10 Agustus 2026</time><b class="rw-jenis">Rapi-rapi</b><span>four inline annotation-lookup loops -&gt; core findAnnotation</span></li>
+      <li><time datetime="2026-08-10">10 Agustus 2026</time><b class="rw-jenis">Perbaikan</b><span>sentry-tunnel returns a static error, never err.message</span></li>
+      <li><time datetime="2026-08-10">10 Agustus 2026</time><b class="rw-jenis">Perbaikan</b><span>feedback.js mirrors t.js's client-SHA-wins reversal</span></li>
+      <li><time datetime="2026-08-10">10 Agustus 2026</time><b class="rw-jenis">Perbaikan</b><span>Buka Baru clears the page-manager thumbnail cache</span></li>
+      <li><time datetime="2026-08-10">10 Agustus 2026</time><b class="rw-jenis">Perbaikan</b><span>empty re-edit commit deletes the edit, the original text returns</span></li>
+      <li><time datetime="2026-08-09">9 Agustus 2026</time><b class="rw-jenis">Catatan</b><span>say plainly that this file is inert, instead of asserting a protection</span></li>
+      <li><time datetime="2026-08-09">9 Agustus 2026</time><b class="rw-jenis">Rapi-rapi</b><span>delete three exports nothing reaches</span></li>
+      <li><time datetime="2026-08-09">9 Agustus 2026</time><b class="rw-jenis">Catatan</b><span>deviceCapability feeds diagnostics, not the rendering decisions it claimed</span></li>
+      <li><time datetime="2026-08-09">9 Agustus 2026</time><b class="rw-jenis">Catatan</b><span>document onDefaults, the deps key the header left out</span></li>
+      <li><time datetime="2026-08-09">9 Agustus 2026</time><b class="rw-jenis">Catatan</b><span>mark state/navigation/utils/events as OLD WING ONLY</span></li>
+      <li><time datetime="2026-08-09">9 Agustus 2026</time><b class="rw-jenis">Rapi-rapi</b><span>drop surgery.reason's 'untrustworthy-run', which nothing could emit</span></li>
+      <li><time datetime="2026-08-09">9 Agustus 2026</time><b class="rw-jenis">Rapi-rapi</b><span>delete RANK_COUNT, whose comment promised a coupling it never had</span></li>
+      <li><time datetime="2026-08-09">9 Agustus 2026</time><b class="rw-jenis">Catatan</b><span>propose making telemetry schema rejections visible before tightening them</span></li>
+      <li><time datetime="2026-08-09">9 Agustus 2026</time><b class="rw-jenis">Catatan</b><span>name seo:check in the gate's stage list, which skipped it</span></li>
+      <li><time datetime="2026-08-09">9 Agustus 2026</time><b class="rw-jenis">Catatan</b><span>reconcile the push section — INCLUDE 9a is armed</span></li>
+      <li><time datetime="2026-08-09">9 Agustus 2026</time><b class="rw-jenis">Catatan</b><span>finish the 2026-07-30 prune — CLAUDE.md 414 -&gt; 200, two files extracted</span></li>
+      <li><time datetime="2026-08-09">9 Agustus 2026</time><b class="rw-jenis">Perbaikan</b><span>annotations follow the page's inherited /Rotate, not just the user's</span></li>
+      <li><time datetime="2026-08-09">9 Agustus 2026</time><b class="rw-jenis">Tes</b><span>assert accounting, not the race</span></li>
+      <li><time datetime="2026-08-09">9 Agustus 2026</time><b class="rw-jenis">Fitur</b><span>sharpen the focused page when zoom settles</span></li>
+      <li><time datetime="2026-08-09">9 Agustus 2026</time><b class="rw-jenis">Fitur</b><span>Atur Halaman joins the File dropdown, and the grey notes become tooltips</span></li>
+      <li><time datetime="2026-08-09">9 Agustus 2026</time><b class="rw-jenis">Tes</b><span>five specs stopped proving a filename and started reading the bytes</span></li>
+      <li><time datetime="2026-08-09">9 Agustus 2026</time><b class="rw-jenis">Perbaikan</b><span>five, under one gate</span></li>
+      <li><time datetime="2026-08-09">9 Agustus 2026</time><b class="rw-jenis">Fitur</b><span>every page takes the width of the first NON-IMAGE page</span></li>
+      <li><time datetime="2026-08-03">3 Agustus 2026</time><b class="rw-jenis">Tulisan</b><span>his words, ruled string by string</span></li>
+      <li><time datetime="2026-08-01">1 Agustus 2026</time><b class="rw-jenis">Fitur</b><span>a general channel, because only edit users could speak</span></li>
+      <li><time datetime="2026-07-31">31 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>the principles list split its own sentences in two</span></li>
+      <li><time datetime="2026-07-31">31 Juli 2026</time><b class="rw-jenis">Tampilan</b><span>one chrome on every page, and the cards match the rig again</span></li>
+      <li><time datetime="2026-07-30">30 Juli 2026</time><b class="rw-jenis">Tes</b><span>assert the properties the RULING named, not just the string</span></li>
+      <li><time datetime="2026-07-30">30 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>build the RULED stamp — 37px on the dropzone, not 12.5px on the headline</span></li>
+      <li><time datetime="2026-07-30">30 Juli 2026</time><b class="rw-jenis">Catatan</b><span>the two generator/token rules a cold session must not re-derive</span></li>
+      <li><time datetime="2026-07-30">30 Juli 2026</time><b class="rw-jenis">Teknis</b><span>reproducible screenshot set for the founder pass</span></li>
+      <li><time datetime="2026-07-30">30 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>no navbar pill, kop-surat stays; guard the machine-readable head</span></li>
+      <li><time datetime="2026-07-30">30 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>template the BODY, not the document — the intent hook was landing in a comment</span></li>
+      <li><time datetime="2026-07-30">30 Juli 2026</time><b class="rw-jenis">Tes</b><span>open the bytes; feat(v2): restore signature paste</span></li>
+      <li><time datetime="2026-07-30">30 Juli 2026</time><b class="rw-jenis">Fitur</b><span>dark D2 honoured on first visit, and privasi/dukung onto tokens</span></li>
+      <li><time datetime="2026-07-29">29 Juli 2026</time><b class="rw-jenis">Fitur</b><span>the token layer, and the landing on the 920 column</span></li>
+      <li><time datetime="2026-07-29">29 Juli 2026</time><b class="rw-jenis">Fitur</b><span>grant WebAssembly and blob workers, so OCR can run</span></li>
+      <li><time datetime="2026-07-29">29 Juli 2026</time><b class="rw-jenis">Fitur</b><span>a rig that serves the REAL production CSP, so the wall can be SEEN</span></li>
+      <li><time datetime="2026-07-29">29 Juli 2026</time><b class="rw-jenis">Catatan</b><span>audit the feature test suite — can each test go red?</span></li>
+      <li><time datetime="2026-07-29">29 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>take duration samples from any full run, and stop the sweep littering</span></li>
+      <li><time datetime="2026-07-29">29 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>the gate was starving itself, and now it says how long it took</span></li>
+      <li><time datetime="2026-07-29">29 Juli 2026</time><b class="rw-jenis">Tes</b><span>turn the sweep from liveness into fidelity</span></li>
+      <li><time datetime="2026-07-29">29 Juli 2026</time><b class="rw-jenis">Tes</b><span>sweep 154 real documents for pipeline LIVENESS, not fidelity</span></li>
+      <li><time datetime="2026-07-29">29 Juli 2026</time><b class="rw-jenis">Tes</b><span>give the rev pin a test that can actually go red</span></li>
+      <li><time datetime="2026-07-29">29 Juli 2026</time><b class="rw-jenis">Tes</b><span>feed our own OCR output back through our own importer</span></li>
+      <li><time datetime="2026-07-29">29 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>route every drawText through one guarded door, not four</span></li>
+      <li><time datetime="2026-07-29">29 Juli 2026</time><b class="rw-jenis">Fitur</b><span>OCR recognition + an invisible text layer writer, behind lab-ocr.html only</span></li>
+      <li><time datetime="2026-07-29">29 Juli 2026</time><b class="rw-jenis">Tulisan</b><span>repair the 11 places where the replacement comma joined a list</span></li>
+      <li><time datetime="2026-07-29">29 Juli 2026</time><b class="rw-jenis">Tulisan</b><span>em-dashes out of every user-visible surface, replaced with &quot;, &quot;</span></li>
+      <li><time datetime="2026-07-29">29 Juli 2026</time><b class="rw-jenis">Tes</b><span>a generated scan corpus that walks the decline boundary</span></li>
+      <li><time datetime="2026-07-29">29 Juli 2026</time><b class="rw-jenis">Tes</b><span>read the wild corpus in place, and stop asserting a margin that moves with N</span></li>
+      <li><time datetime="2026-07-29">29 Juli 2026</time><b class="rw-jenis">Tes</b><span>re-derive space inference on clean data, and pin the margin</span></li>
+      <li><time datetime="2026-07-29">29 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>warn while the cursor is still there, and stop advising a retry that cannot work</span></li>
+      <li><time datetime="2026-07-29">29 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>app_version now names the build the browser is running</span></li>
+      <li><time datetime="2026-07-29">29 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>one invisible character could destroy a whole document</span></li>
+      <li><time datetime="2026-07-28">28 Juli 2026</time><b class="rw-jenis">Kecepatan</b><span>qualify text before walking the operator list, not after</span></li>
+      <li><time datetime="2026-07-28">28 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>a searchable scan is still a scan — read render mode, not &quot;is there text&quot;</span></li>
+      <li><time datetime="2026-07-28">28 Juli 2026</time><b class="rw-jenis">Catatan</b><span>the gate's stage list mirrors CI, or the gate lies</span></li>
+      <li><time datetime="2026-07-28">28 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>mirror CI — the gate could be green while CI was red</span></li>
+      <li><time datetime="2026-07-28">28 Juli 2026</time><b class="rw-jenis">Tampilan</b><span>em-dashes out of the UI strings — the eleven that take a comma</span></li>
+      <li><time datetime="2026-07-28">28 Juli 2026</time><b class="rw-jenis">Fitur</b><span>a scan is no longer a dead end — explain, then offer a route</span></li>
+      <li><time datetime="2026-07-28">28 Juli 2026</time><b class="rw-jenis">Fitur</b><span>measure the installed base, and give every event its own time</span></li>
+      <li><time datetime="2026-07-28">28 Juli 2026</time><b class="rw-jenis">Teknis</b><span>gitignore the wild PDF corpus — real documents stay off the repo</span></li>
+      <li><time datetime="2026-07-28">28 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>the live product had no error capture at all — it does now</span></li>
+      <li><time datetime="2026-07-28">28 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>stop losing writes silently, and put file-open failures on the rail</span></li>
+      <li><time datetime="2026-07-28">28 Juli 2026</time><b class="rw-jenis">Tes</b><span>classes C, D, E — delivery, failure coverage, rail/GA4 parity</span></li>
+      <li><time datetime="2026-07-28">28 Juli 2026</time><b class="rw-jenis">Tes</b><span>class B — no document text ever leaves on the rail</span></li>
+      <li><time datetime="2026-07-28">28 Juli 2026</time><b class="rw-jenis">Tes</b><span>class A — every declared event must actually be emitted</span></li>
+      <li><time datetime="2026-07-28">28 Juli 2026</time><b class="rw-jenis">Catatan</b><span>correct the file map — the docs moved on 2026-07-27, this block didn't</span></li>
+      <li><time datetime="2026-07-28">28 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>stop telling the edit-pdf page we can't do the thing we now do</span></li>
+      <li><time datetime="2026-07-28">28 Juli 2026</time><b class="rw-jenis">Tes</b><span>give first render a budget it can survive a busy machine on</span></li>
+      <li><time datetime="2026-07-28">28 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>warn that a protected PDF can't be saved, before the work is done</span></li>
+      <li><time datetime="2026-07-28">28 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>decline the weight on a mixed-font line, keep the family</span></li>
+      <li><time datetime="2026-07-28">28 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>learn the line's font from per-run geometry, not one blended target</span></li>
+      <li><time datetime="2026-07-28">28 Juli 2026</time><b class="rw-jenis">Tes</b><span>the per-run-target fix can no longer survive its own revert</span></li>
+      <li><time datetime="2026-07-28">28 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>surgery can say it did not clear what it was asked to</span></li>
+      <li><time datetime="2026-07-28">28 Juli 2026</time><b class="rw-jenis">Teknis</b><span>remove decisions.md committed here by mistake</span></li>
+      <li><time datetime="2026-07-28">28 Juli 2026</time><span>pm: residual signal GO, cover change HELD; bank the gate's endpoint blind spot</span></li>
+      <li><time datetime="2026-07-28">28 Juli 2026</time><b class="rw-jenis">Tes</b><span>the sweep now proves the tree didn't move under it</span></li>
+      <li><time datetime="2026-07-28">28 Juli 2026</time><b class="rw-jenis">Catatan</b><span>push authority belongs to the policy, not to anyone's word</span></li>
+      <li><time datetime="2026-07-28">28 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>cut every run of a line, not the widest one</span></li>
+      <li><time datetime="2026-07-28">28 Juli 2026</time><b class="rw-jenis">Catatan</b><span>split the seats — execution moves to a head-dev session rooted here</span></li>
+      <li><time datetime="2026-07-28">28 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>give the visual oracle an ink-delta signal it cannot round away</span></li>
+      <li><time datetime="2026-07-28">28 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>serve our own ES modules network-first — kill cross-deploy module skew</span></li>
+      <li><time datetime="2026-07-27">27 Juli 2026</time><b class="rw-jenis">Catatan</b><span>maintenance pass — retire the old wing's docs, correct what went stale</span></li>
+      <li><time datetime="2026-07-27">27 Juli 2026</time><b class="rw-jenis">Fitur</b><span>teach the first-party rail what people come to do</span></li>
+      <li><time datetime="2026-07-27">27 Juli 2026</time><b class="rw-jenis">Fitur</b><span>Edit Teks Asli — beta, the composite-stamp engine</span></li>
+      <li><time datetime="2026-07-20">20 Juli 2026</time><b class="rw-jenis">Fitur</b><span>install chip shows by default on every visit, not just returning (#126)</span></li>
+      <li><time datetime="2026-07-20">20 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>stamp app_version from the server's deploy SHA, not the client (#125)</span></li>
+      <li><time datetime="2026-07-20">20 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>clean-URL internal links so navigation works in the installed app (#124)</span></li>
+      <li><time datetime="2026-07-20">20 Juli 2026</time><b class="rw-jenis">Fitur</b><span>first-party typed content-blind telemetry rail (#123)</span></li>
+      <li><time datetime="2026-07-19">19 Juli 2026</time><b class="rw-jenis">Fitur</b><span>Play Store demand-validation vote at the download moment (#122)</span></li>
+      <li><time datetime="2026-07-18">18 Juli 2026</time><b class="rw-jenis">Fitur</b><span>installable PWA + homepage install helper (#121)</span></li>
+      <li><time datetime="2026-07-16">16 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>stop app.js crashing on SEO pages (missing #v2-loading)</span></li>
+      <li><time datetime="2026-07-16">16 Juli 2026</time><b class="rw-jenis">Catatan</b><span>strip dangling private-memory citations from public CLAUDE.md</span></li>
+      <li><time datetime="2026-07-16">16 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>telegraph the multi-file load + survive bad files</span></li>
+      <li><time datetime="2026-07-15">15 Juli 2026</time><b class="rw-jenis">Catatan</b><span>trim CLAUDE.md North-Star/status framing to seat pointer (../STATE.md)</span></li>
+      <li><time datetime="2026-07-15">15 Juli 2026</time><b class="rw-jenis">Teknis</b><span>PM docs migrated to project seat + skills lockfile (Great Reorg)</span></li>
+      <li><time datetime="2026-07-14">14 Juli 2026</time><b class="rw-jenis">Catatan</b><span>the blackout's real root cause + retire the stale mobile-first premise</span></li>
+      <li><time datetime="2026-07-14">14 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>retract dangerous negative-keyword advice + 8 researched corrections</span></li>
+      <li><time datetime="2026-07-14">14 Juli 2026</time><b class="rw-jenis">Teknis</b><span>backlog — conversion tracking wired end-to-end (Ads can optimize a real goal)</span></li>
+      <li><time datetime="2026-07-13">13 Juli 2026</time><b class="rw-jenis">Teknis</b><span>backlog — Jul 13 ads audit + founder desk decisions executed</span></li>
+      <li><time datetime="2026-07-13">13 Juli 2026</time><b class="rw-jenis">Fitur</b><span>taste lock — the generator refuses to run on unreviewed copy</span></li>
+      <li><time datetime="2026-07-13">13 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>duplicate ignoreErrors key shipped the fetch filters dead</span></li>
+      <li><time datetime="2026-07-12">12 Juli 2026</time><b class="rw-jenis">Teknis</b><span>backlog — SonarCloud autoscan ignores sonar-project.properties; exclusion must be set in the UI</span></li>
+      <li><time datetime="2026-07-12">12 Juli 2026</time><span>SEO legs: 12 crawlable pages, target-size compression, and the traffic alarm (#119)</span></li>
+      <li><time datetime="2026-07-12">12 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>new GA4 stream (G-7J8JF8XZ1Q) — end the 5-day blackout (#118)</span></li>
+      <li><time datetime="2026-07-11">11 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>load our own Google tag (GT-5MRGDJVG) — GA4 was resolving to null (#117)</span></li>
+      <li><time datetime="2026-07-08">8 Juli 2026</time><b class="rw-jenis">Teknis</b><span>backlog — Sentry sweep #116 to Done; golden-master suite breakage to Open</span></li>
+      <li><time datetime="2026-07-08">8 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>two mobile Sentry crashes — armDrag orphan tile + iOS caret guard (#116)</span></li>
+      <li><time datetime="2026-07-06">6 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>guard GA4 config by hostname on dukung + privasi</span></li>
+      <li><time datetime="2026-07-03">3 Juli 2026</time><b class="rw-jenis">Teknis</b><span>backlog — desktop landing rd4+rd5 to Done</span></li>
+      <li><time datetime="2026-07-03">3 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>flat landing — paper-on-desk cut after live look (founder rd5) (#115)</span></li>
+      <li><time datetime="2026-07-03">3 Juli 2026</time><b class="rw-jenis">Fitur</b><span>desktop toolbox — all 14 tools visible, width filled with content (#114)</span></li>
+      <li><time datetime="2026-07-03">3 Juli 2026</time><b class="rw-jenis">Teknis</b><span>backlog — Kelola pan-steal fix + h1 to Done</span></li>
+      <li><time datetime="2026-07-03">3 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>Kelola drag no longer stolen by native scroll on mobile (#113)</span></li>
+      <li><time datetime="2026-07-03">3 Juli 2026</time><b class="rw-jenis">Fitur</b><span>h1 = value prop — 'PDF beres dalam hitungan detik. Gratis.' (#112)</span></li>
+      <li><time datetime="2026-07-03">3 Juli 2026</time><b class="rw-jenis">Teknis</b><span>backlog — landing composition rd3 to Done</span></li>
+      <li><time datetime="2026-07-03">3 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>landing composition — centered hero, corner stamp, paper-on-desk desktop (#111)</span></li>
+      <li><time datetime="2026-07-03">3 Juli 2026</time><span>docs/v2 status (#110)</span></li>
+      <li><time datetime="2026-07-03">3 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>Sentry fee8a76e — NotFoundError in Kelola drag-reorder (#109)</span></li>
+      <li><time datetime="2026-07-03">3 Juli 2026</time><b class="rw-jenis">Fitur</b><span>carried-signature ghost + ketuk→pilih copy sweep (#108)</span></li>
+      <li><time datetime="2026-07-03">3 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>drag always settles + home-confirm joins the sheet system (#107)</span></li>
+      <li><time datetime="2026-07-03">3 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>desktop goes tool-first — single column, no marketing hero (#106)</span></li>
+      <li><time datetime="2026-07-03">3 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>desktop text punch list — select-then-edit model, floating bars, any-color (#105)</span></li>
+      <li><time datetime="2026-07-03">3 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>launch punch list rd1 + desktop landing (founder findings Jul 3-4) (#104)</span></li>
+      <li><time datetime="2026-07-03">3 Juli 2026</time><b class="rw-jenis">Fitur</b><span>THE SWAP — pdflokal.id IS Editor v2 (#103)</span></li>
+      <li><time datetime="2026-07-03">3 Juli 2026</time><b class="rw-jenis">Fitur</b><span>the landing IS the editor's empty state — homepage build (draf 3b) (#102)</span></li>
+      <li><time datetime="2026-07-03">3 Juli 2026</time><b class="rw-jenis">Fitur</b><span>the physical-document language — stamps, stempel-press, held-paper drag (#101)</span></li>
+      <li><time datetime="2026-07-03">3 Juli 2026</time><b class="rw-jenis">Tampilan</b><span>inherit the brand — PDFLokal red, warm stone, Plus Jakarta Sans (#100)</span></li>
+      <li><time datetime="2026-07-03">3 Juli 2026</time><b class="rw-jenis">Fitur</b><span>support card asks once per calendar day, not once per session (#99)</span></li>
+      <li><time datetime="2026-07-03">3 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>icon sizing — global button-svg safety net, share as primary (#98)</span></li>
+      <li><time datetime="2026-07-03">3 Juli 2026</time><b class="rw-jenis">Tampilan</b><span>founder notes — modern burst, swipe dismiss, 0.2s, SVG icons, human copy (#97)</span></li>
+      <li><time datetime="2026-07-03">3 Juli 2026</time><b class="rw-jenis">Catatan</b><span>Unduh sheet moved to Done (#92/#93)</span></li>
+      <li><time datetime="2026-07-03">3 Juli 2026</time><b class="rw-jenis">Catatan</b><span>growth loop shipped for v2 (#96)</span></li>
+      <li><time datetime="2026-07-03">3 Juli 2026</time><b class="rw-jenis">Fitur</b><span>growth loop — celebrate the download, then invite (share / QRIS) (#96)</span></li>
+      <li><time datetime="2026-07-03">3 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>pre-swap review findings — 2 HIGH, 2 MED, 2 LOW (#95)</span></li>
+      <li><time datetime="2026-07-03">3 Juli 2026</time><b class="rw-jenis">Tes</b><span>bigdoc fixture + generator (completes #94's swept-in stress spec)</span></li>
+      <li><time datetime="2026-07-03">3 Juli 2026</time><b class="rw-jenis">Fitur</b><span>swap-prep — analytics parity, Android back button, desktop ergonomics (#94)</span></li>
+      <li><time datetime="2026-07-03">3 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>compress + re-pick pages left the CTA reaching for missing bytes (#93)</span></li>
+      <li><time datetime="2026-07-03">3 Juli 2026</time><b class="rw-jenis">Fitur</b><span>the Unduh sheet — output pipeline (compress, images, ZIP, page pick) (#92)</span></li>
+      <li><time datetime="2026-07-02">2 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>drag hardening — auto-scroll, stable insertion, grid row collapse (#91)</span></li>
+      <li><time datetime="2026-07-02">2 Juli 2026</time><b class="rw-jenis">Catatan</b><span>Unduh-sheet proposal + Jul 2 decisions (retire low-usage tools, no sidebar)</span></li>
+      <li><time datetime="2026-07-02">2 Juli 2026</time><b class="rw-jenis">Fitur</b><span>FLIP page reorder (grab a real page) + File menu (add / start over) (#90)</span></li>
+      <li><time datetime="2026-07-02">2 Juli 2026</time><b class="rw-jenis">Fitur</b><span>camera-first touch model + color-at-stroke-start + write-over-tipex (#89)</span></li>
+      <li><time datetime="2026-07-02">2 Juli 2026</time><b class="rw-jenis">Fitur</b><span>founder phone punch list — 6 items (#88)</span></li>
+      <li><time datetime="2026-07-02">2 Juli 2026</time><b class="rw-jenis">Fitur</b><span>Editor v2 — clean rebuild on the headless core (hidden beta at /editor-v2.html) (#87)</span></li>
+      <li><time datetime="2026-07-02">2 Juli 2026</time><b class="rw-jenis">Catatan</b><span>check off render foundation (engine + streaming + telegraph), mark live-wiring next</span></li>
+      <li><time datetime="2026-07-02">2 Juli 2026</time><b class="rw-jenis">Fitur</b><span>lab — scroll telegraph (skeleton shimmer + position pill) (#86)</span></li>
+      <li><time datetime="2026-07-02">2 Juli 2026</time><b class="rw-jenis">Fitur</b><span>lab — render-on-settle (don't slow the user, slow the render) (#85)</span></li>
+      <li><time datetime="2026-07-02">2 Juli 2026</time><b class="rw-jenis">Fitur</b><span>Phase 2 (lab) — streaming/windowed page loading (#84)</span></li>
+      <li><time datetime="2026-07-01">1 Juli 2026</time><b class="rw-jenis">Fitur</b><span>Phase 1a — image-backed render engine + phone-openable lab (#83)</span></li>
+      <li><time datetime="2026-07-01">1 Juli 2026</time><b class="rw-jenis">Catatan</b><span>pivot to vision-led foundation rebuild as the spine</span></li>
+      <li><time datetime="2026-07-01">1 Juli 2026</time><b class="rw-jenis">Catatan</b><span>link the mesindev Field Notes writeups</span></li>
+      <li><time datetime="2026-07-01">1 Juli 2026</time><b class="rw-jenis">Fitur</b><span>Phase 0b — PDF import adapter (bytes → Doc, lazy rasterize) (#82)</span></li>
+      <li><time datetime="2026-07-01">1 Juli 2026</time><b class="rw-jenis">Fitur</b><span>Phase 0 — headless document model + operations (#81)</span></li>
+      <li><time datetime="2026-07-01">1 Juli 2026</time><b class="rw-jenis">Catatan</b><span>lock product vision as the north star</span></li>
+      <li><time datetime="2026-07-01">1 Juli 2026</time><b class="rw-jenis">Teknis</b><span>Wave 1 conveniences (#79, #80)</span></li>
+      <li><time datetime="2026-07-01">1 Juli 2026</time><b class="rw-jenis">Fitur</b><span>drop a file onto the sidebar to append pages (#80)</span></li>
+      <li><time datetime="2026-07-01">1 Juli 2026</time><b class="rw-jenis">Fitur</b><span>paste an image from the clipboard into the signature flow (#79)</span></li>
+      <li><time datetime="2026-07-01">1 Juli 2026</time><b class="rw-jenis">Teknis</b><span>update backlog + CLAUDE.md after #77/#78</span></li>
+      <li><time datetime="2026-07-01">1 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>shrink sidebar page badge, drop loud red active-page outline (#78)</span></li>
+      <li><time datetime="2026-07-01">1 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>restore broken &quot;Split PDF&quot; homepage card (#77)</span></li>
+      <li><time datetime="2026-07-01">1 Juli 2026</time><b class="rw-jenis">Rapi-rapi</b><span>Wave 0 PR C — remove dead code, retire orphaned text modal, fix visual test (#76)</span></li>
+      <li><time datetime="2026-07-01">1 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>Wave 0 PR B — Sentry true-fixes (JS-4/7/8) (#75)</span></li>
+      <li><time datetime="2026-07-01">1 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>Wave 0 PR A — whiteout sticky revert, arrow-nudge, Ctrl+Z in sig modal (#74)</span></li>
+      <li><time datetime="2026-07-01">1 Juli 2026</time><b class="rw-jenis">Catatan</b><span>backlog-flush roadmap-2 (waves 0-5), archive roadmap-1</span></li>
+      <li><time datetime="2026-07-01">1 Juli 2026</time><b class="rw-jenis">Fitur</b><span>redesign the Kelola Halaman (page-manager) modal (#73)</span></li>
+      <li><time datetime="2026-07-01">1 Juli 2026</time><b class="rw-jenis">Fitur</b><span>contextual text format bar + click-away commit fix (#72)</span></li>
+      <li><time datetime="2026-07-01">1 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>clear top of first page from fixed toolbar on mobile</span></li>
+      <li><time datetime="2026-07-01">1 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>clear stale PDF.js doc cache on ueReset (Ganti File blank render)</span></li>
+      <li><time datetime="2026-07-01">1 Juli 2026</time><b class="rw-jenis">Fitur</b><span>UI visual regression suite (#70)</span></li>
+      <li><time datetime="2026-07-01">1 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>survive pre-init taps — wrap 87 inline onclicks with optional chain (#69)</span></li>
+      <li><time datetime="2026-07-01">1 Juli 2026</time><b class="rw-jenis">Perbaikan</b><span>hostname allowlist on gtag config — stop polluting prod GA4 from localhost (#71)</span></li>
+      <li><time datetime="2026-06-09">9 Juni 2026</time><b class="rw-jenis">Perbaikan</b><span>mutatePages() SSOT helper for atomic page-array re-key (#68)</span></li>
+      <li><time datetime="2026-06-04">4 Juni 2026</time><b class="rw-jenis">Teknis</b><span>add 3 entries from manual testing + Sentry triage</span></li>
+      <li><time datetime="2026-06-04">4 Juni 2026</time><b class="rw-jenis">Perbaikan</b><span>defensive guards on Hapus Edit + sidebar thumbs (Sentry JS-7, JS-8) (#67)</span></li>
+      <li><time datetime="2026-06-04">4 Juni 2026</time><b class="rw-jenis">Perbaikan</b><span>mobile canvas blank-after-purge — restore from ImageData cache (#66)</span></li>
+      <li><time datetime="2026-06-03">3 Juni 2026</time><b class="rw-jenis">Perbaikan</b><span>null-guard signature preview when no page selected (Sentry JS-6) (#65)</span></li>
+      <li><time datetime="2026-06-03">3 Juni 2026</time><b class="rw-jenis">Perbaikan</b><span>Ganti File now actually renders the new file (#64)</span></li>
+      <li><time datetime="2026-06-03">3 Juni 2026</time><b class="rw-jenis">Teknis</b><span>add 6 new items from manual testing + user feedback</span></li>
+      <li><time datetime="2026-06-02">2 Juni 2026</time><b class="rw-jenis">Teknis</b><span>cleanup drift + spaghetti — 5 cheap wins (#63)</span></li>
+      <li><time datetime="2026-06-02">2 Juni 2026</time><b class="rw-jenis">Teknis</b><span>fix ReDoS regex + drop orphan mermaid docs page</span></li>
+      <li><time datetime="2026-06-02">2 Juni 2026</time><b class="rw-jenis">Teknis</b><span>bump APP_VERSION to 2026.06.02.1</span></li>
+      <li><time datetime="2026-06-02">2 Juni 2026</time><b class="rw-jenis">Teknis</b><span>track backlog.md in repo</span></li>
+      <li><time datetime="2026-06-02">2 Juni 2026</time><b class="rw-jenis">Fitur</b><span>auto-switch to &quot;Pilih&quot; after whiteout + text actions (#60)</span></li>
+      <li><time datetime="2026-06-02">2 Juni 2026</time><b class="rw-jenis">Fitur</b><span>max Sentry — breadcrumbs from track(), 10% replay, device tags (#62)</span></li>
+      <li><time datetime="2026-06-01">1 Juni 2026</time><b class="rw-jenis">Perbaikan</b><span>guard stale selectedAnnotation to stop iOS tap crash (#61)</span></li>
+      <li><time datetime="2026-06-01">1 Juni 2026</time><b class="rw-jenis">Teknis</b><span>bump APP_VERSION to 2026.06.01.1</span></li>
+      <li><time datetime="2026-06-01">1 Juni 2026</time><b class="rw-jenis">Perbaikan</b><span>rename &quot;Hapus Semua&quot; + add confirm guard (C3) (#59)</span></li>
+      <li><time datetime="2026-06-01">1 Juni 2026</time><b class="rw-jenis">Fitur</b><span>&quot;Tempel di semua halaman&quot; checkbox in paraf modal (#56)</span></li>
+      <li><time datetime="2026-06-01">1 Juni 2026</time><b class="rw-jenis">Perbaikan</b><span>default modal tab to Gambar (draw), not Upload Foto (#55)</span></li>
+      <li><time datetime="2026-06-01">1 Juni 2026</time><b class="rw-jenis">Fitur</b><span>inline text on first creation + last-used formatting memory (#54)</span></li>
+      <li><time datetime="2026-06-01">1 Juni 2026</time><b class="rw-jenis">Rapi-rapi</b><span>bottom 3-dots becomes Lainnya menu, top 3-dots hidden (#57)</span></li>
+      <li><time datetime="2026-06-01">1 Juni 2026</time><b class="rw-jenis">Perbaikan</b><span>Escape closes overlay, not the whole editor (#53)</span></li>
+      <li><time datetime="2026-05-30">30 Mei 2026</time><b class="rw-jenis">Teknis</b><span>bump GitHub Actions to Node 24-compatible majors (#52)</span></li>
+      <li><time datetime="2026-05-30">30 Mei 2026</time><b class="rw-jenis">Perbaikan</b><span>tolerance-based pixel diff so CI Linux matches macOS baselines</span></li>
+      <li><time datetime="2026-05-30">30 Mei 2026</time><b class="rw-jenis">Fitur</b><span>Tier 2.4 — golden-master PDF tests via PNG hash</span></li>
+      <li><time datetime="2026-05-30">30 Mei 2026</time><b class="rw-jenis">Fitur</b><span>tunnel Sentry events through /api/sentry-tunnel</span></li>
+      <li><time datetime="2026-05-29">29 Mei 2026</time><b class="rw-jenis">Perbaikan</b><span>enable Sentry for www.pdflokal.id too — apex 301s to www</span></li>
+      <li><time datetime="2026-05-29">29 Mei 2026</time><b class="rw-jenis">Fitur</b><span>Tier 2 step 3 — wire Sentry browser SDK with privacy-first replay</span></li>
+      <li><time datetime="2026-05-28">28 Mei 2026</time><b class="rw-jenis">Fitur</b><span>Tier 1 — Playwright smoke + GH Actions + global error capture (#51)</span></li>
+      <li><time datetime="2026-05-28">28 Mei 2026</time><b class="rw-jenis">Teknis</b><span>remove dead emitter channels with no subscribers</span></li>
+      <li><time datetime="2026-05-28">28 Mei 2026</time><b class="rw-jenis">Perbaikan</b><span>drop unsafe-eval from CSP — no app or vendor code requires it</span></li>
+      <li><time datetime="2026-05-28">28 Mei 2026</time><b class="rw-jenis">Perbaikan</b><span>annotations on rotated pages now export at the correct position</span></li>
+      <li><time datetime="2026-05-28">28 Mei 2026</time><b class="rw-jenis">Perbaikan</b><span>Escape cancels inline edit without kicking user home; font fetch failure no longer re-fetches per annotation</span></li>
+      <li><time datetime="2026-03-17">17 Maret 2026</time><b class="rw-jenis">Perbaikan</b><span>XSS in showToast/showFullscreenLoading, harden modals and cleanup dead code</span></li>
+      <li><time datetime="2026-03-17">17 Maret 2026</time><b class="rw-jenis">Catatan</b><span>update CLAUDE.md, patterns, future-architecture for PageRenderer class</span></li>
+      <li><time datetime="2026-03-17">17 Maret 2026</time><b class="rw-jenis">Rapi-rapi</b><span>extract PageRenderer class from page-rendering.js</span></li>
+      <li><time datetime="2026-03-16">16 Maret 2026</time><span>debug: add viewport width to init console log (v2026.03.16.3)</span></li>
+      <li><time datetime="2026-03-16">16 Maret 2026</time><b class="rw-jenis">Perbaikan</b><span>enable real PDF.js Web Worker by removing preloaded script tag</span></li>
+      <li><time datetime="2026-03-16">16 Maret 2026</time><b class="rw-jenis">Catatan</b><span>update security.md CSP to match vercel.json</span></li>
+      <li><time datetime="2026-03-16">16 Maret 2026</time><b class="rw-jenis">Perbaikan</b><span>allow Google Ads conversion tracking scripts and images</span></li>
+      <li><time datetime="2026-03-16">16 Maret 2026</time><b class="rw-jenis">Teknis</b><span>add app version tag to console for cache debugging</span></li>
+      <li><time datetime="2026-03-16">16 Maret 2026</time><b class="rw-jenis">Perbaikan</b><span>address 3 real causes of scroll flicker from console logs</span></li>
+      <li><time datetime="2026-03-16">16 Maret 2026</time><b class="rw-jenis">Catatan</b><span>update CLAUDE.md with mobile rendering lessons and deviceCapability</span></li>
+      <li><time datetime="2026-03-16">16 Maret 2026</time><b class="rw-jenis">Perbaikan</b><span>remove all canvas eviction and snapshot complexity</span></li>
+      <li><time datetime="2026-03-16">16 Maret 2026</time><b class="rw-jenis">Perbaikan</b><span>use &lt;img&gt; fallback behind canvas instead of background-image</span></li>
+      <li><time datetime="2026-03-16">16 Maret 2026</time><b class="rw-jenis">Perbaikan</b><span>snapshot rendered pages as background-image fallback</span></li>
+      <li><time datetime="2026-03-16">16 Maret 2026</time><b class="rw-jenis">Perbaikan</b><span>GPU-composite canvases, overscroll-behavior on editor</span></li>
+      <li><time datetime="2026-03-16">16 Maret 2026</time><b class="rw-jenis">Perbaikan</b><span>prevent canvas wipe on re-render, raise eviction threshold</span></li>
+      <li><time datetime="2026-03-16">16 Maret 2026</time><b class="rw-jenis">Perbaikan</b><span>hide page selection border on mobile, skip DOM class toggling</span></li>
+      <li><time datetime="2026-03-16">16 Maret 2026</time><b class="rw-jenis">Perbaikan</b><span>fix blank screen on failed PDF load, fix scroll hijacking</span></li>
+      <li><time datetime="2026-03-16">16 Maret 2026</time><b class="rw-jenis">Perbaikan</b><span>eliminate empty state flash and scroll flicker</span></li>
+      <li><time datetime="2026-03-16">16 Maret 2026</time><b class="rw-jenis">Catatan</b><span>update architecture docs, add overview diagram, add GA4 tracking</span></li>
+      <li><time datetime="2026-03-15">15 Maret 2026</time><b class="rw-jenis">Perbaikan</b><span>remove unreliable mobileState.isMobile, fix isProcessingDrop leak</span></li>
+      <li><time datetime="2026-03-15">15 Maret 2026</time><b class="rw-jenis">Perbaikan</b><span>resolve canvas rendering issues on mobile</span></li>
+      <li><time datetime="2026-03-15">15 Maret 2026</time><b class="rw-jenis">Perbaikan</b><span>improve responsiveness and touch targets</span></li>
+      <li><time datetime="2026-03-12">12 Maret 2026</time><b class="rw-jenis">Perbaikan</b><span>resolve remaining HIGH and MEDIUM SonarQube issues</span></li>
+      <li><time datetime="2026-03-12">12 Maret 2026</time><b class="rw-jenis">Perbaikan</b><span>replace English text with Indonesian across UI</span></li>
+      <li><time datetime="2026-03-11">11 Maret 2026</time><b class="rw-jenis">Perbaikan</b><span>add type=&quot;module&quot; to theme.js script tags on dukung and privasi pages</span></li>
+      <li><time datetime="2026-03-11">11 Maret 2026</time><b class="rw-jenis">Perbaikan</b><span>use native HTML elements for accessibility (S6819, S6844, S6848)</span></li>
+      <li><time datetime="2026-03-11">11 Maret 2026</time><b class="rw-jenis">Perbaikan</b><span>resolve structural MEDIUM issues across JS files</span></li>
+      <li><time datetime="2026-03-11">11 Maret 2026</time><b class="rw-jenis">Perbaikan</b><span>Number.parseInt/isNaN/parseFloat + optional chaining (S7773, S6582)</span></li>
+      <li><time datetime="2026-03-11">11 Maret 2026</time><b class="rw-jenis">Rapi-rapi</b><span>reduce complexity in keyboard.js, pdf-export.js, canvas-events.js (S3776)</span></li>
+      <li><time datetime="2026-03-11">11 Maret 2026</time><b class="rw-jenis">Rapi-rapi</b><span>reduce complexity in page-manager.js and img-to-pdf.js (S3776)</span></li>
+      <li><time datetime="2026-03-11">11 Maret 2026</time><b class="rw-jenis">Rapi-rapi</b><span>reduce cognitive complexity in 4 files (S3776)</span></li>
+      <li><time datetime="2026-03-11">11 Maret 2026</time><b class="rw-jenis">Perbaikan</b><span>resolve 7 quick-win HIGH issues (S7768, S7761, S1186)</span></li>
+      <li><time datetime="2026-03-11">11 Maret 2026</time><b class="rw-jenis">Catatan</b><span>update CLAUDE.md for vendor/CDN changes, add system-flow doc</span></li>
+      <li><time datetime="2026-03-11">11 Maret 2026</time><b class="rw-jenis">Fitur</b><span>add Vercel custom event tracking with session IDs</span></li>
+      <li><time datetime="2026-03-11">11 Maret 2026</time><b class="rw-jenis">Perbaikan</b><span>self-host pdf-encrypt-lite, remove esm.sh CDN dependency</span></li>
+      <li><time datetime="2026-03-11">11 Maret 2026</time><b class="rw-jenis">Rapi-rapi</b><span>consolidate breakpoints to 900px, define z-index scale</span></li>
+      <li><time datetime="2026-03-11">11 Maret 2026</time><b class="rw-jenis">Perbaikan</b><span>add missing labels, aria-labels, roles, keyboard handlers</span></li>
+      <li><time datetime="2026-03-11">11 Maret 2026</time><b class="rw-jenis">Kecepatan</b><span>lazy-load editor modules for instant dropzone interactivity</span></li>
+      <li><time datetime="2026-03-11">11 Maret 2026</time><b class="rw-jenis">Perbaikan</b><span>anti-pattern audit batches 1-5 — bugs, validation, SSOT, DRY, leaks</span></li>
+      <li><time datetime="2026-03-11">11 Maret 2026</time><b class="rw-jenis">Teknis</b><span>fix all 13 ESLint warnings (0 errors, 0 warnings)</span></li>
+      <li><time datetime="2026-03-11">11 Maret 2026</time><b class="rw-jenis">Fitur</b><span>add event emitter (pub/sub) for reactive state sync</span></li>
+      <li><time datetime="2026-03-11">11 Maret 2026</time><b class="rw-jenis">Fitur</b><span>add &quot;Hubungi Kami&quot; feedback form + redesign footer</span></li>
+      <li><time datetime="2026-03-11">11 Maret 2026</time><b class="rw-jenis">Catatan</b><span>update CLAUDE.md file structure for split modules</span></li>
+      <li><time datetime="2026-03-11">11 Maret 2026</time><b class="rw-jenis">Rapi-rapi</b><span>split 3 large files into focused modules</span></li>
+      <li><time datetime="2026-03-11">11 Maret 2026</time><b class="rw-jenis">Perbaikan</b><span>responsive polish — icon-only buttons on mobile, full-width layout</span></li>
+      <li><time datetime="2026-03-11">11 Maret 2026</time><b class="rw-jenis">Perbaikan</b><span>clamp canvas DPR to prevent render failure at 200% browser zoom</span></li>
+      <li><time datetime="2026-03-11">11 Maret 2026</time><b class="rw-jenis">Fitur</b><span>add ESLint + GitHub Actions CI, fix lint errors</span></li>
+      <li><time datetime="2026-03-11">11 Maret 2026</time><b class="rw-jenis">Rapi-rapi</b><span>SSOT operation wrappers for annotations and page reorder</span></li>
+      <li><time datetime="2026-03-11">11 Maret 2026</time><b class="rw-jenis">Fitur</b><span>add Google Ads tag (gtag.js) across all pages</span></li>
+      <li><time datetime="2026-03-11">11 Maret 2026</time><b class="rw-jenis">Rapi-rapi</b><span>DRY helpers + unified undo/redo stack</span></li>
+      <li><time datetime="2026-03-11">11 Maret 2026</time><b class="rw-jenis">Catatan</b><span>fix stale references in CLAUDE.md and MEMORY.md</span></li>
+      <li><time datetime="2026-03-11">11 Maret 2026</time><b class="rw-jenis">Catatan</b><span>add WHY comments and SSOT markers across 12 core modules</span></li>
+      <li><time datetime="2026-03-10">10 Maret 2026</time><b class="rw-jenis">Perbaikan</b><span>Gabungkan modal desync, rotated thumbnails, and thumbnail resolution</span></li>
+      <li><time datetime="2026-03-10">10 Maret 2026</time><b class="rw-jenis">Perbaikan</b><span>clean up zoom keyboard shortcuts from PR #50</span></li>
+      <li><time datetime="2026-03-09">9 Maret 2026</time><b class="rw-jenis">Teknis</b><span>add .gitattributes to enforce LF line endings (Windows → Mac migration)</span></li>
+      <li><time datetime="2026-03-09">9 Maret 2026</time><b class="rw-jenis">Catatan</b><span>capture architectural strengths and future improvement plans</span></li>
+      <li><time datetime="2026-02-20">20 Februari 2026</time><b class="rw-jenis">Fitur</b><span>keyboard shortcuts for zoom (+/- keys)</span></li>
+      <li><time datetime="2026-02-20">20 Februari 2026</time><b class="rw-jenis">Perbaikan</b><span>deleted pages included in download, annotation position mismatch on mobile</span></li>
+      <li><time datetime="2026-02-20">20 Februari 2026</time><b class="rw-jenis">Catatan</b><span>add open source infrastructure (CONTRIBUTING, CODE_OF_CONDUCT, issue/PR templates)</span></li>
+      <li><time datetime="2026-02-20">20 Februari 2026</time><b class="rw-jenis">Catatan</b><span>update architecture, editor-redesign, security, and patterns docs</span></li>
+      <li><time datetime="2026-02-20">20 Februari 2026</time><b class="rw-jenis">Catatan</b><span>update CLAUDE.md with new SSOT helpers (annotation factories, modal helpers, file type checks, loadPdfDocument)</span></li>
+      <li><time datetime="2026-02-20">20 Februari 2026</time><b class="rw-jenis">Rapi-rapi</b><span>centralize annotation factories, modal helpers, file type checks, and PDF loading (SSOT)</span></li>
+      <li><time datetime="2026-02-20">20 Februari 2026</time><b class="rw-jenis">Catatan</b><span>update CLAUDE.md with SSOT helpers and architecture reference</span></li>
+      <li><time datetime="2026-02-20">20 Februari 2026</time><b class="rw-jenis">Rapi-rapi</b><span>centralize scattered patterns into SSOT helpers</span></li>
+      <li><time datetime="2026-02-20">20 Februari 2026</time><b class="rw-jenis">Perbaikan</b><span>restore thumbCanvas on undo/redo, clear paraf state on reset/tool-switch</span></li>
+      <li><time datetime="2026-02-20">20 Februari 2026</time><b class="rw-jenis">Perbaikan</b><span>pre-render thumbnail canvases during file load for instant sidebar previews</span></li>
+      <li><time datetime="2026-02-20">20 Februari 2026</time><b class="rw-jenis">Perbaikan</b><span>repair lazy rendering drawImage crashes in thumbnails</span></li>
+      <li><time datetime="2026-02-20">20 Februari 2026</time><b class="rw-jenis">Fitur</b><span>add Paraf (initials) tool with apply-to-all-pages</span></li>
+      <li><time datetime="2026-02-20">20 Februari 2026</time><b class="rw-jenis">Catatan</b><span>update CLAUDE.md with accessibility, performance, and mobile UX patterns</span></li>
+      <li><time datetime="2026-02-20">20 Februari 2026</time><b class="rw-jenis">Perbaikan</b><span>improve accessibility, performance, and mobile UX across editor</span></li>
+      <li><time datetime="2026-02-20">20 Februari 2026</time><b class="rw-jenis">Catatan</b><span>update CLAUDE.md with Feb 2026 cleanup changes</span></li>
+      <li><time datetime="2026-02-20">20 Februari 2026</time><b class="rw-jenis">Rapi-rapi</b><span>remove ~2000 lines of dead code, duplication, and magic numbers</span></li>
+      <li><time datetime="2026-02-20">20 Februari 2026</time><b class="rw-jenis">Catatan</b><span>add hardening patterns to CLAUDE.md</span></li>
+      <li><time datetime="2026-02-20">20 Februari 2026</time><b class="rw-jenis">Perbaikan</b><span>harden against race conditions, memory leaks, and state corruption</span></li>
+      <li><time datetime="2026-02-20">20 Februari 2026</time><b class="rw-jenis">Fitur</b><span>redesign UI with compact header, floating toolbar, and bottom bar</span></li>
+      <li><time datetime="2026-02-19">19 Februari 2026</time><span>Revert &quot;feat(editor): sticky toolbar via full-viewport fixed positioning&quot;</span></li>
+      <li><time datetime="2026-02-19">19 Februari 2026</time><b class="rw-jenis">Fitur</b><span>sticky toolbar via full-viewport fixed positioning</span></li>
+      <li><time datetime="2026-02-19">19 Februari 2026</time><b class="rw-jenis">Perbaikan</b><span>fix Ganti File not loading replacement files</span></li>
+      <li><time datetime="2026-02-19">19 Februari 2026</time><b class="rw-jenis">Fitur</b><span>replace header with File dropdown menu and dynamic width</span></li>
+      <li><time datetime="2026-02-19">19 Februari 2026</time><b class="rw-jenis">Catatan</b><span>add context comments for window.* calls and typeof patterns</span></li>
+      <li><time datetime="2026-02-19">19 Februari 2026</time><b class="rw-jenis">Rapi-rapi</b><span>migrate app.js to ES modules with single entry point (Phase 5)</span></li>
+      <li><time datetime="2026-02-19">19 Februari 2026</time><b class="rw-jenis">Rapi-rapi</b><span>split unified-editor.js into 14 focused ES modules (Phase 4)</span></li>
+      <li><time datetime="2026-02-19">19 Februari 2026</time><b class="rw-jenis">Rapi-rapi</b><span>split pdf-tools.js into 7 focused ES modules (Phase 3)</span></li>
+      <li><time datetime="2026-02-19">19 Februari 2026</time><b class="rw-jenis">Rapi-rapi</b><span>convert changelog, theme, image-tools to ES modules (Phase 2)</span></li>
+      <li><time datetime="2026-02-19">19 Februari 2026</time><b class="rw-jenis">Rapi-rapi</b><span>extract shared foundations to ES modules (Phase 0+1)</span></li>
+      <li><time datetime="2026-02-19">19 Februari 2026</time><b class="rw-jenis">Perbaikan</b><span>improve vertical screen real estate</span></li>
+      <li><time datetime="2026-02-19">19 Februari 2026</time><b class="rw-jenis">Fitur</b><span>continuous vertical scroll with multi-canvas architecture</span></li>
+      <li><time datetime="2026-02-19">19 Februari 2026</time><b class="rw-jenis">Rapi-rapi</b><span>extract canvas utilities and DRY font map (Phase 1)</span></li>
+      <li><time datetime="2026-02-19">19 Februari 2026</time><span>Dedup helpers and add codebase documentation for safe future editing</span></li>
+      <li><time datetime="2026-01-20">20 Januari 2026</time><span>support mobile double-click (e.g. for text and signature) (#34)</span></li>
+      <li><time datetime="2026-01-18">18 Januari 2026</time><span>Add security headers, CSP, and privacy policy</span></li>
+      <li><time datetime="2026-01-18">18 Januari 2026</time><span>Add offline mode documentation and changelog entry</span></li>
+      <li><time datetime="2026-01-18">18 Januari 2026</time><span>Fix PDF.js offline worker loading</span></li>
+      <li><time datetime="2026-01-18">18 Januari 2026</time><span>Self-host core libraries for offline support</span></li>
+      <li><time datetime="2026-01-16">16 Januari 2026</time><span>Update logo images for SEO and sharability</span></li>
+      <li><time datetime="2026-01-12">12 Januari 2026</time><span>Add dark mode</span></li>
+      <li><time datetime="2026-01-12">12 Januari 2026</time><span>Add clickable GitHub link to @hamdi1611 in changelog</span></li>
+      <li><time datetime="2026-01-12">12 Januari 2026</time><span>Update changelog with real user-facing improvements (Jan 4-12)</span></li>
+      <li><time datetime="2026-01-12">12 Januari 2026</time><span>Fix: only show badge for new content, never auto-expand</span></li>
+      <li><time datetime="2026-01-12">12 Januari 2026</time><span>Fix: badge stays hidden after user closes it</span></li>
+      <li><time datetime="2026-01-12">12 Januari 2026</time><span>Implement smart changelog display based on content updates</span></li>
+      <li><time datetime="2026-01-12">12 Januari 2026</time><span>Hide changelog badge when leaving home-view</span></li>
+      <li><time datetime="2026-01-12">12 Januari 2026</time><span>Improve changelog badge: use red checkmark icon</span></li>
+      <li><time datetime="2026-01-12">12 Januari 2026</time><span>Fix: prevent locked signature toast spam</span></li>
+      <li><time datetime="2026-01-12">12 Januari 2026</time><span>Optimize PDF download: skip re-encoding for unmodified PDFs</span></li>
+      <li><time datetime="2026-01-12">12 Januari 2026</time><span>Optimize PDF file size: add compression and signature image optimization</span></li>
+      <li><time datetime="2026-01-12">12 Januari 2026</time><span>Fix signature upload bug: resolve modal transition and history issues</span></li>
+      <li><time datetime="2026-01-12">12 Januari 2026</time><span>Fix signature background removal modal not opening</span></li>
+      <li><time datetime="2026-01-12">12 Januari 2026</time><span>Add more debug logging to trace modal visibility issue</span></li>
+      <li><time datetime="2026-01-11">11 Januari 2026</time><span>Add debug logging to trace signature upload issue</span></li>
+      <li><time datetime="2026-01-11">11 Januari 2026</time><span>Fix signature upload bug caused by DOMContentLoaded race condition</span></li>
+      <li><time datetime="2026-01-11">11 Januari 2026</time><b class="rw-jenis">Catatan</b><span>Update README with recent improvements and architecture</span></li>
+      <li><time datetime="2026-01-11">11 Januari 2026</time><b class="rw-jenis">Fitur</b><span>Improve signature UX with unlock and delete features</span></li>
+      <li><time datetime="2026-01-11">11 Januari 2026</time><span>Refactor changelog system: smooth notification with better UX</span></li>
+      <li><time datetime="2026-01-11">11 Januari 2026</time><span>Add debug logging for signature upload (temporary)</span></li>
+      <li><time datetime="2026-01-11">11 Januari 2026</time><span>Further split app.js: Extract Image Tools and PDF Tools + Organize into js/ folder</span></li>
+      <li><time datetime="2026-01-11">11 Januari 2026</time><span>Split app.js: Extract Unified Editor to separate file</span></li>
+      <li><time datetime="2026-01-11">11 Januari 2026</time><span>Add changelog popup notification system</span></li>
+      <li><time datetime="2026-01-11">11 Januari 2026</time><span>Fix standard font names to match pdf-lib StandardFonts enum</span></li>
+      <li><time datetime="2026-01-11">11 Januari 2026</time><span>Fix font undefined error in PDF export</span></li>
+      <li><time datetime="2026-01-11">11 Januari 2026</time><span>Fix renderEditPage null canvas error in Unified Editor</span></li>
+      <li><time datetime="2026-01-11">11 Januari 2026</time><span>Fix signature modal bug and reduce console logging</span></li>
+      <li><time datetime="2026-01-11">11 Januari 2026</time><span>Fix font rendering in editor and add debug logging</span></li>
+      <li><time datetime="2026-01-11">11 Januari 2026</time><span>Self-host fonts for offline support and restricted networks</span></li>
+      <li><time datetime="2026-01-08">8 Januari 2026</time><span>Update README.md</span></li>
+      <li><time datetime="2026-01-08">8 Januari 2026</time><span>Delete Emojis on Readme</span></li>
+      <li><time datetime="2026-01-08">8 Januari 2026</time><span>Update Readme</span></li>
+      <li><time datetime="2026-01-08">8 Januari 2026</time><span>Update LICENSE</span></li>
+      <li><time datetime="2026-01-08">8 Januari 2026</time><span>Update LICENSE</span></li>
+      <li><time datetime="2026-01-07">7 Januari 2026</time><span>edit margin and alignment</span></li>
+      <li><time datetime="2026-01-07">7 Januari 2026</time><span>edit dukung.html</span></li>
+      <li><time datetime="2026-01-05">5 Januari 2026</time><span>Update app.js</span></li>
+      <li><time datetime="2026-01-05">5 Januari 2026</time><span>Fix PDF password protection with encryption library</span></li>
+      <li><time datetime="2026-01-05">5 Januari 2026</time><span>loading screen and file output name</span></li>
+      <li><time datetime="2026-01-04">4 Januari 2026</time><span>Add features on the text Tools</span></li>
+      <li><time datetime="2026-01-04">4 Januari 2026</time><span>Remove .claude directory and CLAUDE.md from repository</span></li>
+      <li><time datetime="2026-01-04">4 Januari 2026</time><span>Update app.js</span></li>
+      <li><time datetime="2026-01-04">4 Januari 2026</time><span>Revert &quot;Delete .claude directory&quot;</span></li>
+      <li><time datetime="2026-01-04">4 Januari 2026</time><span>Revert &quot;Delete CLAUDE.md&quot;</span></li>
+      <li><time datetime="2026-01-04">4 Januari 2026</time><span>Update app.js</span></li>
+      <li><time datetime="2026-01-04">4 Januari 2026</time><span>Delete .claude directory</span></li>
+      <li><time datetime="2026-01-04">4 Januari 2026</time><span>Delete CLAUDE.md</span></li>
+      <li><time datetime="2026-01-04">4 Januari 2026</time><span>add .gitignore to keep claude files local</span></li>
+      <li><time datetime="2026-01-04">4 Januari 2026</time><span>Create settings.local.json</span></li>
+      <li><time datetime="2026-01-04">4 Januari 2026</time><span>Update app.js</span></li>
+      <li><time datetime="2026-01-04">4 Januari 2026</time><span>Update app.js</span></li>
+      <li><time datetime="2026-01-04">4 Januari 2026</time><span>Update app.js</span></li>
+      <li><time datetime="2026-01-04">4 Januari 2026</time><span>Update app.js</span></li>
+      <li><time datetime="2026-01-04">4 Januari 2026</time><span>Polishing</span></li>
+      <li><time datetime="2025-12-31">31 Desember 2025</time><span>Add files via upload</span></li>
+      <li><time datetime="2025-12-31">31 Desember 2025</time><span>Rename Logo.png to logo.png</span></li>
+      <li><time datetime="2025-12-31">31 Desember 2025</time><span>Add files via upload</span></li>
+      <li><time datetime="2025-12-30">30 Desember 2025</time><span>Add files via upload</span></li>
+      <li><time datetime="2025-12-30">30 Desember 2025</time><span>Add files via upload</span></li>
+      <li><time datetime="2025-12-28">28 Desember 2025</time><span>Delete CLAUDE.md</span></li>
+      <li><time datetime="2025-12-28">28 Desember 2025</time><span>Add files via upload</span></li>
+      <li><time datetime="2025-12-27">27 Desember 2025</time><span>Add files via upload</span></li>
+      <li><time datetime="2025-12-27">27 Desember 2025</time><span>Ojanlubis mobile branch (#27)</span></li>
+      <li><time datetime="2025-12-27">27 Desember 2025</time><span>Add files via upload (#26)</span></li>
+      <li><time datetime="2025-12-27">27 Desember 2025</time><span>Add files via upload</span></li>
+      <li><time datetime="2025-12-27">27 Desember 2025</time><span>Add files via upload</span></li>
+      <li><time datetime="2025-12-27">27 Desember 2025</time><span>Add files via upload</span></li>
+      <li><time datetime="2025-12-27">27 Desember 2025</time><span>Add files via upload</span></li>
+      <li><time datetime="2025-12-27">27 Desember 2025</time><span>Add files via upload</span></li>
+      <li><time datetime="2025-12-27">27 Desember 2025</time><span>Add files via upload</span></li>
+      <li><time datetime="2025-12-26">26 Desember 2025</time><span>Delete CLAUDE.MD (#25)</span></li>
+      <li><time datetime="2025-12-26">26 Desember 2025</time><span>Add files via upload</span></li>
+      <li><time datetime="2025-12-26">26 Desember 2025</time><span>Add files via upload</span></li>
+      <li><time datetime="2025-12-26">26 Desember 2025</time><span>Polish unified editor features and UX improvements</span></li>
+      <li><time datetime="2025-12-26">26 Desember 2025</time><span>Update CLAUDE.MD with current features and architecture</span></li>
+      <li><time datetime="2025-12-26">26 Desember 2025</time><span>Add files via upload</span></li>
+      <li><time datetime="2025-12-26">26 Desember 2025</time><span>Add files via upload</span></li>
+      <li><time datetime="2025-12-26">26 Desember 2025</time><span>Fix editor container size constraints</span></li>
+      <li><time datetime="2025-12-26">26 Desember 2025</time><span>Update style.css</span></li>
+      <li><time datetime="2025-12-26">26 Desember 2025</time><span>Update style.css</span></li>
+      <li><time datetime="2025-12-26">26 Desember 2025</time><span>Add width-based canvas scaling with zoom controls</span></li>
+      <li><time datetime="2025-12-26">26 Desember 2025</time><span>Fix layout containment while keeping canvas wrapper flexible</span></li>
+      <li><time datetime="2025-12-26">26 Desember 2025</time><span>Fix PDF wrapper vertical height adaptation</span></li>
+      <li><time datetime="2025-12-26">26 Desember 2025</time><span>Fix unified editor canvas size - maximize PDF display area</span></li>
+      <li><time datetime="2025-12-26">26 Desember 2025</time><span>Remove max-height/max-width constraints from canvas element</span></li>
+      <li><time datetime="2025-12-26">26 Desember 2025</time><span>Fix desktop canvas sizing with viewport fallback</span></li>
+      <li><time datetime="2025-12-26">26 Desember 2025</time><span>Fix PDF canvas sizing - proper flex layout and dimension calculation</span></li>
+      <li><time datetime="2025-12-26">26 Desember 2025</time><span>Fix PDF editor canvas layout and add collapsible sidebar</span></li>
+      <li><time datetime="2025-12-26">26 Desember 2025</time><span>Maximize unified editor space - reduce padding, wider sidebar (280px), tighter layout</span></li>
+      <li><time datetime="2025-12-26">26 Desember 2025</time><span>Enlarge unified editor layout - wider sidebar, larger thumbnails, more PPT-like feel</span></li>
+      <li><time datetime="2025-12-26">26 Desember 2025</time><span>Fix unified editor layout - use flex column for proper action-bar positioning</span></li>
+      <li><time datetime="2025-12-26">26 Desember 2025</time><span>Fix unified editor layout height to prevent action-bar overlap</span></li>
+      <li><time datetime="2025-12-25">25 Desember 2025</time><span>Add unified editor workspace combining page manager and PDF editor</span></li>
+      <li><time datetime="2025-12-25">25 Desember 2025</time><span>Fix signature not displaying visually in PDF editor</span></li>
+      <li><time datetime="2025-12-25">25 Desember 2025</time><span>Delete SIGNATURE_BUG_DIAGNOSIS.md</span></li>
+      <li><time datetime="2025-12-25">25 Desember 2025</time><span>Add comprehensive diagnosis of signature placement bug</span></li>
+      <li><time datetime="2025-12-25">25 Desember 2025</time><span>Fix signature placement not working after drawing/uploading</span></li>
+      <li><time datetime="2025-12-25">25 Desember 2025</time><span>Add 'Upload Gambar' option to PDF editor signature tool</span></li>
+      <li><time datetime="2025-12-25">25 Desember 2025</time><span>Add comprehensive CLAUDE.MD documentation for AI assistance</span></li>
+      <li><time datetime="2025-12-25">25 Desember 2025</time><span>Add 'Hapus Latar Belakang' (Remove Background) image tool</span></li>
+      <li><time datetime="2025-12-23">23 Desember 2025</time><span>Update README.md</span></li>
+      <li><time datetime="2025-12-23">23 Desember 2025</time><span>Delete CNAME</span></li>
+      <li><time datetime="2025-12-23">23 Desember 2025</time><span>Create CNAME</span></li>
+      <li><time datetime="2025-12-23">23 Desember 2025</time><span>Update dukung.html</span></li>
+      <li><time datetime="2025-12-23">23 Desember 2025</time><span>Update README.md</span></li>
+      <li><time datetime="2025-12-23">23 Desember 2025</time><span>Update README.md</span></li>
+      <li><time datetime="2025-12-23">23 Desember 2025</time><span>Update README with new links and information</span></li>
+      <li><time datetime="2025-12-23">23 Desember 2025</time><span>Enable Vercel Web Analytics in your project</span></li>
+      <li><time datetime="2025-12-21">21 Desember 2025</time><span>Update donation page from QRIS to bank transfer</span></li>
+      <li><time datetime="2025-12-21">21 Desember 2025</time><span>Update index.html</span></li>
+      <li><time datetime="2025-12-21">21 Desember 2025</time><span>Update index.html</span></li>
+      <li><time datetime="2025-12-21">21 Desember 2025</time><span>Add watermark, page numbering, and drop hints to PDF tools</span></li>
+      <li><time datetime="2025-12-21">21 Desember 2025</time><span>Add undo/redo to Page Manager and improve filename output format</span></li>
+      <li><time datetime="2025-12-20">20 Desember 2025</time><span>Fix drag flipping bug in PDF editor</span></li>
+      <li><time datetime="2025-12-20">20 Desember 2025</time><span>Completely redesign PDF editor with major improvements</span></li>
+      <li><time datetime="2025-12-20">20 Desember 2025</time><span>Add drag-and-drop visual indicator and edge placement</span></li>
+      <li><time datetime="2025-12-20">20 Desember 2025</time><span>Optimize Page Manager to avoid re-rendering on every action</span></li>
+      <li><time datetime="2025-12-20">20 Desember 2025</time><span>Fix bug: route dropped PDFs to Page Manager instead of removed tools</span></li>
+      <li><time datetime="2025-12-20">20 Desember 2025</time><span>Add unified Page Manager to consolidate 4 tools into 1</span></li>
+      <li><time datetime="2025-12-20">20 Desember 2025</time><span>Fix multiple bugs in PDFLokal application</span></li>
+      <li><time datetime="2025-12-20">20 Desember 2025</time><span>Add files via upload</span></li>
+      <li><time datetime="2025-12-20">20 Desember 2025</time><span>Delete files.zip</span></li>
+      <li><time datetime="2025-12-20">20 Desember 2025</time><span>Add files via upload</span></li>
+      <li><time datetime="2025-12-20">20 Desember 2025</time><span>Initial commit</span></li>
+      </ol>
+      <!-- riwayat:end -->
+  </dialog>
+
+  <script type="module">
+    // Native <dialog>: Esc and the backdrop-click come from the platform, so
+    // the only thing to wire is open, close, and dismissing on a backdrop tap
+    // (which the platform does NOT give you for free).
+    const d = document.getElementById('rw-drawer');
+    document.getElementById('rw-buka').addEventListener('click', () => d.showModal());
+    document.getElementById('rw-tutup').addEventListener('click', () => d.close());
+    d.addEventListener('click', (e) => { if (e.target === d) d.close(); });
+  </script>
 
   <!-- Theme management -->
   <script type="module" src="js/theme.js"></script>

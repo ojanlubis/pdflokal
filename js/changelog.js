@@ -84,27 +84,27 @@ const changelogData = [
   },
   {
     title: "Tetap Berfungsi di Restricted Networks",
-    description: "PDFLokal sekarang bisa diakses di kantor/sekolah yang besar firewallnya! Semua font sudah tersedia offline. Privasi kamu lebih terjaga.",
+    description: "PDFLokal sekarang bisa diakses di kantor/sekolah yang besar firewallnya! Semua font sudah tersedia offline.",
     date: "11 Januari 2026"
   },
   {
     title: "Editor PDF Lebih Stabil",
-    description: "Tidak ada lagi error saat export PDF atau pindah halaman. Saya perbaiki bug yang bikin aplikasi crash. Sekarang lebih lancar!",
+    description: "Tidak ada lagi error saat export PDF atau pindah halaman.",
     date: "11 Januari 2026"
   },
   {
     title: "Kunci PDF dengan Password Diperbaiki",
-    description: "Fitur proteksi PDF dengan password sekarang bekerja dengan sempurna. File kamu lebih aman!",
+    description: "Fitur proteksi PDF dengan password sekarang bekerja.",
     date: "5 Januari 2026"
   },
   {
     title: "Loading yang Lebih Jelas & Nama File Otomatis",
-    description: "Sekarang ada indikator loading saat proses file besar, jadi kamu tahu aplikasi sedang bekerja. Nama file hasil download otomatis mengikuti file asli.",
+    description: "Sekarang ada indikator loading saat proses file besar. Nama file hasil download otomatis mengikuti file asli.",
     date: "5 Januari 2026"
   },
   {
     title: "Edit Teks Langsung di Canvas",
-    description: "Sekarang kamu bisa resize teks, edit langsung (klik 2x), dan tekan Enter untuk langsung submit. Lebih cepat!",
+    description: "Sekarang kamu bisa resize teks, edit langsung (klik 2x), dan tekan Enter untuk langsung submit.",
     date: "4 Januari 2026"
   }
 ];
