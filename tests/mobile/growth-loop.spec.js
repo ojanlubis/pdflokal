@@ -67,7 +67,11 @@ test.describe('growth loop — mobile', () => {
     await downloadOnce(page);
     await expect(page.locator('#support-card')).toBeVisible({ timeout: 4000 });
     await page.tap('#sc-donate');
-    await expect(page.locator('.sc-qr img[src*="qris"]')).toBeVisible();
+    // The CODE, not the QRIS wordmark above it. `img[src*="qris"]` used to be
+    // unique here and stopped being so the day the QRIS logo was added beside
+    // it (2026-08-28) — two matches, strict-mode violation, and the test went
+    // red without the behaviour changing at all. Assert the payable artifact.
+    await expect(page.locator('.sc-qr img[src$="qris.png"]')).toBeVisible();
     expect(new URL(page.url()).pathname).toBe('/'); // still in the editor, no navigation
   });
 

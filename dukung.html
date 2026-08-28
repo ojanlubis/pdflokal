@@ -87,6 +87,14 @@
       text-align: left;
     }
 
+    /* The hat sits ON his head (his ruling 2026-08-28), so the photo needs a
+       positioning context and room above it for the brim. */
+    .performer-kepala {
+      position: relative;
+      flex: none;
+      padding-top: 14px;
+    }
+
     .performer-face {
       width: 64px;
       height: 64px;
@@ -95,7 +103,17 @@
       /* A ring, not a shadow: on two different grounds a shadow reads as a
          smudge in dark mode. */
       border: 2px solid var(--line);
-      flex: none;
+      display: block;
+    }
+
+    .performer-topi {
+      position: absolute;
+      top: -6px;
+      left: 50%;
+      transform: translateX(-50%) rotate(-12deg);
+      font-size: 1.75rem;
+      line-height: 1;
+      pointer-events: none;
     }
 
     .performer-name {
@@ -122,17 +140,6 @@
       line-height: 1.6;
     }
 
-    /* The hat itself. Sized so it reads as an object above the card rather
-       than as punctuation in a sentence. */
-    .hat {
-      font-size: 2.5rem;
-      line-height: 1;
-      margin-bottom: calc(var(--sp-8) * -1);
-      /* Sits ON the card's top edge — the QR is what's inside the hat. */
-      position: relative;
-      z-index: 1;
-    }
-
     /* ⚠️ THIS CARD IS WHITE IN BOTH THEMES, ON PURPOSE. A QR code has to keep
        its quiet zone and its contrast to stay scannable, so the ground here is
        a hard `white` rather than a token — this is the one place on these two
@@ -148,6 +155,20 @@
       border: 1px solid var(--line);
       max-width: 320px;
       margin: 0 auto;
+    }
+
+    /* The QRIS mark, above every QR code in the product. It is what a payer
+       looks for to know the code is the national standard and their own wallet
+       will read it. Self-hosted like every other asset here, never a CDN. */
+    .qris-logo {
+      display: block;
+      /* The official lockup includes "QR Code Standar Pembayaran Nasional".
+         Measured: the tagline stops being legible below ~150px, so this is a
+         floor, not a preference. The wordmark ALONE was tried first and he
+         refused it — on its own the brackets read as a glitch, not a mark. */
+      width: 180px;
+      height: auto;
+      margin: 0 auto var(--sp-16);
     }
 
     .qr-image {
@@ -456,11 +477,14 @@
       <!-- Traktir Kopi Section — the hat. See .performer / .hat in the style
            block for why the person sits outside the white card. -->
       <div class="donate-section">
-        <h2>Traktir Kopi 🎩</h2>
+        <h2>Traktir Kopi</h2>
 
         <div class="performer">
           <div class="performer-id">
-            <img src="images/ojan.jpg" alt="Foto Fauzan Ahladzikri (Ojan)" class="performer-face" width="64" height="64">
+            <div class="performer-kepala">
+              <span class="performer-topi" aria-hidden="true">🎩</span>
+              <img src="images/ojan.jpg" alt="Foto Fauzan Ahladzikri (Ojan)" class="performer-face" width="64" height="64">
+            </div>
             <div>
               <div class="performer-name">Ojan</div>
               <div class="performer-real">Fauzan Ahladzikri</div>
@@ -468,13 +492,12 @@
           </div>
           <p class="performer-line">
             Makasih udah mampir. Kalau tadi PDFLokal beneran ngebantu kamu,
-            topi saya ada di bawah, seikhlasnya aja.
+            seikhlasnya aja.
           </p>
         </div>
 
-        <div class="hat" aria-hidden="true">🎩</div>
-
         <div class="qr-card">
+          <img src="images/qris-logo.svg" alt="QRIS" class="qris-logo" width="180" height="29">
           <img src="images/qris.png" alt="QRIS - Scan untuk traktir kopi" class="qr-image">
           <p class="qr-caption">Scan pakai aplikasi e-wallet atau mobile banking kamu</p>
         </div>
@@ -609,7 +632,7 @@
            No totals here, and no time of day, both on his ruling. See the
            script header. -->
       <ol class="rw-log" tabindex="0" aria-label="Daftar semua perubahan PDFLokal, dari yang paling baru">
-      <li><time datetime="2026-08-28">28 Agustus 2026</time><span>the product speaks as one person now: his face, his name, saya not kami</span></li>
+      <li><time datetime="2026-08-28">28 Agustus 2026</time><span>Development PDFLokal: the work log as a drawer, and 26 cuts of copy doing no job</span></li>
       <li><time datetime="2026-08-26">26 Agustus 2026</time><b class="rw-jenis">Catatan</b><span>the Ganti commit/doc-font race, and why three fixes were rejected</span></li>
       <li><time datetime="2026-08-26">26 Agustus 2026</time><b class="rw-jenis">Perbaikan</b><span>a re-edit is tappable where it PAINTS, not only where it was born</span></li>
       <li><time datetime="2026-08-26">26 Agustus 2026</time><b class="rw-jenis">Catatan</b><span>a RED gate in the cloud container is not a claim about main</span></li>

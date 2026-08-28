@@ -67,6 +67,21 @@ const JENIS = {
   rail: 'Teknis',
 };
 
+/* ---- ENTRIES HE STRUCK ----
+   This log is generated from git, so an entry cannot be deleted by editing the
+   page: the next `npm run riwayat` would put it straight back. A subject listed
+   here is hidden from the PUBLIC log only. Nothing is rewritten in git, and the
+   commit stays reachable on GitHub, which the page links to.
+   Add to this list ONLY when Fauzan strikes a specific line. Do not use it to
+   tidy the log — the volume is the whole argument, and quietly pruning it is
+   the one thing this element cannot do honestly. */
+const DISEMBUNYIKAN = [
+  // Struck 2026-08-28. Self-referential: a commit about putting his own face
+  // and name on the site, reading back to a stranger as a line about "his face,
+  // his name".
+  'the product speaks as one person now: his face, his name, saya not kami',
+];
+
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;')
   .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
@@ -78,7 +93,8 @@ const commits = execFileSync('git',
   .map((l) => {
     const i = l.indexOf('\t');
     return { tanggal: l.slice(0, i), subject: l.slice(i + 1) };
-  });
+  })
+  .filter((c) => !DISEMBUNYIKAN.includes(c.subject));
 
 const tanggalPanjang = (iso) => {
   const [y, m, d] = iso.split('-');

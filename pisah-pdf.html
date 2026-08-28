@@ -1329,11 +1329,22 @@
        after the user taps "Traktir kopi". So it converts an existing moment
        rather than adding a sixth thing to the first screen. His ruling
        2026-08-22: the face, the name and a channel travel together. */
-    .sc-performer { display: flex; align-items: center; gap: 10px; text-align: left; padding-bottom: 10px; }
-    .sc-performer img.sc-face { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 1px solid var(--line); flex: none; }
-    .sc-performer b { display: block; font-size: 13px; color: var(--ink); line-height: 1.25; }
+    /* Bottom-centred, under the code, with the hat ON his head — his ruling
+       2026-08-28. It was a left-aligned row above the QR with the hat floating
+       off to the right, which read as two unrelated things sharing a line. */
+    .sc-performer { text-align: center; padding-top: 12px; }
+    .sc-performer .sc-kepala { position: relative; display: inline-block; padding-top: 12px; }
+    .sc-performer img.sc-face { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; border: 1px solid var(--line); display: block; }
+    .sc-hat {
+      /* At 44px the brim has to overlap the crown or it reads as floating. */
+      position: absolute; top: 2px; left: 50%;
+      transform: translateX(-50%) rotate(-12deg);
+      font-size: 20px; line-height: 1; pointer-events: none;
+    }
+    .sc-performer b { display: block; font-size: 13px; color: var(--ink); line-height: 1.25; margin-top: 6px; }
     .sc-performer span { display: block; font-size: 11.5px; color: var(--muted); }
-    .sc-hat { margin-left: auto; font-size: 22px; line-height: 1; }
+    /* The QRIS mark, above every QR code in the product. Self-hosted. */
+    .sc-qr .sc-qris-logo { display: block; width: 150px; height: auto; margin: 0 auto 10px; }
     #sc-never, #ic-never {
       display: block; margin: 8px auto 0; color: var(--muted); font-size: 11px;
       text-decoration: underline; min-height: 32px; padding: 0 8px;
@@ -1942,16 +1953,17 @@
       </button>
     </div>
     <div class="sc-qr">
-      <div class="sc-performer">
-        <img src="images/ojan.jpg" alt="Foto Ojan" class="sc-face" width="40" height="40" loading="lazy">
-        <div>
-          <b>Ojan</b>
-          <span>Fauzan Ahladzikri</span>
-        </div>
-        <div class="sc-hat" aria-hidden="true">🎩</div>
-      </div>
+      <img src="images/qris-logo.svg" alt="QRIS" class="sc-qris-logo" width="150" height="24" loading="lazy">
       <img src="images/qris.png" alt="QRIS untuk traktir kopi" loading="lazy">
       <p>Scan pakai e-wallet atau m-banking kamu.</p>
+      <div class="sc-performer">
+        <div class="sc-kepala">
+          <span class="sc-hat" aria-hidden="true">🎩</span>
+          <img src="images/ojan.jpg" alt="Foto Ojan" class="sc-face" width="44" height="44" loading="lazy">
+        </div>
+        <b>Ojan</b>
+        <span>Fauzan Ahladzikri</span>
+      </div>
     </div>
     <button id="sc-never">jangan tampilkan lagi</button>
   </div>
