@@ -226,7 +226,7 @@ function selfTest() {
 // why a slow run is a signal in its own right.
 const TIMINGS = {};
 
-function stage(name, cmd, args) {
+function stage(name, cmd, args, { env = process.env } = {}) {
   console.log(`\n=== ${name} ===`);
   const t0 = Date.now();
   return new Promise((resolve) => {
@@ -235,7 +235,7 @@ function stage(name, cmd, args) {
       console.log(`${name}: exit ${code} (${TIMINGS[name].toFixed(1)}s)`);
       resolve(code);
     };
-    const child = spawn(cmd, args, { cwd: REPO, stdio: 'inherit', shell: false });
+    const child = spawn(cmd, args, { cwd: REPO, stdio: 'inherit', shell: false, env });
     child.on('close', (code) => done(code ?? 1));
     child.on('error', (err) => {
       console.error(`${name}: failed to launch — ${err.message}`);
@@ -392,7 +392,14 @@ async function main() {
   // was left stale. Three gate runs passed over that tree.
   const seo = await stage('SEO', 'npm', ['run', 'seo:check']);
   const core = await stage('CORE', 'npm', ['run', 'test:core']);
-  const pw = await stage('PLAYWRIGHT', 'npx', ['playwright', 'test']);
+  // The authoritative sweep must own the server it judges. Reusing an
+  // unrelated process makes the first half of the suite depend on somebody
+  // else's lifecycle: when that owner exits, every remaining page.goto()
+  // becomes ERR_CONNECTION_REFUSED. Targeted local runs may still reuse a
+  // developer server; only the gate closes this escape hatch.
+  const pw = await stage('PLAYWRIGHT', 'npx', ['playwright', 'test'], {
+    env: { ...process.env, PDFLOKAL_GATE_OWNS_SERVER: '1' },
+  });
 
   const { states, last } = watcher.stop();
   const total = Object.values(TIMINGS).reduce((a, b) => a + b, 0);
