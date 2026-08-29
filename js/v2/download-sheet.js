@@ -14,13 +14,13 @@
  * most people tap, the bytes are ready: the sheet is a perf win in disguise.
  */
 
-import { buildPdfBytes } from '../core/export.js';
 import { ensurePdfJs, ensurePdfLib, ensureFflate } from '../core/vendor.js';
 import { track } from '../lib/analytics.js';
 import { tel } from './telemetry.js';
 import { failureReason } from '../core/failure-reason.js';
 import { durationBucket } from '../core/telemetry-schema.js';
 import { showStamp } from './celebrate.js';
+import { buildPdfArtifact } from './pdf-builder.js';
 
 // WHAT TO SAY WHEN IT FAILS, AND WHEN NOT TO SAY "TRY AGAIN".
 // Founder ruling via PM, 2026-07-29: advice that cannot work is worse than no
@@ -150,18 +150,12 @@ export function createDownloadSheet(deps) {
     try {
       const doc = deps.getDoc();
       const subset = { sources: doc.sources, pages: selectedPages(), selection: { pageId: null, annotationId: null } };
-      // pdf-lib + fontkit are export-only, so they're fetched here rather than at
-      // page load. Opening the sheet is what signals the intent to download.
-      const { PDFLib, fontkit } = await ensurePdfLib();
       // A failed font fetch mid-build silently substitutes Helvetica in the
       // FILE (core/export.js's cacheFallbackFont) — the one witness is this
       // callback. Collected on a local so a superseded build can never flag
       // the current one; surfaced at the CTA (doExport), the moment the user
       // actually takes the bytes, not here (the build may still be discarded).
-      let fontFallback = false;
-      const bytes = await buildPdfBytes(subset, {
-        PDFLib, fontkit, onFontFallback: () => { fontFallback = true; },
-      });
+      const { bytes, fontFallback } = await buildPdfArtifact(subset);
       if (seq !== state.seq) return; // selection changed mid-build
       state.base = { bytes, size: bytes.length, fontFallback };
     } catch (err) {

@@ -1922,19 +1922,13 @@ const pageManager = createPageManager({
     // Export ONLY the selected pages: a shallow Doc sharing the same sources.
     try {
       toast('Sebentar, lagi disiapkan');
-      const [{ buildPdfBytes }, { PDFLib, fontkit }] = await Promise.all([
-        import('../core/export.js'),
-        ensurePdfLib(), // pdf-lib + fontkit: export-only, fetched at the moment of intent
-      ]);
+      const { buildPdfArtifact } = await import('./pdf-builder.js');
       const subset = { sources: doc.sources, pages, selection: { pageId: null, annotationId: null } };
       // Same font-fallback witness the Unduh sheet carries (download-sheet.js,
       // audit finding 2): a failed font fetch substitutes Helvetica in the
       // kept file, and the user must hear about it — the warn toast outranks
       // the success one (same "skips take priority" law as the load loop).
-      let fontFallback = false;
-      const bytes = await buildPdfBytes(subset, {
-        PDFLib, fontkit, onFontFallback: () => { fontFallback = true; },
-      });
+      const { bytes, fontFallback } = await buildPdfArtifact(subset);
       download(new Blob([bytes], { type: 'application/pdf' }), `${baseName}-halaman-${pages.length}.pdf`);
       if (fontFallback) {
         // Ratified by Fauzan 2026-08-14 (PM STATE.md "RATIFIED 2026-08-14").
