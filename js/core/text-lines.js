@@ -34,7 +34,7 @@
 // Direction-agreement gate for the baseline pass: dot(unit_a, unit_b) >= this
 // is ~5° of tolerance between two baselines before we call them different
 // directions (e.g. horizontal text vs. a rotated stamp sharing a `p`).
-const DIRECTION_DOT_MIN = 0.996;
+export const DIRECTION_DOT_MIN = 0.996;
 
 // Perp-offset gate: a run joins a baseline group only if its `p` sits within
 // this fraction of the SMALLER of (run size, group's running min size) from
@@ -50,7 +50,7 @@ const DIRECTION_DOT_MIN = 0.996;
 // split into its own tiny Line instead of silently merging — see test 5,
 // updated to match (a stray tiny fragment is far less harmful than a heading
 // eating a whole paragraph).
-const PERP_TOLERANCE_FACTOR = 0.35;
+export const PERP_TOLERANCE_FACTOR = 0.35;
 
 // Column-guard gate for the along pass: a gap bigger than this multiple of
 // the larger neighboring font size reads as a column gutter, not a word
