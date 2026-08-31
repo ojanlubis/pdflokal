@@ -1,0 +1,90 @@
+# THE RAIL'S ALARM.
+#
+# traffic-floor.yml watches GA4. This watches the TELEMETRY RAIL, and they are
+# different instruments that die independently.
+#
+# The rail's failure mode is silence by design: api/t.js and api/feedback.js
+# answer 204 when they cannot reach the database, because feedback must never
+# degrade the editor. So a deploy that lands without DATABASE_URL, or a Neon
+# Free compute SUSPENDED for exhausting its 100 monthly CU-hours, drops every
+# event while the site stays perfectly healthy and GA4 keeps recording sessions.
+# Nothing goes red. Only VOLUME can see it.
+#
+# SETUP (one manual step, needs the founder):
+#   1. Create a READ-ONLY role on the Neon project (SQL editor, project
+#      lively-cloud-08397659). Do not reuse DATABASE_URL — that one can write:
+#
+#        CREATE ROLE rail_reader WITH LOGIN PASSWORD '<pick a strong one>';
+#        GRANT CONNECT ON DATABASE neondb TO rail_reader;
+#        GRANT USAGE ON SCHEMA public TO rail_reader;
+#        GRANT SELECT ON events TO rail_reader;
+#
+#      SELECT on `events` is all this alarm needs. Do not grant `feedback` —
+#      that table holds a user-authored note and image crops of their document.
+#
+#   2. Settings -> Secrets and variables -> Actions -> New repository secret
+#        name:  RAIL_READONLY_URL
+#        value: the connection string for that role
+#
+#   Without the secret this workflow fails loudly on its first run — which is
+#   the correct behaviour for a monitor, and is how you know it is armed. A
+#   monitor that quietly does nothing is the exact failure it exists to prevent.
+name: Rail floor
+
+on:
+  schedule:
+    # 02:30 UTC = 09:30 WIB — just after traffic-floor, so a morning that breaks
+    # both reads as one story rather than two unrelated pages.
+    - cron: '30 2 * * *'
+  workflow_dispatch: # so it can be run by hand during an incident
+
+jobs:
+  floor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      issues: write # to raise an issue when the floor breaks
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+
+      - name: Check the rail floor
+        env:
+          RAIL_READONLY_URL: ${{ secrets.RAIL_READONLY_URL }}
+        run: |
+          set -o pipefail
+          node scripts/rail-floor.mjs 2>&1 | tee rail.log
+
+      # Same reasoning as traffic-floor.yml: a failed scheduled run emails the
+      # owner, but email is easy to skim past. An issue sits there until someone
+      # closes it. Reuse ONE issue instead of opening a new one every morning of
+      # a multi-day outage — that is how an alarm becomes noise and gets muted.
+      - name: Raise the alarm
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          EXISTING=$(gh issue list --label rail-floor --state open --json number --jq '.[0].number' 2>/dev/null || true)
+          {
+            echo "The daily rail-floor check failed."
+            echo
+            echo '```'
+            cat rail.log 2>/dev/null || echo "(no log - the script itself failed to run)"
+            echo '```'
+            echo
+            echo "The SITE may be fine. Check GA4 first: if traffic is normal and this is red,"
+            echo "the INSTRUMENT died, not the product."
+            echo
+            echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          } > body.md
+
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --body-file body.md
+          else
+            gh label create rail-floor --color B60205 --description "Daily telemetry rail floor breach" 2>/dev/null || true
+            gh issue create --title "Rail floor breached" --label rail-floor --body-file body.md
+          fi
