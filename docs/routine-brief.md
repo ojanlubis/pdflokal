@@ -376,6 +376,53 @@ Once a run records `green`, later runs **skip this step and carry the value forw
 pushing a fix — a push runs the gate on its own tree, per §5.3.1. It is a full Playwright suite and
 it is not free.
 
+### 6.6 The watchmen — is anything actually WATCHING? (added 2026-08-31, and here is why)
+
+**Measured, not hypothesised.** On 2026-08-31 the seat found that `traffic-floor` — the daily GA4
+volume alarm, built precisely because pdflokal lost ~97% of its analytics for five days behind green
+dashboards — **had run 50 times and failed 50 times. It had never once succeeded, since the day it
+was created on 2026-07-13.** Not because traffic collapsed: because `GA4_SA_JSON` was never added as
+a repository secret, so every run died at the credential check having read nothing. Issue #120
+collected **49 daily comments** and stayed open. Seven weeks.
+
+> **A monitor that cannot RUN reads exactly like a monitor that found nothing wrong.** Green, silent
+> and never-started are indistinguishable from outside. **You are the only thing that looks at the
+> watchmen, so look.**
+
+**Check every SCHEDULED workflow, every run.** For each workflow in `.github/workflows/` that has a
+`schedule:` trigger, establish two things:
+
+1. **Did its most recent run fail?**
+2. **Has it EVER succeeded?** This is the one that matters, and the one nobody asks. A workflow with
+   zero successful runs in its whole history was never armed — it is decoration, not coverage.
+
+Use the GitHub tools you already have (`mcp__github__actions_list`, method `list_workflow_runs`, one
+workflow at a time). ⚠️ **Ask for a small `per_page`** — an unbounded listing has blown the tool-result
+size limit here before and had to be re-read from a dump file.
+
+**Verdict:**
+- latest run failed → **warn**, naming the workflow and the failure's first line.
+- **never succeeded at all → warn, and say plainly that it has NEVER been armed**, with the count
+  (`0 successes in N runs since <date>`). Do not soften this into "the last run failed".
+- all scheduled workflows have at least one success and a passing latest run → one clean line.
+
+⛔ **Do not try to fix it.** The fix is almost always **a repository secret**, which is a credential
+and therefore his hand — never the routine's, never the seat's. **Report it and stop.**
+
+**Known pending as of 2026-08-31, so you can report these as continuing rather than new** — say how
+long each has been outstanding, because the point is the accumulating debt, not the novelty:
+
+| workflow | secret it needs | pending since |
+|---|---|---|
+| `traffic-floor` | `GA4_SA_JSON` | **2026-07-13** |
+| `rail-floor` | `RAIL_READONLY_URL` | **2026-08-31** |
+
+`rail-floor` is the rail's own volume alarm, shipped 2026-08-31 for the same reason this section
+exists: `traffic-floor` watches GA4, and **GA4 and the rail die independently** — a deploy without
+`DATABASE_URL`, or a compute suspended on CU-hours, drops every event while the site works and GA4
+records sessions normally. Until its secret exists it is in exactly the state described above, and
+**you reporting that is the only thing standing between it and a second silent seven weeks.**
+
 ### 6.5 A RED gate here is not the same claim as a red gate on his machine
 
 **Measured 2026-08-26, and it cost most of a run to learn — do not re-derive it.** The cloud
@@ -502,7 +549,10 @@ Short prose, not a data dump. He reads it on a phone.
 4. **What broke** — blocked failures first, with the change against last run.
 5. **What you fixed** — what changed, the PR link, `git revert <sha> && git push`, and a screenshot
    when §5.2h applies. Or: what you found and chose not to fix, and why.
-6. **The boring line** — Neon quota, deploy match, audit. One line unless something crossed.
+6. **The boring line** — Neon quota, deploy match, audit, **and the watchmen (§6.6)**. One line
+   unless something crossed. ⚠️ **A scheduled alarm that has NEVER succeeded is not a boring line** —
+   promote it to item 4, say how long it has been unarmed, and name the secret it is waiting on. An
+   alarm nobody armed is a failure of the same kind as a rail nobody watched.
 
 **Report what you could NOT check as loudly as what you checked.** "No network, so the deploy match
 was skipped" is a finding. Silently omitting a check manufactures a green, and this project has been
