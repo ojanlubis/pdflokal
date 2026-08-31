@@ -118,11 +118,35 @@ function readBody(req, maxBytes) {
   });
 }
 
+// Basic per-IP rate limiting (bounded to one warm instance — resets on cold
+// start, but that's fine: its job is only to stop a scripted flood from
+// exhausting the database connection pool between deploys/idle-outs, not to
+// be a durable global limiter). Map is capped so a burst of distinct IPs
+// can't grow it unbounded on a long-lived warm instance.
+const RATE_LIMIT_WINDOW_MS = 60 * 1000;
+const RATE_LIMIT_MAX = 10;
+const rateLimitHits = new Map();
+
+function isRateLimited(ip) {
+  if (rateLimitHits.size > 5000) rateLimitHits.clear();
+  const now = Date.now();
+  const hit = rateLimitHits.get(ip);
+  if (!hit || now - hit.start > RATE_LIMIT_WINDOW_MS) {
+    rateLimitHits.set(ip, { start: now, count: 1 });
+    return false;
+  }
+  hit.count += 1;
+  return hit.count > RATE_LIMIT_MAX;
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).end();
     return;
   }
+
+  const ip = String(req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').split(',')[0].trim();
+  if (ip && isRateLimited(ip)) { res.status(429).end(); return; }
 
   try {
     const raw = await readBody(req, MAX_BODY_BYTES);
