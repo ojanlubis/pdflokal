@@ -20,18 +20,21 @@ jobs:
         with:
           filters: |
             runnable:
-              - 'index.html'
-              - 'editor-v2.html'
-              - 'lab.html'
-              - 'dukung.html'
-              - 'privasi.html'
-              - 'style.css'
+              - '*.html'
+              - '*.js'
+              - '*.css'
+              - '*.webmanifest'
               - 'vercel.json'
+              - 'css/**'
               - 'js/**'
               - 'api/**'
+              - 'seo/**'
+              - 'scripts/**'
               - 'tests/**'
+              - 'images/**'
               - 'fonts/**'
               - 'playwright.config.js'
+              - 'eslint.config.js'
               - 'package.json'
               - 'package-lock.json'
               - '.github/workflows/e2e.yml'
@@ -40,7 +43,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.runnable == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -48,6 +51,11 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      # Keep this order identical to scripts/qa-gate.mjs. A local green must
+      # make the same claim as CI, including the headless domain suite.
+      - run: npm run lint
+      - run: npm run seo:check
+      - run: npm run test:core
 
       - name: Cache Playwright browsers
         id: pw-cache

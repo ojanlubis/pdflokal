@@ -81,7 +81,10 @@ export default defineConfig({
     command: `npx serve -p ${PORT} --no-clipboard --no-port-switching .`,
     url: BASE_URL,
     timeout: 60_000,
-    reuseExistingServer: !process.env.CI,
+    // A targeted local run may intentionally share the developer's server.
+    // The gate is different: its verdict must bind to a server whose lifetime
+    // it owns, so qa-gate.mjs disables reuse through this explicit wire.
+    reuseExistingServer: !process.env.CI && !process.env.PDFLOKAL_GATE_OWNS_SERVER,
     stdout: 'ignore',
     stderr: 'pipe',
   },
