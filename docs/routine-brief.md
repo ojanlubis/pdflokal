@@ -389,6 +389,12 @@ machine: 386 passed in 7.5 minutes** (see 0f5af18). So:
   (the re-edit tap — `.v2-text-edit` never opens), `mobile/back-button.spec.js:48` (passes in
   isolation, fails in a full run). The cast **rotates between runs**, which is the tell that it is
   starvation and not a defect.
+- ⚠️ **CORRECTED 2026-08-31 — this is NOT specific to this container.** `mobile/back-button.spec.js:48`
+  failed **twice (original + retry) on a GitHub Actions runner** in `a4a52ce`'s run, then **passed on
+  the next two runs of the same code** (PR #129, and `901ce5a` on `main`). Same runner class, opposite
+  results. The diagnosis above holds — starvation, cast rotates — but its SCOPE was wrong: **any
+  2-vCPU runner shows it, CI included.** So a red CI run naming only specs from this list is the same
+  weak claim a red gate here is: **name the specs and re-run before reporting "main is broken".**
 - **Do not try to fix these by adding waits.** It was tried: a MutationObserver quiescence wait in
   `tests/helpers/lines.js` moved the failure rate not at all (2 in 3 before, 4 in 6 after) and was
   reverted. Worse, the flake rate of one identical spec swung between 20% and 67% across batches on
