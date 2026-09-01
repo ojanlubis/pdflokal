@@ -226,6 +226,40 @@ function applyZoom() {
   // focused-page sharpening block below for why that distinction is the point.
   scheduleSharpen();
 }
+// The zoom a freshly opened document lands on.
+//
+// WHY DESKTOP FITS THE WIDTH INSTEAD OF SITTING AT 1:1 (founder, 1 Sep 2026,
+// with a screenshot of an invoice arrowed "too far" on both sides): 1:1 means
+// an A4 is 595 CSS px, so on a 1512px laptop the page is a stamp in a field of
+// grey and two thirds of the window is wasted. The old expression was
+// `Math.min(1, fit)` — the cap only ever bit on desktop, where `fit` is
+// comfortably above 1, and it pinned every desktop session to the smallest
+// reading the formula could give. The user CAN zoom in, but the +/- pill is
+// bottom-right chrome a first-time Indonesian user does not go looking for, so
+// "they can zoom" is not an answer to "they never will".
+//
+// Mobile and tablet keep the cap exactly as it was. There the fit is BELOW 1
+// (a phone is narrower than an A4 point-for-point), so the cap is inert for the
+// common case and only guards the small-page one — a 200pt receipt blowing up
+// to 3x on a phone is not what anyone asked for, and he asked about desktop.
+//
+// The gutter is the margin he left room for, and it is 48px a side rather than
+// the 8 the old expression used because a vertical scrollbar (~15px) appears
+// the moment the page is taller than the window — which, fitted to width, it
+// now always is. Measuring clientWidth before that scrollbar exists and then
+// filling to the last pixel would hand every desktop user a horizontal
+// scrollbar on open.
+const OPENING_GUTTER_DESKTOP = 96; // 48 a side
+const OPENING_GUTTER_TOUCH = 16;
+function openingZoom(pageWidth) {
+  if (!(pageWidth > 0)) return 1;
+  const desktop = deviceClass() === 'desktop';
+  const gutter = desktop ? OPENING_GUTTER_DESKTOP : OPENING_GUTTER_TOUCH;
+  const fit = (scrollEl.clientWidth - gutter) / pageWidth;
+  // Same clamps the +/- buttons obey, so the opening view is always a zoom the
+  // user could have reached by hand.
+  return Math.max(0.3, Math.min(fit, desktop ? 3 : 1));
+}
 document.getElementById('z-in').onclick = () => { zoom = Math.min(zoom + 0.25, 3); applyZoom(); };
 document.getElementById('z-out').onclick = () => { zoom = Math.max(zoom - 0.25, 0.3); applyZoom(); };
 
@@ -2715,7 +2749,7 @@ async function loadFilesInner(files) {
   if (wasEmpty) pushEditorHistoryState();
 
   if (firstLoad) {
-    zoom = Math.min(1, (scrollEl.clientWidth - 16) / doc.pages[0].width);
+    zoom = openingZoom(doc.pages[0].width);
   }
   rebuildStage(); // applies zoom + sizer at the end
   // A non-first load that actually grew the doc IS a merge (gabung). Fire at

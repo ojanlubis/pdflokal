@@ -26,7 +26,7 @@
 import { test, expect } from '@playwright/test';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { armGanti } from './helpers/lines.js';
+import { armGanti, visiblePagePoint } from './helpers/lines.js';
 import { expectFirstPage } from './helpers/render.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -83,8 +83,8 @@ async function hitTheWall(page) {
   await page.setInputFiles('#file-input', SCAN);
   await expectFirstPage(page);
   await armGanti(page);
-  const box = await page.locator('.pv-page').first().boundingBox();
-  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  const pt = await visiblePagePoint(page);
+  await page.mouse.click(pt.x, pt.y);
   await expect(page.locator('#scan-offer')).toBeVisible();
 }
 
@@ -148,8 +148,8 @@ test.describe('scan dead end', () => {
     await page.setInputFiles('#file-input', NASTY('surat-word.pdf'));
     await expectFirstPage(page);
     await armGanti(page);
-    const box = await page.locator('.pv-page').first().boundingBox();
-    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    const pt = await visiblePagePoint(page);
+    await page.mouse.click(pt.x, pt.y);
 
     await expect(page.locator('#scan-offer')).toBeHidden();
     expect(await scanOffers(page)).toEqual([]);

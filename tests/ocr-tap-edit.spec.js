@@ -26,6 +26,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { expectFirstPage } from './helpers/render.js';
+import { visiblePagePoint } from './helpers/lines.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const NASTY = (n) => path.join(__dirname, 'fixtures', 'nasty', n);
@@ -93,9 +94,8 @@ test.describe('rung S2 — tap-to-edit on a scan', () => {
     await armGanti(page);
     // Tap anywhere on the page: a scan has no text runs, so this routes to the
     // sheet no matter where it lands.
-    const view = page.locator('.pv-page').first();
-    const box = await view.boundingBox();
-    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    const pt = await visiblePagePoint(page);
+    await page.mouse.click(pt.x, pt.y);
 
     const sheet = page.locator('#scan-offer');
     await expect(sheet).toBeVisible();

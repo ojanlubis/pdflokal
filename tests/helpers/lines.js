@@ -38,10 +38,21 @@ export async function lineBox(page, target) {
     // Page-space px → viewport px: rect/offset ratio absorbs the zoom
     // transform (the same relationship the hint boxes' raw-px styling relied
     // on). Scroll first, then re-measure — the rect moves with the scroll.
+    //
+    // ⚠️ SCROLL THE CONTAINER, NOT THE WINDOW. The editor is container-scroll
+    // by design (#v2-scroll, see render/viewport.js's header) — `window.scrollTo`
+    // here was a no-op that went unnoticed for as long as it did only because
+    // the opening zoom was 1, which fits a whole A4 near enough the viewport
+    // that the subject line was already on screen without scrolling. The moment
+    // desktop started opening fitted to width (app.js openingZoom, 1 Sep 2026)
+    // the line moved off screen and the tap landed on nothing — 14 specs red on
+    // a product change that was correct. The helper was the thing that was wrong.
+    const scroller = document.getElementById('v2-scroll');
     let r = view.getBoundingClientRect();
+    const sc = scroller.getBoundingClientRect();
     const sy = r.height / view.offsetHeight;
-    const centerDocY = r.top + window.scrollY + (line.y + line.h / 2) * sy;
-    window.scrollTo(0, Math.max(0, centerDocY - window.innerHeight / 2));
+    const lineMidY = r.top + (line.y + line.h / 2) * sy;
+    scroller.scrollTop = Math.max(0, scroller.scrollTop + lineMidY - (sc.top + sc.height / 2));
     r = view.getBoundingClientRect();
     const sx = r.width / view.offsetWidth;
     const sy2 = r.height / view.offsetHeight;
@@ -95,5 +106,33 @@ export async function marginPoint(page) {
       && c.y >= b.y - pad && c.y <= b.y + b.h + pad)) || null;
   });
   if (!pt) throw new Error('marginPoint: every candidate overlapped a line — fixture geometry changed');
+  return pt;
+}
+
+// The centre of the part of page 1 that is ACTUALLY ON SCREEN.
+//
+// WHY not `locator('.pv-page').boundingBox()` centre, which is what every
+// caller used to do: that is the centre of the whole page, and a page fitted to
+// the window's width is roughly twice as tall as the window — so its centre is
+// below the fold and the tap lands on nothing. It only ever worked because the
+// opening zoom was 1. Intersecting with the scroll container first says what
+// those callers actually meant ("tap somewhere on the page"), and says it at
+// any zoom. Throws rather than returning a guess: a tap helper that silently
+// returns an off-screen point is the failure it exists to prevent.
+export async function visiblePagePoint(page, nth = 0) {
+  const pt = await page.evaluate((i) => {
+    const view = document.querySelectorAll('.pv-page')[i];
+    const scroller = document.getElementById('v2-scroll');
+    if (!view || !scroller) return null;
+    const r = view.getBoundingClientRect();
+    const sc = scroller.getBoundingClientRect();
+    const top = Math.max(r.top, sc.top, 0);
+    const bottom = Math.min(r.bottom, sc.bottom, window.innerHeight);
+    const left = Math.max(r.left, sc.left, 0);
+    const right = Math.min(r.right, sc.right, window.innerWidth);
+    if (bottom - top < 8 || right - left < 8) return null;
+    return { x: (left + right) / 2, y: (top + bottom) / 2 };
+  }, nth);
+  if (!pt) throw new Error(`visiblePagePoint: page ${nth} is not on screen`);
   return pt;
 }
