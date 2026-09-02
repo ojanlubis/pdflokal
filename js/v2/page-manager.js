@@ -181,10 +181,18 @@ export function createPageManager(deps) {
       return;
     }
     deps.pickBar.classList.remove('show');
-    bulkBar.classList.toggle('show', n > 0);
+    // Always shown once the sheet is open (not just after a tile is picked) —
+    // the bar states what the sheet can do before anything is touched, rather
+    // than hiding every action behind a selection the user has to discover.
+    bulkBar.classList.add('show');
     bulkBar.querySelector('.pm-count').textContent = `${n} dipilih`;
+    const empty = n === 0;
+    bulkBar.querySelector('[data-act="rotate"]').disabled = empty;
+    bulkBar.querySelector('[data-act="extract"]').disabled = empty;
     // Deleting every page is blocked (an empty doc is a dead end, not a state).
-    bulkBar.querySelector('[data-act="delete"]').disabled = n >= deps.getDoc().pages.length;
+    bulkBar.querySelector('[data-act="delete"]').disabled = empty || n >= deps.getDoc().pages.length;
+    // Batal has nothing to cancel at zero — keep it out of the tab order too.
+    bulkBar.querySelector('[data-act="clear"]').hidden = empty;
   }
 
   // ---- FLIP reorder: grab a REAL page and move it -----------------------------------
