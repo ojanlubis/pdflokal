@@ -319,6 +319,79 @@ function setZoomAnchored(next, midX, midY) {
   scrollEl.scrollTop = cy - my;
 }
 
+// ---- placement zoom: you cannot aim at what you cannot see ----------------------
+// The reading zoom and the WORKING zoom are not the same number, and until now
+// one variable served both. Fitted to a phone's width an A4 sits at zoom 0.666,
+// which puts the document's own body type at ~10px on screen (measured,
+// surat-resmi.pdf on a Pixel 7) — and the editing chrome, being inside the same
+// transform, at 14px against a 44px touch floor. So the user is asked to place
+// something precisely against type they can barely read, with a tool the same
+// two-thirds too small. The rail says exactly that: every tool needing a precise
+// tap collapses on phone (tipex 45.3%, hapus 53.1%, teks 54.3%) while every
+// sheet- or modal-driven tool holds (ttd 82.6%, gabung 77.1%).
+//
+// ⚠️ GATED ON THE ZOOM, NOT ON THE DEVICE, and that is the whole point. Desktop
+// does not have this problem because it is zoomed IN (2.38 after openingZoom),
+// not because it is a desktop — so the condition never fires there and no
+// `isDesktop` fork exists to keep true. The cases a device fork would get wrong
+// come out right for free: a tablet opening at 1.0, a desktop user who pressed
+// `−` twice, and a large-format page whose fit-width lands below 1.
+//
+// NO AUTO-RESTORE, deliberately. Phone sessions that place anything place a
+// median of 3–5 things, so bouncing back to reading zoom after each commit would
+// mean a zoom animation every other action — the "jumpy, lost my place" failure
+// this is supposed to prevent. The user keeps the working zoom and leaves it with
+// the same `−` they already know. Fauzan's eye on that; it is a feel call.
+const PLACEMENT_MIN_ZOOM = 1.25;
+
+function zoomForPlacement(pageId, x, y) {
+  if (zoom >= PLACEMENT_MIN_ZOOM) return; // already a working zoom — leave it alone
+  const slot = slots.find((s) => s.page.id === pageId);
+  if (!slot) return;
+  // onPlace speaks PAGE coordinates; setZoomAnchored wants CLIENT ones. Convert
+  // here rather than widening interaction.js's contract — the render layer has no
+  // business knowing about zoom policy.
+  const r = slot.view.getBoundingClientRect();
+  setZoomAnchored(PLACEMENT_MIN_ZOOM, r.left + x * zoom, r.top + y * zoom);
+}
+
+// ---- keep the editor above the on-screen keyboard --------------------------------
+// The keyboard takes roughly half a phone screen and the browser does NOT move a
+// contenteditable inside a scrolling container out from under it. Typing into a
+// box you cannot see is the same defect as aiming at type you cannot read, one
+// step later — so the zoom above would only move the failure rather than fix it.
+//
+// visualViewport is the only thing that reports the keyboard: window.innerHeight
+// does not change on iOS, and on Android it changes inconsistently. Absent (old
+// Android), this is a no-op and the editor behaves exactly as it did before.
+// LIMIT, stated: #v2-sizer's bottom padding is 104px, so an editor opened on the
+// very last line of the last page may have no scroll room left to rise into.
+function keepAboveKeyboard(el) {
+  const vv = window.visualViewport;
+  if (!vv) return () => {};
+  const MARGIN = 24;
+  const nudge = () => {
+    if (!el.isConnected) return;
+    const r = el.getBoundingClientRect();
+    const visibleBottom = vv.offsetTop + vv.height;
+    if (r.bottom > visibleBottom - MARGIN) {
+      scrollEl.scrollTop += r.bottom - (visibleBottom - MARGIN);
+    } else if (r.top < vv.offsetTop + MARGIN) {
+      scrollEl.scrollTop -= (vv.offsetTop + MARGIN) - r.top;
+    }
+  };
+  vv.addEventListener('resize', nudge);
+  vv.addEventListener('scroll', nudge);
+  // The keyboard ANIMATES in, so the resize that matters can land after focus.
+  // One late pass catches the settled height without polling.
+  const settle = setTimeout(nudge, 300);
+  return () => {
+    clearTimeout(settle);
+    vv.removeEventListener('resize', nudge);
+    vv.removeEventListener('scroll', nudge);
+  };
+}
+
 let pinch = null;
 let pinchRaf = false;
 scrollEl.addEventListener('touchstart', (e) => {
@@ -1902,6 +1975,16 @@ const interaction = createInteraction({
     setTool('select'); // one delete per arming; undo covers mistakes
   },
   onPlace: (t, { pageId, x, y }) => {
+    // ONLY the two tools that open an editor, and the restriction is evidence,
+    // not tidiness. onPlace fires AFTER the tap has landed, so the zoom cannot
+    // improve the aim that just happened — what it improves is the typing and
+    // the repositioning that follow (phone sessions already reposition more than
+    // desktop: median 3, mean 6.6 placements before abandoning). A signature
+    // drop has no such follow-through, so zooming there would move the page for
+    // no gain — and `ttd` is the BEST-performing tool on phone (82.6% vs 91.3%
+    // desktop, the smallest gap of any tool). Handing a view-jump to the one
+    // thing that already works is the wrong risk. teks (54.3%) is the loss.
+    if (t === 'text' || t === 'ganti') zoomForPlacement(pageId, x, y);
     if (t === 'text') {
       openTextEditor({ pageId, x, y, anno: null });
     } else if (t === 'ganti') {
@@ -2032,9 +2115,11 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
   syncFormatBar();
 
   let committed = false; // guard: blur fires after Enter-commit too
+  let releaseKeyboardWatch = () => {};
   const commit = () => {
     if (committed) return;
     committed = true;
+    releaseKeyboardWatch(); // before ed.remove(), so the listener never outlives its element
     const text = ed.textContent.trim();
     ed.remove();
     editingAnno = null;
@@ -2405,6 +2490,9 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
 
   overlay.appendChild(ed);
   ed.focus();
+  // focus is what raises the keyboard, so the watch starts here and is released
+  // in commit() above — the only path out of this editor.
+  releaseKeyboardWatch = keepAboveKeyboard(ed);
   // Place the caret at the end (mobile keyboards otherwise start at 0).
   // Guarded (Sentry JAVASCRIPT-D): iOS WebKit can leave the selection
   // rangeless after selectAllChildren — collapseToEnd() then throws
