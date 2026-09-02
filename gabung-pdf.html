@@ -907,6 +907,44 @@
     }
     .dropzone:active .dz-buka { transform: translateY(1px); box-shadow: 0 1px 0 var(--accent-down); }
     .dz-hint { display: block; font-size: var(--fs-n1); color: var(--muted); margin: var(--sp-12) 0 0; }
+    /* ── TEMPLATE LOKAL BAND — DRAFT 2026-09-03, NOT RULED.
+       Sits between the install chip and the tool cards (his order, 2026-09-02:
+       dropzone > install > template lokal > pdflokal cards).
+
+       🔑 IT IS DELIBERATELY NOT AN .ld-card, and that is the whole design
+       problem it exists to solve. Every .ld-card runs armIntent() then
+       fileInput.click() — the picker opens INSTANTLY, no navigation
+       (js/v2/app.js:2944). These do the opposite: they leave for another
+       origin, and there is no file. Same visual language would mean two
+       adjacent rows that look identical and answer differently, which is the
+       defect named in template-lokal/decisions.md 2026-09-02.
+
+       So the break is semantic, not decorative: tools are ICONS in a tile grid,
+       documents are PAGE SHAPES in a scrolling row. "I have a file, process it"
+       versus "I have no file, make me one". */
+    .tl-band { margin-top: var(--sp-24); padding-top: var(--sp-20); border-top: 1px solid var(--line); }
+    .tl-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-12); }
+    .tl-head b { font-size: var(--fs-0); font-weight: 700; letter-spacing: -.01em; }
+    .tl-head span { font-size: var(--fs-n1); color: var(--muted); }
+    .tl-row {
+      display: grid; grid-auto-flow: column; grid-auto-columns: 108px;
+      gap: var(--sp-12); margin-top: var(--sp-12);
+      overflow-x: auto; scroll-snap-type: x proximity;
+      padding-bottom: var(--sp-8); -webkit-overflow-scrolling: touch;
+    }
+    .tl-doc {
+      scroll-snap-align: start; text-decoration: none; color: var(--ink);
+      display: flex; flex-direction: column; gap: var(--sp-8);
+      align-items: center; justify-content: center;
+      background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-button);
+      padding: var(--sp-16) var(--sp-8); text-align: center;
+      transition: transform .1s ease, border-color .15s ease;
+    }
+    .tl-doc:active { transform: scale(.98); }
+    .tl-doc:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    .tl-doc svg { width: 20px; height: 20px; color: var(--accent); }
+    .tl-doc span { font-size: var(--fs-n1); font-weight: 700; letter-spacing: -.01em; line-height: 1.2; }
+    @media (min-width: 720px) { .tl-row { grid-auto-columns: 132px; justify-content: start; } }
     .ld-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-12); margin-top: var(--sp-16); }
     .ld-grid.more, #ld-more { margin-top: var(--sp-12); }
     #ld-more[hidden] { display: none; }
@@ -1627,6 +1665,36 @@
              semua alat". They used to be bridged into one flex flow by a
              .ld-toolbox wrapper for the old "all 14 visible" desktop layout;
              that layout is gone, so the wrapper is too. -->
+        <!-- ⚠️ DRAFT 2026-09-03, NOT RULED, NOT PUSHED. Copy is Fauzan's and the
+             whole band is EXCLUDE 1 + 2 + 5 on specs/spec-low-risk-list.md. -->
+        <section class="tl-band" id="tl-band">
+          <div class="tl-head">
+            <b>Template</b>
+            <span>Gratis, jadi PDF</span>
+          </div>
+          <div class="tl-row" role="list">
+          <a class="tl-doc" href="https://template.pdflokal.id/slip-gaji" data-doc="slip-gaji">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><line x1="6" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="18" y2="12"/></svg>
+            <span>Slip Gaji</span>
+          </a>
+          <a class="tl-doc" href="https://template.pdflokal.id/invoice" data-doc="invoice">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V6z"/><polyline points="14 2 14 7 19 7"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="12" y2="17"/></svg>
+            <span>Invoice</span>
+          </a>
+          <a class="tl-doc" href="https://template.pdflokal.id/kwitansi" data-doc="kwitansi">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3v18l2-1.5L8 21l2-1.5L12 21l2-1.5L16 21l2-1.5L20 21V3z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="13" y2="12"/></svg>
+            <span>Kwitansi</span>
+          </a>
+          <a class="tl-doc" href="https://template.pdflokal.id/surat-jalan" data-doc="surat-jalan">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 17V5a1 1 0 0 0-1-1H2v12a1 1 0 0 0 1 1h1"/><path d="M14 9h4l3 3v5h-2"/><circle cx="6.5" cy="17.5" r="2"/><circle cx="17.5" cy="17.5" r="2"/><line x1="8.5" y1="17.5" x2="15.5" y2="17.5"/></svg>
+            <span>Surat Jalan</span>
+          </a>
+          <a class="tl-doc" href="https://template.pdflokal.id/spk" data-doc="spk">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><polyline points="9 14 11 16 15 12"/></svg>
+            <span>SPK</span>
+          </a>
+          </div>
+        </section>
         <div class="ld-grid">
           <a class="ld-card" href="/gabung-pdf" data-intent="gabung">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>
