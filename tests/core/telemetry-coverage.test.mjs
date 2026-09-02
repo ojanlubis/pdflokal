@@ -59,8 +59,17 @@ function names(fn) {
 const GA4_ONLY = [
   'client_error', 'download', 'editor_action', 'file_failed', 'file_loaded',
   'gabungkan_used', 'ganti_no_text_layer', 'intent_armed', 'pwa_card_open',
-  'pwa_install', 'pwa_installed', 'tester_optin', 'tool_opened', 'vote_playstore',
+  'pwa_install', 'pwa_installed', 'template_card', 'tester_optin', 'tool_opened',
+  'vote_playstore',
 ];
+
+/* `template_card` added 2026-09-03, and the test's own question answered rather
+ * than waved past: it belongs on THIS rail, not the first-party one, because the
+ * only number it has to support is a RATIO — Template-row clicks against tool-card
+ * clicks. Tool cards emit `intent_armed`, which is on this same rail. Ad-blocking
+ * suppresses both by the same factor, so the comparison survives it; moving one
+ * side to a rail the other is not on would silently break exactly the comparison
+ * the row was added to make. Revisit if it ever needs an ABSOLUTE count. */
 
 test('PARITY: the GA4-only event list is exactly what we think it is', () => {
   const tracked = [...names('track')].sort();

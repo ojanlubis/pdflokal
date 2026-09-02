@@ -2950,6 +2950,23 @@ for (const card of document.querySelectorAll('.ld-card[data-intent]')) {
   });
 }
 
+// The Template row leaves for template.pdflokal.id, so nothing downstream of
+// this page can ever attribute the visit back. Without this event the row is
+// unmeasurable, and an unmeasurable funnel cannot be judged — which is the only
+// reason it was added.
+//
+// ⚠️ THE KEY IS `doc`, NOT `source`. GA4 treats source/medium/campaign/term/
+// content/gclid as TRAFFIC-SOURCE fields, and track() forwards `data` straight
+// to gtag(). Passing `source: 'card'` here would rewrite the session's real
+// attribution and show up as our own UI vocabulary in the acquisition report —
+// which is exactly the defect that ate 20.3% of this site's sessions every day
+// in August (decisions.md 2026-09-02).
+for (const card of document.querySelectorAll('.tl-doc[data-doc]')) {
+  card.addEventListener('click', () => {
+    track('template_card', { doc: card.dataset.doc });
+  });
+}
+
 const lihatBtn = document.getElementById('ld-lihat');
 const moreGrid = document.getElementById('ld-more');
 lihatBtn.addEventListener('click', () => {
