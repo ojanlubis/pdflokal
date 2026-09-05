@@ -123,6 +123,15 @@ test('8. every returned value is in the telemetry schema enum', async () => {
 // trace, as enums. `reason` was 'unknown' for the majority of real failures.
 // ---------------------------------------------------------------------------
 
+test('9. the browser image decoder refusing a file is UNSUPPORTED, not unknown', () => {
+  // createImageBitmap's rejection shape: a DOMException, named per engine.
+  for (const name of ['InvalidStateError', 'EncodingError', 'NotSupportedError']) {
+    assert.equal(failureReason({ name, message: 'The source image could not be decoded.' }), 'unsupported');
+  }
+  // …and V8 refusing a typed array is an allocation ceiling, unlike a plain bad length (6b).
+  assert.equal(failureReason(new RangeError('Invalid typed array length: 1099511627776')), 'out-of-memory');
+});
+
 test('10. failureCause: name is the constructor collapsed to the enum, hint is the wording family', () => {
   assert.deepEqual(failureCause(new TypeError("Cannot read properties of undefined (reading 'width')")),
     { name: 'TypeError', hint: 'undefined-prop' });

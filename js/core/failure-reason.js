@@ -44,7 +44,11 @@ const PDFLIB_CORRUPT = /failed to parse|invalid object|no pdf header|expected in
 // ceiling; `Array buffer allocation failed` is the ArrayBuffer one. Both arrive
 // as RangeError, which is ALSO what a stack overflow uses — hence the explicit
 // call-stack exclusion below rather than a blanket RangeError rule.
-const ALLOC = /invalid string length|array buffer allocation failed|out of memory|allocation size overflow/i;
+// `Invalid typed array length` is V8 refusing a Uint8Array the heap cannot
+// hold — pdf-lib's save() and canvas toBlob() both ask for one; added
+// 2026-09-06. Distinct from `Invalid array length` (a plain bad length, kept
+// UNKNOWN below on purpose) by the word 'typed'.
+const ALLOC = /invalid string length|array buffer allocation failed|out of memory|allocation size overflow|invalid typed array length/i;
 const STACK = /call stack/i;
 
 export function failureReason(err) {
@@ -56,6 +60,17 @@ export function failureReason(err) {
     case 'TimeoutError': return 'timeout';
     case 'QuotaExceededError': return 'out-of-memory';
     case 'AbortError': return 'timeout';
+    // The browser's image decoder refusing a file (2026-09-06). createImageBitmap
+    // rejects with a DOMException — InvalidStateError in Chromium, EncodingError
+    // in Firefox/WebKit — for a format it cannot decode (HEIC on most Androids,
+    // a truncated JPEG) or an image too large to decode. Read `unknown` until
+    // now, which is where 15 sessions in 14 days sat, half of them phones that
+    // arrived with `intent: foto`. NotSupportedError is the same family from
+    // other media APIs. A file we cannot decode is UNSUPPORTED, in the same
+    // sense as a character we cannot paint.
+    case 'InvalidStateError': return 'unsupported';
+    case 'EncodingError': return 'unsupported';
+    case 'NotSupportedError': return 'unsupported';
     default: break;
   }
 
