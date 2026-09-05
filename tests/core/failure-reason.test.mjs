@@ -21,7 +21,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { failureReason } from '../../js/core/failure-reason.js';
+import { failureReason, failureCause } from '../../js/core/failure-reason.js';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const loadUmd = (p) => {
@@ -116,4 +116,79 @@ test('8. every returned value is in the telemetry schema enum', async () => {
   ];
   assert.ok(allowed.size > 0, 'schema enum must be non-empty or this assertion is vacuous');
   for (const p of probes) assert.ok(allowed.has(failureReason(p)), `${failureReason(p)} not in schema`);
+});
+
+// ---------------------------------------------------------------------------
+// failureCause (2026-09-06): the two facts a developer reads first off a stack
+// trace, as enums. `reason` was 'unknown' for the majority of real failures.
+// ---------------------------------------------------------------------------
+
+test('10. failureCause: name is the constructor collapsed to the enum, hint is the wording family', () => {
+  assert.deepEqual(failureCause(new TypeError("Cannot read properties of undefined (reading 'width')")),
+    { name: 'TypeError', hint: 'undefined-prop' });
+  assert.deepEqual(failureCause(new Error('WinAnsi cannot encode "✓" (0x2713)')), { name: 'Error', hint: 'encode' });
+  assert.deepEqual(failureCause(new RangeError('Array buffer allocation failed')), { name: 'RangeError', hint: 'alloc' });
+  assert.deepEqual(failureCause(new RangeError('Maximum call stack size exceeded')), { name: 'RangeError', hint: 'stack' });
+  assert.deepEqual(failureCause({ name: 'InvalidStateError', message: 'The source image could not be decoded.' }),
+    { name: 'InvalidStateError', hint: 'image' });
+  assert.deepEqual(failureCause(new Error('Failed to parse PDF document (line:0 col:0 offset=0): No PDF header found')),
+    { name: 'Error', hint: 'parse' });
+  assert.deepEqual(failureCause(new Error('Input document to `PDFDocument.load` is encrypted.')), { name: 'Error', hint: 'encrypted' });
+  assert.deepEqual(failureCause({ name: 'PasswordException', message: 'No password given' }), { name: 'other', hint: 'encrypted' });
+  assert.deepEqual(failureCause(new Error('something we have never seen')), { name: 'Error', hint: 'none' });
+});
+
+test('11. failureCause: garbage in, enum out — never a throw, never a string of the input', () => {
+  assert.deepEqual(failureCause(null), { name: 'none', hint: 'none' });
+  assert.deepEqual(failureCause(undefined), { name: 'none', hint: 'none' });
+  assert.deepEqual(failureCause('a string, not an Error'), { name: 'other', hint: 'none' });
+  assert.deepEqual(failureCause({ name: 'Rp 10.000 untuk Budi', message: 'Jalan Merdeka 17' }), { name: 'other', hint: 'none' });
+});
+
+test('12. failureCause: every value it can return is in the failure_cause schema enums, and the event validates', async () => {
+  const { SCHEMA, validateEvent } = await import('../../js/core/telemetry-schema.js');
+  const names = new Set(SCHEMA.failure_cause.name);
+  const hints = new Set(SCHEMA.failure_cause.hint);
+  assert.ok(names.size > 5 && hints.size > 5, 'enums must be non-empty or this is vacuous');
+  const probes = [
+    null, undefined, 'x', {}, new Error(''), new TypeError('x is not a function'), new RangeError('Invalid string length'),
+    new SyntaxError('Unexpected token'), new ReferenceError('foo is not defined'),
+    { name: 'QuotaExceededError', message: 'quota' }, { name: 'AbortError', message: 'The user aborted a request.' },
+    { name: 'NetworkError', message: 'A network error occurred.' }, { name: 'SecurityError', message: 'Tainted canvases may not be exported.' },
+    { name: 'DataCloneError', message: 'could not be cloned' }, { name: 'WeirdName', message: 'fetch failed' },
+    new Error('Worker crashed: wasm compile'), new Error('HTTP 404'), new Error('Font glyph missing in cmap'),
+    new Error('The image could not be decoded'), new Error('timeout of 10000ms exceeded'),
+    // A message that quotes a document: the hint must be a family label, never the words.
+    new Error('Cannot read properties of null (reading "Nama: Siti Rahayu")'),
+  ];
+  for (const p of probes) {
+    const cause = failureCause(p);
+    assert.ok(names.has(cause.name), `${cause.name} not in schema names`);
+    assert.ok(hints.has(cause.hint), `${cause.hint} not in schema hints`);
+    for (const stage of SCHEMA.failure_cause.stage) {
+      assert.equal(validateEvent('failure_cause', { stage, ...cause }).ok, true);
+    }
+    const flat = JSON.stringify(cause);
+    assert.ok(!/Siti|Rahayu|Merdeka|Budi/.test(flat), 'document words reached the cause');
+  }
+});
+
+test('13. failureCause and the schema agree on the enum lists BOTH ways (no dead member either side)', async () => {
+  // Every schema NAME other than the two sentinels must be reachable from a real error of that name,
+  // and every HINT must be reachable from some message — otherwise the schema claims evidence the
+  // classifier can never produce.
+  const { SCHEMA } = await import('../../js/core/telemetry-schema.js');
+  for (const name of SCHEMA.failure_cause.name) {
+    if (name === 'other' || name === 'none') continue;
+    assert.equal(failureCause({ name, message: '' }).name, name, `schema name ${name} is not recognised by failureCause`);
+  }
+  const samples = {
+    encode: 'WinAnsi cannot encode', glyph: 'no glyph', alloc: 'out of memory', stack: 'Maximum call stack size exceeded',
+    encrypted: 'is encrypted', parse: 'Failed to parse PDF', image: 'image decode', 'undefined-prop': 'x is not a function',
+    worker: 'worker died', fetch: 'fetch failed', timeout: 'timed out', none: '',
+  };
+  for (const hint of SCHEMA.failure_cause.hint) {
+    assert.ok(hint in samples, `schema hint ${hint} has no sample here — add one`);
+    assert.equal(failureCause(new Error(samples[hint])).hint, hint, `hint ${hint} unreachable`);
+  }
 });

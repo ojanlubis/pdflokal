@@ -17,7 +17,7 @@
 import { ensurePdfJs, ensurePdfLib, ensureFflate } from '../core/vendor.js';
 import { track } from '../lib/analytics.js';
 import { tel } from './telemetry.js';
-import { failureReason } from '../core/failure-reason.js';
+import { failureReason, failureCause } from '../core/failure-reason.js';
 import { durationBucket } from '../core/telemetry-schema.js';
 import { showStamp } from './celebrate.js';
 import { buildPdfArtifact } from './pdf-builder.js';
@@ -559,6 +559,11 @@ export function createDownloadSheet(deps) {
       // which is the definition of stopped. (Both props added 2026-08-09; see
       // the failure event in core/telemetry-schema.js.)
       tel('failure', { stage: 'export', reason, class: 'none', blocked: true });
+      // WHAT threw (core/telemetry-schema.js failure_cause): `export/unknown`
+      // was 38 events across 3 sessions in the fortnight before 2026-09-06,
+      // and the stage alone could not say whether that was memory, a font, or
+      // our own code. Same content-blind door as failureReason.
+      tel('failure_cause', { stage: 'export', ...failureCause(err) });
     } finally {
       state.exporting = false;
       render();

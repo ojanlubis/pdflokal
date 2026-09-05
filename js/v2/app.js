@@ -17,7 +17,7 @@
  */
 
 import { createDoc, createAnnotation, getPage, getSource, findAnnotation } from '../core/model.js';
-import { failureReason } from '../core/failure-reason.js';
+import { failureReason, failureCause } from '../core/failure-reason.js';
 import { isStandardFamily, unencodableInStandardFont } from '../core/text-encode.js';
 import {
   addAnnotation, removeAnnotation, updateAnnotation, clearSelection, selectAnnotation,
@@ -1729,6 +1729,7 @@ async function runOcrOnPage(pageId) {
     // isolates this population, so whatever the classifier can say about the
     // error is pure added signal.
     tel('failure', { stage: 'ocr', reason: failureReason(err), class: 'none', blocked: true });
+    tel('failure_cause', { stage: 'ocr', ...failureCause(err) });
     toast('Gagal scan, coba lagi ya');
   }
 }
@@ -2797,6 +2798,10 @@ async function loadFilesInner(files) {
       // exists to catch.
       lastFailureReason = failureReason(err);
       tel('failure', { stage: 'import', reason: failureReason(err), class: 'none', blocked: true });
+      // WHAT threw, as two enums (core/telemetry-schema.js failure_cause). The
+      // import bucket was 'unknown' for 15 sessions in 14 days and nobody could
+      // say whether that was HEIC, a giant photo, or our own code.
+      tel('failure_cause', { stage: 'import', ...failureCause(err) });
     }
   }
 
@@ -3326,6 +3331,7 @@ function reportRuntimeFailure(err) {
     runtimeFailures += 1;
     // blocked:true — an uncaught throw is a real failure, never a forewarning.
     tel('failure', { stage: 'runtime', reason: failureReason(err), class: 'none', blocked: true });
+    tel('failure_cause', { stage: 'runtime', ...failureCause(err) });
   } catch {
     // Error reporting must never itself throw into app code — same law as tel().
   }

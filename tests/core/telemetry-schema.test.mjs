@@ -57,6 +57,8 @@ const VALID_PROPS = {
   visual_oracle: {
     weight_ratio: 'near-parity', height_ratio: 'near-parity', overflow: false, ink_ratio: 'near-parity',
   },
+  // failure_cause (2026-09-06): the two enums failureCause() can return.
+  failure_cause: { stage: 'export', name: 'TypeError', hint: 'undefined-prop' },
 };
 
 test('every SCHEMA event has a VALID_PROPS fixture (test coverage stays complete as events are added)', () => {

@@ -614,6 +614,36 @@ export const SCHEMA = {
   // their files" was being answered with a number that included people whose
   // files opened perfectly. Counting a success as a failure makes the rail
   // pessimistic in exactly the place the push policy trusts it most.
+  // failure_cause (added 2026-09-06): WHAT KIND of thing threw, beside every
+  // `failure` that has a caught error. `reason` above was 'unknown' for the
+  // majority of real failures (218 events / 65 sessions by 2026-08-31 — more
+  // than every named reason together), so "what breaks" was unanswerable for
+  // most breakages. `name` is the error's constructor name collapsed to a fixed
+  // list; `hint` is which FAMILY of library wording the message used, derived
+  // by core/failure-reason.js's failureCause() — a pure module that matches
+  // the message and discards it. No string ever travels; both are enums here.
+  //
+  // ⚠️ A SEPARATE EVENT, NOT NEW PROPS ON `failure`, and that is load-bearing:
+  // validateEvent rejects a MISSING prop and api/t.js runs this same module,
+  // so adding a required prop to `failure` would drop every failure event
+  // from a client still on a cached build until it refreshed — the identical
+  // hazard the 7c2a064 ruling refused for prop REMOVALS. An additive event
+  // blanks nothing: old clients simply never send it. Join to `failure` by
+  // session + adjacent timestamp; the stage is repeated here so a cause is
+  // readable on its own row.
+  failure_cause: {
+    stage: ['import', 'commit', 'export', 'compress', 'render', 'runtime', 'ocr'],
+    name: [
+      'Error', 'TypeError', 'RangeError', 'ReferenceError', 'SyntaxError',
+      'InvalidStateError', 'EncodingError', 'NotSupportedError', 'SecurityError',
+      'QuotaExceededError', 'AbortError', 'NetworkError', 'DataCloneError',
+      'other', 'none',
+    ],
+    hint: [
+      'encode', 'glyph', 'alloc', 'stack', 'encrypted', 'parse', 'image',
+      'undefined-prop', 'worker', 'fetch', 'timeout', 'none',
+    ],
+  },
   failure: {
     // 'ocr' (added 2026-08-23, rung S2): the engine failed to load or threw
     // during recognition. Its own stage rather than 'runtime' because the

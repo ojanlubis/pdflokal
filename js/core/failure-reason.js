@@ -85,3 +85,58 @@ export function failureReason(err) {
 
   return 'unknown';
 }
+
+// ---- failureCause: WHAT KIND of thing threw, still content-blind ---------------
+//
+// WHY A SECOND FUNCTION (2026-09-06): `reason` answers "which of our six
+// product buckets", and for the majority of real failures the honest answer is
+// 'unknown' — 218 events across 65 sessions by 2026-08-31, more than every named
+// reason together. That is a blind spot, not a defect list. This adds the two
+// facts a developer would read first off a stack trace, each collapsed to an
+// enum: the error's constructor NAME, and a HINT derived from which family of
+// words its message uses. Both are enums declared in core/telemetry-schema.js
+// (failure_cause) and validated there; nothing here can return anything else.
+//
+// CONTENT-BLIND, same law as failureReason above: the message is matched HERE
+// and discarded HERE. A hint pattern is a family of library wording, never a
+// capture — no group of the regex is ever returned. If a pattern ever needs a
+// captured value, the design is wrong; add an enum member instead.
+//
+// It rides as its OWN event (failure_cause), not as new props on `failure`:
+// validateEvent rejects a missing prop, and the server runs the same module,
+// so widening `failure` would drop every failure event from a client on a
+// stale cached build until it refreshed. A separate additive event blanks
+// nothing.
+
+const CAUSE_NAMES = new Set([
+  'Error', 'TypeError', 'RangeError', 'ReferenceError', 'SyntaxError',
+  'InvalidStateError', 'EncodingError', 'NotSupportedError', 'SecurityError',
+  'QuotaExceededError', 'AbortError', 'NetworkError', 'DataCloneError',
+]);
+
+// First match wins; ordered from the most specific family to the broadest.
+const HINTS = [
+  ['encode', /cannot encode|winansi/i],
+  ['glyph', /glyph|cmap|no font|font.*not (?:found|loaded)|fontkit/i],
+  ['alloc', /invalid string length|array buffer allocation|out of memory|allocation size overflow|invalid typed array length|memory/i],
+  ['stack', /call stack/i],
+  ['encrypted', /is encrypted|password/i],
+  ['parse', /failed to parse|invalid object|no pdf header|expected instance of|invalid pdf|trailer|xref|unexpected (?:token|end)/i],
+  ['image', /image|bitmap|decode|jpeg|jpg|png|canvas|toblob|drawimage/i],
+  ['undefined-prop', /cannot read propert|cannot set propert|undefined is not|null is not|is not a function|is not iterable|is not defined|is not an object/i],
+  ['worker', /worker|wasm|webassembly|tesseract|pdf\.js|pdfjs/i],
+  ['fetch', /fetch|network|failed to load|load failed|http \d|net::/i],
+  ['timeout', /timeout|timed out|aborted/i],
+];
+
+export function failureCause(err) {
+  const rawName = typeof err?.name === 'string' ? err.name : '';
+  let name = 'none';
+  if (err !== null && err !== undefined) name = CAUSE_NAMES.has(rawName) ? rawName : 'other';
+  const msg = typeof err?.message === 'string' ? err.message : '';
+  let hint = 'none';
+  for (const [label, re] of HINTS) {
+    if (re.test(msg)) { hint = label; break; }
+  }
+  return { name, hint };
+}
