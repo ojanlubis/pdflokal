@@ -114,6 +114,60 @@ export async function probeTextLayer(bytes) {
 // a format it can't handle.
 const EMBEDDABLE_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/jpg']);
 
+// EXIF Orientation (tag 0x0112) of a JPEG, or 1 when absent/unreadable.
+// WHY THIS EXISTS (2026-09-06, measured with tests/image-orientation.spec.js):
+// a phone camera stores the SENSOR's landscape pixels plus an Orientation tag
+// saying how to turn them. createImageBitmap applies the tag, so `width` /
+// `height` below — and therefore the page, and the preview — are the DISPLAYED
+// shape. pdf-lib's embedJpg does not read EXIF: it embeds the raw sideways
+// pixels, and core/export.js stretches them edge-to-edge into the portrait
+// box. The preview was right and the file was wrong, which is the worst version
+// of a bug because the user only finds out after they have it. Any tag other
+// than 1 (rotations 5–8, and the flips/180° 2–4 that keep the same box) means
+// the raw bytes and the displayed pixels disagree, so the image is re-encoded
+// from the oriented bitmap below. A tiny reader on purpose: walk the JPEG
+// markers to APP1, check the Exif header, read IFD0 for 0x0112 in the file's
+// own byte order. Anything malformed reads as 1 — the raw bytes then embed as
+// before, never a throw at import over a metadata block.
+export function jpegExifOrientation(bytes) {
+  try {
+    if (!(bytes?.length > 4) || bytes[0] !== 0xff || bytes[1] !== 0xd8) return 1;
+    let off = 2;
+    while (off + 4 <= bytes.length && bytes[off] === 0xff) {
+      const marker = bytes[off + 1];
+      if (marker === 0xda || marker === 0xd9) break;           // SOS / EOI: no APP1 ahead
+      const size = (bytes[off + 2] << 8) | bytes[off + 3];
+      if (marker === 0xe1 && size >= 14) {                       // APP1
+        const p = off + 4;
+        const isExif = bytes[p] === 0x45 && bytes[p + 1] === 0x78 && bytes[p + 2] === 0x69
+          && bytes[p + 3] === 0x66 && bytes[p + 4] === 0 && bytes[p + 5] === 0;
+        if (isExif) {
+          const t = p + 6;                                       // TIFF header
+          const le = bytes[t] === 0x49 && bytes[t + 1] === 0x49; // 'II' little-endian, 'MM' big
+          const u16 = (i) => (le ? bytes[i] | (bytes[i + 1] << 8) : (bytes[i] << 8) | bytes[i + 1]);
+          const u32 = (i) => (le
+            ? (bytes[i] | (bytes[i + 1] << 8) | (bytes[i + 2] << 16) | (bytes[i + 3] << 24)) >>> 0
+            : ((bytes[i] << 24) | (bytes[i + 1] << 16) | (bytes[i + 2] << 8) | bytes[i + 3]) >>> 0);
+          if (u16(t + 2) !== 0x2a) return 1;
+          const ifd = t + u32(t + 4);
+          const n = u16(ifd);
+          for (let k = 0; k < n; k += 1) {
+            const e = ifd + 2 + k * 12;
+            if (e + 12 > bytes.length) return 1;
+            if (u16(e) === 0x0112) {
+              const v = u16(e + 8);
+              return v >= 1 && v <= 8 ? v : 1;
+            }
+          }
+          return 1;
+        }
+      }
+      off += 2 + size;
+    }
+  } catch { /* malformed metadata: treat as upright */ }
+  return 1;
+}
+
 // bytes (a raw image file) → append a Source + ONE image page to `doc`.
 // Sizing convention: the page's point size EQUALS the image's pixel dimensions,
 // and export draws the image full-bleed edge-to-edge. This matches BOTH the old
@@ -132,15 +186,27 @@ export async function importImage(doc, { name, bytes, mimeType }) {
   const height = bitmap.height;
 
   let storeBytes = bytes;
-  if (!EMBEDDABLE_IMAGE_TYPES.has(type)) {
-    // Transcode to PNG so export's embedPng always succeeds. We already have the
-    // decoded bitmap, so this is one canvas draw + toBlob.
+  const isJpeg = type === 'image/jpeg' || type === 'image/jpg';
+  const turned = isJpeg && jpegExifOrientation(bytes) !== 1;
+  if (!EMBEDDABLE_IMAGE_TYPES.has(type) || turned) {
+    // Transcode so export's embed always paints what the user saw. Two reasons
+    // land here: a format pdf-lib cannot embed (WEBP/GIF/BMP → PNG), or a JPEG
+    // whose EXIF Orientation disagrees with its raw pixels (see
+    // jpegExifOrientation) → re-encoded as JPEG from the ORIENTED bitmap, so a
+    // portrait phone photo stays portrait in the file and not only in the
+    // preview. JPEG, not PNG, for the second case: a 12-megapixel photo as PNG
+    // is tens of megabytes, and the source was lossy already. Re-encoding also
+    // drops the EXIF block — camera model, timestamps, GPS — which the file
+    // never needed to carry. We already have the decoded bitmap, so this is one
+    // canvas draw + toBlob.
     const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
     canvas.getContext('2d').drawImage(bitmap, 0, 0);
-    const pngBlob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
-    storeBytes = new Uint8Array(await pngBlob.arrayBuffer());
+    const blobOut = await new Promise((resolve) => (turned
+      ? canvas.toBlob(resolve, 'image/jpeg', 0.92)
+      : canvas.toBlob(resolve, 'image/png')));
+    storeBytes = new Uint8Array(await blobOut.arrayBuffer());
   }
   if (typeof bitmap.close === 'function') bitmap.close();
 
