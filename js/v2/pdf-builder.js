@@ -7,6 +7,7 @@
  */
 import { buildPdfBytes } from '../core/export.js';
 import { ensurePdfLib } from '../core/vendor.js';
+import { rasterizeTextAnno } from './text-raster.js';
 
 export async function buildPdfArtifact(doc, deps = {}) {
   const loadPdfLib = deps.loadPdfLib || ensurePdfLib;
@@ -17,6 +18,11 @@ export async function buildPdfArtifact(doc, deps = {}) {
     PDFLib,
     fontkit,
     onFontFallback: () => { fontFallback = true; },
+    // The glyph fallback (core/export.js drawTextAsImage): a character the
+    // PDF font cannot paint is embedded as an image painted by the browser,
+    // instead of aborting the whole export. Injected HERE, the one browser
+    // edge every UI route goes through, so no route can forget it.
+    rasterizeText: rasterizeTextAnno,
   });
   return { bytes, fontFallback };
 }

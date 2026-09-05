@@ -364,4 +364,62 @@ test.describe('core export adapter', () => {
     expect(r.centerPx[1]).toBeLessThan(80);
     expect(r.centerPx[2]).toBeLessThan(80);
   });
+
+  /*
+   * THE GLYPH FALLBACK (2026-09-06). A character the PDF font cannot paint —
+   * ✓ in Helvetica here — used to abort the WHOLE export. The rail measured the
+   * cost 2026-08-23..09-05: six sessions, five exported nothing, one user
+   * retried 24 times. With a rasteriser injected (the browser edge always
+   * injects js/v2/text-raster.js), that ONE annotation ships as an image at
+   * the text's own place and size; the annotation next to it stays real text.
+   *
+   * RED-ON-REVERT: against the pre-fix export.js the first case rejects with
+   * `WinAnsi cannot encode`, and the second case is what the pre-fix code did
+   * for everyone — kept as the headless contract, not as the product.
+   */
+  test('glyph fallback: a Helvetica annotation with ✓ exports as an image; its neighbour stays text', async ({ page }) => {
+    await page.goto('/alat-gambar.html');
+    await page.waitForFunction(() => !!window.pdfjsLib && !!window.PDFLib);
+
+    const r = await page.evaluate(`(async () => {
+      ${renderPage}
+      ${buildSourceDoc}
+      const { model, ops, exp, doc } = await buildSourceDoc();
+      const { rasterizeTextAnno } = await import('/js/v2/text-raster.js');
+      const p1 = doc.pages[0];
+      // 36pt Helvetica, top-left (300, 400): the same box the plain-text test uses.
+      ops.addAnnotation(doc, p1.id, model.createAnnotation('text', {
+        x: 300, y: 400, text: '✓ Setuju', fontFamily: 'Helvetica', fontSize: 36, color: '#000000',
+      }));
+      ops.addAnnotation(doc, p1.id, model.createAnnotation('text', {
+        x: 300, y: 500, text: 'XXXXX', fontFamily: 'Helvetica', fontSize: 36, bold: true, color: '#000000',
+      }));
+
+      const withRaster = await exp.buildPdfBytes(doc, { rasterizeText: rasterizeTextAnno });
+      const s = await renderPage(withRaster, 1, 2);
+      // Darkest sample inside the ✓ glyph's own box (first ~30pt of the line).
+      let glyphMin = 255;
+      for (let x = 302; x < 330; x += 2) for (let y = 405; y < 432; y += 2) glyphMin = Math.min(glyphMin, s.px(x, y)[0]);
+      // And above the block: still paper.
+      let aboveMin = 255;
+      for (let x = 300; x < 500; x += 4) aboveMin = Math.min(aboveMin, s.px(x, 385)[0]);
+
+      // The neighbour stayed REAL text: pdf.js can read it back as a string.
+      const out = await window.pdfjsLib.getDocument({ data: withRaster.slice() }).promise;
+      const tc = await (await out.getPage(1)).getTextContent();
+      const strings = tc.items.map((i) => i.str);
+
+      let headlessError = null;
+      try { await exp.buildPdfBytes(doc); } catch (e) { headlessError = String(e && e.message); }
+
+      return { glyphMin, aboveMin, strings, headlessError };
+    })()`);
+
+    expect(r.glyphMin, 'the ✓ must leave ink where the text would have been').toBeLessThan(120);
+    expect(r.aboveMin, 'nothing painted above the block').toBeGreaterThan(240);
+    expect(r.strings.some((t) => t.includes('XXXXX')), 'the encodable neighbour must remain selectable text').toBe(true);
+    expect(r.strings.some((t) => t.includes('✓')), 'the ✓ annotation is an image, not text').toBe(false);
+    // Headless contract, unchanged: no rasteriser injected → the old throw.
+    expect(r.headlessError).toMatch(/cannot encode/i);
+  });
 });

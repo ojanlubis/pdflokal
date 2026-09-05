@@ -36,12 +36,15 @@
  * crash it prevents.
  *
  * ⚠️ WHAT THIS DELIBERATELY DOES NOT FIX: a genuinely unrenderable character —
- * an emoji, or CJK — in a standard font. Those still throw, and the export
- * still fails. Dropping them would silently delete something the user typed
- * and can SEE; that is a product call, not a bug fix, so it is left to the
- * seat. What changed is that the failure now reports `reason: 'unsupported'`
- * instead of 'unknown' (core/failure-reason.js), so we can find out whether it
- * ever actually happens instead of guessing.
+ * an emoji, or CJK — in a standard font. This module never drops one: deleting
+ * something the user typed and can SEE would be silently rewriting their
+ * document. Until 2026-09-06 that meant the export still threw for those
+ * (`reason: 'unsupported'`, core/failure-reason.js), and the rail then showed
+ * what that cost — six sessions in fourteen days, five of them exporting
+ * nothing. The seat ruled: core/export.js's drawTextAsImage now paints such an
+ * annotation as an image the browser rendered (js/v2/text-raster.js), so the
+ * character ships looking exactly as it did on screen. The throw survives only
+ * for headless callers that inject no rasteriser.
  */
 
 // NUMERIC CODEPOINTS, NOT LITERAL CHARACTERS, ON PURPOSE. Every key here is

@@ -2294,35 +2294,35 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
       // out (taste-judge finding, night run 2026-07-19). A later deliberate
       // tap still selects it like any text object — one grammar, kept.
       if (!draft) selectAnnotation(doc, created.id);
-      // TELL THEM NOW, WHILE THE CURSOR IS STILL THERE. A standard font encodes
-      // through WinAnsi; an emoji or a CJK character in one makes pdf-lib throw
-      // at export, and core/export.js has no per-annotation guard, so the whole
-      // document fails to save. Discovering that at Unduh means discovering it
-      // after all the work is done (2026-07-28: 41 attempts, 82 minutes, zero
-      // exports). Here it costs one keystroke to fix.
+      // COUNT IT, DON'T WARN ABOUT IT (changed 2026-09-06). This used to toast
+      // `Huruf ✓ nggak bisa disimpan pakai font ini` — true from 2026-07-29,
+      // when a character a standard font cannot encode aborted the whole
+      // export, and the toast was the only defence. It is FALSE now:
+      // core/export.js paints such an annotation as an image the browser
+      // rendered (drawTextAsImage, js/v2/text-raster.js) and the export goes
+      // through. The rail showed the warning never worked as a defence anyway:
+      // one user pressed through it 24 times in 14 minutes and still left with
+      // nothing (2026-08-31). A warning that names a wall that no longer
+      // exists is copy doing no job, so it is deleted rather than reworded
+      // (his standing instruction, 2026-08-28); if he wants a heads-up that
+      // the character ships as an image, that is his copy to write.
       //
-      // WARN, never DROP (founder ruling via PM, 2026-07-29): deleting a
-      // character the user can SEE is worse than telling them about it. The
-      // export decline stays as the backstop. Same shape as the encrypted-PDF
-      // warning at import.
-      // AUTHORED TEXT ONLY. A Ganti Teks replace has already run a real
-      // coverage check against the document's own font a few lines up, and
-      // says something more precise ("font pengganti yang mirip"). Warning
-      // here too would overwrite that with a blunter message, and would be a
-      // FALSE ALARM whenever the clone font can paint the glyph (Arimo has
-      // Cyrillic; the export would have been fine). Caught by
-      // tests/font-coverage.spec.js, which is exactly what it is there for.
+      // The failure event STAYS, unchanged in meaning: `commit/unsupported`
+      // has always meant "a character the standard font cannot encode was
+      // committed", and it still does — it is now also the count of
+      // annotations that take the raster path at export. blocked:false as
+      // before: the text below is committed either way.
+      // AUTHORED TEXT ONLY. A Ganti Teks replace runs a real coverage check
+      // against the document's own font a few lines up and reports through
+      // `insert` instead. Caught by tests/font-coverage.spec.js.
       if (!d.replaceCoverId && isStandardFamily(d.fontFamily)) {
         const bad = unencodableInStandardFont(text);
         if (bad.length) {
-          // COPY IS PLACEHOLDER - client-facing words are Fauzan's, per the seat.
-          toast(`Huruf ${bad.slice(0, 3).join(' ')} nggak bisa disimpan pakai font ini`); // TODO(copy): his words
           // `class` from the FIRST offending character only, through
           // unsupportedCharClass — which returns an enum and nothing else, so
           // the character cannot ride along. 'emoji' and 'cjk' are entirely
           // different product problems and were indistinguishable here until
-          // 2026-08-09. blocked:false because this is a WARN, not a DROP: the
-          // text below is committed either way (founder ruling 2026-07-29).
+          // 2026-08-09.
           tel('failure', {
             stage: 'commit',
             reason: 'unsupported',

@@ -24,7 +24,7 @@
 import { buildExportPlan } from './operations.js';
 import { applyPageSurgery } from './page-surgery.js';
 import { CLONE_FONT_VARIANTS, CLONE_FONT_URLS } from './clone-fonts.js';
-import { toStandardFontSafe, drawTextSafe } from './text-encode.js';
+import { toStandardFontSafe, drawTextSafe, unencodableInStandardFont } from './text-encode.js';
 import { totalPageRotation } from './page-rotation.js';
 import { orderedForPaint } from './annotation-order.js';
 
@@ -221,6 +221,60 @@ function drawWhiteout(pdfPage, anno, frame, env) {
   pdfPage.drawRectangle({ x: r.x, y: r.y, width: r.width, height: r.height, color });
 }
 
+// Can THIS embedded font paint every character of `text`? Two font kinds, two
+// honest answers: a custom/clone font (embedded through fontkit) exposes its
+// own cmap, so ask it glyph by glyph — pdf-lib would NOT throw for a missing
+// one, it paints .notdef, the silent tofu this check exists to catch. A
+// standard font has no cmap to ask; its ceiling is WinAnsi, and
+// text-encode.js already derives that set against the real vendored pdf-lib.
+// Detected from the font object itself, never from the family name: a failed
+// clone fetch hands back a STANDARD font under a custom family's name
+// (cacheFallbackFont), and asking the name would say "custom" about a font
+// that is about to throw WinAnsi.
+function fontCanPaint(font, text) {
+  const fk = font?.embedder?.font;
+  if (typeof fk?.hasGlyphForCodePoint === 'function') {
+    for (const ch of text) {
+      if (ch === '\n' || ch === '\r') continue;
+      if (!fk.hasGlyphForCodePoint(ch.codePointAt(0))) return false;
+    }
+    return true;
+  }
+  return unencodableInStandardFont(text).length === 0;
+}
+
+// THE GLYPH FALLBACK (2026-09-06). A character the PDF font cannot paint used
+// to abort the ENTIRE export: measured on the rail 2026-08-23..09-05, six
+// sessions hit `export/unsupported`, five exported nothing, one user retried
+// 24 times. Every one had seen the character painted correctly on screen,
+// because the screen uses the browser's fonts. So when the adapter injects a
+// rasteriser (js/v2/text-raster.js — same font string the overlay used), THIS
+// annotation alone is embedded as an image at the exact place and size the
+// text would have gone; every other annotation stays real text. Headless
+// callers inject nothing and keep the old behaviour: the throw.
+//
+// This supersedes the 2026-07-29 "warn at commit, keep the export decline as
+// the backstop" ruling, which was made with zero data. The data says the
+// backstop was the wall. Seat ruling + receipts: ../decisions.md 2026-09-06.
+async function drawTextAsImage(pdfPage, anno, frame, env, text) {
+  let raster = null;
+  try {
+    raster = await env.rasterizeText({ ...anno, text });
+  } catch (err) {
+    console.warn('[core/export] text raster failed, falling back to drawText:', err);
+    return false;
+  }
+  if (!raster || !raster.png || !(raster.width > 0) || !(raster.height > 0)) return false;
+  const img = await env.newDoc.embedPng(raster.png);
+  // Anchor at the view-space BOTTOM-LEFT of the block, exactly like drawSignature.
+  const yV = anno.y + raster.height;
+  const { x, y } = transformAnnotationCoords(frame.rotation, anno.x, yV, frame.wU, frame.hU);
+  pdfPage.drawImage(img, {
+    x, y, width: raster.width, height: raster.height, rotate: env.PDFLib.degrees(frame.rotation),
+  });
+  return true;
+}
+
 async function drawText(pdfPage, anno, frame, env) {
   const font = await env.getFont(anno.fontFamily, anno.bold, anno.italic);
   const color = parseHexColor(env.PDFLib, anno.color);
@@ -233,7 +287,11 @@ async function drawText(pdfPage, anno, frame, env) {
   // the whole document. That is the 2026-07-28 incident (41 failed downloads,
   // 82 minutes of work). Applied to custom fonts too: they do not throw, they
   // paint .notdef, and a real space beats a tofu box.
-  const lines = toStandardFontSafe(anno.text).split('\n');
+  const safeText = toStandardFontSafe(anno.text);
+  if (typeof env.rasterizeText === 'function' && !fontCanPaint(font, safeText)) {
+    if (await drawTextAsImage(pdfPage, { ...anno, fontSize: size }, frame, env, safeText)) return;
+  }
+  const lines = safeText.split('\n');
   for (let i = 0; i < lines.length; i += 1) {
     const yV = anno.y + size * TEXT_BASELINE_RATIO + i * size * TEXT_LINE_HEIGHT;
     const { x, y } = transformAnnotationCoords(frame.rotation, anno.x, yV, frame.wU, frame.hU);
@@ -383,6 +441,7 @@ export async function buildPdfBytes(doc, deps = {}) {
   const env = {
     PDFLib, fontkit, newDoc, fontCache: {}, imageCache: new Map(),
     onFontFallback: deps.onFontFallback || null, // see cacheFallbackFont
+    rasterizeText: deps.rasterizeText || null,   // see drawTextAsImage
   };
   env.getFont = (family, bold, italic) => getFont(env, family, bold, italic);
 

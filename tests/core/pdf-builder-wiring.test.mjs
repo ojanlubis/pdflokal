@@ -19,6 +19,10 @@ test('buildPdfArtifact returns the bytes and whether a fallback happened', async
     buildPdf: async (doc, deps) => {
       assert.deepEqual(doc.pages, ['page']);
       depsSeen.push(deps.PDFLib, deps.fontkit);
+      // The glyph fallback rides through this same adapter (2026-09-06): every
+      // UI route gets the browser rasteriser, or a ✓ in Helvetica kills the
+      // export again for whichever route forgot it.
+      assert.equal(typeof deps.rasterizeText, 'function', 'the adapter must inject rasterizeText');
       deps.onFontFallback();
       return new Uint8Array([37, 80, 68, 70]);
     },
