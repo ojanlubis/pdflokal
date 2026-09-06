@@ -60,26 +60,63 @@
   <script defer src="/_vercel/insights/script.js"></script>
 
   <style>
+    /* ---- LAYOUT (2026-09-06) ----
+       page-base.css still gives .donate-page its padding and centres its
+       text; this block overrides the centring above 900px where the two
+       columns need a left edge. Widths sit on the site's own column. */
     .donate-page {
-      max-width: 900px;
+      max-width: var(--column);
       margin: 0 auto;
     }
 
+    /* Band 1: the person, the hat, the performance. Areas, not source order,
+       because the work-log button must follow the hat on a phone and follow
+       the PERSON on desktop, and it is one element. */
+    .dk-atas {
+      display: grid;
+      /* PHONE ORDER, ranked: the name, then the hat, then the paragraph,
+         then the log. The intro is the argument, and the argument is what a
+         reader concludes after seeing the face and the code — so on a phone
+         it follows them instead of pushing the QR under the fold (measured:
+         QR top at 973px on a 812px screen with the intro first). */
+      grid-template-areas: "judul" "orang" "topi" "intro" "log";
+      gap: var(--sp-24);
+      margin-bottom: var(--sp-64);
+    }
+    .dk-atas h1     { grid-area: judul; }
+    .donate-intro   { grid-area: intro; }
+    .performer      { grid-area: orang; }
+    .topi           { grid-area: topi; }
+    .dk-atas .rw-buka { grid-area: log; justify-self: center; }
+
+    .dk-atas h1 {
+      font-size: var(--fs-4);
+      font-weight: 700;
+      letter-spacing: -.02em;
+      line-height: 1.1;
+      margin-bottom: var(--sp-16);
+    }
+    .donate-intro {
+      max-width: var(--measure);
+      margin: 0 auto;
+      font-size: var(--fs-0);
+    }
+    /* page-base.css pads .donate-page 64/24 on top of .pg-wrap's gutter;
+       on a 375px screen that left 295px for a 288px card. The gutter is
+       enough. */
+    .donate-page { padding: var(--sp-24) 0 0; }
+
     /* ---- THE HAT (2026-08-27, founder brief: "a street performer that has
        done performance and is now receiving donations in his hat"). The
-       person stands on the THEMED ground; the white card below is the hat he
-       is holding out. Face, name and the QR are one destination, in that
+       person stands on the THEMED ground; the white card is the hat he is
+       holding out. Face, name and the QR are one destination, in that
        reading order — his ruling 2026-08-22 is that the face, the name and a
        contact channel travel together, so none of the three ships alone. */
-    .performer {
-      text-align: center;
-      margin-bottom: var(--sp-24);
-    }
+    .performer { text-align: center; }
 
     /* SIDE BY SIDE, not stacked (his ruling 2026-08-28: "ini jangan atas
-       bawah, mending sebelahan"). The row is an inline-flex so it still
-       centres inside the card while the face and the name sit beside each
-       other. */
+       bawah, mending sebelahan"). Inline-flex so it centres on a phone and
+       sits on the left edge on desktop. */
     .performer-id {
       display: inline-flex;
       align-items: center;
@@ -96,8 +133,8 @@
     }
 
     .performer-face {
-      width: 64px;
-      height: 64px;
+      width: 72px;
+      height: 72px;
       border-radius: 50%;
       object-fit: cover;
       /* A ring, not a shadow: on two different grounds a shadow reads as a
@@ -111,13 +148,13 @@
       top: -6px;
       left: 50%;
       transform: translateX(-50%) rotate(-12deg);
-      font-size: 1.75rem;
+      font-size: 1.875rem;
       line-height: 1;
       pointer-events: none;
     }
 
     .performer-name {
-      font-size: 1.125rem;
+      font-size: var(--fs-2);
       font-weight: 700;
       color: var(--ink);
       line-height: 1.2;
@@ -127,7 +164,7 @@
        LICENSE and on GitHub, so a stranger can check it. "Ojan" alone is
        warmth with nothing to check. */
     .performer-real {
-      font-size: var(--fs-n1);
+      font-size: var(--fs-0);
       color: var(--muted);
       margin-top: 2px;
     }
@@ -135,10 +172,33 @@
     .performer-line {
       max-width: 30rem;
       margin: var(--sp-16) auto 0;
-      font-size: 1rem;
+      font-size: var(--fs-0);
       color: var(--ink);
       line-height: 1.6;
     }
+
+    /* The field the hat sits in: the landing dropzone's own fill, so the
+       white card reads as an object on a ground rather than a white box on
+       a white page (which is what it was in light mode). */
+    .topi {
+      background: var(--dzfill);
+      border-radius: var(--r-panel);
+      padding: var(--sp-32) var(--sp-24);
+      text-align: center;
+    }
+    .topi h2 {
+      font-size: var(--fs-1);
+      font-weight: 600;
+      margin-bottom: var(--sp-16);
+    }
+    .topi-nominal {
+      max-width: 22rem;
+      margin: var(--sp-16) auto 0;
+      font-size: var(--fs-n1);
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    .topi-nominal strong { color: var(--ink); }
 
     /* ⚠️ THIS CARD IS WHITE IN BOTH THEMES, ON PURPOSE. A QR code has to keep
        its quiet zone and its contrast to stay scannable, so the ground here is
@@ -150,9 +210,9 @@
     .qr-card {
       background: white;
       border-radius: var(--r-panel);
-      padding: var(--sp-32);
+      padding: var(--sp-24);
       text-align: center;
-      border: 1px solid var(--line);
+      border: 1px solid rgba(63,49,35,.14);
       max-width: 320px;
       margin: 0 auto;
     }
@@ -172,9 +232,11 @@
     }
 
     .qr-image {
+      display: block;
       width: 100%;
       max-width: 240px;
       height: auto;
+      margin: 0 auto;
       border-radius: var(--r-control);
     }
 
@@ -186,6 +248,44 @@
       color: #57504a;
     }
 
+    /* Download QR — pinned colours for the same reason as the caption. A
+       bordered button, not the accent: the act of this card is the scan,
+       and a red button under a payment code would read as "pay here". */
+    .qr-unduh {
+      display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-8);
+      min-height: 44px; padding: 0 var(--sp-24);
+      margin-top: var(--sp-16);
+      border: 1px solid rgba(63,49,35,.24);
+      border-radius: var(--r-button);
+      color: #211d1a;
+      font-size: var(--fs-n1); font-weight: 600;
+      text-decoration: none;
+    }
+    .qr-unduh svg { width: 16px; height: 16px; }
+    @media (hover: hover) { .qr-unduh:hover { background: #f6f5f3; color: #211d1a; } }
+    .qr-unduh:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+    /* Band 2: other ways + FAQ. One column on a phone, two from 900px. */
+    .dk-bawah {
+      display: grid;
+      gap: var(--sp-48);
+      text-align: left;
+    }
+    .other-ways li p { color: var(--muted); font-size: var(--fs-n1); margin-top: 4px; line-height: 1.5; }
+    .other-ways li strong { font-size: var(--fs-0); }
+
+    .dk-balik {
+      margin-top: var(--sp-48);
+      text-align: left;
+    }
+    .dk-balik a {
+      display: inline-flex; align-items: center; gap: var(--sp-8);
+      min-height: 44px;
+      color: var(--ink); font-weight: 600; font-size: var(--fs-0);
+    }
+    .dk-balik a svg { width: 18px; height: 18px; }
+    @media (hover: hover) { .dk-balik a:hover { color: var(--accent); } }
+    .dk-balik a:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: var(--r-control); }
 
     /* ---- THE WORK LOG DRAWER (2026-08-28) ----
        His brief, in three corrections: "put it somewhere bentuknya slider aja...
@@ -202,20 +302,21 @@
        There is deliberately NO total anywhere. A count would let the reader
        stop scrolling, and the scrolling IS the evidence. */
     .rw-buka {
-      display: block;
-      margin: 0 auto var(--sp-48);
+      display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-12);
+      min-height: 48px;
       padding: 0 var(--sp-24);
-      min-height: 44px;
       background: none;
       border: 1px solid var(--line);
       border-radius: var(--r-button);
       color: var(--ink);
       font: inherit;
-      font-size: var(--fs-n1);
+      font-size: var(--fs-0);
       font-weight: 600;
       cursor: pointer;
     }
-    .rw-buka:hover { background: var(--surface); }
+    .rw-buka svg { width: 18px; height: 18px; color: var(--muted); }
+    @media (hover: hover) { .rw-buka:hover { background: var(--dzfill); } }
+    .rw-buka:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 
     /* The dialog IS the drawer: full height, pinned right, no rounded page
        corners on the outer edge. `margin` beats the UA centring. */
@@ -306,83 +407,30 @@
       .rw-log span { grid-column: auto; display: inline; }
     }
 
-    /* ⚠️ NO COMPENSATING BORDER, MATCHING CURRENT RENDERING — unlike
-       .privacy-section on the other page, this class was never in
-       legacy-bridge.css's border-compensation list (it named
-       `.support-card, .donation-card`, stale class names this page does not
-       use), so in light mode this card has always sat edge-less on the
-       --bg page (both --surface and --bg are white). Preserved as-is rather
-       than "fixed" here — flagged in the handoff instead, since adding an
-       edge it has never had is a visual change outside this pass's scope. */
-    .donate-section {
-      background: var(--surface);
-      padding: var(--sp-48);
-      border-radius: var(--r-panel);
-      box-shadow: none;
-      margin-bottom: var(--sp-48);
-    }
-
-    .donate-section h2 {
-      text-align: center;
-      margin-bottom: var(--sp-24);
-      font-size: 1.25rem;
-    }
-
-    .transfer-steps {
-      display: flex;
-      flex-direction: column;
-      gap: var(--sp-16);
-      margin-top: var(--sp-32);
-      padding: var(--sp-24);
-      background: var(--dzbg);
-      border-radius: var(--r-button);
-      text-align: left;
-    }
-
-    .transfer-step {
-      display: flex;
-      align-items: flex-start;
-      gap: var(--sp-16);
-      text-align: left;
-    }
-
-    .step-number {
-      width: 28px;
-      height: 28px;
-      background: var(--accent);
-      color: white;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 0.875rem;
-      font-weight: 600;
-      flex-shrink: 0;
-    }
-
-    .step-text {
-      font-size: 0.9375rem;
-      color: var(--muted);
-      line-height: 1.5;
-    }
-
-    .step-text strong {
-      color: var(--ink);
+    /* DESKTOP is a different arrangement, not the same thing wider: the
+       person and the performance on the left, the hat on the right, other
+       ways beside the FAQ. */
+    @media (min-width: 900px) {
+      .donate-page { text-align: left; padding-top: var(--sp-48); }
+      .dk-atas {
+        grid-template-columns: minmax(0, 1fr) 400px;
+        grid-template-areas: "judul topi" "intro topi" "orang topi" "log topi";
+        column-gap: var(--sp-64);
+        row-gap: var(--sp-24);
+        align-items: start;
+      }
+      .dk-atas h1 { font-size: var(--fs-6); margin-bottom: 0; }
+      .donate-intro { margin-left: 0; font-size: var(--fs-1); }
+      .performer { text-align: left; margin-top: var(--sp-8); }
+      .performer-line { margin-left: 0; }
+      .dk-atas .rw-buka { justify-self: start; margin-top: var(--sp-16); }
+      .topi { padding: var(--sp-32); }
+      .dk-bawah { grid-template-columns: 1fr 1fr; column-gap: var(--sp-64); }
     }
 
     @media (max-width: 480px) {
-      .qr-card {
-        padding: var(--sp-24);
-        max-width: 280px;
-      }
-
-      .qr-image {
-        max-width: 200px;
-      }
-
-      .donate-section {
-        padding: var(--sp-24);
-      }
+      .qr-card { max-width: 288px; }
+      .qr-image { max-width: 208px; }
     }
   </style>
 </head>
@@ -461,144 +509,162 @@
     </div>
   </div>
 
-  <!-- Main Content -->
+  <!-- Main Content.
+       LAYOUT, 2026-09-06: one page, two bands, each ranked.
+       Band 1 (.dk-atas) — the person and the hat. On a phone it stacks:
+       name → the hat → the work log. From 900px it is two columns: the person
+       and the performance on the left, the hat held out on the right, so the
+       face sits BESIDE the code it asks for — an adjacency a phone cannot
+       suggest. The QR is on screen one at both viewports; before this it sat
+       under three paragraphs and a heading and fell below the 800px fold.
+       Band 2 (.dk-bawah) — other ways + FAQ, side by side on desktop.
+       Every user-visible string here is his (2026-08-28) or the one he gave
+       on 2026-09-06 ("Download QR"). Nothing was rewritten. -->
   <main class="pg-wrap">
     <div class="donate-page">
-      <h1>Dukung PDFLokal</h1>
 
-      <p class="donate-intro">
-        PDFLokal saya bikin biar kamu bisa urus dokumen tanpa ribet.
-        <br><br>
-        Nggak ada iklan. Nggak ada paywall. File kamu nggak pernah diupload kemana-mana.
-        <br><br>
-        Kalau PDFLokal ngebantu kamu, boleh banget traktir saya kopi sebagai bentuk dukungan.
-      </p>
+      <section class="dk-atas">
+          <h1>Dukung PDFLokal</h1>
 
-      <!-- Traktir Kopi Section — the hat. See .performer / .hat in the style
-           block for why the person sits outside the white card. -->
-      <div class="donate-section">
-        <h2>Traktir Kopi</h2>
+          <p class="donate-intro">
+            PDFLokal saya bikin biar kamu bisa urus dokumen tanpa ribet.
+            Nggak ada iklan. Nggak ada paywall. File kamu nggak pernah diupload kemana-mana.
+            Kalau PDFLokal ngebantu kamu, boleh banget traktir saya kopi sebagai bentuk dukungan.
+          </p>
 
-        <div class="performer">
-          <div class="performer-id">
-            <div class="performer-kepala">
-              <span class="performer-topi" aria-hidden="true">🎩</span>
-              <img src="images/ojan.jpg" alt="Foto Fauzan Ahladzikri (Ojan)" class="performer-face" width="64" height="64">
+          <!-- The performer. See .performer / .hat in the style block for why
+               the person stands OUTSIDE the hat. -->
+          <div class="performer">
+            <div class="performer-id">
+              <div class="performer-kepala">
+                <span class="performer-topi" aria-hidden="true">🎩</span>
+                <img src="images/ojan.jpg" alt="Foto Fauzan Ahladzikri (Ojan)" class="performer-face" width="72" height="72">
+              </div>
+              <div>
+                <div class="performer-name">Ojan</div>
+                <div class="performer-real">Fauzan Ahladzikri</div>
+              </div>
             </div>
-            <div>
-              <div class="performer-name">Ojan</div>
-              <div class="performer-real">Fauzan Ahladzikri</div>
-            </div>
+            <p class="performer-line">
+              Makasih udah mampir. Kalau tadi PDFLokal beneran ngebantu kamu,
+              seikhlasnya aja.
+            </p>
           </div>
-          <p class="performer-line">
-            Makasih udah mampir. Kalau tadi PDFLokal beneran ngebantu kamu,
-            seikhlasnya aja.
-          </p>
+
+        <!-- THE HAT. A field of the landing's dropzone grey holding one white
+             card — the same figure/ground the homepage uses for its dropzone,
+             so this page finally shares the site's face. The card is white in
+             both themes (QR contrast); the field follows the theme. -->
+        <div class="topi">
+          <h2>Traktir Kopi</h2>
+
+          <div class="qr-card">
+            <img src="images/qris-logo.svg" alt="QRIS" class="qris-logo" width="180" height="29">
+            <img src="images/qris.png" alt="QRIS - Scan untuk traktir kopi" class="qr-image" width="645" height="649">
+            <p class="qr-caption">Scan pakai aplikasi e-wallet atau mobile banking kamu</p>
+            <!-- His ask, 2026-09-06: a phone can screenshot, "tp boleh juga
+                 tambahin 'download QR'". A download attribute on the real
+                 asset; nothing is generated. Pinned colours: white ground. -->
+            <a class="qr-unduh" href="/images/qris.png" download="QRIS-PDFLokal.png">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M4 20h16"/></svg>
+              Download QR
+            </a>
+          </div>
+
+          <p class="topi-nominal">Masukin nominal sesuai keinginan, <strong>secangkir kopi aja udah bikin semangat!</strong></p>
         </div>
 
-        <div class="qr-card">
-          <img src="images/qris-logo.svg" alt="QRIS" class="qris-logo" width="180" height="29">
-          <img src="images/qris.png" alt="QRIS - Scan untuk traktir kopi" class="qr-image">
-          <p class="qr-caption">Scan pakai aplikasi e-wallet atau mobile banking kamu</p>
+        <!-- Opens the work-log drawer. Under the person on desktop, under the
+             hat on a phone: it is the performance the hat is asking to be paid
+             for, so it sits with the performer, not in the FAQ. -->
+        <button type="button" class="rw-buka" id="rw-buka">
+          <span>Development PDFLokal</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
+        </button>
+      </section>
+
+      <section class="dk-bawah">
+        <!-- Other Ways to Support -->
+        <div class="other-ways">
+          <h2>Nggak Mau Traktir? Gapapa!</h2>
+          <ul>
+            <li>
+              <span>⭐</span>
+              <div>
+                <strong>Kasih Star di GitHub</strong>
+                <p>Bantu lebih banyak orang nemuin PDFLokal dengan kasih star di repo GitHub saya.</p>
+              </div>
+            </li>
+            <li>
+              <span>📢</span>
+              <div>
+                <strong>Ceritain ke Temen</strong>
+                <p>Share PDFLokal ke temen, keluarga, atau rekan kerja yang sering ngurusin dokumen.</p>
+              </div>
+            </li>
+            <li>
+              <span>🐛</span>
+              <div>
+                <strong>Laporin Bug</strong>
+                <p>Nemu error? <a href="https://tiktok.com/@okeojan" target="_blank" rel="noopener">DM saya di TikTok</a> atau buka issue di GitHub biar saya bisa benerin.</p>
+              </div>
+            </li>
+            <li>
+              <span>💻</span>
+              <div>
+                <strong>Kontribusi Kode</strong>
+                <p>PDFLokal itu open source. Pull request selalu saya sambut!</p>
+              </div>
+            </li>
+          </ul>
         </div>
 
-        <div class="transfer-steps">
-          <div class="transfer-step">
-            <div class="step-text">Masukin nominal sesuai keinginan, <strong>secangkir kopi aja udah bikin semangat!</strong></div>
+        <!-- FAQ -->
+        <div class="faq-section">
+          <h2>Tanya Jawab</h2>
+
+          <div class="faq-item">
+            <h3>Kenapa PDFLokal gratis?</h3>
+            <p>
+              Menurut saya, tools buat urus dokumen itu harusnya gratis.
+              Masa iya harus bayar cuma buat gabung PDF atau kompres gambar?
+            </p>
+          </div>
+
+          <div class="faq-item">
+            <h3>Kalau aku traktir kopi, fiturnya jadi berbayar nggak?</h3>
+            <p>
+              Nggak dong. Semua fitur yang ada sekarang bakal tetap gratis buat semua orang selamanya.
+              Traktiran kopi ini buat bantu biaya domain, hosting, dan development fitur baru.
+            </p>
+          </div>
+
+          <div class="faq-item">
+            <h3>File aku aman nggak?</h3>
+            <p>
+              Aman banget. Semua proses jalan langsung di browser kamu. File nggak pernah diupload ke server manapun.
+              Nggak percaya? Cek sendiri source code-nya, semuanya open source.
+            </p>
+          </div>
+
+          <div class="faq-item">
+            <h3>Bakal ada fitur premium?</h3>
+            <p>
+              Nggak ada dan nggak akan pernah ada. PDFLokal ini proyek pribadi yang saya buka buat umum, bukan bisnis.
+              Kalau ada fitur yang butuh server (kayak konversi Word), saya bakal cari cara biar tetap gratis.
+            </p>
           </div>
         </div>
-      </div>
+      </section>
 
-      <!-- Opens the work-log drawer. Under the hat on purpose: it is the
-           performance the hat is asking to be paid for. -->
-      <button type="button" class="rw-buka" id="rw-buka">Development PDFLokal</button>
-
-      <!-- Other Ways to Support -->
-      <div class="other-ways">
-        <h2>Nggak Mau Traktir? Gapapa!</h2>
-        <ul>
-          <li>
-            <span>⭐</span>
-            <div>
-              <strong>Kasih Star di GitHub</strong>
-              <p style="color: var(--muted); font-size: 0.9375rem; margin-top: 4px;">
-                Bantu lebih banyak orang nemuin PDFLokal dengan kasih star di repo GitHub saya.
-              </p>
-            </div>
-          </li>
-          <li>
-            <span>📢</span>
-            <div>
-              <strong>Ceritain ke Temen</strong>
-              <p style="color: var(--muted); font-size: 0.9375rem; margin-top: 4px;">
-                Share PDFLokal ke temen, keluarga, atau rekan kerja yang sering ngurusin dokumen.
-              </p>
-            </div>
-          </li>
-          <li>
-            <span>🐛</span>
-            <div>
-              <strong>Laporin Bug</strong>
-              <p style="color: var(--muted); font-size: 0.9375rem; margin-top: 4px;">
-                Nemu error? <a href="https://tiktok.com/@okeojan" target="_blank" rel="noopener">DM saya di TikTok</a> atau buka issue di GitHub biar saya bisa benerin.
-              </p>
-            </div>
-          </li>
-          <li>
-            <span>💻</span>
-            <div>
-              <strong>Kontribusi Kode</strong>
-              <p style="color: var(--muted); font-size: 0.9375rem; margin-top: 4px;">
-                PDFLokal itu open source. Pull request selalu saya sambut!
-              </p>
-            </div>
-          </li>
-        </ul>
-      </div>
-
-      <!-- FAQ -->
-      <div class="faq-section">
-        <h2>Tanya Jawab</h2>
-
-        <div class="faq-item">
-          <h3>Kenapa PDFLokal gratis?</h3>
-          <p>
-            Menurut saya, tools buat urus dokumen itu harusnya gratis.
-            Masa iya harus bayar cuma buat gabung PDF atau kompres gambar?
-          </p>
-        </div>
-
-        <div class="faq-item">
-          <h3>Kalau aku traktir kopi, fiturnya jadi berbayar nggak?</h3>
-          <p>
-            Nggak dong. Semua fitur yang ada sekarang bakal tetap gratis buat semua orang selamanya.
-            Traktiran kopi ini buat bantu biaya domain, hosting, dan development fitur baru.
-          </p>
-        </div>
-
-        <div class="faq-item">
-          <h3>File aku aman nggak?</h3>
-          <p>
-            Aman banget. Semua proses jalan langsung di browser kamu. File nggak pernah diupload ke server manapun.
-            Nggak percaya? Cek sendiri source code-nya, semuanya open source.
-          </p>
-        </div>
-
-        <div class="faq-item">
-          <h3>Bakal ada fitur premium?</h3>
-          <p>
-            Nggak ada dan nggak akan pernah ada. PDFLokal ini proyek pribadi yang saya buka buat umum, bukan bisnis.
-            Kalau ada fitur yang butuh server (kayak konversi Word), saya bakal cari cara biar tetap gratis.
-          </p>
-        </div>
-      </div>
-
-      <!-- Thank You -->
-      <div style="text-align: center; padding: var(--sp-48) 0;">
-        <a href="/" class="pg-btn" style="margin-top: var(--sp-24);">
+      <!-- The way back. A link, not the page's only red: the exit was the
+           loudest element on a page whose act is the QR. -->
+      <p class="dk-balik">
+        <a href="/">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m11 18-6-6 6-6"/></svg>
           Balik ke Tools
         </a>
-      </div>
+      </p>
     </div>
   </main>
 
