@@ -131,6 +131,9 @@ const CAUSE_NAMES = new Set([
 
 // First match wins; ordered from the most specific family to the broadest.
 const HINTS = [
+  // Our own 0-byte guard in v2/app.js (`new Error('empty file')`): a phone picker that hands over a
+  // File with size 0 (cloud-backed, not yet downloaded). First real failure_cause row, 2026-09-06.
+  ['empty', /empty file|zero.?byte|\b0 bytes/i],
   ['encode', /cannot encode|winansi/i],
   ['glyph', /glyph|cmap|no font|font.*not (?:found|loaded)|fontkit/i],
   ['alloc', /invalid string length|array buffer allocation|out of memory|allocation size overflow|invalid typed array length|memory/i],

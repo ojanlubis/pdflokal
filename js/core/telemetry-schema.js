@@ -640,7 +640,7 @@ export const SCHEMA = {
       'other', 'none',
     ],
     hint: [
-      'encode', 'glyph', 'alloc', 'stack', 'encrypted', 'parse', 'image',
+      'empty', 'encode', 'glyph', 'alloc', 'stack', 'encrypted', 'parse', 'image',
       'undefined-prop', 'worker', 'fetch', 'timeout', 'none',
     ],
   },

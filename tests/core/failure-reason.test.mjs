@@ -192,7 +192,7 @@ test('13. failureCause and the schema agree on the enum lists BOTH ways (no dead
     assert.equal(failureCause({ name, message: '' }).name, name, `schema name ${name} is not recognised by failureCause`);
   }
   const samples = {
-    encode: 'WinAnsi cannot encode', glyph: 'no glyph', alloc: 'out of memory', stack: 'Maximum call stack size exceeded',
+    empty: 'empty file', encode: 'WinAnsi cannot encode', glyph: 'no glyph', alloc: 'out of memory', stack: 'Maximum call stack size exceeded',
     encrypted: 'is encrypted', parse: 'Failed to parse PDF', image: 'image decode', 'undefined-prop': 'x is not a function',
     worker: 'worker died', fetch: 'fetch failed', timeout: 'timed out', none: '',
   };
@@ -200,4 +200,13 @@ test('13. failureCause and the schema agree on the enum lists BOTH ways (no dead
     assert.ok(hint in samples, `schema hint ${hint} has no sample here — add one`);
     assert.equal(failureCause(new Error(samples[hint])).hint, hint, `hint ${hint} unreachable`);
   }
+});
+
+test('14. failureCause names the 0-byte import (app.js throws new Error(\'empty file\')) as hint empty', () => {
+  // 2026-09-06: the first real failure_cause row on the rail was import/Error/none — a plain Error
+  // whose message matched no hint. The only plain-Error throw on the import path is the 0-byte guard,
+  // and without its own hint it is indistinguishable from any error we have never seen.
+  assert.deepEqual(failureCause(new Error('empty file')), { name: 'Error', hint: 'empty' });
+  assert.equal(failureCause(new Error('File is 0 bytes')).hint, 'empty');
+  assert.equal(failureCause(new Error('zero-byte upload')).hint, 'empty');
 });
