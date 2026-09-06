@@ -219,14 +219,17 @@
 
     /* The QRIS mark, above every QR code in the product. It is what a payer
        looks for to know the code is the national standard and their own wallet
-       will read it. Self-hosted like every other asset here, never a CDN. */
+       will read it. Self-hosted like every other asset here, never a CDN.
+       THE WORDMARK ALONE, his ruling 2026-09-06: "the QRIS header that 'QR Code
+       standar pembayaran nasional' one, is bad i think we dont need that, just
+       QRIS logo is okay". qris-mark.svg is the official lockup (qris-logo.svg)
+       with its viewBox cut to the bracketed wordmark — same paths, no third-
+       party file. 88px: at 64 the brackets thin out, at 112 it crowds the QR.
+       The editor's support card and the SEO pages still carry the full lockup
+       at 150px — a separate surface, not swapped here. */
     .qris-logo {
       display: block;
-      /* The official lockup includes "QR Code Standar Pembayaran Nasional".
-         Measured: the tagline stops being legible below ~150px, so this is a
-         floor, not a preference. The wordmark ALONE was tried first and he
-         refused it — on its own the brackets read as a glitch, not a mark. */
-      width: 180px;
+      width: 88px;
       height: auto;
       margin: 0 auto var(--sp-16);
     }
@@ -559,7 +562,7 @@
           <h2>Traktir Kopi</h2>
 
           <div class="qr-card">
-            <img src="images/qris-logo.svg" alt="QRIS" class="qris-logo" width="180" height="29">
+            <img src="images/qris-mark.svg" alt="QRIS" class="qris-logo" width="88" height="33">
             <img src="images/qris.png" alt="QRIS - Scan untuk traktir kopi" class="qr-image" width="645" height="649">
             <p class="qr-caption">Scan pakai aplikasi e-wallet atau mobile banking kamu</p>
             <!-- His ask, 2026-09-06: a phone can screenshot, "tp boleh juga
