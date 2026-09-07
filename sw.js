@@ -16,7 +16,25 @@
 // Edit-beta deploy left on returning visitors' devices (Sentry JAVASCRIPT-P —
 // see the module-graph note in the fetch handler below). Bump this whenever a
 // deploy could leave a stale entry that no longer matches its siblings.
-const CACHE = 'pdflokal-shell-v2';
+//
+// Bumped v2 -> v3 on 2026-09-07 for the SAME class, measured again: Sentry
+// JAVASCRIPT-V/J (4+2 events, 2026-08-18 → 08-30) is a STALE HTML served beside
+// a fresh app.js — `document.getElementById('fm-pages')` returns null and the
+// module dies at top level, though every page on disk has carried that id since
+// 2026-08-09. JAVASCRIPT-Y/Z (2+1 events) is the module half: a stale
+// telemetry-schema.js beside a sibling importing `ocrLinesBucket`, which landed
+// 2026-08-23. Both kill js/v2/app.js at module top level, so the editor, the
+// toolbar AND the telemetry all go with it — the rail cannot report this by
+// construction, because the reporting module is part of the dead graph.
+//
+// ⚠️ THE BUMP CURES THE STRANDED, NOT THE CLASS. It evicts the poisoned v2
+// caches once (see the activate handler below). It does nothing about the
+// mechanism that poisons v3: the offline fallback in the /js/ branch below is
+// PER-FILE, so one module can still fall back to a stale cached copy while its
+// siblings arrive fresh. The recovery for that is the boot guard in
+// index.html's <head> — a matched-generation cache is the real fix and is not
+// built. tests/core/sw-cache-generation.test.mjs names the poisoned generations.
+const CACHE = 'pdflokal-shell-v3';
 const PRECACHE = [
   '/',
   '/manifest.webmanifest',
