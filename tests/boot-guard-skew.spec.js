@@ -10,65 +10,88 @@
  * the premise the whole guard rests on — that a browser reports a module LINK
  * failure (an import naming an export the loaded module does not have) as a
  * window `error` event with a message we can classify. That is a browser
- * behaviour claim, and only a browser can answer it.
+ * behaviour claim, and only a browser can answer it. tests/module-graph-alive.js
+ * already relies on the same mechanism reaching `pageerror`, for the null-DOM
+ * half; this covers the missing-export half and the recovery.
  *
- * The mismatch is manufactured the way the deploy manufactures it: the module
- * graph is served as a MIXTURE. js/core/telemetry-schema.js is rewritten on the
- * wire with `ocrLinesBucket` removed, exactly the shape of Sentry JAVASCRIPT-Y/Z
- * (2026-08-25, 08-28), while every sibling is served fresh. The interception is
- * then dropped, so the reload the guard triggers gets a coherent set — which is
- * what a real heal gets once the stale cache is gone.
+ * ⚠️ THREE THINGS THE OBVIOUS VERSION OF THIS TEST GETS WRONG, all of which
+ * make a CORRECT guard look broken. Written down because each one cost a read:
+ *
+ *   1. `page.on('load')` cannot count the heal. The module error fires before
+ *      `load`, and purging two empty caches takes milliseconds — so the reload
+ *      usually lands before the first document's `load` event ever fires, and a
+ *      correct heal reports ONE load. The counter has to live in
+ *      sessionStorage, which survives a reload in the same tab.
+ *   2. `addInitScript` writing to `window` cannot count it either: every
+ *      document gets a fresh window, so the count is always 1.
+ *   3. The stale route must serve the stale body EXACTLY ONCE, not be removed
+ *      on a timer. The reload re-requests the module within milliseconds; a
+ *      route still armed serves it stale a second time, the second boot dies
+ *      too, the guard correctly reports 'repeat' and does NOT reload — and the
+ *      test fails having measured its own race.
  */
 import { test, expect } from '@playwright/test';
 
-const SCHEMA_URL = /js\/core\/telemetry-schema\.js/;
+const BOOTS = `sessionStorage.setItem('__boots', String(Number(sessionStorage.getItem('__boots') || 0) + 1));`;
+
+async function boots(page) {
+  // Tolerates the execution context being destroyed mid-navigation, which is
+  // exactly what this test is trying to observe.
+  try {
+    return await page.evaluate(() => Number(sessionStorage.getItem('__boots') || 0));
+  } catch {
+    return -1;
+  }
+}
 
 test('a stale module beside fresh siblings self-heals: exactly one reload, then a booted editor', async ({ page }) => {
-  let loads = 0;
-  // Counted in the PAGE, not from navigation events: a reload the guard triggers
-  // and a navigation Playwright triggers look identical from the outside, and
-  // this test's whole verdict is "how many times did the document execute".
-  await page.addInitScript(() => { window.__bootCount = (window.__bootCount || 0) + 1; });
-  page.on('load', () => { loads++; });
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.addInitScript(BOOTS);
 
   // THE SKEW. One module served stale (its `ocrLinesBucket` export removed);
-  // every sibling untouched and fresh. app.js:30 imports that binding, so the
-  // graph fails to LINK — no code in it ever runs.
-  await page.route(SCHEMA_URL, async (route) => {
+  // every sibling untouched and fresh. app.js imports that binding, so the graph
+  // fails to LINK and no code in it ever runs. ONCE — see note 3 above.
+  let served = false;
+  await page.route(/js\/core\/telemetry-schema\.js/, async (route) => {
+    if (served) { await route.continue(); return; }
+    served = true;
     const res = await route.fetch();
     const body = (await res.text()).replace(/export function ocrLinesBucket/, 'function ocrLinesBucket');
     await route.fulfill({ status: 200, headers: { 'content-type': 'text/javascript' }, body });
   });
 
-  await page.goto('/');
+  // `commit`, not the default `load`: the guard's reload interrupts the first
+  // navigation, and goto() waiting on `load` can reject on that interruption.
+  await page.goto('/', { waitUntil: 'commit' });
 
-  // The guard empties caches, unregisters the SW and reloads. Drop the skew
-  // first-come-first-served: by the time the reload's request lands, the route
-  // is gone and the second load gets a coherent set.
-  await page.waitForTimeout(500);
-  await page.unroute(SCHEMA_URL);
+  // The heal happened: the document executed twice in this tab.
+  await expect.poll(() => boots(page), { timeout: 20000 }).toBe(2);
+  await page.waitForLoadState('networkidle');
 
-  // The editor booted — the toolbar exists and the module graph is alive.
-  await expect(page.locator('#btn-open')).toBeVisible({ timeout: 15000 });
-  await page.waitForFunction(() => document.getElementById('fm-pages') !== null);
+  // The SECOND boot was clean. Exactly one throw in the whole test — the skewed
+  // first load. A second entry would mean the reload did not fix anything.
+  expect(errors).toHaveLength(1);
+  expect(errors[0]).toMatch(/ocrLinesBucket|does not provide an export|Importing binding|import not found/);
 
-  // EXACTLY ONE heal. Two would be a loop, zero would mean the browser never
-  // dispatched the link failure to window and the guard is decoration.
-  expect(loads).toBe(2);
-  expect(await page.evaluate(() => window.__bootCount)).toBe(2);
-
-  // And the one-shot is spent, so a later error in this tab cannot reload again.
+  // The editor is alive, and the one-shot is spent so nothing can loop.
+  await expect(page.locator('#btn-open')).toBeVisible();
   expect(await page.evaluate(() => sessionStorage.getItem('pdflokal_boot_healed'))).toBe('1');
+  expect(await boots(page)).toBe(2); // still 2 — it did not keep reloading
 });
 
 test('a coherent set does not heal — the guard is inert on a healthy boot', async ({ page }) => {
-  let loads = 0;
-  page.on('load', () => { loads++; });
+  // The falsifier for the test above. Without it, "exactly one reload" could be
+  // measuring the guard's eagerness rather than a heal.
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.addInitScript(BOOTS);
+
   await page.goto('/');
   await expect(page.locator('#btn-open')).toBeVisible();
-  await page.waitForTimeout(500);
-  expect(loads).toBe(1);
-  // The falsifier for the test above: if the guard healed here, the "exactly one
-  // reload" assertion there would be measuring the guard's eagerness, not a heal.
+  await page.waitForLoadState('networkidle');
+
+  expect(errors).toEqual([]);
+  expect(await boots(page)).toBe(1);
   expect(await page.evaluate(() => sessionStorage.getItem('pdflokal_boot_healed'))).toBe(null);
 });
