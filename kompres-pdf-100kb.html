@@ -192,7 +192,14 @@
        with a browser error page, and that stale cache is the only copy that user has.
 
        SILENT ON PURPOSE. It reloads; it says nothing. Any words here would be
-       client-facing copy, which is Fauzan's to write, not a session's. -->
+       client-facing copy, which is Fauzan's to write, not a session's.
+
+       IT ALSO REPORTS ITSELF, and that is the other half of the fix. The rail is
+       structurally blind to this failure — js/v2/telemetry.js is inside the dead
+       graph — so the report has to be built here, by hand, importing nothing.
+       api/t.js validates it against js/core/telemetry-schema.js all the same, and
+       drops an off-schema event SILENTLY, so the shape is pinned by
+       tests/core/boot-failure-beacon.test.mjs against these exact bytes. -->
   <script>
   (function () {
     var KEY = 'pdflokal_boot_healed';
@@ -207,12 +214,47 @@
       for (var i = 0; i !== CLASSES.length; i++) { if (CLASSES[i][0].test(msg)) return CLASSES[i][1]; }
       return null;
     }
+    // A real 8-4-4-4-12: api/t.js drops the WHOLE batch on anything else, and
+    // crypto.randomUUID is absent on iOS Safari before 15.4 and in every
+    // non-secure context — not an edge case for a guard that fires on flaky
+    // mobile connections. Per pageload, never persisted, same as the rail's.
+    function uuid() {
+      try { if (crypto && typeof crypto.randomUUID === 'function') return crypto.randomUUID(); } catch (err) { /* fall through */ }
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+        var r = Math.random() * 16 | 0;
+        return (c === 'x' ? r : (r & 3 | 8)).toString(16);
+      });
+    }
+    // app_version 'dev' on purpose: api/t.js stamps its own deploy SHA. /api/rev
+    // cannot be reached without a module, and for a SKEW the build the user
+    // loaded is not one value anyway - a mixture is what is being reported.
+    function report(kind, action) {
+      try {
+        var body = JSON.stringify({
+          session_id: uuid(),
+          app_version: 'dev',
+          events: [{ event: 'boot_failure', props: { kind: kind, action: action }, dt: 0 }]
+        });
+        if (navigator.sendBeacon) {
+          navigator.sendBeacon('/api/t', new Blob([body], { type: 'application/json' }));
+        } else {
+          fetch('/api/t', { method: 'POST', body: body, keepalive: true });
+        }
+      } catch (err) { /* the report may never become the failure */ }
+    }
     function onError(e) {
-      if (!classify((e && e.message) || '')) return;
-      if (navigator.onLine === false) return;
+      var kind = classify((e && e.message) || '');
+      if (!kind) return;
+      // sendBeacon rather than a bare fetch: it is the transport specified to
+      // survive the navigation this function is about to cause.
+      if (navigator.onLine === false) { report(kind, 'declined'); return; }
       var already;
-      try { already = sessionStorage.getItem(KEY); sessionStorage.setItem(KEY, '1'); } catch (err) { return; }
-      if (already) return;
+      try { already = sessionStorage.getItem(KEY); sessionStorage.setItem(KEY, '1'); } catch (err) { report(kind, 'declined'); return; }
+      // 'repeat' = we already healed this session and it died anyway, so the
+      // reload did NOT fix it. Without this value the rail shows a heal and
+      // nothing after it, which reads as a success.
+      if (already) { report(kind, 'repeat'); return; }
+      report(kind, 'heal');
       var reload = function () { location.reload(); };
       var jobs = [];
       try {
