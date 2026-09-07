@@ -106,3 +106,39 @@ between (every other test in `ganti-font-preview.spec.js` deliberately polls unt
 lands first), then assert the committed annotation carries `docFontFamily`. Guard it against
 vacuity by asserting a `pdflokal-doc-` family actually registered in `document.fonts` — otherwise a
 fixture whose font never loads makes the test pass for free.
+
+## 2026-09-07 — the boot guard: heal once, narrowly, never offline
+
+Cross-deploy asset skew still kills `js/v2/app.js` at module top level (Sentry JAVASCRIPT-V/J/Y/Z,
+9 events, 2026-08-18 → 08-30). The 2026-07-28 network-first fix in `sw.js` closed the common path,
+not the class: the offline fallback there is **per-file**, so one module can still come back stale
+from cache while its siblings arrive fresh. When that happens there is no editor, no toolbar, and
+**no telemetry** — the rail cannot report it, because `js/v2/telemetry.js` is inside the dead graph.
+
+The recovery is an inline `<head>` script in `index.html` (inherited by the 12 generated pages) that
+empties every cache, unregisters the service worker, and reloads. Three constraints on it, and each
+one was a live choice:
+
+1. **Narrow message match, not "any error."** Healing on every error reloads users through unrelated
+   bugs, and a reload loop is strictly worse than a broken editor. It matches the module-load class
+   only, in Safari's, Chrome's and Firefox's phrasings — our 9 measured events are all Safari, and a
+   Safari-shaped fix would be a guard placed where the bug was seen rather than over the class.
+2. **Disarmed at `load`.** Every failure it exists for happens while the deferred module graph is
+   executing, which is before `load`. Staying armed afterwards would let an ordinary runtime
+   `TypeError` wipe a user's cache mid-edit.
+3. **Once per tab session, recorded in `sessionStorage`, and it fails CLOSED.** If storage cannot be
+   written (blocked storage, some private modes) it never heals at all — without a record, "once" is
+   unenforceable.
+
+**Never while offline.** Emptying the cache offline replaces a dead editor with a browser error page,
+and the stale cache is the only copy that user has. The offline check runs *before* the one-shot flag
+is written, so a user who comes back online still has their one heal.
+
+**Silent.** It reloads and says nothing. Any words would be client-facing copy, which is Fauzan's.
+
+**The class is NOT closed, and the guard is not the fix — it is the recovery.** A skew can still be
+manufactured on every deploy; the guard only makes it survivable, and only for a user who is online
+and whose storage works. The real fix is a generation-tagged cache: all `/js/` keyed by deploy SHA,
+with the offline fallback only ever serving a complete matched generation, never a mixture. That is
+a rewrite of the fetch handler plus a deploy-time SHA the client can read, and it was not attempted
+here.

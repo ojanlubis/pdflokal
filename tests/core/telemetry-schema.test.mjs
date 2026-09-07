@@ -57,6 +57,11 @@ const VALID_PROPS = {
   visual_oracle: {
     weight_ratio: 'near-parity', height_ratio: 'near-parity', overflow: false, ink_ratio: 'near-parity',
   },
+  // boot_failure (2026-09-07): sent by index.html's inline boot guard, not by
+  // any tel() call site — js/v2/telemetry.js is inside the module graph this
+  // event reports the death of. Shape pinned against the real bytes in
+  // tests/core/boot-failure-beacon.test.mjs.
+  boot_failure: { kind: 'missing-export', action: 'heal' },
   // failure_cause (2026-09-06): the two enums failureCause() can return.
   failure_cause: { stage: 'export', name: 'TypeError', hint: 'undefined-prop' },
 };

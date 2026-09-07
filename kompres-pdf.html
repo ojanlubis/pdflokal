@@ -165,6 +165,118 @@
        ⚠️ Byte-identical in index.html, privasi.html and dukung.html —
        tests/core/theme-boot-parity.test.mjs fails if they drift. -->
   <script>try{var t=localStorage.getItem('pdflokal_theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
+  <!-- BOOT GUARD. Self-heals ONCE from a skewed asset set, then gets out of the way.
+       ⚠️ GENERATED ONWARD: this lives in index.html's <head>, which the SEO generator
+       copies VERBATIM into all 12 tool pages. Edit it here and run `npm run seo`;
+       tests/core/boot-guard.test.mjs fails if the thirteen copies drift.
+
+       WHY IT EXISTS: a cross-deploy skew (stale HTML beside fresh JS, or one stale
+       module beside fresh siblings) kills js/v2/app.js at MODULE TOP LEVEL. There is
+       then no editor, no toolbar, and NO TELEMETRY — the rail is blind to this by
+       construction, because js/v2/telemetry.js is part of the dead graph. Sentry
+       JAVASCRIPT-V/J/Y/Z, 9 events, 2026-08-18 to 08-30. sw.js is network-first for
+       /js/, but its offline fallback is PER-FILE, so a flaky connection can still
+       hand one module a stale cached copy while its siblings arrive fresh.
+
+       WHY THE MATCH IS NARROW, and what was chosen: healing on EVERY error would
+       reload users through unrelated bugs, and a reload loop is strictly worse than
+       a broken editor. So three layers, and all three must hold:
+         1. the message is module-load shaped (the three classes below, in Safari's,
+            Chrome's and Firefox's phrasing — our 9 measured events are all Safari).
+         2. the guard is DISARMED at window load. Every failure it exists for happens
+            while the deferred module graph executes, which is before load.
+         3. it heals at most ONCE per tab session, recorded in sessionStorage. If
+            storage cannot be written it fails CLOSED and never heals, because
+            without a record "once" is unenforceable.
+       And never while offline: emptying the cache offline replaces a dead editor
+       with a browser error page, and that stale cache is the only copy that user has.
+
+       SILENT ON PURPOSE. It reloads; it says nothing. Any words here would be
+       client-facing copy, which is Fauzan's to write, not a session's.
+
+       IT ALSO REPORTS ITSELF, and that is the other half of the fix. The rail is
+       structurally blind to this failure — js/v2/telemetry.js is inside the dead
+       graph — so the report has to be built here, by hand, importing nothing.
+       api/t.js validates it against js/core/telemetry-schema.js all the same, and
+       drops an off-schema event SILENTLY, so the shape is pinned by
+       tests/core/boot-failure-beacon.test.mjs against these exact bytes. -->
+  <script>
+  (function () {
+    var KEY = 'pdflokal_boot_healed';
+    // The module-load class only. Order matters: the export shapes are checked
+    // before the generic syntax bucket so the more specific one wins.
+    var CLASSES = [
+      [/Importing binding name|does not provide an export|import not found/, 'missing-export'],
+      [/is not an object \(evaluating|Cannot read properties of null|\bis null\b/, 'null-dom'],
+      [/Unexpected token|Unexpected identifier|Unexpected end of|SyntaxError/, 'syntax']
+    ];
+    function classify(msg) {
+      for (var i = 0; i !== CLASSES.length; i++) { if (CLASSES[i][0].test(msg)) return CLASSES[i][1]; }
+      return null;
+    }
+    // A real 8-4-4-4-12: api/t.js drops the WHOLE batch on anything else, and
+    // crypto.randomUUID is absent on iOS Safari before 15.4 and in every
+    // non-secure context — not an edge case for a guard that fires on flaky
+    // mobile connections. Per pageload, never persisted, same as the rail's.
+    function uuid() {
+      try { if (crypto && typeof crypto.randomUUID === 'function') return crypto.randomUUID(); } catch (err) { /* fall through */ }
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+        var r = Math.random() * 16 | 0;
+        return (c === 'x' ? r : (r & 3 | 8)).toString(16);
+      });
+    }
+    // app_version 'dev' on purpose: api/t.js stamps its own deploy SHA. /api/rev
+    // cannot be reached without a module, and for a SKEW the build the user
+    // loaded is not one value anyway - a mixture is what is being reported.
+    function report(kind, action) {
+      try {
+        var body = JSON.stringify({
+          session_id: uuid(),
+          app_version: 'dev',
+          events: [{ event: 'boot_failure', props: { kind: kind, action: action }, dt: 0 }]
+        });
+        if (navigator.sendBeacon) {
+          navigator.sendBeacon('/api/t', new Blob([body], { type: 'application/json' }));
+        } else {
+          fetch('/api/t', { method: 'POST', body: body, keepalive: true });
+        }
+      } catch (err) { /* the report may never become the failure */ }
+    }
+    function onError(e) {
+      var kind = classify((e && e.message) || '');
+      if (!kind) return;
+      // sendBeacon rather than a bare fetch: it is the transport specified to
+      // survive the navigation this function is about to cause.
+      if (navigator.onLine === false) { report(kind, 'declined'); return; }
+      var already;
+      try { already = sessionStorage.getItem(KEY); sessionStorage.setItem(KEY, '1'); } catch (err) { report(kind, 'declined'); return; }
+      // 'repeat' = we already healed this session and it died anyway, so the
+      // reload did NOT fix it. Without this value the rail shows a heal and
+      // nothing after it, which reads as a success.
+      if (already) { report(kind, 'repeat'); return; }
+      report(kind, 'heal');
+      var reload = function () { location.reload(); };
+      var jobs = [];
+      try {
+        if (window.caches) {
+          jobs.push(caches.keys().then(function (ks) {
+            return Promise.all(ks.map(function (k) { return caches.delete(k); }));
+          }));
+        }
+      } catch (err) { /* nothing to purge is not a failure */ }
+      try {
+        if (navigator.serviceWorker) {
+          jobs.push(navigator.serviceWorker.getRegistrations().then(function (rs) {
+            return Promise.all(rs.map(function (r) { return r.unregister(); }));
+          }));
+        }
+      } catch (err) { /* same */ }
+      Promise.all(jobs).then(reload, reload);
+    }
+    window.addEventListener('error', onError);
+    window.addEventListener('load', function () { window.removeEventListener('error', onError); });
+  })();
+  </script>
   <style>
     :root {
       /* ⚠️ THE DESIGN TOKENS ARE NOT HERE. They live in /css/tokens.css — one

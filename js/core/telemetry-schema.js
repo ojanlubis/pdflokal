@@ -631,6 +631,40 @@ export const SCHEMA = {
   // blanks nothing: old clients simply never send it. Join to `failure` by
   // session + adjacent timestamp; the stage is repeated here so a cause is
   // readable on its own row.
+  // boot_failure (2026-09-07): THE ONE EVENT NOT EMITTED BY js/. A cross-deploy
+  // asset skew kills js/v2/app.js at module top level, and js/v2/telemetry.js is
+  // in that same graph — so there is no live code left to call tel(). The rail's
+  // blindness here is STRUCTURAL, not a missing call site: Sentry saw 9 events
+  // over twelve days (JAVASCRIPT-V/J/Y/Z, 2026-08-18 → 08-30) and our own rail
+  // saw zero, by construction.
+  //
+  // It is therefore sent by the inline boot guard in index.html's <head>, which
+  // hand-builds the envelope and imports nothing. api/t.js validates it against
+  // THIS module all the same, which is why the shape is pinned by
+  // tests/core/boot-failure-beacon.test.mjs against the actual bytes the page
+  // sends — an off-schema event is dropped SILENTLY, so a wrong shape here would
+  // look exactly like the outage it is meant to report.
+  //
+  // kind: WHICH HALF OF THE SKEW. 'missing-export' is a stale module beside a
+  // fresh sibling importing a binding it does not have; 'null-dom' is a stale
+  // HTML beside fresh JS, so an id the code expects is absent; 'syntax' is a
+  // truncated or otherwise unparseable module. They need different remedies, so
+  // one bucket for all three would make the rail unable to say which is running.
+  // action: WHAT THE GUARD DID. 'heal' = purging and reloading now. 'repeat' =
+  // it already healed this session and the page died again, i.e. the reload did
+  // NOT fix it — the one value that tells us the recovery is insufficient rather
+  // than working. 'declined' = it deliberately did not heal (offline, where
+  // emptying the cache would replace a dead editor with a browser error page, or
+  // sessionStorage unavailable, where "once" cannot be enforced).
+  //
+  // NOTE the ATTRIBUTION LIMIT: the guard sends app_version 'dev', so api/t.js
+  // stamps the SERVER's deploy SHA at arrival. That is not laziness — /api/rev
+  // cannot be consulted without a module, and for a SKEW the "build the user
+  // loaded" is not one value; a mixture of builds is precisely what is reported.
+  boot_failure: {
+    kind: ['missing-export', 'null-dom', 'syntax'],
+    action: ['heal', 'repeat', 'declined'],
+  },
   failure_cause: {
     stage: ['import', 'commit', 'export', 'compress', 'render', 'runtime', 'ocr'],
     name: [

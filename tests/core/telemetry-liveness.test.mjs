@@ -87,10 +87,49 @@ function scanCallSites() {
   return { literals, nonLiteral };
 }
 
+/*
+ * THE ONE EMITTER THAT IS NOT A tel() CALL, and why the scanner GREW rather
+ * than the assertion shrinking (2026-09-07).
+ *
+ * `boot_failure` is sent by the inline boot guard in index.html's <head>. It
+ * cannot be a tel() call: the event reports that js/v2/app.js died at module
+ * top level, and js/v2/telemetry.js is inside that same dead graph. There is
+ * no live code left to call tel(). The blindness is structural.
+ *
+ * An exemption list would have made this event invisible to the very check
+ * that exists to catch a declared-but-dead event, so each entry names WHERE
+ * the emitter is and is verified to actually be there — a positive assertion,
+ * not a waiver. The file is HTML, so the scan below looks for the event name
+ * inside the envelope the guard hand-builds.
+ */
+const INLINE_EMITTERS = { boot_failure: 'index.html' };
+
+function scanInlineEmitters() {
+  const found = new Map();
+  for (const [event, file] of Object.entries(INLINE_EMITTERS)) {
+    const src = fs.readFileSync(path.join(ROOT, file), 'utf8');
+    if (new RegExp(`event:\\s*'${event}'`).test(src)) found.set(event, [file]);
+  }
+  return found;
+}
+
+test('LIVENESS: each inline emitter is REALLY there — this list is a claim, not a waiver', () => {
+  const found = scanInlineEmitters();
+  for (const [event, file] of Object.entries(INLINE_EMITTERS)) {
+    assert.ok(
+      found.has(event),
+      `${event} is listed as emitted inline by ${file}, and it is not there. The event is declared in\n`
+      + 'SCHEMA and emitted by nothing, which is exactly the state the next test exists to forbid —\n'
+      + 'this list would be hiding it. Either restore the emitter or delete both entries.',
+    );
+  }
+});
+
 test('LIVENESS: every SCHEMA event is emitted by at least one code path', () => {
   const { literals } = scanCallSites();
+  const inline = scanInlineEmitters();
   const declared = Object.keys(SCHEMA);
-  const dead = declared.filter((e) => !literals.has(e));
+  const dead = declared.filter((e) => !literals.has(e) && !inline.has(e));
 
   assert.deepEqual(
     dead, [],
