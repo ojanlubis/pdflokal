@@ -32,9 +32,42 @@ const FLUSH_AT = 10;
 // takes the entire import graph with it — page renders, every button dead
 // (Sentry JAVASCRIPT-T; js/lib/analytics.js took the identical fix in July and
 // this sibling was missed). A session id needs UNIQUENESS, not cryptography.
+//
+// WHY THE FALLBACK MUST BE SHAPED LIKE A UUID (2026-09-07, found while fixing
+// the above): the FIRST fallback (682cb7e) stopped the throw but shipped
+// `s-${Date.now()...}-${Math.random()...}` — never a UUID. api/t.js's own
+// `UUID_RE` rejects anything that isn't `[0-9a-f]{8}-...{4}-...{4}-...{4}-
+// ...{12}`, and a session_id that fails it drops the WHOLE envelope, not just
+// the id ("either failing means we can't trust the envelope at all"). So the
+// exact population this exists to save — old iOS Safari, LAN http — went from
+// "kills the app" to "invisible to the rail, silently, forever": worse in one
+// way (unmeasurable) though better in the one that matters (the editor still
+// works). `crypto.getRandomValues` is the still-cryptographic middle rung
+// (present on far more runtimes than `randomUUID`, e.g. any secure-context
+// browser before randomUUID's 2021 rollout); `Math.random` is the last resort
+// for a runtime with no `crypto` object at all. Both branches below are laid
+// out as an RFC4122 v4 string on purpose — a session id needs uniqueness and
+// SHAPE, not cryptographic strength, and shape is the part the server checks.
+function randomUUIDFromBytes(bytes) {
+  bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
+  bytes[8] = (bytes[8] & 0x3f) | 0x80; // variant 10xx
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+// __ prefix marks a test-only export (same convention as api/t.js's
+// __setQueryForTests) — nothing in this module's own code calls it directly
+// by name, `sessionId` below does.
+export function __randomUUIDFallback() {
+  if (typeof crypto?.getRandomValues === 'function') {
+    return randomUUIDFromBytes(crypto.getRandomValues(new Uint8Array(16)));
+  }
+  const bytes = new Uint8Array(16);
+  for (let i = 0; i < bytes.length; i += 1) bytes[i] = Math.floor(Math.random() * 256);
+  return randomUUIDFromBytes(bytes);
+}
 const sessionId = typeof crypto?.randomUUID === 'function'
   ? crypto.randomUUID()
-  : `s-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  : __randomUUIDFallback();
 
 // <meta name="pdflokal-rev"> is stamped at deploy time (commit SHA) when
 // present; local dev and any page that doesn't carry it are honestly 'dev'
