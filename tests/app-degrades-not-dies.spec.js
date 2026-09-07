@@ -51,7 +51,16 @@ test('HTML missing #fm-pages: the editor still boots, only that one row is dead'
 
   await expect(page.locator('#fm-pages')).toHaveCount(0); // genuinely absent — the fixture is real
   await expect(page.locator('#btn-open')).toBeVisible();
-  await expect(page.locator('#btn-file')).toBeVisible();
+  // PRESENCE, NOT VISIBILITY, and the distinction cost a red gate on 2026-09-07.
+  // #btn-file lives in <header>, and `body.is-empty header { display: none }`
+  // (index.html) hides the whole editor chrome until a document is open. This
+  // fixture never opens one, so toBeVisible() could never have passed — it was
+  // asserting the landing state was the editor state. What this test actually
+  // claims is one line up: app.js did not THROW with #fm-pages absent. The
+  // element being in the DOM and its siblings still binding is the evidence for
+  // that; whether the landing happens to paint it is a different property, and
+  // not this test's.
+  await expect(page.locator('#btn-file')).toHaveCount(1);
 
   // The siblings bound after it survived.
   await expect(page.locator('#fm-add')).toHaveCount(1);
