@@ -160,11 +160,17 @@ test('6. ONE opener, two callers — the File-menu route is not a second impleme
   assert.ok(body.includes("action: 'pages_open'"), 'the tel() moved out of the shared opener');
 
   // Both button routes go through it.
+  // ⚠️ ANCHORED ON THE ROUTING, NOT ON THE BINDING SPELLING (2026-09-07). This
+  // used to require `getElementById('btn-pages').addEventListener(…)` literally,
+  // and went red when every top-level bind in app.js moved to the on() helper —
+  // a correct file failing for a change that could not affect what this test
+  // claims. What it means to assert is that #btn-pages reaches openPagesSheet;
+  // how the listener is attached is not its business.
   assert.ok(
-    /getElementById\('btn-pages'\)\.addEventListener\('click',\s*openPagesSheet\s*\)/.test(APP_CODE),
+    /'btn-pages'[^\n]*openPagesSheet/.test(APP_CODE),
     'the toolbar button no longer routes through openPagesSheet',
   );
-  const fmStart = APP_CODE.indexOf("getElementById('fm-pages')");
+  const fmStart = APP_CODE.indexOf("'fm-pages'");
   assert.ok(fmStart !== -1, 'nothing is wired to #fm-pages — the menu item is dead');
   const fmHandler = APP_CODE.slice(fmStart, APP_CODE.indexOf('\n});', fmStart));
   assert.ok(fmHandler.includes('openPagesSheet()'), '#fm-pages does not call the shared opener');

@@ -96,6 +96,25 @@ let editingIsReplace = false; // Ganti Teks draft open → NO format bar (see be
 let feedbackAsked = false;
 function resetEditFeedback() { feedbackAsked = false; dismissEditFeedback(); }
 
+// ---- on(): the ONLY way this file binds a listener at module top level --------
+// WHY: every binding below runs while the module is EXECUTING, so a throw here
+// aborts the whole graph — no editor, no toolbar, and no telemetry either,
+// because js/v2/telemetry.js is imported by this same graph and dies with it.
+// A top-level bind straight onto a #fm-pages lookup did exactly that
+// for real users (Sentry JAVASCRIPT-V/J, 6 events, 2026-08-18 to 08-30): a
+// stale HTML was served beside a fresh app.js, one id was absent, and the
+// entire product was dead with nothing left alive to report it.
+// So a missing element costs ONE control and nothing else. Accepts an id or an
+// already-resolved element (a top-level const can be null for the same reason);
+// forwards listener options; returns the element it bound, or null.
+// SINGLE SOURCE OF TRUTH for top-level listener binding in this file.
+function on(target, type, handler, opts) {
+  const el = typeof target === 'string' ? document.getElementById(target) : target;
+  if (!el) return null;
+  el.addEventListener(type, handler, opts);
+  return el;
+}
+
 const scrollEl = document.getElementById('v2-scroll');
 const stage = document.getElementById('v2-stage');
 const emptyEl = document.getElementById('empty');
@@ -260,8 +279,8 @@ function openingZoom(pageWidth) {
   // user could have reached by hand.
   return Math.max(0.3, Math.min(fit, desktop ? 3 : 1));
 }
-document.getElementById('z-in').onclick = () => { zoom = Math.min(zoom + 0.25, 3); applyZoom(); };
-document.getElementById('z-out').onclick = () => { zoom = Math.max(zoom - 0.25, 0.3); applyZoom(); };
+on('z-in', 'click', () => { zoom = Math.min(zoom + 0.25, 3); applyZoom(); });
+on('z-out', 'click', () => { zoom = Math.max(zoom - 0.25, 0.3); applyZoom(); });
 
 // ---- contact bookmark: tap the tab, the panel slides up; tap again or tap
 // outside to close. Same toggle + outside-pointerdown-close idiom as the
@@ -394,7 +413,7 @@ function keepAboveKeyboard(el) {
 
 let pinch = null;
 let pinchRaf = false;
-scrollEl.addEventListener('touchstart', (e) => {
+on(scrollEl, 'touchstart', (e) => {
   if (e.touches.length === 2) {
     e.preventDefault(); // ours, not the browser's
     // A finger that landed on a selected object may have started a drag —
@@ -404,7 +423,7 @@ scrollEl.addEventListener('touchstart', (e) => {
     pinch = { d0: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) || 1, z0: zoom };
   }
 }, { passive: false });
-scrollEl.addEventListener('touchmove', (e) => {
+on(scrollEl, 'touchmove', (e) => {
   if (!pinch || e.touches.length !== 2) return;
   e.preventDefault();
   if (pinchRaf) return; // rAF-throttle: refresh loops slots, keep it 1×/frame
@@ -419,11 +438,11 @@ scrollEl.addEventListener('touchmove', (e) => {
   });
 }, { passive: false });
 const endPinch = (e) => { if (e.touches.length < 2) pinch = null; };
-scrollEl.addEventListener('touchend', endPinch);
-scrollEl.addEventListener('touchcancel', endPinch);
+on(scrollEl, 'touchend', endPinch);
+on(scrollEl, 'touchcancel', endPinch);
 
 // Desktop: trackpad pinch arrives as ctrl+wheel; cmd+wheel for mouse users.
-scrollEl.addEventListener('wheel', (e) => {
+on(scrollEl, 'wheel', (e) => {
   if (!(e.ctrlKey || e.metaKey)) return;
   e.preventDefault();
   setZoomAnchored(zoom * (e.deltaY < 0 ? 1.1 : 0.9), e.clientX, e.clientY);
@@ -1828,7 +1847,7 @@ document.addEventListener('pointermove', (e) => {
 
 // Hapus works BOTH ways (founder ask): with a selection it deletes now; with
 // nothing selected it arms delete-mode — the next tapped object is removed.
-document.getElementById('btn-delete-anno').addEventListener('click', () => {
+on('btn-delete-anno', 'click', () => {
   if (tool === 'delete') { setTool('select'); return; } // toggle off (on-off law)
   if (doc.selection.annotationId) { deleteSelected(); return; }
   setTool('delete');
@@ -2078,8 +2097,8 @@ function openPagesSheet() {
   // anyone has asked of the rail.
   tel('tool_use', { tool: 'halaman', action: 'pages_open' });
 }
-document.getElementById('btn-pages').addEventListener('click', openPagesSheet);
-document.getElementById('pm-close').addEventListener('click', () => pageManager.close());
+on('btn-pages', 'click', openPagesSheet);
+on('pm-close', 'click', () => pageManager.close());
 
 // ---- inline text editing ------------------------------------------------------------
 // One code path for "place new text" and "edit existing text": a contenteditable
@@ -2556,9 +2575,9 @@ function syncSigBar() {
     ? (found.anno.subtype === 'paraf' ? 'Paraf terpilih' : 'Tanda tangan terpilih')
     : (armed ? 'Pilih tempat untuk menempatkan' : '');
 }
-document.getElementById('btn-redraw-sig').addEventListener('click', () => signatureModal.open());
+on('btn-redraw-sig', 'click', () => signatureModal.open());
 
-document.getElementById('btn-all-pages').addEventListener('click', () => {
+on('btn-all-pages', 'click', () => {
   const found = selectedSignatureAnno();
   if (!found) return;
   const { page: home, anno } = found;
@@ -2599,8 +2618,8 @@ function doRedo() {
   const prevPages = doc.pages;
   if (redo(history, doc)) { pageManager.invalidateThumbs(); rebuildStage(); syncEditedRasters(prevPages); }
 }
-document.getElementById('btn-undo').addEventListener('click', doUndo);
-document.getElementById('btn-redo').addEventListener('click', doRedo);
+on('btn-undo', 'click', doUndo);
+on('btn-redo', 'click', doRedo);
 
 document.addEventListener('keydown', (e) => {
   // Never hijack typing surfaces (the inline editor stops propagation itself).
@@ -2910,7 +2929,7 @@ function applyIntent(intent) {
 
 const fileInput = document.getElementById('file-input');
 const DEFAULT_ACCEPT = fileInput.getAttribute('accept');
-document.getElementById('btn-open').addEventListener('click', () => fileInput.click());
+on('btn-open', 'click', () => fileInput.click());
 
 // Foto jadi PDF narrows the picker to images; everything else keeps both.
 //
@@ -2974,7 +2993,7 @@ for (const card of document.querySelectorAll('.tl-doc[data-doc]')) {
 
 const lihatBtn = document.getElementById('ld-lihat');
 const moreGrid = document.getElementById('ld-more');
-lihatBtn.addEventListener('click', () => {
+on(lihatBtn, 'click', () => {
   const open = moreGrid.hidden;
   moreGrid.hidden = !open;
   lihatBtn.setAttribute('aria-expanded', String(open));
@@ -3030,20 +3049,20 @@ function toggleFileMenu(show) {
   fileMenu.hidden = !show;
   fileBtn.setAttribute('aria-expanded', String(show));
 }
-fileBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleFileMenu(fileMenu.hidden); });
+on(fileBtn, 'click', (e) => { e.stopPropagation(); toggleFileMenu(fileMenu.hidden); });
 document.addEventListener('pointerdown', (e) => {
   if (!fileMenu.hidden && !e.target.closest('.file-menu-wrap')) toggleFileMenu(false);
 });
-document.getElementById('fm-add').addEventListener('click', () => {
+on('fm-add', 'click', () => {
   toggleFileMenu(false);
   fileInput.click(); // appends → merge, the default loadFiles path
 });
-document.getElementById('fm-new').addEventListener('click', () => {
+on('fm-new', 'click', () => {
   toggleFileMenu(false);
   pendingReplace = true; // applied when the picker actually returns files
   fileInput.click();
 });
-document.getElementById('fm-pages').addEventListener('click', () => {
+on('fm-pages', 'click', () => {
   toggleFileMenu(false);
   openPagesSheet(); // the SAME opener the toolbar button uses — never a second one
 });
@@ -3076,7 +3095,7 @@ async function resetDoc() {
   baseName = 'dokumen';
   setTool('select');
 }
-fileInput.addEventListener('change', async (e) => {
+on(fileInput, 'change', async (e) => {
   const files = e.target.files;
   if (files?.length) {
     if (pendingReplace) await resetDoc();
@@ -3109,19 +3128,19 @@ function doDownload() {
   if (doc.pages.length === 0) return;
   downloadSheet.open();
 }
-document.getElementById('btn-download').addEventListener('click', doDownload);
+on('btn-download', 'click', doDownload);
 
 // ---- wordmark → home (punch list #3) --------------------------------------------
 // On the landing the wordmark is already home; with a doc open it asks first —
 // a reload throws away un-downloaded edits.
-document.getElementById('btn-home').addEventListener('click', () => {
+on('btn-home', 'click', () => {
   if (document.body.classList.contains('is-empty')) return;
   document.getElementById('home-confirm').showModal();
 });
-document.getElementById('hc-cancel').addEventListener('click', () => {
+on('hc-cancel', 'click', () => {
   document.getElementById('home-confirm').close();
 });
-document.getElementById('hc-go').addEventListener('click', () => {
+on('hc-go', 'click', () => {
   window.location.assign('/');
 });
 
