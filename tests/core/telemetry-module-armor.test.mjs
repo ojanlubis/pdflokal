@@ -62,3 +62,44 @@ test('tel() still works with a degraded session id', async () => {
   // calling it does not throw into app code.
   assert.doesNotThrow(() => mod.tel('open', { pages: 1 }));
 });
+
+// WHY THIS TEST EXISTS ON TOP OF THE TWO ABOVE: "does not throw" was the
+// whole bar the JAVASCRIPT-T fix (682cb7e) cleared, and its fallback shipped
+// as `s-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,10)}`
+// — never a UUID. api/t.js's UUID_RE
+// (`/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i`) rejects
+// anything else, and a session_id that fails it drops the WHOLE envelope
+// (api/t.js: "either failing means we can't trust the envelope at all") — not
+// just the id. So the exact population this fallback exists to save (old iOS
+// Safari, LAN http) stayed invisible to the rail even after the crash was
+// fixed: the app no longer died, but every one of its events was silently
+// 204'd on arrival.
+//
+// Reads the WIRE payload sendBeacon actually receives, not a re-implemented
+// copy of the generator or a private variable — `sessionId` is module-scope
+// and was never exported, and asserting on a copy could pass while the real
+// call site still ships the old shape.
+test('the session id sent on the wire is a v4 UUID under this same degraded crypto', async () => {
+  const mod = await import('../../js/v2/telemetry.js');
+  let sentBlob = null;
+  Object.defineProperty(globalThis, 'navigator', {
+    value: { sendBeacon: (url, blob) => { sentBlob = blob; return true; } },
+    configurable: true,
+    writable: true,
+  });
+
+  const validDocOpen = {
+    text_layer: true, pages: '1', device: 'desktop', intent: 'none', display_mode: 'browser',
+  };
+  // FLUSH_AT is 10 in js/v2/telemetry.js — the 10th call flushes synchronously.
+  for (let i = 0; i < 10; i += 1) mod.tel('doc_open', validDocOpen);
+
+  assert.ok(sentBlob, 'flush() never reached navigator.sendBeacon — no batch to assert on');
+  const envelope = JSON.parse(await sentBlob.text());
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i; // pinned to api/t.js's own regex
+  assert.match(
+    envelope.session_id,
+    UUID_RE,
+    `session_id "${envelope.session_id}" is not a UUID — api/t.js's UUID_RE would silently drop this whole envelope`,
+  );
+});
