@@ -161,8 +161,13 @@ test.describe('a stamped document', () => {
     await page.click('#btn-download');
     await expect(page.locator('#dl-sheet')).toBeVisible();
     await expect(note(page)).toBeVisible();
-    // Copy is Fauzan's and unruled — assert the subject, not his sentence.
-    await expect(note(page)).toContainText(/meterai/i);
+    // ⚠️ VERBATIM, and that is the point (INCLUDE 7 receipt 3). He RULED this
+    // sentence on 2026-09-09 ("ok the copy is approved"); asserting it word for
+    // word is what stops a later session tidying his words into its own. If this
+    // assertion fails, the fix is to ask him, never to update the expectation.
+    await expect(note(page)).toHaveText(
+      'Dokumen ini punya meterai atau tanda tangan digital. Kalau disimpan dari sini, segelnya rusak dan dokumen bisa gagal diverifikasi. File aslimu nggak berubah.',
+    );
 
     // AND IT NEVER BLOCKS. The button is live and the file arrives.
     await expect(page.locator('#ds-cta')).toBeEnabled();
@@ -192,5 +197,32 @@ test.describe('a stamped document', () => {
     await page.click('#ds-format button[data-v="img"]'); // the simplest way to make it visible
     await expect(note(page)).toBeVisible();
     await page.locator('#dl-sheet').screenshot({ path: 'test-results/seal-note-sheet.png' });
+  });
+});
+
+// THE SIGNING PAGE'S OWN WORDS, ASSERTED VERBATIM (INCLUDE 7 receipt 3).
+// This page used to INVITE people to paste a meterai image — the one place the
+// site stopped being a neutral tool and started instructing, and the only real
+// exposure the 2026-09-09 legal read turned up (a pasted picture is never a
+// valid stamp, and a picture lifted off a USED meterai is UU 10/2020 Pasal 26).
+// He ruled both replacements on 2026-09-09. Word for word on purpose: if this
+// goes red, ask him — do not update the expectation.
+test.describe('tanda-tangan-pdf: what we say about materai', () => {
+  test('both ruled paragraphs are live, verbatim', async ({ page }) => {
+    await page.goto('/tanda-tangan-pdf');
+
+    await expect(page.locator('.ld-copy p', { hasText: 'Yang perlu kamu tahu' })).toHaveText(
+      'Yang perlu kamu tahu: menempelkan gambar meterai lewat Upload itu cuma gambar, bukan meterai yang sah. Untuk dokumen elektronik, yang sah cuma e-meterai dari Peruri. Saya lebih memilih menjelaskan batasannya daripada membiarkanmu mengira sudah beres padahal belum.',
+    );
+
+    await expect(page.locator('.ld-faq details p', { hasText: 'tidak menerbitkan e-meterai' })).toHaveText(
+      'PDFLokal tidak menerbitkan e-meterai, itu hanya sah lewat kanal resmi Peruri. Menempelkan gambar meterai di sini tidak membuat dokumenmu bermeterai sah, dan kalau gambarnya diambil dari meterai yang sudah terpakai, itu bisa kena pidana.',
+    );
+
+    // THE CONTROL. The old invitation must be gone, not merely outnumbered —
+    // an added paragraph next to a surviving "tempelkan ... lalu tanda tangani"
+    // would satisfy both assertions above and still tell people to do it.
+    await expect(page.locator('body')).not.toContainText('tempelkan gambar meterai yang sudah sah kamu peroleh');
+    await expect(page.locator('body')).not.toContainText('kamu bisa menempelkannya lewat menu Upload');
   });
 });

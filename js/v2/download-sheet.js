@@ -52,7 +52,9 @@ export function failMessage(reason) {
 // say so, next to the button that does it, and we do not block: editing your
 // own stamped document is legitimate and it is their file.
 //
-// TODO(copy): DRAFTED, awaiting his ruling — seat TODO.md item 8a
+// RULED BY FAUZAN 2026-09-09 ("ok the copy is approved"), drafted by the seat so
+// authoring became approving. Recorded in the seat's decisions.md 2026-09-09, and
+// asserted VERBATIM in tests/pdf-bermeterai.spec.js so nothing tidies it later.
 const SIGNED_NOTE = 'Dokumen ini punya meterai atau tanda tangan digital. Kalau disimpan dari sini, segelnya rusak dan dokumen bisa gagal diverifikasi. File aslimu nggak berubah.';
 
 const COMPRESS_QUALITY = 0.72; // the "Otomatis" preset — one sane default, still
