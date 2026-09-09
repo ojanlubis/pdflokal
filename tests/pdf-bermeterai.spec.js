@@ -41,6 +41,37 @@ const PLAIN = 'surat-resmi.pdf';
 
 const note = (page) => page.locator('#ds-signed');
 
+// Rail capture, the same shape tests/pdf-terkunci.spec.js uses (each spec
+// keeps its own copy today; not consolidated here because that is a change to
+// four other files, not to this feature).
+async function captureRail(page) {
+  await page.addInitScript(() => {
+    window.__rail = [];
+    const push = (url, txt) => {
+      try { window.__rail.push({ url: String(url), body: JSON.parse(txt) }); } catch { /* non-JSON */ }
+    };
+    navigator.sendBeacon = (url, blob) => {
+      Promise.resolve(blob && blob.text ? blob.text() : blob).then((t) => push(url, t));
+      return true;
+    };
+    const origFetch = window.fetch ? window.fetch.bind(window) : null;
+    window.fetch = (url, opts) => {
+      if (typeof url === 'string' && url.includes('/api/') && opts?.body) push(url, String(opts.body));
+      return origFetch ? origFetch(url, opts) : Promise.resolve(new Response('{}'));
+    };
+  });
+}
+
+const railEvents = async (page) => {
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  return page.evaluate(() => (window.__rail || [])
+    .filter((b) => b.url.includes('/api/t'))
+    .flatMap((b) => b.body.events || []));
+};
+
 async function openSheet(page, fixture) {
   await page.goto('/');
   await page.setInputFiles('#file-input', NASTY(fixture));
@@ -55,6 +86,36 @@ test.describe('a stamped document', () => {
     await page.setInputFiles('#file-input', NASTY(SIGNED));
     await expectFirstPage(page);
     expect(await page.evaluate(() => window.v2.getDoc().sources.map((s) => s.signed))).toEqual([true]);
+  });
+
+  test('THE RAIL learns it — doc_open carries signed, and the event still arrives whole', async ({ page }) => {
+    // Two things at once, and the second is the one that could bite: the new
+    // prop must be TRUE for a stamped file, and the event must still validate.
+    // core/telemetry-schema.js is imported by the client AND by api/t.js, and
+    // an off-schema event is dropped in silence — a mis-wired call site would
+    // not error, doc_open would simply stop existing.
+    await captureRail(page);
+    await page.goto('/');
+    await page.setInputFiles('#file-input', NASTY(SIGNED));
+    await expectFirstPage(page);
+
+    await expect.poll(async () => (await railEvents(page)).some((e) => e.event === 'doc_open')).toBe(true);
+    const open = (await railEvents(page)).find((e) => e.event === 'doc_open');
+    expect(open.props.signed).toBe(true);
+    // The rest of the event is intact — the skew failure mode is a blank
+    // doc_open, not a wrong one.
+    expect(open.props).toMatchObject({ pages: '1', display_mode: 'browser' });
+  });
+
+  test('CONTROL: the rail says FALSE for an ordinary PDF', async ({ page }) => {
+    // A prop hard-coded to true would satisfy the test above and nothing else.
+    await captureRail(page);
+    await page.goto('/');
+    await page.setInputFiles('#file-input', NASTY(PLAIN));
+    await expectFirstPage(page);
+
+    await expect.poll(async () => (await railEvents(page)).some((e) => e.event === 'doc_open')).toBe(true);
+    expect((await railEvents(page)).find((e) => e.event === 'doc_open').props.signed).toBe(false);
   });
 
   test('CONTROL: an ordinary PDF is not flagged, and the sheet stays silent', async ({ page }) => {

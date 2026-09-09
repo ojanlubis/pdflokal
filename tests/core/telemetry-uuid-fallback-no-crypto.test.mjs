@@ -49,7 +49,7 @@ test('the Math.random fallback still sends a v4 UUID on the wire', async () => {
   });
 
   const validDocOpen = {
-    text_layer: true, pages: '1', device: 'desktop', intent: 'none', display_mode: 'browser',
+    text_layer: true, signed: false, pages: '1', device: 'desktop', intent: 'none', display_mode: 'browser',
   };
   for (let i = 0; i < 10; i += 1) mod.tel('doc_open', validDocOpen); // FLUSH_AT === 10
 
