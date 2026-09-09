@@ -21,6 +21,7 @@ import { failureReason, failureCause } from '../core/failure-reason.js';
 import { durationBucket } from '../core/telemetry-schema.js';
 import { showStamp } from './celebrate.js';
 import { buildPdfArtifact } from './pdf-builder.js';
+import { passThroughSource } from '../core/export.js';
 
 // WHAT TO SAY WHEN IT FAILS, AND WHEN NOT TO SAY "TRY AGAIN".
 // Founder ruling via PM, 2026-07-29: advice that cannot work is worse than no
@@ -43,6 +44,16 @@ export function failMessage(reason) {
     default: return 'Waduh, gagal membuat file'; // TODO(copy) - no retry advice for an unknown-to-us reason
   }
 }
+
+// THE SEAL NOTE. A document carrying an Indonesian e-meterai or a digital
+// signature opens fine here, and any download that REBUILDS it breaks the
+// cryptographic seal while the visible stamp survives as page content — the
+// user ends up holding a file that looks stamped and fails verification. We
+// say so, next to the button that does it, and we do not block: editing your
+// own stamped document is legitimate and it is their file.
+//
+// TODO(copy): DRAFTED, awaiting his ruling — seat TODO.md item 8a
+const SIGNED_NOTE = 'Dokumen ini punya meterai atau tanda tangan digital. Kalau disimpan dari sini, segelnya rusak dan dokumen bisa gagal diverifikasi. File aslimu nggak berubah.';
 
 const COMPRESS_QUALITY = 0.72; // the "Otomatis" preset — one sane default, still
 const COMPRESS_MAXDIM = 1600;  // the right answer when the user has no hard cap.
@@ -100,6 +111,31 @@ export function createDownloadSheet(deps) {
     return doc.pages.filter((p) => state.picked.includes(p.id));
   }
 
+  // The shallow Doc the export is actually given: the same sources, only the
+  // selected pages. ONE HOME on purpose — buildBase exports it and the seal
+  // note below asks core/export.js what will happen to it, and those two must
+  // never be able to disagree about which document is being talked about.
+  function currentSubset() {
+    return {
+      sources: deps.getDoc().sources,
+      pages: selectedPages(),
+      selection: { pageId: null, annotationId: null },
+    };
+  }
+
+  // Will THIS download rebuild the file, and therefore break a seal? Asked of
+  // core/export.js's own predicate rather than re-derived here, so the note
+  // cannot drift from the code that decides. Two ways to reach a rebuild:
+  //   - the PDF path at any size other than Asli (Compress rasterizes and
+  //     rebuilds — the seal is gone whatever the source looked like);
+  //   - the image path, where there is no PDF left to carry a seal at all;
+  //   - or an eligible-looking document that isn't (an annotation, a rotation,
+  //     a page unticked, a merge), which passThroughSource decides.
+  function sealSurvivesThisDownload() {
+    if (state.format !== 'pdf' || state.size !== 'asli') return false;
+    return !!passThroughSource(currentSubset());
+  }
+
   // ---- the image path's fallback source (2026-08-09) ---------------------------
   //
   // THE BUG THIS EXISTS FOR. `buildBase()` runs pdf-lib's buildPdfBytes the
@@ -148,8 +184,7 @@ export function createDownloadSheet(deps) {
     state.building = true;
     render();
     try {
-      const doc = deps.getDoc();
-      const subset = { sources: doc.sources, pages: selectedPages(), selection: { pageId: null, annotationId: null } };
+      const subset = currentSubset();
       // A failed font fetch mid-build silently substitutes Helvetica in the
       // FILE (core/export.js's cacheFallbackFont) — the one witness is this
       // callback. Collected on a local so a superseded build can never flag
@@ -337,6 +372,17 @@ export function createDownloadSheet(deps) {
         row.appendChild(b);
       }
     }
+
+    // The seal note (see SIGNED_NOTE). Narrower than "the document is signed"
+    // on purpose: on PDF, Asli, whole document, untouched, core/export.js
+    // hands the original bytes straight back and the seal is fine — telling
+    // them it breaks would be false at the exact moment it is not.
+    const noteEl = el('#ds-signed');
+    const anySigned = (doc.sources || []).some((src) => src.signed);
+    // textContent, never innerHTML: the same rule showToast follows, and it
+    // keeps this a string the copy ruling can replace without re-reading HTML.
+    if (anySigned) noteEl.textContent = SIGNED_NOTE;
+    noteEl.hidden = !anySigned || sealSurvivesThisDownload();
 
     segSync('#ds-pages', state.picked ? 'some' : 'all');
     el('#ds-all-sub').textContent = `${nAll} halaman`;
