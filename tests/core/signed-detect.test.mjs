@@ -44,11 +44,17 @@ const latin1 = (s) => new Uint8Array([...s].map((c) => c.charCodeAt(0)));
 //
 // `wild/` is skipped because it is gitignored — it is not on CI, so an
 // assertion over it would mean one thing on this machine and nothing at all in
-// the pipeline. It was swept by hand instead, 2026-09-09: 154 real documents,
-// exactly ONE flagged, and that one is a genuine `adbe.pkcs7.detached` DocMDP
-// certification signature on a real Indonesian government PDF (a TRUE
-// positive — see this file's own header for what is still unproven). 153
-// ordinary real-world documents read false.
+// the pipeline.
+//
+// ⚠️ A HAND SWEEP WAS CLAIMED HERE AND COULD NOT BE REPRODUCED. The original
+// note said 154 real documents were swept on 2026-09-09 with exactly one
+// flagged, a genuine DocMDP signature on an Indonesian government PDF. A later
+// scan the same day over 257 PDFs in Downloads, Documents and Desktop found
+// ZERO carrying a signature marker. The two cannot both describe the same disk.
+// The claim is left recorded and explicitly UNVERIFIED rather than deleted or
+// repeated as fact — an unreproducible measurement is not evidence, and the
+// paired control below is what this detector actually stands on.
+// [[plausible-answer-from-unchecked-data]]
 const SKIP_DIRS = new Set(['wild']);
 function allPdfs(dir) {
   const out = [];
@@ -67,7 +73,12 @@ test('detectSigned: the signed fixture reads as signed', () => {
 });
 
 test('CONTROL: no unsigned fixture in the repo is flagged', () => {
-  const pdfs = allPdfs(FIXTURES).filter((p) => path.basename(p) !== 'bermeterai.pdf');
+  // Both SIGNED fixtures are excluded, and nothing else may be: this list is
+  // the whole strength of the control, so an addition here must be a file
+  // proven signed by an outside verifier, never a file that merely inconveniences
+  // the sweep.
+  const SIGNED = new Set(['bermeterai.pdf', 'bertandatangan-asli.pdf']);
+  const pdfs = allPdfs(FIXTURES).filter((p) => !SIGNED.has(path.basename(p)));
   // Guard the instrument before believing its verdict: an empty sweep would
   // pass for free. [[assertions-over-empty-sets]]
   assert.ok(pdfs.length >= 20, `expected a real corpus, walked ${pdfs.length} PDFs`);
@@ -96,4 +107,25 @@ test('detectSigned: never throws, and garbage means "we do not know"', () => {
   for (const input of [null, undefined, new Uint8Array(0), new Uint8Array([0x2f]), 'not bytes', 42, {}]) {
     assert.equal(detectSigned(input), false, `threw or flagged on ${String(input)}`);
   }
+});
+
+// ⚠️ THE PAIRED CONTROL, and it is the strongest evidence this detector has.
+// Every other case here is a file we SHAPED — the detector can only prove it
+// reads bytes we already knew how to write. bertandatangan-asli.pdf is
+// surat-word.pdf signed by pyHanko, an outside pipeline that has never heard of
+// pdflokal, and poppler's `pdfsig` (a different PROCESS, sharing no code with
+// us) reports "Signature is Valid", adbe.pkcs7.detached, SHA-256.
+//
+// The pair is what makes it a control rather than a second sample: the SAME
+// document reads false unsigned and true signed, one difference between them.
+// Provenance and the exact commands: scripts/gen-fixture-bertandatangan-asli.md
+//
+// STILL NOT a Peruri e-meterai. That residual is survivable ON PURPOSE and the
+// reason is architectural: core/export.js passThroughSource never consults
+// `signed`, so a detector miss costs the WARNING, never the seal.
+test('a GENUINELY signed PDF is detected — and its own unsigned original is not', () => {
+  const signed = bytesOf(path.join(FIXTURES, 'nasty/bertandatangan-asli.pdf'));
+  const original = bytesOf(path.join(FIXTURES, 'nasty/surat-word.pdf'));
+  assert.equal(detectSigned(signed), true, 'a real pyHanko/PKCS#7 signature must read true');
+  assert.equal(detectSigned(original), false, 'the same document unsigned must read false');
 });
