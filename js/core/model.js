@@ -31,8 +31,16 @@ export function _resetIds() { _seq = 0; }
 // has no decryption at all, so they can never be written back out. Recorded at
 // import so the app can say so BEFORE the user invests an edit, instead of
 // failing at the download (founder field report, the 444-page KBLI table).
-export function createSource({ name, bytes, numPages = 0, encrypted = false }) {
-  return { id: nextId('src'), name, bytes, numPages, encrypted };
+// `signed` — this source carries a PDF digital signature or an Indonesian
+// e-meterai (both are PAdES/PKCS#7 signature dictionaries). The VISIBLE stamp
+// is page content and survives anything; the cryptographic seal does not.
+// core/export.js rebuilds the document with pdf-lib and there is no
+// incremental-update path anywhere in this stack, so a rebuild breaks the
+// digest and the file then fails Peruri verification while looking perfect.
+// Recorded at import so the download sheet can say so at the one moment it
+// matters (core/import.js detectSigned).
+export function createSource({ name, bytes, numPages = 0, encrypted = false, signed = false }) {
+  return { id: nextId('src'), name, bytes, numPages, encrypted, signed };
 }
 
 // An annotation — stable id, referenced directly (never by {pageIndex,index}).

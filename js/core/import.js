@@ -51,6 +51,71 @@ async function detectEncrypted(pdf) {
   }
 }
 
+// SINGLE SOURCE OF TRUTH for "this PDF carries a digital signature or an
+// e-meterai". Peruri's e-meterai and every PAdES signature are the same
+// structure: a signature dictionary whose /Contents holds a PKCS#7 blob and
+// whose /ByteRange names the file bytes that blob digests.
+//
+// WHY IT MATTERS: core/export.js rebuilds the document with pdf-lib
+// (`newDoc.save(...)`) and there is NO incremental-update path anywhere in
+// this stack. A rebuild moves every byte, so the digest no longer matches
+// anything — while the visible meterai/signature graphic survives untouched
+// as ordinary page content. The user ends up holding a document that LOOKS
+// stamped and FAILS verification, and nothing on screen ever said so. That is
+// the same trade `ignoreEncryption` offers above and we refuse it the same
+// way: say it out loud (js/v2/download-sheet.js) and, where we can, don't
+// rewrite the file at all (core/export.js passThroughSource).
+//
+// ⚠️ WHY A RAW BYTE SCAN IS LEGITIMATE HERE, AND MUST NOT BE "FIXED" INTO A
+// PARSER. The bank's [[strings-cannot-read-a-pdf]] rule is real and still
+// holds for every OTHER dictionary key: object streams and FlateDecode put
+// /Font, /Rotate, /Type inside compressed streams, so a byte grep for them is
+// a silent false negative. /ByteRange is the one documented exception. ISO
+// 32000 requires every value in a signature dictionary to be a DIRECT object
+// when a byte-range digest is present — the digest covers the file from byte 0
+// to the start of the /Contents string and from its end to EOF, so the
+// dictionary must sit uncompressed at a known file offset or the range means
+// nothing. A signature dictionary therefore CANNOT live inside a compressed
+// object stream, and its /ByteRange array is always literal bytes. That is the
+// whole justification for the cheap approach: not "a parser would be nicer",
+// but "the format guarantees the bytes are here in the clear".
+//
+// Never throws: a scan that fails means "we don't know", and not knowing must
+// not block an import that would otherwise work. Same discipline as
+// detectEncrypted.
+const BYTE_RANGE = [0x2f, 0x42, 0x79, 0x74, 0x65, 0x52, 0x61, 0x6e, 0x67, 0x65]; // "/ByteRange"
+// PDF white-space (ISO 32000 table 1): NUL, TAB, LF, FF, CR, SP.
+const isPdfSpace = (b) => b === 0x20 || b === 0x0a || b === 0x0d || b === 0x09 || b === 0x00 || b === 0x0c;
+
+export function detectSigned(bytes) {
+  try {
+    if (!bytes || !(bytes.length > BYTE_RANGE.length)) return false;
+    for (let i = 0; i <= bytes.length - BYTE_RANGE.length; i += 1) {
+      if (bytes[i] !== BYTE_RANGE[0]) continue; // fast reject on '/' (35ms over 50MB, measured)
+      let hit = true;
+      for (let k = 1; k < BYTE_RANGE.length; k += 1) {
+        if (bytes[i + k] !== BYTE_RANGE[k]) { hit = false; break; }
+      }
+      if (!hit) continue;
+      // TIGHTENING, and it is the part carrying the information. The marker
+      // alone would also match a name that merely starts with it
+      // (`/ByteRangeFoo`) or the literal text inside a page that talks about
+      // signatures. What identifies a signature dictionary is the ARRAY that
+      // must follow: `/ByteRange [ 0 840 960 1200 ]`. So: whitespace*, '[',
+      // whitespace*, then a digit — anything else is not a byte range.
+      let j = i + BYTE_RANGE.length;
+      while (j < bytes.length && isPdfSpace(bytes[j])) j += 1;
+      if (bytes[j] !== 0x5b) continue; // '['
+      j += 1;
+      while (j < bytes.length && isPdfSpace(bytes[j])) j += 1;
+      if (bytes[j] >= 0x30 && bytes[j] <= 0x39) return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 export async function importPdf(doc, { name, bytes }) {
   // WHY the ensure: pdf.js is no longer a <script> tag in index.html — it is
   // fetched on demand (core/vendor.js). This is the first moment it's genuinely
@@ -59,7 +124,13 @@ export async function importPdf(doc, { name, bytes }) {
   // Defensive .slice(): PDF.js may detach the ArrayBuffer it's handed.
   const pdf = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
   const source = addSource(doc, createSource({
-    name, bytes, numPages: pdf.numPages, encrypted: await detectEncrypted(pdf),
+    name,
+    bytes,
+    numPages: pdf.numPages,
+    encrypted: await detectEncrypted(pdf),
+    // The RAW bytes, not the PDF.js document: the signature dictionary is a
+    // file-layout fact, and PDF.js exposes no handle on it. See detectSigned.
+    signed: detectSigned(bytes),
   }));
 
   const pages = [];
