@@ -31,6 +31,7 @@
  * here would mean this test has to change when he rules on them.
  */
 import { test, expect } from '@playwright/test';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { expectFirstPage } from './helpers/render.js';
@@ -68,6 +69,21 @@ const railEvents = async (page) => {
     .filter((b) => b.url.includes('/api/t'))
     .flatMap((b) => b.body.events || []));
 };
+
+// Draw a real Tip-Ex through the real tool, so the document genuinely needs a
+// rebuild. Hand-poking a model field would prove less: the question these
+// tests ask is what the EXPORT does with a document a user has changed.
+async function drawWhiteout(page) {
+  await page.click('[data-tool="whiteout"]');
+  const box = await page.locator('.pv-page').first().boundingBox();
+  await page.mouse.move(box.x + 60, box.y + 80);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 220, box.y + 130, { steps: 8 });
+  await page.mouse.up();
+  await expect.poll(async () => page.evaluate(
+    () => window.v2.getDoc().pages[0].annotations.length,
+  )).toBeGreaterThan(0);
+}
 
 test.describe('protected PDFs', () => {
   test('a protected PDF still OPENS and renders — we warn about the edge, we do not build a wall', async ({ page }) => {
@@ -115,6 +131,16 @@ test.describe('protected PDFs', () => {
     await page.goto('/');
     await page.setInputFiles('#file-input', NASTY('terkunci.pdf'));
     await expectFirstPage(page);
+
+    // ⚠️ THE EDIT IS WHAT MAKES THIS TEST ABOUT ANYTHING (2026-09-09). An
+    // UNTOUCHED document is now handed back as its own bytes without pdf-lib
+    // being asked to load it at all (core/export.js passThroughSource, so an
+    // e-meterai survives an export) — so an untouched locked file no longer
+    // refuses, and this test would have been asserting a message that never
+    // appears. One Tip-Ex makes a rebuild genuinely necessary, and a rebuild
+    // is what pdf-lib genuinely cannot do here. The untouched case has its own
+    // test below.
+    await drawWhiteout(page);
 
     await page.click('#btn-download');
     await expect(page.locator('#dl-sheet')).toBeVisible();
@@ -221,6 +247,10 @@ test.describe('protected PDFs — the image path', () => {
     await page.goto('/');
     await page.setInputFiles('#file-input', NASTY(LOCKED));
     await expectFirstPage(page);
+    // EDITED, for the reason spelled out on the specific-message test above:
+    // an untouched document never reaches pdf-lib now, so only a document that
+    // actually needs rebuilding can prove the refusal is still honest.
+    await drawWhiteout(page);
 
     await page.click('#btn-download');
     await expect(page.locator('#dl-sheet')).toBeVisible();
@@ -229,6 +259,37 @@ test.describe('protected PDFs — the image path', () => {
     await expect(page.locator('#toast')).toContainText(/terkunci/i);
     await expect.poll(async () => (await railEvents(page))
       .some((e) => e.event === 'failure' && e.props.stage === 'export')).toBe(true);
+  });
+
+  test('an UNTOUCHED locked PDF now DOWNLOADS AS PDF — byte-identical, and still locked', async ({ page }) => {
+    // THE SIDE BENEFIT OF THE PASS-THROUGH (2026-09-09). core/export.js hands
+    // back the source bytes when nothing changed — it exists so an e-meterai
+    // survives a download, and this file is the other population it rescues.
+    // pdf-lib never sees these bytes, so its missing decrypt path stops
+    // mattering. We decrypt nothing and remove nothing: what comes out is what
+    // went in, encryption handler included.
+    await captureRail(page);
+    await page.goto('/');
+    await page.setInputFiles('#file-input', NASTY(LOCKED));
+    await expectFirstPage(page);
+
+    await page.click('#btn-download');
+    await expect(page.locator('#dl-sheet')).toBeVisible();
+    const { buf, filename } = await downloadBytes(page, () => page.click('#ds-cta'));
+
+    // READ THE BYTES, never the filename. Byte-for-byte against the fixture on
+    // disk is the whole claim — a rebuild would produce a valid PDF of similar
+    // size that every cheaper check would accept.
+    expect(filename).toMatch(/\.pdf$/);
+    const source = fs.readFileSync(NASTY(LOCKED));
+    expect(buf.length).toBe(source.length);
+    expect(buf.equals(source)).toBe(true);
+    // Still protected. This is not a lock-removal tool and must never become one.
+    expect(buf.toString('latin1')).toMatch(/\/Filter\s*\/Standard/);
+
+    // Nothing failed, so nothing is reported as failing.
+    const events = await railEvents(page);
+    expect(events.filter((e) => e.event === 'failure' && e.props.stage === 'export')).toEqual([]);
   });
 
   test('an EDITED locked PDF still refuses — we never silently drop what the user drew', async ({ page }) => {
@@ -244,17 +305,7 @@ test.describe('protected PDFs — the image path', () => {
     await page.goto('/');
     await page.setInputFiles('#file-input', NASTY(LOCKED));
     await expectFirstPage(page);
-
-    // Draw a real Tip-Ex through the real tool, not a hand-poked model field.
-    await page.click('[data-tool="whiteout"]');
-    const box = await page.locator('.pv-page').first().boundingBox();
-    await page.mouse.move(box.x + 60, box.y + 80);
-    await page.mouse.down();
-    await page.mouse.move(box.x + 220, box.y + 130, { steps: 8 });
-    await page.mouse.up();
-    await expect.poll(async () => page.evaluate(
-      () => window.v2.getDoc().pages[0].annotations.length,
-    )).toBeGreaterThan(0);
+    await drawWhiteout(page); // a real Tip-Ex through the real tool
 
     await page.click('#btn-download');
     await expect(page.locator('#dl-sheet')).toBeVisible();

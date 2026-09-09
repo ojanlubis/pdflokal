@@ -19,7 +19,7 @@ import {
 // declared event validates cleanly at least once, and as a base to mutate
 // for the negative tests below.
 const VALID_PROPS = {
-  doc_open: { text_layer: true, pages: '1', device: 'desktop', intent: 'none', display_mode: 'browser' },
+  doc_open: { text_layer: true, signed: false, pages: '1', device: 'desktop', intent: 'none', display_mode: 'browser' },
   tool_use: { tool: 'teks', action: 'text' },
   // export carries BOTH the edit-ladder fields (surgery_used/fallback/duration)
   // and the intent fields (format/size/pages_scope) — the two branches taught
@@ -104,6 +104,24 @@ test('unknown prop fails the whole event', () => {
 test('missing a required prop fails', () => {
   const { text_layer, ...rest } = VALID_PROPS.doc_open; // eslint-disable-line no-unused-vars
   assert.equal(validateEvent('doc_open', rest).ok, false);
+});
+
+// THE SKEW `signed` COSTS, STATED OUT LOUD (2026-09-09). This module is
+// imported verbatim by api/t.js, which drops an off-schema event silently, and
+// every declared prop is required. PDFLokal is an installable PWA, so a cached
+// install still running the old JS sends doc_open WITHOUT `signed` and loses
+// the WHOLE event — text_layer, pages, device and intent with it — until it
+// updates. That cost was accepted (same trade as failure.class/blocked,
+// 2026-08-09), but the bank's rule is that a schema edit must SIMULATE the
+// skew rather than assume it: this is that simulation, so the loss is a
+// measured fact instead of a comment. Expect a doc_open dip after the deploy
+// and do not read it as a usage drop.
+test('SKEW, ACCEPTED: an old client\'s doc_open (no `signed`) loses the whole event', () => {
+  const { signed, ...oldClient } = VALID_PROPS.doc_open; // eslint-disable-line no-unused-vars
+  assert.equal(validateEvent('doc_open', oldClient).ok, false);
+  // …and the current client is fine, so this is about the skew and not about
+  // a schema that rejects everything.
+  assert.equal(validateEvent('doc_open', VALID_PROPS.doc_open).ok, true);
 });
 
 test('enum value outside the declared list fails', () => {

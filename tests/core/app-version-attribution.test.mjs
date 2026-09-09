@@ -75,7 +75,7 @@ test('5. CONTENT-BLIND BY CONSTRUCTION: it reads nothing off the request', () =>
 
 // ---- api/t.js precedence -----------------------------------------------------
 const SESSION = '3f1c9a52-0b6e-4a7d-9c11-2f7e5d8a4b30';
-const EVENT = { event: 'doc_open', props: { text_layer: true, pages: '1', device: 'desktop', intent: 'none', display_mode: 'browser' } };
+const EVENT = { event: 'doc_open', props: { text_layer: true, signed: false, pages: '1', device: 'desktop', intent: 'none', display_mode: 'browser' } };
 
 function mkReq(bodyObj) {
   const text = JSON.stringify(bodyObj);

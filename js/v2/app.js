@@ -2761,9 +2761,15 @@ async function loadFilesInner(files) {
         // text-layer probe re-opens the PDF independently (probeTextLayer,
         // core/import.js) — NOT awaited: it must never slow down a multi-file
         // merge loop, and a probe failure is just "don't know" (dropped).
+        // Read SYNCHRONOUSLY, for the same reason docIntent is: the probe's
+        // .then can resolve after the NEXT file in a multi-file merge loop has
+        // already been added, and `doc.sources.at(-1)` would then describe the
+        // wrong file.
+        const docSigned = !!doc.sources.at(-1)?.signed;
         probeTextLayer(bytes)
           .then((hasText) => tel('doc_open', {
-            text_layer: hasText, pages: pagesBucket(importedPages.length), device: deviceClass(), intent: docIntent,
+            text_layer: hasText, signed: docSigned,
+            pages: pagesBucket(importedPages.length), device: deviceClass(), intent: docIntent,
             display_mode: displayMode(),
           }))
           .catch(() => {});
@@ -2771,7 +2777,8 @@ async function loadFilesInner(files) {
         await importImage(doc, { name: f.name, bytes, mimeType: f.type });
         // An image page has no text layer at all — that's the scan ladder's
         // own job (spec-edit-dokumen-foto.md), not this rail's.
-        tel('doc_open', { text_layer: false, pages: pagesBucket(1), device: deviceClass(), intent: docIntent, display_mode: displayMode() });
+        // signed:false — an image has no PDF structure to carry a signature.
+        tel('doc_open', { text_layer: false, signed: false, pages: pagesBucket(1), device: deviceClass(), intent: docIntent, display_mode: displayMode() });
       }
       // Carry the intent so the funnel joins up: intent_armed → file_loaded →
       // download. Without it we'd know people PRESSED "Pisah PDF" but not whether

@@ -78,7 +78,7 @@ function mkRes() {
 const VALID = {
   session_id: '3f1c9a52-0b6e-4a7d-9c11-2f7e5d8a4b30',
   app_version: 'abc1234',
-  events: [{ event: 'doc_open', props: { text_layer: true, pages: '1', device: 'desktop', intent: 'none', display_mode: 'browser' } }],
+  events: [{ event: 'doc_open', props: { text_layer: true, signed: false, pages: '1', device: 'desktop', intent: 'none', display_mode: 'browser' } }],
 };
 
 // Drive the handler with the database stubbed, and report what the insert saw.
@@ -133,7 +133,7 @@ test('DELIVERY: a valid event actually reaches the insert, with its props intact
   // The props must survive validation, or the row lands empty and the rail is
   // "working" while carrying nothing — the 2026-07 blackout's exact shape.
   assert.equal(rows[0].event, 'doc_open');
-  assert.deepEqual(rows[0].props, { text_layer: true, pages: '1', device: 'desktop', intent: 'none', display_mode: 'browser' });
+  assert.deepEqual(rows[0].props, { text_layer: true, signed: false, pages: '1', device: 'desktop', intent: 'none', display_mode: 'browser' });
 });
 
 test('DELIVERY: an off-schema event is dropped BEFORE the insert, not stored as junk', async () => {

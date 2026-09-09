@@ -329,8 +329,25 @@ export const SCHEMA = {
   // counted phone-scanner PDFs as born-digital — the wrong side of the exact
   // ratio this event exists to measure, and the population the OCR decision
   // rests on. Readings before 2026-07-28 overstate born-digital by that share.
+  // signed (2026-09-09): does this document carry an e-meterai or a digital
+  // signature? Any export that REBUILDS the file destroys the seal while the
+  // visible stamp survives, so this is the population that needs the download
+  // sheet's note and the pass-through (core/import.js detectSigned,
+  // core/export.js passThroughSource). Content-blind by construction: a
+  // boolean about the file's STRUCTURE, never a filename and never document
+  // text.
+  //
+  // ⚠️ ADDING A PROP IS A CLIENT-SKEW EVENT, and it is accepted here with eyes
+  // open. Every declared prop is REQUIRED (validateEvent below), and this
+  // module is imported verbatim by api/t.js, which drops an off-schema event
+  // silently. PDFLokal is an installable PWA, so cached installs still running
+  // the old JS will send doc_open WITHOUT `signed` and lose the WHOLE event —
+  // text_layer, pages, device and intent with it — until they update. Same
+  // trade taken for failure.class/blocked on 2026-08-09; expect a doc_open dip
+  // for a few days after this deploys and do not read it as a usage drop.
   doc_open: {
     text_layer: 'bool',
+    signed: 'bool',
     pages: PAGES_BUCKET,
     device: DEVICE,
     intent: INTENT,

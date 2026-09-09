@@ -89,7 +89,7 @@ test('the session id sent on the wire is a v4 UUID under this same degraded cryp
   });
 
   const validDocOpen = {
-    text_layer: true, pages: '1', device: 'desktop', intent: 'none', display_mode: 'browser',
+    text_layer: true, signed: false, pages: '1', device: 'desktop', intent: 'none', display_mode: 'browser',
   };
   // FLUSH_AT is 10 in js/v2/telemetry.js — the 10th call flushes synchronously.
   for (let i = 0; i < 10; i += 1) mod.tel('doc_open', validDocOpen);

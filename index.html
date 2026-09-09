@@ -1372,6 +1372,12 @@
     .ds-spin-lite { border-color: rgba(255,255,255,.4); border-top-color: #fff; }
     @keyframes ds-rot { to { transform: rotate(360deg); } }
     @media (prefers-reduced-motion: reduce) { .ds-spin { animation: none; } }
+    /* The only prose in the sheet. Muted and quiet on purpose: it is a
+       heads-up, not an error, and it must not compete with the CTA under it. */
+    .ds-note {
+      font-size: 12.5px; line-height: 1.45; color: var(--muted);
+      margin: 2px 0 10px; padding-left: 10px; border-left: 2px solid var(--line);
+    }
     .ds-cta {
       width: 100%; min-height: 50px; border: none; border-radius: 12px;
       background: var(--accent); color: #fff; font: inherit; font-weight: 700; font-size: 15px;
@@ -1930,6 +1936,7 @@
                the DM is a conversation, and the two channels coexist. -->
           <a href="#fb-form" id="fb-open">Ada masukan?</a>
           <span>Dibuat di Indonesia</span>
+          <span>© 2026 PT Fauzan Karya Digital</span>
         </footer>
       </div>
     </div>
@@ -2229,6 +2236,17 @@
           <button type="button" data-v="some">Pilih…<small id="ds-some-sub">&nbsp;</small></button>
         </div>
       </div>
+
+      <!-- THE SEAL NOTE. It lives HERE, beside Unduh, and deliberately not at
+           import: the import toast is long gone by the time someone taps the
+           button, and Unduh is where an e-meterai or a digital signature
+           actually dies. It never blocks — editing your own stamped document
+           is legitimate. Shown only when a source is signed AND this
+           particular download would rebuild the file; on the untouched PDF
+           path core/export.js hands the original bytes back and the seal
+           survives, so saying otherwise would be a lie. Text is set from
+           js/v2/download-sheet.js, RULED BY FAUZAN 2026-09-09. -->
+      <p class="ds-note" id="ds-signed" hidden></p>
 
       <button class="ds-cta" id="ds-cta"><span id="ds-cta-main"></span><small id="ds-cta-sub" hidden></small></button>
     </div>
