@@ -137,8 +137,17 @@ test.describe('telemetry client', () => {
     // both pages (born-digital, not a scan) — text_layer must read true; the
     // file is 2 pages → pagesBucket puts it in '2-5'; Desktop Chrome's default
     // viewport (>900px) reads as 'desktop' (js/v2/app.js's deviceClass()).
-    // No ?buat= and a bare homepage → intent is 'none'.
-    expect(docOpen.props).toEqual({ text_layer: true, pages: '2-5', device: 'desktop', intent: 'none', display_mode: 'browser' });
+    // No ?buat= and a bare homepage → intent is 'none'. `signed` is FALSE and
+    // that is a real reading, not padding: sample-2pages.pdf carries no
+    // signature dictionary, so this line doubles as the negative control for
+    // core/import.js detectSigned — if the detector ever starts flagging
+    // ordinary documents, this goes red here first.
+    //
+    // ⚠️ toEqual, not toMatchObject, ON PURPOSE. This asserts the WHOLE prop
+    // set, so a field added to doc_open cannot arrive on the rail unnoticed —
+    // which is exactly what it just caught. Adding a prop means updating this
+    // line deliberately; do not loosen the matcher to avoid that.
+    expect(docOpen.props).toEqual({ text_layer: true, pages: '2-5', device: 'desktop', intent: 'none', display_mode: 'browser', signed: false });
   });
 
   test('(e) doc_open carries the declared intent from ?buat=', async ({ page }) => {

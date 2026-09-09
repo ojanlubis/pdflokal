@@ -121,6 +121,24 @@ test.describe('failure reporting', () => {
       };
     });
 
+    // ⚠️ THE EDIT IS A PRECONDITION, NOT DECORATION (2026-09-09). An UNTOUCHED
+    // single-source document is now handed straight back as its own bytes and
+    // pdf-lib is never asked to load it (core/export.js passThroughSource, so
+    // an e-meterai survives a download). The poisoned loader above would then
+    // never be reached, the export would SUCCEED, and this test would be
+    // asserting a catch block that never ran. One Tip-Ex forces the rebuild
+    // that the poison is aimed at. Fourth instrument the pass-through blinded;
+    // the pattern is in core/export.js's own comment.
+    await page.click('[data-tool="whiteout"]');
+    const box = await page.locator('.pv-page').first().boundingBox();
+    await page.mouse.move(box.x + 60, box.y + 80);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 220, box.y + 130, { steps: 8 });
+    await page.mouse.up();
+    await expect.poll(async () => page.evaluate(
+      () => window.v2.getDoc().pages[0].annotations.length,
+    )).toBeGreaterThan(0);
+
     await page.click('#btn-download');
     await expect(page.locator('#dl-sheet')).toBeVisible({ timeout: 15_000 });
     let downloaded = true;
