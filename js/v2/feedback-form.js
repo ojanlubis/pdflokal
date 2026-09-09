@@ -11,18 +11,33 @@
  *
  * ⚠️ WHY THIS IS A SEPARATE MODULE AND NOT A SECOND ENTRY POINT INTO
  * edit-feedback.js — read this before "simplifying" the two together.
- * edit-feedback.js carries the consent-gated image path: it can attach
- * before/after crops of an edited line, under privacy invariants its own header
- * calls non-negotiable. The seat's decisions.md names content-blindness as the
- * ONE failure class that cannot be walked back: a document string that leaves a
- * device is out, permanently. Adding a second door into that module is exactly
- * how a sample ends up on a path nobody audited — not because someone decided
- * to send content, but because two callers shared a state machine that only one
- * of them was reasoned about.
+ * edit-feedback.js carries the consent-gated crop path: it attaches before/after
+ * crops of an edited line, produced by OUR code from the user's document, under
+ * privacy invariants its own header calls non-negotiable. Adding a second door
+ * into that module is how a sample ends up on a path nobody audited — not
+ * because someone decided to send content, but because two callers shared a
+ * state machine that only one of them was reasoned about. That still stands:
+ * this module never passes a `sample`, and never will.
  *
- * So: this module NEVER passes a sample argument. It calls feedback(rating,
- * note) with two arguments, always. There is no code path here that can reach
- * an image, because there is no code here that knows images exist.
+ * ⚠️ THE OLD INVARIANT HERE WAS "no code path can reach an image, because there
+ * is no code here that knows images exist." HE RETIRED IT ON 2026-09-09 — the
+ * form now accepts ONE PASTED SCREENSHOT. It is written out rather than quietly
+ * deleted, because the replacement is narrower than it looks and the difference
+ * is the whole defence:
+ *
+ *   THE ONLY IMAGE THAT CAN EXIST HERE IS ONE THE USER PASTED, DELIBERATELY,
+ *   INTO THIS TEXTAREA. Nothing in this module reads the editor, the canvas,
+ *   the document, or the clipboard unprompted. There is no attach button by his
+ *   own ruling ("gausah ada tombolnya"), and there must never be an "attach the
+ *   current page" convenience — that would turn a deliberate act into a default
+ *   and take the product's "no uploads" claim with it.
+ *
+ * The paste is shown BACK before it can be sent (#fb-shot), because a
+ * screenshot the sender never saw is a screenshot they did not really choose.
+ * Validation is core/feedback-shot.js — its own module, deliberately not
+ * core/feedback-sample.js: a matched PNG crop pair at 40KB and one user-chosen
+ * JPEG at 200KB are different objects, and one validator holding the union of
+ * both rules enforces neither.
  *
  * ONE SCREEN, per ojan-ui-taste ("one viewport = one reading + one action"):
  * the rating and the note are shown together, not as two steps. The user got
@@ -38,11 +53,15 @@
  * are his. Any change to a user-visible word here needs him again.
  */
 import { feedback } from './telemetry.js';
+import { SHOT_MAX_DIM, SHOT_DATA_URL_PREFIX, validateShot } from '../core/feedback-shot.js';
 
 const NOTE_MAX = 500;
 
 let dlg = null;
 let rating = null;
+let shot = null;        // the pasted screenshot, as a validated data URL
+let shotEl = null;
+let shotImg = null;
 let noteEl = null;
 let sendEl = null;
 let thumbUp = null;
@@ -58,9 +77,20 @@ function setRating(next) {
   if (sendEl) sendEl.disabled = !next;
 }
 
+function clearShot() {
+  shot = null;
+  if (shotImg) shotImg.removeAttribute('src');
+  if (shotEl) shotEl.hidden = true;
+}
+
 function reset() {
   rating = null;
   if (noteEl) noteEl.value = '';
+  // THE IMAGE IS CLEARED ON EVERY OPEN, not only on send. A screenshot pasted,
+  // then dismissed with Batal, must not be sitting there attached the next time
+  // the dialog opens — the user would be re-consenting to something they had
+  // already backed out of, without being asked again.
+  clearShot();
   setRating(null);
   const body = dlg && dlg.querySelector('.fb-body');
   const done = dlg && dlg.querySelector('.fb-done');
@@ -68,10 +98,58 @@ function reset() {
   if (done) done.hidden = true;
 }
 
+// A pasted image → a small JPEG data URL, or null. Never throws: a paste that
+// cannot be decoded is simply not an attachment, and the note still sends.
+//
+// RE-ENCODED, ALWAYS, EVEN WHEN THE ORIGINAL WOULD FIT. Two reasons and both
+// matter: a screenshot pasted from a phone is often several megapixels, and a
+// canvas round-trip DROPS EVERY METADATA BLOCK the source carried — EXIF,
+// timestamps, and on some platforms the GPS a screenshot tool wrote in. We are
+// asking for a picture of our own UI, not for where the user was standing.
+async function toShot(blob) {
+  try {
+    const bitmap = await window.createImageBitmap(blob);
+    const scale = Math.min(1, SHOT_MAX_DIM / Math.max(bitmap.width, bitmap.height));
+    const w = Math.max(1, Math.round(bitmap.width * scale));
+    const h = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    canvas.getContext('2d').drawImage(bitmap, 0, 0, w, h);
+    bitmap.close?.();
+    // One retry at a lower quality, then give up. A loop chasing the cap would
+    // spend a phone's battery on an attachment nobody promised to send.
+    for (const q of [0.65, 0.45]) {
+      const url = canvas.toDataURL('image/jpeg', q);
+      if (url.startsWith(SHOT_DATA_URL_PREFIX) && validateShot(url)) return url;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function onPaste(e) {
+  const items = [...(e.clipboardData?.items || [])];
+  const item = items.find((i) => i.kind === 'file' && i.type.startsWith('image/'));
+  if (!item) return;                          // pasting TEXT stays ordinary paste
+  const blob = item.getAsFile();
+  if (!blob) return;
+  e.preventDefault();                         // stop the browser dropping a filename in the note
+  toShot(blob).then((url) => {
+    if (!url) return;                         // too big even at 0.45, or undecodable — silently no attachment
+    shot = url;
+    if (shotImg) shotImg.src = url;
+    if (shotEl) shotEl.hidden = false;
+  });
+}
+
 function send() {
   if (!rating) return;                       // guard: the button is disabled, but never trust the view
   const note = noteEl ? noteEl.value : '';
-  feedback(rating, note);                    // TWO ARGUMENTS. Never a third. See the header.
+  // `sample` is ALWAYS null from here — the crop pair belongs to
+  // edit-feedback.js and this module has never owned one. `shot` is the pasted
+  // screenshot, and it is the only image this file can produce.
+  feedback(rating, note, null, shot);
   const body = dlg.querySelector('.fb-body');
   const done = dlg.querySelector('.fb-done');
   if (body) body.hidden = true;
@@ -114,6 +192,12 @@ export function initFeedbackForm() {
   if (cancel) cancel.addEventListener('click', () => dlg.close());
 
   if (noteEl) noteEl.setAttribute('maxlength', String(NOTE_MAX));
+
+  shotEl = dlg.querySelector('#fb-shot');
+  shotImg = dlg.querySelector('#fb-shot-img');
+  const shotClear = dlg.querySelector('#fb-shot-clear');
+  if (noteEl) noteEl.addEventListener('paste', onPaste);
+  if (shotClear) shotClear.addEventListener('click', clearShot);
 
   // Clicking the backdrop closes. The global `dialog` rule IS the overlay, so
   // the backdrop is the dialog element itself and anything inside .sheet is a

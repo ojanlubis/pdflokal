@@ -377,6 +377,20 @@
     .fb-owner a { display: block; font-size: 11.5px; color: var(--muted); font-weight: 500; text-decoration: none; }
     .fb-owner a:hover { color: var(--ink); text-decoration: underline; }
 
+    /* The pasted screenshot, shown back at a size you can actually check. */
+    #fb-shot { position: relative; margin: 10px 0 0; }
+    #fb-shot img {
+      display: block; width: 100%; max-height: 180px; object-fit: contain;
+      border: 1px solid var(--line); border-radius: 8px; background: var(--bg);
+    }
+    #fb-shot-clear {
+      position: absolute; top: 6px; right: 6px;
+      width: 28px; height: 28px; border-radius: 8px; line-height: 1;
+      display: grid; place-items: center; font-size: 17px;
+      background: var(--surface); color: var(--ink);
+      box-shadow: 0 1px 6px rgba(0,0,0,.22);
+    }
+
     .fb-thumbs { display: flex; gap: var(--sp-8); }
     .fb-thumbs button {
       flex: 1 1 0;
@@ -2121,7 +2135,20 @@
             <span>Kurang</span>
           </button>
         </div>
-        <textarea id="fb-note" rows="3" placeholder="boleh minta feedbacknya di sini, supaya kita bisa improve terus pdflokal. (boleh dikosongin juga kok)"></textarea>
+        <!-- PASTE, NOT UPLOAD (his ruling 2026-09-09: "gausah ada tombolnya,
+             bilang aja diplaceholdernya"). No attach button anywhere, and
+             nothing here ever reaches into the editor for pixels — the only
+             image that can exist is one the user deliberately pasted. That is
+             the whole reason this is defensible against the product's own "no
+             uploads" claim, so a convenience button would not be a small
+             addition, it would remove the argument. -->
+        <textarea id="fb-note" rows="3" placeholder="tulis feedbacknya di sini, atau boleh paste screenshot"></textarea>
+        <!-- The pasted image, shown back before it can be sent. A screenshot
+             the sender never saw is a screenshot they did not really choose. -->
+        <div id="fb-shot" hidden>
+          <img id="fb-shot-img" alt="">
+          <button type="button" id="fb-shot-clear" aria-label="Hapus">×</button>
+        </div>
         <div class="fb-row">
           <button type="button" id="fb-cancel">Batal</button>
           <button type="button" id="fb-send" disabled>Kirim</button>
