@@ -1,26 +1,23 @@
 /*
- * THE CONTACT BOOKMARK — his five channels, and the size he ruled.
+ * THE FEEDBACK TAB — what replaced his five social channels.
  * ============================================================================
- * The floating tab bottom-left in the editor, and the panel it opens.
+ * REWRITTEN 2026-09-09 on his ruling: "ilangin semua sosmed gue, gaada yang
+ * peduli wkwk, ganti jadi feedback form aja". The floating tab bottom-left used
+ * to be a chat glyph opening a panel of five handles. Both are gone.
  *
- * WHY THE HANDLES ARE PINNED VERBATIM, which is unusual for this suite: every
- * href here is a live link that carries FAUZAN'S NAME. A typo does not 404 —
- * social platforms hand a near-miss username to whoever actually owns it, so
- * the failure mode is a working link to a stranger's account, shipped on his
- * product, indistinguishable from correct until someone clicks it. That is not
- * a copy test; it is the same class as a wrong bank number.
+ * ⚠️ WHY THIS FILE WAS REWRITTEN RATHER THAN DELETED, and it is the whole
+ * point. The old suite existed because a mistyped handle does not 404 — social
+ * platforms hand a near-miss username to whoever actually owns it, so the
+ * failure mode was a working link to a STRANGER'S account shipped under his
+ * name. Removing the links removes that risk only while they stay removed. So
+ * the guard inverts: it used to pin the five hrefs verbatim, and now it asserts
+ * that NO social handle appears on this surface at all. Deleting the file would
+ * have deleted the guard along with the thing it guarded, and an accidental
+ * restore — a revert, a copy-paste from an SEO page, a "the panel used to be
+ * nicer" — would have shipped silently.
  *
- * SOURCE OF TRUTH: engine/wiki/machine/public-identity.md. The handles are NOT
- * decided here and NOT decided in index.html — both read from that page, which
- * is the machine's one home for them. He is `okeojan` on TikTok and X,
- * `ojan.lubis` on Instagram and Threads. If this test and the wiki ever
- * disagree, the wiki wins and this file is the bug.
- *
- * ⚠️ AND IT PINS THE COUNT, deliberately. On 2026-08-23 the wiki page listed
- * THREE channels and he had to be asked for the other two — a list of three
- * reads identically whether three is the answer or three is what someone
- * happened to know. `toEqual` on the whole array (not `toContain` per link)
- * is what makes a silently-dropped channel fail here.
+ * SOURCE OF TRUTH for the handles is still engine/wiki/machine/public-identity.md.
+ * They are not decided here, they are simply not on this page any more.
  */
 import { test, expect } from '@playwright/test';
 import path from 'path';
@@ -29,14 +26,10 @@ import { expectFirstPage } from './helpers/render.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Verbatim, in order, from the wiki table.
-const CHANNELS = [
-  'https://tiktok.com/@okeojan',
-  'https://instagram.com/ojan.lubis',
-  'https://www.threads.com/@ojan.lubis',
-  'https://x.com/okeojan',
-  'https://ojanlubis.id',
-];
+// The hosts he ships as himself, from the wiki. Present here ONLY so their
+// ABSENCE can be asserted — this list must never become a list of links again
+// without him saying so.
+const SOCIAL_HOSTS = ['tiktok.com', 'instagram.com', 'threads.com', 'x.com', 'ojanlubis.id'];
 
 async function openEditor(page) {
   await page.goto('/');
@@ -44,54 +37,61 @@ async function openEditor(page) {
   await expectFirstPage(page);
 }
 
-test.describe('the contact bookmark', () => {
-  test('the tab is small furniture, not a banner — 40x40, no wider than the zoom control', async ({ page }) => {
-    // RULED BY FAUZAN 2026-08-23: "chip kontak saya di sini kegedean, kecilin
-    // lagi". The labelled version was 44x131 — nearly 3x #zoom-ctl's footprint
-    // on the opposite corner, and on desktop it overlapped the document. The
-    // assertion is RELATIVE to #zoom-ctl rather than a bare pixel count,
-    // because "the two floating controls weigh the same" is the actual rule;
-    // a hardcoded 40 would go green if both were re-inflated together.
+test.describe('the feedback tab', () => {
+  test('the tab SAYS what it does — no glyph anyone has to tap to decode', async ({ page }) => {
+    // RULED 2026-09-09: "icon ini diganti jadi kata2 aja ya 'ada masukan?'".
+    // The string is the footer's, ratified 2026-08-22 — one name for one act.
+    await openEditor(page);
+    expect((await page.locator('#contact-tab-btn').innerText()).trim()).toBe('Ada masukan?');
+    expect(await page.locator('#contact-tab-btn svg').count()).toBe(0);
+  });
+
+  test('it stays furniture — no taller than the zoom control on the opposite corner', async ({ page }) => {
+    // HIS EARLIER RULING SURVIVES THE RELABEL (2026-08-23: "chip kontak saya di
+    // sini kegedean, kecilin lagi"). A labelled tab is wider than an icon by
+    // construction, so WIDTH can no longer be the test — HEIGHT is what "same
+    // weight as the other floating control" now means, and it is asserted
+    // relative to #zoom-ctl rather than as a pixel count, so re-inflating both
+    // together still goes red.
     await openEditor(page);
     const chip = await page.locator('#contact-tab-btn').boundingBox();
     const zoom = await page.locator('#zoom-ctl').boundingBox();
-    expect(chip.width).toBeLessThanOrEqual(zoom.width);
     expect(chip.height).toBeLessThanOrEqual(zoom.width);
-
-    // Icon-only, so the words have to survive somewhere a screen reader and a
-    // desktop hover can both still reach. Losing the label was the cost of the
-    // size; losing the NAME would be a different, worse change.
-    await expect(page.locator('#contact-tab-btn')).toHaveAttribute('aria-label', 'Kontak saya');
-    await expect(page.locator('#contact-tab-btn')).toHaveAttribute('title', 'Kontak saya');
-    expect((await page.locator('#contact-tab-btn').innerText()).trim()).toBe('');
   });
 
-  test('every channel he ships as himself is there, and no other', async ({ page }) => {
+  test('THE GUARD: no social handle is anywhere on this surface', async ({ page }) => {
+    await openEditor(page);
+    const hrefs = await page.locator('a[href]').evaluateAll((els) => els.map((e) => e.href));
+    // Guard the instrument before believing its verdict: a page with no links
+    // at all would pass this for free. [[assertions-over-empty-sets]]
+    expect(hrefs.length).toBeGreaterThan(0);
+    const found = hrefs.filter((h) => SOCIAL_HOSTS.some((host) => h.includes(host)));
+    expect(found, 'a social handle came back onto the editor surface').toEqual([]);
+    expect(await page.locator('#contact-tab-panel').count()).toBe(0);
+  });
+
+  test('it opens the feedback dialog, and the dialog says who is asking', async ({ page }) => {
     await openEditor(page);
     await page.click('#contact-tab-btn');
-    await expect(page.locator('#contact-tab-panel')).toBeVisible();
+    await expect(page.locator('#fb-form')).toBeVisible();
 
-    const hrefs = await page.locator('#contact-tab-panel a').evaluateAll(
-      (els) => els.map((e) => e.getAttribute('href')),
-    );
-    expect(hrefs).toEqual(CHANNELS);
-
-    // Every one opens away from the editor, and carries rel=noopener — a
+    // The byline that replaced the panel's owner row. mesindev.com is the only
+    // link, and it must open away from the editor with rel=noopener — a
     // target=_blank without it hands the opened tab a live handle on this one.
-    for (const a of await page.locator('#contact-tab-panel a').all()) {
-      const href = await a.getAttribute('href');
-      await expect(a, href).toHaveAttribute('target', '_blank');
-      expect(await a.getAttribute('rel'), href).toContain('noopener');
-    }
+    const link = page.locator('.fb-owner a');
+    await expect(link).toHaveAttribute('href', 'https://mesindev.com');
+    await expect(link).toHaveAttribute('target', '_blank');
+    expect(await link.getAttribute('rel')).toContain('noopener');
+    await expect(page.locator('.fb-owner b')).toHaveText('Ojan');
   });
 
-  test('the panel is really closed when it is closed', async ({ page }) => {
-    // visibility, not just opacity: an invisible-but-present panel still takes
-    // taps and still reads aloud, which is the bug #support-card already had.
-    await openEditor(page);
-    const first = page.locator('#contact-tab-panel a').first();
-    await expect(first).toBeHidden();
-    await page.click('#contact-tab-btn');
-    await expect(first).toBeVisible();
+  test('CONTROL: the footer link still opens the SAME dialog — two doors, one form', async ({ page }) => {
+    // The tab reuses #fb-open's own handler rather than getting a parallel one.
+    // If they ever diverge, one of these two paths stops working and this is
+    // where it shows.
+    await page.goto('/');
+    await page.click('#fb-open');
+    await expect(page.locator('#fb-form')).toBeVisible();
+    await expect(page.locator('.fb-owner b')).toHaveText('Ojan');
   });
 });

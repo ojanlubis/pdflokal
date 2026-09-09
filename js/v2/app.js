@@ -299,24 +299,12 @@ on('z-out', 'click', () => { zoom = Math.max(zoom - 0.25, 0.3); applyZoom(); });
 // Fixing it in one module and re-introducing it in a sibling, in one sitting, is
 // why the rule is structural and not a reminder: A TOP-LEVEL LOOKUP OF AN
 // INDEX-ONLY ELEMENT IS ALWAYS GUARDED.
-const contactTabBtn = document.getElementById('contact-tab-btn');
-const contactTabPanel = document.getElementById('contact-tab-panel');
-if (contactTabBtn && contactTabPanel) {
-  const toggleContactTab = (show) => {
-    contactTabPanel.classList.toggle('show', show);
-    contactTabBtn.setAttribute('aria-expanded', String(show));
-  };
-  contactTabBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    toggleContactTab(!contactTabPanel.classList.contains('show'));
-  });
-  document.addEventListener('pointerdown', (e) => {
-    if (contactTabPanel.classList.contains('show') &&
-        !e.target.closest('#contact-tab-btn, #contact-tab-panel')) {
-      toggleContactTab(false);
-    }
-  });
-}
+// ⚠️ THE CONTACT TAB'S WIRING LIVES IN js/v2/feedback-form.js NOW (2026-09-09).
+// It used to toggle a panel of social handles from here. He retired the handles
+// and the panel with them; the tab opens the feedback dialog, so its listener
+// belongs beside the dialog it opens rather than in app.js's top-level block.
+// The guarded-lookup rule that this block used to demonstrate still stands and
+// is demonstrated by every on() call above it.
 
 // ---- camera: pinch-zoom + pan (the Google-Maps feel, founder ask) ----------------
 // One-finger pan = NATIVE container scroll (overflow auto on both axes — free,

@@ -84,6 +84,12 @@ function send() {
 export function initFeedbackForm() {
   dlg = document.getElementById('fb-form');
   const open = document.getElementById('fb-open');
+  // TWO DOORS, ONE DIALOG (2026-09-09). The footer link and the floating tab
+  // both land here. Deliberately not two implementations: the tab was wired in
+  // app.js while it opened its own panel, and leaving it there would have meant
+  // two modules owning one surface — the exact shape this file's own header
+  // warns about for the image path.
+  const tab = document.getElementById('contact-tab-btn');
   if (!dlg || !open) return;                 // SEO pages that drop the footer simply have no channel
 
   noteEl = dlg.querySelector('#fb-note');
@@ -96,6 +102,9 @@ export function initFeedbackForm() {
     reset();
     dlg.showModal();
   });
+  // Same act, same dialog, same telemetry — so the tab reuses the link's own
+  // handler rather than getting a parallel one that can drift from it.
+  if (tab) tab.addEventListener('click', (e) => { e.preventDefault(); open.click(); });
 
   if (thumbUp) thumbUp.addEventListener('click', () => setRating('up'));
   if (thumbDown) thumbDown.addEventListener('click', () => setRating('down'));
