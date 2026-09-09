@@ -423,6 +423,66 @@ function scaleAnnotationGeometry(anno, k) {
   return out;
 }
 
+// ---- pass-through: the untouched document -----------------------------------
+
+// Is this Doc PROVABLY the source file, unchanged? Returns the Source whose
+// bytes are the whole truth, or null.
+//
+// WHY THIS EXISTS, and it is not an optimisation. Everything below rebuilds
+// the document: copyPages into a fresh PDFDocument, then `newDoc.save(...)`.
+// There is no incremental-update path anywhere in this stack. For an ordinary
+// PDF that is invisible. For a document carrying an Indonesian e-meterai or
+// any PAdES digital signature it is destruction: the signature digests a byte
+// range of the ORIGINAL file, and a rebuild moves every byte. The visible
+// meterai graphic survives as page content, so the output looks perfectly
+// stamped and fails Peruri verification — the user finds out somewhere else,
+// days later, which is the exact failure mode core/import.js refuses
+// `ignoreEncryption` for. Handing back the original bytes is the only real
+// fix; a warning is what we do when we cannot.
+//
+// SIDE BENEFIT, deliberate: an untouched ENCRYPTED PDF now downloads instead
+// of being refused. pdf-lib has no decryption and throws at
+// `PDFDocument.load` — but we are no longer asking it to load anything, and
+// the bytes we hand back are the user's own encrypted file, byte for byte. We
+// decrypt nothing and claim to remove nothing. (The refusal remains honest the
+// moment anything below stops holding: then a rebuild really is required, and
+// pdf-lib really cannot do it.)
+//
+// ⚠️ STRICT, NOT CLEVER. Every condition below is a thing that would otherwise
+// silently vanish from the user's file, and the cost of being wrong is
+// asymmetric: a missed pass-through costs a seal that was already doomed, a
+// wrong pass-through silently drops work the user did. So when in doubt,
+// rebuild. Do not relax one of these into "usually fine".
+export function passThroughSource(doc) {
+  const sources = doc?.sources;
+  if (!Array.isArray(sources) || sources.length !== 1) return null; // nothing to compose
+  const source = sources[0];
+  if (!source || !(source.bytes?.length > 0)) return null;
+  const pages = doc.pages;
+  if (!Array.isArray(pages) || pages.length === 0) return null;
+  // EVERY page of the source, in the source's own order, and no others. This
+  // one test covers deleted, added, reordered AND deselected-in-the-sheet all
+  // at once — the download sheet builds its subset Doc by filtering
+  // `doc.pages` (js/v2/download-sheet.js selectedPages), so "page 3 was
+  // unticked" arrives here as a pages array that no longer covers the source.
+  if (pages.length !== source.numPages) return null;
+  for (let i = 0; i < pages.length; i += 1) {
+    const page = pages[i];
+    if (!page || page.isFromImage) return null;              // an image page is not this source
+    if (page.sourceId !== source.id) return null;
+    if (page.sourcePageNum !== i) return null;               // reordered, or a subset
+    if (page.annotations?.length) return null;               // Tip-Ex / teks / TTD / a Ganti edit
+    if (totalPageRotation(page) !== (page.baseRotation || 0)) return null; // the user turned it
+    // Merge width normalisation (core/operations.js): a page whose display
+    // width was rescaled to match an anchor is not its source page any more,
+    // even though the pixels came from there. Guarded explicitly rather than
+    // left to the one-source test above, so a future single-source normalise
+    // cannot walk through here.
+    if (page.baseWidth > 0 && page.width !== page.baseWidth) return null;
+  }
+  return source;
+}
+
 // ---- the adapter ---------------------------------------------------------------
 
 // Build final PDF bytes for a core Doc. `deps` injects the vendor libs so the
@@ -432,6 +492,19 @@ export async function buildPdfBytes(doc, deps = {}) {
   const PDFLib = deps.PDFLib || globalThis.PDFLib;
   const fontkit = deps.fontkit || globalThis.fontkit;
   if (!PDFLib) throw new Error('buildPdfBytes: PDFLib is required (inject via deps or load the vendor script)');
+
+  // NOTHING CHANGED → HAND BACK THE ORIGINAL BYTES. See passThroughSource for
+  // the whole argument; the short version is that rebuilding an untouched
+  // document is not free — it destroys an e-meterai or a digital signature —
+  // and there is no version of "rebuild it identically" that keeps a digest
+  // taken over the original file's byte offsets.
+  //
+  // A COPY, not the array itself: callers keep these bytes (the sheet caches
+  // them, compress reads them, a Blob wraps them) and must never be handed a
+  // view onto the Source's own buffer that a later write could disturb. Same
+  // defensive stance as import.js's `bytes.slice()` before PDF.js.
+  const untouched = passThroughSource(doc);
+  if (untouched) return new Uint8Array(untouched.bytes);
 
   const newDoc = await PDFLib.PDFDocument.create();
   // fontkit is only needed for custom fonts (Montserrat/Carlito); standard

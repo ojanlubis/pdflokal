@@ -143,6 +143,16 @@ const IN_PAGE = async ({ src, corrupt }) => {
     const imgBefore = await toImageData(before.dataUrl, before.width, before.height);
 
     stage = 'export';
+    // ⚠️ READ THIS BEFORE TREATING A GREEN SWEEP AS REFACTOR EVIDENCE
+    // (2026-09-09). This sweep imports each document and exports it UNTOUCHED
+    // — which is now precisely the shape core/export.js hands straight back as
+    // the original bytes (passThroughSource, so an e-meterai survives a
+    // download). So for the no-op run the fidelity oracle below compares the
+    // file with ITSELF and cannot see the rebuild path at all. The `corrupt`
+    // mode still goes red (it damages the output after export), so the oracle
+    // is not broken — but "the wild corpus exports faithfully" no longer says
+    // anything about copyPages/save. To sweep the REBUILD path, make each doc
+    // ineligible first (an annotation, a rotation, or one page deselected).
     let out = await buildPdfBytes(doc, { PDFLib, fontkit });
     if (!out || !out.length) return { ok: false, stage: 'export', reason: 'empty-output' };
 

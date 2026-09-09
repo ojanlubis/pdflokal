@@ -371,13 +371,21 @@ test('export: END TO END, a photo in front of an A4 produces an A4-WIDE document
 test('export: a page at factor 1 is not touched — no wrapper, source content stream verbatim', async () => {
   const PDFLib = loadUmd('js/vendor/pdf-lib.min.js');
   const fontkit = loadUmd('js/vendor/fontkit.umd.min.js');
-  const bytes = new Uint8Array(fs.readFileSync(NASTY('surat-fragmen.pdf')));
+  // ⚠️ A TWO-PAGE FIXTURE, ONE PAGE EXPORTED, AND THAT IS DELIBERATE (2026-09-09).
+  // This test used to hand buildPdfBytes a complete, untouched, single-source
+  // document — which is now exactly the shape core/export.js hands straight
+  // back as the ORIGINAL BYTES (passThroughSource, so an e-meterai survives).
+  // The content-stream comparison below then compared the source file with
+  // itself and would have passed even if the scale wrapper this test exists to
+  // catch came back. Exporting a SUBSET keeps the factor at 1 while forcing the
+  // REBUILD path, which is the path the claim is about. [[fixture-must-distinguish]]
+  const bytes = new Uint8Array(fs.readFileSync(path.join(root, 'tests/fixtures/sample-2pages.pdf')));
   const probe = await PDFLib.PDFDocument.load(bytes);
   const srcPage = probe.getPages()[0];
   const { width: nativeW, height: nativeH } = srcPage.getSize();
 
   const doc = model.createDoc();
-  const src = pdfSource(doc, 'surat-fragmen.pdf', bytes);
+  const src = pdfSource(doc, 'sample-2pages.pdf', bytes, 2);
   ops.addPages(doc, [model.createPage({ source: src, sourcePageNum: 0, width: nativeW, height: nativeH })]);
 
   const out = await PDFLib.PDFDocument.load(await buildPdfBytes(doc, { PDFLib, fontkit }));
