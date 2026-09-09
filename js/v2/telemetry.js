@@ -18,6 +18,7 @@
  */
 import { validateEvent } from '../core/telemetry-schema.js';
 import { validateSample } from '../core/feedback-sample.js';
+import { validateShot } from '../core/feedback-shot.js';
 
 const ENDPOINT = '/api/t';
 const FLUSH_AT = 10;
@@ -246,8 +247,14 @@ const FEEDBACK_NOTE_MAX = 1000;
  * @param {string} [note] user-typed, capped, optional
  * @param {{before: string, after: string}} [sample] two PNG data URLs — only
  *   ever passed when the user saw them rendered in the pill and tapped Kirim.
+ * @param {string} [shot] ONE JPEG data URL, and only ever a screenshot the user
+ *   PASTED into the general feedback form themselves (js/v2/feedback-form.js).
+ *   A FOURTH POSITIONAL ARGUMENT ON PURPOSE, rather than widening `sample`:
+ *   the two images have different producers, different validators and different
+ *   consent stories, and the day they share a parameter is the day a crop can
+ *   arrive on the screenshot's path without anyone choosing it.
  */
-export function feedback(rating, note, sample) {
+export function feedback(rating, note, sample, shot) {
   try {
     if (rating !== 'up' && rating !== 'down') return;
     const payload = { session_id: sessionId, app_version: appVersion, rating };
@@ -259,8 +266,12 @@ export function feedback(rating, note, sample) {
       payload.sample_before = validSample.before;
       payload.sample_after = validSample.after;
     }
+    const validShot = validateShot(shot);
+    if (validShot) payload.screenshot = validShot;
 
-    if (validSample && typeof fetch === 'function') {
+    // Either image makes the body too large for sendBeacon's 64KB, so the fetch
+    // path is what carries them. The condition used to name only the sample.
+    if ((validSample || validShot) && typeof fetch === 'function') {
       try {
         // Plain fetch, no keepalive — see the transport finding above. Never
         // awaited, never surfaced to app code; a failed send here just means
@@ -280,7 +291,11 @@ export function feedback(rating, note, sample) {
     }
 
     if (typeof navigator?.sendBeacon !== 'function') return; // no beacon — drop, never retry
+    // Beacon fallback: the images are exactly what made this too big, so they
+    // are what gets dropped. Rating and note still land — which is the same
+    // trade every other drop in this file makes.
     if (validSample) { delete payload.sample_before; delete payload.sample_after; }
+    if (validShot) delete payload.screenshot;
     const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
     navigator.sendBeacon(FEEDBACK_ENDPOINT, blob);
   } catch {

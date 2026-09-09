@@ -80,7 +80,13 @@ test('DELIVERY: a valid 👎 reaches the insert, parameterized, with its note in
   // The note is a value, never text spliced into SQL. This is the one field a
   // user actually types, so it is the one that must never reach the statement.
   assert.equal(calls[0].text.includes('hurufnya'), false, 'the note was interpolated into the SQL');
-  assert.deepEqual(calls[0].params, [SESSION, 'abc1234', 'down', 'hurufnya jadi tebal', null, null]);
+  // ⚠️ THE WHOLE ARRAY, not a subset — and it went red for the right reason on
+  // 2026-09-09 when `screenshot` was added as the 7th parameter. A new column
+  // silently joining this insert is exactly what a full-array assertion is for,
+  // so it is updated deliberately here rather than loosened to a prefix match.
+  // The trailing nulls are sample_before, sample_after, screenshot: this body
+  // carries no image of any kind.
+  assert.deepEqual(calls[0].params, [SESSION, 'abc1234', 'down', 'hurufnya jadi tebal', null, null, null]);
   assert.equal(res.code, 204);
 });
 

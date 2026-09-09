@@ -52,14 +52,43 @@ function makeQuery(dsn) {
 // Notes are short reactions, not essays — a much smaller cap than telemetry's
 // 32KB batch. NOTE_MAX bounds the stored string; MAX_BODY_BYTES bounds the raw
 // request so a hostile client can't stream megabytes at us before we slice.
-// MAX_BODY_BYTES is sized for the Increment D sample case (two base64 PNGs,
-// ~54.6KB each at the 40KB-raw cap, ~109KB combined) plus JSON/field
-// overhead and a safety margin — comfortably bounded either way, never
-// unbounded.
+// MAX_BODY_BYTES was sized for the Increment D sample case alone (two base64
+// PNGs, ~54.6KB each at the 40KB-raw cap, ~109KB combined). RAISED 2026-09-09
+// for the pasted screenshot: 200KB raw base64s to ~274KB, and the cap has to
+// hold that PLUS a sample, because a crafted body can carry both even though no
+// client sends both. Still a bound, never unbounded — that is the property.
 const NOTE_MAX = 1000;
-const MAX_BODY_BYTES = 200 * 1024;
+const MAX_BODY_BYTES = 420 * 1024;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const APP_VERSION_RE = /^[0-9a-f]{7,40}$|^dev$/;
+
+// ---- the pasted screenshot (mirrors js/core/feedback-shot.js) --------------
+// ⚠️ ITS OWN PREFIX, ITS OWN CAP, ITS OWN FUNCTION — not a widened sample
+// check. The crop pair is PNG at 40KB produced by our code; this is one JPEG at
+// 200KB chosen by a user. A single validator holding the union of both rule
+// sets enforces neither, and the looser half would silently become the rule for
+// the stricter object. Duplicated from core/ for the same reason readBody is:
+// this file must not import from the browser bundle.
+const SHOT_DATA_URL_PREFIX = 'data:image/jpeg;base64,';
+const SHOT_MAX_BYTES = 200 * 1024;
+
+function shotBytes(dataUrl) {
+  if (typeof dataUrl !== 'string' || !dataUrl.startsWith(SHOT_DATA_URL_PREFIX)) return Infinity;
+  const b64 = dataUrl.slice(SHOT_DATA_URL_PREFIX.length);
+  if (b64.length === 0 || b64.length % 4 !== 0 || !SAMPLE_BASE64_RE.test(b64)) return Infinity;
+  const padding = b64.endsWith('==') ? 2 : b64.endsWith('=') ? 1 : 0;
+  return Math.floor((b64.length * 3) / 4) - padding;
+}
+
+// Returns the data URL, or null. Never a repaired value — a screenshot that
+// fails here is simply not stored, and the rating and note land exactly as a
+// feedback with no screenshot always has.
+function validateShot(body) {
+  const url = body?.screenshot;
+  const bytes = shotBytes(url);
+  if (!(bytes > 0) || bytes > SHOT_MAX_BYTES) return null;
+  return url;
+}
 
 // ---- Increment D: sample validation (mirrors js/core/feedback-sample.js) ----
 const SAMPLE_DATA_URL_PREFIX = 'data:image/png;base64,';
@@ -165,6 +194,7 @@ export default async function handler(req, res) {
     // the WHOLE sample (never a partial one) on anything off — the rating+
     // note above are already extracted and land regardless.
     const sample = validateSample(body);
+    const shot = validateShot(body);
 
     // THE CLIENT'S OWN ANSWER WINS — mirroring api/t.js's 2026-07-29 reversal,
     // which this file missed until the 2026-08-09 audit (finding 4). The same
@@ -195,9 +225,9 @@ export default async function handler(req, res) {
     try {
       const query = queryOverride || makeQuery(dsn);
       const out = await query(
-        `insert into feedback (session_id, app_version, rating, note, sample_before, sample_after)
-         values ($1::uuid,$2,$3,$4,$5,$6)`,
-        [sessionId, storedVersion, rating, note, sample?.before ?? null, sample?.after ?? null],
+        `insert into feedback (session_id, app_version, rating, note, sample_before, sample_after, screenshot)
+         values ($1::uuid,$2,$3,$4,$5,$6,$7)`,
+        [sessionId, storedVersion, rating, note, sample?.before ?? null, sample?.after ?? null, shot],
       );
       if (out?.rowCount !== 1) {
         console.error(`[feedback] insert SHORT written=${out?.rowCount ?? 'unknown'} rows_expected=1`);

@@ -97,16 +97,24 @@ test.describe('general feedback form — mobile', () => {
     expect(sent.length).toBe(0); // dismissing sent nothing at all
   });
 
-  test('the founder-ratified copy is exactly what ships (his words, 2026-08-03)', async ({ page }) => {
+  test('the founder-ratified copy is exactly what ships (2026-08-03, placeholder re-ruled 2026-09-09)', async ({ page }) => {
     // He ruled these six strings one at a time and rewrote two of them himself.
     // A ruling nobody checks is a green that cannot go red, so this asserts the
-    // two he authored VERBATIM — including the lowercase and his spelling of
+    // ones he authored VERBATIM — including the lowercase and his spelling of
     // "terimakasih", which are his and not typos to tidy. If a future pass
     // sentence-cases or "improves" them, this fails, which is the point.
+    //
+    // ⚠️ THE PLACEHOLDER CHANGED, AND THIS TEST IS WHY THAT WAS SAFE. It went
+    // RED on CI when the string moved, exactly as designed — the old value was
+    // his from 2026-08-03 and nothing may retire it quietly. He re-ruled it on
+    // 2026-09-09 when the form gained the pasted screenshot: "gausah ada
+    // tombolnya, bilang aja diplaceholdernya 'tulis feedbacknya di sini, atau
+    // boleh paste screenshot'". So the expectation is updated with a DATE and a
+    // quote, never silently. A red here always means ask him, never edit.
     await openForm(page);
     await expect(page.locator('#fb-note')).toHaveAttribute(
       'placeholder',
-      'boleh minta feedbacknya di sini, supaya kita bisa improve terus pdflokal. (boleh dikosongin juga kok)',
+      'tulis feedbacknya di sini, atau boleh paste screenshot',
     );
     await expect(page.locator('#fb-open')).toHaveText('Ada masukan?');
     await expect(page.locator('.fb-body h2')).toHaveText('Gimana PDFLokal?');

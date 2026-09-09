@@ -287,6 +287,12 @@
          its own mode and page values must not be ported into it. A toolbar at
          --sp-48 is a toolbar that wastes the document's room. */
       --header-h: 44px; --toolbar-h: 52px;
+      /* THE HEIGHT EVERYTHING BELOW THE CHROME MEASURES AGAINST. It was
+         spelled `calc(var(--header-h) + var(--toolbar-h))` at each use site,
+         which stopped being true the moment the two could share a row. One
+         name, redefined once per breakpoint. */
+      --chrome-h: calc(var(--header-h) + var(--toolbar-h));
+      --header-merged-h: 52px;   /* the single-row height (tools are 36px + padding) */
     }
     /* Self-hosted fonts (preview parity with the PDF export) */
     @font-face { font-family: 'Montserrat'; src: url('fonts/montserrat-regular.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
@@ -336,10 +342,17 @@
 
     /* ---- header ---- */
     header {
-      height: var(--header-h); flex: 0 0 auto;
+      min-height: var(--header-h); flex: 0 0 auto;
       display: flex; align-items: center; gap: 8px; padding: 0 10px;
-      background: var(--surface); border-bottom: 1px solid var(--line);
+      background: var(--surface);
+      /* WRAPS ON PURPOSE. Below the merge breakpoint the toolbar takes a full
+         row of its own; above it, everything stays on one line. No JS, no
+         second element, no duplicated tool buttons to keep in sync. */
+      flex-wrap: wrap;
     }
+    /* Narrow: the toolbar is a row of its own and carries the bottom edge, so
+       the header must NOT also draw one — two borders read as a seam. */
+    header > #toolbar { order: 9; flex: 1 0 100%; margin: 0 -10px; }
     .brand { font-weight: 700; font-size: 15px; letter-spacing: -.01em; }
     .brand-red { color: var(--accent); }
     /* home confirm: rides the standard dialog/.sheet system (the global
@@ -352,6 +365,32 @@
      * renders as a success. This system has one meaning for red and a second
      * colour meaning "good" is not being introduced here. */
     .fb-sheet { max-width: 380px; }
+    /* The byline under the question. Muted and small on purpose: it answers
+       "who am I writing to", it is not a place to go. The domain is the only
+       link, because it is the only one that leads anywhere useful. */
+    .fb-owner {
+      display: flex; align-items: center; gap: 9px;
+      margin: -2px 0 14px;
+    }
+    .fb-owner img { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex: none; }
+    .fb-owner b { display: block; font-size: 13px; font-weight: 700; color: var(--ink); line-height: 1.25; }
+    .fb-owner a { display: block; font-size: 11.5px; color: var(--muted); font-weight: 500; text-decoration: none; }
+    .fb-owner a:hover { color: var(--ink); text-decoration: underline; }
+
+    /* The pasted screenshot, shown back at a size you can actually check. */
+    #fb-shot { position: relative; margin: 10px 0 0; }
+    #fb-shot img {
+      display: block; width: 100%; max-height: 180px; object-fit: contain;
+      border: 1px solid var(--line); border-radius: 8px; background: var(--bg);
+    }
+    #fb-shot-clear {
+      position: absolute; top: 6px; right: 6px;
+      width: 28px; height: 28px; border-radius: 8px; line-height: 1;
+      display: grid; place-items: center; font-size: 17px;
+      background: var(--surface); color: var(--ink);
+      box-shadow: 0 1px 6px rgba(0,0,0,.22);
+    }
+
     .fb-thumbs { display: flex; gap: var(--sp-8); }
     .fb-thumbs button {
       flex: 1 1 0;
@@ -484,12 +523,73 @@
     }
     .tool.active { background: rgba(220,38,38,.08); color: var(--accent); }
 
+    /* ---- MERGED CHROME: one row when the width can hold it ---------------
+       His ruling 2026-09-09: "buat desktop, pindahin tools2nya ke atas. karena
+       spacenya kosong, cuma bikin dua baris navbar kalo spacenya ga cukup aja".
+       So the two-row layout is the FALLBACK, not the default.
+
+       ⚠️ THE BREAKPOINT IS MEASURED, NOT CHOSEN — 900px, 2026-09-09.
+       `.spacer { flex: 1 }` is the slack in this row, so its width IS the
+       headroom. Measured in Chromium: 152px of slack at 1000, 52 at 900, 12 at
+       860, and ZERO at 848. **848 is the true minimum**; 900 is that plus a
+       stated ~50px so the row never sits flush against its own ends, because a
+       row with no breathing room reads as broken even while it technically
+       fits. If a tool is added or a label reworded, RE-MEASURE — a stale
+       breakpoint shows up as a cramped row, never as an error.
+
+       ⚠️ AND THE GAUGE TOOK THREE TRIES, which is the part worth keeping.
+       Per-tool `scrollWidth` reported "fits" at every width down to 760, twice,
+       because the tools were not the element losing width. A third attempt
+       queried `#spacer` — it is a CLASS, so the query returned null and the
+       check passed on null. Only the fourth gauge, the spacer's own geometry
+       through a selector proven to match, showed a number that moved.
+       [[a-watcher-must-be-proven-to-fire]] is the sibling rule.
+
+       ⚠️ AND CHECK THE CEILING AT BOTH SIDES OF IT. design-discipline §2: a
+       band that holds three destinations at 1280 holds four at 375 without
+       anyone editing it. Here the count is unchanged either way — File, the
+       tool cluster (ONE destination, grouped), and Unduh (the one primary) —
+       which is the whole reason this merge is legitimate rather than a
+       fourth thing competing on one line. */
+    @media (min-width: 900px) {
+      :root { --chrome-h: var(--header-merged-h); }
+      header {
+        min-height: var(--header-merged-h); flex-wrap: nowrap;
+        border-bottom: 1px solid var(--line);
+      }
+      /* The flex spacer is what pushes Unduh right in the two-row layout. On
+         the merged row the TOOLBAR grows into that space instead and centres
+         its own children, so a second grower would fight it and shove the
+         tools off-centre. One grower per row. */
+      header > .spacer { display: none; }
+      header > #toolbar {
+        order: 3; flex: 1 1 auto; margin: 0;
+        height: auto; background: none; border-bottom: 0; padding: 0;
+        overflow: visible;
+      }
+      /* Undo/redo/Unduh sit AFTER the tools on the merged row. The markup has
+         the toolbar last (it was appended), so the order is stated here rather
+         than implied by the DOM. */
+      header > #btn-undo, header > #btn-redo, header > #btn-download { order: 5; }
+      /* Icon ABOVE label needs 52px of vertical room. On one shared row the
+         label moves BESIDE the icon — same target size, half the height. */
+      .tool {
+        flex-direction: row; gap: 6px;
+        min-width: 0; height: 36px; padding: 0 9px; font-size: 12.5px;
+      }
+      .tool svg { width: 17px; height: 17px; }
+      /* The BETA cap was corner-pinned so it could not widen a tight toolbar.
+         On the merged row there is room beside the word, and a corner chip on a
+         36px control overlaps its own label. */
+      .tool .beta-tag { position: static; margin-left: 1px; }
+    }
+
     /* ---- format bar: contextual, only when text is in play ---- */
     /* Contextual bars OVERLAY the canvas (founder: the document must never
        jump when a bar appears/disappears) — frosted so the page shows through. */
     #format-bar {
       display: none; align-items: center; gap: 6px;
-      position: absolute; top: calc(var(--header-h) + var(--toolbar-h)); left: 0; right: 0;
+      position: absolute; top: var(--chrome-h); left: 0; right: 0;
       z-index: 45; height: 46px; padding: 0 10px;
       background: rgba(255,255,255,.93); backdrop-filter: blur(6px);
       border-bottom: 1px solid var(--line); box-shadow: 0 4px 14px rgba(63,49,35,.07);
@@ -623,61 +723,33 @@
        above was always claiming. The words survive as aria-label + title, so
        a screen reader and a desktop hover both still say "Kontak saya" — the
        label moved, it was not deleted. */
+    /* ⚠️ THE TAB SAYS WHAT IT DOES (2026-09-09, his ruling: "icon ini diganti
+       jadi kata2 aja ya 'ada masukan?'"). It was a chat glyph opening a panel
+       of five social handles; the handles are gone — "gaada yang peduli" — and
+       the glyph went with them, because an icon that has to be tapped to learn
+       its meaning fails his own element test (design-discipline §2).
+
+       AND THE PANEL IS GONE, NOT REPOINTED. Once the tab itself reads "Ada
+       masukan?", a panel whose only content was a button reading "Ada masukan?"
+       is a step that asks the same question twice. The tab opens #fb-form
+       directly. Whose product this is now lives INSIDE that dialog, where it
+       answers "who am I writing to" at the moment the question occurs.
+
+       The string is not new: it is the footer's, ratified 2026-08-22, and
+       reusing it keeps one name for one act (EXCLUDE 2 — copy is his). */
     #contact-tab-btn {
       position: fixed; left: 10px; bottom: 14px; z-index: 30;
-      width: 40px; height: 40px; border-radius: 12px;
-      display: grid; place-items: center;
+      min-height: 40px; padding: 0 14px; border-radius: 12px;
+      display: inline-flex; align-items: center;
       background: var(--surface); box-shadow: 0 3px 14px rgba(0,0,0,.16);
-      color: var(--muted);
+      color: var(--muted); font-size: 13px; font-weight: 600;
     }
-    #contact-tab-btn svg { width: 19px; height: 19px; display: block; }
-    #contact-tab-panel {
-      position: fixed; left: 10px; bottom: 62px; z-index: 30;
-      width: max-content; max-width: min(78vw, 260px);
-      background: var(--surface); box-shadow: 0 3px 14px rgba(0,0,0,.16);
-      border-radius: 12px; padding: 8px;
-      /* visibility (not just opacity): same reasoning as #support-card — a
-         dismissed panel must be GONE to hit-testing and screen readers. */
-      opacity: 0; visibility: hidden; pointer-events: none;
-      transform: translateY(10px); /* rests slightly low → reads as "slides up" on open */
-      transition: opacity .22s ease, transform .22s ease, visibility 0s linear .22s;
-    }
-    #contact-tab-panel.show {
-      opacity: 1; visibility: visible; pointer-events: auto;
-      transform: translateY(0); transition-delay: 0s;
-    }
-    /* One row per channel. min-height 40, not 44: this is a LIST inside an
-       already-opened panel, where rows are separated and mis-taps are cheap —
-       the 44 law guards isolated targets a finger hunts for, and the opening
-       tab is the one that has to meet it. Same reasoning text-runs.js records
-       for inflating a HIT box rather than a visual one. */
-    #contact-tab-panel a {
-      display: flex; align-items: center; gap: 10px;
-      min-height: 40px; padding: 0 10px; border-radius: 9px;
-      color: var(--ink); font-size: 13px; font-weight: 600; text-decoration: none;
-    }
-    #contact-tab-panel a:hover { background: var(--bg); }
-    /* The handle is the quiet half: the platform is what you scan for, the
-       handle is what you check once you have found it. */
-    #contact-tab-panel a b { font-weight: 600; }
-    #contact-tab-panel a span { color: var(--muted); font-weight: 500; margin-left: auto; }
-    #contact-tab-panel a svg { width: 16px; height: 16px; flex: none; color: var(--muted); }
-    /* The owner row. Deliberately NOT an <a> — it is not a sixth channel, it
-       is the answer to "whose handles are these". */
-    #contact-tab-panel .ct-owner {
-      display: flex; align-items: center; gap: 10px;
-      padding: 4px 10px 8px; margin-bottom: 4px;
-      border-bottom: 1px solid var(--line);
-    }
-    #contact-tab-panel .ct-owner img { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; flex: none; }
-    #contact-tab-panel .ct-owner b { display: block; font-size: 13px; font-weight: 700; color: var(--ink); line-height: 1.25; }
-    #contact-tab-panel .ct-owner span { display: block; font-size: 11px; color: var(--muted); font-weight: 500; margin-left: 0; }
-    @media (prefers-reduced-motion: reduce) { #contact-tab-panel { transition: none; } }
+    #contact-tab-btn:hover { color: var(--ink); }
 
     /* ---- the landing (= the editor's empty state; design: draf 3b) ---- */
     /* Editor chrome yields while the landing is up; it has its own header. */
     body.is-empty header, body.is-empty #toolbar, body.is-empty #zoom-ctl,
-    body.is-empty #contact-tab-btn, body.is-empty #contact-tab-panel { display: none; }
+    body.is-empty #contact-tab-btn { display: none; }
     #empty {
       position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain;
       /* The PAGE ground is white (ruled 2026-07-29). The body underneath is
@@ -1322,7 +1394,7 @@
     /* signature context strip ("Semua Hal.") */
     #sig-bar {
       display: none; align-items: center; gap: 8px; height: 46px;
-      position: absolute; top: calc(var(--header-h) + var(--toolbar-h)); left: 0; right: 0;
+      position: absolute; top: var(--chrome-h); left: 0; right: 0;
       z-index: 45; padding: 0 10px;
       background: rgba(255,255,255,.93); backdrop-filter: blur(6px);
       border-bottom: 1px solid var(--line); box-shadow: 0 4px 14px rgba(63,49,35,.07);
@@ -1604,8 +1676,16 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></svg>
     </button>
     <button id="btn-download" disabled>Unduh</button>
-  </header>
-
+    <!-- ⚠️ THE TOOLBAR LIVES INSIDE <header> (2026-09-09, his ruling: "buat
+         desktop, pindahin tools2nya ke atas. karena spacenya kosong").
+         It is ONE element in TWO layouts, never two elements:
+           wide  → it sits on the header's own row, between File and Unduh
+           narrow→ header wraps and it takes its own row, exactly as before
+         A sibling cannot be pulled into a flex row by CSS, so the DOM move is
+         what makes the wide layout possible at all. Placement is by `order`,
+         so the markup order here is not the reading order — see the header
+         rules in the stylesheet, and --chrome-h, which is what everything
+         positioned BELOW the chrome measures against. -->
   <div id="toolbar" role="toolbar" aria-label="Alat">
     <!-- No "Pilih" button (founder ruling 2026-07-19): the neutral mode is a
          STATE, not a tool — nothing lit means nothing armed. Every armed tool
@@ -1635,6 +1715,8 @@
       Halaman
     </button>
   </div>
+  </header>
+
 
   <div id="format-bar" role="toolbar" aria-label="Format teks"></div>
   <div id="sig-bar" role="toolbar" aria-label="Aksi tanda tangan">
@@ -1996,44 +2078,20 @@
     <button id="z-in" aria-label="Perbesar">+</button>
     <button id="z-out" aria-label="Perkecil">−</button>
   </div>
-  <!-- Contact bookmark: quiet furniture tab, bottom-left, mirrors #zoom-ctl.
-       Two separate elements (button + panel), not one wrapper — see the CSS
-       comment for why.
+  <!-- The feedback tab: quiet furniture, bottom-left, mirrors #zoom-ctl.
+       It used to be a chat glyph opening a panel of five social handles. He
+       retired both on 2026-09-09 — "ilangin semua sosmed gue, gaada yang
+       peduli wkwk, ganti jadi feedback form aja" — so the tab now says what it
+       does and opens the general feedback dialog (#fb-form) directly.
 
-       ⚠️ THE HANDLES ARE NOT INVENTED HERE AND MUST NOT BE. They come from
-       `engine/wiki/machine/public-identity.md`, which is the machine's one
-       home for them, and each is verified against fkd/loker's own shipped
-       Kontak dialog. A handle typed from memory is a live link to someone
-       else's account. If a channel is missing from the wiki it is missing
-       here too — that is the design, not an oversight.
+       ⚠️ THE HANDLES ARE NOT COMMENTED OUT AND MUST NOT BE RESTORED FROM HERE.
+       They live in `engine/wiki/machine/public-identity.md`, which is the
+       machine's one home for them; a handle typed from memory is a live link
+       to someone else's account. This surface simply no longer carries them.
 
-       ⚠️ THREADS AND X CAME FROM HIM, NOT FROM THE MACHINE (2026-08-23). He
-       asked for "semua sosmed gue... threads x instagram, cari aja" — and
-       they were not there: not in the wiki page, not in loker's dialog, not
-       anywhere under ~/machine. The Instagram handle made threads/@ojan.lubis
-       a good guess and it turned out correct, which is exactly why it was not
-       shipped as one: a guessed handle that happens to resolve is a live link
-       to a stranger's account until someone confirms whose it is. He supplied
-       both, they are now in the wiki, and the wiki is what a future session
-       reads. -->
-  <button id="contact-tab-btn" aria-expanded="false" aria-controls="contact-tab-panel"
-          aria-label="Kontak saya" title="Kontak saya">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9 9 0 0 1-3.9-.9L3 20.5l1.5-4.5a8.4 8.4 0 0 1-.9-3.9 8.4 8.4 0 0 1 8.4-9 8.4 8.4 0 0 1 9 8.4Z"/></svg>
-  </button>
-  <div id="contact-tab-panel">
-    <!-- WHO the channels belong to. Added 2026-08-27: this panel listed five
-         handles and never said whose they were. Not a destination — a label on
-         the list below it. -->
-    <div class="ct-owner">
-      <img src="images/ojan.jpg" alt="Foto Ojan" width="32" height="32" loading="lazy">
-      <div><b>Ojan</b><span>Fauzan Ahladzikri</span></div>
-    </div>
-    <a href="https://tiktok.com/@okeojan" target="_blank" rel="noopener"><b>TikTok</b><span>@okeojan</span></a>
-    <a href="https://instagram.com/ojan.lubis" target="_blank" rel="noopener"><b>Instagram</b><span>ojan.lubis</span></a>
-    <a href="https://www.threads.com/@ojan.lubis" target="_blank" rel="noopener"><b>Threads</b><span>ojan.lubis</span></a>
-    <a href="https://x.com/okeojan" target="_blank" rel="noopener"><b>X</b><span>@okeojan</span></a>
-    <a href="https://ojanlubis.id" target="_blank" rel="noopener"><b>Website</b><span>ojanlubis.id</span></a>
-  </div>
+       Wired by js/v2/feedback-form.js, alongside the footer's own link — one
+       dialog, one code path, two doors. -->
+  <button id="contact-tab-btn">Ada masukan?</button>
   <div id="toast" role="status" aria-live="polite"></div>
 
   <!-- The general feedback channel, opened from the footer's "Ada masukan?".
@@ -2052,6 +2110,17 @@
     <div class="sheet fb-sheet">
       <div class="fb-body">
         <h2>Gimana PDFLokal?</h2>
+        <!-- WHO IS ASKING. Moved here 2026-09-09 from the retired contact
+             panel, where it labelled a list of handles. It is a BYLINE, not a
+             destination: the dialog's one primary is Kirim, and an identity
+             block competing with it would be a second thing to decide about
+             (design-discipline §2 — the ceiling counts destinations). Small,
+             muted, directly under the question so it answers "who am I writing
+             to" exactly when that occurs to someone. -->
+        <div class="fb-owner">
+          <img src="images/ojan.jpg" alt="" width="28" height="28" loading="lazy">
+          <div><b>Ojan</b><a href="https://mesindev.com" target="_blank" rel="noopener">mesindev.com</a></div>
+        </div>
         <div class="fb-thumbs" role="group" aria-label="Penilaian">
           <button type="button" id="fb-up" aria-pressed="false">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/></svg>
@@ -2062,7 +2131,20 @@
             <span>Kurang</span>
           </button>
         </div>
-        <textarea id="fb-note" rows="3" placeholder="boleh minta feedbacknya di sini, supaya kita bisa improve terus pdflokal. (boleh dikosongin juga kok)"></textarea>
+        <!-- PASTE, NOT UPLOAD (his ruling 2026-09-09: "gausah ada tombolnya,
+             bilang aja diplaceholdernya"). No attach button anywhere, and
+             nothing here ever reaches into the editor for pixels — the only
+             image that can exist is one the user deliberately pasted. That is
+             the whole reason this is defensible against the product's own "no
+             uploads" claim, so a convenience button would not be a small
+             addition, it would remove the argument. -->
+        <textarea id="fb-note" rows="3" placeholder="tulis feedbacknya di sini, atau boleh paste screenshot"></textarea>
+        <!-- The pasted image, shown back before it can be sent. A screenshot
+             the sender never saw is a screenshot they did not really choose. -->
+        <div id="fb-shot" hidden>
+          <img id="fb-shot-img" alt="">
+          <button type="button" id="fb-shot-clear" aria-label="Hapus">×</button>
+        </div>
         <div class="fb-row">
           <button type="button" id="fb-cancel">Batal</button>
           <button type="button" id="fb-send" disabled>Kirim</button>
