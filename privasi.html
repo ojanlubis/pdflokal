@@ -374,14 +374,12 @@
         </div>
         <p style="color: var(--muted); line-height: 1.6;">
           Nggak ada cookie. Tiap sesi (dari kamu buka PDFLokal sampai kamu tutup tabnya) dapat ID
-          acak sendiri yang nggak nyambung ke sesi lain. <strong>Satu pengecualian, dan saya
-          jelaskan terus terang</strong>: ada satu ID lagi, tersimpan di browsermu
-          (<code>pdflokal_visitor_id</code>, lihat tabel Local Storage di bawah), yang memang saya
-          bikin supaya bisa nyambung antar kunjungan, karena itu satu-satunya cara saya tahu kamu
-          ini pengunjung baru atau yang sudah pernah datang. Datanya saya simpan sendiri di
-          infrastruktur saya sendiri, nggak dijual atau dibagikan ke siapa pun, justru ini lebih
-          privat dibanding Google Analytics yang dipakai kebanyakan situs lain, karena datanya
-          nggak pernah keluar dari server saya.
+          acak sendiri yang nggak nyambung ke sesi lain. <strong>Satu pengecualian, dan saya sebut
+          terus terang</strong>: ada satu ID lagi yang tersimpan di browsermu
+          (<code>pdflokal_visitor_id</code>, ada di tabel Local Storage di bawah) dan ikut terkirim
+          ke sini, supaya saya tahu bedanya pengunjung baru dan yang sudah pernah datang. Cuma
+          angka acak: bukan nama, bukan email, nggak nyambung ke apa pun di luar sini. Dan dia
+          berhenti di server saya, Mixpanel, GA4, dan Sentry nggak pernah menerimanya.
         </p>
         <p style="color: var(--muted); line-height: 1.6; margin-top: var(--sp-16);">
           Khusus fitur Edit (masih beta): kalau kamu kasih rating 👎, saya akan tanya dulu, <em>"Boleh
@@ -412,6 +410,14 @@
            ⚠️ EVERY NEGATIVE HERE IS SCOPED TO WHAT THE RECORDING CARRIES, and each
            one was read off a decompressed payload, not off a config file:
            tests/mixpanel-replay-privacy.spec.js and tests/sentry-replay-privacy.spec.js.
+           ⚠️ THE MASKING PARAGRAPH WAS REWRITTEN 2026-09-10 (later) AND MUST TRACK
+           index.html's record_unmask_text_selector. It used to say pdflokal's own
+           labels were asterisked too; after Fauzan watched the first real replays
+           that stopped being true, and a privacy page describing a config that no
+           longer exists is worse than one that says nothing. The shape it describes
+           is the shape that shipped: mask everything, then unmask ONLY static chrome
+           that is identical for every visitor. Change that allowlist and this
+           paragraph changes in the same commit.
            The three Mixpanel-only claims (no cookie, no cross-visit id, no location)
            are in their own paragraph BECAUSE THEY DO NOT TRANSFER: `ip:false` and
            `disable_persistence` are Mixpanel keys, and Sentry's replay keeps a
@@ -439,16 +445,19 @@
         </p>
         <ul class="privacy-list">
           <li><strong>Isi dokumenmu.</strong> Di rekaman, halaman PDF-mu cuma muncul sebagai kotak kosong. Gambarnya tidak pernah ikut terkirim</li>
-          <li><strong>Teks yang kamu ketik.</strong> Semua tulisan ditutup jadi tanda bintang sebelum rekamannya dikirim</li>
+          <li><strong>Teks yang kamu ketik.</strong> Ditutup jadi tanda bintang sebelum rekamannya dikirim, termasuk waktu kamu mengganti tulisan yang sudah ada di dokumen</li>
           <li><strong>Nama file kamu</strong></li>
         </ul>
         <p style="color: var(--muted); line-height: 1.6; margin-top: var(--sp-16);">
-          Penutupannya saya pasang total, jadi tulisan PDFLokal sendiri (nama tombol, judul menu)
-          ikut jadi tanda bintang. Rekamannya jadi cuma bentuk dan gerakan, bukan kata-kata.
+          Cara nutupnya: semua tulisan saya tutup dulu tanpa kecuali, baru saya buka lagi khusus
+          buat tulisan PDFLokal sendiri, nama tombol, judul menu, teks yang isinya sama persis buat
+          semua orang. Jadi di rekaman kelihatan kamu lagi buka menu apa, tapi apa pun yang datang
+          dari kamu tetap jadi tanda bintang.
         </p>
         <p style="color: var(--muted); line-height: 1.6; margin-top: var(--sp-16);">
           Khusus Mixpanel: nggak ada cookie baru, nggak ada ID yang mengikuti kamu antar kunjungan,
-          dan lokasimu nggak ikut dicatat.
+          dan lokasimu nggak ikut dicatat. ID pengunjung yang saya ceritakan di Telemetri Produk itu
+          punya server saya sendiri, nggak pernah sampai ke Mixpanel maupun Sentry.
         </p>
         <div class="privacy-highlight">
           <p>
@@ -512,21 +521,12 @@
             </tr>
             <tr>
               <td><code>pdflokal_visitor_id</code></td>
-              <td>ID acak, dibikin sekali di perangkatmu dan dipakai lagi tiap kamu balik. <strong>Ini
-                satu-satunya yang saya kirim keluar dari browsermu</strong>, ke server saya sendiri saja
-                (bukan ke Mixpanel, GA4, atau Sentry), soalnya cuma dengan ini saya bisa tahu bedanya
-                pengunjung baru dan yang sudah pernah datang</td>
+              <td>ID acak, dibikin sekali di perangkatmu dan dipakai lagi tiap kamu balik.
+                <strong>Satu-satunya baris di tabel ini yang ikut keluar dari browsermu</strong>,
+                ke server saya sendiri, ceritanya ada di Telemetri Produk di atas</td>
             </tr>
           </tbody>
         </table>
-        <p style="color: var(--muted); line-height: 1.6; margin-top: var(--sp-16);">
-          Baris terakhir itu beda dari semua baris di atasnya. Yang lain nyimpen preferensi, nggak
-          pernah keluar dari perangkatmu. <code>pdflokal_visitor_id</code> saya pakai buat mengenali
-          kunjungan yang sama, jadi dia ikut terkirim ke telemetri PDFLokal (bagian di atas), bukan
-          cuma tersimpan diam di browser. Tetap bukan nama, bukan email, bukan apa pun yang bisa
-          dilacak balik ke kamu, cuma angka acak yang bilang "ini kunjungan yang sama dengan yang
-          kemarin".
-        </p>
       </div>
 
       <!-- Keamanan -->

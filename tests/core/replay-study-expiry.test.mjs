@@ -55,6 +55,16 @@ test('the Mixpanel recorder is gone by 2026-10-10, or this fails', () => {
     + 'tests/mixpanel-replay-privacy.spec.js\'s replay half. Keep mixpanel.init and the track() '
     + 'fan-out. Then delete this file.',
   );
+  // The unmask allowlist is one of the record_* keys and comes out with them.
+  // Named separately because it is the newest and the easiest to overlook: it
+  // was added 2026-09-10 (later) so pdflokal's own chrome stays readable, and
+  // an orphaned unmask selector left behind after `record_mask_all_text` is
+  // gone would be a masking config nobody has read.
+  assert.equal(
+    html.includes('record_unmask_text_selector'), false,
+    'The recorder is out but record_unmask_text_selector is still in index.html. It is part of the '
+    + 'study\'s masking config: delete it with the rest of the record_* keys and run `npm run seo`.',
+  );
   assert.equal(
     cdnPresent, false,
     'The recorder is out of index.html but cdn.mxpnl.com is still in vercel.json\'s script-src. '

@@ -70,20 +70,36 @@ test.describe('privasi.html — Local Storage table, ratified rows', () => {
     const row = table.locator('tr', { has: page.locator('code:text-is("pdflokal_visitor_id")') });
     await expect(row).toHaveCount(1);
     const fungsi = await row.locator('td').nth(1).innerText();
-    // Structural checks only, because the wording itself is unruled: it must
-    // say the id is sent to pdflokal's OWN server, and must name the three
-    // destinations it explicitly does NOT reach (privasi.html elsewhere
-    // scopes an identical "no cross-visit id" claim to Mixpanel only —
-    // this row is the one place that claim does not hold, and it must say so).
+    // Structural checks only, because the wording itself is unruled. The ROW
+    // must say this key leaves the browser for pdflokal's own server — that is
+    // the fact a reader skimming only the table has to come away with.
+    expect(fungsi).toMatch(/keluar dari browsermu/);
     expect(fungsi).toMatch(/server saya sendiri/);
-    expect(fungsi).toMatch(/Mixpanel/);
-    expect(fungsi).toMatch(/GA4/);
-    expect(fungsi).toMatch(/Sentry/);
 
-    // The telemetry section's own "no cookie, no cross-visit ID" claim must
-    // name this key as its one exception, not leave the old blanket
-    // sentence standing unqualified beside it.
-    const telemetrySection = page.locator('.privacy-section', { hasText: 'Telemetri Produk' });
+    // ⚠️ THE THREE NAMED NON-DESTINATIONS MOVED, AND THIS GUARD MOVED WITH THEM
+    // (2026-09-10 later, the /privasi consolidation). They used to be crammed
+    // into the table cell AND repeated in a paragraph under the table AND
+    // implied in Telemetri Produk — three tellings of one fact, which is the
+    // sediment that pass was written to remove. They now live once, in
+    // Telemetri Produk, where the id's whole story is told. What must not be
+    // lost is the CLAIM, so it is asserted here at its new address: the
+    // section that says "no cookie, no cross-visit id" has to name this key as
+    // its one exception and say which services never receive it. Elsewhere on
+    // the page an identical "no cross-visit id" line is scoped to Mixpanel
+    // only; this is the paragraph that keeps the two from reading as a
+    // contradiction.
+    // ⚠️ BY ITS HEADING, NOT BY hasText. `hasText: 'Telemetri Produk'` matched TWO
+    // sections the moment the Perekaman Sesi section gained a cross-reference to
+    // this one ("ID pengunjung yang saya ceritakan di Telemetri Produk…"), which
+    // is copy the consolidation deliberately added. A locator that a legitimate
+    // sentence can break is the wrong locator.
+    const telemetrySection = page
+      .locator('.privacy-section')
+      .filter({ has: page.getByRole('heading', { name: 'Telemetri Produk' }) });
     await expect(telemetrySection.getByText('pdflokal_visitor_id')).toHaveCount(1);
+    const telemetryText = await telemetrySection.innerText();
+    expect(telemetryText).toMatch(/Mixpanel/);
+    expect(telemetryText).toMatch(/GA4/);
+    expect(telemetryText).toMatch(/Sentry/);
   });
 });

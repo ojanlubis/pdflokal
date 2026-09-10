@@ -93,6 +93,12 @@ same day, same shape as the two above):
   which is why what may ride it is nailed down in `index.html`'s own comment and enforced by
   `tests/mixpanel-replay-privacy.spec.js`: no filename, no typed text, no document pixels.
   A measured leak was caught on the first run of that spec, so the guard is not theoretical.
+  **Amended 2026-09-10 (later):** the recording now carries pdflokal's own static chrome in
+  plain text (`record_unmask_text_selector`, an allowlist over unchanged deny-by-default
+  masking). Nothing user-derived moved: the three negatives above are unchanged and the same
+  spec proves them, plus a structural check that no allowlist entry is an ancestor of a node
+  carrying a filename, typed text or a document-derived number. Both directions were proven
+  to go red by sabotage before this was believed.
 
 ⚠️ **AND THE INSTRUMENT LESSON, which outlives this directive.** The violation happened inside the
 TESSERACT WORKER, and **Playwright's `page.on('console')` does not carry worker messages** — nor does

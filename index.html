@@ -177,9 +177,20 @@
           guarantee does not depend on a default nobody re-reads.
         - `record_mask_all_text` + `record_mask_all_inputs` mask every text node and
           every field, which covers the Ganti Teks contenteditable (`.v2-text-edit`),
-          the typed text annotations in `.pv-overlay`, and any filename that lands in
-          a toast. Masking is a superset of any selector list, so there is no list to
-          go stale when a new surface is added.
+          the typed text annotations in `.pv-overlay`, the filename painted into
+          `#ds-meta`, and any filename that lands in a toast.
+        - `record_unmask_text_selector` carves NAMED STATIC CHROME back out of that
+          mask, and it is an ALLOWLIST on top of deny-by-default, never a switch to
+          allow-by-default. ⚠️ THE RULE THAT MAKES IT DANGEROUS: while
+          `record_mask_all_text` is true the SDK ignores `record_mask_text_selector`
+          entirely (mixpanel-recorder, `Yw()`: maskAll ? !closest(unmaskingSelector)
+          : …), so THERE IS NO WAY TO RE-MASK A DESCENDANT OF AN UNMASKED NODE.
+          Unmasking is inherited by the whole subtree, forever. Therefore every
+          entry below is a node whose ENTIRE subtree ships in the HTML identically
+          for every visitor, and adding user-derived text inside one of them leaks
+          it silently. Anything varying per visitor — a filename, a page count, a
+          byte size, typed text — stays out, which is why `#dl-sheet` and `#pm-sheet`
+          are entered by their static children and not by their roots.
         - `input[type="file"]` is BLOCKED, and this one is not defence in depth, it
           is a MEASURED LEAK. `record_mask_all_inputs:true` does NOT mask a file
           input's value: with masking on, the first run of
@@ -197,14 +208,16 @@
           The toast is the other place a real filename is ever painted; the other
           two are user-authored notes and consent-gated document crops. Blocking
           means they survive somebody later flipping a mask flag off.
-       CONSEQUENCE, on purpose: replays are legible as shapes and gestures, not as
-       words. ⚖ RULED 2026-09-10 (seat decisions.md): MASKING STAYS EXACTLY AS IT IS,
-       pdflokal's own labels asterisked included. His reason, and it is the whole
-       argument: he knows his own UI positions by heart, so shapes and gestures answer
-       the study's question without any label being legible. Do NOT loosen
-       record_mask_all_text to make a replay easier to read. privasi.html says this
-       out loud ("tulisan PDFLokal sendiri ikut jadi tanda bintang"), so loosening it
-       would also make that page wrong. -->
+       CONSEQUENCE, on purpose: a replay reads as pdflokal's own words around a
+       document nobody can see. ⚖ RULED 2026-09-10 (later, seat decisions.md), and
+       it SUPERSEDES that morning's "masking stays exactly as it is": he watched the
+       first real replays and every label, button and heading was asterisked, so the
+       recording answered where a person tapped but not what they were looking at.
+       The ruling is READABLE CHROME, MASKED VISITOR. Do NOT reach that by setting
+       record_mask_all_text false and listing what to hide — allow-by-default is the
+       exact posture that let a real filename out of a file input on this very build.
+       privasi.html's Perekaman Sesi section says which half is which; changing the
+       allowlist means changing that page in the same commit. -->
   <script>
   (function () {
     // Same gate as gtag above: never from localhost, never from a preview URL,
@@ -254,7 +267,41 @@
       record_mask_all_text: true,
       record_mask_all_inputs: true,
       record_canvas: false,
-      record_block_selector: 'img, video, canvas, input[type="file"], #toast, #fb-form, #edit-feedback'
+      record_block_selector: 'img, video, canvas, input[type="file"], #toast, #fb-form, #edit-feedback',
+      // THE ALLOWLIST. Masking stays deny-by-default above; these are the only
+      // nodes carved out of it, and each one's WHOLE SUBTREE is static markup
+      // shipped identically to every visitor. See the head comment for why a
+      // descendant can never be re-masked, which is what makes an over-broad
+      // entry here a silent leak rather than a visible one. Blocking wins over
+      // unmasking, so nothing in record_block_selector is reachable from here.
+      // Pinned node-by-node by tests/mixpanel-replay-privacy.spec.js, which
+      // also asserts the sensitive nodes are NOT reachable from any entry.
+      record_unmask_text_selector: [
+        'body > header',   // brand, File ▾ + its menu, undo/redo, Unduh, and #toolbar
+                           // (the tool names — Teks, Tip-Ex, Edit, TTD, Hapus, Halaman —
+                           // which are the study's whole question). No user text lives here.
+        '#empty',          // the landing IS the editor's empty state: nav, headings, FAQ,
+                           // dropzone copy, footer. Static HTML; js only toggles display.
+        '#zoom-ctl',       // + / −
+        '#contact-tab-btn',// "Ada masukan?" (the dialog it opens, #fb-form, stays BLOCKED)
+        '#sig-bar',        // "Terapkan ke Semua Hal." / "Gambar Ulang", and #sig-bar-label,
+                           // the ONE entry whose text is set from js (app.js ~2562) rather
+                           // than shipped in the HTML — a closed set of three fixed strings.
+        '#v2-loading .lp-title', '#v2-loading .lp-note',
+                           // "Memproses…" and the local-processing note. NOT the box: its
+                           // sibling .lp-count carries a file count, which varies per visitor.
+        '#home-confirm', '#scan-offer',
+                           // both are h2 + p + fixed buttons, nothing else
+        '#sig-modal',      // tab labels and checkbox labels only; the drawn signature is a
+                           // <canvas>, the uploaded one a <canvas>, the picker an
+                           // input[type=file] — all three already BLOCKED
+        '#support-card',   // the post-download card, fully static markup
+        // #dl-sheet and #pm-sheet are entered BY THEIR STATIC CHILDREN. Their roots
+        // are not safe: #ds-meta paints the filename, and #ds-size / #ds-all-sub /
+        // #ds-cta-main / .pm-count / #pm-pick-ok all paint document-derived numbers.
+        '#dl-sheet .ds-title h2', '#dl-sheet .ds-label', '#ds-format', '#ds-imgfmt', '#ds-signed',
+        '#pm-sheet .pm-head', '#pm-bulk button', '#pm-pickbar .note', '#pm-pick-cancel'
+      ]
     });
   })();
   </script>
