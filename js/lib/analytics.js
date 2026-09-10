@@ -1,6 +1,12 @@
 /*
  * PDFLokal - lib/analytics.js (ES Module)
- * Lightweight analytics wrapper around Vercel Web Analytics va() function.
+ * THE THIRD-PARTY EVENT FAN-OUT. track(name, data) is the single call site the
+ * whole app uses; this file decides who hears it. Four sinks, in order: a Sentry
+ * breadcrumb, Vercel Web Analytics va(), GA4 gtag(), and (since 2026-09-10)
+ * Mixpanel. Every one is guarded, so a blocked or unloaded SDK is a no-op, never
+ * an error. ⚠️ This is NOT the first-party Neon rail - that is tel() in
+ * js/v2/telemetry.js, a different module with its own schema. The two rails are
+ * never dual-written to the same event.
  * Generates a per-session ID to approximate user behavior patterns.
  *
  * WHY session ID: Vercel Analytics doesn't track sessions natively.
@@ -56,5 +62,32 @@ export function track(name, data = {}) {
   // gtag() exists when Google tag script is loaded (not in local dev).
   if (typeof window.gtag === 'function') {
     window.gtag('event', name, data);
+  }
+
+  // MIXPANEL — fourth sink, added 2026-09-10 for the one-month session-replay
+  // UX study (seat decisions.md 2026-09-10). Init + config live in index.html's
+  // head; this line is the whole wire.
+  //
+  // WHY THE GUARD IS `typeof ... === 'function'` AND NOT A TRUTHINESS CHECK: the
+  // official loader snippet sets `window.mixpanel` to an ARRAY before the CDN
+  // bundle lands, and stubs .track onto it so early calls queue instead of being
+  // lost. An array is truthy; only the function check is honest about both
+  // states, and both states are correct to call.
+  //
+  // WHY `data` GOES STRAIGHT THROUGH: every call site in this repo passes fixed
+  // vocabulary (tool names, action names, enum-ish outcomes). That is a standing
+  // invariant, not an accident. ⛔ A FILENAME, A PAGE OF DOCUMENT TEXT, OR
+  // ANYTHING THE USER TYPED MAY NEVER BE PUT IN `data` — this function fans out
+  // to three third parties and one of them now records sessions.
+  //
+  // NOT the Neon rail. That is tel() in js/v2/telemetry.js, a separate module
+  // with its own schema validator; the two are never dual-written. Do not merge
+  // them to "simplify".
+  if (typeof window.mixpanel?.track === 'function') {
+    try {
+      window.mixpanel.track(name, { ...data, session: sessionId });
+    } catch {
+      // Analytics may never throw into app code (same law as tel()).
+    }
   }
 }

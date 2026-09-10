@@ -77,6 +77,23 @@ same day, same shape as the two above):
   for data to leave the device and does not touch the privacy claim. `img-src` has carried `data:`
   since long before this, for the same reason.
 
+**2026-09-10 — two hosts added for the one-month Mixpanel session-replay study**
+(seat `decisions.md` 2026-09-10). **BOTH COME OUT WHEN THE STUDY ENDS, 2026-10-10.**
+
+- **`script-src https://cdn.mxpnl.com`** — the Mixpanel loader snippet in `index.html`'s head
+  fetches `mixpanel-2-latest.min.js` from there, and the SDK lazily fetches its rrweb-based
+  recorder bundle from the same host. This is the FIRST CDN script in this product that is not
+  Google's. It does not weaken the "all vendor libs self-hosted, zero CDN" rule, which is about
+  the libraries that touch the user's document (pdf-lib, PDF.js, tesseract) — but it is the
+  closest anything has come, and it is temporary for that reason.
+- **`connect-src https://api-js.mixpanel.com https://api.mixpanel.com`** — where events and replay
+  payloads go. Both are listed because the SDK's default host has moved between versions and a
+  pinned-to-latest bundle may change it under us; a wrong single host fails SILENTLY under CSP.
+  ⚠️ **This is the only directive in this policy that lets user-derived data leave the device**,
+  which is why what may ride it is nailed down in `index.html`'s own comment and enforced by
+  `tests/mixpanel-replay-privacy.spec.js`: no filename, no typed text, no document pixels.
+  A measured leak was caught on the first run of that spec, so the guard is not theoretical.
+
 ⚠️ **AND THE INSTRUMENT LESSON, which outlives this directive.** The violation happened inside the
 TESSERACT WORKER, and **Playwright's `page.on('console')` does not carry worker messages** — nor does
 a document-level `securitypolicyviolation` listener. Both reported zero on a page Chromium was
@@ -88,13 +105,13 @@ about worker code needs the CDP instrument, not that one.**
 
 ```
 default-src 'self';
-script-src 'self' 'wasm-unsafe-eval' 'unsafe-inline' https://www.googletagmanager.com https://googleads.g.doubleclick.net blob:;
+script-src 'self' 'wasm-unsafe-eval' 'unsafe-inline' https://www.googletagmanager.com https://googleads.g.doubleclick.net https://cdn.mxpnl.com blob:;
 worker-src 'self' blob:;
 manifest-src 'self';
 style-src 'self' 'unsafe-inline';
 img-src 'self' data: blob: https://www.google.com https://www.google.co.id https://www.googleadservices.com https://googleads.g.doubleclick.net;
 font-src 'self';
-connect-src 'self' data: https://www.google-analytics.com https://analytics.google.com https://www.googletagmanager.com https://www.google.com;
+connect-src 'self' data: https://www.google-analytics.com https://analytics.google.com https://www.googletagmanager.com https://www.google.com https://api-js.mixpanel.com https://api.mixpanel.com;
 frame-ancestors 'none';
 base-uri 'self';
 form-action 'self';

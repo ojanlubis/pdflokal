@@ -398,6 +398,63 @@
         </p>
       </div>
 
+      <!-- Perekaman Sesi — SESSION REPLAY, BOTH RECORDERS.
+           ⚠️ IT NAMES SENTRY FIRST ON PURPOSE. Sentry's replayIntegration has run
+           in production since 1bb779b (2026-05-29), at 10% since fd5d39c
+           (2026-06-02), and this page had never mentioned it. Disclosing the NEW
+           recorder while staying quiet about the older one would be worse than
+           saying nothing, so the section covers both or it does not ship.
+           ⚠️ EVERY NEGATIVE HERE IS SCOPED TO WHAT THE RECORDING CARRIES, and each
+           one was read off a decompressed payload, not off a config file:
+           tests/mixpanel-replay-privacy.spec.js and tests/sentry-replay-privacy.spec.js.
+           The three Mixpanel-only claims (no cookie, no cross-visit id, no location)
+           are in their own paragraph BECAUSE THEY DO NOT TRANSFER: `ip:false` and
+           `disable_persistence` are Mixpanel keys, and Sentry's replay keeps a
+           sticky session of its own. Do not merge that paragraph upward.
+           ⏳ EXPIRES WITH THE STUDY: on 2026-10-10 the Mixpanel half comes out
+           together with the record_* keys. tests/core/replay-study-expiry.test.mjs
+           goes red by itself if it does not. -->
+      <div class="privacy-section">
+        <h2>Perekaman Sesi (Session Replay)</h2>
+        <p style="color: var(--muted); line-height: 1.6; margin-bottom: var(--sp-16);">
+          Terus terang dulu: ada dua layanan yang merekam cara orang memakai PDFLokal, dan halaman
+          ini baru menyebut keduanya sekarang.
+        </p>
+        <ul class="privacy-list">
+          <li><strong>Sentry</strong>, sudah jalan sejak akhir Mei 2026. Tugas utamanya menangkap error, tapi dia juga merekam sesi: sekarang 1 dari 10 kunjungan, plus setiap kunjungan yang ada error-nya</li>
+          <li><strong>Mixpanel</strong>, semua sesi, sampai <strong>10 Oktober 2026</strong>. Saya mau lihat sendiri apakah alur fitur Edit kepakai atau malah bikin bingung. Setelah tanggal itu perekamannya saya matikan</li>
+        </ul>
+        <p style="color: var(--muted); line-height: 1.6; margin-top: var(--sp-16);">
+          Yang terekam cuma gerakan di layar: di mana kamu tap, ke mana kamu scroll, tombol mana
+          yang kamu buka, dan berapa lama kamu berhenti di satu langkah.
+        </p>
+        <p style="color: var(--muted); line-height: 1.6; margin-top: var(--sp-16); margin-bottom: 0;">
+          <strong>Yang TIDAK terekam.</strong> Saya buka sendiri paket data yang dikirim kedua
+          layanan itu untuk memastikannya:
+        </p>
+        <ul class="privacy-list">
+          <li><strong>Isi dokumenmu.</strong> Di rekaman, halaman PDF-mu cuma muncul sebagai kotak kosong. Gambarnya tidak pernah ikut terkirim</li>
+          <li><strong>Teks yang kamu ketik.</strong> Semua tulisan ditutup jadi tanda bintang sebelum rekamannya dikirim</li>
+          <li><strong>Nama file kamu</strong></li>
+        </ul>
+        <p style="color: var(--muted); line-height: 1.6; margin-top: var(--sp-16);">
+          Penutupannya saya pasang total, jadi tulisan PDFLokal sendiri (nama tombol, judul menu)
+          ikut jadi tanda bintang. Rekamannya jadi cuma bentuk dan gerakan, bukan kata-kata.
+        </p>
+        <p style="color: var(--muted); line-height: 1.6; margin-top: var(--sp-16);">
+          Khusus Mixpanel: nggak ada cookie baru, nggak ada ID yang mengikuti kamu antar kunjungan,
+          dan lokasimu nggak ikut dicatat.
+        </p>
+        <div class="privacy-highlight">
+          <p>
+            Dua-duanya pihak ketiga, bukan server saya sendiri seperti telemetri di atas. Itu
+            sebabnya Mixpanel saya kasih batas waktu, dan itu sebabnya keduanya saya tulis di sini.
+            Perekaman cuma jalan di halaman alat, bukan di halaman ini, dan file PDF-mu sendiri
+            tetap tidak pernah saya kirim ke mana pun.
+          </p>
+        </div>
+      </div>
+
       <!-- Local Storage -->
       <div class="privacy-section">
         <h2>Penyimpanan Lokal (Local Storage)</h2>
@@ -489,7 +546,7 @@
       <!-- Back Button -->
       <div style="text-align: center; padding: var(--sp-48) 0;">
         <p style="font-size: 1rem; color: var(--muted); margin-bottom: var(--sp-16);">
-          Terakhir diupdate: 18 Januari 2026
+          Terakhir diupdate: 10 September 2026
         </p>
         <a href="/" class="pg-btn">
           Balik ke Tools

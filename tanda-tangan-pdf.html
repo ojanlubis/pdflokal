@@ -148,6 +148,116 @@
       gtag('config', 'G-7J8JF8XZ1Q');
     }
   </script>
+  <!-- MIXPANEL — ONE-MONTH SESSION-REPLAY STUDY. ENDS 2026-10-10.
+       WHY IT EXISTS: to watch whether the editor's edit flow is actually usable
+       (seat decisions.md 2026-09-10). It is a UX instrument, not a marketing one,
+       and it is TEMPORARY: on 2026-10-10 the `record_*` keys below come out and
+       `mixpanel.init` keeps only the event fan-out in js/lib/analytics.js.
+
+       WHY THE TOKEN IS INLINE HERE: there is no build step, so the client has no
+       env vars by construction. Same reason G-7J8JF8XZ1Q above is inline. This is
+       the browser Project Token, which ships in every page by design; it is not a
+       service-account secret and it grants no read access to the project.
+
+       ⚠️ GENERATED ONWARD: this head is copied VERBATIM into all 12 tool pages by
+       scripts/gen-seo-pages.js. Edit here, then run `npm run seo`.
+       ⚠️ NOT on privasi.html / dukung.html / alat-gambar.html — they carry their own
+       heads and are outside the study's question.
+       ⚠️ NOTHING here reaches template.pdflokal.id: that subdomain is a separate
+       repo (fkd/template-lokal) with no Mixpanel, and `cross_subdomain_cookie` is
+       forced false below so not even a cookie crosses.
+
+       THE PRIVACY ARGUMENT, in the order it has to hold:
+        - `record_block_selector` keeps rrweb's own default `img, video` and ADDS to
+          it. Every rendered PDF page is an `img` element whose src is a `data:` URL
+          (js/render/page-view.js), so blocking `img` is what keeps the document's
+          pixels out of the recording. A blocked node ships as a sized placeholder
+          with no attributes, so the data URL never leaves the device.
+        - `record_canvas:false` is the SDK default; it is written out anyway so the
+          guarantee does not depend on a default nobody re-reads.
+        - `record_mask_all_text` + `record_mask_all_inputs` mask every text node and
+          every field, which covers the Ganti Teks contenteditable (`.v2-text-edit`),
+          the typed text annotations in `.pv-overlay`, and any filename that lands in
+          a toast. Masking is a superset of any selector list, so there is no list to
+          go stale when a new surface is added.
+        - `input[type="file"]` is BLOCKED, and this one is not defence in depth, it
+          is a MEASURED LEAK. `record_mask_all_inputs:true` does NOT mask a file
+          input's value: with masking on, the first run of
+          tests/mixpanel-replay-privacy.spec.js caught rrweb emitting an
+          incremental input event whose text was the browser's fake-path
+          prefix followed by THE REAL FILENAME, the instant a document was
+          opened. (That prefix token is deliberately not spelled out in this
+          comment: rrweb serialises HTML comments too, so this block ships
+          into every replay, and the spec's guard greps for that token.)
+          The filename is the single most identifying string this product ever
+          touches. Blocking the node is what stops it, and the
+          selector is by TYPE rather than by id (`#file-input`, `#sig-file`) so a
+          file input added later is covered the day it is added.
+        - `#toast`, `#fb-form` and `#edit-feedback` are BLOCKED, not merely masked.
+          The toast is the other place a real filename is ever painted; the other
+          two are user-authored notes and consent-gated document crops. Blocking
+          means they survive somebody later flipping a mask flag off.
+       CONSEQUENCE, on purpose: replays are legible as shapes and gestures, not as
+       words. ⚖ RULED 2026-09-10 (seat decisions.md): MASKING STAYS EXACTLY AS IT IS,
+       pdflokal's own labels asterisked included. His reason, and it is the whole
+       argument: he knows his own UI positions by heart, so shapes and gestures answer
+       the study's question without any label being legible. Do NOT loosen
+       record_mask_all_text to make a replay easier to read. privasi.html says this
+       out loud ("tulisan PDFLokal sendiri ikut jadi tanda bintang"), so loosening it
+       would also make that page wrong. -->
+  <script>
+  (function () {
+    // Same gate as gtag above: never from localhost, never from a preview URL,
+    // so the Playwright gate cannot spend the free tier's 10k replays. The seam
+    // is how tests/core-adjacent specs observe the recorder without a prod host.
+    var live = location.hostname === 'pdflokal.id' || location.hostname === 'www.pdflokal.id';
+    if (!live && window.__PDFLOKAL_MP_FORCE !== true) return;
+    // PIN THE BUNDLE URL TO https, AND IT IS NOT COSMETIC. The official snippet
+    // below builds its src PROTOCOL-RELATIVE ("//cdn.mxpnl.com/..."), which
+    // resolves to whatever scheme the page was served over. `script-src` names
+    // `https://cdn.mxpnl.com`, so on any http origin the browser asks for
+    // http://cdn.mxpnl.com and CSP REFUSES IT: the SDK never executes,
+    // `mixpanel` stays the snippet's array stub forever, and nothing goes red.
+    // Caught by tests/mixpanel-replay-privacy.spec.js's real-policy case, which
+    // serves the live header over http and failed exactly this way. Production
+    // is https so it would not have bitten there, but a latent scheme
+    // dependency in the one line that loads a third party is not worth keeping.
+    // MIXPANEL_CUSTOM_LIB_URL is the snippet's own documented override.
+    window.MIXPANEL_CUSTOM_LIB_URL = 'https://cdn.mxpnl.com/libs/mixpanel-2-latest.min.js';
+    // ---- official Mixpanel loader snippet, verbatim (mixpanel-js
+    // dist/mixpanel-jslib-snippet.min.js). It stubs the API synchronously, so a
+    // track() that fires before the CDN bundle lands is QUEUED, not lost. ----
+    (function(e,c){if(!c.__SV){var l,h;window.mixpanel=c;c._i=[];c.init=function(q,r,f){function t(d,a){var g=a.split(".");2==g.length&&(d=d[g[0]],a=g[1]);d[a]=function(){d.push([a].concat(Array.prototype.slice.call(arguments,0)))}}var b=c;"undefined"!==typeof f?b=c[f]=[]:f="mixpanel";b.people=b.people||[];b.toString=function(d){var a="mixpanel";"mixpanel"!==f&&(a+="."+f);d||(a+=" (stub)");return a};b.people.toString=function(){return b.toString(1)+".people (stub)"};l="disable time_event track track_pageview track_links track_forms track_with_groups add_group set_group remove_group register register_once alias unregister identify name_tag set_config reset opt_in_tracking opt_out_tracking has_opted_in_tracking has_opted_out_tracking clear_opt_in_out_tracking start_batch_senders start_session_recording stop_session_recording people.set people.set_once people.unset people.increment people.append people.union people.track_charge people.clear_charges people.delete_user people.remove".split(" ");
+    for(h=0;h<l.length;h++)t(b,l[h]);var n="set set_once union unset remove delete".split(" ");b.get_group=function(){function d(p){a[p]=function(){b.push([g,[p].concat(Array.prototype.slice.call(arguments,0))])}}for(var a={},g=["get_group"].concat(Array.prototype.slice.call(arguments,0)),m=0;m<n.length;m++)d(n[m]);return a};c._i.push([q,r,f])};c.__SV=1.2;var k=e.createElement("script");k.type="text/javascript";k.async=!0;k.src="undefined"!==typeof MIXPANEL_CUSTOM_LIB_URL?MIXPANEL_CUSTOM_LIB_URL:"file:"===
+    e.location.protocol&&"//cdn.mxpnl.com/libs/mixpanel-2-latest.min.js".match(/^\/\//)?"https://cdn.mxpnl.com/libs/mixpanel-2-latest.min.js":"//cdn.mxpnl.com/libs/mixpanel-2-latest.min.js";e=e.getElementsByTagName("script")[0];e.parentNode.insertBefore(k,e)}})(document,window.mixpanel||[]);
+    window.mixpanel.init('6089c2c6b35fb3ccf65487d7dbcd1cd0', {
+      // ---- identity: this session only, and never off this hostname ----
+      // js/v2/telemetry.js and js/lib/analytics.js both hold "a session id, never
+      // a person" as law. Mixpanel's default is the opposite (a cookie on
+      // .pdflokal.id that outlives the visit AND reaches template.pdflokal.id), so
+      // all three keys below are corrections, not preferences.
+      disable_persistence: true,
+      cross_subdomain_cookie: false,
+      autocapture: false,        // default false; written out because autocapture
+                                 // reads clicked elements' TEXT, which is the one
+                                 // thing this instrument must never read.
+      track_pageview: false,     // GA4 already owns pageviews.
+      ip: false,                 // Mixpanel geolocates from the request IP by
+                                 // default and stores city/region. privasi.html's
+                                 // "Data yang TIDAK Saya Kumpulkan" list says
+                                 // "Data lokasi atau GPS", so this is not a
+                                 // preference either, it is that claim staying true.
+      // ---- session replay: 100%, no sampling ----
+      // ~5,000 sessions/month against a 10,000/month free-tier ceiling, so
+      // sampling would only cost fidelity. Revisit if traffic doubles.
+      record_sessions_percent: 100,
+      record_mask_all_text: true,
+      record_mask_all_inputs: true,
+      record_canvas: false,
+      record_block_selector: 'img, video, canvas, input[type="file"], #toast, #fb-form, #edit-feedback'
+    });
+  })();
+  </script>
   <script defer src="/_vercel/insights/script.js"></script>
   <!--
     PDFLokal v2 — the clean rebuild on js/core + js/render, swapped in as the
