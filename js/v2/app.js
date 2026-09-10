@@ -761,6 +761,11 @@ function setTool(next) {
   syncFormatBar();
   syncSigBar();
 }
+// data-tool is the DOM's vocabulary; the rail's is telemetry-schema.js's
+// `tool` enum. They are deliberately not the same words (the markup is
+// English, the schema is the product's own Indonesian verbs), so the mapping
+// lives here, once, instead of at each emit site.
+const ARM_TOOL = { text: 'teks', whiteout: 'tipex', ganti: 'ganti', signature: 'ttd' };
 for (const btn of document.querySelectorAll('#toolbar .tool[data-tool]')) {
   btn.addEventListener('click', () => {
     const t = btn.dataset.tool;
@@ -768,6 +773,15 @@ for (const btn of document.querySelectorAll('#toolbar .tool[data-tool]')) {
     // is an ON-OFF switch — tapping it again disarms back to neutral. This is
     // also the ONLY touch-side escape from an armed tool (Escape is keyboard).
     if (tool === t) { setTool('select'); return; }
+    // ⚠️ THE ARM EVENT GOES HERE, IN THE CLICK HANDLER, AND NOT IN setTool().
+    // setTool is called ~10 times per edit by the editor itself — after every
+    // commit, on Escape, on delete, on home — and all but a handful are the
+    // editor talking to itself. Emitting from there would bury the one signal
+    // this event exists for (a person REACHING for a tool) under machine
+    // noise, and would report a disarm as an arm. Above the signature branch
+    // on purpose: pressing TTD with no saved signature never reaches setTool,
+    // and that is precisely the path that was invisible.
+    if (ARM_TOOL[t]) tel('tool_use', { tool: ARM_TOOL[t], action: 'arm' });
     if (t === 'signature' && !storedSignature) { signatureModal.open(); return; }
     setTool(t);
     if (t === 'text') toast('Pilih tempat untuk menulis');
@@ -1838,6 +1852,10 @@ document.addEventListener('pointermove', (e) => {
 on('btn-delete-anno', 'click', () => {
   if (tool === 'delete') { setTool('select'); return; } // toggle off (on-off law)
   if (doc.selection.annotationId) { deleteSelected(); return; }
+  // Hapus is not in #toolbar's data-tool loop, so it needs its own arm. The
+  // delete-now branch above deliberately does NOT emit one: that press is an
+  // outcome, and `tool_use`/hapus/delete already reports it.
+  tel('tool_use', { tool: 'hapus', action: 'arm' });
   setTool('delete');
   toast('Pilih objek yang mau dihapus');
 });
@@ -3118,6 +3136,10 @@ const downloadSheet = createDownloadSheet({
   pickPages: (preselected) => pageManager.openPick(preselected),
   download,
   toast,
+  // For export_intent's `device` prop. Injected rather than imported because
+  // deviceClass() is app.js-local (it reads the live viewport), and the sheet
+  // must not grow a second, drifting definition of what a phone is.
+  deviceClass,
 });
 function doDownload() {
   if (doc.pages.length === 0) return;

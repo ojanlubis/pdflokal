@@ -12,6 +12,7 @@
  */
 
 import { ensureSignaturePad } from '../core/vendor.js';
+import { tel } from './telemetry.js';
 
 const WHITE_THRESHOLD = 235; // r,g,b all above this → transparent
 
@@ -286,6 +287,14 @@ export function createSignatureModal({ modal, onReady, toast }) {
     // clear()s the canvas, so painting before it exists paints into nothing.
     // Callers do not await — the sheet is already up and interactive.
     async open() {
+      // THE FIRST HALF OF THE TTD FUNNEL, and it lives HERE rather than at the
+      // call sites for a reason: there are two ways in (the toolbar press with
+      // no saved signature, and Gambar Ulang from the signature bar) and a
+      // third is one feature away. `tool_use`/ttd/signature only fires when a
+      // signature is PLACED, so before this event a person who opened the pad,
+      // drew, and gave up produced no row at all. open-minus-placed is the
+      // number that was missing.
+      tel('tool_use', { tool: 'ttd', action: 'sig_modal_open' });
       modal.showModal();
       showTab('draw');
       uploadedImg = null;

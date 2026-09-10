@@ -361,9 +361,35 @@ export const SCHEMA = {
   // "which tool" so e.g. "pressed Halaman" (discoverability — nothing told
   // us this before, see app.js's armIntent() note) is distinguishable from
   // a committed edit.
+  //
+  // ⚠️ 'arm' AND 'sig_modal_open' ARE THE INTENT HALF, added 2026-09-10 after
+  // the rail could not answer a question it should have owned. Every action
+  // above this line is an OUTCOME: a placed signature, a committed whiteout,
+  // an opened page sheet. Nothing recorded a user REACHING for a tool, so a
+  // tool that is discovered and abandoned looked exactly like a tool nobody
+  // touched, and TTD was the worst case — pressing it with no saved signature
+  // opens the drawing modal and returns, so drawing and then giving up left
+  // no trace at all. 'arm' fires on the toolbar press itself; the outcome
+  // action still fires later, so arm-minus-outcome IS the drop-off.
+  // Deliberately NOT emitted for the on-off disarm tap or for any internal
+  // setTool('select') — there are ~10 of those per edit and they are the
+  // editor talking to itself, not a user reaching for anything.
   tool_use: {
     tool: ['select', 'teks', 'tipex', 'ganti', 'ttd', 'hapus', 'halaman', 'gabung'],
-    action: ['select', 'whiteout', 'text', 'text_inline', 'signature', 'paraf', 'delete', 'pages_open', 'merge'],
+    action: ['select', 'whiteout', 'text', 'text_inline', 'signature', 'paraf', 'delete', 'pages_open', 'merge', 'arm', 'sig_modal_open'],
+  },
+  // THE OTHER HALF OF THE SAME BLIND SPOT (2026-09-10). `export` fires when a
+  // file is actually produced, and `failure`/stage:export fires when the build
+  // throws. Between them sits the case neither can see: the sheet was opened,
+  // the size and format were looked at, and the person left. Measured on the
+  // rail before this shipped — 566 of 1779 editing sessions in 14 days never
+  // exported, against 13 sessions with an export failure — so the loss is
+  // overwhelmingly abandonment, not a crash, and nothing said WHERE.
+  // `device` is here and not decoration: phone and desktop fail this step for
+  // different reasons, and the split is the first thing worth acting on.
+  export_intent: {
+    pages: PAGES_BUCKET,
+    device: DEVICE,
   },
   export: {
     // surgery_used/fallback are DELIBERATE CONSTANTS (false/'none') — not

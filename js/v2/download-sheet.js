@@ -18,7 +18,7 @@ import { ensurePdfJs, ensurePdfLib, ensureFflate } from '../core/vendor.js';
 import { track } from '../lib/analytics.js';
 import { tel } from './telemetry.js';
 import { failureReason, failureCause } from '../core/failure-reason.js';
-import { durationBucket } from '../core/telemetry-schema.js';
+import { durationBucket, pagesBucket } from '../core/telemetry-schema.js';
 import { showStamp } from './celebrate.js';
 import { buildPdfArtifact } from './pdf-builder.js';
 import { passThroughSource } from '../core/export.js';
@@ -635,6 +635,17 @@ export function createDownloadSheet(deps) {
       state.compressed = null;
       state.compressing = false; // belt-and-braces vs any historic flag leak
       state.exporting = false;
+      // EXPORT INTENT — the step between "edited something" and "got a file".
+      // Emitted AFTER the double-open guard above (a second Ctrl+S is not a
+      // second intent) and BEFORE showModal(), so it cannot be lost to
+      // anything buildBase() does. `export`/`failure` both fire later and both
+      // describe an attempt that reached the builder; this one is the only
+      // record that the sheet was ever looked at. Its absence is what made
+      // abandonment and never-tried indistinguishable on the rail.
+      tel('export_intent', {
+        pages: pagesBucket(deps.getDoc().pages.length),
+        device: deps.deviceClass(),
+      });
       modal.showModal();
       buildBase(); // truth on the button + pre-warmed bytes for the 90% path
       // buildBase's tail re-runs buildCompressed when size is already 'kompres'.

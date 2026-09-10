@@ -21,6 +21,10 @@ import {
 const VALID_PROPS = {
   doc_open: { text_layer: true, signed: false, pages: '1', device: 'desktop', intent: 'none', display_mode: 'browser' },
   tool_use: { tool: 'teks', action: 'text' },
+  // export_intent — the download sheet was OPENED (2026-09-10). Its whole job
+  // is to sit between `export` (a file was produced) and `failure`/export (the
+  // builder threw), so abandonment stops looking like never-tried.
+  export_intent: { pages: '2-5', device: 'phone' },
   // export carries BOTH the edit-ladder fields (surgery_used/fallback/duration)
   // and the intent fields (format/size/pages_scope) — the two branches taught
   // this event different halves of the same question; the merge keeps both.

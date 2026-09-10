@@ -69,7 +69,8 @@ Event shapes you will need:
 | event | props |
 | --- | --- |
 | `doc_open` | `device`, `display_mode`, `intent`, `pages`, `text_layer` |
-| `tool_use` | `tool`, `action` |
+| `tool_use` | `tool`, `action` — `action` splits INTENT from OUTCOME: `arm` / `sig_modal_open` are a user reaching for a tool, everything else is a committed edit. arm-minus-outcome is the per-tool drop-off. |
+| `export_intent` | `pages`, `device` — the Unduh sheet was opened. Sits between `export` (a file was produced) and `failure`/`export` (the builder threw); without it, abandoning the sheet and never trying look identical. |
 | `export` | `format`, `size`, `duration`, `pages_scope`, `fallback`, `surgery_used` |
 | `failure` | `stage`, `reason`, `class`, `blocked` |
 

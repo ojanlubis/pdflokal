@@ -349,4 +349,86 @@ test.describe('telemetry client', () => {
     const events = (await beaconBodies(page)).flatMap((b) => b.events);
     expect(events.filter((e) => e.event === 'failure')).toEqual([]);
   });
+  /*
+   * ---- THE INTENT HALF (2026-09-10) --------------------------------------
+   * Three events that exist because the rail could answer "did it work?" and
+   * could not answer "did anyone try?". Before them, a tool discovered and
+   * abandoned was indistinguishable from a tool nobody touched, and 566 of
+   * 1779 editing sessions in 14 days left without exporting against only 13
+   * export failures — a loss that was almost entirely abandonment with no row
+   * anywhere describing it.
+   *
+   * Each test below asserts a PRESENCE and an ABSENCE, because the presence
+   * alone would also pass if the event fired on everything.
+   */
+  test('(i) arming a tool fires tool_use/arm — and the disarm tap does not', async ({ page }) => {
+    await captureBeacons(page);
+    await page.goto('/');
+    await page.setInputFiles('#file-input', SAMPLE_PDF);
+    await expectFirstPage(page);
+
+    await page.click('[data-tool="text"]');          // arm
+    await page.click('[data-tool="text"]');          // on-off law: this DISARMS
+    await fakeTabHidden(page);
+
+    await expect.poll(async () => (await beaconBodies(page))
+      .flatMap((b) => b.events).some((e) => e.event === 'tool_use')).toBe(true);
+    const events = (await beaconBodies(page)).flatMap((b) => b.events);
+    const arms = events.filter((e) => e.event === 'tool_use' && e.props.action === 'arm');
+    // EXACTLY ONE. Two would mean the disarm counted as an arm; more would
+    // mean the emit slipped into setTool(), which the editor calls to itself
+    // after every commit, Escape and delete.
+    expect(arms.map((e) => e.props.tool), 'the disarm tap emitted an arm').toEqual(['teks']);
+  });
+
+  test('(j) opening the signature pad fires sig_modal_open even when nothing is ever placed', async ({ page }) => {
+    await captureBeacons(page);
+    await page.goto('/');
+    await page.setInputFiles('#file-input', SAMPLE_PDF);
+    await expectFirstPage(page);
+
+    // No saved signature, so this press opens the drawing pad and returns
+    // without ever reaching setTool — the exact path that used to be silent.
+    await page.click('[data-tool="signature"]');
+    await expect(page.locator('#sig-modal')).toBeVisible();
+    await fakeTabHidden(page);
+
+    await expect.poll(async () => (await beaconBodies(page))
+      .flatMap((b) => b.events).some((e) => e.props?.action === 'sig_modal_open')).toBe(true);
+    const events = (await beaconBodies(page)).flatMap((b) => b.events);
+    const ttd = events.filter((e) => e.event === 'tool_use' && e.props.tool === 'ttd');
+    expect(ttd.map((e) => e.props.action).sort()).toEqual(['arm', 'sig_modal_open']);
+    // AND THE ABSENCE THAT MAKES IT A FUNNEL: nothing was drawn or placed, so
+    // the outcome action must not be here. open-minus-placed is the drop-off.
+    expect(
+      ttd.some((e) => e.props.action === 'signature' || e.props.action === 'paraf'),
+      'a signature outcome was reported without one being placed',
+    ).toBe(false);
+  });
+
+  test('(k) opening the download sheet fires export_intent — with no export behind it', async ({ page }) => {
+    await captureBeacons(page);
+    await page.goto('/');
+    await page.setInputFiles('#file-input', SAMPLE_PDF);
+    await expectFirstPage(page);
+
+    await page.click('#btn-download');
+    await expect(page.locator('#dl-sheet')).toBeVisible();
+    // Walk away. THIS is the case the rail could not see: no download, no
+    // failure, nothing. It must now leave exactly one row.
+    await page.keyboard.press('Escape');
+    await fakeTabHidden(page);
+
+    await expect.poll(async () => (await beaconBodies(page))
+      .flatMap((b) => b.events).some((e) => e.event === 'export_intent')).toBe(true);
+    const events = (await beaconBodies(page)).flatMap((b) => b.events);
+    const intents = events.filter((e) => e.event === 'export_intent');
+    expect(intents).toHaveLength(1);
+    expect(intents[0].props).toMatchObject({ pages: '2-5' });
+    expect(['phone', 'tablet', 'desktop']).toContain(intents[0].props.device);
+    // The two events that already existed must stay silent, or the new one is
+    // measuring the same thing twice instead of the gap between them.
+    expect(events.filter((e) => e.event === 'export')).toEqual([]);
+    expect(events.filter((e) => e.event === 'failure' && e.props.stage === 'export')).toEqual([]);
+  });
 });
