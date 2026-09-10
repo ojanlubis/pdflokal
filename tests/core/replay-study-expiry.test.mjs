@@ -33,7 +33,21 @@ const DEADLINE = Date.parse('2026-10-11T00:00:00+07:00');
 test('the Mixpanel recorder is gone by 2026-10-10, or this fails', () => {
   const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
   const csp = fs.readFileSync(path.join(ROOT, 'vercel.json'), 'utf8');
-  const recorderPresent = html.includes('record_sessions_percent');
+
+  // ⚠️ THE HTML COMMENTS COME OUT FIRST, AND THIS IS NOT TIDINESS. The head
+  // above the Mixpanel init DISCUSSES these keys by name at length. A plain
+  // `html.includes('record_unmask_text_selector')` is therefore satisfied by
+  // the prose ABOUT the key and says nothing about the key itself — measured
+  // 2026-09-10 by renaming the real key and watching this file stay green.
+  // Every assertion below reads `config`, which is index.html with its HTML
+  // comments removed, and matches the key with its `:` so it can only be the
+  // config site. Inline `//` comments inside <script> are untouched on
+  // purpose: the allowlist's own annotations live there and stripping them
+  // would take the entries with them.
+  const config = html.replace(/<!--[\s\S]*?-->/g, '');
+  const key = (name) => new RegExp(`${name}\\s*:`).test(config);
+  const recorderPresent = key('record_sessions_percent');
+  const unmaskPresent = key('record_unmask_text_selector');
   const cdnPresent = csp.includes('cdn.mxpnl.com');
 
   if (Date.now() < DEADLINE) {
@@ -44,6 +58,19 @@ test('the Mixpanel recorder is gone by 2026-10-10, or this fails', () => {
       recorderPresent, true,
       'record_sessions_percent is not in index.html. Either the recorder was removed early (then '
       + 'delete this file too) or the config key was renamed and this expiry guard is now inert.',
+    );
+    // THE SAME LIVENESS CHECK FOR THE ALLOWLIST, and it is here because the
+    // teardown assertion below is otherwise unfalsifiable until 2026-10-11.
+    // Without this line, renaming or restructuring record_unmask_text_selector
+    // today leaves the pre-deadline branch green while the post-deadline
+    // assertion silently becomes a check on a string nothing uses — the exact
+    // inertness the message above warns about, one key over.
+    assert.equal(
+      unmaskPresent, true,
+      'record_unmask_text_selector is not in index.html while the recorder still is. Either the '
+      + 'unmask allowlist was removed (then privasi.html\'s Perekaman Sesi paragraph is now wrong '
+      + 'and must change in the same commit) or the key was renamed and the teardown assertion '
+      + 'below is now inert.',
     );
     return;
   }
@@ -61,7 +88,7 @@ test('the Mixpanel recorder is gone by 2026-10-10, or this fails', () => {
   // an orphaned unmask selector left behind after `record_mask_all_text` is
   // gone would be a masking config nobody has read.
   assert.equal(
-    html.includes('record_unmask_text_selector'), false,
+    unmaskPresent, false,
     'The recorder is out but record_unmask_text_selector is still in index.html. It is part of the '
     + 'study\'s masking config: delete it with the rest of the record_* keys and run `npm run seo`.',
   );

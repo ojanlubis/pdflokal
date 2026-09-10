@@ -165,7 +165,7 @@ test.describe('telemetry is content-blind', () => {
     }
   });
 
-  test('the envelope carries exactly session_id + app_version + events — nothing else', async ({ page }) => {
+  test('the envelope carries exactly session_id + app_version + visitor_id + events — nothing else', async ({ page }) => {
     await captureBodies(page);
     await page.goto('/');
     await page.setInputFiles('#file-input', NASTY('label-tebal.pdf'));
@@ -178,9 +178,24 @@ test.describe('telemetry is content-blind', () => {
       // Pinned deliberately. A URL, a referrer, a user-agent or a "context"
       // blob added here would each be a content channel that no per-event
       // schema check would ever see — validateEvent only inspects props.
-      expect(Object.keys(env).sort()).toEqual(['app_version', 'events', 'session_id']);
+      //
+      // ⚠️ A KEY IS ADDED HERE ONLY WITH HIS RULING AND ONLY WITH A SHAPE PIN
+      // UNDER IT. `visitor_id` is the fourth, ruled 2026-09-10, and this list
+      // went red on the build that added it — which is the guard working, not
+      // the guard being wrong. Widening the list without pinning the new key's
+      // SHAPE would turn this test into a spelling check: any content at all
+      // could then ride a top-level key whose name happens to be allowed.
+      expect(Object.keys(env).sort()).toEqual(['app_version', 'events', 'session_id', 'visitor_id']);
       expect(typeof env.session_id).toBe('string');
       expect(env.session_id).toMatch(/^[0-9a-f-]{36}$/i);
+      // visitor_id is the ONE persistent id on this rail (js/v2/telemetry.js,
+      // his ruling). null is a REAL value here, not a missing one: blocked or
+      // absent localStorage degrades the id and never drops the batch, so the
+      // key still rides every envelope. Nothing else is a legal value.
+      expect(
+        env.visitor_id === null || /^[0-9a-f-]{36}$/i.test(env.visitor_id),
+        `visitor_id is neither a UUID nor null: ${JSON.stringify(env.visitor_id)}`,
+      ).toBe(true);
       expect(Array.isArray(env.events)).toBe(true);
     }
   });
