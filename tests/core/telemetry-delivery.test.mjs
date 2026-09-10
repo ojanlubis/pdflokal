@@ -42,7 +42,11 @@ const ENV = { DATABASE_URL: 'postgresql://user:pw@example.test/neondb' };
 // those. Every row assertion below still reads `rows[0].event` etc, because
 // paramsToRows re-assembles what the SQL would have written — the parameters
 // ARE the row, in the order the placeholder skeleton names them.
-const COLS = ['ts', 'session_id', 'app_version', 'event', 'props'];
+// visitor_id joined as the 6th column 2026-09-10 (seat decisions.md same
+// date) — COLS updated deliberately, not loosened to a prefix match, same
+// reasoning as feedback-delivery.test.mjs's screenshot column: a full-array
+// assertion is what catches a column silently joining or going missing.
+const COLS = ['ts', 'session_id', 'app_version', 'event', 'props', 'visitor_id'];
 function paramsToRows(params) {
   const rows = [];
   for (let i = 0; i < params.length; i += COLS.length) {
@@ -134,6 +138,27 @@ test('DELIVERY: a valid event actually reaches the insert, with its props intact
   // "working" while carrying nothing — the 2026-07 blackout's exact shape.
   assert.equal(rows[0].event, 'doc_open');
   assert.deepEqual(rows[0].props, { text_layer: true, signed: false, pages: '1', device: 'desktop', intent: 'none', display_mode: 'browser' });
+});
+
+// ---------------------------------------------------------------------------
+// visitor_id (2026-09-10). Additive and DELIBERATELY not part of the
+// envelope-trust check that session_id/app_version sit behind — an invalid
+// or missing visitor_id must degrade to NULL, never drop otherwise-good
+// events. See api/t.js's own comment for why it is treated differently.
+// ---------------------------------------------------------------------------
+test('VISITOR_ID: a valid UUID rides the insert untouched', async () => {
+  const { calls } = await run({ ...VALID, visitor_id: 'a1b2c3d4-0000-4000-8000-000000000001' });
+  assert.equal(calls[0].body[0].visitor_id, 'a1b2c3d4-0000-4000-8000-000000000001');
+});
+
+test('VISITOR_ID: missing, malformed, or non-UUID degrades to NULL — never drops the batch', async () => {
+  for (const bad of [undefined, null, '', 'not-a-uuid', 12345, { fake: true }]) {
+    const payload = bad === undefined ? VALID : { ...VALID, visitor_id: bad };
+    const { res, calls } = await run(payload);
+    assert.equal(res.code, 204);
+    assert.equal(calls.length, 1, `a bad visitor_id (${JSON.stringify(bad)}) must not drop the batch`);
+    assert.equal(calls[0].body[0].visitor_id, null, `bad visitor_id (${JSON.stringify(bad)}) must store as NULL, not itself`);
+  }
 });
 
 test('DELIVERY: an off-schema event is dropped BEFORE the insert, not stored as junk', async () => {

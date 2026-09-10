@@ -44,7 +44,27 @@ create table if not exists events (
   session_id uuid not null,
   app_version text not null,
   event text not null,
-  props jsonb not null default '{}'::jsonb
+  props jsonb not null default '{}'::jsonb,
+
+  -- visitor_id — ADDED 2026-09-10 (`alter table events add column`, out of
+  -- band from this file's original create, applied live via the Neon MCP;
+  -- folded back in here so the snapshot stays honest). NULLABLE BY LAW: the
+  -- 121,214 rows that already existed cannot be backfilled — nothing before
+  -- this date carried an id capable of surviving between visits, so
+  -- retention can only ever be read from this date forward, never earlier.
+  --
+  -- WHY IT LIVES HERE AND NOT ONLY IN `session_id`: session_id
+  -- (js/v2/telemetry.js) is minted fresh every pageload BY DESIGN, so it
+  -- joins events into one visit and is structurally unable to say whether
+  -- two visits are the same person — measured 2026-09-10, only 0.25% of
+  -- session_ids were ever seen on more than one day, almost all midnight
+  -- straddles. visitor_id is the one exception to "no persistent id" on
+  -- this rail (seat decisions.md 2026-09-10, his ruling): generated once
+  -- client-side into localStorage (`pdflokal_visitor_id`), reused on every
+  -- later visit from the same browser. It NEVER reaches Mixpanel, GA4,
+  -- Sentry, or js/lib/analytics.js's track() — this table and this table
+  -- alone.
+  visitor_id uuid
 );
 
 -- Read patterns are always "recent, by event, filtered on a prop". props is
@@ -53,6 +73,10 @@ create table if not exists events (
 -- prop lookup ever becomes a hot path.
 create index if not exists events_ts_idx on events (ts desc);
 create index if not exists events_event_idx on events (event);
+-- Partial: visitor_id is null on every pre-2026-09-10 row and will stay null
+-- on any client too old to send it, so a plain index would spend most of its
+-- size indexing nulls nothing ever looks up.
+create index if not exists events_visitor_id_idx on events (visitor_id) where visitor_id is not null;
 
 -- ---- feedback: the ONE user-authored free field in the product ---------------
 -- Deliberately a separate table so the events rail's "no string field ever"
@@ -94,6 +118,21 @@ create table if not exists feedback (
   ),
   constraint feedback_sample_total_chk check (
     char_length(coalesce(sample_before, '')) + char_length(coalesce(sample_after, '')) <= 115000
+  ),
+
+  -- screenshot — ADDED 2026-09-09 (`b56ad49`, "paste a screenshot into the
+  -- note"). Folded back into this snapshot 2026-09-10 — it shipped as an
+  -- additive `alter table` at the time and this file was not updated then,
+  -- which is a drift this entry closes rather than repeats. ONE JPEG data
+  -- URL the user pasted themselves into the general feedback form
+  -- (core/feedback-shot.js); deliberately its own column and its own check,
+  -- not folded into sample_before/after — a PNG crop pair our own code
+  -- produces and a user-chosen JPEG are different objects with different
+  -- consent stories.
+  screenshot text,
+  constraint feedback_screenshot_shape_chk check (
+    screenshot is null
+    or (screenshot like 'data:image/jpeg;base64,%' and char_length(screenshot) <= 280000)
   )
 );
 
@@ -124,7 +163,7 @@ create index if not exists feedback_rating_idx on feedback (rating);
 -- back to 1 and the next insert collides with a backfilled row. Applied to the
 -- live database on 2026-08-23 after the backfill, for exactly that reason.
 
--- ---- read side: 5 views, so a PM session sees the shape in one SELECT ---------
+-- ---- read side: 6 views, so a PM session sees the shape in one SELECT ---------
 
 -- Daily volume per event — the first thing to look at before writing any spec:
 -- is the wild sending anything at all.
@@ -192,6 +231,32 @@ select
 from feedback
 group by 1
 order by 1 desc;
+
+-- Daily returning-vs-new split by visitor_id — ADDED 2026-09-10, seat
+-- decisions.md same date. Only counts rows that carry a visitor_id, so the
+-- window starts the day the client began sending one; there is no way to
+-- ask this question of anything earlier; `day`'s minimum in this view IS
+-- that boundary, read it before trusting any number from it. A visitor is
+-- "new" the first calendar day (server tz) their id is ever seen in this
+-- table, "returning" every day after.
+create or replace view v_visitor_retention
+with (security_invoker = on) as
+with by_day as (
+  select
+    visitor_id,
+    date_trunc('day', ts) as day,
+    min(date_trunc('day', ts)) over (partition by visitor_id) as first_day
+  from events
+  where visitor_id is not null
+)
+select
+  day,
+  count(distinct visitor_id) as visitors,
+  count(distinct visitor_id) filter (where day = first_day) as new_visitors,
+  count(distinct visitor_id) filter (where day > first_day) as returning_visitors
+from by_day
+group by day
+order by day desc;
 
 -- ---- retention (spec §2/§7): 180 days, instrumentation not a warehouse --------
 -- NOT scheduled here, and it never was on Supabase either. Run periodically:

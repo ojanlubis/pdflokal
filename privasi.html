@@ -373,10 +373,15 @@
           </p>
         </div>
         <p style="color: var(--muted); line-height: 1.6;">
-          Nggak ada cookie, nggak ada ID yang mengikuti kamu antar kunjungan, setiap sesi cuma dapat
-          ID acak yang hilang begitu tab ditutup. Datanya saya simpan sendiri di infrastruktur saya
-          sendiri, nggak dijual atau dibagikan ke siapa pun, justru ini lebih privat dibanding Google
-          Analytics yang dipakai kebanyakan situs lain, karena datanya nggak pernah keluar dari server saya.
+          Nggak ada cookie. Tiap sesi (dari kamu buka PDFLokal sampai kamu tutup tabnya) dapat ID
+          acak sendiri yang nggak nyambung ke sesi lain. <strong>Satu pengecualian, dan saya
+          jelaskan terus terang</strong>: ada satu ID lagi, tersimpan di browsermu
+          (<code>pdflokal_visitor_id</code>, lihat tabel Local Storage di bawah), yang memang saya
+          bikin supaya bisa nyambung antar kunjungan, karena itu satu-satunya cara saya tahu kamu
+          ini pengunjung baru atau yang sudah pernah datang. Datanya saya simpan sendiri di
+          infrastruktur saya sendiri, nggak dijual atau dibagikan ke siapa pun, justru ini lebih
+          privat dibanding Google Analytics yang dipakai kebanyakan situs lain, karena datanya
+          nggak pernah keluar dari server saya.
         </p>
         <p style="color: var(--muted); line-height: 1.6; margin-top: var(--sp-16);">
           Khusus fitur Edit (masih beta): kalau kamu kasih rating 👎, saya akan tanya dulu, <em>"Boleh
@@ -455,12 +460,19 @@
         </div>
       </div>
 
-      <!-- Local Storage -->
+      <!-- Local Storage
+           ⚠️ pdflokal_visitor_id ADDED 2026-09-10 (seat decisions.md same
+           date, his ruling): the ONE row in this table that leaves the
+           device. Every other key here is a pure local preference, so the
+           old intro paragraph's blanket "tidak pernah dikirim ke server"
+           was true until this key existed and would be false the moment it
+           shipped silently. Rewritten instead of just adding a row. -->
       <div class="privacy-section">
         <h2>Penyimpanan Lokal (Local Storage)</h2>
         <p style="color: var(--muted); line-height: 1.6; margin-bottom: var(--sp-16);">
           PDFLokal menyimpan beberapa preferensi di browser kamu menggunakan Local Storage.
-          Data ini <strong>hanya tersimpan di perangkat kamu</strong> dan tidak pernah dikirim ke server.
+          Hampir semuanya cuma buat kamu sendiri, nggak pernah saya lihat dan nggak pernah
+          dikirim ke mana-mana. Satu kunci beda, dan saya tandai jelas di tabelnya.
         </p>
         <table class="storage-table">
           <thead>
@@ -498,8 +510,23 @@
               <td><code>pdflokal-install-dismissed</code></td>
               <td>Mengingat bahwa ajakan pasang aplikasi sudah ditutup</td>
             </tr>
+            <tr>
+              <td><code>pdflokal_visitor_id</code></td>
+              <td>ID acak, dibikin sekali di perangkatmu dan dipakai lagi tiap kamu balik. <strong>Ini
+                satu-satunya yang saya kirim keluar dari browsermu</strong>, ke server saya sendiri saja
+                (bukan ke Mixpanel, GA4, atau Sentry), soalnya cuma dengan ini saya bisa tahu bedanya
+                pengunjung baru dan yang sudah pernah datang</td>
+            </tr>
           </tbody>
         </table>
+        <p style="color: var(--muted); line-height: 1.6; margin-top: var(--sp-16);">
+          Baris terakhir itu beda dari semua baris di atasnya. Yang lain nyimpen preferensi, nggak
+          pernah keluar dari perangkatmu. <code>pdflokal_visitor_id</code> saya pakai buat mengenali
+          kunjungan yang sama, jadi dia ikut terkirim ke telemetri PDFLokal (bagian di atas), bukan
+          cuma tersimpan diam di browser. Tetap bukan nama, bukan email, bukan apa pun yang bisa
+          dilacak balik ke kamu, cuma angka acak yang bilang "ini kunjungan yang sama dengan yang
+          kemarin".
+        </p>
       </div>
 
       <!-- Keamanan -->

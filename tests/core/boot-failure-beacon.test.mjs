@@ -126,8 +126,12 @@ test('5. DELIVERY: the exact bytes the page sends are accepted and written by ap
 
   // Drive the REAL handler with the REAL payload. An off-schema event is dropped
   // silently by design, so "no error" proves nothing — the row count does.
+  // /6, not /5: visitor_id joined the insert as a 6th column 2026-09-10. This
+  // hand-built inline envelope never carries one (no imports, so no
+  // localStorage read — see the file header), api/t.js stores NULL for it,
+  // and the placeholder skeleton is still 6 columns wide either way.
   let captured = null;
-  __setQueryForTests((text, params) => { captured = { text, params }; return { rowCount: params.length / 5 }; });
+  __setQueryForTests((text, params) => { captured = { text, params }; return { rowCount: params.length / 6 }; });
   try {
     const req = {
       method: 'POST',

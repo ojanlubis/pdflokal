@@ -54,4 +54,36 @@ test.describe('privasi.html — Local Storage table, ratified rows', () => {
     await expect(row.locator('td').nth(1))
       .toHaveText('Menyimpan tanda tangan di perangkat ini agar tidak perlu digambar ulang');
   });
+
+  // pdflokal_visitor_id (2026-09-10, seat decisions.md same date) — DRAFT
+  // wording, put to him, NOT YET RATIFIED. Unlike the block above this test
+  // does not pin the copy character for character: doing that before he has
+  // ruled would misrepresent a draft as his words, the exact thing this
+  // file's own header exists to prevent in the other direction. Once he
+  // rules, replace this with an exact-text pin the same shape as the other
+  // two tests here and cite the date.
+  test('lists pdflokal_visitor_id, the one key that is not a pure local preference', async ({ page }) => {
+    await page.goto('/privasi.html');
+    const table = page.locator('.storage-table');
+    await expect(table).toBeVisible();
+
+    const row = table.locator('tr', { has: page.locator('code:text-is("pdflokal_visitor_id")') });
+    await expect(row).toHaveCount(1);
+    const fungsi = await row.locator('td').nth(1).innerText();
+    // Structural checks only, because the wording itself is unruled: it must
+    // say the id is sent to pdflokal's OWN server, and must name the three
+    // destinations it explicitly does NOT reach (privasi.html elsewhere
+    // scopes an identical "no cross-visit id" claim to Mixpanel only —
+    // this row is the one place that claim does not hold, and it must say so).
+    expect(fungsi).toMatch(/server saya sendiri/);
+    expect(fungsi).toMatch(/Mixpanel/);
+    expect(fungsi).toMatch(/GA4/);
+    expect(fungsi).toMatch(/Sentry/);
+
+    // The telemetry section's own "no cookie, no cross-visit ID" claim must
+    // name this key as its one exception, not leave the old blanket
+    // sentence standing unqualified beside it.
+    const telemetrySection = page.locator('.privacy-section', { hasText: 'Telemetri Produk' });
+    await expect(telemetrySection.getByText('pdflokal_visitor_id')).toHaveCount(1);
+  });
 });

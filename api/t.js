@@ -114,6 +114,16 @@ export default async function handler(req, res) {
       return;
     }
 
+    // visitor_id — ADDITIVE 2026-09-10, and DELIBERATELY NOT part of the
+    // envelope-trust check above. session_id/app_version failing means the
+    // envelope can't be trusted at all; visitor_id failing means nothing of
+    // the sort — it is optional on the wire (older cached clients never send
+    // it, and js/v2/telemetry.js itself sends null whenever localStorage was
+    // unavailable, see its header). An invalid value here degrades to NULL
+    // for every row in the batch; it must never drop otherwise-good events.
+    const rawVisitorId = envelope?.visitor_id;
+    const visitorId = typeof rawVisitorId === 'string' && UUID_RE.test(rawVisitorId) ? rawVisitorId : null;
+
     // ⚠️ THE CLIENT'S OWN ANSWER WINS NOW, AND THAT IS A REVERSAL (2026-07-29).
     // This used to stamp the SERVER's deploy SHA unconditionally, because the
     // client could only ever say 'dev'. The cost was invisible until a real
@@ -162,7 +172,9 @@ export default async function handler(req, res) {
       const rawDt = Number(e.dt); // NOT `raw` — that is the request body above
       const dt = Number.isFinite(rawDt) ? Math.max(0, Math.min(MAX_EVENT_AGE_MS, Math.round(rawDt))) : 0;
       const ts = new Date(received - dt).toISOString();
-      rows.push({ ts, session_id: sessionId, app_version: storedVersion, event: e.event, props: clean });
+      rows.push({
+        ts, session_id: sessionId, app_version: storedVersion, event: e.event, props: clean, visitor_id: visitorId,
+      });
     }
 
     if (rows.length === 0) { res.status(204).end(); return; }
@@ -210,13 +222,13 @@ export default async function handler(req, res) {
     // One statement, one round trip, up to 50 rows — parameterized, never
     // interpolated. Only the placeholder skeleton is built from the row count.
     const placeholders = rows
-      .map((_, i) => `($${i * 5 + 1}::timestamptz,$${i * 5 + 2}::uuid,$${i * 5 + 3},$${i * 5 + 4},$${i * 5 + 5}::jsonb)`)
+      .map((_, i) => `($${i * 6 + 1}::timestamptz,$${i * 6 + 2}::uuid,$${i * 6 + 3},$${i * 6 + 4},$${i * 6 + 5}::jsonb,$${i * 6 + 6}::uuid)`)
       .join(',');
-    const params = rows.flatMap((r) => [r.ts, r.session_id, r.app_version, r.event, JSON.stringify(r.props)]);
+    const params = rows.flatMap((r) => [r.ts, r.session_id, r.app_version, r.event, JSON.stringify(r.props), r.visitor_id]);
     try {
       const query = queryOverride || makeQuery(dsn);
       const out = await query(
-        `insert into events (ts, session_id, app_version, event, props) values ${placeholders}`,
+        `insert into events (ts, session_id, app_version, event, props, visitor_id) values ${placeholders}`,
         params,
       );
       const written = out?.rowCount;

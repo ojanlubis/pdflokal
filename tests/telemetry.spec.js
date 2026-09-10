@@ -67,6 +67,12 @@ test.describe('telemetry client', () => {
     expect(payload.session_id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
     expect(payload).toHaveProperty('app_version');
     expect(typeof payload.app_version).toBe('string');
+    // visitor_id (2026-09-10, seat decisions.md): the one persistent id on
+    // this rail. A fresh profile with no prior visit still mints one on
+    // first flush — see the dedicated persistence test below for the
+    // across-reload half of this contract.
+    expect(payload).toHaveProperty('visitor_id');
+    expect(payload.visitor_id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
     expect(Array.isArray(payload.events)).toBe(true);
     expect(payload.events).toHaveLength(10);
     // Each event carries `dt` — ms before THIS flush — so the server can derive a
@@ -81,6 +87,68 @@ test.describe('telemetry client', () => {
     // problem: dt is non-increasing as you walk the batch (earlier events are older).
     const dts = payload.events.map((e) => e.dt);
     expect(dts.every((v, i) => i === 0 || dts[i - 1] >= v)).toBe(true);
+  });
+
+  test('VISITOR_ID: persists in localStorage under the ruled key and survives a reload', async ({ page }) => {
+    await captureBeacons(page);
+    await page.goto('/');
+
+    await page.evaluate(async () => {
+      const { tel } = await import('/js/v2/telemetry.js');
+      for (let i = 0; i < 10; i += 1) tel('tool_use', { tool: 'teks', action: 'text' });
+    });
+    await expect.poll(async () => (await beaconBodies(page)).length).toBe(1);
+    const visitorId = (await beaconBodies(page))[0].visitor_id;
+
+    // The exact key name privasi.html's storage table must name.
+    const stored = await page.evaluate(() => localStorage.getItem('pdflokal_visitor_id'));
+    expect(stored).toBe(visitorId);
+
+    // A second pageload — a real reload, not just a second import — must read
+    // the SAME id back rather than minting a new one. This is the entire
+    // point of the key: without it every visit looks like a first visit.
+    // captureBeacons' addInitScript re-runs on the reload too, so
+    // window.__beacons resets to [] — poll for 1 again, not 2.
+    await page.reload();
+    await page.evaluate(async () => {
+      const { tel } = await import('/js/v2/telemetry.js');
+      for (let i = 0; i < 10; i += 1) tel('tool_use', { tool: 'teks', action: 'text' });
+    });
+    await expect.poll(async () => (await beaconBodies(page)).length).toBe(1);
+    const secondVisitorId = (await beaconBodies(page))[0].visitor_id;
+    expect(secondVisitorId).toBe(visitorId);
+  });
+
+  test('VISITOR_ID: blocked localStorage degrades telemetry, never breaks it', async ({ page }) => {
+    // Simulates private-mode/blocked storage: both getItem and setItem throw,
+    // same as a real hardened browser. tel() must still queue and flush —
+    // spec §2's law ("telemetry can never throw into app code") applies to
+    // this new code path exactly as much as to the rest of the file.
+    await page.addInitScript(() => {
+      const blocked = () => { throw new DOMException('blocked', 'SecurityError'); };
+      Object.defineProperty(window, 'localStorage', {
+        configurable: true,
+        get() { return { getItem: blocked, setItem: blocked, removeItem: blocked }; },
+      });
+    });
+    await captureBeacons(page);
+    const errors = [];
+    page.on('pageerror', (err) => errors.push(err));
+    await page.goto('/');
+
+    await page.evaluate(async () => {
+      const { tel } = await import('/js/v2/telemetry.js');
+      for (let i = 0; i < 10; i += 1) tel('tool_use', { tool: 'teks', action: 'text' });
+    });
+    await expect.poll(async () => (await beaconBodies(page)).length).toBe(1);
+    const payload = (await beaconBodies(page))[0];
+
+    expect(errors).toEqual([]);
+    expect(payload.events).toHaveLength(10);
+    // Never a value that only LOOKS persistent — see readVisitorId()'s own
+    // comment for why sending a freshly-minted, unsaved id would be worse
+    // than sending nothing at all.
+    expect(payload.visitor_id).toBeNull();
   });
 
   test('(a) flushes on visibilitychange:hidden even under the 10-event threshold', async ({ page }) => {

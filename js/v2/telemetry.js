@@ -7,9 +7,20 @@
  * about what's allowed), queues, and flushes via sendBeacon once the queue
  * hits FLUSH_AT or the tab goes hidden. Every exported function is
  * try/catch-armored: a bug in here must never become a bug in the editor.
- * No cookies, no localStorage, no retries — a lost batch is lost, never
- * queued for later (spec §2, §7's falsifier: accept residual loss, never
- * escalate to blocking sends).
+ * No cookies, no retries — a lost batch is lost, never queued for later
+ * (spec §2, §7's falsifier: accept residual loss, never escalate to
+ * blocking sends).
+ *
+ * ⚠️ "NO LOCALSTORAGE" STOPPED BEING TRUE 2026-09-10, AND THIS IS THE ONE
+ * DELIBERATE EXCEPTION. `visitor_id` (below) is a single UUID in
+ * `pdflokal_visitor_id`, generated once and reused on every later visit from
+ * the same browser — his ruling, because retention ("does anyone come back")
+ * is structurally unanswerable from `session_id` alone (spec above: a fresh
+ * id every pageload, measured 2026-09-10 at 0.25% of ids ever seen on a
+ * second day, almost all midnight straddles). It rides ONLY this rail's
+ * envelope, to THIS product's own Neon table. It is never read by, written
+ * to, or forwarded into js/lib/analytics.js's track() — Mixpanel, GA4,
+ * Vercel Analytics and Sentry never see it, and privasi.html says so.
  *
  * NOT the same rail as js/lib/analytics.js (GA4 + Vercel Web Analytics,
  * acquisition-focused, third-party) — that module is untouched. This one is
@@ -57,7 +68,7 @@ function randomUUIDFromBytes(bytes) {
 }
 // __ prefix marks a test-only export (same convention as api/t.js's
 // __setQueryForTests) — nothing in this module's own code calls it directly
-// by name, `sessionId` below does.
+// by name, `sessionId` and `readVisitorId()` below do.
 export function __randomUUIDFallback() {
   if (typeof crypto?.getRandomValues === 'function') {
     return randomUUIDFromBytes(crypto.getRandomValues(new Uint8Array(16)));
@@ -66,9 +77,44 @@ export function __randomUUIDFallback() {
   for (let i = 0; i < bytes.length; i += 1) bytes[i] = Math.floor(Math.random() * 256);
   return randomUUIDFromBytes(bytes);
 }
-const sessionId = typeof crypto?.randomUUID === 'function'
-  ? crypto.randomUUID()
-  : __randomUUIDFallback();
+function freshUUID() {
+  return typeof crypto?.randomUUID === 'function' ? crypto.randomUUID() : __randomUUIDFallback();
+}
+const sessionId = freshUUID();
+
+// ---- visitor_id: the ONE persistent id on this rail (his ruling, 2026-09-10) --
+// A UUID in localStorage, generated once, reused forever, so `events` rows
+// from the same browser can be joined ACROSS visits — the thing `sessionId`
+// above is deliberately unable to do. See the file header for why this
+// exception exists and what it is walled off from.
+//
+// WHY IT NEVER THROWS AND NEVER BLOCKS: same law as everything else in this
+// file (spec §2) — a storage failure (private mode, blocked storage, quota)
+// must degrade telemetry, never break it. On failure this returns null, and
+// EVERY caller below treats null as "omit the field" — sending a value that
+// only looks persistent (freshly minted, never actually saved) would be
+// worse than sending nothing, because it would silently poison the
+// retention read with visitors who are each counted as new every time.
+//
+// WRITE-BACK IS VERIFIED, NOT ASSUMED: some browsers' private-mode
+// localStorage accepts a setItem that never actually persists (Safari's old
+// behaviour). Reading the value back is the only way to know the id will
+// still be there on the NEXT visit, which is the entire point of this key.
+const VISITOR_ID_KEY = 'pdflokal_visitor_id';
+const VISITOR_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function readVisitorId() {
+  try {
+    if (typeof localStorage === 'undefined') return null;
+    const existing = localStorage.getItem(VISITOR_ID_KEY);
+    if (typeof existing === 'string' && VISITOR_ID_RE.test(existing)) return existing;
+    const fresh = freshUUID();
+    localStorage.setItem(VISITOR_ID_KEY, fresh);
+    return localStorage.getItem(VISITOR_ID_KEY) === fresh ? fresh : null;
+  } catch {
+    return null; // private mode / blocked storage — tel() still runs, just without a persistent id
+  }
+}
+const visitorId = readVisitorId();
 
 // <meta name="pdflokal-rev"> is stamped at deploy time (commit SHA) when
 // present; local dev and any page that doesn't carry it are honestly 'dev'
@@ -155,7 +201,16 @@ function flush() {
       dt: Math.max(0, Math.min(MAX_EVENT_AGE_MS, now - e.t)),
     }));
     queue = [];
-    const payload = JSON.stringify({ session_id: sessionId, app_version: appVersion, events: batch });
+    // visitor_id rides every batch, null when storage failed (see readVisitorId
+    // above) — api/t.js treats null/absent/invalid identically: write NULL,
+    // never drop the batch over it. Never let a rejected visitor_id take
+    // session_id/app_version/events down with it.
+    const payload = JSON.stringify({
+      session_id: sessionId,
+      app_version: appVersion,
+      visitor_id: visitorId,
+      events: batch,
+    });
     if (typeof navigator?.sendBeacon !== 'function') return; // no beacon support — drop, never retry
     const blob = new Blob([payload], { type: 'application/json' });
     navigator.sendBeacon(ENDPOINT, blob);
