@@ -61,3 +61,9 @@ tests/fixtures/wild/
 # watcher stops, so it can never move the tree under a run.
 .gate-baseline.json
 review-shots/
+
+# Playwright fixture cache: the real Mixpanel SDK + recorder bundles, fetched
+# from cdn.mxpnl.com by tests/mixpanel-replay-privacy.spec.js. ~450KB of vendor
+# code that must NEVER be committed — the spec fetches the CDN for real on
+# purpose, because a stubbed recorder proves nothing about the recorder.
+tests/.cache/
