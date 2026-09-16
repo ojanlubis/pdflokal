@@ -73,8 +73,24 @@ function scanCallSites() {
   const nonLiteral = [];
   for (const f of sourceFiles(JS)) {
     const src = stripComments(fs.readFileSync(f, 'utf8'));
-    for (const m of src.matchAll(/\btel\(\s*([^),]*)/g)) {
-      const arg = m[1].trim();
+    for (const m of src.matchAll(/(function\s+)?\btel\(\s*([^),]*)/g)) {
+      // ⚠️ A DECLARATION IS NOT A CALL SITE — grown 2026-09-16, the way this
+      // test's own message asks for ("this test has to grow a way to resolve
+      // it — do not just delete the assertion").
+      //
+      // js/v2/app.js now DECLARES `function tel(event, props)`: a thin wrapper
+      // that forwards to telemetry.js and additionally notifies the bug-report
+      // prompt when a committed edit goes by. Its parameter list reads exactly
+      // like a computed call, so the scan flagged the wrapper's own signature.
+      //
+      // The existing `f !== TEL_DEF` exemption is the same idea one level
+      // coarser — a whole file excused because it defines tel. Reusing that
+      // shape here would have meant excusing ALL of app.js, which is where most
+      // of the real call sites live: the guard would have gone quiet on the file
+      // it matters most on, and stayed green while doing it. Skipping only the
+      // declaration keeps every one of those call sites visible.
+      if (m[1]) continue;
+      const arg = m[2].trim();
       const lit = /^'([a-z_]+)'$/.exec(arg);
       if (lit) {
         if (!literals.has(lit[1])) literals.set(lit[1], []);

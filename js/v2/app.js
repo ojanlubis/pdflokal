@@ -43,7 +43,17 @@ import { createPageManager } from './page-manager.js';
 import { createSignatureModal } from './signature-modal.js';
 import { createDownloadSheet } from './download-sheet.js';
 import { track } from '../lib/analytics.js';
-import { tel } from './telemetry.js';
+// ⚠️ IMPORTED UNDER A DIFFERENT NAME, and the local `tel` below wraps it.
+// WHY: the bug-report prompt needs "the first COMMITTED edit of the day", and
+// there is no single commit chokepoint — outcomes fire from nine call sites
+// (whiteout, text, text_inline, signature, paraf, delete, merge, ganti_commit).
+// Touching all nine would be nine chances to miss one, and a tenth tool added
+// later would silently not count. The rail ALREADY draws the line this needs:
+// 2026-09-10 split `tool_use` into intent ('arm', 'sig_modal_open') and outcome.
+// Wrapping the one function every one of them already calls means the prompt
+// inherits that taxonomy instead of keeping a second copy of it.
+import { tel as telSend } from './telemetry.js';
+import { createBugReportPrompt } from './bug-report-prompt.js';
 import { showEditFeedback, dismissEditFeedback, setFeedbackSample } from './edit-feedback.js';
 import { initFeedbackForm } from './feedback-form.js';
 import { createCelebration } from './celebrate.js';
@@ -51,6 +61,31 @@ import { initInstallPrompt, isStandalone } from './install-prompt.js';
 import { applyIntentCopy } from './intent-copy.js';
 import { ensurePdfLib } from '../core/vendor.js';
 import { readPageContents, extractFontMetrics } from '../core/redact.js';
+
+// ---- the bug-report prompt's edit trigger -------------------------------------
+// The actions on `tool_use` that mean AN EDIT WAS APPLIED TO THE DOCUMENT.
+// Deliberately NOT the whole enum: 'arm' and 'sig_modal_open' are the INTENT half
+// (a tool reached for, nothing changed), 'select' is picking a tool, and
+// 'pages_open' opens a sheet. None of those is a commit, and counting them would
+// fire the prompt at someone who has not yet done anything they could find a bug
+// in. `ganti_commit` is its own event, not a tool_use, so it is named separately.
+const COMMIT_ACTIONS = new Set(['whiteout', 'text', 'text_inline', 'signature', 'paraf', 'delete', 'merge']);
+const bugPrompt = createBugReportPrompt();
+
+// Every existing `tel(...)` call site keeps working untouched — this is the one
+// place that knows the prompt exists.
+function tel(event, props) {
+  telSend(event, props);
+  // ⚠️ TOTAL, and in this order. Telemetry is the load-bearing call; a nudge is
+  // not. If anything in here ever throws, it must not take the rail down with it
+  // — that would be a cosmetic feature breaking an instrument, which is the
+  // inversion this codebase keeps paying for.
+  try {
+    if (event === 'ganti_commit' || (event === 'tool_use' && COMMIT_ACTIONS.has(props?.action))) {
+      bugPrompt.onEditCommit();
+    }
+  } catch { /* a prompt may never break the rail */ }
+}
 import { planRunRemoval } from '../core/text-walk.js';
 import { extractFontProgram, lookupFontObject } from '../core/doc-fonts.js';
 import { textCoveredBy } from '../core/stamp.js';
@@ -221,6 +256,15 @@ function download(blob, filename) {
   // The chokepoint every export path funnels through — celebrate here, AFTER
   // the save was triggered. (Wave 5: reward the "I got my file" moment.)
   celebration.onDownloadSuccess();
+  // The bug-report prompt's OTHER trigger (founder, 2026-09-16: "pertamakali
+  // berhasil download sama pertamakali commit editan di hari itu"). Both call the
+  // same capped entry point, so "whichever happens first" falls out of the cap
+  // rather than the two triggers needing to know about each other.
+  //
+  // It deliberately does NOT share a cap with celebration above — that was
+  // offered and refused: "engga. gpp dua ajakan. most user ignore the share
+  // anyway." So a user can see both on one day, by his ruling.
+  bugPrompt.onDownloadSuccess();
 }
 const celebration = createCelebration({ toast });
 initInstallPrompt(); // homepage "install to home screen" chip + adaptive card (off the download moment)

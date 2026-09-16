@@ -284,6 +284,11 @@
                            // dropzone copy, footer. Static HTML; js only toggles display.
         '#zoom-ctl',       // + / −
         '#contact-tab-btn',// "Ada masukan?" (the dialog it opens, #fb-form, stays BLOCKED)
+        '#bug-prompt',     // the once-a-day "kabarin saya kalo ada bug" card. TWO FIXED
+                           // STRINGS, built in js/v2/bug-report-prompt.js and identical for
+                           // every visitor — no user text can reach it. Unmasked ON PURPOSE:
+                           // masked it is a grey rectangle, and "did anyone notice this?" is
+                           // precisely the question a replay of it has to answer.
         '#sig-bar',        // "Terapkan ke Semua Hal." / "Gambar Ulang", and #sig-bar-label,
                            // the ONE entry whose text is set from js (app.js ~2562) rather
                            // than shipped in the HTML — a closed set of three fixed strings.
@@ -902,6 +907,54 @@
       color: var(--muted); font-size: 13px; font-weight: 600;
     }
     #contact-tab-btn:hover { color: var(--ink); }
+
+    /* ---- the bug-report prompt (js/v2/bug-report-prompt.js) ----------------
+       Founder ask 2026-09-16: the expensive bugs here are SILENT — the user is
+       the only detector — so ask them, once a day, on the first committed edit
+       or the first download.
+
+       IT SITS DIRECTLY ON TOP OF #contact-tab-btn AND POINTS AT IT. That is the
+       entire design: the card is temporary, the button is permanent, so what it
+       teaches is a LOCATION rather than being one. left/bottom are computed off
+       that button's own box (left:10, bottom:14, min-height:40) — if those move,
+       these move, and the tail stops lining up.
+
+       Type: --fs-n1 over --fs-2. He asked for "h1", meaning weight, not the tag
+       — the editor is CONSOLE mode where display sizes are forbidden
+       (specs/design-system.md) and tokens.css marks --fs-2 as the editor's
+       ceiling, so that IS the largest honest step here. */
+    #bug-prompt {
+      position: fixed; left: 10px; bottom: 62px; z-index: 31;
+      max-width: min(300px, calc(100vw - 20px));
+      padding: 12px 14px; border-radius: 14px; cursor: pointer;
+      background: var(--surface); border: 1px solid var(--line);
+      box-shadow: 0 6px 22px rgba(0,0,0,.18);
+      opacity: 0; transform: translateY(6px);
+      transition: opacity .22s ease, transform .22s ease;
+    }
+    #bug-prompt.show { opacity: 1; transform: translateY(0); }
+    #bug-prompt .bp-small {
+      font-size: var(--fs-n1); color: var(--muted); margin-bottom: 2px;
+    }
+    #bug-prompt .bp-big {
+      font-size: var(--fs-2); line-height: 1.22; font-weight: 700; color: var(--ink);
+    }
+    /* The tail. Sits at the card's bottom-left so it points down INTO the button
+       below it, which is the one job this element has. Border trick rather than a
+       rotated square so it inherits nothing that could drift in dark mode. */
+    #bug-prompt::after {
+      content: ''; position: absolute; left: 22px; bottom: -8px;
+      border: 8px solid transparent; border-top-color: var(--surface);
+      border-bottom: 0; filter: drop-shadow(0 2px 1px rgba(0,0,0,.10));
+    }
+    /* Motion is the only thing reduced-motion needs to take away here — the card
+       must still appear, or the feature silently does not exist for those users. */
+    @media (prefers-reduced-motion: reduce) {
+      #bug-prompt { transition: none; transform: none; }
+    }
+    /* Landing has no anchor to point at (#contact-tab-btn is display:none), and
+       the JS refuses to show there too. Belt and braces, cheap. */
+    body.is-empty #bug-prompt { display: none; }
 
     /* ---- the landing (= the editor's empty state; design: draf 3b) ---- */
     /* Editor chrome yields while the landing is up; it has its own header. */
