@@ -86,7 +86,19 @@ test('DELIVERY: a valid 👎 reaches the insert, parameterized, with its note in
   // so it is updated deliberately here rather than loosened to a prefix match.
   // The trailing nulls are sample_before, sample_after, screenshot: this body
   // carries no image of any kind.
-  assert.deepEqual(calls[0].params, [SESSION, 'abc1234', 'down', 'hurufnya jadi tebal', null, null, null]);
+  //
+  // ⚠️ UPDATED AGAIN 2026-09-16 when `ts` became the FIRST parameter (dual-write,
+  // seat `specs/spec-rail-to-turso.md`). It moved from a database default to an
+  // explicit value for a reason the soak depends on: Neon and Turso issue
+  // different ids, so without one shared clock written to both there is no
+  // column pair that identifies a single feedback row in both stores, and the
+  // daily comparison has nothing to join on.
+  // The value itself is generated at call time, so its SHAPE is asserted — that
+  // shape is what `feedback_ts_shape_chk` in the Turso schema enforces, and a
+  // drift here would be refused there rather than silently stored.
+  const [sentTs, ...rest] = calls[0].params;
+  assert.match(sentTs, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/, 'ts must be ISO-8601 UTC ms');
+  assert.deepEqual(rest, [SESSION, 'abc1234', 'down', 'hurufnya jadi tebal', null, null, null]);
   assert.equal(res.code, 204);
 });
 

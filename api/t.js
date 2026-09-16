@@ -37,6 +37,7 @@ export const config = { runtime: 'nodejs', api: { bodyParser: false } };
 
 import { neon } from '@neondatabase/serverless';
 import { validateEvent } from '../js/core/telemetry-schema.js';
+import { tursoWrite, arg as tArg, placeholders as tPlaceholders } from './_turso.js';
 
 // ⚠️ TEST SEAM, and the ONLY reason anything but `handler` is exported here.
 // tests/core/*.mjs swap in a recorder so the delivery tests assert on the SQL
@@ -173,7 +174,20 @@ export default async function handler(req, res) {
       const dt = Number.isFinite(rawDt) ? Math.max(0, Math.min(MAX_EVENT_AGE_MS, Math.round(rawDt))) : 0;
       const ts = new Date(received - dt).toISOString();
       rows.push({
-        ts, session_id: sessionId, app_version: storedVersion, event: e.event, props: clean, visitor_id: visitorId,
+        ts,
+        // ⚠️ LOWERCASED FOR THE DUAL-WRITE, 2026-09-16, and it is not cosmetic.
+        // UUID_RE is case-INSENSITIVE, so an uppercase-hex id passes validation.
+        // Postgres's `uuid` type then normalises it to lowercase silently;
+        // SQLite has no uuid type, so Turso's CHECK is a lowercase-only GLOB and
+        // the same event would land in Neon and be REFUSED by Turso. Normalising
+        // once, here, is what keeps the two stores byte-comparable — which is the
+        // only thing that makes the daily soak comparison mean anything.
+        // No-op against Neon: it lowercased this already.
+        session_id: sessionId.toLowerCase(),
+        app_version: storedVersion,
+        event: e.event,
+        props: clean,
+        visitor_id: visitorId ? visitorId.toLowerCase() : visitorId,
       });
     }
 
@@ -186,7 +200,11 @@ export default async function handler(req, res) {
     // injects it from the linked Neon store, so in practice it is present or
     // the store is gone.
     const dsn = process.env.DATABASE_URL;
-    if (!dsn && !queryOverride) { res.status(204).end(); return; }
+    // ⚠️ NO LONGER AN EARLY RETURN (2026-09-16, dual-write). A missing
+    // DATABASE_URL must skip the NEON write only — it must not skip Turso, or
+    // the day Neon is removed this line silently takes the whole rail dark
+    // again. Each store has its own dark branch and neither speaks for the other.
+    const neonConfigured = Boolean(dsn) || Boolean(queryOverride);
 
     // Awaited on purpose (not true fire-and-forget): a Vercel Node invocation
     // can be frozen the instant a response is sent, so an un-awaited insert
@@ -225,19 +243,59 @@ export default async function handler(req, res) {
       .map((_, i) => `($${i * 6 + 1}::timestamptz,$${i * 6 + 2}::uuid,$${i * 6 + 3},$${i * 6 + 4},$${i * 6 + 5}::jsonb,$${i * 6 + 6}::uuid)`)
       .join(',');
     const params = rows.flatMap((r) => [r.ts, r.session_id, r.app_version, r.event, JSON.stringify(r.props), r.visitor_id]);
-    try {
-      const query = queryOverride || makeQuery(dsn);
-      const out = await query(
-        `insert into events (ts, session_id, app_version, event, props, visitor_id) values ${placeholders}`,
-        params,
-      );
-      const written = out?.rowCount;
-      if (written !== rows.length) {
-        console.error(`[telemetry] insert SHORT written=${written ?? 'unknown'} rows_expected=${rows.length}`);
+
+    const writeNeon = async () => {
+      if (!neonConfigured) return;
+      try {
+        const query = queryOverride || makeQuery(dsn);
+        const out = await query(
+          `insert into events (ts, session_id, app_version, event, props, visitor_id) values ${placeholders}`,
+          params,
+        );
+        const written = out?.rowCount;
+        if (written !== rows.length) {
+          console.error(`[telemetry] insert SHORT written=${written ?? 'unknown'} rows_expected=${rows.length}`);
+        }
+      } catch (err) {
+        console.error(`[telemetry] insert FAILED error=${err?.name ?? 'Error'} code=${err?.code ?? 'none'} rows_dropped=${rows.length}`);
       }
-    } catch (err) {
-      console.error(`[telemetry] insert FAILED error=${err?.name ?? 'Error'} code=${err?.code ?? 'none'} rows_dropped=${rows.length}`);
-    }
+    };
+
+    // DUAL-WRITE, 2026-09-16 (seat `specs/spec-rail-to-turso.md`). Neon remains
+    // the source of truth for the length of the soak; Turso is written in
+    // parallel and the two are compared daily by a process that is neither.
+    //
+    // ⚠️ THE SEAT RULED AGAINST DUAL-WRITE IN AUGUST — `spec-rail-to-neon.md`,
+    // "a dual-write path that silently half-fails is a new instrument to
+    // distrust." That objection is answered by the comparison, not waived: the
+    // soak's whole question is whether Turso writes faithfully, so it is checked
+    // against Neon row-for-row rather than trusted because it returned.
+    //
+    // api/_turso.js never throws, so this can never reach the outer catch, and
+    // it carries its own 4s abort so a slow Turso cannot hold the invocation
+    // open on a path whose only job is to answer 204.
+    const writeTurso = async () => {
+      const out = await tursoWrite({
+        url: process.env.TURSO_EVENTS_URL,
+        token: process.env.TURSO_EVENTS_TOKEN,
+        sql: `insert into events (ts, session_id, app_version, event, props, visitor_id) values ${tPlaceholders(rows.length, 6)}`,
+        args: rows.flatMap((r) => [
+          tArg(r.ts), tArg(r.session_id), tArg(r.app_version),
+          tArg(r.event), tArg(JSON.stringify(r.props)), tArg(r.visitor_id),
+        ]),
+        expected: rows.length,
+      });
+      // `unconfigured` is the dark branch and is silent on purpose — it is the
+      // normal state until the env vars land, and a log line per request would
+      // be noise, not signal. Everything else is a real loss and says so.
+      if (!out.ok && out.reason !== 'unconfigured') {
+        console.error(`[telemetry] turso insert FAILED reason=${out.reason} rows_dropped=${rows.length}`);
+      }
+    };
+
+    // allSettled, not all: neither store may ever affect the other, and neither
+    // may affect the 204. Both are already individually total.
+    await Promise.allSettled([writeNeon(), writeTurso()]);
 
     res.status(204).end();
   } catch {

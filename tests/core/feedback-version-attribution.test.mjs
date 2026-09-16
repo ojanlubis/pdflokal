@@ -52,7 +52,12 @@ async function stored(clientVersion, serverSha) {
     }
   }
   assert.ok(params && params.length, 'the insert must have happened, or this asserts nothing');
-  return params[1];
+  // ⚠️ POSITION MOVED 1 -> 2 on 2026-09-16: `ts` became the first parameter when
+  // the dual-write needed one shared clock across both stores. Asserted by NAME
+  // rather than trusted by index — an off-by-one here would silently test the
+  // session_id instead of the app_version and pass for the wrong reason.
+  const [, , appVersion] = params;
+  return appVersion;
 }
 
 test('1. THE MIRRORED REVERSAL: a real client SHA wins over the server arrival stamp', async () => {

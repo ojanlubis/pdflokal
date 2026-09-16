@@ -36,6 +36,7 @@
 export const config = { runtime: 'nodejs', api: { bodyParser: false } };
 
 import { neon } from '@neondatabase/serverless';
+import { tursoWrite, arg as tArg } from './_turso.js';
 
 // ⚠️ TEST SEAM — same one api/t.js carries, and duplicated for the same reason
 // readBody() below is: each function stays a single self-contained file. Tests
@@ -208,7 +209,21 @@ export default async function handler(req, res) {
     const storedVersion = clientSha || (/^[0-9a-f]{7,40}$/.test(serverSha) ? serverSha : appVersion);
 
     const dsn = process.env.DATABASE_URL;
-    if (!dsn && !queryOverride) { res.status(204).end(); return; } // rail dark, never broken
+    // ⚠️ NO LONGER AN EARLY RETURN (2026-09-16, dual-write): a missing
+    // DATABASE_URL must skip the NEON write only, never the Turso one.
+    const neonConfigured = Boolean(dsn) || Boolean(queryOverride);
+
+    // ⭐ EXPLICIT ts, ADDED 2026-09-16, and it is what makes the soak checkable.
+    // Both stores used to fill this from their own server clock (`now()` /
+    // `strftime`), so the same 👎 would land with two different timestamps —
+    // and since the two stores also issue DIFFERENT ids (Neon continues from
+    // 1,116, Turso starts at 100,000), there would be NO column pair that
+    // identifies one row in both. The daily comparison would have nothing to
+    // join on. One clock, written to both, gives (session_id, ts, rating) as a
+    // stable key. api/t.js already worked this way; this is the sibling file
+    // catching up, which is the same "the fix never travelled" defect the
+    // comment below describes.
+    const ts = new Date().toISOString();
 
     // ⭐ THIS BRANCH USED TO BE BLIND, and it was blind for three weeks after
     // api/t.js stopped being (2026-07-28): `await fetch(...)` with the result
@@ -222,19 +237,50 @@ export default async function handler(req, res) {
     // aggregate — a dead feedback loop looks exactly like a well-liked
     // product. Content-blind for the same reason as api/t.js, and more
     // pointedly: this row carries a note the user TYPED. Never `err.message`.
-    try {
-      const query = queryOverride || makeQuery(dsn);
-      const out = await query(
-        `insert into feedback (session_id, app_version, rating, note, sample_before, sample_after, screenshot)
-         values ($1::uuid,$2,$3,$4,$5,$6,$7)`,
-        [sessionId, storedVersion, rating, note, sample?.before ?? null, sample?.after ?? null, shot],
-      );
-      if (out?.rowCount !== 1) {
-        console.error(`[feedback] insert SHORT written=${out?.rowCount ?? 'unknown'} rows_expected=1`);
+    // Lowercased for the same reason as api/t.js: Postgres's uuid type
+    // normalises case and SQLite's GLOB check does not, so an uppercase id would
+    // land in one store and be refused by the other.
+    const sid = String(sessionId).toLowerCase();
+
+    const writeNeon = async () => {
+      if (!neonConfigured) return;
+      try {
+        const query = queryOverride || makeQuery(dsn);
+        const out = await query(
+          `insert into feedback (ts, session_id, app_version, rating, note, sample_before, sample_after, screenshot)
+           values ($1::timestamptz,$2::uuid,$3,$4,$5,$6,$7,$8)`,
+          [ts, sid, storedVersion, rating, note, sample?.before ?? null, sample?.after ?? null, shot],
+        );
+        if (out?.rowCount !== 1) {
+          console.error(`[feedback] insert SHORT written=${out?.rowCount ?? 'unknown'} rows_expected=1`);
+        }
+      } catch (err) {
+        console.error(`[feedback] insert FAILED error=${err?.name ?? 'Error'} code=${err?.code ?? 'none'} rows_dropped=1`);
       }
-    } catch (err) {
-      console.error(`[feedback] insert FAILED error=${err?.name ?? 'Error'} code=${err?.code ?? 'none'} rows_dropped=1`);
-    }
+    };
+
+    // DUAL-WRITE to its OWN database (pdflokal-feedback), never the events one.
+    // That separation IS the read-only grant: Turso has no table permissions, so
+    // the only way the floor alarm can read `events` without also reading the
+    // notes a user typed is for them to be different databases.
+    const writeTurso = async () => {
+      const out = await tursoWrite({
+        url: process.env.TURSO_FEEDBACK_URL,
+        token: process.env.TURSO_FEEDBACK_TOKEN,
+        sql: `insert into feedback (ts, session_id, app_version, rating, note, sample_before, sample_after, screenshot)
+              values (?,?,?,?,?,?,?,?)`,
+        args: [
+          tArg(ts), tArg(sid), tArg(storedVersion), tArg(rating), tArg(note),
+          tArg(sample?.before ?? null), tArg(sample?.after ?? null), tArg(shot),
+        ],
+        expected: 1,
+      });
+      if (!out.ok && out.reason !== 'unconfigured') {
+        console.error(`[feedback] turso insert FAILED reason=${out.reason} rows_dropped=1`);
+      }
+    };
+
+    await Promise.allSettled([writeNeon(), writeTurso()]);
 
     res.status(204).end();
   } catch {
