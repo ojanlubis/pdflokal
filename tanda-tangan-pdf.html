@@ -926,7 +926,11 @@
     #bug-prompt {
       position: fixed; left: 10px; bottom: 62px; z-index: 31;
       max-width: min(300px, calc(100vw - 20px));
-      padding: 12px 14px; border-radius: 14px; cursor: pointer;
+      padding: 12px 14px; border-radius: 14px;
+      /* INERT. It floats over the document for 9s after a first edit; a tap
+         meant for the page must reach the page. The button below is the door.
+         (Was clickable for one deploy and opened the dialog by accident.) */
+      pointer-events: none;
       background: var(--surface); border: 1px solid var(--line);
       box-shadow: 0 6px 22px rgba(0,0,0,.18);
       opacity: 0; transform: translateY(6px);

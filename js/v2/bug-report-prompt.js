@@ -86,14 +86,14 @@ export function createBugReportPrompt() {
     // tokens.css marks as the editor's ceiling.
     el.append(small, big);
 
-    // The whole card is the target. Clicking it opens the very dialog it points
-    // at, by dispatching a click on the existing button rather than opening the
-    // dialog directly — ONE door, one code path (feedback-form.js owns it).
-    el.addEventListener('click', () => {
-      dismiss();
-      document.getElementById('contact-tab-btn')?.click();
-    });
-
+    // ⚠️ NOT CLICKABLE, ON PURPOSE — reversed 2026-09-16, the same day it
+    // shipped. The first version made the whole card open the feedback dialog.
+    // Measured on the live build: the card is ~300×100px sitting over the
+    // DOCUMENT for 9 seconds right after a first edit, so a tap meant for the
+    // page (placing the next whiteout) landed on the card and opened the dialog
+    // by accident. The card's job is to teach WHERE to report; the permanent
+    // button below it is the door. So the card is inert (pointer-events:none in
+    // index.html) and taps fall through to whatever the user was aiming at.
     return el;
   }
 

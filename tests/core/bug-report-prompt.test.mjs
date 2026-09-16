@@ -178,13 +178,18 @@ test('PRIVATE MODE: storage throwing degrades to once-per-session, never to sile
   assert.equal(cardsIn(body).length, 1);
 });
 
-test('clicking the card opens the EXISTING door rather than a second code path', () => {
+// Reversed 2026-09-16: the card was clickable for one deploy and, sitting over
+// the document for 9s after a first edit, swallowed taps meant for the page and
+// opened the feedback dialog by accident (measured on the live build). It is
+// inert now; the permanent #contact-tab-btn is the only door.
+test('INERT: the card has no click handler — a tap aimed at the page must not open anything', () => {
   const { body } = installDom();
-  let clicked = 0;
-  document.__register('contact-tab-btn', { click: () => { clicked += 1; } });
+  let opened = 0;
+  document.__register('contact-tab-btn', { click: () => { opened += 1; } });
   mod.createBugReportPrompt().onEditCommit();
-  cardsIn(body)[0]._listeners.click();
-  assert.equal(clicked, 1, 'feedback-form.js must stay the single owner of that dialog');
+  const card = cardsIn(body)[0];
+  assert.equal(card._listeners.click, undefined, 'a click listener here is the accidental-open bug');
+  assert.equal(opened, 0);
 });
 
 // ---- THE BACKGROUND-TAB BUG, found by watching it in a real browser --------
