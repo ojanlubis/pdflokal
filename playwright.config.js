@@ -64,8 +64,15 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
-      // tests/mobile/ runs under the mobile-chrome project only
-      testIgnore: ['mobile/**'],
+      // tests/mobile/ runs under the mobile-chrome project only.
+      // ⚠️ 'core/**' MUST BE REPEATED HERE. A project-level testIgnore REPLACES
+      // the top-level one rather than adding to it, so with only 'mobile/**'
+      // this project silently imported every tests/core/*.test.mjs, and
+      // node:test ran them on import inside Playwright's own process. Nobody saw
+      // it because they passed — until one core file leaked a fake setTimeout
+      // and froze the whole E2E run into its 45-minute timeout (2026-09-16).
+      // Core tests belong to `npm run test:core`, one process per file.
+      testIgnore: ['mobile/**', 'core/**'],
     },
     {
       // Real touch events + mobile viewport + DPR ~2.6. Catches the

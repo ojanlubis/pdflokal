@@ -15,8 +15,30 @@
  * and EXCLUDE 2 makes it un-editable by any session. A test is the only thing
  * that makes silently rewording it go red.
  */
-import { test, beforeEach } from 'node:test';
+import { test, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+
+// ⚠️ EVERY GLOBAL THIS FILE REPLACES IS RESTORED AFTER EACH TEST — and the first
+// version did not, which TIMED OUT CI (2026-09-16, run 35077471690, 45 min).
+// Under `node --test` each file is its own process, so a leaked fake setTimeout
+// was harmless and 499/499 passed. But Playwright was ALSO importing
+// tests/core/*.test.mjs into its one shared process (see playwright.config.js),
+// and a setTimeout that never fires froze that process: output stopped at test
+// 162 and nothing happened for 44 minutes. Locally the same leak surfaced as
+// every core file loaded after this one failing. Never leave a global replaced.
+const ORIGINALS = {
+  setTimeout: globalThis.setTimeout,
+  clearTimeout: globalThis.clearTimeout,
+  requestAnimationFrame: globalThis.requestAnimationFrame,
+  document: globalThis.document,
+  localStorage: globalThis.localStorage,
+};
+afterEach(() => {
+  for (const [k, v] of Object.entries(ORIGINALS)) {
+    if (v === undefined) delete globalThis[k];
+    else globalThis[k] = v;
+  }
+});
 
 // Minimal DOM. Deliberately hand-built rather than jsdom: this module touches
 // six DOM calls and a dependency would be a larger surface than the thing tested.
