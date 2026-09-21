@@ -53,6 +53,18 @@ if (window.Sentry) Sentry.init({
     // a module script failed" — all the same transient network class, none
     // actionable. (Also covers bare 'Failed to fetch'.)
     /(Importing a module script failed|Failed to fetch|(fetch|loading) dynamically imported module)/i,
+    // iOS WebKit and nothing else (7/7 events, Sentry JAVASCRIPT-12/14,
+    // 2026-09-13 → 09-21): "NotReadableError: The I/O read operation failed.",
+    // bare or TypeError-wrapped, always stackless, always an unhandled
+    // rejection with no frame of ours. Breadcrumbs put it 0.4–1.4s after the
+    // download anchor's click() (WebKit reading the blob it was handed for the
+    // save), or 22 minutes after the file picker opened (an iCloud file the
+    // picker could not materialise; the change event never fired). Every
+    // File/Blob read this app makes is awaited inside a try and reported on
+    // the rail as failure_cause (js/v2/app.js loadFilesInner, download-sheet.js
+    // doExport), so what reaches here is only what WebKit failed to read on
+    // its own. Not actionable from a page; the rail keeps the real ones.
+    /NotReadableError: The I\/O read operation failed/,
     // Battle-tested entries adapted from Excalidraw's sentry.ts.
     "undefined is not an object (evaluating 'window.__pad.performLoop')",
     "InvalidStateError: Failed to execute 'transaction' on 'IDBDatabase': The database connection is closing.",
