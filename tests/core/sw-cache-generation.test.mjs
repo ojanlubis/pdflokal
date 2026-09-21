@@ -34,7 +34,7 @@ const SW = fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8');
 // Generations that were live while a documented cross-deploy skew incident was
 // killing the module graph. A device still holding one of these has the broken
 // set on it; only a different CACHE name purges it.
-const POISONED = ['pdflokal-shell-v1', 'pdflokal-shell-v2', 'pdflokal-shell-v3'];
+const POISONED = ['pdflokal-shell-v1', 'pdflokal-shell-v2'];
 
 function cacheName() {
   const m = /^const CACHE = '([^']+)';$/m.exec(SW);

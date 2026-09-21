@@ -34,17 +34,7 @@
 // siblings arrive fresh. The recovery for that is the boot guard in
 // index.html's <head> — a matched-generation cache is the real fix and is not
 // built. tests/core/sw-cache-generation.test.mjs names the poisoned generations.
-//
-// Bumped v3 -> v4 on 2026-09-21, same class a THIRD time, and this time the
-// RAIL saw it (Sentry was not needed): `runtime/TypeError/undefined-prop`
-// 20-50 ms after `export_intent`, ~20 visitors in 12 days, first seen the day
-// `#ds-signed` shipped (2026-09-09) — the only editor-path id added since v3
-// precached `/` on 2026-09-07. The navigate branch below falls back to that
-// precached `/`, so a stale HTML ran beside a fresh download-sheet.js and the
-// Unduh sheet died before painting its CTA. The node is null-guarded now
-// (tests/download-sheet-stale-html.spec.js); this bump evicts the stale `/`.
-// Still the stranded, still not the class.
-const CACHE = 'pdflokal-shell-v4';
+const CACHE = 'pdflokal-shell-v3';
 const PRECACHE = [
   '/',
   '/manifest.webmanifest',
