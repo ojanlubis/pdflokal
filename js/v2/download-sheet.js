@@ -379,12 +379,23 @@ export function createDownloadSheet(deps) {
     // on purpose: on PDF, Asli, whole document, untouched, core/export.js
     // hands the original bytes straight back and the seal is fine — telling
     // them it breaks would be false at the exact moment it is not.
+    //
+    // ⚠️ GUARDED, and it is the only node here that is (2026-09-21). #ds-signed
+    // shipped 2026-09-09, after sw.js precached `/` for cache v3 — so a
+    // navigation that falls back to that HTML runs this file against a DOM
+    // without it. Unguarded, `null.hidden` threw BEFORE the CTA below was
+    // painted: the sheet opened with a dead Unduh button, deterministically,
+    // for ~20 visitors in 12 days, and the rail filed it as `runtime` because
+    // render() runs outside buildBase()'s try. A missing note costs the note,
+    // never the download. Pinned by tests/download-sheet-stale-html.spec.js.
     const noteEl = el('#ds-signed');
-    const anySigned = (doc.sources || []).some((src) => src.signed);
-    // textContent, never innerHTML: the same rule showToast follows, and it
-    // keeps this a string the copy ruling can replace without re-reading HTML.
-    if (anySigned) noteEl.textContent = SIGNED_NOTE;
-    noteEl.hidden = !anySigned || sealSurvivesThisDownload();
+    if (noteEl) {
+      const anySigned = (doc.sources || []).some((src) => src.signed);
+      // textContent, never innerHTML: the same rule showToast follows, and it
+      // keeps this a string the copy ruling can replace without re-reading HTML.
+      if (anySigned) noteEl.textContent = SIGNED_NOTE;
+      noteEl.hidden = !anySigned || sealSurvivesThisDownload();
+    }
 
     segSync('#ds-pages', state.picked ? 'some' : 'all');
     el('#ds-all-sub').textContent = `${nAll} halaman`;
