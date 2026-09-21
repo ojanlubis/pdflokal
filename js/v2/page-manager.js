@@ -232,10 +232,18 @@ export function createPageManager(deps) {
   function wireTile(tile, page) {
     let pressTimer = null;
     let start = null;
-    let drag = null; // { placeholder, rect, lastX, lastY, slots, pIndex }
+    let drag = null; // { placeholder, rect, pointerId, originX, originY, lastX, lastY, slots, pIndex }
 
     tile.addEventListener('pointerdown', (e) => {
       if (e.target.closest('.pm-add')) return;
+      // ONE POINTER OWNS THE TILE (Sentry JAVASCRIPT-F, Android Chrome, 5 events
+      // Jul 8 → Sep 16). A second finger on a pressed tile used to start a
+      // second long-press timer while the first stayed armed; the second
+      // finger's release then ended the press as a tap (start = null), and
+      // 280ms after the FIRST touch its timer still fired, armed a drag, and
+      // the rAF loop read start.x off null on every frame. The second pointer
+      // is ignored here and in end() below; the first keeps its press.
+      if (start) return;
       start = { x: e.clientX, y: e.clientY, id: e.pointerId };
       if (e.pointerType === 'mouse') {
         pressTimer = 0;           // mouse: drag arms on first movement
@@ -263,7 +271,8 @@ export function createPageManager(deps) {
       // ACTIVE — a rebuild during the long-press wait (thumbnail upgrade)
       // detaches this tile, and insertBefore against an orphan throws.
       // Stale tile → don't arm; the rebuilt tile carries fresh listeners.
-      if (tile.parentNode !== grid) { start = null; pressTimer = null; return; }
+      // No press → nothing to arm either (a drag is a press that lasted).
+      if (!start || tile.parentNode !== grid) { start = null; pressTimer = null; return; }
       const rect = tile.getBoundingClientRect();
       const placeholder = document.createElement('div');
       placeholder.className = 'pm-tile pm-placeholder';
@@ -279,7 +288,14 @@ export function createPageManager(deps) {
       tile.style.zIndex = '50';
       tile.style.pointerEvents = 'none';
 
-      drag = { placeholder, rect, lastX: e.clientX ?? start.x, lastY: e.clientY ?? start.y };
+      // The drag carries its own origin and pointer: the loop below and the
+      // window listeners read only `drag`, never the tap-state `start`, so
+      // the two cannot disagree about whether a drag is alive.
+      drag = {
+        placeholder, rect, pointerId: start.id,
+        originX: start.x, originY: start.y,
+        lastX: e.clientX ?? start.x, lastY: e.clientY ?? start.y,
+      };
       dragActive = true;
       recacheSlots();
       // The pointer may be gone by the time the long-press timer fires.
@@ -290,7 +306,7 @@ export function createPageManager(deps) {
       // caught, Jul 4, desktop). The window hears the release no matter where
       // it lands — even outside the dialog. Removed in end().
       drag.winMove = (ev) => {
-        if (!drag) return;
+        if (!drag || ev.pointerId !== drag.pointerId) return; // another finger: not ours
         ev.preventDefault();
         drag.lastX = ev.clientX;
         drag.lastY = ev.clientY;
@@ -317,7 +333,7 @@ export function createPageManager(deps) {
     function dragLoop() {
       if (!drag) return;
       tile.style.transform =
-        `translate(${drag.lastX - start.x}px, ${drag.lastY - start.y}px) scale(1.045) rotate(1.5deg)`;
+        `translate(${drag.lastX - drag.originX}px, ${drag.lastY - drag.originY}px) scale(1.045) rotate(1.5deg)`;
 
       // Auto-scroll: proportional to how deep the finger is in the edge zone.
       const gr = grid.getBoundingClientRect();
@@ -352,7 +368,7 @@ export function createPageManager(deps) {
     }
 
     tile.addEventListener('pointermove', (e) => {
-      if (!start) return;
+      if (!start || e.pointerId !== start.id) return; // see pointerdown: one pointer owns the tile
       if (!drag) {
         const moved = Math.hypot(e.clientX - start.x, e.clientY - start.y);
         if (pressTimer === 0 && moved > DRAG_SLOP) armDrag(e);          // mouse
@@ -365,6 +381,9 @@ export function createPageManager(deps) {
     });
 
     const end = (e) => {
+      // A pointer that never owned the tile has nothing to end (see pointerdown).
+      // The drag loop's synthetic cancel carries no pointerId and always passes.
+      if (start && e.pointerId !== undefined && e.pointerId !== start.id) return;
       clearTimeout(pressTimer);
       if (drag) {
         const d = drag;

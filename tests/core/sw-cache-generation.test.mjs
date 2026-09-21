@@ -11,7 +11,10 @@
  * 2026-07-28 mixed module graph (Sentry JAVASCRIPT-P) and `v2` carried the
  * 2026-08-18 → 08-30 one (JAVASCRIPT-V/J/Y/Z: a stale HTML without
  * `id="fm-pages"` served beside a fresh app.js, and a stale
- * telemetry-schema.js served beside a sibling importing `ocrLinesBucket`).
+ * telemetry-schema.js served beside a sibling importing `ocrLinesBucket`),
+ * and `v3` carried the 2026-09-09 → 09-21 one (JAVASCRIPT-10/13: an
+ * install-day `/` shell without `id="ds-signed"` served as the fallback for a
+ * failed launch, beside a fresh download-sheet.js — see sw-shell-refresh).
  * Naming them means a future revert to either name goes red for the reason it
  * is wrong, not for being a smaller integer.
  *
@@ -34,7 +37,7 @@ const SW = fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8');
 // Generations that were live while a documented cross-deploy skew incident was
 // killing the module graph. A device still holding one of these has the broken
 // set on it; only a different CACHE name purges it.
-const POISONED = ['pdflokal-shell-v1', 'pdflokal-shell-v2'];
+const POISONED = ['pdflokal-shell-v1', 'pdflokal-shell-v2', 'pdflokal-shell-v3'];
 
 function cacheName() {
   const m = /^const CACHE = '([^']+)';$/m.exec(SW);
