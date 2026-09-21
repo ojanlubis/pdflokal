@@ -93,11 +93,29 @@ export function ensureOcrEngine() {
  */
 export async function recognizeCanvas(canvas, opts = {}) {
   const Tesseract = await ensureOcrEngine();
+  // THE WORKER'S FAILURE CHANNEL, WIRED TO THIS RUN. tesseract.js reports a
+  // worker-side failure through `errorHandler`; when none is configured its
+  // onmessage does `throw Error(msg)` instead — uncaught, straight into
+  // window.onerror (Sentry JAVASCRIPT-11: the WASM heap out of memory on a
+  // 2016 Oppo, which the recognize() rejection below had ALREADY turned into
+  // "Gagal scan"; the throw reported the same failure a second time).
+  // Measured while pinning that (tests/ocr-tap-edit.spec.js test 9): a
+  // failure in the LOAD phase — the language file 404s, or a flaky link drops
+  // it — reaches the handler and nothing else. createWorker() never settles,
+  // so a handler that merely swallowed would leave the run on "Memproses…"
+  // forever. The handler therefore rejects the run itself, and both phases
+  // race against it. On that load-phase path the spawned Worker is out of
+  // reach (the library holds it), so it idles until the tab closes, exactly
+  // as it did before; the difference is that the user is told.
+  let failRun;
+  const workerFailed = new Promise((_, reject) => { failRun = reject; });
+  workerFailed.catch(() => {}); // a report after the run settled is not an unhandled rejection
   const options = {
     workerPath: `${ENGINE_DIR}worker.min.js`,
     corePath: ENGINE_DIR,
     langPath: ENGINE_DIR,
     gzip: false, // see the header — not a preference
+    errorHandler: (err) => failRun(err instanceof Error ? err : new Error(String(err))),
   };
   // ⚠️ THE KEY IS OMITTED, NOT SET TO undefined, AND THAT IS THE WHOLE POINT.
   // tesseract.js merges these over its own defaults, so `logger: undefined`
@@ -114,8 +132,8 @@ export async function recognizeCanvas(canvas, opts = {}) {
   }
   let worker = null;
   try {
-    worker = await Tesseract.createWorker(LANG, 1, options);
-    const { data } = await worker.recognize(canvas);
+    worker = await Promise.race([Tesseract.createWorker(LANG, 1, options), workerFailed]);
+    const { data } = await Promise.race([worker.recognize(canvas), workerFailed]);
     return data;
   } finally {
     // Never let a terminate failure mask the real error (or the real result):

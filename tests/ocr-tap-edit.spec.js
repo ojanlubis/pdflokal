@@ -369,3 +369,43 @@ test.describe('rung S2 — tap-to-edit on a scan', () => {
     }
   });
 });
+
+test.describe('rung S2 — when the engine itself fails', () => {
+  test('9 · a worker-side failure REJECTS the run and raises ZERO uncaught page errors', async ({ page }) => {
+    test.setTimeout(OCR_TIMEOUT);
+    // Sentry JAVASCRIPT-11 (Oppo CPH1701, Android 6, 2026-09-13): the WASM heap
+    // ran out of memory mid-recognition. tesseract.js rejected the job — which
+    // js/v2/app.js's runOcrOnPage catches and turns into "Gagal scan" — and
+    // THEN threw the same error out of its worker onmessage handler, because
+    // no `errorHandler` was configured: `if (!errorHandler) throw Error(...)`
+    // in the vendored bundle. One failure, reported twice, the second copy
+    // uncaught. The failure is manufactured here through the engine's own
+    // API rather than the network: the worker is asked for a language that
+    // is not vendored, so its load job rejects. (A route on the traineddata
+    // request does not reach a request the worker makes through the service
+    // worker — measured, not assumed.) That path found a second defect while
+    // it was being pinned: a LOAD-phase failure reached the throw and nothing
+    // else — createWorker() never settled, and the run sat on "Memproses…"
+    // forever. What is asserted is the split runOcrOnPage depends on: a
+    // rejection the caller can handle ("Gagal scan" appears), and nothing
+    // escaping to window.onerror beside it.
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    await openScan(page);
+    await page.evaluate(async () => {
+      const { ensureOcrEngine } = await import('/js/v2/ocr-engine.js');
+      const Tesseract = await ensureOcrEngine();
+      const real = Tesseract.createWorker;
+      Tesseract.createWorker = (lang, oem, options) => real('tidak-ada', oem, options);
+    });
+
+    const pageId = await page.evaluate(() => window.v2.getDoc().pages[0].id);
+    await page.evaluate((id) => window.v2.runOcrOnPage(id), pageId);
+
+    await expect(page.locator('#toast')).toContainText('Gagal scan');
+    expect(await page.evaluate((id) => window.v2.ocrIndex.hasLines(id), pageId)).toBe(false);
+    // Give the worker its beat to post the reject message that used to throw.
+    await page.waitForTimeout(500);
+    expect(errors).toEqual([]);
+  });
+});
