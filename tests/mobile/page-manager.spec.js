@@ -260,4 +260,41 @@ test.describe('page manager — mobile', () => {
     await page.tap('.pm-tile >> nth=0');
     await expect(page.locator('#pm-bulk')).toBeVisible();
   });
+
+  test('a second finger on a pressed tile cannot arm a drag that has lost its origin', async ({ page }) => {
+    // Sentry JAVASCRIPT-F (Android Chrome, 5 events Jul 8 → Sep 16): two
+    // fingers land on the same tile. Each pointerdown started its own
+    // long-press timer and the first one was never cleared. When the second
+    // finger lifted, end() treated it as a tap and nulled `start` — and 280ms
+    // after the FIRST touch its timer still fired, armed a drag, and the
+    // rAF loop read `start.x` off null on every frame. One pointer owns the
+    // tile: the second finger is ignored on the way down and on the way up,
+    // and the drag carries its own origin instead of borrowing the tap's.
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    await openSheet(page);
+    const order = await page.evaluate(() => window.v2.getDoc().pages.map((p) => p.id));
+    const first = await page.locator('.pm-tile >> nth=0').elementHandle();
+    const a = await first.boundingBox();
+    const touch = (type, pointerId, dx) => first.dispatchEvent(type, {
+      pointerId, pointerType: 'touch', clientX: a.x + 40 + dx, clientY: a.y + 40, bubbles: true, isPrimary: pointerId === 21,
+    });
+    await touch('pointerdown', 21, 0);   // finger 1: the long-press timer starts
+    await touch('pointerdown', 22, 12);  // finger 2, same tile, before it fires
+    await touch('pointerup', 22, 12);    // finger 2 lifts first
+    await page.waitForTimeout(380);      // finger 1's timer fires
+    expect(errors).toEqual([]);
+
+    // Finger 1 is still down, so a drag armed for IT is legitimate — and it
+    // must be able to end cleanly, because its origin is its own.
+    await touch('pointerup', 21, 0);
+    await expect(page.locator('.pm-drag-ghost')).toHaveCount(0);
+    await expect(page.locator('.pm-placeholder')).toHaveCount(0);
+    expect(errors).toEqual([]);
+    expect(await page.evaluate(() => window.v2.getDoc().pages.map((p) => p.id))).toEqual(order);
+
+    // The sheet is still alive: a plain tap still selects.
+    await page.tap('.pm-tile >> nth=1');
+    await expect(page.locator('#pm-bulk')).toBeVisible();
+  });
 });

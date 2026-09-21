@@ -1654,6 +1654,10 @@
         // covered Chrome/Firefox wording. Without this, ~5-10% of mobile
         // Safari users with flaky connections become Sentry noise.
         /(Importing a module script failed|Failed to fetch|(fetch|loading) dynamically imported module)/i,
+        // iOS WebKit reading a blob or picker file on its own and failing —
+        // stackless, no frame of ours. The WHY lives with the v2 copy of this
+        // list in js/sentry-init.js (Sentry JAVASCRIPT-12/14).
+        /NotReadableError: The I\/O read operation failed/,
         /QuotaExceededError: (The quota has been exceeded|.*setItem.*Storage)/i,
         "Internal error opening backing store for indexedDB.open"
       ],
