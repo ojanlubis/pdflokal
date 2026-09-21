@@ -171,6 +171,36 @@ function getOrParseFont(pdfPage, PDFLib, fontkit, fontName, cache) {
   return { ok: true, fontObj, entry };
 }
 
+// ---- save-time readiness ----------------------------------------------------
+//
+// ⚠️ pdf-lib's embedFont() is LAZY. It returns a PDFFont having read almost
+// nothing; the FontDescriptor is only written at `doc.save()`, and THAT is
+// when it reads italicAngle (the `post` table), ascent/descent/capHeight/
+// xHeight, bbox, `post.isFixedPitch` and `head.macStyle`. A document subset
+// missing one of those tables therefore passes every check below, embeds
+// "successfully" — and then throws from inside save(), which is outside every
+// try in this file. The rung's decline never fires, and the whole export dies.
+//
+// Measured on the rail 2026-09-21: `export / TypeError / undefined-prop`,
+// three sessions, 3-48 retries each, zero files. Every Unduh throws the same way
+// because the edit is still in the document. Reproduced on two wild fixtures:
+// `Cannot read properties of undefined (reading 'italicAngle')` from pdf-lib's
+// embedFontDescriptor. This reads exactly those fields NOW, while a throw
+// can still decline rung 1 and fall to the clone/twin rungs as designed.
+export function fontEmbedsAtSave(parsed) {
+  try {
+    const { bbox } = parsed;
+    const nums = [parsed.italicAngle, parsed.ascent, parsed.descent, bbox.minX, bbox.minY, bbox.maxX, bbox.maxY];
+    // capHeight/xHeight are optional to pdf-lib (`l||a`, `h||0`), but reading
+    // them still dereferences OS/2 inside fontkit, so they must not throw.
+    void parsed.capHeight; void parsed.xHeight;
+    void parsed.post.isFixedPitch; void parsed.head.macStyle.italic;
+    return nums.every((n) => Number.isFinite(n));
+  } catch {
+    return false;
+  }
+}
+
 // ---- rung 1: doc-subset -------------------------------------------------------
 
 async function tryNativeSubset(pdfPage, PDFLib, fontkit, insert, text, cache) {
@@ -178,6 +208,9 @@ async function tryNativeSubset(pdfPage, PDFLib, fontkit, insert, text, cache) {
   const got = getOrParseFont(pdfPage, PDFLib, fontkit, insert.fontName, cache);
   if (!got.ok) return got;
   const { entry } = got;
+  // Before embedFont, never after: once embedded, the font sits in the doc's
+  // font list and save() will try it regardless of what this rung returns.
+  if (!entry.embedded && !fontEmbedsAtSave(entry.parsed)) return { ok: false, reason: 'unsupported-font' };
 
   try {
     if (!textCoveredBy(entry.parsed, text)) {
