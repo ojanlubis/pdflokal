@@ -95,6 +95,30 @@ export function createDownloadSheet(deps) {
   const { modal } = deps;
   const el = (id) => modal.querySelector(id);
 
+  // THE SEAL NOTE'S ELEMENT, OWNED HERE. It landed on 2026-09-09 as one <p> in
+  // index.html plus the render() line that fills it — and a shell served from
+  // the service worker's cache (a launch whose first request failed) beside a
+  // fresh copy of this module had render() setting .hidden on null: 63 taps in
+  // twelve days, every one a user who could not download (Sentry
+  // JAVASCRIPT-10/13). A module must not require the shell it runs in to be
+  // its own age. When the element is missing it is mounted where the shell
+  // would have put it, just above the CTA; when it is present nothing here
+  // runs. sw.js now refreshes the shell it falls back to, which closes the
+  // mechanism measured, not the class; this closes the class for this one
+  // element, as every element born after a shell's install day has to.
+  function signedNoteEl() {
+    let p = el('#ds-signed');
+    if (p) return p;
+    p = document.createElement('p');
+    p.className = 'ds-note';
+    p.id = 'ds-signed';
+    p.hidden = true;
+    const cta = el('#ds-cta');
+    if (cta) cta.insertAdjacentElement('beforebegin', p);
+    else modal.appendChild(p);
+    return p;
+  }
+
   const state = {
     format: 'pdf', imgfmt: 'jpg', size: 'asli', target: null, picked: null, // null = semua / no cap
     base: null,        // { bytes, size } — the real built PDF for current selection
@@ -379,7 +403,7 @@ export function createDownloadSheet(deps) {
     // on purpose: on PDF, Asli, whole document, untouched, core/export.js
     // hands the original bytes straight back and the seal is fine — telling
     // them it breaks would be false at the exact moment it is not.
-    const noteEl = el('#ds-signed');
+    const noteEl = signedNoteEl();
     const anySigned = (doc.sources || []).some((src) => src.signed);
     // textContent, never innerHTML: the same rule showToast follows, and it
     // keeps this a string the copy ruling can replace without re-reading HTML.
