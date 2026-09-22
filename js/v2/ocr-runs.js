@@ -14,16 +14,13 @@
  * (whose text layer is painted invisible over the pixels that carry the
  * words). Both land here correctly.
  *
- * WHAT THIS DELIBERATELY IS NOT. Rung S2 is a COVER-AND-RETYPE, not the pixel
- * surgery of rung S3: the original word is erased by painting over it, not by
- * inpainting the paper, and the replacement is set in an ESTIMATED font
- * because a scan carries no embedded font program to prove one right. On white
- * paper that reads as editing the photo; on a textured or shadowed phone photo
- * it will read as a patch. That fidelity line is Fauzan's to draw from the
- * live artifact — the seat's job was to put the artifact in front of him, not
- * to pre-empt it with a ruling of our own.
+ * This remains cover-and-retype, not destructive pixel removal. The app's
+ * scan-appearance adapter can fit smooth paper shading and compare bundled
+ * lettering against the recognised line. Texture, hard shadows, and ambiguous
+ * fonts retain the flat-cover/default-font fallback. The source image stays
+ * in the PDF; this is not secure redaction.
  *
- * WHY IT NEVER TOUCHES THE EXPORT PATH, and this is the load-bearing
+ * WHY IT NEVER USES TEXT SURGERY, and this is the load-bearing
  * difference from its born-digital twin. A Ganti Teks cover carries
  * `replaceTargets` + `replaceBox`, which is the SURGERY INTENT
  * core/page-surgery.js keys on to cut the original show-ops out of the content
@@ -31,10 +28,9 @@
  * this module creates carries NEITHER field (js/v2/app.js's ocrReplace), and
  * every filter in page-surgery.js and export.js is written as
  * `type === 'whiteout' && replaceTargets?.length && replaceBox`, so an S2 pair
- * is invisible to all of it and exports as exactly what it is: a filled rect
- * and a text object. Rung S2 therefore ships without touching the export path
- * at all — which is also why it does not fall under the low-risk list's
- * export-path condition.
+ * is invisible to text surgery and exports as a cover plus a text object.
+ * A cover carrying paperImage uses the export image drawer; the flat fallback
+ * uses the rectangle drawer. Changes there do touch the export path.
  */
 
 import { ocrLinesToPageLines, ocrScaleFor } from '../core/ocr-lines.js';

@@ -213,7 +213,11 @@ const TEXT_LINE_HEIGHT = 1.2; // must match page-view.js CSS line-height
 // the class rather than a live bug. Keep the numbers here and nowhere else.
 const DEFAULT_FONT_SIZE = { text: 16, watermark: 48, pageNumber: 12 };
 
-function drawWhiteout(pdfPage, anno, frame, env) {
+async function drawWhiteout(pdfPage, anno, frame, env) {
+  if (anno.ocrBox && anno.paperImage) {
+    await drawSignature(pdfPage, { ...anno, image: anno.paperImage }, frame, env);
+    return;
+  }
   const r = whiteoutCornerAndDims(frame.rotation, anno, frame.wU, frame.hU);
   // Color-matched Tip-Ex: anno.color is sampled from the page background at
   // draw time (app layer). White stays the default for plain documents.

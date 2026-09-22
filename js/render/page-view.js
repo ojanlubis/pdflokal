@@ -233,6 +233,10 @@ export function renderAnnotationEl(anno) {
     el.style.width = (anno.width || 0) + 'px';
     el.style.height = (anno.height || 0) + 'px';
     el.style.background = anno.color || '#fff';
+    if (anno.ocrBox && anno.paperImage) {
+      el.style.backgroundImage = `url("${anno.paperImage}")`;
+      el.style.backgroundSize = '100% 100%';
+    }
   } else if (anno.type === 'signature' && anno.image) {
     const im = document.createElement('img');
     im.src = anno.image;

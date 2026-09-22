@@ -31,6 +31,7 @@ import {
 } from '../core/telemetry-schema.js';
 import { compareRegions } from '../core/visual-oracle.js';
 import { createOcrIndex, ocrEngineLoaded } from './ocr-runs.js';
+import { scanAppearance } from './scan-appearance.js';
 import { validateSample } from '../core/feedback-sample.js';
 import { createPageSlot, syncOverlay, textFontCss, measureTextAnnoWidth } from '../render/page-view.js';
 import { createViewportStream } from '../render/viewport.js';
@@ -1710,14 +1711,8 @@ function ocrReplace(pageId, line) {
     // born-digital draft uses — taking it as given rather than re-deriving it
     // keeps ONE rule for what the editor will accept.
     fontSize: line.size,
-    // The honest default, and deliberately not a guess. A scan carries no
-    // embedded font program for core/stamp.js to prove anything against, and
-    // the engine cannot help either: Tesseract's LSTM recogniser dropped the
-    // font classifier its legacy engine had, so there is no serif/sans signal
-    // to read here — the spec's "serif/sans guess" would have to be
-    // reconstructed from stroke pixels, which is its own piece of work and is
-    // not this rung. Helvetica is what mapRunFont falls back to for the same
-    // reason one ladder over.
+    // Pixel comparison can select a bundled substitute, never recover the
+    // original font. Uncertain matches retain the established default.
     fontFamily: 'Helvetica',
     recorded: true,
     ocrCoverId: cover.id,
@@ -1729,7 +1724,34 @@ function ocrReplace(pageId, line) {
   // Paper and ink sampled off the raster. This matters MORE on a scan than on
   // a born-digital page: paper in a photograph is never #fff, and a pure-white
   // cover on a grey-white scan is a visible patch.
-  matchReplaceColors(cover, draft, pageId, line);
+  matchScanAppearance(cover, draft, pageId, line);
+}
+
+async function matchScanAppearance(cover, draft, pageId, line) {
+  const originalDoc = doc;
+  try {
+    const result = await scanAppearance(await withPageRasterCtx(pageId), line);
+    // Undo/new-file/re-edit must not attach a late result to a restored copy.
+    if (doc !== originalDoc || findAnnotation(doc, cover.id)?.annotation !== cover) return;
+    const ed = draft.editorEl;
+    // Commit freezes appearance too: a download begun immediately after it
+    // must not race a later patch being installed in the preview/model.
+    if (!ed?.isConnected || editingEl !== ed) return;
+    if (result.paperImage) {
+      updateAnnotation(doc, cover.id, { paperImage: result.paperImage });
+      const el = stage.querySelector(`[data-anno-id="${cover.id}"]`);
+      if (el) { el.style.backgroundImage = `url("${result.paperImage}")`; el.style.backgroundSize = '100% 100%'; }
+    }
+    if (draft.appearanceLocked) return;
+    if (result.lettering) {
+      const { x, y, score: _score, ...style } = result.lettering;
+      Object.assign(draft, style, { scanPlacement: { x, y } });
+      ed.style.font = textFontCss(draft); ed.style.color = draft.color || '#000';
+      ed.style.left = `${x}px`; ed.style.top = `${y}px`;
+    } else {
+      await matchReplaceColors(cover, draft, pageId, line);
+    }
+  } catch { /* best effort; the immediate editor keeps its original defaults */ }
 }
 
 // Reopen a committed S2 edit. Same drop-and-reapply shape as reEditLine, and
@@ -1749,9 +1771,10 @@ function reEditOcrLine(pageId, cover, replacement) {
       textId: replacement?.id ?? null,
       box: { x: box.x, y: box.y, w: box.w, h: box.h },
       coverColor: cover.color,
+      paperImage: cover.paperImage,
     },
   };
-  openTextEditor({ pageId, x: box.x, y: box.y, anno: null, draft });
+  openTextEditor({ pageId, x: replacement?.x ?? box.x, y: replacement?.y ?? box.y, anno: null, draft });
   setTool('select');
   toastEl.classList.remove('show');
 }
@@ -1967,6 +1990,8 @@ async function matchReplaceColors(cover, draft, pageId, line) {
   try {
     const r = await withPageRasterCtx(pageId);
     if (!r) return;
+    if (cover.ocrBox && (findAnnotation(doc, cover.id)?.annotation !== cover
+      || draft.appearanceLocked || editingEl !== draft.editorEl)) return;
     const o = 3 * r.s;
     const paper = [];
     for (let i = 0; i <= 4; i += 1) {
@@ -1982,7 +2007,7 @@ async function matchReplaceColors(cover, draft, pageId, line) {
     const coverColor = medColor(paper);
     updateAnnotation(doc, cover.id, { color: coverColor });
     const el = stage.querySelector(`[data-anno-id="${cover.id}"]`);
-    if (el) el.style.background = coverColor;
+    if (el) el.style.backgroundColor = coverColor;
 
     const paperLum = lumOf(paper.map((p) => [p[0], p[1], p[2]])
       .reduce((a, b) => [a[0] + b[0] / paper.length, a[1] + b[1] / paper.length, a[2] + b[2] / paper.length], [0, 0, 0]));
@@ -2182,6 +2207,12 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
   // lands — the draft is its only handle, since a newer tap can open another
   // editor (and another draft) before this async work resolves.
   if (draft) draft.editorEl = ed;
+  // Font estimation may finish after the editor opens. Once someone types,
+  // their text must not change size/position underneath their caret.
+  if (draft?.ocrCoverId) {
+    ed.addEventListener('input', () => { draft.appearanceLocked = true; });
+    ed.addEventListener('compositionstart', () => { draft.appearanceLocked = true; });
+  }
   syncFormatBar();
 
   let committed = false; // guard: blur fires after Enter-commit too
@@ -2270,6 +2301,7 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
           x: draft.ocrReEdit.box.x, y: draft.ocrReEdit.box.y,
           width: draft.ocrReEdit.box.w, height: draft.ocrReEdit.box.h,
           color: draft.ocrReEdit.coverColor,
+          ...(draft.ocrReEdit.paperImage ? { paperImage: draft.ocrReEdit.paperImage } : {}),
           ocrBox: draft.ocrReEdit.box,
         }));
         d = { ...d, ocrCoverId: newCover.id };
@@ -2349,7 +2381,7 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
         gantiDocFont = covered;
       }
       const created = addAnnotation(doc, pageId, createAnnotation('text', {
-        text, x, y,
+        text, x: d.scanPlacement?.x ?? x, y: d.scanPlacement?.y ?? y,
         fontSize: d.fontSize, fontFamily: d.fontFamily,
         bold: d.bold, italic: d.italic, color: d.color,
         ...replaceProps,
