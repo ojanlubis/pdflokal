@@ -34,7 +34,7 @@ import { extractFontProgram, lookupFontObject } from './doc-fonts.js';
 import { drawTextSafe } from './text-encode.js';
 import { getFontStyleInfo } from './font-style.js';
 import { cloneFamilyFor } from './font-decide.js';
-import { CLONE_FONT_VARIANTS, CLONE_FONT_URLS } from './clone-fonts.js';
+import { CLONE_FONT_VARIANTS, CLONE_FONT_URLS, isSfntFontProgram } from './clone-fonts.js';
 import { fingerprintProgram, FAMILY_BUCKET_TO_CLONE } from './font-fingerprint.js';
 
 // ---- shared little helpers ---------------------------------------------------
@@ -245,7 +245,11 @@ async function fetchCloneFontBytes(fontName) {
   try {
     const res = await fetch(url, { signal: controller.signal });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.arrayBuffer();
+    const bytes = await res.arrayBuffer();
+    // Same law as export.js: pdf-lib embeds bytes verbatim, and a PDF cannot
+    // carry a WOFF/WOFF2 program. Throwing declines the rung (clone-unavailable).
+    if (!isSfntFontProgram(new Uint8Array(bytes))) throw new Error(`stamp.js: ${url} is not an sfnt font program`);
+    return bytes;
   } finally {
     clearTimeout(timeoutId);
   }

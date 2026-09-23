@@ -23,7 +23,7 @@
 
 import { buildExportPlan } from './operations.js';
 import { applyPageSurgery } from './page-surgery.js';
-import { CLONE_FONT_VARIANTS, CLONE_FONT_URLS } from './clone-fonts.js';
+import { CLONE_FONT_VARIANTS, CLONE_FONT_URLS, isSfntFontProgram } from './clone-fonts.js';
 import { toStandardFontSafe, drawTextSafe, unencodableInStandardFont } from './text-encode.js';
 import { totalPageRotation } from './page-rotation.js';
 import { orderedForPaint } from './annotation-order.js';
@@ -38,7 +38,7 @@ import { orderedForPaint } from './annotation-order.js';
 // clone-fonts.js: routed by /BaseFont for substitution AND offered in the
 // font dropdown as authoring choices (founder ruling 2026-07-20 evening;
 // spec-font-fidelity-engine.md §3) — core/stamp.js's rung-2 clone ladder
-// needs the EXACT same weight-file mapping to fetch the same woff2 this
+// needs the EXACT same weight-file mapping to fetch the same TTF this
 // module would, so it's factored into one shared source rather than kept as
 // two copies.
 const FONT_NAME_MAP = {
@@ -49,11 +49,11 @@ const FONT_NAME_MAP = {
   ...CLONE_FONT_VARIANTS,
 };
 
-const CUSTOM_FONT_URLS = {
-  'Montserrat': 'fonts/montserrat-regular.woff2',
-  'Montserrat-Bold': 'fonts/montserrat-bold.woff2',
-  'Montserrat-Italic': 'fonts/montserrat-italic.woff2',
-  'Montserrat-BoldItalic': 'fonts/montserrat-bolditalic.woff2',
+export const CUSTOM_FONT_URLS = {
+  'Montserrat': 'fonts/ttf/montserrat-regular.ttf',
+  'Montserrat-Bold': 'fonts/ttf/montserrat-bold.ttf',
+  'Montserrat-Italic': 'fonts/ttf/montserrat-italic.ttf',
+  'Montserrat-BoldItalic': 'fonts/ttf/montserrat-bolditalic.ttf',
   ...CLONE_FONT_URLS,
 };
 
@@ -111,6 +111,9 @@ async function embedCustomFont(env, fontName, bold) {
     clearTimeout(timeoutId);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const fontBytes = await res.arrayBuffer();
+    // A web container here would embed verbatim and paint as dots outside
+    // pdf.js — the Helvetica fallback, WITH its witness, is the honest result.
+    if (!isSfntFontProgram(new Uint8Array(fontBytes))) throw new Error('not an sfnt font program');
     env.fontCache[fontName] = await env.newDoc.embedFont(fontBytes);
     return env.fontCache[fontName];
   } catch (err) {
