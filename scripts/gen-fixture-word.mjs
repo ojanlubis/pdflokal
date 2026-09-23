@@ -13,24 +13,18 @@
  * LOW-LEVEL context API (context.obj / context.flateStream / context.register),
  * the same objects a real Word/LibreOffice PDF writer would produce.
  *
- * WHY carlito-regular.woff2 as the embedded program: it's a REAL repo asset
+ * WHY carlito-regular as the embedded program: it's a REAL repo asset
  * (already used by core/export.js's Calibri-compatible embed), and Carlito is
  * itself the metric-compatible OPEN substitute for Word's own default body
  * font (Calibri) — an apt choice for a fixture whose whole point is "the
  * shape Word produces". No new licensed asset introduced.
  *
- * WHY the raw bytes go into FontFile2 UNCHANGED (still WOFF2-compressed, not
- * decompressed to a bare sfnt): this is NOT a new shortcut invented for this
- * fixture — scripts/gen-fixture-cid.mjs (already committed, already the RUNG
- * B/C fixture) does the exact same thing via pdf-lib's own embedFont(), and
- * core/reinsert.js's extractFontProgram + fontkit.create() already round-trip
- * that shape correctly (verified against undangan-cid.pdf, see reinsert.js's
- * own comment). The repo carries no raw .ttf/.otf (`fonts/` is woff2-only —
- * checked via `head -c4` magic bytes: 774f4632 'wOF2' on every file, and
- * neither `fonts/` nor `js/vendor/` has a plain sfnt asset), and there is no
- * woff (non-2) decompressor available either — so this fixture follows the
- * SAME precedent the codebase already established, rather than reaching for
- * a new (and licensed) system font.
+ * WHY fonts/ttf/ and not fonts/*.woff2: FontFile2 must hold TrueType (sfnt).
+ * Until 2026-09-23 every generator here wrote the .woff2 bytes verbatim, a
+ * format no real PDF carries and only fontkit happened to parse, so rung 1
+ * was being tested against the impossible (PR #137 found the same bug in
+ * export). tests/core/fixture-font-programs.test.mjs now fails any fixture
+ * that carries a wOF2/wOFF program.
  *
  * KNOWN Y-COORDS (pdf.js page-space, origin bottom-left, A4 595x842) — pinned
  * here for tests/core/reinsert-simple.test.mjs to reconstruct exact target
@@ -79,7 +73,7 @@ function winAnsiByteToUnicode(byte) {
   return WINANSI_CP1252_OVERLAY_BYTE_TO_UNICODE.get(byte) ?? null; // undefined slot
 }
 
-const fontBytes = new Uint8Array(fs.readFileSync(path.join(root, 'fonts/carlito-regular.woff2')));
+const fontBytes = new Uint8Array(fs.readFileSync(path.join(root, 'fonts/ttf/carlito-regular.ttf')));
 const font = fontkit.create(fontBytes);
 const scale = 1000 / font.unitsPerEm; // PDF simple-font glyph space is fixed at 1/1000 em
 

@@ -5,7 +5,7 @@
  * ink-color sampler rendered solid black text back as visible GRAY. Run:
  * `node scripts/gen-fixture-bold.mjs`.
  *
- * WHY montserrat-bold.woff2 specifically: it's a REAL repo asset (also used
+ * WHY montserrat-bold specifically (fonts/ttf/): it's a REAL repo asset (also used
  * by core/export.js's Montserrat-Bold embed fallback) whose own PostScript
  * name is 'MontserratThin-Bold' (verified directly against the vendored
  * fontkit) — embedding it unsubset via pdf-lib produces a genuine Type0/
@@ -39,14 +39,13 @@ const fontkit = loadUmd('js/vendor/fontkit.umd.min.js');
 
 const doc = await PDFLib.PDFDocument.create();
 doc.registerFontkit(fontkit);
-// subset:false — same fontkit-subset-encoder RangeError noted in every other
-// gen-fixture-*.mjs script; the app never subsets either (see core/export.js).
+// subset:false — kept, see gen-fixture-cid.mjs.
 const bold = await doc.embedFont(
-  new Uint8Array(fs.readFileSync(path.join(root, 'fonts/montserrat-bold.woff2'))),
+  new Uint8Array(fs.readFileSync(path.join(root, 'fonts/ttf/montserrat-bold.ttf'))),
   { subset: false },
 );
 const regular = await doc.embedFont(
-  new Uint8Array(fs.readFileSync(path.join(root, 'fonts/montserrat-regular.woff2'))),
+  new Uint8Array(fs.readFileSync(path.join(root, 'fonts/ttf/montserrat-regular.ttf'))),
   { subset: false },
 );
 

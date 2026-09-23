@@ -7,8 +7,7 @@
  * the real-PDF falsifier check the spec's §8 calls for ("check the nasty
  * corpus + 2-3 real PDFs BEFORE building D3-D5") — every region below is
  * drawn through the SAME Type0/Identity-H hex-glyph-id path as
- * gen-fixture-cid.mjs (subset:false — the vendored fontkit subset ENCODER
- * RangeErrors on this woff2; the app never subsets either, see core/export.js),
+ * gen-fixture-cid.mjs (subset:false, see there),
  * so detection must work by GEOMETRY alone, never by reading the text.
  *
  * Five clearly separated regions, each >= 60pt from its neighbors (comfortably
@@ -61,11 +60,11 @@ const fontkit = loadUmd('js/vendor/fontkit.umd.min.js');
 
 const doc = await PDFLib.PDFDocument.create();
 doc.registerFontkit(fontkit);
-// subset:false — same fontkit-subset-encoder bug noted in gen-fixture-cid.mjs
+// subset:false — kept, see gen-fixture-cid.mjs
 // and gen-fixture-fragmen.mjs; the point (Type0/Identity-H hex glyph-id
 // strings, string-match-proof geometry) survives unsubsetted.
 const montserrat = await doc.embedFont(
-  new Uint8Array(fs.readFileSync(path.join(root, 'fonts/montserrat-regular.woff2'))),
+  new Uint8Array(fs.readFileSync(path.join(root, 'fonts/ttf/montserrat-regular.ttf'))),
   { subset: false },
 );
 

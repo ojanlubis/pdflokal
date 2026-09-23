@@ -30,12 +30,12 @@ const fontkit = loadUmd('js/vendor/fontkit.umd.min.js');
 
 const doc = await PDFLib.PDFDocument.create();
 doc.registerFontkit(fontkit);
-// subset:false — vendored fontkit's subset ENCODER RangeErrors on this woff2
-// (a fontkit bug; the app never subsets either — see core/export.js). The
-// fixture's point survives: embedFont still emits Type0/Identity-H with hex
+// subset:false — kept from when this read the .woff2, whose subset the
+// vendored fontkit could not encode (fonts/ttf/ subsets fine; switching would
+// change the fixture's shape, not just its container). The point survives: embedFont still emits Type0/Identity-H with hex
 // GLYPH-ID strings, which is the string-match-proof shape Rung B must handle.
 const montserrat = await doc.embedFont(
-  new Uint8Array(fs.readFileSync(path.join(root, 'fonts/montserrat-regular.woff2'))),
+  new Uint8Array(fs.readFileSync(path.join(root, 'fonts/ttf/montserrat-regular.ttf'))),
   { subset: false },
 );
 // A standard-14 font on the SAME page: the width extractor must cope with a

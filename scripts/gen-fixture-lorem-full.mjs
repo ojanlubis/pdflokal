@@ -26,6 +26,11 @@
  * false sidesteps it entirely by embedding the whole program, which is
  * exactly the shape THIS fixture wants anyway (full coverage, by construction).
  *
+ * ⚠ 2026-09-23: the above was measured against the .woff2 files. The source
+ * is now fonts/ttf/ (a PDF cannot carry WOFF2), and fontkit subsets those
+ * fine — the RangeError was the container, not fontkit. subset:false stays so
+ * the fixture's shape is unchanged; a real byte-subset fixture is now buildable.
+ *
  * WHY the UMD-loader pattern (`new Function`, never `vm`): the vendored UMDs
  * must run in the CURRENT realm — a `vm` sandbox gives pdf-lib a different
  * Uint8Array class and its own type checks reject cross-realm typed arrays.
@@ -71,7 +76,7 @@ doc.registerFontkit(fontkit);
 // present in this PDF's font resource, not just the glyphs this page's own
 // text happens to use.
 const montserrat = await doc.embedFont(
-  new Uint8Array(fs.readFileSync(path.join(root, 'fonts/montserrat-regular.woff2'))),
+  new Uint8Array(fs.readFileSync(path.join(root, 'fonts/ttf/montserrat-regular.ttf'))),
   { subset: false },
 );
 

@@ -211,6 +211,10 @@ async function tryNativeSubset(pdfPage, PDFLib, fontkit, insert, text, cache) {
   // Before embedFont, never after: once embedded, the font sits in the doc's
   // font list and save() will try it regardless of what this rung returns.
   if (!entry.embedded && !fontEmbedsAtSave(entry.parsed)) return { ok: false, reason: 'unsupported-font' };
+  // fontkit parses WOFF2 happily, and pdf-lib re-embeds these bytes verbatim —
+  // so a file pdflokal itself exported before 2026-09-23 (WOFF2 as FontFile2)
+  // would carry its bug into the new edit. Decline; the clone rung is sfnt.
+  if (!entry.embedded && !isSfntFontProgram(entry.bytes)) return { ok: false, reason: 'unsupported-font' };
 
   try {
     if (!textCoveredBy(entry.parsed, text)) {
