@@ -107,6 +107,9 @@ self.addEventListener('fetch', (event) => {
   // Same-origin only — let GA/gtag/DoubleClick/Sentry and Vercel insights pass straight through.
   if (url.origin !== self.location.origin) return;
   if (url.pathname.startsWith('/_vercel/')) return;
+  // A count of people is a claim about NOW: served from cache offline it would
+  // show yesterday's number as today's. Network or nothing (api/visitors.js).
+  if (url.pathname === '/api/visitors') return;
 
   // OUR OWN ES MODULES: network-first, cache only as the offline fallback.
   //

@@ -118,3 +118,43 @@ export async function tursoWrite({ url, token, sql, args, expected, timeoutMs = 
 export function placeholders(rowCount, colCount) {
   return Array.from({ length: rowCount }, () => `(${Array(colCount).fill('?').join(',')})`).join(',');
 }
+
+/**
+ * Run ONE read and return the first column of the first row.
+ * Returns { ok, value, reason } and never throws. Same first two gates as
+ * tursoWrite (transport, then the statement's own type — a refused statement
+ * still arrives as HTTP 200); the third gate is "a row came back", since a
+ * scalar read with no row is not a zero.
+ */
+export async function tursoScalar({ url, token, sql, args = [], timeoutMs = 3000 }) {
+  const endpoint = toHttpUrl(url);
+  if (!endpoint || !token) return { ok: false, value: null, reason: 'unconfigured' };
+
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${endpoint}/v2/pipeline`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requests: [{ type: 'execute', stmt: { sql, args } }, { type: 'close' }],
+      }),
+      signal: ctl.signal,
+    });
+    if (!res.ok) return { ok: false, value: null, reason: `http_${res.status}` };
+
+    const body = await res.json();
+    const results = Array.isArray(body?.results) ? body.results : [];
+    const bad = results.find((r) => r?.type === 'error');
+    if (bad) return { ok: false, value: null, reason: `sql_${bad?.error?.code ?? 'unknown'}` };
+
+    const exec = results.find((r) => r?.response?.type === 'execute');
+    const cell = exec?.response?.result?.rows?.[0]?.[0];
+    if (!cell) return { ok: false, value: null, reason: 'no_row' };
+    return { ok: true, value: cell.value ?? null, reason: null };
+  } catch (err) {
+    return { ok: false, value: null, reason: err?.name === 'AbortError' ? 'timeout' : 'network' };
+  } finally {
+    clearTimeout(timer);
+  }
+}
