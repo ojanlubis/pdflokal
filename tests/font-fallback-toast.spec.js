@@ -42,7 +42,10 @@ async function failCarlitoFont(page) {
   await page.addInitScript(() => {
     const orig = window.fetch.bind(window);
     window.fetch = (url, opts) => {
-      if (String(url).includes('fonts/carlito-')) {
+      // Matches fonts/carlito-*.woff2 (screen) and fonts/ttf/carlito-*.ttf
+      // (what export embeds since 2026-09-23) — pinned to one path, this
+      // stopped failing anything the day the path moved.
+      if (/\/carlito-[a-z]+\.(woff2|ttf)$/.test(String(url))) {
         return Promise.resolve(new Response('forced failure', { status: 500 }));
       }
       return orig(url, opts);

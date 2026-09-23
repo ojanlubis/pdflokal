@@ -7,7 +7,7 @@
  * (Arimo/Tinos/Cousine — Croscore — plus Carlito/Caladea — crosextra —
  * font-decide.js's CLONE_TABLE targets). Rung 2 of core/stamp.js's font
  * ladder (spec-edit-rebuild-composite.md §3) needs that SAME weight-file ->
- * URL mapping to fetch the identical woff2 export.js would embed for an
+ * URL mapping to fetch the identical font file export.js would embed for an
  * authored Arimo/etc. text annotation — but stamp.js can't import export.js
  * directly: export.js -> page-surgery.js -> stamp.js is already a chain, and
  * export.js importing stamp.js's own values back would close it into a
@@ -27,27 +27,40 @@ export const CLONE_FONT_VARIANTS = {
   Caladea: { '00': 'Caladea', '10': 'Caladea-Bold', '01': 'Caladea-Italic', '11': 'Caladea-BoldItalic' },
 };
 
-// pdf-lib font name -> self-hosted woff2 path, exactly export.js's
+// pdf-lib font name -> self-hosted TrueType path (fonts/ttf/, decoded once
+// from the fonts/*.woff2 the page's @font-face uses — pdf-lib embeds bytes
+// verbatim and a PDF cannot carry WOFF2; see isSfntFontProgram), exactly export.js's
 // CUSTOM_FONT_URLS shape, same restriction.
 export const CLONE_FONT_URLS = {
-  Arimo: 'fonts/arimo-regular.woff2',
-  'Arimo-Bold': 'fonts/arimo-bold.woff2',
-  'Arimo-Italic': 'fonts/arimo-italic.woff2',
-  'Arimo-BoldItalic': 'fonts/arimo-bolditalic.woff2',
-  Tinos: 'fonts/tinos-regular.woff2',
-  'Tinos-Bold': 'fonts/tinos-bold.woff2',
-  'Tinos-Italic': 'fonts/tinos-italic.woff2',
-  'Tinos-BoldItalic': 'fonts/tinos-bolditalic.woff2',
-  Cousine: 'fonts/cousine-regular.woff2',
-  'Cousine-Bold': 'fonts/cousine-bold.woff2',
-  'Cousine-Italic': 'fonts/cousine-italic.woff2',
-  'Cousine-BoldItalic': 'fonts/cousine-bolditalic.woff2',
-  Carlito: 'fonts/carlito-regular.woff2',
-  'Carlito-Bold': 'fonts/carlito-bold.woff2',
-  'Carlito-Italic': 'fonts/carlito-italic.woff2',
-  'Carlito-BoldItalic': 'fonts/carlito-bolditalic.woff2',
-  Caladea: 'fonts/caladea-regular.woff2',
-  'Caladea-Bold': 'fonts/caladea-bold.woff2',
-  'Caladea-Italic': 'fonts/caladea-italic.woff2',
-  'Caladea-BoldItalic': 'fonts/caladea-bolditalic.woff2',
+  Arimo: 'fonts/ttf/arimo-regular.ttf',
+  'Arimo-Bold': 'fonts/ttf/arimo-bold.ttf',
+  'Arimo-Italic': 'fonts/ttf/arimo-italic.ttf',
+  'Arimo-BoldItalic': 'fonts/ttf/arimo-bolditalic.ttf',
+  Tinos: 'fonts/ttf/tinos-regular.ttf',
+  'Tinos-Bold': 'fonts/ttf/tinos-bold.ttf',
+  'Tinos-Italic': 'fonts/ttf/tinos-italic.ttf',
+  'Tinos-BoldItalic': 'fonts/ttf/tinos-bolditalic.ttf',
+  Cousine: 'fonts/ttf/cousine-regular.ttf',
+  'Cousine-Bold': 'fonts/ttf/cousine-bold.ttf',
+  'Cousine-Italic': 'fonts/ttf/cousine-italic.ttf',
+  'Cousine-BoldItalic': 'fonts/ttf/cousine-bolditalic.ttf',
+  Carlito: 'fonts/ttf/carlito-regular.ttf',
+  'Carlito-Bold': 'fonts/ttf/carlito-bold.ttf',
+  'Carlito-Italic': 'fonts/ttf/carlito-italic.ttf',
+  'Carlito-BoldItalic': 'fonts/ttf/carlito-bolditalic.ttf',
+  Caladea: 'fonts/ttf/caladea-regular.ttf',
+  'Caladea-Bold': 'fonts/ttf/caladea-bold.ttf',
+  'Caladea-Italic': 'fonts/ttf/caladea-italic.ttf',
+  'Caladea-BoldItalic': 'fonts/ttf/caladea-bolditalic.ttf',
 };
+
+// True when `bytes` open with an sfnt tag — the only container a PDF's
+// /FontFile2 (or /FontFile3 OpenType) can hold. pdf-lib's embedFont writes
+// the bytes it is given VERBATIM, so a .woff2 handed to it ships as an
+// invalid font program: every glyph a dot in Chrome/Preview/Acrobat, while
+// pdf.js substitutes by name and hides it (tests/core/export-font-program).
+export function isSfntFontProgram(bytes) {
+  if (!bytes || bytes.length < 4) return false;
+  const tag = String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]);
+  return tag === '\x00\x01\x00\x00' || tag === 'true' || tag === 'OTTO';
+}

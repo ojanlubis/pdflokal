@@ -399,7 +399,8 @@ test.describe('export pipeline', () => {
     // those hits should not count against the bug's invariant. We only care
     // about embed-time fetches during ueBuildFinalPDF.
     let montserratFetchCount = 0;
-    await page.route('**/fonts/montserrat-*.woff2', (route) => {
+    // Both the screen woff2 and the export TTF (fonts/ttf/, 2026-09-23).
+    await page.route(/\/fonts\/(ttf\/)?montserrat-[a-z]+\.(woff2|ttf)$/, (route) => {
       montserratFetchCount += 1;
       return route.fulfill({ status: 500, body: 'forced failure' });
     });
@@ -423,6 +424,9 @@ test.describe('export pipeline', () => {
 
     // Bug #2 invariant: failed font is fetched at most once thanks to the
     // negative-cache write after the fallback embed.
+    // ≥1 too: at 0 the route never fired (the path moved, 2026-09-23), and
+    // "at most once" would pass on a fetch it never saw.
+    expect(montserratFetchCount).toBeGreaterThanOrEqual(1);
     expect(montserratFetchCount).toBeLessThanOrEqual(1);
   });
 
