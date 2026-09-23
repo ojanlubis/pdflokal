@@ -15,7 +15,7 @@
  * The subset TTF itself is a committed artifact (cut with fonttools —
  * scripts-side tooling, not available in-repo; same committed-output pattern
  * as every gen-fixture PDF). The embed here is a real sfnt in FontFile2, so
- * pdf.js renders it everywhere — unlike the woff2-carrying fixtures.
+ * pdf.js renders it everywhere — as every fixture does since 2026-09-23.
  *
  * KNOWN LINES (pdf.js page-space, origin bottom-left, A4 595x842):
  *   'FORMULIR PESANAN'                                x=72 y=760 size=20

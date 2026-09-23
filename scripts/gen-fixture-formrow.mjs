@@ -30,7 +30,7 @@
  * (`font_seen: {subtype:'truetype', flavor:'truetype-simple', embedded:true}`)
  * requires a genuine SIMPLE /Subtype /TrueType font, which only a hand-built
  * font dict (pdf-lib's low-level context API) can produce. This script
- * follows gen-fixture-word.mjs's exact recipe (same carlito-regular.woff2
+ * follows gen-fixture-word.mjs's exact recipe (same fonts/ttf/carlito-regular.ttf
  * asset, same WinAnsiEncoding width table, zero new licensed assets).
  *
  * KNOWN Y-COORDS (pdf.js page-space, origin bottom-left, A4 595x842):
@@ -76,7 +76,7 @@ function winAnsiByteToUnicode(byte) {
   return WINANSI_CP1252_OVERLAY_BYTE_TO_UNICODE.get(byte) ?? null;
 }
 
-const fontBytes = new Uint8Array(fs.readFileSync(path.join(root, 'fonts/carlito-regular.woff2')));
+const fontBytes = new Uint8Array(fs.readFileSync(path.join(root, 'fonts/ttf/carlito-regular.ttf')));
 const font = fontkit.create(fontBytes);
 const scale = 1000 / font.unitsPerEm;
 

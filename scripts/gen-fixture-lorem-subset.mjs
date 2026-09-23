@@ -26,6 +26,11 @@
  * subset:false — that workaround exists precisely because true subsetting
  * is broken here, not by choice.
  *
+ * ⚠ 2026-09-23: the above was measured against the .woff2 files. The source
+ * is now fonts/ttf/ (a PDF cannot carry WOFF2), and fontkit subsets those
+ * fine — the RangeError was the container, not fontkit. subset:false stays so
+ * the fixture's shape is unchanged; a real byte-subset fixture is now buildable.
+ *
  * THE WORKAROUND, and why it's still an HONEST "tight subset" fixture for
  * what this test actually needs to prove: embed Montserrat's FULL program
  * (subset:false, same as lorem-full.pdf) — but choose the e2e test's
@@ -85,7 +90,7 @@ const fontkit = loadUmd('js/vendor/fontkit.umd.min.js');
 // confirms the "genuinely uncoverable" claim above against the ACTUAL bytes
 // about to be embedded, on every regeneration.
 const montserratBytesForProbe = new Uint8Array(
-  fs.readFileSync(path.join(root, 'fonts/montserrat-regular.woff2')),
+  fs.readFileSync(path.join(root, 'fonts/ttf/montserrat-regular.ttf')),
 );
 const probeFont = fontkit.create(montserratBytesForProbe);
 const zheCovered = probeFont.hasGlyphForCodePoint(0x0416);

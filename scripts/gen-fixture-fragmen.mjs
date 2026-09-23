@@ -46,10 +46,10 @@ const doc = await PDFLib.PDFDocument.create();
 doc.registerFontkit(fontkit);
 
 const helvetica = await doc.embedFont(PDFLib.StandardFonts.Helvetica);
-// subset:false — same fontkit-subset-encoder bug noted in gen-fixture-cid.mjs;
+// subset:false — kept, see gen-fixture-cid.mjs;
 // the point (Type0/Identity-H hex glyph-id strings) survives unsubsetted.
 const montserrat = await doc.embedFont(
-  new Uint8Array(fs.readFileSync(path.join(root, 'fonts/montserrat-regular.woff2'))),
+  new Uint8Array(fs.readFileSync(path.join(root, 'fonts/ttf/montserrat-regular.ttf'))),
   { subset: false },
 );
 

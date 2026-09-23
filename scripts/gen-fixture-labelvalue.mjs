@@ -30,8 +30,8 @@
  * for this question rather than coverage. Same lesson as the QA gate: an
  * assertion that cannot come out differently proves nothing.
  *
- * WHY these two font programs: montserrat-bold.woff2 and carlito-regular.woff2
- * are both REAL repo assets already shipped in fonts/ (no new licensed asset),
+ * WHY these two font programs: montserrat-bold and carlito-regular (fonts/ttf/)
+ * are both REAL repo assets already shipped (no new licensed asset),
  * and they are genuinely different families, so the two runs land in genuinely
  * different /Font resources — which is the whole point. Same pairing
  * tests/core/page-surgery-mixedfonts.test.mjs already builds inline; this
@@ -66,8 +66,8 @@ const LEFT = 72;
 const doc = await PDFLib.PDFDocument.create();
 doc.registerFontkit(fontkit);
 
-const bold = await doc.embedFont(new Uint8Array(fs.readFileSync(path.join(root, 'fonts/montserrat-bold.woff2'))));
-const regular = await doc.embedFont(new Uint8Array(fs.readFileSync(path.join(root, 'fonts/carlito-regular.woff2'))));
+const bold = await doc.embedFont(new Uint8Array(fs.readFileSync(path.join(root, 'fonts/ttf/montserrat-bold.ttf'))));
+const regular = await doc.embedFont(new Uint8Array(fs.readFileSync(path.join(root, 'fonts/ttf/carlito-regular.ttf'))));
 
 const page = doc.addPage([595, 842]);
 

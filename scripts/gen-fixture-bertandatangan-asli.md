@@ -20,13 +20,17 @@ openssl pkcs12 -export -out signer.p12 -inkey k.pem -in c.pem -passout pass:test
 # then pyhanko: append_signature_field(field_name='Sig1') + sign_pdf
 ```
 
+**Re-signed 2026-09-23** (same recipe, pyHanko 0.37.0 in a scratch venv) after
+`surat-word.pdf` was regenerated from `fonts/ttf/` — the first cut carried a
+WOFF2 font program, which no real PDF can (see `gen-fixture-word.mjs`).
+
 **Verified by a DIFFERENT PROCESS**, not by us — poppler's `pdfsig`, which
 shares no code with this repo:
 
 ```
 Signature Type: adbe.pkcs7.detached
 Signing Hash Algorithm: SHA-256
-Signed Ranges: [0 - 33986], [38856 - 39373]
+Signed Ranges: [0 - 39774], [44644 - 45150]
 Total document signed
 Signature Validation: Signature is Valid.
 Certificate Validation: Certificate issuer isn't Trusted.
