@@ -537,7 +537,9 @@
     .fb-owner img { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex: none; }
     .fb-owner b { display: block; font-size: 13px; font-weight: 700; color: var(--ink); line-height: 1.25; }
     .fb-owner a { display: block; font-size: 11.5px; color: var(--muted); font-weight: 500; text-decoration: none; }
-    .fb-owner a:hover { color: var(--ink); text-decoration: underline; }
+    @media (hover: hover) {
+      .fb-owner a:hover { color: var(--ink); text-decoration: underline; }
+    }
 
     /* The pasted screenshot, shown back at a size you can actually check. */
     #fb-shot { position: relative; margin: 10px 0 0; }
@@ -563,7 +565,9 @@
       font: inherit; font-size: 13px; cursor: pointer;
     }
     .fb-thumbs button svg { width: 17px; height: 17px; }
-    .fb-thumbs button:hover { background: var(--dzfill); }
+    @media (hover: hover) {
+      .fb-thumbs button:hover { background: var(--dzfill); }
+    }
     .fb-thumbs button[aria-pressed="true"] {
       color: var(--ink); font-weight: 600; border-color: var(--ink);
     }
@@ -594,7 +598,9 @@
       font-weight: 600;
     }
     #fb-send:disabled { opacity: .45; cursor: not-allowed; }
-    #fb-send:not(:disabled):hover { background: var(--accent-down); border-color: var(--accent-down); }
+    @media (hover: hover) {
+      #fb-send:not(:disabled):hover { background: var(--accent-down); border-color: var(--accent-down); }
+    }
     /* ⚠️ `:not([hidden])` IS LOAD-BEARING, not tidiness. A bare
        `.fb-done { display: flex }` BEATS the UA stylesheet's `[hidden] {
        display: none }` on specificity, so the thank-you panel rendered
@@ -906,7 +912,9 @@
       background: var(--surface); box-shadow: 0 3px 14px rgba(0,0,0,.16);
       color: var(--muted); font-size: 13px; font-weight: 600;
     }
-    #contact-tab-btn:hover { color: var(--ink); }
+    @media (hover: hover) {
+      #contact-tab-btn:hover { color: var(--ink); }
+    }
 
     /* ---- the bug-report prompt (js/v2/bug-report-prompt.js) ----------------
        Founder ask 2026-09-16: the expensive bugs here are SILENT — the user is
@@ -1056,7 +1064,9 @@
       font-size: var(--fs-1); font-weight: 500; color: var(--ink); text-decoration: none;
       padding: 0 var(--sp-8); border-radius: var(--r-control);
     }
-    .ld-burger-menu a:hover { background: var(--dzfill); }
+    @media (hover: hover) {
+      .ld-burger-menu a:hover { background: var(--dzfill); }
+    }
     .ld-burger-lang { margin-top: var(--sp-8); padding-top: var(--sp-8); border-top: 1px solid var(--line); }
     .ld-burger-lang-label {
       display: block; font-size: var(--fs-n1); font-weight: 700; color: var(--muted);
@@ -1087,7 +1097,9 @@
       font-size: var(--fs-n1); color: var(--muted); text-decoration: none; font-weight: 500;
       min-height: 44px; padding: 0 var(--sp-8); display: inline-flex; align-items: center;
     }
-    .ld-nav a:hover { color: var(--ink); }
+    @media (hover: hover) {
+      .ld-nav a:hover { color: var(--ink); }
+    }
 
     .ld-hd-right { display: flex; align-items: center; gap: var(--sp-8); }
 
@@ -1100,7 +1112,9 @@
       position: relative; display: inline-flex; align-items: center; justify-content: center;
       width: 44px; height: 44px; border-radius: var(--r-control); color: var(--muted); cursor: pointer;
     }
-    .ld-theme-toggle:hover { color: var(--ink); }
+    @media (hover: hover) {
+      .ld-theme-toggle:hover { color: var(--ink); }
+    }
     .ld-theme-toggle:has(:focus-visible) { outline: 3px solid var(--accent); outline-offset: 2px; }
     .ld-theme-toggle-input {
       position: absolute; inset: 0; margin: 0; opacity: 0; appearance: none; cursor: pointer;
@@ -1115,7 +1129,9 @@
       font-size: var(--fs-n1); color: var(--muted); text-decoration: none; font-weight: 500;
       min-height: 44px; padding: 0 var(--sp-8); display: inline-flex; align-items: center;
     }
-    .ld-hd-privasi-mobile:hover { color: var(--ink); }
+    @media (hover: hover) {
+      .ld-hd-privasi-mobile:hover { color: var(--ink); }
+    }
 
     /* Language control — PLACEHOLDER, desktop only (mobile's equivalent lives
        inside the burger drawer, above). Globe + "ID" + a dropdown offering
@@ -1134,7 +1150,9 @@
       font-size: var(--fs-n1); font-weight: 500; color: var(--muted);
     }
     .ld-lang-btn::-webkit-details-marker { display: none; }
-    .ld-lang-btn:hover { color: var(--ink); }
+    @media (hover: hover) {
+      .ld-lang-btn:hover { color: var(--ink); }
+    }
     .ld-lang-btn svg { width: 16px; height: 16px; }
     .ld-lang-chev { transition: transform .18s ease; }
     .ld-lang[open] .ld-lang-chev { transform: rotate(180deg); }
@@ -1150,7 +1168,9 @@
       border-radius: var(--r-control); font: inherit; font-size: var(--fs-n1); color: var(--ink);
       text-align: left; cursor: pointer;
     }
-    .ld-lang-opt:hover:not(:disabled) { background: var(--dzfill); }
+    @media (hover: hover) {
+      .ld-lang-opt:hover:not(:disabled) { background: var(--dzfill); }
+    }
     /* ⚠️ ACTIVE IS NOT ACCENT. This read `color: var(--accent)` and it broke the
        one rule specs/design-system.md §4 calls the most likely to be broken:
        RED MEANS TOUCHABLE, and nothing else. "Indonesia" here is the CURRENT
@@ -1251,6 +1271,13 @@
       100% { transform: rotate(-8deg) scale(1); opacity: 1; }
     }
     @media (prefers-reduced-motion: reduce) { .ld-stamp { animation: none; } }
+    /* Under ~450px of dropzone the stamp's low left corner cut 12-17px into the
+       upload icon (measured at 375). It stays 37px, because the mask does not
+       survive rescaling (§6), and tests/mobile/stamps.spec.js holds it inside
+       the dropzone's width and below the headline. So it goes as high and as far
+       right as those allow, and the dropzone takes 16px more top room so the
+       icon clears its corner (13px at 375; that rule sits after .dropzone). */
+    @media (max-width: 599px) { .ld-stamp { top: -39px; right: 5px; } }
 
     /* ⚠️ THE STAMP NEEDS MORE INK IN DARK, AND ONLY IN DARK.
        specs/design-system.md §6 predicted this exactly: "the mask does not
@@ -1294,6 +1321,8 @@
       padding: var(--sp-32) var(--sp-16); font: inherit; color: inherit;
       transition: border-color .15s ease, background .15s ease;
     }
+    /* Room for the stamp's corner on a phone: see .ld-stamp's 599px rule. */
+    @media (max-width: 599px) { .dropzone { padding-top: var(--sp-48); } }
     .dropzone.over { border-color: var(--accent); background: rgba(220,38,38,.05); }
     .dropzone:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
     .dz-icon { width: 38px; height: 38px; color: var(--muted); margin: 0 auto var(--sp-8); display: block; }
@@ -1342,7 +1371,10 @@
     .tl-doc:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     .tl-doc svg { width: 20px; height: 20px; color: var(--accent); }
     .tl-doc span { font-size: var(--fs-n1); font-weight: 700; letter-spacing: -.01em; line-height: 1.2; }
-    @media (min-width: 720px) { .tl-row { grid-auto-columns: 132px; justify-content: center; } }
+    /* Start, not centre: centred, the row sat 106px in from the column edge its
+       own label and the tool cards below both start on — two left edges one row
+       apart. The cards keep their smaller size, which is what sets them apart. */
+    @media (min-width: 720px) { .tl-row { grid-auto-columns: 132px; } }
     .ld-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-12); margin-top: var(--sp-16); }
     .ld-grid.more, #ld-more { margin-top: var(--sp-12); }
     #ld-more[hidden] { display: none; }
@@ -1374,10 +1406,12 @@
       padding: var(--sp-24) 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
       display: flex; gap: var(--sp-16); align-items: flex-start;
     }
-    .ld-janji svg { width: 22px; height: 22px; color: var(--accent); margin-top: 2px; flex: none; }
+    /* Ink, not accent: red means touchable (specs/design-system.md §4), and the
+       shield is not a control. The link under it keeps the red. */
+    .ld-janji svg { width: 22px; height: 22px; color: var(--ink); margin-top: 2px; flex: none; }
     .ld-janji b { font-size: var(--fs-1); display: block; letter-spacing: -.01em; }
     .ld-janji p { font-size: var(--fs-0); color: var(--muted); margin: var(--sp-4) 0 0; max-width: var(--measure); }
-    .ld-janji a { color: var(--accent); font-weight: 500; }
+    .ld-janji a { color: var(--accent); font-weight: 500; text-underline-offset: 3px; }
     /* EVERYTHING BELOW THE HERO STAYS ON THE WORKING COLUMN, so the page reads
        as one column under a full-width masthead. The promise was the first
        section to join it and the rest disagreed with it immediately — which is
@@ -1389,6 +1423,8 @@
        what was actually wrong. Flipping it back is one line. */
     .ld-faq { padding: var(--sp-64) 0 0; max-width: var(--column); margin-inline: auto; }
     .ld-faq h2 { font-size: var(--fs-3); letter-spacing: -.02em; margin: 0 0 var(--sp-8); }
+    .ld h1, .ld h2, .ld-janji b { text-wrap: balance; }
+    .ld-janji p, .ld-faq details p, .ld-copy p { text-wrap: pretty; }
     .ld-faq details { border-bottom: 1px solid var(--line); }
     .ld-faq summary {
       cursor: pointer; list-style: none; font-weight: 700; font-size: var(--fs-0);
@@ -1408,10 +1444,14 @@
     .ld-tools nav a { font-size: var(--fs-0); color: var(--muted); text-decoration: none; min-height: 32px; display: inline-flex; align-items: center; }
     /* was an inline style="margin-top:18px" — 18 is not on the ramp, and an
        inline style is unreachable by the theme and by any future lint. */
-    .ld-tools-h2-gap { margin-top: var(--sp-24); }
+    /* Scoped to .ld-tools h2 so it outranks the margin reset above; as a lone
+       class it lost on specificity and the two groups touched. */
+    .ld-tools h2.ld-tools-h2-gap { margin-top: var(--sp-32); }
     /* var(--red) never existed — this rule had been dead since it was written,
        so the links had no hover at all. --accent is the token. */
-    .ld-tools nav a:hover { color: var(--accent); text-decoration: underline; }
+    @media (hover: hover) {
+      .ld-tools nav a:hover { color: var(--accent); text-decoration: underline; }
+    }
     /* Long-form SEO copy, injected into the tool pages by scripts/gen-seo-pages.js.
        Absent from index.html itself — the homepage keeps its short, punchy hero. */
     /* Structure may go full width. TEXT MAY NOT — prose caps at --measure.
@@ -1433,6 +1473,9 @@
     }
     .ld-foot a { font-size: var(--fs-n1); color: var(--muted); text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
     .ld-foot span { margin-left: auto; font-size: var(--fs-n2); color: var(--muted); }
+    /* Only the first pushes right; when both did, the free space split in two
+       and "Dibuat di Indonesia" floated alone mid-row at desktop. */
+    .ld-foot span + span { margin-left: 0; }
     /* desktop composition (founder, Jul 5 rd4+rd5: fill the width with CONTENT,
        on a flat page). Paper-on-desk was tried live and CUT by the founder —
        one continuous surface, no floating sheet.
@@ -1480,8 +1523,10 @@
          gives both grids the same 4 columns and the same card width. */
       .ld-grid { grid-template-columns: repeat(4, 1fr); margin-top: var(--sp-24); }
       .ld-lihat { display: flex; }
-      .ld-card:hover { border-color: var(--accent); }
-      .dropzone:hover { border-color: var(--accent); background: rgba(220,38,38,.04); }
+      @media (hover: hover) {
+        .ld-card:hover { border-color: var(--accent); }
+        .dropzone:hover { border-color: var(--accent); background: rgba(220,38,38,.04); }
+      }
       /* FAQ reads as a broadsheet: two columns under one heading */
       .ld-faq { display: grid; grid-template-columns: 1fr 1fr; gap: 0 var(--sp-48); align-items: start; }
       .ld-faq h2 { grid-column: 1 / -1; }
@@ -1647,6 +1692,7 @@
       font-variant-numeric: tabular-nums;
     }
     .ds-seg button small { font-size: 10.5px; color: var(--muted); font-weight: 400; }
+    .ds-seg button small:empty { display: none; }
     .ds-seg button.on { border-color: var(--accent); background: rgba(220,38,38,.07); color: var(--accent); }
     .ds-seg button.on small { color: var(--accent); opacity: .75; }
     .ds-hemat { color: #1d8a44; font-weight: 600; }
@@ -1689,13 +1735,15 @@
       dialog.bottomsheet { align-items: center; padding: 16px; }
       .ds-body { border-radius: 16px; }
       .tool { min-width: 66px; }
-      .tool:hover { background: rgba(220,38,38,.05); }
-      .icon-btn:hover:not(:disabled) { color: var(--ink); }
-      #btn-file:hover:not(:disabled) { color: var(--ink); }
-      #file-menu button:hover { background: var(--bg); }
-      .ds-seg button:hover:not(.on) { border-color: rgba(220,38,38,.4); }
-      .pm-tile:hover:not(.pm-placeholder) { border-color: rgba(220,38,38,.45); }
-      .pm-bulk button:hover, .pm-pickbar button:hover { border-color: var(--accent); color: var(--accent); }
+      @media (hover: hover) {
+        .tool:hover { background: rgba(220,38,38,.05); }
+        .icon-btn:hover:not(:disabled) { color: var(--ink); }
+        #btn-file:hover:not(:disabled) { color: var(--ink); }
+        #file-menu button:hover { background: var(--bg); }
+        .ds-seg button:hover:not(.on) { border-color: rgba(220,38,38,.4); }
+        .pm-tile:hover:not(.pm-placeholder) { border-color: rgba(220,38,38,.45); }
+        .pm-bulk button:hover, .pm-pickbar button:hover { border-color: var(--accent); color: var(--accent); }
+      }
       #v2-stage { padding-bottom: 40px; }
       .pv-anno { cursor: grab; }
       .pv-anno-watermark, .pv-anno-pageNumber { cursor: default; }
@@ -1893,7 +1941,9 @@
       border: 1px solid var(--ink); color: var(--ink); text-decoration: none;
       font-weight: 600; font-size: var(--fs-n1);
     }
-    .mk-support:hover { background: var(--dzbg); }
+    @media (hover: hover) {
+      .mk-support:hover { background: var(--dzbg); }
+    }
     /* The full work log, on /dukung's drawer. A text link, underlined so it
        reads as one standing still; lighter than the button under it. */
     .mk-more { display: inline-block; margin-top: var(--sp-12); font-size: var(--fs-n1); color: var(--ink); text-underline-offset: 3px; }
@@ -1903,7 +1953,7 @@
        covered Buka File on a 667px screen. In flow it is a surface on the
        page, so it separates by line, not shadow. */
     @media (max-width: 599px) {
-      #maker-card { position: relative; right: auto; bottom: auto; width: auto; margin-top: var(--sp-16); box-shadow: none; }
+      #maker-card { position: relative; right: auto; bottom: auto; width: auto; margin-top: var(--sp-24); box-shadow: none; }
     }
     /* "194 visitor hari ini" behind a green pulse (his wording 2026-09-24). Green is
        his ask and the system owns no green, so it is named here and nowhere
@@ -2661,7 +2711,7 @@
         <div class="ds-label">Halaman</div>
         <div class="ds-seg" id="ds-pages">
           <button type="button" data-v="all" class="on">Semua<small id="ds-all-sub"></small></button>
-          <button type="button" data-v="some">Pilih…<small id="ds-some-sub">&nbsp;</small></button>
+          <button type="button" data-v="some">Pilih…<small id="ds-some-sub"></small></button>
         </div>
       </div>
 

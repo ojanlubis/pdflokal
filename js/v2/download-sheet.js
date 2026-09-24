@@ -412,7 +412,7 @@ export function createDownloadSheet(deps) {
 
     segSync('#ds-pages', state.picked ? 'some' : 'all');
     el('#ds-all-sub').textContent = `${nAll} halaman`;
-    el('#ds-some-sub').innerHTML = state.picked ? `${n} dipilih` : '&nbsp;';
+    el('#ds-some-sub').textContent = state.picked ? `${n} dipilih` : '';
 
     // CTA
     const main = el('#ds-cta-main');
