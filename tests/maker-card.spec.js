@@ -91,7 +91,8 @@ test('homepage count: shown with a number, hidden when the API has none', async 
   await page.goto('/');
   const c = page.locator('.ld-hd .visitor-count');
   await expect(c).toBeVisible();
-  await expect(c).toContainText('184');
+  await expect(c).toHaveText('184/hari');
+  await expect(c.locator('.vc-pulse')).toBeVisible();
   // never collides with the centred nav
   expect(overlap(await c.boundingBox(), await page.locator('.ld-nav').boundingBox())).toBe(false);
 
@@ -118,12 +119,25 @@ test('editor count: between File and the tools when wide, first to go when narro
   expect(box.x + box.width).toBeLessThan(firstTool.x);
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/editor-1440.png`, clip: { x: 0, y: 0, width: 1440, height: 70 } });
 
-  await page.setViewportSize({ width: 960, height: 800 });
+  await page.setViewportSize({ width: 900, height: 800 });
   await expect(c).toBeHidden();
   // and the tools did not lose anything to it
   expect(await page.locator('#toolbar').evaluate((t) => t.scrollWidth <= t.clientWidth + 1)).toBe(true);
-  if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/editor-960.png`, clip: { x: 0, y: 0, width: 960, height: 70 } });
+  if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/editor-900.png`, clip: { x: 0, y: 0, width: 900, height: 70 } });
 
   await page.setViewportSize({ width: 1440, height: 800 });
   await expect(c).toBeVisible();
+});
+
+test('"Lihat selengkapnya" opens the full work log on /dukung', async ({ page }) => {
+  await mock(page);
+  await page.goto('/');
+  await page.locator('#maker-card .mk-more').click();
+  await expect(page).toHaveURL(/\/dukung#development$/);
+  await expect(page.locator('#rw-drawer')).toBeVisible();
+  await expect(page.locator('#rw-drawer .rw-log li').first()).toBeVisible();
+  // and it counted as answering the card: back home, it does not greet again
+  await page.goto('/');
+  await page.waitForTimeout(1500);
+  await expect(page.locator('#maker-card')).toBeHidden();
 });

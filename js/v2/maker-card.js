@@ -7,7 +7,8 @@
  *
  *   1. THE MAKER CARD — Ojan's face and name (inherited from /dukung, the
  *      performer), his last three approved updates (js/updates.js), one way
- *      to support him. Homepage only, on a visitor's first open, and again
+ *      to support him, and "Lihat selengkapnya" to the full work log (the
+ *      /dukung drawer, opened by #development). Homepage only, on a visitor's first open, and again
  *      only when an approved update exists they have not seen.
  *      A CORNER CARD, NOT A CENTRED DIALOG: the dropzone and Buka File stay
  *      usable. Blocking someone who came to fix a PDF, before they have tried
@@ -69,7 +70,7 @@ export function initMakerCard({ entries = shownUpdates(), delay = SHOW_DELAY_MS 
   card.querySelector('.mk-close').addEventListener('click', dismiss);
   // The support link navigates on its own; marking seen first means the card
   // does not greet them again when they come back from /dukung.
-  card.querySelector('.mk-support').addEventListener('click', () => writeSeen(entries[0].id));
+  for (const a of card.querySelectorAll('.mk-support, .mk-more')) a.addEventListener('click', () => writeSeen(entries[0].id));
 
   // Homepage only. Opening a document leaves the landing; the card goes with
   // it, without marking seen — they never answered it.
