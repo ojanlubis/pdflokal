@@ -1,10 +1,10 @@
 /*
  * The maker card and the visitor count (js/v2/maker-card.js, 2026-09-23).
  *
- * js/updates.js ships entries as approved:false until Fauzan approves them, so
- * the real file shows nothing — and that is asserted too. Every other test
- * serves an APPROVED copy of the same file through page.route, so the card's
- * behaviour is tested without anyone's approval being faked in the repo.
+ * js/updates.js entries stay approved:false until Fauzan approves them; one
+ * test serves an all-unapproved copy and asserts the card never appears. The
+ * rest serve an all-approved copy, so the card's behaviour is tested without
+ * depending on which entries he has approved today.
  * /api/visitors is a Vercel function the local static server does not run;
  * it is mocked the same way.
  */
@@ -16,6 +16,8 @@ import { expectFirstPage } from './helpers/render.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REAL_UPDATES = fs.readFileSync(path.join(__dirname, '..', 'js', 'updates.js'), 'utf8');
+// Fauzan approved the first three entries 2026-09-24; this still forces
+// every entry approved so the tests do not depend on what is approved today.
 const approved = (src) => src.replaceAll('approved: false', 'approved: true');
 
 async function mock(page, { visitors = 184, updates = approved(REAL_UPDATES) } = {}) {
@@ -67,8 +69,8 @@ test('closing it keeps it closed; a NEW approved update brings it back', async (
   await expect(page.locator('#maker-card')).toBeVisible();
 });
 
-test('as shipped (nothing approved), the card never appears', async ({ page }) => {
-  await mock(page, { updates: null });
+test('with nothing approved, the card never appears', async ({ page }) => {
+  await mock(page, { updates: REAL_UPDATES.replaceAll('approved: true', 'approved: false') });
   await page.goto('/');
   await page.waitForTimeout(1500);
   await expect(page.locator('#maker-card')).toBeHidden();

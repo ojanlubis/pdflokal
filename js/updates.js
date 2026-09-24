@@ -21,20 +21,20 @@ export const UPDATES = [
   {
     id: '2026-09-23-teks-titik',
     date: '2026-09-23',
-    text: 'Teks hasil Edit nggak lagi jadi titik-titik di file yang diunduh.',
-    approved: false,
+    text: 'Teks hasil Edit nggak lagi jadi titik-titik saat file diunduh.',
+    approved: true,
   },
   {
     id: '2026-09-22-scan-nyatu',
     date: '2026-09-22',
     text: 'Edit di dokumen hasil scan sekarang ikut warna kertas dan bentuk hurufnya.',
-    approved: false,
+    approved: true,
   },
   {
     id: '2026-09-21-unduh-hp',
     date: '2026-09-21',
     text: 'Tombol Unduh yang kadang nggak bisa ditekan di HP udah beres.',
-    approved: false,
+    approved: true,
   },
 ];
 
