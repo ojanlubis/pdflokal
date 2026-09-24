@@ -101,7 +101,9 @@ a {
   text-decoration: none;
   transition: color .15s ease;
 }
-a:hover { color: var(--accent-down); }
+@media (hover: hover) {
+  a:hover { color: var(--accent-down); }
+}
 
 /* ---- DUKUNG.HTML COMPONENTS — .other-ways, .faq-section, .faq-item,
    .donate-page, .donate-intro. privasi.html's .privacy-* classes are already

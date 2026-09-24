@@ -95,6 +95,8 @@ test.describe('stamp moments — mobile', () => {
         gapLeft: Math.round(s.left - d.left),
         withinDropzoneWidth: s.left >= d.left && s.right <= d.right,
         clearOfHeadline: s.top >= h.bottom - 4,
+        // The rotated box's bottom IS the stamp's lowest corner.
+        clearOfIcon: Math.round(document.querySelector('.dz-icon').getBoundingClientRect().top - s.bottom),
       };
     });
     expect(geom.overhangsDropzoneTop, 'the stamp does not straddle the dropzone\'s top edge — it is not pressed ONTO the corner').toBe(true);
@@ -117,6 +119,8 @@ test.describe('stamp moments — mobile', () => {
 
     expect(geom.withinDropzoneWidth, 'the stamp hangs outside the dropzone horizontally').toBe(true);
     expect(geom.clearOfHeadline, 'the stamp has drifted back up into the headline — that is the pre-ruling position').toBe(true);
+    // 2026-09-24: at 375 the stamp's low corner cut 12-17px into the upload icon.
+    expect(geom.clearOfIcon, `the stamp's lowest corner is ${-geom.clearOfIcon}px into the upload icon`).toBeGreaterThanOrEqual(8);
     // Permanent means permanent: still there after a reload.
     await page.reload();
     await page.waitForTimeout(1200);
