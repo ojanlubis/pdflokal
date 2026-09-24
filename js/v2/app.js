@@ -59,6 +59,7 @@ import { showEditFeedback, dismissEditFeedback, setFeedbackSample } from './edit
 import { initFeedbackForm } from './feedback-form.js';
 import { createCelebration } from './celebrate.js';
 import { initInstallPrompt, isStandalone } from './install-prompt.js';
+import { initMakerCard, initVisitorCount } from './maker-card.js';
 import { applyIntentCopy } from './intent-copy.js';
 import { ensurePdfLib } from '../core/vendor.js';
 import { readPageContents, extractFontMetrics } from '../core/redact.js';
@@ -269,6 +270,8 @@ function download(blob, filename) {
 }
 const celebration = createCelebration({ toast });
 initInstallPrompt(); // homepage "install to home screen" chip + adaptive card (off the download moment)
+initMakerCard();    // homepage: Ojan + his last approved updates (js/updates.js)
+initVisitorCount(); // header count, homepage + editor (api/visitors.js)
 // The general feedback channel: a footer link, never prompted. Separate from
 // edit-feedback.js on purpose — that module owns the consent-gated image path
 // and must keep a single door. See feedback-form.js's header.
