@@ -1905,7 +1905,7 @@
     @media (max-width: 599px) {
       #maker-card { position: relative; right: auto; bottom: auto; width: auto; margin-top: var(--sp-16); box-shadow: none; }
     }
-    /* "194/hari" behind a green pulse, his simplification 2026-09-24. Green is
+    /* "194 visitor hari ini" behind a green pulse (his wording 2026-09-24). Green is
        his ask and the system owns no green, so it is named here and nowhere
        else. The pulse is the one motion: it says "people are here", and it is
        still under prefers-reduced-motion. */
@@ -1924,7 +1924,9 @@
     .visitor-count[hidden] { display: none; }
     /* Homepage: beside the wordmark, only where the centred nav leaves room.
        First thing to go (his ruling), so it leaves before the nav does. */
-    .ld-hd .visitor-count { display: none; }
+    /* 24px off the wordmark (his call 2026-09-24: "kurang ketengah", horizontal):
+       at the flex gap's 8px it read as part of the logo. */
+    .ld-hd .visitor-count { display: none; margin-left: var(--sp-16); }
     @media (min-width: 1100px) { .ld-hd .visitor-count:not([hidden]) { display: inline-flex; } }
     /* Editor: between File and the tools; measured out when crowded. */
     /* flex-shrink 1000: when the row gets tight the count gives up its room
@@ -1963,7 +1965,7 @@
         </button>
       </div>
     </div>
-    <span class="visitor-count" data-visitor-count hidden title="Jumlah browser yang membuka PDFLokal dalam 24 jam terakhir"><span class="vc-pulse" aria-hidden="true"></span><span><b class="vc-n"></b>/hari</span></span>
+    <span class="visitor-count" data-visitor-count hidden title="Jumlah browser yang membuka PDFLokal dalam 24 jam terakhir"><span class="vc-pulse" aria-hidden="true"></span><span><b class="vc-n"></b> visitor hari ini</span></span>
     <span class="spacer"></span>
     <button class="icon-btn" id="btn-undo" disabled aria-label="Urungkan" title="Urungkan (Ctrl+Z)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
@@ -2044,7 +2046,7 @@
                obvious thing a stranger will try. Same defect the founder found
                on privasi/dukung, one layer upstream and twelve times over. -->
           <a class="ld-mark" href="/" aria-label="PDFLokal, ke beranda">PDF<em>Lokal</em></a>
-          <span class="visitor-count" data-visitor-count hidden title="Jumlah browser yang membuka PDFLokal dalam 24 jam terakhir"><span class="vc-pulse" aria-hidden="true"></span><span><b class="vc-n"></b>/hari</span></span>
+          <span class="visitor-count" data-visitor-count hidden title="Jumlah browser yang membuka PDFLokal dalam 24 jam terakhir"><span class="vc-pulse" aria-hidden="true"></span><span><b class="vc-n"></b> visitor hari ini</span></span>
           <button class="ld-burger" id="ld-burger" type="button" aria-expanded="false" aria-controls="ld-burger-menu" aria-label="Buka menu navigasi">
             <svg class="ld-burger-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
               <line class="ld-burger-l1" x1="3" y1="6" x2="21" y2="6"/>

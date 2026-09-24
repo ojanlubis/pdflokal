@@ -91,7 +91,7 @@ test('homepage count: shown with a number, hidden when the API has none', async 
   await page.goto('/');
   const c = page.locator('.ld-hd .visitor-count');
   await expect(c).toBeVisible();
-  await expect(c).toHaveText('184/hari');
+  await expect(c).toHaveText('184 visitor hari ini');
   await expect(c.locator('.vc-pulse')).toBeVisible();
   // never collides with the centred nav
   expect(overlap(await c.boundingBox(), await page.locator('.ld-nav').boundingBox())).toBe(false);
