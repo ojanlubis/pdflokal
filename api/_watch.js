@@ -71,33 +71,69 @@ export function floorFromDays(byDay, now) {
 }
 
 // ---- A1-A6 (seat specs/telemetry-alerts.md) --------------------------------
-/**
- * `m` is the measured numbers; returns the alarms that fired, worst first.
- * Each carries a short Indonesian line for the email, numbers only — never a
- * note's text (A4's notes travel separately, to the inbox only).
- */
+// The email is read by Fauzan on his phone. His verdict on the first one
+// (2026-09-25): "the copywriting is bad and hard for me to understand". So:
+// no alarm codes, no "sesi"/"median", no file paths, times in WIB, and every
+// line says what happened in the product's own words (the tool is "Edit").
+// `short` builds the subject, `line` the body.
+const pct = (a, b) => Math.round((100 * a) / b);
+const nf = (n) => new Intl.NumberFormat('id-ID').format(n);
+
+/** `m` is the measured numbers; returns the alarms that fired, worst first. */
 export function evaluateAlarms(m) {
   const fired = [];
   if (m.floor && m.floor.breached) {
-    fired.push({ id: 'floor', line: `Rail sepi: ${m.floor.yesterday} sesi kemarin, batas ${m.floor.floor} (median ${m.floor.baseline}). Situs mungkin sehat, cek apakah instrumennya mati.` });
+    fired.push({ id: 'floor', short: 'data pengunjung anjlok',
+      line: `Kemarin yang kecatat cuma ${nf(m.floor.yesterday)} kunjungan, biasanya sekitar ${nf(m.floor.baseline)}. Bisa jadi situsnya aman dan pencatatnya yang mati, cek GA4 dulu.` });
   }
   if (m.a1 === 0) {
-    fired.push({ id: 'A1', line: 'A1: nol ganti_tap/ganti_commit dalam 48 jam. Rail putus atau Edit nggak kepakai.' });
+    fired.push({ id: 'A1', short: 'Edit nggak kepakai 2 hari',
+      line: 'Dua hari ini nggak ada satu pun yang pakai Edit. Biasanya ribuan kali sehari, jadi kemungkinan pencatatnya mati.' });
   }
   if (m.a6 >= 1) {
-    fired.push({ id: 'A6', line: `A6: ${m.a6} sesi kerja beneran lalu gagal tanpa file (24 jam).` });
+    fired.push({ id: 'A6', short: `${m.a6}x orang gagal dapet file`,
+      line: `${m.a6} kali ada orang yang udah ngedit, ketemu error, lalu pergi tanpa dapet filenya (24 jam terakhir).` });
   }
   if (m.a2 && m.a2.n >= 10 && m.a2.low / m.a2.n > 0.20) {
-    fired.push({ id: 'A2', line: `A2: ${m.a2.low}/${m.a2.n} visual_oracle lebih tipis dari aslinya (7 hari, batas 20%).` });
+    fired.push({ id: 'A2', short: 'hasil Edit sering lebih tipis',
+      line: `${pct(m.a2.low, m.a2.n)}% hasil Edit keliatan lebih tipis dari tulisan aslinya (7 hari terakhir, normalnya di bawah 20%).` });
   }
   if (m.a3 && m.a3.n >= 10 && m.a3.twin / m.a3.n > 0.30) {
-    fired.push({ id: 'A3', line: `A3: ${m.a3.twin}/${m.a3.n} insert jatuh ke font twin (7 hari, batas 30%).` });
+    fired.push({ id: 'A3', short: 'Edit sering salah font',
+      line: `${pct(m.a3.twin, m.a3.n)}% Edit nggak nemu font yang sama dan pakai font pengganti (7 hari terakhir, normalnya di bawah 30%).` });
   }
   if (m.a5 && m.a5.total >= 5 && m.a5.down / m.a5.total > 0.40) {
-    fired.push({ id: 'A5', line: `A5: ${m.a5.down}/${m.a5.total} feedback jempol bawah (7 hari, batas 40%).` });
+    fired.push({ id: 'A5', short: 'banyak jempol bawah',
+      line: `${m.a5.down} dari ${m.a5.total} feedback minggu ini jempol bawah.` });
   }
   if (m.a4 >= 1) {
-    fired.push({ id: 'A4', line: `A4: ${m.a4} catatan feedback baru (24 jam), teksnya di bawah.` });
+    fired.push({ id: 'A4', short: `${m.a4} feedback baru`, line: null });
   }
   return fired;
+}
+
+/** "25 Sep, 14.12 WIB" from the rail's UTC ts. */
+export function wibTime(ts) {
+  const d = new Date(ts);
+  const day = new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', day: 'numeric', month: 'short' }).format(d);
+  const time = new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', hour12: false }).format(d);
+  return `${day}, ${time.replace(':', '.')} WIB`;
+}
+
+/**
+ * The email, pure. `notes` are [ts, rating, note] rows; note text is quoted
+ * exactly as the user wrote it (routine brief §4: never paraphrased).
+ */
+export function composeEmail(m, fired, notes = []) {
+  // A phone shows ~40 characters of subject: the worst two, then a count.
+  const head = fired.slice(0, 2).map((f) => f.short).join(', ');
+  const subject = `pdflokal: ${head}${fired.length > 2 ? `, dan ${fired.length - 2} lainnya` : ''}`;
+  const parts = [];
+  const lines = fired.map((f) => f.line).filter(Boolean);
+  if (lines.length) parts.push(lines.join('\n'));
+  if (notes.length) {
+    parts.push(`Feedback baru:\n${notes.map(([ts, rating, note]) => `${rating === 'down' ? '👎' : '👍'} "${note}"\n${wibTime(ts)}`).join('\n\n')}`);
+  }
+  if (m.visitorsYesterday != null) parts.push(`Kemarin ada ${nf(m.visitorsYesterday)} pengunjung.`);
+  return { subject, body: parts.join('\n\n') };
 }

@@ -128,3 +128,33 @@ test('evaluateAlarms: each rule fires on its own condition, and only then', () =
 test('evaluateAlarms: the rail-dead signals come first', () => {
   assert.deepEqual(ids({ a4: 2, a1: 0, floor: { breached: true, yesterday: 0, floor: 23, baseline: 90 } }), ['floor', 'A1', 'A4']);
 });
+
+// ── the email he reads on his phone (his verdict 2026-09-25: "the copywriting
+// is bad and hard for me to understand") ─────────────────────────────────────
+import { composeEmail, wibTime } from '../../api/_watch.js';
+
+const ALL = {
+  floor: { breached: true, yesterday: 3, baseline: 215 }, visitorsYesterday: 2, a1: 0,
+  a2: { n: 100, low: 30 }, a3: { n: 100, twin: 40 }, a4: 1, a5: { total: 10, down: 6 }, a6: 3,
+};
+
+test('email: no internal codes, jargon, paths or em-dashes reach him', () => {
+  const e = composeEmail(ALL, evaluateAlarms(ALL), [['2026-09-25T07:12:03.000Z', 'up', 'font tidak bisa dikecil kan']]);
+  const text = `${e.subject}\n${e.body}`;
+  assert.doesNotMatch(text, /\bA[1-6]\b/, 'alarm codes only mean something inside our docs');
+  assert.doesNotMatch(text, /\bsesi\b|median|\/api\/|specs\/|UTC/i);
+  assert.doesNotMatch(text, /—/);
+  assert.match(e.body, /"font tidak bisa dikecil kan"\n25 Sep, 14\.12 WIB/, 'the note verbatim, the time in WIB');
+  assert.match(e.body, /Kemarin ada 2 pengunjung\./);
+});
+
+test('email: the subject keeps the worst two and counts the rest', () => {
+  const e = composeEmail(ALL, evaluateAlarms(ALL));
+  assert.equal(e.subject, 'pdflokal: data pengunjung anjlok, Edit nggak kepakai 2 hari, dan 5 lainnya');
+  const one = { ...QUIET, a6: 2, visitorsYesterday: 185 };
+  assert.equal(composeEmail(one, evaluateAlarms(one)).subject, 'pdflokal: 2x orang gagal dapet file');
+});
+
+test('wibTime: UTC in, Jakarta clock out, across midnight', () => {
+  assert.equal(wibTime('2026-09-25T17:30:00.000Z'), '26 Sep, 00.30 WIB');
+});

@@ -19,7 +19,7 @@
  */
 import { cronAuthorized } from '../_cron.js';
 import { tursoQuery, tursoWrite, arg } from '../_turso.js';
-import { BASELINE_DAYS, floorFromDays, evaluateAlarms, jakartaDay, jakartaMidnight } from '../_watch.js';
+import { BASELINE_DAYS, floorFromDays, evaluateAlarms, composeEmail, jakartaDay, jakartaMidnight } from '../_watch.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 // seat specs/telemetry-alerts.md "Synthetic sessions": excluded from every read.
@@ -43,10 +43,12 @@ export async function measure(now = new Date()) {
   const today0 = jakartaMidnight(now);
 
   const days = await one(ev,
-    `select substr(datetime(ts, '+7 hours'), 1, 10) as d, count(distinct session_id)
+    `select substr(datetime(ts, '+7 hours'), 1, 10) as d, count(distinct session_id),
+            count(distinct visitor_id)
      from events where ts >= ? and ts < ? and session_id <> ? group by d`,
     [since29, today0, MARKER]);
   const floor = floorFromDays(new Map(days.map(([d, n]) => [d, Number(n)])), now);
+  const visitorsYesterday = Number(days.find(([d]) => d === floor.day)?.[2] ?? 0);
 
   const [[a1]] = await one(ev,
     `select count(*) from events where event in ('ganti_tap','ganti_commit') and ts > ?`,
@@ -78,6 +80,7 @@ export async function measure(now = new Date()) {
 
   return {
     floor,
+    visitorsYesterday,
     a1: Number(a1),
     a2: { n: Number(a2n), low: Number(a2low) },
     a3: { n: Number(a3n), twin: Number(a3twin) },
@@ -147,8 +150,8 @@ export default async function handler(req, res) {
     const reason = String(err?.message ?? 'unknown').slice(0, 60);
     const sent = await email({
       day,
-      subject: 'pdflokal: 🔴 watch nggak bisa baca rail',
-      body: `Watch harian pdflokal gagal membaca Turso (${reason}).\n\nSitusnya mungkin sehat. Yang mati bisa jadi instrumennya: token/URL Turso di Vercel, atau Turso-nya sendiri.\n\nDicek otomatis oleh /api/cron/watch.`,
+      subject: 'pdflokal: data pengunjung nggak kebaca',
+      body: `Pengecekan harian nggak bisa baca database pengunjung. Situsnya mungkin aman, tapi sampai ini beres, nggak ada yang ngawasin pdflokal.\n\nKode error: ${reason}`,
     });
     const rec = await record('fail', { day, error: reason, email: sent }, 'rail unreadable');
     res.status(500).json({ status: 'fail', error: reason, email: sent, record: rec });
@@ -159,16 +162,7 @@ export default async function handler(req, res) {
   const { notes, ...numbers } = m;
   const findings = { day, ...numbers, fired: fired.map((f) => f.id) };
   let sent = 'not-needed';
-  if (fired.length) {
-    const noteText = notes.length
-      ? `\n\nCatatan feedback (24 jam), apa adanya:\n${notes.map(([ts, rating, note]) => `- ${ts.slice(0, 16).replace('T', ' ')} UTC ${rating === 'down' ? '👎' : '👍'} ${note}`).join('\n')}`
-      : '';
-    sent = await email({
-      day,
-      subject: `pdflokal: ${fired.length === 1 ? fired[0].line.split(':')[0] : `${fired.length} alarm`} (${day})`,
-      body: `${fired.map((f) => f.line).join('\n')}${noteText}\n\nKemarin: ${m.floor.yesterday} sesi (median ${m.floor.baseline}).\nDicek otomatis oleh /api/cron/watch. Batasnya di specs/telemetry-alerts.md.`,
-    });
-  }
+  if (fired.length) sent = await email({ day, ...composeEmail(m, fired, notes) });
   findings.email = sent;
   const status = fired.some((f) => f.id === 'floor' || f.id === 'A1') ? 'fail' : fired.length ? 'warn' : 'ok';
   const rec = await record(status, findings, fired.length ? fired.map((f) => f.id).join(',') : 'quiet');
