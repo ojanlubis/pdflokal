@@ -23,19 +23,18 @@ to pdflokal.id.
 - **Vanilla JS, native ES modules, no build step, no bundler, no framework** — that constraint is the
   moat. **The CLIENT has no npm runtime deps and never will**; that is the half that is load-bearing,
   because it is what makes the product a folder of files a browser runs.
-  **`api/` is not the client, and since 2026-08-23 it has exactly one dependency:**
-  `@neondatabase/serverless`, the rail's Postgres driver (seat `../specs/spec-rail-to-neon.md`). It
-  was taken deliberately, over Neon's undocumented raw HTTP endpoint, because the write path that
-  must never fail silently is the wrong place to own an unspecified protocol. **The bar for the
-  second one is the same: name what breaks without it.** `npm audit --omit=dev` is the check that
-  this stays honest.
-- **All vendor libs self-hosted in `js/vendor/`, zero CDN.** pdf-lib, PDF.js, Signature Pad,
-  pdf-encrypt-lite, Canvas API. See `docs/security.md` for CSP, headers, load order.
+  **`api/` is not the client, and since 2026-08-23 it has exactly one npm dependency:**
+  `@neondatabase/serverless`, the rail's Postgres driver (seat `../specs/spec-rail-to-neon.md`). It was taken deliberately, over Neon's
+  undocumented raw HTTP endpoint, because the write path that must never fail silently is the wrong
+  place to own an unspecified protocol. **The bar for the second one is the same: name what breaks
+  without it.** `npm audit --omit=dev` is the check that this stays honest. The rail itself is now a
+  Neon + Turso dual-write (`api/t.js`, `api/_turso.js`) — Turso is plain `fetch`, no added dependency.
+- **All vendor libs that touch the user's document are self-hosted in `js/vendor/`, zero CDN** — the
+  named exception is third-party analytics, loaded from their own CDNs per the CSP in `vercel.json`.
+  See `docs/security.md` for CSP, headers, load order.
 - **No server-dependent features, permanently** — no PDF↔Word, no server OCR. In-browser OCR is
-  sanctioned. The only server code in the repo is `api/`: `t.js` (telemetry sink), `feedback.js`
-  (thumbs + consent-gated sample), `rev.js` (deploy SHA for build attribution, no input at all),
-  and `sentry-tunnel.js` (proxies Sentry envelopes past ad blockers — the one endpoint that
-  forwards data to a third party, DSN-allowlisted).
+  sanctioned. The only server code in the repo is `api/` — see `api/`, each file's header says what
+  it is. `sentry-tunnel.js` is the one endpoint that forwards data to a third party (DSN-allowlisted).
 - **All UI text in Indonesian**, informal "kamu". English tech terms (tap, scroll, install) are fine
   inside step-by-step instructions. **No em-dashes in user-visible text** — use `, `.
 - Never add an external API call carrying user data. Privacy is the product.
@@ -44,10 +43,9 @@ to pdflokal.id.
 ## The tree
 
 - **`index.html` is Editor v2 — the live product.** The landing page IS the editor's empty state.
-  Headless core `js/core/` (model, operations, history, import, export, compress, export-images,
-  `text-walk.js`, `stamp.js`) · render layer `js/render/` (page-view, viewport, interaction; pages are
-  `<img>`, one overlay, one pointer path) · app shell `js/v2/` (app, download-sheet, page-manager,
-  signature-modal, format-bar, celebrate). CSS is self-contained inside `index.html`.
+  Headless core `js/core/` (model, operations, import/export) · render layer `js/render/` (pages are
+  `<img>`, one overlay, one pointer path) · app shell `js/v2/` (app chrome and UI flows). CSS is
+  self-contained inside `index.html`.
 - **12 SEO pages** are generated: `seo/pages.json` + `scripts/gen-seo-pages.js`, run via `npm run seo`.
   **Never hand-edit generated output.** Copy changes go through Fauzan.
 - **`alat-gambar.html` is the OLD wing** (noindexed) — `js/editor/`, `js/pdf-tools/`, `style.css`, the
@@ -161,9 +159,10 @@ no server-dependent features · never hand-edit generated SEO pages.
 
 ## Git
 
-- **There are no branches** (founder instruction 2026-07-27): local `main` and remote `main`, nothing
-  else. Preserved-but-unmerged work lives on **tags** (`archive/i18n-groundwork`,
-  `archive/edit-ladder-preheal`).
+- **Branches open on his word, gated by CI.** `e2e.yml` runs the full gate but only on a push to
+  `main` or a PR — a bare branch push doesn't trigger it — so work that needs the CI gate before
+  landing goes through a branch and a PR, and the branch is deleted after merge. Preserved-but-
+  unmerged work lives on **tags** — see `git tag -l 'archive/*'`.
 - **Never `git add -A`** — stage explicit paths. Other sessions have uncommitted work in this tree.
   **Never sweep another session's work, in either direction.**
 - **Always `git -C <absolute path>`.** Bash cwd is session-dependent.
@@ -172,7 +171,7 @@ no server-dependent features · never hand-edit generated SEO pages.
 - If you ever audit a branch: squash-merging makes `git branch --merged` report it unmerged forever —
   use a three-dot diff (`git diff origin/main...$b`), never commit counts.
 
-**Rhythm:** failing test → green → `npm run gate` → local commit on `main` → update `../STATE.md` +
+**Rhythm:** failing test → green → `npm run gate` → local commit on `main` (or a branch + PR when the CI gate is needed, above) → update `../STATE.md` +
 `../TODO.md` → **push if the change is on the 9a list, otherwise hand it to Fauzan.** Document after
 approval: `README.md` → `CLAUDE.md` → the seat.
 
@@ -187,7 +186,7 @@ gated on a worktree branch while `main` sat behind it would have shipped nothing
   `../specs/` (build specs). The interface between the two seats is the disk, not a channel.
 - **`decisions.md` here** — code-level WHY that has no other home. Founder rulings go to the seat's.
 - **The bench memory bank:
-  `~/.claude/projects/-Users-ojanlubis-machine-fkd-pdflokal-app/memory/`** — 50 topic files
+  `~/.claude/projects/-Users-ojanlubis-machine-fkd-pdflokal-app/memory/`** — topic files
   (`pdfjs-worker.md`, `pdf-lib-bitstability.md`, `when-the-instrument-is-the-bug.md`,
   `mobile-rendering.md`, `ga4-shared-tag-carrier.md`…). It is **not in this repo and you will not find
   it by searching.** Read `MEMORY.md` there before any deep work in `js/core/`, any guard, any test,

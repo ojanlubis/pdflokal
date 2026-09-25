@@ -109,20 +109,8 @@ arrive tagged `source: 'worker'` (`tests/csp-live-policy.spec.js`). **Every work
 — Tesseract, pdf.js, the service worker — is invisible to the page console. Any "no errors" claim
 about worker code needs the CDP instrument, not that one.**
 
-```
-default-src 'self';
-script-src 'self' 'wasm-unsafe-eval' 'unsafe-inline' https://www.googletagmanager.com https://googleads.g.doubleclick.net https://cdn.mxpnl.com blob:;
-worker-src 'self' blob:;
-manifest-src 'self';
-style-src 'self' 'unsafe-inline';
-img-src 'self' data: blob: https://www.google.com https://www.google.co.id https://www.googleadservices.com https://googleads.g.doubleclick.net;
-font-src 'self';
-connect-src 'self' data: https://www.google-analytics.com https://analytics.google.com https://www.googletagmanager.com https://www.google.com https://api-js.mixpanel.com https://api.mixpanel.com;
-frame-ancestors 'none';
-base-uri 'self';
-form-action 'self';
-object-src 'none';
-```
+See `vercel.json` for the live policy text — that is the source of truth, and this document is not
+a second copy of it.
 
 **Why 'unsafe-inline' and 'unsafe-eval':**
 - `'unsafe-inline'` for scripts: Required for theme flash prevention, JSON-LD schema, Vercel analytics init, pdfjsLib config
