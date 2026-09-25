@@ -4,6 +4,9 @@
   "functions": {
     "api/cron/*.js": { "maxDuration": 60 }
   },
+  "crons": [
+    { "path": "/api/cron/watch", "schedule": "0 3 * * *" }
+  ],
   "headers": [
     {
       "source": "/(.*)",
