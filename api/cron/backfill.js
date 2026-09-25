@@ -194,5 +194,12 @@ export default async function handler(req, res) {
   out.turso_n = before.rows.length;
   out.turso_fp = fingerprint(tursoLines);
   out.match = out.neon_n === out.turso_n && out.neon_fp === out.turso_fp;
+  // Diagnosis for a mismatch: the first differing line from each side. Events
+  // only — its props are content-blind by the rail's own law; feedback notes
+  // must never be echoed here.
+  if (!out.match && table === 'events') {
+    const i = neonLines.findIndex((l, k) => l !== tursoLines[k]);
+    if (i !== -1) out.first_diff = { index: i, neon: neonLines[i], turso: tursoLines[i] ?? null };
+  }
   res.status(200).json(out);
 }
