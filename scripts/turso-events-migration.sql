@@ -138,3 +138,16 @@ group by day;
 -- NOT scheduled here, and it never was on Supabase or Neon either. Run
 -- periodically. ⚠️ `now() - interval '180 days'` has no SQLite form:
 --   delete from events where ts < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-180 days');
+
+-- routine_runs — the cloud routine's record (and, since 2026-09-25, the daily
+-- Vercel watch's: routine = 'vercel-watch'). Moved from Neon with its 11 rows,
+-- ids kept. Additive. Applied 2026-09-25 by the one-off api/cron/backfill.js.
+create table if not exists routine_runs (
+  id integer primary key autoincrement,
+  ts text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  routine text not null,
+  status text not null,
+  window_hours real,
+  findings text not null default '{}' check (json_valid(findings)),
+  note text
+);
