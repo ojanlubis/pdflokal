@@ -119,6 +119,58 @@ export function placeholders(rowCount, colCount) {
   return Array.from({ length: rowCount }, () => `(${Array(colCount).fill('?').join(',')})`).join(',');
 }
 
+// A libSQL HTTP cell back to a JS value. Integers arrive as STRINGS (they may
+// exceed 2^53); callers that need a number convert explicitly.
+function cellValue(cell) {
+  if (!cell || cell.type === 'null') return null;
+  if (cell.type === 'float') return Number(cell.value);
+  return cell.value ?? null;
+}
+
+/**
+ * Run ONE read and return every row as an array of values, in column order.
+ * Returns { ok, rows, cols, reason } and never throws. Same two gates as
+ * tursoScalar. Used by the cron jobs (api/cron/), which read many rows — an
+ * empty result is `rows: []` and ok, because "no rows" is an answer here.
+ */
+export async function tursoQuery({ url, token, sql, args = [], timeoutMs = 20000 }) {
+  const endpoint = toHttpUrl(url);
+  if (!endpoint || !token) return { ok: false, rows: [], cols: [], reason: 'unconfigured' };
+
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${endpoint}/v2/pipeline`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requests: [{ type: 'execute', stmt: { sql, args } }, { type: 'close' }],
+      }),
+      signal: ctl.signal,
+    });
+    if (!res.ok) return { ok: false, rows: [], cols: [], reason: `http_${res.status}` };
+
+    const body = await res.json();
+    const results = Array.isArray(body?.results) ? body.results : [];
+    const bad = results.find((r) => r?.type === 'error');
+    if (bad) return { ok: false, rows: [], cols: [], reason: `sql_${bad?.error?.code ?? 'unknown'}` };
+
+    const exec = results.find((r) => r?.response?.type === 'execute');
+    if (!exec) return { ok: false, rows: [], cols: [], reason: 'no_results' };
+    const result = exec.response.result;
+    return {
+      ok: true,
+      cols: (result.cols ?? []).map((c) => c.name),
+      rows: (result.rows ?? []).map((row) => row.map(cellValue)),
+      reason: null,
+    };
+  } catch (err) {
+    return { ok: false, rows: [], cols: [], reason: err?.name === 'AbortError' ? 'timeout' : 'network' };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * Run ONE read and return the first column of the first row.
  * Returns { ok, value, reason } and never throws. Same first two gates as

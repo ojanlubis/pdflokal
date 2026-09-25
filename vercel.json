@@ -1,6 +1,9 @@
 {
   "cleanUrls": true,
   "trailingSlash": false,
+  "functions": {
+    "api/cron/*.js": { "maxDuration": 60 }
+  },
   "headers": [
     {
       "source": "/(.*)",
