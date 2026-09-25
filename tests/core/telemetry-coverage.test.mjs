@@ -59,9 +59,17 @@ function names(fn) {
 const GA4_ONLY = [
   'client_error', 'download', 'editor_action', 'file_failed', 'file_loaded',
   'gabungkan_used', 'ganti_no_text_layer', 'intent_armed', 'pwa_card_open',
-  'pwa_install', 'pwa_installed', 'template_card', 'tester_optin', 'tool_opened',
-  'vote_playstore',
+  'pwa_install', 'pwa_installed', 'share_card_shown', 'share_sent', 'share_tap',
+  'template_card', 'tester_optin', 'tool_opened', 'vote_playstore',
 ];
+
+/* `share_card_shown` / `share_tap` / `share_sent` added 2026-09-25 (founder ask:
+ * is growth word of mouth or the share card, and do people who were told pass
+ * it on?). They belong HERE because the question needs them JOINED to the
+ * visitor's traffic source — "did someone who arrived via utm_source=share tap
+ * share themselves" — and only GA4 carries source. The first-party rail stores
+ * no referrer or UTM by design. Ad-blocking drops the shown/tap/sent funnel and
+ * the arrivals by the same factor, so the ratios survive it. */
 
 /* `template_card` added 2026-09-03, and the test's own question answered rather
  * than waved past: it belongs on THIS rail, not the first-party one, because the

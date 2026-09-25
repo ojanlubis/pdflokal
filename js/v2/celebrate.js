@@ -14,6 +14,7 @@
  */
 
 import { createPlaystoreVote } from './playstore-vote.js';
+import { track } from '../lib/analytics.js';
 
 // TEMPORARY (founder call 2026-07-19): during the Play Store demand-validation
 // drive, the download moment shows the binary VOTE card instead of share/tip —
@@ -26,7 +27,12 @@ const PLAYSTORE_CAMPAIGN = false;
 
 const OPTOUT_KEY = 'pdflokal-support-optout';
 const LAST_SHOWN_KEY = 'pdflokal-support-last';
-const SHARE_URL = 'https://www.pdflokal.id';
+// TAGGED (founder ask 2026-09-25: is growth word of mouth, or this card?).
+// WhatsApp strips the referrer, so an untagged link from a friend landed in
+// GA4's Direct beside people who typed the address — the card's reach was
+// invisible. utm_medium=referral puts these arrivals in GA4's Referral
+// channel as source "share", instead of Unassigned.
+const SHARE_URL = 'https://www.pdflokal.id/?utm_source=share&utm_medium=referral';
 // Written the way a friend would actually send it, not like a brochure.
 const SHARE_TEXT = 'Eh coba deh pdflokal.id, bisa edit + tanda tangan PDF langsung di HP. Gratis, dan filenya nggak diupload ke mana-mana.';
 
@@ -158,7 +164,13 @@ export function createCelebration(deps) {
     deps.toast('Oke, nggak bakal muncul lagi');
   });
 
+  // share_card_shown → share_tap → share_sent is the funnel that says whether
+  // the card gets used at all; GA4's source "share" says who it brings in.
+  // share_sent means the share sheet or clipboard SUCCEEDED, not that a friend
+  // received it — the OS never tells us that.
   card.querySelector('#sc-share').addEventListener('click', async () => {
+    const method = navigator.share ? 'native' : 'copy';
+    track('share_tap', { method });
     try {
       if (navigator.share) {
         await navigator.share({ title: 'PDFLokal', text: SHARE_TEXT, url: SHARE_URL });
@@ -168,6 +180,7 @@ export function createCelebration(deps) {
         deps.toast('Udah disalin, tinggal kirim ke temanmu');
         hide();
       }
+      track('share_sent', { method });
     } catch { /* user cancelled the share sheet; keep the card, no nagging */ }
   });
 
@@ -197,6 +210,7 @@ export function createCelebration(deps) {
       setTimeout(() => {
         card.classList.remove('qr-open');
         card.classList.add('show');
+        track('share_card_shown');
       }, 200); // right on the heels of the burst (founder: 1.1s was too slow)
     },
   };
