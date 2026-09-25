@@ -58,13 +58,15 @@ export function fingerprint(lines) {
   return h.digest('hex');
 }
 
+// ⚠ Every Neon query below selects `id::text as id`, and a bare ORDER BY id
+// would then sort the TEXT alias ('10' before '4'). Order by the table column.
 const TS = `to_char(ts at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`;
 
 const TABLES = {
   events: {
     neonSql: `select id::text as id, ${TS} as ts, session_id::text as session_id, app_version,
                      event, props, visitor_id::text as visitor_id
-              from events where ts >= $1 and ts < $2 order by id`,
+              from events where ts >= $1 and ts < $2 order by events.id`,
     tursoSql: `select id, ts, session_id, app_version, event, props, visitor_id
                from events where ts >= ? and ts < ? and id < ${ID_CEILING.events} order by id`,
     insertCols: ['id', 'ts', 'session_id', 'app_version', 'event', 'props', 'visitor_id'],
@@ -76,7 +78,7 @@ const TABLES = {
   feedback: {
     neonSql: `select id::text as id, ${TS} as ts, session_id::text as session_id, app_version, rating,
                      note, sample_before, sample_after, screenshot
-              from feedback where ts >= $1 and ts < $2 order by id`,
+              from feedback where ts >= $1 and ts < $2 order by feedback.id`,
     tursoSql: `select id, ts, session_id, app_version, rating, note, sample_before, sample_after, screenshot
                from feedback where ts >= ? and ts < ? and id < ${ID_CEILING.feedback} order by id`,
     insertCols: ['id', 'ts', 'session_id', 'app_version', 'rating', 'note', 'sample_before', 'sample_after', 'screenshot'],
@@ -89,7 +91,7 @@ const TABLES = {
   routine_runs: {
     neonSql: `select id::text as id, ${TS} as ts, routine, status, window_hours::float8 as window_hours,
                      findings, note
-              from routine_runs where ts >= $1 and ts < $2 order by id`,
+              from routine_runs where ts >= $1 and ts < $2 order by routine_runs.id`,
     tursoSql: `select id, ts, routine, status, window_hours, findings, note
                from routine_runs where ts >= ? and ts < ? order by id`,
     insertCols: ['id', 'ts', 'routine', 'status', 'window_hours', 'findings', 'note'],
