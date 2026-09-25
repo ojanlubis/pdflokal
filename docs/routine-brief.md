@@ -272,8 +272,8 @@ a confident green to answer it carefully.
 
 **Your own `npm run gate` is not sufficient on its own.** It is run by the session that wants the
 merge, in the environment that session controls. The repo also has GitHub Actions — `e2e.yml`
-(Playwright), `lint.yml`, `traffic-floor.yml` — which are a **different machine running a different
-checkout**, and that independence is the whole value. Both must agree.
+(Playwright) and `lint.yml`, which are a **different machine running a different checkout**, and
+that independence is the whole value. Both must agree.
 
 1. Open the PR. Wait for `gh pr checks <pr>` to stop being pending.
 2. **Any check `fail` or `cancelled` → do not merge.** Leave the PR open, report it, and say which
@@ -389,17 +389,10 @@ size limit here before and had to be re-read from a dump file.
 ⛔ **Do not try to fix it.** The fix is almost always **a repository secret**, which is a credential
 and therefore his hand — never the routine's, never the seat's. **Report it and stop.**
 
-**Known pending as of 2026-08-31, so you can report these as continuing rather than new** — say how
-long each has been outstanding, because the point is the accumulating debt, not the novelty:
-
-| workflow | secret it needs | pending since |
-|---|---|---|
-| `traffic-floor` | `GA4_SA_JSON` | **2026-07-13** |
-
-`rail-floor` (the rail's own volume alarm) **no longer exists as a workflow**: it never ran once for
-want of `RAIL_READONLY_URL`, and on 2026-09-25 it moved into the daily Vercel watch (§6.1), which
-reads Turso with credentials Vercel already holds. **GA4 and the rail still die independently**, so
-`traffic-floor` staying unarmed means GA4 has no alarm at all. Keep saying so.
+**Nothing is known-pending as of 2026-09-25.** `rail-floor` moved into the daily Vercel watch (§6.1),
+and `traffic-floor` (the GA4 volume alarm, never armed for want of `GA4_SA_JSON`) was **deleted by his
+ruling** that day: *"no dont need"*. GA4 has no alarm now, on purpose. Do not report that as a gap,
+and do not rebuild it. Any NEW scheduled workflow that has never succeeded is still a **warn**.
 
 ### 6.5 A RED gate here is not the same claim as a red gate on his machine
 
