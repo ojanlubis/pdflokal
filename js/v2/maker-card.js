@@ -18,7 +18,7 @@
  *      Also on the SEO pages, which copy the landing: that is where most first
  *      visits arrive from Google. "Seen" is per origin, so it shows once.
  *
- *   2. THE COUNT — distinct browsers in the last 24 hours (api/visitors.js),
+ *   2. THE COUNT — distinct browsers since midnight WIB (api/visitors.js),
  *      in the homepage header beside the wordmark and in the editor header
  *      between File and the tools. His ruling: it is the FIRST thing to go
  *      when the header gets tight.

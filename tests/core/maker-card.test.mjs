@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 
 import { UPDATES, shownUpdates } from '../../js/updates.js';
 import { shouldShowCard, shortDate, formatCount } from '../../js/v2/maker-card.js';
-import { countVisitors, MIN_SHOWN } from '../../api/visitors.js';
+import { countVisitors, startOfDayWIB, MIN_SHOWN } from '../../api/visitors.js';
 
 const u = (id, date, approved = true) => ({ id, date, text: `t ${id}`, approved });
 
@@ -68,7 +68,16 @@ test('countVisitors: a real count comes back as a number', async () => {
   let sent;
   const n = await withFetch(async (url, init) => { sent = JSON.parse(init.body); return turso(row(184))(); }, () => countVisitors(cfg));
   assert.equal(n, 184);
-  assert.equal(sent.requests[0].stmt.args[0].value, '2026-09-22T10:00:00.000Z', 'window is the last 24 hours');
+  assert.equal(sent.requests[0].stmt.args[0].value, '2026-09-22T17:00:00.000Z', 'window starts at midnight WIB today');
+});
+
+test('startOfDayWIB: the Jakarta calendar day, not the UTC one', () => {
+  // 17:00Z is 00:00 WIB — the boundary itself belongs to the new day.
+  assert.equal(startOfDayWIB(Date.parse('2026-09-24T17:00:00Z')), '2026-09-24T17:00:00.000Z');
+  // 16:59Z is 23:59 WIB, still yesterday in Jakarta.
+  assert.equal(startOfDayWIB(Date.parse('2026-09-24T16:59:59Z')), '2026-09-23T17:00:00.000Z');
+  // 00:30Z is 07:30 WIB — same Jakarta day as the 17:00Z boundary before it.
+  assert.equal(startOfDayWIB(Date.parse('2026-09-25T00:30:00Z')), '2026-09-24T17:00:00.000Z');
 });
 
 test('countVisitors: anything it cannot vouch for is null, never a number', async () => {
