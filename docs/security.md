@@ -47,13 +47,10 @@ July 2026 before anyone noticed. Verify the rail by querying for rows, never by 
 
 ## Content Security Policy (CSP)
 
-⚠️ **This block is a COPY of the live policy in `vercel.json`, and it has drifted before.** Until
-2026-07-30 it showed `'unsafe-eval'`, which the live policy has never had. A security document that
-overstates what is permitted is the dangerous direction: it tells you a capability works when the
-browser will refuse it. `tests/core/csp-doc-parity.test.mjs` fails if this copy and `vercel.json`
-disagree, so that drift cannot come back silently.
-
-**`vercel.json` is the source of truth. This is documentation of it.**
+**`vercel.json` holds the policy, and this document does not copy it.** A copy lived here until
+2026-09-25 and drifted in the dangerous direction: it showed `'unsafe-eval'`, which the live policy
+never had, telling readers a capability worked that the browser refuses. What must stay true of the
+policy is pinned by `tests/core/csp-policy.test.mjs`.
 
 **2026-07-30 — two directives added for OCR** (ruled by Fauzan, security assessment by the PM,
 recorded in the seat's `decisions.md`):
@@ -112,9 +109,10 @@ about worker code needs the CDP instrument, not that one.**
 See `vercel.json` for the live policy text — that is the source of truth, and this document is not
 a second copy of it.
 
-**Why 'unsafe-inline' and 'unsafe-eval':**
+**Why 'unsafe-inline' and 'wasm-unsafe-eval':**
 - `'unsafe-inline'` for scripts: Required for theme flash prevention, JSON-LD schema, Vercel analytics init, pdfjsLib config
-- `'unsafe-eval'`: Required by PDF.js and fontkit libraries for dynamic code execution
+- `'wasm-unsafe-eval'`: lets OCR (tesseract.js) compile WebAssembly, and nothing else. Full `'unsafe-eval'`
+  is NOT granted and must not be: it would re-open `eval()` product-wide (`tests/core/csp-policy.test.mjs`)
 - `'unsafe-inline'` for styles: Inline styles in HTML and dynamic style manipulation
 - Nonces would require server-side rendering or build step (against project philosophy)
 
@@ -124,8 +122,8 @@ a second copy of it.
 1. Test on Vercel preview first
 2. Check browser console for CSP violations — **and if the feature uses a worker, check CDP's Log
    domain too, because the page console cannot see worker violations** (see the 2026-08-23 note above)
-3. Update CSP in vercel.json if needed. `tests/core/csp-doc-parity.test.mjs` fails if this document
-   and `vercel.json` disagree, so the two cannot drift silently.
+3. Update CSP in vercel.json if needed. `tests/core/csp-policy.test.mjs` pins what must stay true of
+   it (no full `'unsafe-eval'`, `worker-src` keeps `'self'` for offline).
 
 ## Security Files
 
