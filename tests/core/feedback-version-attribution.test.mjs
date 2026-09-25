@@ -37,7 +37,6 @@ function mkReq(bodyObj) {
 // driver's wire format.
 async function stored(clientVersion, serverSha) {
   const saved = { ...process.env };
-  process.env.DATABASE_URL = 'postgresql://user:pw@example.test/neondb';
   if (serverSha === undefined) delete process.env.VERCEL_GIT_COMMIT_SHA;
   else process.env.VERCEL_GIT_COMMIT_SHA = serverSha;
   let params = null;
@@ -47,7 +46,7 @@ async function stored(clientVersion, serverSha) {
     await feedbackHandler(mkReq({ session_id: SESSION, app_version: clientVersion, rating: 'down' }), res);
   } finally {
     __setQueryForTests(null);
-    for (const k of ['DATABASE_URL', 'VERCEL_GIT_COMMIT_SHA']) {
+    for (const k of ['VERCEL_GIT_COMMIT_SHA']) {
       if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k];
     }
   }

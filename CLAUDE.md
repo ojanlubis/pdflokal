@@ -23,12 +23,10 @@ to pdflokal.id.
 - **Vanilla JS, native ES modules, no build step, no bundler, no framework** — that constraint is the
   moat. **The CLIENT has no npm runtime deps and never will**; that is the half that is load-bearing,
   because it is what makes the product a folder of files a browser runs.
-  **`api/` is not the client, and since 2026-08-23 it has exactly one npm dependency:**
-  `@neondatabase/serverless`, the rail's Postgres driver (seat `../specs/spec-rail-to-neon.md`). It was taken deliberately, over Neon's
-  undocumented raw HTTP endpoint, because the write path that must never fail silently is the wrong
-  place to own an unspecified protocol. **The bar for the second one is the same: name what breaks
-  without it.** `npm audit --omit=dev` is the check that this stays honest. The rail itself is now a
-  Neon + Turso dual-write (`api/t.js`, `api/_turso.js`) — Turso is plain `fetch`, no added dependency.
+  **`api/` has zero npm dependencies again since 2026-09-25**, when the rail left Neon for Turso
+  (`api/_turso.js`, plain `fetch` over Turso's documented SQL-over-HTTP). Neon's driver had been the
+  one exception, taken because Neon documented only the package, not the wire. **The bar for any
+  dependency: name what breaks without it.** `npm audit --omit=dev` is the check that this stays honest.
 - **All vendor libs that touch the user's document are self-hosted in `js/vendor/`, zero CDN** — the
   named exception is third-party analytics, loaded from their own CDNs per the CSP in `vercel.json`.
   See `docs/security.md` for CSP, headers, load order.

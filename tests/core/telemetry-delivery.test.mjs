@@ -29,7 +29,7 @@ import assert from 'node:assert/strict';
 
 import handler, { __setQueryForTests } from '../../api/t.js';
 
-const ENV = { DATABASE_URL: 'postgresql://user:pw@example.test/neondb' };
+const ENV = {};
 
 // THE SEAM, AND WHY IT IS NOT A STUBBED `fetch` (2026-08-23, the Neon move).
 // The old version of these tests replaced globalThis.fetch and read the
@@ -232,22 +232,45 @@ test('TIMESTAMPS: a missing or absurd dt degrades to now — never a garbage row
 // OR "emitted and rejected", indistinguishably. Every liveness result and alarm
 // threshold rests on arrival == emission. These tests are what make that hold.
 // ---------------------------------------------------------------------------
-test('a REJECTED statement is reported (a bad password or a column mismatch must not vanish)', async () => {
-  // Under PostgREST this was the dangerous case: an error RESPONSE resolved
-  // like a success. The driver throws instead, so the trap is gone by
-  // construction — but the REPORT is what sizes the damage, and that is still
-  // ours to get right. SQLSTATE 28P01 = invalid_password, the modern spelling
-  // of the 401 this test used to assert.
-  const err = Object.assign(new Error('password authentication failed'), { name: 'NeonDbError', code: '28P01' });
-  const { res, calls, logged } = await run(VALID, { queryImpl: () => { throw err; } });
-  assert.equal(calls.length, 1, 'the insert was attempted');
+// The REAL write path, with only the network stubbed: Turso refuses a
+// statement with HTTP 200 and an error inside the body (measured 2026-09-16;
+// api/_turso.js header). That is the blackout shape, so it is driven here
+// end to end rather than through the SQL seam.
+async function runRefused(payload, envPrefix) {
+  const realErr = console.error;
+  const realFetch = globalThis.fetch;
+  const logged = [];
+  const saved = {};
+  for (const k of [`${envPrefix}_URL`, `${envPrefix}_TOKEN`]) saved[k] = process.env[k];
+  process.env[`${envPrefix}_URL`] = 'libsql://db-x.aws-ap-south-1.turso.io';
+  process.env[`${envPrefix}_TOKEN`] = 'test-token';
+  __setQueryForTests(null);
+  globalThis.fetch = async () => ({
+    ok: true, status: 200,
+    json: async () => ({ results: [
+      { type: 'error', error: { message: 'SQLite error: CHECK constraint failed: value Budi Santoso Wijaya', code: 'SQLITE_CONSTRAINT' } },
+      { type: 'ok', response: { type: 'close' } }] }),
+  });
+  console.error = (...a) => { logged.push(a.join(' ')); };
+  const res = mkRes();
+  try {
+    await handler(mkReq(payload), res);
+  } finally {
+    console.error = realErr;
+    globalThis.fetch = realFetch;
+    for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+  }
+  return { res, logged };
+}
+
+test('a REJECTED statement is reported (a refused row must not vanish)', async () => {
+  const { res, logged } = await runRefused(VALID, 'TURSO_EVENTS');
   const line = logged.find((l) => l.includes('[telemetry]'));
-  assert.ok(line, 'a rejected insert produced NO observable signal — this is the blackout shape');
+  assert.ok(line, 'a statement Turso REFUSED inside an HTTP 200 produced no signal: the blackout shape');
   assert.match(line, /FAILED/);
-  assert.match(line, /error=NeonDbError/);
-  assert.match(line, /code=28P01/, 'the SQLSTATE is the only thing that says WHICH failure this was');
+  assert.match(line, /error=sql_SQLITE_CONSTRAINT/, 'the code is the only thing that says WHICH failure this was');
   assert.match(line, /rows_dropped=1/, 'the log must say HOW MUCH was lost, or it cannot size the damage');
-  // The client contract is untouched: telemetry never breaks the editor.
+  assert.equal(line.includes('Budi'), false, 'the database message quotes the value; it must never reach the log');
   assert.equal(res.code, 204);
 });
 
@@ -291,19 +314,25 @@ test('a driver that answers with no rowCount at all is reported, not assumed hea
   assert.match(line, /written=unknown/);
 });
 
-test('DARK RAIL: no DATABASE_URL means no insert and still a 204 — never a 500', async () => {
-  // The deploy-order hazard, pinned. This branch is correct and must stay, but
-  // it is why the env var has to exist BEFORE the code that reads it ships:
-  // every event is dropped here and nothing anywhere goes red.
-  const saved = process.env.DATABASE_URL;
-  delete process.env.DATABASE_URL;
+test('DARK RAIL: no Turso config means no insert and still a 204 — never a 500', async () => {
+  // The deploy-order hazard, pinned: without its env vars the rail drops every
+  // event and nothing here goes red (the daily watch is what notices). It must
+  // not even TRY to reach the network, and must still answer 204.
+  const saved = { url: process.env.TURSO_EVENTS_URL, token: process.env.TURSO_EVENTS_TOKEN };
+  delete process.env.TURSO_EVENTS_URL; delete process.env.TURSO_EVENTS_TOKEN;
   __setQueryForTests(null);
+  const realFetch = globalThis.fetch;
+  let fetched = 0;
+  globalThis.fetch = async () => { fetched += 1; return { ok: true, status: 200, json: async () => ({}) }; };
   const res = mkRes();
   try {
     await handler(mkReq(VALID), res);
   } finally {
-    if (saved === undefined) delete process.env.DATABASE_URL; else process.env.DATABASE_URL = saved;
+    globalThis.fetch = realFetch;
+    if (saved.url !== undefined) process.env.TURSO_EVENTS_URL = saved.url;
+    if (saved.token !== undefined) process.env.TURSO_EVENTS_TOKEN = saved.token;
   }
+  assert.equal(fetched, 0, 'a dark rail must not attempt a write');
   assert.equal(res.code, 204);
 });
 

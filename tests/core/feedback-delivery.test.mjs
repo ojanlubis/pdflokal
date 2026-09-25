@@ -26,7 +26,7 @@ import assert from 'node:assert/strict';
 
 import handler, { __setQueryForTests } from '../../api/feedback.js';
 
-const ENV = { DATABASE_URL: 'postgresql://user:pw@example.test/neondb' };
+const ENV = {};
 const SESSION = '3f1c9a52-0b6e-4a7d-9c11-2f7e5d8a4b30';
 
 function mkReq(bodyObj, { method = 'POST' } = {}) {
@@ -102,14 +102,44 @@ test('DELIVERY: a valid 👎 reaches the insert, parameterized, with its note in
   assert.equal(res.code, 204);
 });
 
+// The REAL write path, with only the network stubbed: Turso refuses a
+// statement with HTTP 200 and an error inside the body (measured 2026-09-16;
+// api/_turso.js header). That is the blackout shape, so it is driven here
+// end to end rather than through the SQL seam.
+async function runRefused(payload, envPrefix) {
+  const realErr = console.error;
+  const realFetch = globalThis.fetch;
+  const logged = [];
+  const saved = {};
+  for (const k of [`${envPrefix}_URL`, `${envPrefix}_TOKEN`]) saved[k] = process.env[k];
+  process.env[`${envPrefix}_URL`] = 'libsql://db-x.aws-ap-south-1.turso.io';
+  process.env[`${envPrefix}_TOKEN`] = 'test-token';
+  __setQueryForTests(null);
+  globalThis.fetch = async () => ({
+    ok: true, status: 200,
+    json: async () => ({ results: [
+      { type: 'error', error: { message: 'SQLite error: CHECK constraint failed: value Budi Santoso Wijaya', code: 'SQLITE_CONSTRAINT' } },
+      { type: 'ok', response: { type: 'close' } }] }),
+  });
+  console.error = (...a) => { logged.push(a.join(' ')); };
+  const res = mkRes();
+  try {
+    await handler(mkReq(payload), res);
+  } finally {
+    console.error = realErr;
+    globalThis.fetch = realFetch;
+    for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+  }
+  return { res, logged };
+}
+
 test('a REJECTED insert is reported — this branch was silent for three weeks', async () => {
-  const err = Object.assign(new Error('new row violates check constraint'), { name: 'NeonDbError', code: '23514' });
-  const { res, logged } = await run(VALID, { queryImpl: () => { throw err; } });
+  const { res, logged } = await runRefused(VALID, 'TURSO_FEEDBACK');
   const line = logged.find((l) => l.includes('[feedback]'));
-  assert.ok(line, 'a rejected feedback insert produced NO observable signal');
+  assert.ok(line, 'a feedback row Turso REFUSED inside an HTTP 200 produced NO observable signal');
   assert.match(line, /FAILED/);
-  assert.match(line, /error=NeonDbError/);
-  assert.match(line, /code=23514/);
+  assert.match(line, /error=sql_SQLITE_CONSTRAINT/);
+  assert.equal(line.includes('Budi'), false, 'the database message quotes the value; it must never reach the log');
   assert.equal(res.code, 204, 'the client contract is untouched: feedback never breaks the editor');
 });
 
@@ -150,15 +180,24 @@ test('a SUCCESSFUL insert stays quiet — a signal that always fires is one nobo
   assert.equal(res.code, 204);
 });
 
-test('DARK RAIL: no DATABASE_URL means no insert and still a 204', async () => {
-  const saved = process.env.DATABASE_URL;
-  delete process.env.DATABASE_URL;
+test('DARK RAIL: no Turso config means no insert and still a 204', async () => {
+  // The deploy-order hazard, pinned: without its env vars the rail drops every
+  // event and nothing here goes red (the daily watch is what notices). It must
+  // not even TRY to reach the network, and must still answer 204.
+  const saved = { url: process.env.TURSO_FEEDBACK_URL, token: process.env.TURSO_FEEDBACK_TOKEN };
+  delete process.env.TURSO_FEEDBACK_URL; delete process.env.TURSO_FEEDBACK_TOKEN;
   __setQueryForTests(null);
+  const realFetch = globalThis.fetch;
+  let fetched = 0;
+  globalThis.fetch = async () => { fetched += 1; return { ok: true, status: 200, json: async () => ({}) }; };
   const res = mkRes();
   try {
     await handler(mkReq(VALID), res);
   } finally {
-    if (saved === undefined) delete process.env.DATABASE_URL; else process.env.DATABASE_URL = saved;
+    globalThis.fetch = realFetch;
+    if (saved.url !== undefined) process.env.TURSO_FEEDBACK_URL = saved.url;
+    if (saved.token !== undefined) process.env.TURSO_FEEDBACK_TOKEN = saved.token;
   }
+  assert.equal(fetched, 0, 'a dark rail must not attempt a write');
   assert.equal(res.code, 204);
 });

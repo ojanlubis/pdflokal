@@ -1,18 +1,14 @@
 /*
  * PDFLokal — api/_turso.js  (Turso / libSQL writer, shared by t.js and feedback.js)
  * ============================================================================
- * Added 2026-09-16 for the DUAL-WRITE soak (seat `specs/spec-rail-to-turso.md`).
- * Neon Free bills AWAKE-TIME and pdflokal writes thin, constant, all day — the
- * worst possible shape for that meter — so the rail is moving to a vendor that
- * bills rows. During the soak BOTH stores are written and compared daily; Neon
- * stays the source of truth until the comparison has been green for days.
+ * Added 2026-09-16 for the dual-write soak; since 2026-09-25 the rail's ONLY
+ * store (Neon removed after the history was backfilled and fingerprint-
+ * verified). Neon Free billed AWAKE-TIME and pdflokal writes thin, constant,
+ * all day, the worst possible shape for that meter; Turso bills rows.
  *
- * ⭐ THE ZERO-DEPENDENCY LAW IS RESTORED HERE. `api/t.js` took pdflokal's first
- * production dependency (`@neondatabase/serverless`) for one stated reason: Neon
- * documents the npm package and NOT the wire contract underneath it, and
- * building the rail's only write path on an undocumented shape trades a
- * dependency for a silent-breakage risk. Turso documents its SQL-over-HTTP
- * protocol, so that reason does not apply and this file is plain `fetch`.
+ * ⭐ ZERO DEPENDENCIES. Turso documents its SQL-over-HTTP protocol, so this is
+ * plain `fetch`. (Neon's driver was the one npm dependency pdflokal ever took,
+ * because Neon documented only the package, not the wire. It left with Neon.)
  *
  * ⚠️⚠️ THE TRAP THIS FILE EXISTS TO AVOID — MEASURED 2026-09-16 AGAINST THE REAL
  * DATABASE, not read off a doc. A REJECTED STATEMENT COMES BACK AS **HTTP 200**:
@@ -71,8 +67,8 @@ export function arg(v) {
  */
 export async function tursoWrite({ url, token, sql, args, expected, timeoutMs = 4000 }) {
   const endpoint = toHttpUrl(url);
-  // DARK BRANCH, same semantics as the Neon path: no config means no write and
-  // no noise. During the soak this is the normal state until the env vars land.
+  // DARK BRANCH: no config means no write and no noise ("rail dark, never
+  // broken"). The daily watch is what notices a rail that went dark.
   if (!endpoint || !token) return { ok: false, written: 0, reason: 'unconfigured' };
 
   const ctl = new AbortController();
@@ -111,6 +107,34 @@ export async function tursoWrite({ url, token, sql, args, expected, timeoutMs = 
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * The rail's one insert path (api/t.js, api/feedback.js) since Neon was
+ * removed 2026-09-25. Returns { dark, written, error } and never throws:
+ *   dark     no Turso config — the deliberate "rail dark, never broken" branch
+ *   error    a short token (transport, statement code, or a thrown error's
+ *            NAME) — never a message, which can quote row content
+ *   written  rows the store says it wrote; the caller compares to expected
+ *
+ * `override` is each endpoint's test seam: tests intercept at OUR contract,
+ * the SQL and its plain values, and return { rowCount } or throw.
+ */
+export async function tursoInsert({ url, token, sql, values, expected, override = null }) {
+  if (override) {
+    try {
+      const out = await override(sql, values);
+      return { dark: false, written: out?.rowCount, error: null };
+    } catch (err) {
+      return { dark: false, written: 0, error: err?.name ?? 'Error' };
+    }
+  }
+  const out = await tursoWrite({ url, token, sql, args: values.map(arg), expected });
+  if (out.ok) return { dark: false, written: out.written, error: null };
+  if (out.reason === 'unconfigured') return { dark: true, written: 0, error: null };
+  const short = /^short_(\d+|unknown)$/.exec(out.reason ?? '');
+  if (short) return { dark: false, written: short[1] === 'unknown' ? undefined : Number(short[1]), error: null };
+  return { dark: false, written: 0, error: out.reason };
 }
 
 // Builds `values (?,?,?),(?,?,?)...` for a multi-row insert. Only the

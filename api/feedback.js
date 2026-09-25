@@ -14,10 +14,10 @@
  * the client has to handle (feedback must never degrade the editor). Never
  * stores IP or UA — neither is read from the request at all.
  *
- * ON NEON SINCE 2026-08-23, alongside api/t.js and for the same reasons (seat
- * `specs/spec-rail-to-neon.md`): the browser never reached this database, so
- * PostgREST's whole job was work nobody asked for. Same `DATABASE_URL`, same
- * Neon project, its own table.
+ * WRITES TO TURSO ONLY, since 2026-09-25 (Neon removed, history backfilled;
+ * see api/t.js). Its OWN database, `pdflokal-feedback`, never the events one:
+ * Turso has no table permissions, so separate databases ARE the read-only
+ * grant that lets the watch read `events` without reading typed notes.
  *
  * Increment D (spec-edit-fidelity-instrumentation.md, decisions.md
  * 2026-07-23/2026-07-27): optionally accepts TWO small PNG data URLs —
@@ -35,20 +35,12 @@
  */
 export const config = { runtime: 'nodejs', api: { bodyParser: false } };
 
-import { neon } from '@neondatabase/serverless';
-import { tursoWrite, arg as tArg } from './_turso.js';
+import { tursoInsert } from './_turso.js';
 
-// ⚠️ TEST SEAM — same one api/t.js carries, and duplicated for the same reason
-// readBody() below is: each function stays a single self-contained file. Tests
-// assert on the SQL and its parameters (ours) rather than the driver's HTTP
-// wire format (Neon's, undocumented).
+// ⚠️ TEST SEAM — same one api/t.js carries. Tests assert on the SQL and its
+// plain values (ours) and return { rowCount } or throw.
 let queryOverride = null;
 export function __setQueryForTests(fn) { queryOverride = fn; }
-
-function makeQuery(dsn) {
-  const sql = neon(dsn);
-  return (text, params) => sql.query(text, params, { fullResults: true });
-}
 
 // Notes are short reactions, not essays — a much smaller cap than telemetry's
 // 32KB batch. NOTE_MAX bounds the stored string; MAX_BODY_BYTES bounds the raw
@@ -208,21 +200,8 @@ export default async function handler(req, res) {
     const clientSha = /^[0-9a-f]{7,40}$/.test(appVersion) ? appVersion : '';
     const storedVersion = clientSha || (/^[0-9a-f]{7,40}$/.test(serverSha) ? serverSha : appVersion);
 
-    const dsn = process.env.DATABASE_URL;
-    // ⚠️ NO LONGER AN EARLY RETURN (2026-09-16, dual-write): a missing
-    // DATABASE_URL must skip the NEON write only, never the Turso one.
-    const neonConfigured = Boolean(dsn) || Boolean(queryOverride);
-
-    // ⭐ EXPLICIT ts, ADDED 2026-09-16, and it is what makes the soak checkable.
-    // Both stores used to fill this from their own server clock (`now()` /
-    // `strftime`), so the same 👎 would land with two different timestamps —
-    // and since the two stores also issue DIFFERENT ids (Neon continues from
-    // 1,116, Turso starts at 100,000), there would be NO column pair that
-    // identifies one row in both. The daily comparison would have nothing to
-    // join on. One clock, written to both, gives (session_id, ts, rating) as a
-    // stable key. api/t.js already worked this way; this is the sibling file
-    // catching up, which is the same "the fix never travelled" defect the
-    // comment below describes.
+    // EXPLICIT ts (2026-09-16), in the rail's one format (ISO, UTC, ms, Z),
+    // rather than the database's own clock default.
     const ts = new Date().toISOString();
 
     // ⭐ THIS BRANCH USED TO BE BLIND, and it was blind for three weeks after
@@ -237,50 +216,24 @@ export default async function handler(req, res) {
     // aggregate — a dead feedback loop looks exactly like a well-liked
     // product. Content-blind for the same reason as api/t.js, and more
     // pointedly: this row carries a note the user TYPED. Never `err.message`.
-    // Lowercased for the same reason as api/t.js: Postgres's uuid type
-    // normalises case and SQLite's GLOB check does not, so an uppercase id would
-    // land in one store and be refused by the other.
+    // Lowercased for the same reason as api/t.js: SQLite's GLOB check is
+    // lowercase-only and would refuse an uppercase id.
     const sid = String(sessionId).toLowerCase();
 
-    const writeNeon = async () => {
-      if (!neonConfigured) return;
-      try {
-        const query = queryOverride || makeQuery(dsn);
-        const out = await query(
-          `insert into feedback (ts, session_id, app_version, rating, note, sample_before, sample_after, screenshot)
-           values ($1::timestamptz,$2::uuid,$3,$4,$5,$6,$7,$8)`,
-          [ts, sid, storedVersion, rating, note, sample?.before ?? null, sample?.after ?? null, shot],
-        );
-        if (out?.rowCount !== 1) {
-          console.error(`[feedback] insert SHORT written=${out?.rowCount ?? 'unknown'} rows_expected=1`);
-        }
-      } catch (err) {
-        console.error(`[feedback] insert FAILED error=${err?.name ?? 'Error'} code=${err?.code ?? 'none'} rows_dropped=1`);
-      }
-    };
-
-    // DUAL-WRITE to its OWN database (pdflokal-feedback), never the events one.
-    // That separation IS the read-only grant: Turso has no table permissions, so
-    // the only way the floor alarm can read `events` without also reading the
-    // notes a user typed is for them to be different databases.
-    const writeTurso = async () => {
-      const out = await tursoWrite({
-        url: process.env.TURSO_FEEDBACK_URL,
-        token: process.env.TURSO_FEEDBACK_TOKEN,
-        sql: `insert into feedback (ts, session_id, app_version, rating, note, sample_before, sample_after, screenshot)
-              values (?,?,?,?,?,?,?,?)`,
-        args: [
-          tArg(ts), tArg(sid), tArg(storedVersion), tArg(rating), tArg(note),
-          tArg(sample?.before ?? null), tArg(sample?.after ?? null), tArg(shot),
-        ],
-        expected: 1,
-      });
-      if (!out.ok && out.reason !== 'unconfigured') {
-        console.error(`[feedback] turso insert FAILED reason=${out.reason} rows_dropped=1`);
-      }
-    };
-
-    await Promise.allSettled([writeNeon(), writeTurso()]);
+    const out = await tursoInsert({
+      url: process.env.TURSO_FEEDBACK_URL,
+      token: process.env.TURSO_FEEDBACK_TOKEN,
+      sql: `insert into feedback (ts, session_id, app_version, rating, note, sample_before, sample_after, screenshot)
+            values (?,?,?,?,?,?,?,?)`,
+      values: [ts, sid, storedVersion, rating, note, sample?.before ?? null, sample?.after ?? null, shot],
+      expected: 1,
+      override: queryOverride,
+    });
+    if (out.error) {
+      console.error(`[feedback] insert FAILED error=${out.error} rows_dropped=1`);
+    } else if (!out.dark && out.written !== 1) {
+      console.error(`[feedback] insert SHORT written=${out.written ?? 'unknown'} rows_expected=1`);
+    }
 
     res.status(204).end();
   } catch {

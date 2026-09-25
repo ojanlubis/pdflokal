@@ -322,9 +322,9 @@ stores are written with `Promise.allSettled`, so neither can affect the other.
 
 ### 6.2 Dependency audit
 
-`npm ci`, then `npm audit --omit=dev`. pdflokal has **one production dependency**
-(`@neondatabase/serverless`) and the client has none — no build step, no bundler, and that constraint
-is the moat. `--omit=dev` is the check that keeps it honest. High or critical in the production tree
+`npm ci`, then `npm audit --omit=dev`. pdflokal has **zero production dependencies** since
+2026-09-25 (the Neon driver left with Neon), and the client has none — no build step, no bundler, and
+that constraint is the moat. Any production dependency appearing is itself worth a **warn**. `--omit=dev` is the check that keeps it honest. High or critical in the production tree
 → **warn**; report the advisory, do not upgrade it.
 
 ### 6.3 Deploy match
