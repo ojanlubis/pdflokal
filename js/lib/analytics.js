@@ -28,6 +28,23 @@ const sessionId = typeof crypto?.randomUUID === 'function'
   ? crypto.randomUUID()
   : `s-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
+// GA4 reads these event-parameter names as the session's TRAFFIC SOURCE, not
+// as custom data. intent_armed sent `source: 'card'`, and GA4 recorded ~35
+// sessions a day as arriving from a website called "card" (plus "seo_page"),
+// Unassigned, stolen from Organic/Direct — every day from August until
+// 2026-09-25 (seat decisions.md 2026-09-02). Rewritten HERE, at the sink, so
+// the next call site that says `source` cannot bring it back. Only the GA4 copy
+// is renamed: Sentry, Vercel and Mixpanel keep the key they always had.
+const GA4_RESERVED = new Set(['source', 'medium', 'campaign', 'term', 'content', 'gclid']);
+
+export function forGA4(data) {
+  const out = {};
+  for (const [k, v] of Object.entries(data || {})) {
+    out[GA4_RESERVED.has(k) ? `cta_${k}` : k] = v;
+  }
+  return out;
+}
+
 /**
  * Track a custom event via Vercel Web Analytics.
  * @param {string} name - Event name (max 255 chars)
@@ -61,7 +78,7 @@ export function track(name, data = {}) {
   // WHY: Send same events to GA4 so we can compare dashboards.
   // gtag() exists when Google tag script is loaded (not in local dev).
   if (typeof window.gtag === 'function') {
-    window.gtag('event', name, data);
+    window.gtag('event', name, forGA4(data));
   }
 
   // MIXPANEL — fourth sink, added 2026-09-10 for the one-month session-replay
