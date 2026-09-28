@@ -175,9 +175,9 @@ Some of the real bugs in this repo's history are written up as field notes: the 
   project is built on: your file never leaves your device. Declined permanently, not "coming soon."
 - **OCR di server** — same reason, same answer.
 
-**OCR in the browser is a different thing and it is planned** — running locally (WASM/WebGPU),
-nothing uploaded. Roughly half of all documents opened here are scans with no text layer, so this
-is the other half of the product, not a footnote.
+**OCR in the browser is a different thing, and it is live** — it runs locally (Tesseract, WASM),
+nothing uploaded, and the engine only downloads when you ask for it. Open a scanned page, tap Edit,
+and you can tap a word and replace it.
 
 ## Lisensi & Commercial Use
 

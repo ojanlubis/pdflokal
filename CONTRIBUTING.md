@@ -47,7 +47,7 @@ Use the [bug report template](https://github.com/ojanlubis/pdflokal/issues/new?t
 
 ### Suggesting Features
 
-Use the [feature request template](https://github.com/ojanlubis/pdflokal/issues/new?template=feature_request.yml). Features must be client-side. Server-dependent features (PDF-to-Word, OCR) are out of scope for now.
+Use the [feature request template](https://github.com/ojanlubis/pdflokal/issues/new?template=feature_request.yml). Features must be client-side. Server-dependent features (PDF-to-Word, server-side OCR) are out of scope. In-browser OCR is in scope and already live.
 
 ### Pull Requests
 

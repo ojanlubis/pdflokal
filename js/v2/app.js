@@ -3320,7 +3320,8 @@ window.v2 = {
 // offer. Never silently swap the tool — that would be the app doing something
 // the user didn't ask for (seat ruling).
 //
-// The copy must NOT imply OCR is coming; that is an open founder call.
+// (An older note here said the copy must not imply OCR is coming. That call was
+// made: rung S2 ships and #so-ocr is the OCR entry point — see index.html.)
 //
 // `accepted` fires when the tool is actually ARMED, never on the button click.
 // A click measures the button; we need the behaviour. And it fires ONLY from
