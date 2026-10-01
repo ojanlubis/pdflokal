@@ -9,8 +9,8 @@
  * sees one line and expects to replace all of it.
  *
  * This module clusters js/v2/text-runs.js's `extract()` output into Line[]
- * by GEOMETRY alone — two passes, both in raw PDF user space (pdf.x0/y0/
- * ux/uy/len/size), which is rotation-independent unlike the display x/y/w/h:
+ * by GEOMETRY, in raw PDF user space (pdf.x0/y0/ux/uy/len/size), which is
+ * rotation-independent unlike the display x/y/w/h. Three passes:
  *
  *   1. Baseline pass: sort by the perpendicular offset from the baseline
  *      direction (`p`), grow groups of runs that share a direction and sit
@@ -18,8 +18,35 @@
  *   2. Along pass: within each baseline group, sort by position along the
  *      baseline (`a0`) and split wherever the gap between runs is wide
  *      enough to be a column gutter rather than a word space — the COLUMN
- *      GUARD that keeps two-column layouts from merging into one line just
- *      because they share a baseline.
+ *      GUARD (1.5em) that keeps two-column layouts from merging into one
+ *      line just because they share a baseline.
+ *   3. Soft split (2026-10-01, founder ruling, corpus-measured in
+ *      reference/line-split-measure-2026-10-01.md): below the column guard,
+ *      a gap wider than 0.6em ALSO splits a line, but only on structural
+ *      evidence, and never inside a paragraph. Gap width alone cannot tell a
+ *      label/value pair from a justified prose line (60-70% wrong on the web
+ *      corpus at every threshold), so the gate is:
+ *        marker — the left piece is a list marker ("a)", "1.1.", "iii.", a
+ *                 bullet or dash), or
+ *        colon  — the left piece ends with ":" or the right piece starts
+ *                 with ":",
+ *      and the line is NOT part of a body-text block (paragraph-detect.js).
+ *      A third leg, `column` (>= N other baselines have a wide gap ending at
+ *      the same x), is implemented but OFF by default: 1 wrong in 28 on the
+ *      web sample.
+ *
+ * ⚠️ HONEST HEADER: this module is no longer geometry-only. Passes 1 and 2 are
+ * pure geometry; the soft split's marker and colon legs READ RUN TEXT
+ * (run.str), and the paragraph guard reads line geometry across lines. The
+ * input is still plain objects, headless, deterministic and
+ * order-independent.
+ *
+ * OCR does NOT come through here. core/ocr-lines.js bands Tesseract words by
+ * vertical overlap in pixel space and builds its own Lines (its header says
+ * why it does not reuse this module), and js/v2/ocr-runs.js only borrows
+ * resolveTap. So the soft split cannot touch an OCR line; there is nothing to
+ * opt out of, and tests/core/text-lines-softsplit.test.mjs (test 17) pins that ocr-lines.js does
+ * not import this function.
  *
  * Each resulting Line carries its own `pdf` geometry — {x0,y0,ux,uy,len,size}
  * spanning every member run's along-extent — which becomes the single
@@ -27,9 +54,11 @@
  * even when pdf.js's item boundaries don't match the content stream's actual
  * show-op boundaries.
  *
- * HEADLESS on purpose (no DOM, no vendor imports) — pure geometry over plain
- * objects, tested in tests/core/ under `node --test`, same as text-walk.js.
+ * HEADLESS on purpose (no DOM, no vendor imports) — plain objects in, plain
+ * objects out, tested in tests/core/ under `node --test`, same as text-walk.js.
  */
+
+import { detectParagraphs, SOFT_SPLIT_GAP_FACTOR } from './paragraph-detect.js';
 
 // Direction-agreement gate for the baseline pass: dot(unit_a, unit_b) >= this
 // is ~5° of tolerance between two baselines before we call them different
@@ -56,6 +85,28 @@ export const PERP_TOLERANCE_FACTOR = 0.35;
 // the larger neighboring font size reads as a column gutter, not a word
 // space within one line — split there even though the baseline matches.
 const COLUMN_GAP_FACTOR = 1.5;
+
+// Soft split (see header, pass 3): a gap above SOFT_SPLIT_GAP_FACTOR (0.6em,
+// defined in paragraph-detect.js so the guard looks at the same gaps) times
+// the larger neighbouring font size is a CANDIDATE split below the column
+// guard. It only splits when a gate leg agrees and the line is not inside a
+// paragraph block.
+
+// The default soft-split rule: marker and colon legs ON, column leg OFF
+// (column: 0 = off; N >= 1 = on, needing N other baselines to share the
+// column). `guard` is the paragraph veto. `gapEm` is the candidate threshold.
+export const DEFAULT_SOFT_SPLIT = Object.freeze({
+  gapEm: SOFT_SPLIT_GAP_FACTOR,
+  marker: true,
+  colon: true,
+  column: 0,
+  guard: true,
+});
+
+// A list marker, as the whole left piece of a line: "a)", "(a)", "1.", "1.1.",
+// "12)", "iii.", "IV)", or one or two symbol characters (bullet, dash, ...).
+// Identical to the pattern the corpus measurement used.
+const MARKER_RE = /^(\(?\d{1,3}([.)]\d*)*[.)]?|\(?[A-Za-z][.)]|\(?[ivxIVX]{1,4}[.)]|[^\p{L}\p{N}\s]{1,2})$/u;
 
 // Word-space inference: an along-gap bigger than this fraction of the
 // PRECEDING run's size is treated as a real word boundary and gets a
@@ -164,6 +215,45 @@ function splitAlongBaseline(items) {
   return segments;
 }
 
+const squash = (s) => s.replace(/\s+/g, ' ').trim();
+
+// Soft split of ONE column-guard segment (a base line). `leftmost` is true for
+// the first segment of its baseline: the marker leg only looks there, because a
+// list marker opens a row; a short left piece in the middle of a row is a cell,
+// not a marker (this is the corpus-measured prototype rule, kept exactly).
+// Walks the gaps wider
+// than rule.gapEm and cuts at the ones a gate leg vouches for. Returns
+// [{ items, reason }] where `reason` is why this piece was cut from its LEFT
+// neighbour ('marker' | 'colon' | 'column'), null for the first piece.
+function softSplitSegment(segment, rule, columnCount, leftmost) {
+  const pieces = [];
+  let piece = [];
+  let reason = null;
+  for (const item of segment) {
+    if (piece.length > 0) {
+      const prev = piece[piece.length - 1];
+      const gap = item.a0 - prev.a1;
+      const em = Math.max(prev.run.pdf.size, item.run.pdf.size);
+      if (gap > rule.gapEm * em) {
+        const left = squash(piece.map((g) => g.run.str).join(' '));
+        const right = item.run.str.trim();
+        let why = null;
+        if (rule.marker && leftmost && pieces.length === 0 && MARKER_RE.test(left)) why = 'marker';
+        else if (rule.colon && (/:$/.test(left) || /^:/.test(right))) why = 'colon';
+        else if (rule.column > 0 && columnCount(item) >= rule.column) why = 'column';
+        if (why) {
+          pieces.push({ items: piece, reason });
+          piece = [];
+          reason = why;
+        }
+      }
+    }
+    piece.push(item);
+  }
+  if (piece.length > 0) pieces.push({ items: piece, reason });
+  return pieces;
+}
+
 // Assemble one Line from a segment (geomItem[] already sorted by a0).
 function assembleLine(segment) {
   const runs = segment.map((item) => item.run);
@@ -225,11 +315,50 @@ function assembleLine(segment) {
   };
 }
 
+// Column evidence for the (off by default) column leg: how many OTHER
+// baselines have a wide-gap ENDING at this item's start along the baseline.
+function makeColumnCounter(baselineGroups) {
+  const ends = [];
+  baselineGroups.forEach((grp, gi) => {
+    const byA0 = [...grp.items].sort((a, b) => a.a0 - b.a0);
+    for (let k = 1; k < byA0.length; k += 1) {
+      const em = Math.max(byA0[k - 1].run.pdf.size, byA0[k].run.pdf.size);
+      if (byA0[k].a0 - byA0[k - 1].a1 > 0.5 * em) ends.push({ a: byA0[k].a0, gi, dx: grp.dirX, dy: grp.dirY });
+    }
+  });
+  const groupOf = new Map();
+  baselineGroups.forEach((grp, gi) => grp.items.forEach((it) => groupOf.set(it, gi)));
+  return (item) => {
+    const me = groupOf.get(item);
+    const { ux, uy, size } = item.run.pdf;
+    const seen = new Set();
+    for (const e of ends) {
+      if (e.gi !== me && e.dx * ux + e.dy * uy >= DIRECTION_DOT_MIN && Math.abs(e.a - item.a0) <= 0.1 * size) seen.add(e.gi);
+    }
+    return seen.size;
+  };
+}
+
 // Cluster pdf.js text runs (js/v2/text-runs.js's extract() shape) into
-// visual Lines. Pure geometry, order-independent (paint-order scrambling
+// visual Lines. Deterministic and order-independent (paint-order scrambling
 // doesn't change the result — everything is re-sorted before use).
-export function groupRunsIntoLines(runs) {
+//
+// `opts.softSplit` — the gated split below the column guard (see header,
+// pass 3). Omitted: DEFAULT_SOFT_SPLIT (marker + colon legs, paragraph guard
+// on, column leg off). `false`: no soft split (the pre-2026-10-01 behaviour,
+// exactly). An object overrides any DEFAULT_SOFT_SPLIT field.
+//
+// Every returned Line carries two ADDITIVE fields (nothing existing changes):
+//   blockId     id of the body-text block the line sits in, or null
+//               (paragraph-detect.js; a blocked line is never soft-split)
+//   splitReason 'marker' | 'colon' | 'column' when this line is a piece of a
+//               soft-split baseline (either side of the cut), else null
+export function groupRunsIntoLines(runs, opts) {
   if (!runs || runs.length === 0) return [];
+
+  const rule = opts && opts.softSplit === false
+    ? null
+    : { ...DEFAULT_SOFT_SPLIT, ...((opts && opts.softSplit) || {}) };
 
   const geomItems = runs.map((run) => {
     const { a0, a1 } = along(run);
@@ -238,11 +367,34 @@ export function groupRunsIntoLines(runs) {
 
   const baselineGroups = clusterBaselines(geomItems);
 
-  const lines = [];
+  // Base lines: baseline groups cut at the column guard only.
+  const base = [];
   for (const group of baselineGroups) {
-    const segments = splitAlongBaseline(group.items);
-    for (const segment of segments) lines.push(assembleLine(segment));
+    splitAlongBaseline(group.items).forEach((segment, k) => {
+      base.push({ segment, line: assembleLine(segment), leftmost: k === 0 });
+    });
   }
+
+  const blockOf = rule && rule.guard
+    ? detectParagraphs(base.map((b) => b.line)).blockOf
+    : base.map(() => -1);
+  const columnCount = rule && rule.column > 0 ? makeColumnCounter(baselineGroups) : () => 0;
+
+  const lines = [];
+  base.forEach((b, i) => {
+    const blockId = blockOf[i] >= 0 ? blockOf[i] : null;
+    const pieces = rule && blockId === null && b.segment.length > 1
+      ? softSplitSegment(b.segment, rule, columnCount, b.leftmost)
+      : null;
+    if (!pieces || pieces.length === 1) {
+      lines.push(Object.assign(b.line, { blockId, splitReason: null }));
+      return;
+    }
+    pieces.forEach((pc, k) => {
+      const reasonRight = pieces[k + 1] ? pieces[k + 1].reason : null;
+      lines.push(Object.assign(assembleLine(pc.items), { blockId: null, splitReason: pc.reason || reasonRight }));
+    });
+  });
   return lines;
 }
 
