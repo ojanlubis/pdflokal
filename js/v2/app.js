@@ -93,7 +93,9 @@ import { extractFontProgram, lookupFontObject } from '../core/doc-fonts.js';
 import { textCoveredBy } from '../core/stamp.js';
 import { resolveFontFingerprint, FAMILY_BUCKET_TO_CLONE, isInformativeBaseFont } from '../core/font-fingerprint.js';
 import { cloneFamilyFor } from '../core/font-decide.js';
-import { buildEditedPageBytes, editSignature, pageEdits } from '../core/page-surgery.js';
+import { editSignature, pageEdits } from '../core/page-surgery.js';
+import { createEditedPageProvider } from './edited-page-provider.js';
+import { createBakeFailureReporter, scrubbedError } from './bake-failure.js';
 
 // WHY there is no `window.pdfjsLib.…workerSrc = …` line here any more: pdf.js is
 // loaded on demand now (core/vendor.js), so touching it at module top-level
@@ -882,56 +884,23 @@ function getDryRunDoc(PDFLib, source) {
   return pdfLibDocCache.get(source.id);
 }
 
-// spec-live-surgery.md increment 2 (§3/§4/§8.2): the rasterizer's injected
-// boundary onto a page's committed edits, WITHOUT core/import.js ever
-// importing this v2 app module. Reuses the SAME dry-run pdf-lib doc
-// smartReplace/prepareDocFont already cache per source above — copyPages
-// only READS srcDoc (buildPdfBytes' own srcDocCache already shares one load
-// across every page of a source the same way), so handing the throwaway
-// dry-run doc to buildEditedPageBytes is safe even though it was originally
-// named for a different caller.
-//
-// Only the PIPELINE lands here, not its trigger: nothing yet calls
-// rasterizer.invalidateEditedPage() or re-rasterizes on commit/undo/redo
-// (that's increment 3) — this provider just answers "what should this
-// page's background be, right now" correctly whenever createPageRasterizer
-// happens to ask (first render, zoom change, viewport re-entry). Any
-// failure — missing source, no PDFLib/fontkit, buildEditedPageBytes
-// throwing — returns null so the rasterizer falls back to the plain source
-// render; a broken edited-page build must never break rasterization.
-async function editedPageProvider(page) {
-  try {
-    if (!editSignature(page)) { page.editApplied = null; return null; } // no committed edits — today's path
-    const source = getSource(doc, page.sourceId);
-    if (!source) { page.editApplied = null; return null; }
-    const { PDFLib, fontkit } = await ensurePdfLib();
-    const srcDoc = await getDryRunDoc(PDFLib, source);
-    const result = await buildEditedPageBytes(srcDoc, page, page.annotations, { PDFLib, fontkit });
-    // Increment 3 (spec-live-surgery.md §5/§8.3): stash exactly which cover/
-    // text annotation ids THIS bake consumed, directly on the page (the same
-    // render-layer-cache pattern as page.raster — see page-view.js's header
-    // comment). js/render/page-view.js's overlay builder reads this to skip
-    // drawing a SUCCESSFUL edit's cover/text as a DOM overlay (Decision 1) —
-    // reading it straight off buildEditedPageBytes' own `applied` set means
-    // the overlay can never independently disagree with what the raster
-    // actually shows. A declined edit's ids are simply absent from this set,
-    // so its cover (and, if native-insert alone declined, its twin text)
-    // keep rendering exactly as before (Decision 2).
-    page.editApplied = result.bytes ? result.applied : new Set();
-    // Stash the per-edit telemetry outcomes on the page (same render-cache
-    // pattern as editApplied) so commit()'s rebake can fire the surgery/insert
-    // events for the edit it just committed — WITHOUT this provider (which
-    // also runs on plain zoom/viewport re-renders) ever firing telemetry
-    // itself. Data here; the firing is gated to the commit path in commit().
-    page.editOutcomes = result.outcomes || [];
-    return result.bytes ? { bytes: result.bytes } : null;
-  } catch (err) {
-    console.warn('editedPageProvider gagal, pakai raster asli:', err);
-    page.editApplied = null;
-    page.editOutcomes = null;
-    return null;
-  }
-}
+// The rasterizer's door onto a page's committed edits — js/v2/edited-page-provider.js
+// holds the body and its WHY (moved 2026-10-01 so the failure report below is
+// testable against the real provider). A bake that throws still falls back to
+// the plain source render; what changed is that it now SAYS so, on the rail
+// and in Sentry (js/v2/bake-failure.js — seat ruling 2026-10-01).
+const reportBakeFailure = createBakeFailureReporter({ tel, getSentry: () => window.Sentry || null });
+const editedPageProvider = createEditedPageProvider({
+  getSource: (sourceId) => getSource(doc, sourceId),
+  loadPdfLib: ensurePdfLib,
+  getSrcDoc: getDryRunDoc,
+  onBakeFailure: (err, page) => {
+    // The SCRUBBED error, not `err`: Sentry turns console calls into
+    // breadcrumbs, and a raw message can quote the document (bake-failure.js).
+    console.warn('editedPageProvider gagal, pakai raster asli:', scrubbedError(err));
+    reportBakeFailure(err, `${page.id}:${editSignature(page)}`);
+  },
+});
 
 // spec-live-surgery.md §5/§8.3 (increment 3): re-render `pageId`'s background
 // raster from its CURRENT edit set and swap it in with no blank frame
