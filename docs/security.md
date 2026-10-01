@@ -1,59 +1,43 @@
-# PDFLokal Security & Libraries Reference
+# PDFLokal security — what the config files can't say
 
-Detailed security configuration and library documentation. See [CLAUDE.md](../CLAUDE.md) for project overview.
+`vercel.json` holds the headers and the CSP; `index.html` holds the load order; `js/vendor/` holds the
+libraries. This file holds only the why and the traps. See [CLAUDE.md](../CLAUDE.md) for the rest.
 
 ## Privacy Requirements
 
 - **Files must NEVER leave the user's device** — the invariant everything else serves. Unchanged.
 - No external API calls with user data
 - Open source = users can verify privacy claims
-- **Analytics are anonymous and content-blind, not consent-gated** _(corrected 2026-07-27 — this
-  line previously read "no analytics or tracking without explicit user consent," which the product
-  has not matched since GA4 shipped; a requirements doc that states a rule the code doesn't follow
-  is worse than no doc)._ What actually runs: GA4 for **acquisition only** (how people arrive), and
+- **Analytics are anonymous and content-blind, not consent-gated.** What actually runs: GA4 for **acquisition only** (how people arrive), and
   a first-party typed rail for **behavior**. Neither carries file contents or a persistent user id.
   The one consent-gated exception is the beta Edit image crop, below.
 
-## Server surface (added 2026-07 — keep this honest)
+## Server surface
 
-All *file processing* is client-side, but the app is no longer purely static. Two serverless
-endpoints are the only code that runs off-device, and neither ever receives a PDF:
+All *file processing* is client-side. `api/` is the only code that runs off-device (each file's
+header says what it is); none of it ever receives a PDF. The two that take user-originated data:
 
 - **`api/t.js`** — typed, content-blind telemetry. Every event is validated against
   `js/core/telemetry-schema.js` and **dropped if off-schema**. The schema has no free-string field,
   so it cannot carry document content even by accident. Always answers 204, so it never reveals
-  whether a write happened. Writes to **Neon** (Postgres, `DATABASE_URL` held only in env) since
-  2026-08-23 — previously Supabase. The database has **no HTTP front door at all**: no PostgREST, no
-  Data API, no anon role. The only credential is the connection string, and only these two functions
-  hold it.
+  whether a write happened. Writes to **Turso** only (`api/_turso.js`, plain `fetch`, no driver);
+  the credentials are `TURSO_EVENTS_*` / `TURSO_FEEDBACK_*` in env, held only by `api/`.
 - **`api/feedback.js`** — the beta Edit 👍/👎, plus an **opt-in** image crop of the one edited line.
   Sent only when the user rates 👎, *sees the exact crops*, and taps Kirim. Size-capped client-side,
-  re-checked server-side (never trust the client), and constrained again by DB check constraints.
+  re-checked server-side (never trust the client), and constrained again by table CHECK constraints
+  (`scripts/turso-feedback-migration.sql`).
 
 Both **fail closed**: if their env vars are absent the endpoint 204s and writes nothing. That
 property is load-bearing and also a trap — it silently swallowed a week of preview telemetry in
 July 2026 before anyone noticed. Verify the rail by querying for rows, never by a 2xx response.
 
-## Security Headers (vercel.json)
-
-| Header | Value | Purpose |
-|--------|-------|---------|
-| X-Content-Type-Options | nosniff | Prevent MIME-type sniffing |
-| X-Frame-Options | DENY | Prevent clickjacking |
-| X-XSS-Protection | 1; mode=block | XSS filter (legacy browsers) |
-| Referrer-Policy | strict-origin-when-cross-origin | Limit referrer info |
-| Permissions-Policy | camera=(), microphone=(), geolocation=(), payment=() | Disable unused APIs |
-| Content-Security-Policy | (see below) | Control resource loading |
-
 ## Content Security Policy (CSP)
 
-**`vercel.json` holds the policy, and this document does not copy it.** A copy lived here until
-2026-09-25 and drifted in the dangerous direction: it showed `'unsafe-eval'`, which the live policy
-never had, telling readers a capability worked that the browser refuses. What must stay true of the
-policy is pinned by `tests/core/csp-policy.test.mjs`.
+**`vercel.json` holds the policy, and this document does not copy it** — a copy once drifted to show
+an `'unsafe-eval'` the live policy never had. What must stay true of the policy is pinned by
+`tests/core/csp-policy.test.mjs`. Below: why the non-obvious directives exist.
 
-**2026-07-30 — two directives added for OCR** (ruled by Fauzan, security assessment by the PM,
-recorded in the seat's `decisions.md`):
+**Two directives for OCR** (ruled by Fauzan 2026-07-30, seat `decisions.md`):
 
 - **`script-src 'wasm-unsafe-eval'`** — WebAssembly cannot compile without it. It does NOT grant
   `eval()`; that is asserted by a real in-page test, not assumed, because the names are similar
@@ -62,8 +46,7 @@ recorded in the seat's `decisions.md`):
   and must stay.** Dropping it would kill the service worker, and therefore offline mode, and
   therefore a shipped and announced feature, with nothing throwing and the page looking fine.
 
-**2026-08-23 — a third directive, found in PRODUCTION after rung S2 shipped** (ruled by Fauzan the
-same day, same shape as the two above):
+**A third for OCR, found in production** (ruled 2026-08-23):
 
 - **`connect-src data:`** — tesseract's core is an emscripten SINGLE_FILE build: it carries the WASM
   binary inline as base64 and fetches it back as a `data:` URI. Without this, every recognition
@@ -74,8 +57,8 @@ same day, same shape as the two above):
   for data to leave the device and does not touch the privacy claim. `img-src` has carried `data:`
   since long before this, for the same reason.
 
-**2026-09-10 — two hosts added for the one-month Mixpanel session-replay study**
-(seat `decisions.md` 2026-09-10). **BOTH COME OUT WHEN THE STUDY ENDS, 2026-10-10.**
+**Two hosts for the one-month Mixpanel session-replay study** (seat `decisions.md` 2026-09-10).
+**BOTH COME OUT WHEN THE STUDY ENDS, 2026-10-10.**
 
 - **`script-src https://cdn.mxpnl.com`** — the Mixpanel loader snippet in `index.html`'s head
   fetches `mixpanel-2-latest.min.js` from there, and the SDK lazily fetches its rrweb-based
@@ -89,13 +72,9 @@ same day, same shape as the two above):
   ⚠️ **This is the only directive in this policy that lets user-derived data leave the device**,
   which is why what may ride it is nailed down in `index.html`'s own comment and enforced by
   `tests/mixpanel-replay-privacy.spec.js`: no filename, no typed text, no document pixels.
-  A measured leak was caught on the first run of that spec, so the guard is not theoretical.
-  **Amended 2026-09-10 (later):** the recording now carries pdflokal's own static chrome in
-  plain text (`record_unmask_text_selector`, an allowlist over unchanged deny-by-default
-  masking). Nothing user-derived moved: the three negatives above are unchanged and the same
-  spec proves them, plus a structural check that no allowlist entry is an ancestor of a node
-  carrying a filename, typed text or a document-derived number. Both directions were proven
-  to go red by sabotage before this was believed.
+  The recording carries pdflokal's own static chrome in plain text (`record_unmask_text_selector`,
+  an allowlist over deny-by-default masking); the same spec checks that no allowlist entry is an
+  ancestor of a node carrying a filename, typed text or a document-derived number.
 
 ⚠️ **AND THE INSTRUMENT LESSON, which outlives this directive.** The violation happened inside the
 TESSERACT WORKER, and **Playwright's `page.on('console')` does not carry worker messages** — nor does
@@ -106,70 +85,18 @@ arrive tagged `source: 'worker'` (`tests/csp-live-policy.spec.js`). **Every work
 — Tesseract, pdf.js, the service worker — is invisible to the page console. Any "no errors" claim
 about worker code needs the CDP instrument, not that one.**
 
-See `vercel.json` for the live policy text — that is the source of truth, and this document is not
-a second copy of it.
-
-**Why 'unsafe-inline' and 'wasm-unsafe-eval':**
-- `'unsafe-inline'` for scripts: Required for theme flash prevention, JSON-LD schema, Vercel analytics init, pdfjsLib config
-- `'wasm-unsafe-eval'`: lets OCR (tesseract.js) compile WebAssembly, and nothing else. Full `'unsafe-eval'`
-  is NOT granted and must not be: it would re-open `eval()` product-wide (`tests/core/csp-policy.test.mjs`)
-- `'unsafe-inline'` for styles: Inline styles in HTML and dynamic style manipulation
+**Why 'unsafe-inline':**
+- for scripts: the inline theme-flash guard, JSON-LD, and the analytics loaders in `index.html`'s head
+- for styles: Inline styles in HTML and dynamic style manipulation
 - Nonces would require server-side rendering or build step (against project philosophy)
 
-**Why Google domains:** Vercel Web Analytics + Google Analytics (GA4) for anonymous usage tracking. No personal data collected — only tool names, action types, and per-session IDs. See `js/lib/analytics.js`.
+**Why Google domains:** GA4 (and the Ads tag) for acquisition. See `js/lib/analytics.js`.
 
 **If adding new features that require external resources:**
 1. Test on Vercel preview first
 2. Check browser console for CSP violations — **and if the feature uses a worker, check CDP's Log
-   domain too, because the page console cannot see worker violations** (see the 2026-08-23 note above)
+   domain too, because the page console cannot see worker violations** (above)
 3. Update CSP in vercel.json if needed. `tests/core/csp-policy.test.mjs` pins what must stay true of
    it (no full `'unsafe-eval'`, `worker-src` keeps `'self'` for offline).
 
-## Security Files
-
-| File | URL | Purpose |
-|------|-----|---------|
-| security.txt | /.well-known/security.txt | Security contact for vulnerability reports |
-| humans.txt | /humans.txt | Team and contributor credits |
-| privasi.html | /privasi.html | Privacy policy in Indonesian |
-
-The `security.txt` file is served at `/.well-known/security.txt` via a rewrite rule in `vercel.json`.
-
-## Self-Hosted Libraries (2.6 MB total)
-
-Core libraries are self-hosted in `/js/vendor/` for offline support, firewall compatibility, and no CDN dependencies.
-
-| Library | Version | Size | Purpose |
-|---------|---------|------|---------|
-| **pdf-lib** | 1.17.1 | 513 KB | PDF manipulation (merge, split, edit, etc.) |
-| **fontkit** | 1.1.1 | 741 KB | Custom font embedding for pdf-lib |
-| **PDF.js** | 3.11.174 | 313 KB | PDF rendering and thumbnails |
-| **PDF.js Worker** | 3.11.174 | 1.1 MB | PDF processing (loaded before pdf.min.js for offline fake worker) |
-| **Signature Pad** | 4.1.7 | 12 KB | Digital signature capture |
-| **pdf-encrypt-lite** | 1.0.1 | ~12 KB | PDF password encryption (self-hosted, patched to use `window.PDFLib`) |
-| **fflate** | 0.8.3 | 33 KB | ZIP bundling for pages→images export (Editor v2 Unduh sheet) |
-
-**Library Loading Order** (in index.html):
-```html
-<script src="js/vendor/pdf-lib.min.js"></script>
-<script src="js/vendor/fontkit.umd.min.js"></script>
-<script src="js/vendor/pdf.worker.min.js"></script>  <!-- BEFORE pdf.min.js! -->
-<script src="js/vendor/pdf.min.js"></script>
-<script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'js/vendor/pdf.worker.min.js';</script>
-<script src="js/vendor/signature_pad.umd.min.js"></script>
-```
-
-**Note:** `workerSrc` points to the self-hosted worker file for real Web Worker support. PDF.js falls back to a fake (main-thread) worker if the file is unavailable offline.
-
-**pdf-encrypt-lite is self-hosted** as of Mar 2026: patched to use `window.PDFLib` instead of ESM imports. Imported as ES module from `./js/vendor/pdf-encrypt-lite.min.js` via inline `<script type="module">` in index.html.
-
-## Self-Hosted Fonts (268KB total, Latin charset)
-
-All fonts in `/fonts/` for offline + privacy. Loaded via `@font-face` in `style.css` for UI, fetched as ArrayBuffer for PDF embedding via `getFont()` in `pdf-export.js`.
-
-- **Montserrat** (4 variants) - 77KB
-- **Carlito** (4 variants) - 122KB (open-source Calibri alternative)
-- **Plus Jakarta Sans** (4 weights) - 49KB (UI only)
-- **Standard PDF fonts**: Helvetica, Times-Roman, Courier (built into pdf-lib)
-
-Font mapping: `CSS_FONT_MAP` constant in `js/lib/state.js`. fontkit registered with PDFDocument for custom font support.
+`security.txt` is served at `/.well-known/security.txt` via a rewrite in `vercel.json`.
