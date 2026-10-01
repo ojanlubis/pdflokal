@@ -748,7 +748,7 @@
     {
       "slug": "kompres-pdf-500kb",
       "intent": "kompres",
-      "target": 512000,
+      "target": 500000,
       "title": "Kompres PDF 500KB Online Gratis - Pas Buat Syarat Unggah | PDFLokal",
       "description": "Kompres PDF sampai di bawah 500KB, langsung di browser. Gratis, tanpa akun, tanpa upload. Ukuran hasilnya ditunjukkan sebelum kamu mengunduh.",
       "h1": "Kompres PDF sampai di bawah 500KB",
@@ -812,7 +812,7 @@
     {
       "slug": "kompres-pdf-1mb",
       "intent": "kompres",
-      "target": 1048576,
+      "target": 1000000,
       "title": "Kompres PDF 1MB Online Gratis - Perkecil di Bawah 1MB | PDFLokal",
       "description": "Kompres PDF sampai di bawah 1MB, langsung di browser. Gratis, tanpa akun, tanpa upload. Kualitas terbaik yang masih muat.",
       "h1": "Kompres PDF sampai di bawah 1MB",
@@ -884,7 +884,7 @@
     {
       "slug": "kompres-pdf-200kb",
       "intent": "kompres",
-      "target": 204800,
+      "target": 200000,
       "title": "Kompres PDF 200KB Online Gratis - Perkecil di Bawah 200KB | PDFLokal",
       "description": "Kompres PDF sampai di bawah 200KB langsung di browser. Gratis, tanpa akun, tanpa upload. Saya bilang terus terang kalau tidak tercapai.",
       "h1": "Kompres PDF sampai di bawah 200KB",
@@ -949,7 +949,7 @@
     {
       "slug": "kompres-pdf-100kb",
       "intent": "kompres",
-      "target": 102400,
+      "target": 100000,
       "title": "Kompres PDF 100KB Online Gratis - Perkecil di Bawah 100KB | PDFLokal",
       "description": "Kompres PDF sampai di bawah 100KB langsung di browser. Gratis, tanpa akun, tanpa upload. Batas paling ketat, saya jujur soal hasilnya.",
       "h1": "Kompres PDF sampai di bawah 100KB",

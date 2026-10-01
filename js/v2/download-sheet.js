@@ -65,13 +65,21 @@ const COMPRESS_MAXDIM = 1600;  // the right answer when the user has no hard cap
 // SIZE: "kompres pdf 500kb", "kompres pdf 1mb", "kompres pdf 100kb" — because
 // CPNS, SNBP and e-filing portals reject a berkas over a hard cap. These are the
 // caps people actually type. See compressToTargetBytes() in js/core/compress.js.
-const TARGETS = [
+//
+// DECIMAL BYTES, ON PURPOSE. "200 KB" on a portal may mean 200,000 or 204,800
+// bytes, and we cannot tell which a given portal enforces. A file at 204,000 bytes
+// passes one reading and is rejected by the other, and being rejected after we said
+// "muat di bawah 200 KB" is the one failure this feature must not have. So the cap
+// is the SMALLER reading: a file under 200,000 bytes passes both. (Which base each
+// portal enforces is not measured here; this is the safe side of not knowing.)
+// Exported so tests/core/size-caps.test.mjs can hold the table to that rule.
+export const TARGETS = [
   { v: null, label: 'Otomatis' },
-  { v: 2 * 1024 * 1024, label: '2 MB' },
-  { v: 1024 * 1024, label: '1 MB' },
-  { v: 500 * 1024, label: '500 KB' },
-  { v: 200 * 1024, label: '200 KB' },
-  { v: 100 * 1024, label: '100 KB' },
+  { v: 2_000_000, label: '2 MB' },
+  { v: 1_000_000, label: '1 MB' },
+  { v: 500_000, label: '500 KB' },
+  { v: 200_000, label: '200 KB' },
+  { v: 100_000, label: '100 KB' },
 ];
 const IMG_DIMS = { asli: null, sedang: 1500, kecil: 800 };
 
@@ -79,9 +87,12 @@ const IMG_DIMS = { asli: null, sedang: 1500, kecil: 800 };
 // with are quoted in KB ("maksimal 500KB"), so a result rendered "0,33 MB" makes
 // the user do the conversion themselves at exactly the moment they're anxious
 // about whether it fits. "335 KB" answers the question they actually have.
-function fmtMB(bytes) {
-  const mb = bytes / (1024 * 1024);
-  if (mb < 1) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+// DECIMAL, to match the presets: KB = 1000 bytes, MB = 1,000,000 (TARGETS above).
+// A 204,000-byte result must not read "199 KB" beside "belum masuk 200 KB".
+// Exported for tests/core/size-caps.test.mjs.
+export function fmtMB(bytes) {
+  const mb = bytes / 1_000_000;
+  if (mb < 1) return `${Math.max(1, Math.round(bytes / 1000))} KB`;
   return `${mb.toFixed(1).replace('.', ',')} MB`;
 }
 

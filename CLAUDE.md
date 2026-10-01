@@ -34,7 +34,8 @@ to pdflokal.id.
   `<img>`, one overlay, one pointer path) · app shell `js/v2/` (app chrome and UI flows). CSS is
   self-contained inside `index.html`.
 - **12 SEO pages** are generated: `seo/pages.json` + `scripts/gen-seo-pages.js`, run via `npm run seo`.
-  **Never hand-edit generated output.** Copy changes go through Fauzan.
+  SEO copy ships on the seat's pen; Fauzan judges it on the deploy (seat decisions 2026-10-01).
+  **Never hand-edit generated output.** Copy changes go in `seo/pages.json`, then `npm run seo`.
 - **`alat-gambar.html` is the OLD wing** (noindexed) — `js/editor/`, `js/pdf-tools/`, `style.css`, the
   old `init*.js`, `ueState`, `js/changelog.js`. It exists only to keep the image tools alive until
   absorption, and dies at demolition. Do not build new surfaces on it.

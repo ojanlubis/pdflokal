@@ -38,7 +38,6 @@
  */
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
-import { createHash } from 'node:crypto';
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -47,55 +46,20 @@ import { dirname, join, extname } from 'node:path';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 /* ===========================================================================
- * THE TASTE LOCK  (--sample / --approve)
+ * --sample <slug>  (render one page, to LOOK at it)
  * ===========================================================================
- * WHY (the scar, Jul 12 2026):
- *   Fauzan looked at a generated page for NINETY SECONDS and produced two
- *   corrections nobody else could have: an h1 rewrite, and "orang yang masuk ke
- *   /pisah-pdf pasti mau pisah, tapi wording-nya nggak ngasih tau." Both were pure
- *   taste. Both were sitting ONE `npm run seo` away from hardening into TWELVE
- *   production pages — and no test on earth would have caught them, because the
- *   pages were CORRECT. They were just written in the wrong language for the user.
+ * SEO copy ships on the seat's pen; Fauzan judges it on the deploy (seat
+ * decisions 2026-10-01). The human taste lock that refused `npm run seo`
+ * until a human approved a rendered page is RETIRED. This is what remains of it:
+ * an optional way to render ONE page through a real HTTP server and drop a PNG on
+ * the desk. The intent copy ("Seret PDF yang mau dipisah") is applied by JS at
+ * runtime, so a file:// render would show the generic copy.
  *
- *   This script is a 12x MULTIPLIER, and nothing could stop it firing.
- *
- * WHAT THIS DOES: `npm run seo` now REFUSES to generate when the copy
- * (seo/pages.json) has changed and no human has looked at a rendered page since.
- *   1. edit seo/pages.json
- *   2. `npm run seo`            -> REFUSED, tells you to sample
- *   3. `npm run seo:sample -- <slug>` -> renders ONE page, drops a PNG on the desk
- *   4. a human LOOKS at it, then `npm run seo:approve`
- *   5. `npm run seo`            -> proceeds
- *
- * IT CAN ONLY REFUSE. It cannot alter a single byte of what a user sees — which is
- * precisely what makes it PM-plane tooling rather than a product change (spec §10b).
- *
- * The sample RENDERS, it does not describe. Showing Fauzan `seo/pages.json` would
- * not have worked: he did not read the JSON, he LOOKED at a page. Taste does not
- * fire on descriptions. It is also why the sample must be screenshotted through a
- * real HTTP server — the intent copy ("Seret PDF yang mau dipisah") is applied by
- * JS at runtime, so a file:// render would show the generic copy and hide the very
- * thing being reviewed.
- *
- * Screenshots go through the Playwright CLI, NEVER Playwright MCP: the MCP
+ * Screenshots go through a Playwright script, NEVER Playwright MCP: the MCP
  * silently redirects out-of-root writes into the REPO ROOT and misreports the path,
- * and this repo is PUBLIC. (Verified Jul 12, probe P4. See EXCEPTIONS.md rule 5.)
+ * and this repo is PUBLIC. (EXCEPTIONS.md rule 5.)
  * =========================================================================== */
-const LOCK = join(ROOT, 'seo/.taste-lock');
 const DESK = join(process.env.HOME, 'machine/work/pdflokal/taste/pending');
-
-const copyHash = () => createHash('sha256')
-  .update(readFileSync(join(ROOT, 'seo/pages.json')))
-  .digest('hex').slice(0, 16);
-
-const approvedHash = () => (existsSync(LOCK) ? readFileSync(LOCK, 'utf8').trim().split(/\s+/)[0] : null);
-
-function approve() {
-  const h = copyHash();
-  writeFileSync(LOCK, `${h}\n# approved by a human who LOOKED at a rendered page.\n# Regenerate the lock with: npm run seo:approve\n`);
-  console.log(`  ✅ copy approved (${h}). \`npm run seo\` will now generate all pages.`);
-  process.exit(0);
-}
 
 // Serve the repo statically for the screenshot. Node stdlib, no npx serve — which
 // caches aggressively and would happily screenshot a stale page.
@@ -111,7 +75,7 @@ function serve(port) {
     res.end(readFileSync(abs));
   });
   // Resolve only once it is ACTUALLY listening — firing the screenshot against a
-  // socket that isn't up yet is a race, and a race in a safety lock is worthless.
+  // socket that isn't up yet is a race, and a race is worthless.
   return new Promise((res) => { srv.listen(port, () => res(srv)); });
 }
 
@@ -162,18 +126,17 @@ async function sample(slug) {
     process.exit(1);
   }
 
-  console.log(`\n  📄 TASTE SAMPLE, 1 of ${pages.length}\n`);
+  console.log(`\n  📄 SAMPLE, 1 of ${pages.length}\n`);
   console.log(`     ${out}`);
   console.log(`\n     h1:       ${page.h1}`);
   console.log(`     sub:      ${page.sub}`);
-  console.log(`     intent:   ${page.intent}${page.target ? ` (target ${Math.round(page.target / 1024)} KB)` : ''}`);
+  console.log(`     intent:   ${page.intent}${page.target ? ` (target ${Math.round(page.target / 1000)} KB)` : ''}`);
   console.log(`\n     LOOK AT THE PNG. Not the JSON, the JSON is where the last two`);
   console.log(`     taste errors hid in plain sight and passed every test.`);
-  console.log(`\n     Then: npm run seo:approve\n`);
+  console.log('');
 }
 
 const SAMPLE_I = process.argv.indexOf('--sample');
-if (process.argv.includes('--approve')) approve();
 if (SAMPLE_I !== -1) {
   await sample(process.argv[SAMPLE_I + 1]);
   process.exit(0);
@@ -186,27 +149,6 @@ if (SAMPLE_I !== -1) {
 // when a generated page genuinely disagrees with seo/pages.json + index.html.
 const CHECK = process.argv.includes('--check');
 const drift = [];
-
-// THE LOCK. Deliberately does NOT apply to --check: that path only READS and
-// compares, it writes nothing, and CI runs it. A safety lock that breaks CI is a
-// safety lock someone deletes — the same disease as a check that cries wolf.
-if (!CHECK) {
-  const now = copyHash();
-  const ok = approvedHash();
-  if (ok !== now) {
-    console.error('\n  🔒 REFUSING TO GENERATE, the copy changed and nobody has LOOKED at it.\n');
-    console.error(`     seo/pages.json  ${now}`);
-    console.error(`     last approved   ${ok ?? '(never)'}\n`);
-    console.error('     This script writes 12 pages at once. On Jul 12 a wording error sat ONE run');
-    console.error('     away from hardening into all twelve, and no test would have caught it,');
-    console.error('     because the pages were CORRECT, just written in the wrong language for the');
-    console.error('     user. Fauzan found it in ninety seconds BY LOOKING at a rendered page.\n');
-    console.error('     Render one, look at it, then approve:');
-    console.error('       npm run seo:sample -- kompres-pdf');
-    console.error('       npm run seo:approve\n');
-    process.exit(1);
-  }
-}
 
 function emit(relPath, content) {
   const abs = join(ROOT, relPath);
