@@ -25,11 +25,11 @@
 import { test, expect } from '@playwright/test';
 
 const CAPS = [
-  { slug: 'kompres-pdf-500kb', bytes: 500 * 1024, label: '500 KB', pages: 3 },
-  { slug: 'kompres-pdf-100kb', bytes: 100 * 1024, label: '100 KB', pages: 3 },
+  { slug: 'kompres-pdf-500kb', bytes: 500_000, label: '500 KB', pages: 3 },
+  { slug: 'kompres-pdf-100kb', bytes: 100_000, label: '100 KB', pages: 3 },
   // The forced miss. 14 heavy scan pages cannot reach 100 KB at any rung on the
   // ladder, so this exercises the path where honesty is load-bearing.
-  { slug: 'kompres-pdf-100kb', bytes: 100 * 1024, label: '100 KB', pages: 14, expectMiss: true },
+  { slug: 'kompres-pdf-100kb', bytes: 100_000, label: '100 KB', pages: 14, expectMiss: true },
 ];
 
 // Build scan-like pages in-browser: white paper + a photo + "text" rules. Real

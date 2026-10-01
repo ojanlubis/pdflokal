@@ -130,7 +130,7 @@ async function sample(slug) {
   console.log(`     ${out}`);
   console.log(`\n     h1:       ${page.h1}`);
   console.log(`     sub:      ${page.sub}`);
-  console.log(`     intent:   ${page.intent}${page.target ? ` (target ${Math.round(page.target / 1024)} KB)` : ''}`);
+  console.log(`     intent:   ${page.intent}${page.target ? ` (target ${Math.round(page.target / 1000)} KB)` : ''}`);
   console.log(`\n     LOOK AT THE PNG. Not the JSON, the JSON is where the last two`);
   console.log(`     taste errors hid in plain sight and passed every test.`);
   console.log('');
