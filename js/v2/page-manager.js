@@ -20,6 +20,7 @@
 import { removePage, reorderPage, rotatePage } from '../core/operations.js';
 import { record } from '../core/history.js';
 import { track } from '../lib/analytics.js';
+import { t as tr } from '../lib/i18n.js';
 
 const LONG_PRESS_MS = 280;
 const DRAG_SLOP = 8; // px of movement that cancels a pending long-press
@@ -116,7 +117,7 @@ export function createPageManager(deps) {
     // bulk actions cover the same jobs for keyboard users).
     tile.setAttribute('role', 'button');
     tile.setAttribute('tabindex', '0');
-    tile.setAttribute('aria-label', `Halaman ${index + 1}`);
+    tile.setAttribute('aria-label', tr('pm.page', { n: index + 1 }));
     tile.setAttribute('aria-pressed', String(selected.has(page.id)));
     tile.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') {
@@ -176,7 +177,7 @@ export function createPageManager(deps) {
       // Pick mode: bulk actions hidden; the pick bar is the only exit.
       bulkBar.classList.remove('show');
       deps.pickBar.classList.add('show');
-      deps.pickBar.querySelector('#pm-pick-ok').textContent = `Pakai (${n})`;
+      deps.pickBar.querySelector('#pm-pick-ok').textContent = tr('pm.use', { n });
       deps.pickBar.querySelector('#pm-pick-ok').disabled = n === 0;
       return;
     }
@@ -185,7 +186,7 @@ export function createPageManager(deps) {
     // the bar states what the sheet can do before anything is touched, rather
     // than hiding every action behind a selection the user has to discover.
     bulkBar.classList.add('show');
-    bulkBar.querySelector('.pm-count').textContent = `${n} dipilih`;
+    bulkBar.querySelector('.pm-count').textContent = tr('pm.selected', { count: n });
     const empty = n === 0;
     bulkBar.querySelector('[data-act="rotate"]').disabled = empty;
     bulkBar.querySelector('[data-act="extract"]').disabled = empty;
@@ -460,7 +461,7 @@ export function createPageManager(deps) {
       track('editor_action', { action: 'delete_page' });
       render();
       deps.onDocChanged();
-      deps.toast(`${pages.length} halaman dihapus. Salah? Tinggal Undo`);
+      deps.toast(tr('pm.deleted', { count: pages.length }));
     } else if (act === 'extract') {
       track('editor_action', { action: 'split' }); // old name kept: extract IS split
       deps.onExtract(pages);

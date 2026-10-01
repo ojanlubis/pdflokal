@@ -837,5 +837,175 @@
     "src": [
       "js/v2/edit-feedback.js"
     ]
+  },
+  "sig.pickImage": {
+    "text": "Pilih file gambar ya",
+    "src": [
+      "js/v2/signature-modal.js"
+    ]
+  },
+  "sig.readFailed": {
+    "text": "Gagal membaca gambar",
+    "src": [
+      "js/v2/signature-modal.js"
+    ]
+  },
+  "sig.drawFirst": {
+    "text": "Gambar tanda tanganmu dulu ya",
+    "src": [
+      "js/v2/signature-modal.js"
+    ]
+  },
+  "sig.uploadFirst": {
+    "text": "Upload gambar tanda tanganmu dulu ya",
+    "src": [
+      "js/v2/signature-modal.js"
+    ]
+  },
+  "sig.empty": {
+    "text": "Tanda tangan kosong",
+    "src": [
+      "js/v2/signature-modal.js"
+    ]
+  },
+  "celebrate.shareText": {
+    "text": "Eh coba deh pdflokal.id, bisa edit + tanda tangan PDF langsung di HP. Gratis, dan filenya nggak diupload ke mana-mana.",
+    "src": [
+      "js/v2/celebrate.js"
+    ]
+  },
+  "celebrate.stampOffline": {
+    "text": "Tetap jalan",
+    "src": [
+      "js/v2/celebrate.js"
+    ]
+  },
+  "celebrate.stampDone": {
+    "text": "Beres ✓",
+    "src": [
+      "js/v2/celebrate.js"
+    ]
+  },
+  "celebrate.offlineToast": {
+    "text": "Internet putus. Tenang, semuanya jalan di HP-mu, bukan di server.",
+    "src": [
+      "js/v2/celebrate.js"
+    ]
+  },
+  "celebrate.neverToast": {
+    "text": "Oke, nggak bakal muncul lagi",
+    "src": [
+      "js/v2/celebrate.js"
+    ]
+  },
+  "celebrate.copiedToast": {
+    "text": "Udah disalin, tinggal kirim ke temanmu",
+    "src": [
+      "js/v2/celebrate.js"
+    ]
+  },
+  "playstore.thanksNo": {
+    "text": "Oke, makasih masukannya!",
+    "src": [
+      "js/v2/playstore-vote.js"
+    ]
+  },
+  "playstore.thanksLater": {
+    "text": "Sip, makasih ya!",
+    "src": [
+      "js/v2/playstore-vote.js"
+    ]
+  },
+  "format.font": {
+    "text": "Jenis huruf",
+    "src": [
+      "js/v2/format-bar.js"
+    ]
+  },
+  "format.size": {
+    "text": "Ukuran huruf",
+    "src": [
+      "js/v2/format-bar.js"
+    ]
+  },
+  "format.bold": {
+    "text": "Tebal",
+    "src": [
+      "js/v2/format-bar.js"
+    ]
+  },
+  "format.italic": {
+    "text": "Miring",
+    "src": [
+      "js/v2/format-bar.js"
+    ]
+  },
+  "format.color": {
+    "text": "Warna {color}",
+    "src": [
+      "js/v2/format-bar.js"
+    ]
+  },
+  "format.moreColors": {
+    "text": "Warna lainnya",
+    "src": [
+      "js/v2/format-bar.js"
+    ]
+  },
+  "pm.page": {
+    "text": "Halaman {n}",
+    "src": [
+      "js/mobile-ui.js",
+      "js/v2/page-manager.js"
+    ]
+  },
+  "pm.use": {
+    "text": "Pakai ({n})",
+    "src": [
+      "js/v2/page-manager.js"
+    ]
+  },
+  "pm.selected": {
+    "text": "{count} dipilih",
+    "src": [
+      "js/v2/download-sheet.js",
+      "js/v2/page-manager.js"
+    ]
+  },
+  "pm.deleted": {
+    "text": "{count} halaman dihapus. Salah? Tinggal Undo",
+    "src": [
+      "js/v2/page-manager.js"
+    ]
+  },
+  "bugPrompt.small": {
+    "text": "Halo user PDFLokal",
+    "src": [
+      "js/v2/bug-report-prompt.js"
+    ]
+  },
+  "bugPrompt.big": {
+    "text": "Mohon kabarin saya ya kalo ada bug, di sini",
+    "src": [
+      "js/v2/bug-report-prompt.js"
+    ]
+  },
+  "render.loading": {
+    "text": "memuat…",
+    "src": [
+      "js/render/page-view.js"
+    ]
+  },
+  "theme.toLight": {
+    "text": "Ganti ke mode terang",
+    "src": [
+      "js/theme.js"
+    ]
+  },
+  "theme.toDark": {
+    "text": "Ganti ke mode gelap",
+    "src": [
+      "js/theme.js"
+    ]
   }
 }

@@ -24,6 +24,7 @@
  *      when the header gets tight.
  */
 import { shownUpdates } from '../updates.js';
+import { numberLocale } from '../lib/i18n.js';
 
 export const SEEN_KEY = 'pdflokal_maker_seen';
 const SHOW_DELAY_MS = 900; // let the landing paint and be read first
@@ -84,7 +85,7 @@ export function initMakerCard({ entries = shownUpdates(), delay = SHOW_DELAY_MS 
 // ---- the count ----------------------------------------------------------------
 
 export function formatCount(n) {
-  return Number.isInteger(n) ? n.toLocaleString('id-ID') : null;
+  return Number.isInteger(n) ? n.toLocaleString(numberLocale()) : null;
 }
 
 // Editor header: the count is the first thing to leave when the row runs out

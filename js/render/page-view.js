@@ -27,6 +27,7 @@
  * (Decision 2).
  */
 import { orderedForPaint, annotationZIndex } from '../core/annotation-order.js';
+import { t as tr } from '../lib/i18n.js';
 
 // Render a full page view (background + annotation overlay).
 // opts.activeId = id of the currently-active annotation → rendered on top.
@@ -88,7 +89,7 @@ function attachPlaceholder(view) {
   ph.style.cssText =
     'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;' +
     'color:#c4c4c4;font-size:13px;background:#fff';
-  ph.textContent = view.dataset.phLabel || 'memuat…';
+  ph.textContent = view.dataset.phLabel || tr('render.loading');
   view.insertBefore(ph, view.firstChild);
 }
 

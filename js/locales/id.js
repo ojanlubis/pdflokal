@@ -254,4 +254,62 @@ export default {
     skip: 'Nggak usah',
     send: 'Kirim',
   },
+
+  // Signature dialog (js/v2/signature-modal.js)
+  sig: {
+    pickImage: 'Pilih file gambar ya',
+    readFailed: 'Gagal membaca gambar',
+    drawFirst: 'Gambar tanda tanganmu dulu ya',
+    uploadFirst: 'Upload gambar tanda tanganmu dulu ya',
+    empty: 'Tanda tangan kosong',
+  },
+
+  // The share card, offline notice and stamps (js/v2/celebrate.js)
+  celebrate: {
+    shareText: 'Eh coba deh pdflokal.id, bisa edit + tanda tangan PDF langsung di HP. Gratis, dan filenya nggak diupload ke mana-mana.',
+    stampOffline: 'Tetap jalan',
+    stampDone: 'Beres ✓',
+    offlineToast: 'Internet putus. Tenang, semuanya jalan di HP-mu, bukan di server.',
+    neverToast: 'Oke, nggak bakal muncul lagi',
+    copiedToast: 'Udah disalin, tinggal kirim ke temanmu',
+  },
+
+  // Play Store vote card (js/v2/playstore-vote.js)
+  playstore: {
+    thanksNo: 'Oke, makasih masukannya!',
+    thanksLater: 'Sip, makasih ya!',
+  },
+
+  // Text format bar (js/v2/format-bar.js), aria-labels and the colour input's tooltip
+  format: {
+    font: 'Jenis huruf',
+    size: 'Ukuran huruf',
+    bold: 'Tebal',
+    italic: 'Miring',
+    color: 'Warna {color}',
+    moreColors: 'Warna lainnya',
+  },
+
+  // Kelola Halaman sheet (js/v2/page-manager.js)
+  pm: {
+    page: 'Halaman {n}',
+    use: 'Pakai ({n})',
+    selected: '{count} dipilih',
+    deleted: '{count} halaman dihapus. Salah? Tinggal Undo',
+  },
+
+  // The bug-report card (js/v2/bug-report-prompt.js): the founder's own words
+  bugPrompt: {
+    small: 'Halo user PDFLokal',
+    big: 'Mohon kabarin saya ya kalo ada bug, di sini',
+  },
+
+  // Page placeholder before a page is rendered (js/render/page-view.js)
+  render: { loading: 'memuat…' },
+
+  // Dark-mode toggle's aria-label and tooltip (js/theme.js)
+  theme: {
+    toLight: 'Ganti ke mode terang',
+    toDark: 'Ganti ke mode gelap',
+  },
 };
