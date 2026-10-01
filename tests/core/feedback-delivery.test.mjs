@@ -88,7 +88,7 @@ test('DELIVERY: a valid 👎 reaches the insert, parameterized, with its note in
   // carries no image of any kind.
   //
   // ⚠️ UPDATED AGAIN 2026-09-16 when `ts` became the FIRST parameter (dual-write,
-  // seat `specs/spec-rail-to-turso.md`). It moved from a database default to an
+  // seat decisions.md 2026-09-16). It moved from a database default to an
   // explicit value for a reason the soak depends on: Neon and Turso issue
   // different ids, so without one shared clock written to both there is no
   // column pair that identifies a single feedback row in both stores, and the

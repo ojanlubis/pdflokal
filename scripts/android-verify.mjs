@@ -13,7 +13,7 @@
  *
  * Usage:
  *   node scripts/android-verify.mjs [url-path] [screenshot-name]
- *   node scripts/android-verify.mjs /editor-v2.html v2-loaded
+ *   node scripts/android-verify.mjs / v2-loaded
  */
 import { chromium } from '@playwright/test';
 import { execSync } from 'child_process';
@@ -22,7 +22,7 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ADB = process.env.ADB || `${process.env.HOME}/Library/Android/sdk/platform-tools/adb`;
-const urlPath = process.argv[2] || '/editor-v2.html';
+const urlPath = process.argv[2] || '/';
 const shotName = process.argv[3] || 'android-verify';
 const OUT = process.env.SHOT_DIR || '/tmp';
 

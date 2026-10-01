@@ -9,7 +9,7 @@
  * ⚠️ AND THERE WAS A SPEC THAT LOOKED LIKE IT COVERED THIS. `signature-paste.spec.js`
  * drives /alat-gambar.html — the dead old wing — through window.ueState. Anyone
  * answering "is signature paste tested?" by filename got the wrong answer.
- * docs/test-suite-audit.md, Class 3, called it the sharpest instance.
+ * docs/test-suite-audit.md (deleted 2026-10-01; git log -- docs/test-suite-audit.md), Class 3, called it the sharpest instance.
  *
  * ⚠️ THE FIXTURE IS DELIBERATELY NOT THE 1x1 RED PIXEL the sibling spec uses.
  * The audit's Class 1 note: that fixture "has no background to remove", so a

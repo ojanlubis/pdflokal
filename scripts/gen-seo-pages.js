@@ -10,7 +10,7 @@
  *   plain static files; nothing is transformed at deploy time; if this script is
  *   never run again, the site still works. That is the whole distinction — a code
  *   generator is not a build pipeline. It preserves every property that
- *   docs/strengths.md exists to protect: the file you read is the file that
+ *   docs/strengths.md (deleted 2026-10-01; git log -- docs/strengths.md) exists to protect: the file you read is the file that
  *   ships, there is no bundler between source and browser, and any future Claude
  *   can open gabung-pdf.html and see exactly what a user sees.
  *

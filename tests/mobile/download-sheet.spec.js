@@ -51,7 +51,7 @@ test.describe('unduh sheet — mobile', () => {
   test('the 90% path: two taps produce the PDF', async ({ page }) => {
     await openSheet(page);
     // ⚠️ THIS FILE HAD FIVE DOWNLOAD ASSERTIONS AND OPENED THE BYTES ZERO TIMES
-    // (docs/test-suite-audit.md, Class 1). It could not have told the difference
+    // (docs/test-suite-audit.md (deleted 2026-10-01; git log -- docs/test-suite-audit.md), Class 1). It could not have told the difference
     // between the mobile output pipeline working and it emitting 0-byte,
     // truncated, or blank files — on the surface that most users are on.
     const { buf, filename } = await downloadBytes(page, () => page.tap('#ds-cta'));

@@ -1,5 +1,5 @@
 /*
- * core/font-decide.js — tier-1 exact-clone routing (spec-font-fidelity-engine.md §3).
+ * core/font-decide.js — tier-1 exact-clone routing (docs/spec-font-fidelity-engine.md (deleted 2026-10-01; git log -- docs/spec-font-fidelity-engine.md) §3).
  * Pure string logic — zero PDFLib/fixture needed, same shape as font-style.test.mjs's
  * parseStyleFromName block. The table rows are the REAL /BaseFont spellings the
  * wild produces (Word, LibreOffice, InDesign, pdf-lib itself).
