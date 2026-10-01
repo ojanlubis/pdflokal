@@ -130,9 +130,11 @@ Permanent refusals: never attach GA4 to Ads tag `AW-17538923405` · no fabricate
 
 ## Git
 
-- **Branches open on his word, gated by CI.** `e2e.yml` runs the full gate but only on a push to
-  `main` or a PR — a bare branch push doesn't trigger it — so work that needs the CI gate before
-  landing goes through a branch and a PR, and the branch is deleted after merge. Preserved-but-
+- **Branches open on his word, gated by CI.** `e2e.yml` runs the full gate on a PR (a newer push
+  cancels the PR's superseded run) and once a night on `main` (01:00 WIB), NOT after every merge:
+  his ruling 2026-10-01, CI "secukupnya". A bare branch push triggers nothing, and retargeting a
+  PR's base does not either (push once after a retarget). So work that needs the gate goes through a
+  PR; iterate locally (lint, core, the specs you touched) and push once. Delete the branch after merge. Preserved-but-
   unmerged work lives on **tags** — see `git tag -l 'archive/*'`.
 - **Never `git add -A`** — stage explicit paths. Other sessions have uncommitted work in this tree.
   **Never sweep another session's work, in either direction.**
