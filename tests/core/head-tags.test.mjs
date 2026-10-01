@@ -131,7 +131,7 @@ test('3. the crawler-facing files at the root still exist and are not empty', ()
   const linked = /<link rel="manifest" href="\/([^"]+)"/.exec(read('index.html'));
   assert.ok(linked, 'index.html no longer links a web app manifest — the PWA stops being installable');
 
-  for (const f of ['robots.txt', 'sitemap.xml', 'humans.txt', linked[1]]) {
+  for (const f of ['robots.txt', 'sitemap.xml', 'humans.txt', 'llms.txt', linked[1]]) {
     const abs = path.join(ROOT, f);
     assert.ok(fs.existsSync(abs), `${f} is missing from the repo root`);
     assert.ok(fs.statSync(abs).size > 0, `${f} exists but is EMPTY, which is the same as missing to a crawler`);
@@ -172,4 +172,20 @@ test('4. the landing has NOT been stripped relative to a generated page', () => 
     `the landing has ${landing.meta} <meta> tags and kompres-pdf.html has ${generated.meta}. `
     + 'They are generated from the same template, so a difference means one of them was edited by hand.',
   );
+});
+
+// llms.txt (2026-10-01, his ruling: the seat writes it) is a list of links an
+// assistant will follow. A tool page renamed or deleted leaves a dead link in a
+// file nobody re-reads, so every pdflokal.id link in it must resolve to a page
+// on disk, the way Vercel's cleanUrls serves it (/x -> x.html, / -> index.html).
+test('3b. every pdflokal.id link in llms.txt resolves to a page in the repo', () => {
+  const txt = read('llms.txt');
+  const paths = [...txt.matchAll(/\]\(https:\/\/www\.pdflokal\.id(\/[^)\s]*)\)/g)].map((m) => m[1]);
+  assert.ok(paths.length >= 10, `only ${paths.length} pdflokal.id links found in llms.txt: the instrument is blind`);
+  const missing = paths.filter((p) => {
+    const file = p === '/' ? 'index.html' : `${p.slice(1).replace(/\.html$/, '')}.html`;
+    return !fs.existsSync(path.join(ROOT, file));
+  });
+  assert.deepEqual(missing, [], `llms.txt links to pages that do not exist: ${missing.join(', ')}`);
+  assert.ok(/^# PDFLokal\n\n> \S/.test(txt), 'llms.txt lost its llmstxt.org head: "# PDFLokal", blank line, "> summary"');
 });
