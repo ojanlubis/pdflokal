@@ -21,8 +21,8 @@ export const UPDATES = [
   {
     id: '2026-10-01-edit-isian',
     date: '2026-10-01',
-    text: 'Edit sekarang lebih pas di formulir dan daftar.',
-    approved: false,
+    text: 'Tools Edit sekarang bisa mendeteksi formulir dan list, supaya editnya lebih pas',
+    approved: true,
   },
   {
     id: '2026-10-01-ukuran-bebas',
