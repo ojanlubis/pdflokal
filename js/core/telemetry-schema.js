@@ -569,12 +569,9 @@ export const SCHEMA = {
     //   flips        — whole-line face changes while typing (js/v2/
     //                  line-font-live.js). Measures whether the decision
     //                  should become monotone (B3, proposed, not ruled).
-    // ⚠️ CLIENT SKEW, accepted with eyes open, same as doc_open.signed above:
-    // every prop is required, so a cached PWA still on the old JS sends
-    // `insert` without these three and loses the WHOLE event until it
-    // refreshes. The alternative (a separate event, failure_cause's shape) was
-    // weighed and set aside because the design names these as `insert`
-    // fields; the seat ratifies that trade in the PR.
+    // All three are OPTIONAL (OPTIONAL_PROPS below; seat ruling 2026-10-01:
+    // a new prop is never required). A cached PWA still on the old JS sends
+    // `insert` without them, and the event still validates and lands.
     decision: ['native', 'clone', 'substitute', 'none'],
     decided_live: 'bool',
     flips: 'int',
@@ -644,7 +641,7 @@ export const SCHEMA = {
   // exactly the values they carried yesterday, so every dashboard and every
   // view in scripts/telemetry-migration.sql keeps reading what it always read.
   // Redefining a live field is the founder's own hand; adding beside it is not.
-  // (validateEvent has no optional props by design — see its "missing a
+  // (validateEvent had no optional props until 2026-10-01 — see its "missing a
   // required prop" check — so both props are supplied at ALL FIVE call sites,
   // with a neutral value where the axis does not apply. That is the cost of
   // the no-optionals law and it is the right cost: a prop that is sometimes
@@ -803,6 +800,18 @@ function validateProp(descriptor, value) {
   return false;
 }
 
+// OPTIONAL props, per event (added 2026-10-01, seat ruling: a prop added to a
+// live event is NEVER required). Every prop is required unless listed here.
+// WHY: api/t.js validates with this same module, so a newly REQUIRED prop
+// makes every cached PWA client — still running the JS from before the prop
+// existed — lose the WHOLE event until it refreshes. An optional prop is
+// still type-checked when present; it may only be absent. Kept as a side
+// table, not a descriptor wrapper, so every descriptor in SCHEMA keeps its
+// enum/bool/int shape (the no-string-prop law walks them).
+export const OPTIONAL_PROPS = {
+  insert: new Set(['decision', 'decided_live', 'flips']),
+};
+
 // Pure, no I/O. {ok:true, clean} | {ok:false}. Strict on every axis the spec
 // calls out: unknown event, unknown prop, missing required prop, enum value
 // outside the list, and wrong type all fail the WHOLE event (never a partial
@@ -820,7 +829,10 @@ export function validateEvent(name, props) {
 
   const clean = {};
   for (const key of declaredKeys) {
-    if (!(key in src)) return { ok: false }; // missing a required prop
+    if (!(key in src)) {
+      if (OPTIONAL_PROPS[name]?.has(key)) continue; // optional and absent: fine
+      return { ok: false }; // missing a required prop
+    }
     if (!validateProp(shape[key], src[key])) return { ok: false }; // wrong type / bad enum
     clean[key] = src[key];
   }
