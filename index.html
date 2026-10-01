@@ -773,6 +773,14 @@
       border: 1px solid var(--line); background: var(--bg); padding: 0 6px; color: var(--ink);
     }
     .fb-font { max-width: 118px; }
+    /* size field: typed number + presets. Same footprint as the select it
+       replaced; 16px because iOS zooms the page on focusing a smaller input. */
+    #format-bar input.fb-size {
+      font: inherit; font-size: 16px; min-height: 34px; width: 52px; flex: 0 0 auto;
+      border-radius: 8px; border: 1px solid var(--line); background: var(--bg);
+      padding: 0 4px; color: var(--ink); text-align: center;
+    }
+    #format-bar input.fb-size::placeholder { color: var(--ink); opacity: 1; }
     .fb-toggle {
       min-width: 34px; min-height: 34px; border: 1px solid var(--line); border-radius: 8px;
       font-size: 14px; color: var(--muted); background: var(--bg);
