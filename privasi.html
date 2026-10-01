@@ -11,13 +11,12 @@
        full note + the "is this ID alive?" curl check. NEVER attach a GA4 destination to the
        shared Ads tag AW-17538923405 (mesindev loads it too -> rebuilds the property leak). -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-7J8JF8XZ1Q"></script>
-  <script async src="https://www.googletagmanager.com/gtag/js?id=AW-17538923405"></script>
+  <!-- No Google Ads tag on /privasi (his ruling 2026-10-01): the page that lists the cookies sets none from Ads. -->
   <script>
     window.dataLayer = window.dataLayer || [];
     function gtag(){dataLayer.push(arguments);}
     gtag('js', new Date());
     if (location.hostname === 'pdflokal.id' || location.hostname === 'www.pdflokal.id') {
-      gtag('config', 'AW-17538923405');
       gtag('config', 'G-7J8JF8XZ1Q');
     }
   </script>
@@ -590,11 +589,11 @@
             </tr>
             <tr>
               <td><code>_gcl_au</code>, <code>_gcl_ls</code></td>
-              <td>Cookie dan Local Storage Google Ads, untuk mengukur iklan</td>
+              <td>Cookie dan Local Storage Google Ads, untuk mengukur iklan. Dipasang di halaman alat, bukan di halaman ini</td>
             </tr>
             <tr>
               <td><code>IDE</code>, <code>test_cookie</code></td>
-              <td>Cookie Google Ads di domain doubleclick.net</td>
+              <td>Cookie Google Ads di domain doubleclick.net. Dipasang di halaman alat, bukan di halaman ini</td>
             </tr>
             <tr>
               <td><code>sentryReplaySession</code></td>
