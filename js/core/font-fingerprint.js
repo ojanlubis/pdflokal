@@ -214,6 +214,23 @@ export function resolveFontFingerprint(page, PDFLib, fontkit, fontName) {
   };
 }
 
+// The FontFace descriptors a document's own embedded font must be registered
+// under, from the font's own bold/italic facts (resolveFontFingerprint's, the
+// same ones font_seen reports). WHY they cannot be left off: a FontFace with no
+// `weight` registers as 400, so the editor's CSS `font-weight: 700` (textFontCss
+// writes 700 for a bold draft) makes the browser SYNTHESISE a faux bold on top
+// of a program that is already bold (e.g. "Amiri-Bold") — heavier, wider glyphs
+// than the document's own, and a replacement that no longer fits its slot.
+// Declaring the face's real weight/style lets the browser match it as-is.
+// A fingerprint that declined (ok:false carries bold/italic false) yields the
+// same 400/normal the descriptor-less FontFace had, so nothing changes there.
+export function docFontFaceDescriptors(facts) {
+  return {
+    weight: facts && facts.bold ? '700' : '400',
+    style: facts && facts.italic ? 'italic' : 'normal',
+  };
+}
+
 // Re-exported purely so callers that only need the informativeness test
 // don't have to import font-style.js separately for it.
 export { isInformativeBaseFont };
