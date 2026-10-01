@@ -1050,6 +1050,10 @@
       margin: 0 var(--sp-8) var(--sp-8);
     }
     .ld-burger-lang-opts { display: flex; flex-direction: column; gap: var(--sp-4); }
+    /* The other language is a real link now, and `.ld-burger-menu a` sizes every
+       drawer link like a nav item; inside the language list it must match the
+       current-language row beside it. Keeps the 44px tap height. */
+    .ld-burger-lang-opts a.ld-lang-opt { font-size: var(--fs-n1); }
 
     /* A PLAIN FLEX ROW. There is NO wrapper — no background, no border, no
        radius, no shadow. He killed it on sight: "the shadow wrapper is... bad it
@@ -1151,7 +1155,7 @@
        usefully press. Colouring it red teaches the opposite of the grammar
        every other red thing on the page teaches. Weight carries selection;
        colour stays reserved. */
-    .ld-lang-opt.is-active { font-weight: 700; color: var(--ink); }
+    .ld-lang-opt.is-active { font-weight: 700; color: var(--ink); cursor: default; }
     a.ld-lang-opt { text-decoration: none; }
     .ld-lang-opt:disabled { color: var(--muted); cursor: not-allowed; }
     /* Centered hero (founder, Jul 5) — the document opens like a letter's

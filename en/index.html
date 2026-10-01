@@ -102,7 +102,7 @@
       "name": "Is it really free? What are the limits?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Free. No limit on the number of files, no watermark, no account needed. PDFLokal lives on support from its users, never on your data."
+        "text": "Free. No limit on the number of files, no watermark, no account needed. PDFLokal lives on support from its users, not on your data."
       }
     },
     {
@@ -1098,6 +1098,10 @@
       margin: 0 var(--sp-8) var(--sp-8);
     }
     .ld-burger-lang-opts { display: flex; flex-direction: column; gap: var(--sp-4); }
+    /* The other language is a real link now, and `.ld-burger-menu a` sizes every
+       drawer link like a nav item; inside the language list it must match the
+       current-language row beside it. Keeps the 44px tap height. */
+    .ld-burger-lang-opts a.ld-lang-opt { font-size: var(--fs-n1); }
 
     /* A PLAIN FLEX ROW. There is NO wrapper — no background, no border, no
        radius, no shadow. He killed it on sight: "the shadow wrapper is... bad it
@@ -1199,7 +1203,7 @@
        usefully press. Colouring it red teaches the opposite of the grammar
        every other red thing on the page teaches. Weight carries selection;
        colour stays reserved. */
-    .ld-lang-opt.is-active { font-weight: 700; color: var(--ink); }
+    .ld-lang-opt.is-active { font-weight: 700; color: var(--ink); cursor: default; }
     a.ld-lang-opt { text-decoration: none; }
     .ld-lang-opt:disabled { color: var(--muted); cursor: not-allowed; }
     /* Centered hero (founder, Jul 5) — the document opens like a letter's
@@ -2305,14 +2309,14 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
           <div>
             <b>Your files never leave your device.</b>
-            <p>Diplomas, ID cards, contracts. Everything is processed in your own browser, never on someone else's server. <a href="/privasi">Read my privacy promise</a></p>
+            <p>Diplomas, ID cards, contracts. Everything is processed in your own browser, not on someone else's server. <a href="/privasi">Read my privacy promise</a></p>
           </div>
         </div>
         <section class="ld-faq">
           <h2>Frequently asked</h2>
           <details>
             <summary>Is it really free? What are the limits?</summary>
-            <p>Free. No limit on the number of files, no watermark, no account needed. PDFLokal lives on support from its users, never on your data.</p>
+            <p>Free. No limit on the number of files, no watermark, no account needed. PDFLokal lives on support from its users, not on your data.</p>
           </details>
           <details>
             <summary>Where do my files get uploaded?</summary>
@@ -2372,7 +2376,7 @@
       <div class="lp-track"><div class="lp-fill"></div></div>
       <div class="lp-title">Processing…</div>
       <div class="lp-count" aria-hidden="true" hidden></div>
-      <p class="lp-note">Processed right on your phone and uploaded nowhere.</p>
+      <p class="lp-note">Processed right on your phone, not uploaded anywhere.</p>
     </div>
   </div>
   <div id="zoom-ctl">

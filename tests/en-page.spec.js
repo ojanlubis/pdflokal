@@ -186,4 +186,21 @@ test.describe('/en', () => {
     await page.click('#hc-go');
     await expect(page).toHaveURL(/\/en\/?$/);
   });
+
+  // Evidence for the seat, not an assertion: the language control OPEN on both
+  // pages, desktop dropdown and 390px drawer. Runs only when EN_SHOT_DIR is set.
+  test('9. screenshots of the language control (EN_SHOT_DIR only)', async ({ page }) => {
+    test.skip(!process.env.EN_SHOT_DIR, 'set EN_SHOT_DIR to write the PNGs');
+    const out = (n) => path.join(process.env.EN_SHOT_DIR, n);
+    for (const [url, tag] of [['/', 'id'], ['/en', 'en']]) {
+      await page.setViewportSize({ width: 1280, height: 400 });
+      await page.goto(url);
+      await page.locator('.ld-lang-btn').click();
+      await page.screenshot({ path: out(`lang-menu-${tag}-desktop.png`), clip: { x: 760, y: 0, width: 520, height: 220 } });
+      await page.setViewportSize({ width: 390, height: 560 });
+      await page.goto(url);
+      await page.click('#ld-burger');
+      await page.screenshot({ path: out(`lang-drawer-${tag}-390.png`) });
+    }
+  });
 });
