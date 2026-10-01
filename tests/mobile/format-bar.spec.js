@@ -47,7 +47,8 @@ test.describe('format bar — mobile', () => {
   test('font family + color + size flow into the model and the DOM', async ({ page }) => {
     await openAndPlaceText(page, 'gaya');
     await page.selectOption('.fb-font', 'Montserrat');
-    await page.selectOption('.fb-size', '32');
+    await page.fill('.fb-size', '32');
+    await page.press('.fb-size', 'Enter');
     await page.tap('.fb-color[data-color="#d33131"]');
 
     const anno = await page.evaluate(() => window.v2.getDoc().pages[0].annotations[0]);

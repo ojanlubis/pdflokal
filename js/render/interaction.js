@@ -314,7 +314,7 @@ export function createInteraction(ctx) {
       if (gesture.anno.type === 'text') {
         // Text resize = fontSize scaling (no width/height on text annos).
         const factor = Math.max(0.2, (gesture.baseElW + dx) / gesture.baseElW);
-        const fontSize = Math.min(120, Math.max(6, Math.round(gesture.baseFontSize * factor)));
+        const fontSize = Math.min(120, Math.max(1, Math.round(gesture.baseFontSize * factor)));
         updateAnnotation(doc, gesture.anno.id, { fontSize });
         gesture.annoEl.style.fontSize = fontSize + 'px'; // longhand beats the shorthand
       } else {

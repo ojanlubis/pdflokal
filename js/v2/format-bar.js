@@ -14,8 +14,8 @@
 import { updateAnnotation } from '../core/operations.js';
 import { record } from '../core/history.js';
 import { FONT_CSS } from '../render/page-view.js';
+import { FONT_SIZE_PRESETS, parseFontSize, formatFontSize } from '../core/font-size.js';
 
-const SIZES = [10, 12, 14, 18, 24, 32, 48, 64];
 const COLORS = ['#000000', '#d33131', '#1d6fdc', '#1d8a44', '#ffffff'];
 
 // deps = {
@@ -64,16 +64,26 @@ export function createFormatBar(deps) {
   }
   el.appendChild(fontSel);
 
-  const sizeSel = document.createElement('select');
-  sizeSel.className = 'fb-size';
-  sizeSel.setAttribute('aria-label', 'Ukuran huruf');
-  for (const s of SIZES) {
+  // Size = a typed number plus presets (founder 2026-10-01: the old <select>
+  // bottomed out at 10 and could not be typed into). type=text + inputmode
+  // =decimal, not type=number: number inputs reject a comma, and Indonesian
+  // keyboards type "7,5". 16px font in CSS or iOS zooms the page on focus.
+  const sizeIn = document.createElement('input');
+  sizeIn.type = 'text';
+  sizeIn.inputMode = 'decimal';
+  sizeIn.autocomplete = 'off';
+  sizeIn.className = 'fb-size';
+  sizeIn.setAttribute('aria-label', 'Ukuran huruf');
+  const sizeList = document.createElement('datalist');
+  sizeList.id = 'fb-size-presets';
+  for (const s of FONT_SIZE_PRESETS) {
     const opt = document.createElement('option');
     opt.value = String(s);
-    opt.textContent = String(s);
-    sizeSel.appendChild(opt);
+    sizeList.appendChild(opt);
   }
-  el.appendChild(sizeSel);
+  sizeIn.setAttribute('list', sizeList.id);
+  el.appendChild(sizeIn);
+  el.appendChild(sizeList);
 
   const boldBtn = document.createElement('button');
   boldBtn.className = 'fb-toggle fb-bold';
@@ -111,7 +121,7 @@ export function createFormatBar(deps) {
   // ---- state sync ---------------------------------------------------------------
   function reflect(style) {
     fontSel.value = style.fontFamily || 'Helvetica';
-    sizeSel.value = String(style.fontSize || 18);
+    sizeIn.value = formatFontSize(style.fontSize || 18);
     boldBtn.classList.toggle('on', !!style.bold);
     boldBtn.setAttribute('aria-pressed', String(!!style.bold));
     italicBtn.classList.toggle('on', !!style.italic);
@@ -137,7 +147,34 @@ export function createFormatBar(deps) {
   }
 
   fontSel.addEventListener('change', () => apply({ fontFamily: fontSel.value }));
-  sizeSel.addEventListener('change', () => apply({ fontSize: Number(sizeSel.value) }));
+  // Commit on change and on Enter. Both can fire for one edit, so a commit
+  // whose text already equals the current size's display is a no-op: no second
+  // undo step, and a fractional size from a document line (7.395, shown as
+  // "7.4") is never rewritten unless the user actually changes it.
+  function commitSize() {
+    const cur = (deps.getTarget() || defaults).fontSize || 18;
+    const raw = sizeIn.value.trim();
+    if (raw !== '' && raw !== formatFontSize(cur)) {
+      const n = parseFontSize(raw, cur);
+      if (n !== cur) { apply({ fontSize: n }); return; }
+    }
+    reflect(deps.getTarget() || defaults);   // garbage / empty / unchanged: show the real value
+  }
+  sizeIn.addEventListener('change', commitSize);
+  sizeIn.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); commitSize(); sizeIn.blur(); }
+  });
+  // Browsers filter a datalist by the field's current text, so a field showing
+  // "18" would offer only "18". Empty it on focus (the size stays visible as
+  // the placeholder) so the whole preset list opens; blur puts the value back.
+  sizeIn.addEventListener('focus', () => {
+    sizeIn.placeholder = sizeIn.value;
+    sizeIn.value = '';
+  });
+  sizeIn.addEventListener('blur', () => {
+    sizeIn.placeholder = '';
+    commitSize();
+  });
   boldBtn.addEventListener('click', () => apply({ bold: !(deps.getTarget() || defaults).bold }));
   italicBtn.addEventListener('click', () => apply({ italic: !(deps.getTarget() || defaults).italic }));
   for (const s of swatches) s.addEventListener('click', () => apply({ color: s.dataset.color }));
@@ -146,7 +183,7 @@ export function createFormatBar(deps) {
 
   // Keep taps inside the bar from bubbling into the stage (deselecting), and
   // keep BUTTON taps from stealing focus (which would blur-commit an open
-  // inline editor). Selects are exempt — a dropdown needs focus to open; the
+  // inline editor). Selects and the size field are exempt — they need focus; the
   // draft commits-and-stays-selected instead (app.js), so the change still lands.
   el.addEventListener('pointerdown', (e) => {
     e.stopPropagation();
