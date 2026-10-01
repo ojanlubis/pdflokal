@@ -151,7 +151,7 @@
   "JPG": "JPG",
   "paling kompatibel": "most compatible",
   "PNG": "PNG",
-  "tanpa kompresi": "no compression",
+  "tanpa kompresi": "lossless",
   "Ukuran": "Size",
   "Target": "Target",
   "Semua": "All",
@@ -169,7 +169,7 @@
   "Gabung/Merge PDF": "Merge PDF",
   "Editor PDF Browser-based": "Browser-based PDF editor",
   "PDF ke Gambar (JPG/PNG)": "PDF to Image (JPG/PNG)",
-  "Tanda Tangan Digital": "Digital Signature",
+  "Tanda Tangan Digital": "Sign PDF",
   "Convert Format Gambar": "Convert Image Format",
   "Gambar ke PDF": "Image to PDF",
   "Hapus Latar Belakang Gambar": "Remove Image Background"
