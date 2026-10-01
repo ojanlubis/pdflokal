@@ -146,7 +146,7 @@ test.describe('ganti teks — the nasty fixtures (field-bug pins)', () => {
     await page.keyboard.type('Teks pengganti Times');
     // PIN MOVED (font-fidelity tier 1, founder-ratified 2026-07-20): this
     // fixture's body text is unembedded standard-14 /Times-Roman — exactly
-    // spec-font-fidelity-engine.md §3's "the /BaseFont is ALL the file
+    // docs/spec-font-fidelity-engine.md (deleted 2026-10-01; git log -- docs/spec-font-fidelity-engine.md) §3's "the /BaseFont is ALL the file
     // knows" case. The old pin was mapRunFont's 'Times-Roman' bucket guess;
     // core/font-decide.js now routes the real /BaseFont to Tinos — same
     // widths (metric-compatible by construction), real embedded outlines.

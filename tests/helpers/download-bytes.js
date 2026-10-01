@@ -1,6 +1,6 @@
 /*
  * OPEN THE BYTES. The audit's top item, and the only one that would have caught
- * the mutation at the top of docs/test-suite-audit.md.
+ * the mutation at the top of docs/test-suite-audit.md (deleted 2026-10-01; git log -- docs/test-suite-audit.md).
  * ============================================================================
  * That mutation: `core/export.js` made to silently drop EVERY text annotation —
  * `teks` is 38.8% of all real tool use — and the two specs most likely to

@@ -1,6 +1,6 @@
 -- pdflokal telemetry rail — EVENTS, on Turso (libSQL / SQLite).
--- Port of scripts/neon-rail-migration.sql, 2026-09-16. That file stays the
--- record of the Neon rail while dual-write runs; this one is the Turso truth.
+-- Port of scripts/neon-rail-migration.sql (deleted 2026-10-01; git log -- scripts/neon-rail-migration.sql), 2026-09-16. That file was the
+-- record of the Neon rail; this one is the Turso truth.
 --
 -- WHY TWO DATABASES. Turso has no GRANT, no roles and no row policies: a token
 -- is read-only or read-write for a WHOLE database. The Neon rail's read-only

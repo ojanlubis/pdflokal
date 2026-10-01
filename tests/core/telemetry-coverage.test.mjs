@@ -224,7 +224,7 @@ test('COVERAGE: no failure report hard-codes its reason', () => {
       // ⚠️ A MISSING `reason` IS A FAILURE, NOT A SKIP. This block was
       // `const m = ...; if (!m) continue;` — so a `tel('failure', {...})` call
       // site that omits `reason` entirely produced m === null, hit the continue,
-      // and was never asserted against. docs/test-suite-audit.md Class 5 called
+      // and was never asserted against. docs/test-suite-audit.md (deleted 2026-10-01; git log -- docs/test-suite-audit.md) Class 5 called
       // it the sharpest finding in the audit, and it was a defect in this guard.
       //
       // It is worse than a silent skip: telemetry-schema.js's validateEvent

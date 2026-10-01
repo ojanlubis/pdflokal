@@ -1,7 +1,7 @@
 /*
  * api/_turso.js — the dual-write path, and specifically its THREE GATES.
  * ============================================================================
- * Added 2026-09-16 with the dual-write (seat `specs/spec-rail-to-turso.md`).
+ * Added 2026-09-16 with the dual-write (seat decisions.md 2026-09-16).
  *
  * WHY THIS FILE IS NOT OPTIONAL. Turso's SQL-over-HTTP returns **HTTP 200** for
  * a statement the database REFUSED — measured against the real database on

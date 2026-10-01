@@ -37,7 +37,7 @@ import { orderedForPaint } from './annotation-order.js';
 // font-fidelity tier 1, core/font-decide.js) are spread in from
 // clone-fonts.js: routed by /BaseFont for substitution AND offered in the
 // font dropdown as authoring choices (founder ruling 2026-07-20 evening;
-// spec-font-fidelity-engine.md §3) — core/stamp.js's rung-2 clone ladder
+// docs/spec-font-fidelity-engine.md (deleted 2026-10-01; git log -- docs/spec-font-fidelity-engine.md) §3) — core/stamp.js's rung-2 clone ladder
 // needs the EXACT same weight-file mapping to fetch the same TTF this
 // module would, so it's factored into one shared source rather than kept as
 // two copies.

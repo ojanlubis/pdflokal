@@ -159,7 +159,7 @@ export function createSignatureModal({ modal, onReady, toast }) {
    * to users: "Pas jendela tanda tangan kebuka, tinggal tempel (Ctrl/Cmd+V),
    * langsung masuk tanpa perlu simpan file dulu." v2 shipped with NO
    * ClipboardEvent handling anywhere in js/v2/, so the product has been claiming
-   * a feature it does not have. docs/test-suite-audit.md found it from the other
+   * a feature it does not have. docs/test-suite-audit.md (deleted 2026-10-01; git log -- docs/test-suite-audit.md) found it from the other
    * end: signature-paste.spec.js reads as coverage but drives the dead old wing.
    *
    * Restoring is the honest option and the cheap one — retracting the claim

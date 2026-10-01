@@ -1,5 +1,5 @@
 /*
- * LAB — tier-2 glyph COMPOSITION prototype (spec-font-fidelity-engine.md §4)
+ * LAB — tier-2 glyph COMPOSITION prototype (docs/spec-font-fidelity-engine.md (deleted 2026-10-01; git log -- docs/spec-font-fidelity-engine.md) §4)
  * ============================================================================
  * Proves ONE real case end to end: a TRUE subset (tests/fixtures/nasty/
  * carlito-subset.ttf — é present as a composite, É absent, the acute outline

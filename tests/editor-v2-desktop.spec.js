@@ -41,7 +41,7 @@ test.describe('editor v2 — desktop', () => {
 
     // Download goes through the Unduh sheet: open → big button → real PDF.
     //
-    // ⚠️ THIS USED TO ASSERT ONLY suggestedFilename(). docs/test-suite-audit.md
+    // ⚠️ THIS USED TO ASSERT ONLY suggestedFilename(). docs/test-suite-audit.md (deleted 2026-10-01; git log -- docs/test-suite-audit.md)
     // proved what that is worth: `core/export.js` was mutated to drop every text
     // annotation and 39 tests passed, this one among them. A filename comes from
     // the code that NAMES the file, never from the code that BUILDS it.
