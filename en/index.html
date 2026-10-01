@@ -1,77 +1,125 @@
 <!-- GENERATED FILE, DO NOT EDIT BY HAND.
-     Source: seo/pages.json (copy) + index.html (the app shell template).
+     Source: index.html (the shell) + i18n/markup.en.json (the English).
      Regenerate with: npm run seo
      Hand edits are destroyed on the next run, and "npm run seo:check" fails CI. -->
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
   <!-- SEO Meta Tags (carried over at the swap, Jul 3 2026 — the ranking title stays) -->
-  <title>Tanda Tangan PDF Online Gratis - Tanpa Print, Tanpa Scan | PDFLokal</title>
-  <meta name="description" content="Tanda tangani PDF langsung di browser. Gambar pakai jari, atau pakai foto tanda tanganmu. Gratis, tanpa akun, tanpa upload.">
+  <title>PDFLokal - Merge, Compress, Edit PDF | Free & Fast</title>
+  <meta name="description"
+    content="Free PDF & image tools. Merge, split, compress and edit PDFs right in your browser. Files are never uploaded. Fast & safe.">
   <meta name="keywords"
-    content="gabung pdf, merge pdf, kompres pdf, edit pdf, tanda tangan pdf, kompres gambar, gratis, indonesia, tanpa upload">
-  <link rel="canonical" href="https://www.pdflokal.id/tanda-tangan-pdf">
+    content="merge pdf, combine pdf, compress pdf, edit pdf, sign pdf, compress image, free, no upload">
+  <link rel="canonical" href="https://www.pdflokal.id/en">
   <!-- hreflang: ONLY on `/` and `/en`, reciprocal (the same three links on both).
        scripts/gen-seo-pages.js strips them from the 12 tool pages, which have no
        English twin; scripts/gen-en-page.js reuses them verbatim on /en. x-default
        is /en on purpose (docs: reference/seo-i18n-plan-2026-10-01.md section 4). -->
-  <meta property="og:title" content="Tanda Tangan PDF Online Gratis - Tanpa Print, Tanpa Scan | PDFLokal">
-  <meta property="og:description" content="Tanda tangani PDF langsung di browser. Gambar pakai jari, atau pakai foto tanda tanganmu. Gratis, tanpa akun, tanpa upload.">
+  <link rel="alternate" hreflang="id" href="https://www.pdflokal.id/">
+  <link rel="alternate" hreflang="en" href="https://www.pdflokal.id/en">
+  <link rel="alternate" hreflang="x-default" href="https://www.pdflokal.id/en">
+  <meta property="og:title" content="PDFLokal - Free & Fast PDF Tools">
+  <meta property="og:description" content="Handle your documents right in the browser. Free, fast, safe.">
   <meta property="og:image" content="https://www.pdflokal.id/images/og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:url" content="https://www.pdflokal.id/tanda-tangan-pdf">
+  <meta property="og:url" content="https://www.pdflokal.id/en">
   <meta property="og:type" content="website">
-  <meta property="og:locale" content="id_ID">
+  <meta property="og:locale" content="en_US">
   <meta property="og:site_name" content="PDFLokal">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Tanda Tangan PDF Online Gratis - Tanpa Print, Tanpa Scan | PDFLokal">
-  <meta name="twitter:description" content="Tanda tangani PDF langsung di browser. Gambar pakai jari, atau pakai foto tanda tanganmu. Gratis, tanpa akun, tanpa upload.">
+  <meta name="twitter:title" content="PDFLokal - Free & Fast PDF Tools">
+  <meta name="twitter:description" content="Handle your documents right in the browser. Free, fast, safe.">
   <meta name="twitter:image" content="https://www.pdflokal.id/images/og-image.png">
   <script type="application/ld+json">
 {
   "@context": "https://schema.org",
-  "@graph": [
+  "@type": "WebApplication",
+  "name": "PDFLokal",
+  "url": "https://www.pdflokal.id/en",
+  "logo": {
+    "@type": "ImageObject",
+    "url": "https://www.pdflokal.id/images/logo.png",
+    "width": 512,
+    "height": 512,
+    "caption": "PDFLokal Logo"
+  },
+  "description": "Free PDF app made in Indonesia. Compress, edit, merge and sign PDFs right in the browser. Safe: files are not uploaded to a server (offline processing).",
+  "applicationCategory": "UtilitiesApplication",
+  "operatingSystem": "All modern web browsers (Chrome, Firefox, Safari, Edge)",
+  "browserRequirements": "Requires JavaScript",
+  "softwareVersion": "2.0",
+  "inLanguage": "en-US",
+  "isAccessibleForFree": true,
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "IDR",
+    "description": "Free forever, no daily limits"
+  },
+  "featureList": [
+    "Merge PDF",
+    "Browser-based PDF editor",
+    "Split PDF",
+    "PDF to Image (JPG/PNG)",
+    "Compress PDF",
+    "Digital Signature",
+    "Initials",
+    "Compress Image",
+    "Resize Image",
+    "Convert Image Format",
+    "Image to PDF",
+    "Remove Image Background"
+  ],
+  "author": {
+    "@type": "Organization",
+    "name": "PDFLokal Indonesia",
+    "url": "https://www.pdflokal.id/"
+  },
+  "screenshot": "https://www.pdflokal.id/images/screenshot-preview.jpg"
+}
+</script>
+  <!-- FAQPage — the landing has shown a visible FAQ for months with no markup for
+       it. Added 2026-07-31 under specs/design-system.md §6b: a visual
+       simplification may never remove a machine-readable claim, and the same
+       logic makes an unclaimed one free to add, because structured data is not
+       in the visual flow and costs a reader nothing.
+       ⚠️ THE THREE Q&A PAIRS BELOW MUST STAY WORD-FOR-WORD IDENTICAL to the
+       visible FAQ in the body. Google treats schema that does not match visible
+       content as spam, and the failure is invisible from here — it shows up in
+       Search Console weeks later. If you edit one, edit both. -->
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
     {
-      "@type": "SoftwareApplication",
-      "name": "Tanda tangani PDF tanpa print, PDFLokal",
-      "url": "https://www.pdflokal.id/tanda-tangan-pdf",
-      "description": "Tanda tangani PDF langsung di browser. Gambar pakai jari, atau pakai foto tanda tanganmu. Gratis, tanpa akun, tanpa upload.",
-      "applicationCategory": "UtilitiesApplication",
-      "operatingSystem": "Chrome, Firefox, Safari, Edge",
-      "browserRequirements": "Requires JavaScript",
-      "inLanguage": "id-ID",
-      "isAccessibleForFree": true,
-      "offers": {
-        "@type": "Offer",
-        "price": "0",
-        "priceCurrency": "IDR"
-      },
-      "publisher": {
-        "@type": "Organization",
-        "name": "PDFLokal",
-        "url": "https://www.pdflokal.id/"
+      "@type": "Question",
+      "name": "Is it really free? What are the limits?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Free. No limit on the number of files, no watermark, no account needed. PDFLokal lives on support from its users, never on your data."
       }
     },
     {
-      "@type": "BreadcrumbList",
-      "itemListElement": [
-        {
-          "@type": "ListItem",
-          "position": 1,
-          "name": "PDFLokal",
-          "item": "https://www.pdflokal.id/"
-        },
-        {
-          "@type": "ListItem",
-          "position": 2,
-          "name": "Tanda tangani PDF tanpa print",
-          "item": "https://www.pdflokal.id/tanda-tangan-pdf"
-        }
-      ]
+      "@type": "Question",
+      "name": "Where do my files get uploaded?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Nowhere. Everything is processed on your phone or laptop. Once the page has opened, it keeps working even if you turn your internet off."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "My phone is old and slow. Will it cope?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. PDFLokal is built to stay smooth on cheap phones and slow internet."
+      }
     }
   ]
 }
@@ -1957,9 +2005,9 @@
     @media (max-width: 899px) { header > .visitor-count { display: none; } }
   </style>
 </head>
-<body class="is-empty" data-intent="ttd">
+<body class="is-empty">
   <header>
-    <button class="brand" id="btn-home" aria-label="Kembali ke beranda">PDF<span class="brand-red">Lokal</span></button>
+    <button class="brand" id="btn-home" aria-label="Back to home">PDF<span class="brand-red">Lokal</span></button>
     <div class="file-menu-wrap">
       <button id="btn-file" disabled aria-haspopup="menu" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;vertical-align:-3px;margin-right:2px"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M15 2v5h5"/></svg>File ▾</button>
       <div id="file-menu" role="menu" hidden>
@@ -1971,29 +2019,29 @@
              KNOWN AND ACCEPTED (decisions.md, 2026-08-09, N2(b)): hover does not
              exist on touch, so phones lose these notes outright. Ruled, with the
              cost stated. Do not "fix" it with a mobile fallback. -->
-        <button role="menuitem" id="fm-add" title="gabung">
+        <button role="menuitem" id="fm-add" title="merge">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M15 2v5h5"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
-          Tambah File
+          Add File
         </button>
-        <button role="menuitem" id="fm-new" title="ganti semua">
+        <button role="menuitem" id="fm-new" title="replace all">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M15 2v5h5"/></svg>
-          Buka Baru
+          Open New
         </button>
-        <button role="menuitem" id="fm-pages" title="Kelola halaman: urutkan, putar, hapus, ekstrak">
+        <button role="menuitem" id="fm-pages" title="Manage pages: reorder, rotate, delete, extract">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-          Atur Halaman
+          Manage Pages
         </button>
       </div>
     </div>
-    <span class="visitor-count" data-visitor-count hidden title="Jumlah browser yang membuka PDFLokal hari ini"><span class="vc-pulse" aria-hidden="true"></span><span><b class="vc-n"></b> visitor hari ini</span></span>
+    <span class="visitor-count" data-visitor-count hidden title="Number of browsers that opened PDFLokal today"><span class="vc-pulse" aria-hidden="true"></span><span><b class="vc-n"></b> visitors today</span></span>
     <span class="spacer"></span>
-    <button class="icon-btn" id="btn-undo" disabled aria-label="Urungkan" title="Urungkan (Ctrl+Z)">
+    <button class="icon-btn" id="btn-undo" disabled aria-label="Undo" title="Undo (Ctrl+Z)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
     </button>
-    <button class="icon-btn" id="btn-redo" disabled aria-label="Ulangi" title="Ulangi (Ctrl+Y)">
+    <button class="icon-btn" id="btn-redo" disabled aria-label="Redo" title="Redo (Ctrl+Y)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></svg>
     </button>
-    <button id="btn-download" disabled>Unduh</button>
+    <button id="btn-download" disabled>Download</button>
     <!-- ⚠️ THE TOOLBAR LIVES INSIDE <header> (2026-09-09, his ruling: "buat
          desktop, pindahin tools2nya ke atas. karena spacenya kosong").
          It is ONE element in TWO layouts, never two elements:
@@ -2004,45 +2052,45 @@
          so the markup order here is not the reading order — see the header
          rules in the stylesheet, and --chrome-h, which is what everything
          positioned BELOW the chrome measures against. -->
-  <div id="toolbar" role="toolbar" aria-label="Alat">
+  <div id="toolbar" role="toolbar" aria-label="Tools">
     <!-- No "Pilih" button (founder ruling 2026-07-19): the neutral mode is a
          STATE, not a tool — nothing lit means nothing armed. Every armed tool
          toggles off on a second tap; V / Escape also disarm. -->
     <button class="tool" data-tool="text" aria-pressed="false">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
-      Teks
+      Text
     </button>
     <button class="tool" data-tool="whiteout" aria-pressed="false">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="8" rx="1"/></svg>
-      Tip-Ex
+      Whiteout
     </button>
-    <button class="tool" data-tool="ganti" aria-pressed="false" aria-label="Edit teks asli yang sudah tercetak di PDF" title="Edit teks asli di PDF, masih beta, kabari saya kalau ada yang aneh">
+    <button class="tool" data-tool="ganti" aria-pressed="false" aria-label="Edit the original text already printed in the PDF" title="Edit the original text in the PDF. Still in beta, tell me if anything looks off">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
       Edit<span class="beta-tag">beta</span>
     </button>
     <button class="tool" data-tool="signature" aria-pressed="false">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17c3-6 5-8 6-6s-1 7 1 7 3-9 5-9 0 9 2 9 2-3 4-3"/></svg>
-      TTD
+      Sign
     </button>
-    <button class="tool" id="btn-delete-anno" disabled aria-label="Hapus objek terpilih">
+    <button class="tool" id="btn-delete-anno" disabled aria-label="Delete selected object">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-      Hapus
+      Delete
     </button>
-    <button class="tool" id="btn-pages" disabled aria-label="Kelola halaman: urutkan, putar, hapus, ekstrak">
+    <button class="tool" id="btn-pages" disabled aria-label="Manage pages: reorder, rotate, delete, extract">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-      Halaman
+      Pages
     </button>
   </div>
   </header>
 
 
-  <div id="format-bar" role="toolbar" aria-label="Format teks"></div>
-  <div id="sig-bar" role="toolbar" aria-label="Aksi tanda tangan">
+  <div id="format-bar" role="toolbar" aria-label="Text format"></div>
+  <div id="sig-bar" role="toolbar" aria-label="Signature actions">
     <span id="sig-bar-label"></span>
-    <button id="btn-all-pages">Terapkan ke Semua Hal.</button>
+    <button id="btn-all-pages">Apply to All Pages</button>
     <button id="btn-redraw-sig">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;vertical-align:-2px"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
-      Gambar Ulang
+      Redraw
     </button>
   </div>
 
@@ -2065,9 +2113,9 @@
                from Google — a wordmark that does nothing is the single most
                obvious thing a stranger will try. Same defect the founder found
                on privasi/dukung, one layer upstream and twelve times over. -->
-          <a class="ld-mark" href="/" aria-label="PDFLokal, ke beranda">PDF<em>Lokal</em></a>
-          <span class="visitor-count" data-visitor-count hidden title="Jumlah browser yang membuka PDFLokal hari ini"><span class="vc-pulse" aria-hidden="true"></span><span><b class="vc-n"></b> visitor hari ini</span></span>
-          <button class="ld-burger" id="ld-burger" type="button" aria-expanded="false" aria-controls="ld-burger-menu" aria-label="Buka menu navigasi">
+          <a class="ld-mark" href="/en" aria-label="PDFLokal, back to home">PDF<em>Lokal</em></a>
+          <span class="visitor-count" data-visitor-count hidden title="Number of browsers that opened PDFLokal today"><span class="vc-pulse" aria-hidden="true"></span><span><b class="vc-n"></b> visitors today</span></span>
+          <button class="ld-burger" id="ld-burger" type="button" aria-expanded="false" aria-controls="ld-burger-menu" aria-label="Open navigation menu">
             <svg class="ld-burger-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
               <line class="ld-burger-l1" x1="3" y1="6" x2="21" y2="6"/>
               <line class="ld-burger-l2" x1="3" y1="12" x2="21" y2="12"/>
@@ -2078,10 +2126,9 @@
 
         <!-- Desktop only (<900px hides this via the media query) — mobile's
              equivalent is the burger + #ld-burger-menu below. -->
-        <nav class="ld-nav" aria-label="Navigasi utama">
+        <nav class="ld-nav" aria-label="Main navigation">
           <a href="https://github.com/ojanlubis/pdflokal" rel="noopener">Github</a>
-          <a href="/privasi">Privasi</a>
-          <a href="/dukung">Dukung</a>
+          <a href="/privasi">Privacy</a>
         </nav>
 
         <div class="ld-hd-right">
@@ -2089,7 +2136,7 @@
                the exact hooks js/theme.js already binds to — see that file
                for the "change" listener and the aria-label swap. Nothing here
                reimplements it; this is markup + styling only. -->
-          <label class="ld-theme-toggle theme-toggle" for="theme-toggle-checkbox" aria-label="Ganti tema" title="Ganti tema">
+          <label class="ld-theme-toggle theme-toggle" for="theme-toggle-checkbox" aria-label="Switch theme" title="Switch theme">
             <input type="checkbox" id="theme-toggle-checkbox" class="ld-theme-toggle-input">
             <svg class="ld-theme-toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
@@ -2097,7 +2144,7 @@
           </label>
 
           <!-- Mobile only — desktop hides this in favour of .ld-nav's Privasi link. -->
-          <a href="/privasi" class="ld-hd-privasi-mobile">Privasi</a>
+          <a href="/privasi" class="ld-hd-privasi-mobile">Privacy</a>
 
           <!-- Language control. Desktop only; mobile's equivalent lives inside
                the burger drawer. A plain link to the other language's page
@@ -2105,14 +2152,14 @@
                stored choice. scripts/gen-en-page.js swaps which option is the
                link on /en. -->
           <details class="ld-lang">
-            <summary class="ld-lang-btn" aria-label="Pilih bahasa">
+            <summary class="ld-lang-btn" aria-label="Choose language">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-              <span>ID</span>
+              <span>EN</span>
               <svg class="ld-lang-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
             </summary>
             <div class="ld-lang-menu">
-              <span class="ld-lang-opt is-active" aria-current="true" lang="id">Indonesia</span>
-              <a class="ld-lang-opt" href="/en" hreflang="en" lang="en">English</a>
+              <a class="ld-lang-opt" href="/" hreflang="id" lang="id">Bahasa Indonesia</a>
+              <span class="ld-lang-opt is-active" aria-current="true" lang="en">English</span>
             </div>
           </details>
         </div>
@@ -2128,12 +2175,11 @@
            of flow and does not disturb the header's flex layout. -->
       <div class="ld-burger-menu" id="ld-burger-menu" hidden>
         <a href="https://github.com/ojanlubis/pdflokal" rel="noopener">Github</a>
-        <a href="/dukung">Dukung</a>
         <div class="ld-burger-lang">
-          <span class="ld-burger-lang-label">Bahasa</span>
+          <span class="ld-burger-lang-label">Language</span>
           <div class="ld-burger-lang-opts">
-            <span class="ld-lang-opt is-active" aria-current="true" lang="id">Indonesia</span>
-            <a class="ld-lang-opt" href="/en" hreflang="en" lang="en">English</a>
+            <a class="ld-lang-opt" href="/" hreflang="id" lang="id">Bahasa Indonesia</a>
+            <span class="ld-lang-opt is-active" aria-current="true" lang="en">English</span>
           </div>
         </div>
       </div>
@@ -2145,8 +2191,7 @@
                  used to sit here was cut, not reworded — subtraction beats
                  softening, and the claims it made now live in the FAQ and the
                  privacy promise further down, where content is free. -->
-            <h1>Tanda tangani PDF tanpa print</h1>
-            <p class="ld-sub">Gambar pakai jari, atau pakai foto tanda tangan yang sudah ada. Taruh di tempatnya, unduh, selesai.</p>
+            <h1>For sorting out PDFs.</h1>
           </div>
         <!-- ⭐ THE WORKING COLUMN. Everything inside shares one 920 width — the
              dropzone and the tool cards read as a single column because they
@@ -2160,10 +2205,11 @@
         <div class="dz-wrap">
         <button class="dropzone" id="btn-open">
           <svg class="dz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          <span class="dz-title">Seret file ke sini, atau</span>
-          <span class="dz-buka">Buka File</span>
-          <span class="dz-hint">PDF atau foto, boleh banyak sekaligus</span>
+          <span class="dz-title">Drag a file here, or</span>
+          <span class="dz-buka">Open File</span>
+          <span class="dz-hint">PDF or photos, as many as you like at once</span>
         </button>
+        <div class="ld-stamp" aria-hidden="true">Free</div>
         </div>
         <!-- Install chip: quiet, below the dropzone. Shown only to RETURNING users
              (js/v2/install-prompt.js); tap opens the adaptive install card. Never
@@ -2171,7 +2217,7 @@
         <div class="ip-chip-wrap">
           <button class="ip-chip" id="ip-chip" hidden>
             <img class="ip-chip-ic" src="/images/icon-192.png" alt="">
-            <span class="ip-chip-label">Install PDFLokal di hapemu</span>
+            <span class="ip-chip-label">Install PDFLokal on your phone</span>
             <svg class="ip-chip-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
           </button>
         </div>
@@ -2180,23 +2226,6 @@
              IN FLOW under the dropzone on phones, where a fixed sheet covered
              Buka File on a 667px screen (tests/maker-card.spec.js). Copy is model-written, approved by
            Fauzan before it ships (ruling 2026-09-23). -->
-      <aside id="maker-card" hidden aria-label="Dari Ojan">
-        <button type="button" class="mk-close" aria-label="Tutup">×</button>
-        <div class="mk-id">
-          <div class="mk-kepala">
-            <span class="mk-topi" aria-hidden="true">🎩</span>
-            <img src="/images/ojan.jpg" alt="Foto Fauzan Ahladzikri (Ojan)" class="mk-face" width="48" height="48" loading="lazy">
-          </div>
-          <div>
-            <div class="mk-name">Ojan</div>
-            <div class="mk-real">Fauzan Ahladzikri</div>
-          </div>
-        </div>
-        <p class="mk-label">Update terakhir</p>
-        <ul class="mk-list"></ul>
-        <a class="mk-more" href="/dukung#development">Lihat selengkapnya</a>
-        <a class="mk-support" href="/dukung">Dukung</a>
-      </aside>
         <!-- "Mau ngapain hari ini?" was here and was RULED AWAY (2026-07-29).
              The cards say what they do; a label asking the question the cards
              already answer was one more thing competing for the same glance. -->
@@ -2208,187 +2237,117 @@
              that layout is gone, so the wrapper is too. -->
         <!-- ⚠️ DRAFT 2026-09-03, NOT RULED, NOT PUSHED. Copy is Fauzan's and the
              whole band is EXCLUDE 1 + 2 + 5 on specs/spec-low-risk-list.md. -->
-        <section class="tl-band" id="tl-band">
-          <div class="tl-head">
-            <b>Template</b>
-          </div>
-          <div class="tl-row" role="list">
-          <a class="tl-doc" href="https://template.pdflokal.id/slip-gaji" data-doc="slip-gaji">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><line x1="6" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="18" y2="12"/></svg>
-            <span>Slip Gaji</span>
-          </a>
-          <a class="tl-doc" href="https://template.pdflokal.id/invoice" data-doc="invoice">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V6z"/><polyline points="14 2 14 7 19 7"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="12" y2="17"/></svg>
-            <span>Invoice</span>
-          </a>
-          <a class="tl-doc" href="https://template.pdflokal.id/kwitansi" data-doc="kwitansi">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3v18l2-1.5L8 21l2-1.5L12 21l2-1.5L16 21l2-1.5L20 21V3z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="13" y2="12"/></svg>
-            <span>Kwitansi</span>
-          </a>
-          <a class="tl-doc" href="https://template.pdflokal.id/surat-jalan" data-doc="surat-jalan">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 17V5a1 1 0 0 0-1-1H2v12a1 1 0 0 0 1 1h1"/><path d="M14 9h4l3 3v5h-2"/><circle cx="6.5" cy="17.5" r="2"/><circle cx="17.5" cy="17.5" r="2"/><line x1="8.5" y1="17.5" x2="15.5" y2="17.5"/></svg>
-            <span>Surat Jalan</span>
-          </a>
-          <a class="tl-doc" href="https://template.pdflokal.id/spk" data-doc="spk">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><polyline points="9 14 11 16 15 12"/></svg>
-            <span>SPK</span>
-          </a>
-          </div>
-        </section>
         <div class="ld-grid">
           <a class="ld-card" href="/gabung-pdf" data-intent="gabung">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>
-            <b>Gabung PDF</b>
+            <b>Merge PDF</b>
           </a>
           <a class="ld-card" href="/tanda-tangan-pdf" data-intent="ttd">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
-            <b>Tanda Tangan</b>
+            <b>Sign</b>
           </a>
           <a class="ld-card" href="/kompres-pdf" data-intent="kompres">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
-            <b>Kompres PDF</b>
+            <b>Compress PDF</b>
           </a>
           <a class="ld-card" href="/jpg-ke-pdf" data-intent="foto">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
-            <b>Foto jadi PDF</b>
+            <b>Photo to PDF</b>
           </a>
         </div>
         <div class="ld-grid" id="ld-more" hidden>
           <a class="ld-card" href="/pisah-pdf" data-intent="split">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/><circle cx="6" cy="18" r="3"/><path d="M14.8 14.8 20 20"/></svg>
-            <b>Pisah PDF</b>
+            <b>Split PDF</b>
           </a>
           <a class="ld-card" href="/pdf-ke-jpg" data-intent="gambar">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
-            <b>PDF jadi Gambar</b>
+            <b>PDF to Images</b>
           </a>
           <a class="ld-card" href="/edit-pdf" data-intent="teks">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
-            <b>Tambah Teks</b>
+            <b>Add Text</b>
           </a>
           <a class="ld-card" href="/tanda-tangan-pdf" data-intent="paraf">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16c2-4 4-6 6-3s3 1 5-4"/><path d="M4 20h16"/></svg>
-            <b>Paraf</b>
+            <b>Initials</b>
           </a>
           <a class="ld-card" href="/edit-pdf" data-intent="tipex">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="8" rx="2"/></svg>
-            <b>Tip-Ex</b>
+            <b>Whiteout</b>
           </a>
           <a class="ld-card" href="/hapus-halaman-pdf" data-intent="halaman">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-            <b>Atur Halaman</b>
+            <b>Manage Pages</b>
           </a>
           <a class="ld-card" href="/alat-gambar">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m14 10 4-4"/><path d="M18 10V6h-4"/><path d="m10 14-4 4"/><path d="M6 14v4h4"/></svg>
-            <b>Kompres Gambar</b>
+            <b>Compress Image</b>
           </a>
           <a class="ld-card" href="/alat-gambar">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 3 9 15"/><path d="M21 8V3h-5"/><path d="M3 21l6-6"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
-            <b>Ubah Ukuran Gambar</b>
+            <b>Resize Image</b>
           </a>
           <a class="ld-card" href="/alat-gambar">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>
-            <b>Konversi Gambar</b>
+            <b>Convert Image</b>
           </a>
           <a class="ld-card" href="/alat-gambar">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/></svg>
-            <b>Hapus Background</b>
+            <b>Remove Background</b>
           </a>
         </div>
-        <button class="ld-lihat" id="ld-lihat" aria-expanded="false" aria-controls="ld-more">Lihat semua alat
+        <button class="ld-lihat" id="ld-lihat" aria-expanded="false" aria-controls="ld-more">See all tools
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
         </button>
         </div><!-- /.ld-col — the 920 column ends here, after the cards -->
         <div class="ld-janji">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
           <div>
-            <b>Filemu nggak pernah ninggalin perangkatmu.</b>
-            <p>Ijazah, KTP, kontrak. Semua diproses di browser-mu sendiri, bukan di server orang. <a href="/privasi">Baca janji privasi saya</a></p>
+            <b>Your files never leave your device.</b>
+            <p>Diplomas, ID cards, contracts. Everything is processed in your own browser, never on someone else's server. <a href="/privasi">Read my privacy promise</a></p>
           </div>
         </div>
-        <div class="ld-copy">
-          <p>Alur lama: print, tanda tangan, scan, kirim. Tiga langkah yang butuh printer dan scanner yang biasanya tidak ada di rumah. PDFLokal memotongnya jadi satu langkah, tanda tangani langsung di layar, di browser, tanpa dokumenmu pernah diunggah ke server siapa pun.</p>
-          <h2>Cara menandatangani PDF</h2>
-          <ol>
-          <li>Seret PDF yang mau ditandatangani ke kotak di atas.</li>
-          <li>Ketuk <strong>Tanda Tangan</strong>. Gambar tanda tanganmu pakai jari atau mouse, atau ketuk tab <strong>Upload</strong> dan pilih foto tanda tangan yang sudah kamu punya.</li>
-          <li>Ketuk tempat di halaman untuk menaruhnya. Geser dan ubah ukurannya sampai pas, lalu unduh.</li>
-          </ol>
-          <h2>Pakai foto tanda tangan yang sudah ada</h2>
-          <p>Kebanyakan orang punya foto tanda tangan di atas kertas putih, difoto pakai HP. PDFLokal otomatis membersihkan latar putihnya jadi transparan, jadi tanda tanganmu duduk rapi di atas dokumen, bukan sebagai kotak putih yang menutupi teks.</p>
-          <p>Warna tinta tanda tanganmu dibiarkan persis seperti aslinya. Kalau kamu menandatangani dengan pena hitam, hasilnya hitam.</p>
-          <h2>Paraf juga bisa</h2>
-          <p>Dokumen resmi di Indonesia sering minta paraf di setiap halaman, bukan cuma tanda tangan di halaman terakhir. PDFLokal punya alat paraf tersendiri, ukurannya lebih kecil, dan ada tombol <strong>Semua Halaman</strong> yang menyalin parafmu ke posisi yang sama di seluruh halaman sekaligus.</p>
-          <h2>Ini sah nggak?</h2>
-          <p>PDFLokal menempelkan gambar tanda tanganmu ke dalam dokumen, sama seperti menandatangani hasil print lalu men-scan-nya, dan diterima di sebagian besar keperluan sehari-hari: surat pernyataan, formulir, kontrak kerja.</p>
-          <p>Yang PDFLokal <strong>tidak</strong> lakukan adalah tanda tangan digital bersertifikat (yang terikat identitas digital resmi). Kalau instansimu memintanya secara khusus, kamu butuh penyedia tersertifikasi. Saya lebih baik jujur soal ini daripada membiarkanmu salah kira.</p>
-          <h2>Tanda tangan pakai jari di HP</h2>
-          <p>Menggambar tanda tangan dengan jari di layar HP hasilnya sering terlihat kaku dan gemetar. PDFLokal menghaluskan goresanmu dan menyesuaikan ketebalannya dengan kecepatan gerakan, sama seperti pena betulan, yang menipis saat digerakkan cepat.</p>
-          <p>Kalau hasilnya tetap kurang mirip, pakai saja tab Upload dan foto tanda tanganmu di atas kertas putih. Buat kebanyakan orang, hasilnya jauh lebih rapi dan lebih menyerupai tanda tangan asli.</p>
-          <h2>Soal materai</h2>
-          <p>Beberapa dokumen di Indonesia meminta e-meterai. PDFLokal tidak menerbitkan e-meterai, itu diterbitkan lewat kanal resmi Peruri, dan siapa pun yang menawarkannya secara gratis lewat situs biasa patut kamu curigai.</p>
-          <p>Yang perlu kamu tahu: menempelkan gambar meterai lewat Upload itu cuma gambar, bukan meterai yang sah. Untuk dokumen elektronik, yang sah cuma e-meterai dari Peruri. Saya lebih memilih menjelaskan batasannya daripada membiarkanmu mengira sudah beres padahal belum.</p>
-          <h2>Tanda tanganmu tidak saya simpan</h2>
-          <p>Tanda tangan adalah data yang paling sensitif di dokumenmu, dan situs lain memintamu mengunggahnya. Beberapa bahkan menyimpannya di akunmu "supaya praktis dipakai lagi", artinya, tanda tanganmu duduk di server orang.</p>
-          <p>Di PDFLokal, tanda tanganmu ada di dalam browser selama kamu mengerjakan dokumen, dan lenyap saat kamu menutup tab. Tidak ada akun, jadi tidak ada tempat untuk menyimpannya.</p>
-        </div>
         <section class="ld-faq">
-          <h2>Sering ditanya</h2>
+          <h2>Frequently asked</h2>
           <details>
-            <summary>Tanda tangannya bisa dipindah setelah ditaruh?</summary>
-            <p>Bisa. Geser, ubah ukurannya, atau hapus. Setelah pas, tanda tangan otomatis terkunci supaya tidak tergeser tak sengaja, ketuk dua kali untuk membukanya lagi.</p>
+            <summary>Is it really free? What are the limits?</summary>
+            <p>Free. No limit on the number of files, no watermark, no account needed. PDFLokal lives on support from its users, never on your data.</p>
           </details>
           <details>
-            <summary>Latar putih di foto tanda tanganku hilang?</summary>
-            <p>Ya, otomatis dibersihkan jadi transparan. Kalau hasilnya kurang pas, opsinya bisa kamu matikan.</p>
+            <summary>Where do my files get uploaded?</summary>
+            <p>Nowhere. Everything is processed on your phone or laptop. Once the page has opened, it keeps working even if you turn your internet off.</p>
           </details>
           <details>
-            <summary>Bisa tanda tangan di beberapa halaman sekaligus?</summary>
-            <p>Bisa lewat alat Paraf, ada tombol Semua Halaman yang menyalinnya ke posisi yang sama di setiap halaman.</p>
-          </details>
-          <details>
-            <summary>Tanda tanganku disimpan di server kalian?</summary>
-            <p>Tidak. Tidak ada yang dikirim ke mana pun. Tanda tanganmu ada di browser-mu selama kamu mengerjakan dokumen, dan hilang saat kamu menutup halaman.</p>
-          </details>
-          <details>
-            <summary>Harus bikin akun?</summary>
-            <p>Tidak perlu.</p>
-          </details>
-          <details>
-            <summary>Bisa tanda tangan pakai jari di HP?</summary>
-            <p>Bisa. Goresannya dihaluskan otomatis, dan ketebalannya mengikuti kecepatan gerakan supaya tidak terlihat kaku.</p>
-          </details>
-          <details>
-            <summary>Bisa sekalian pasang e-meterai?</summary>
-            <p>PDFLokal tidak menerbitkan e-meterai, itu hanya sah lewat kanal resmi Peruri. Menempelkan gambar meterai di sini tidak membuat dokumenmu bermeterai sah, dan kalau gambarnya diambil dari meterai yang sudah terpakai, itu bisa kena pidana.</p>
+            <summary>My phone is old and slow. Will it cope?</summary>
+            <p>Yes. PDFLokal is built to stay smooth on cheap phones and slow internet.</p>
           </details>
         </section>
         <div class="ld-tools">
-          <h2>Semua alat PDFLokal</h2>
-          <nav aria-label="Semua alat">
-            <a href="/gabung-pdf">Gabung PDF</a>
-            <a href="/pisah-pdf">Pisah PDF</a>
-            <a href="/kompres-pdf">Kompres PDF</a>
-            <a href="/tanda-tangan-pdf">Tanda Tangan PDF</a>
+          <h2>All PDFLokal tools</h2>
+          <nav aria-label="All tools">
+            <a href="/gabung-pdf">Merge PDF</a>
+            <a href="/pisah-pdf">Split PDF</a>
+            <a href="/kompres-pdf">Compress PDF</a>
+            <a href="/tanda-tangan-pdf">Sign PDF</a>
             <a href="/edit-pdf">Edit PDF</a>
-            <a href="/hapus-halaman-pdf">Hapus Halaman PDF</a>
-            <a href="/pdf-ke-jpg">PDF ke JPG</a>
-            <a href="/jpg-ke-pdf">JPG ke PDF</a>
+            <a href="/hapus-halaman-pdf">Delete PDF Pages</a>
+            <a href="/pdf-ke-jpg">PDF to JPG</a>
+            <a href="/jpg-ke-pdf">JPG to PDF</a>
           </nav>
           <!-- Separate group on purpose: these are the same compressor with a hard
                cap pre-set, not different tools. Listing them as "alat" would be a
                lie to the user; hiding them would be a dead end for the crawler. -->
-          <h2 class="ld-tools-h2-gap">Kompres ke ukuran tertentu</h2>
-          <nav aria-label="Kompres ke ukuran tertentu">
-            <a href="/kompres-pdf-1mb">Kompres PDF 1MB</a>
-            <a href="/kompres-pdf-500kb">Kompres PDF 500KB</a>
-            <a href="/kompres-pdf-200kb">Kompres PDF 200KB</a>
-            <a href="/kompres-pdf-100kb">Kompres PDF 100KB</a>
+          <h2 class="ld-tools-h2-gap">Compress to a set size</h2>
+          <nav aria-label="Compress to a set size">
+            <a href="/kompres-pdf-1mb">Compress PDF to 1MB</a>
+            <a href="/kompres-pdf-500kb">Compress PDF to 500KB</a>
+            <a href="/kompres-pdf-200kb">Compress PDF to 200KB</a>
+            <a href="/kompres-pdf-100kb">Compress PDF to 100KB</a>
           </nav>
         </div>
         <footer class="ld-foot">
-          <a href="/dukung">Dukung Saya</a>
-          <a href="/privasi">Privasi</a>
+          <a href="/privasi">Privacy</a>
           <!-- "Github", not "GitHub" — the founder ruled the capitalization for
                the navbar (2026-07-29) and the footer said the other thing, so one
                page carried two spellings of one word. -->
@@ -2399,7 +2358,7 @@
                RULED 2026-08-22: the string stays as-is, alongside the TikTok
                DM (#contact-tab-btn) — the in-page form is an anonymous act,
                the DM is a conversation, and the two channels coexist. -->
-          <a href="#fb-form" id="fb-open">Ada masukan?</a>
+          <a href="#fb-form" id="fb-open">Got feedback?</a>
           <span>Dibuat di Indonesia</span>
           <span>© 2026 PT Fauzan Karya Digital</span>
         </footer>
@@ -2411,14 +2370,14 @@
   <div id="v2-loading" hidden>
     <div class="lp-box" role="status" aria-live="polite">
       <div class="lp-track"><div class="lp-fill"></div></div>
-      <div class="lp-title">Memproses…</div>
+      <div class="lp-title">Processing…</div>
       <div class="lp-count" aria-hidden="true" hidden></div>
-      <p class="lp-note">Diproses langsung di HP-mu, nggak diupload ke mana-mana.</p>
+      <p class="lp-note">Processed right on your phone and uploaded nowhere.</p>
     </div>
   </div>
   <div id="zoom-ctl">
-    <button id="z-in" aria-label="Perbesar">+</button>
-    <button id="z-out" aria-label="Perkecil">−</button>
+    <button id="z-in" aria-label="Zoom in">+</button>
+    <button id="z-out" aria-label="Zoom out">−</button>
   </div>
   <!-- The feedback tab: quiet furniture, bottom-left, mirrors #zoom-ctl.
        It used to be a chat glyph opening a panel of five social handles. He
@@ -2433,7 +2392,7 @@
 
        Wired by js/v2/feedback-form.js, alongside the footer's own link — one
        dialog, one code path, two doors. -->
-  <button id="contact-tab-btn">Ada masukan?</button>
+  <button id="contact-tab-btn">Got feedback?</button>
   <div id="toast" role="status" aria-live="polite"></div>
 
   <!-- The general feedback channel, opened from the footer's "Ada masukan?".
@@ -2448,10 +2407,10 @@
        "terimakasih" are HIS, deliberately preserved, not a typo to tidy. Client
        copy is his hand alone: do not "fix", shorten, sentence-case or
        re-translate any of it. Changing a word here needs him, again. -->
-  <dialog id="fb-form" aria-label="Kirim masukan">
+  <dialog id="fb-form" aria-label="Send feedback">
     <div class="sheet fb-sheet">
       <div class="fb-body">
-        <h2>Gimana PDFLokal?</h2>
+        <h2>How's PDFLokal?</h2>
         <!-- WHO IS ASKING. Moved here 2026-09-09 from the retired contact
              panel, where it labelled a list of handles. It is a BYLINE, not a
              destination: the dialog's one primary is Kirim, and an identity
@@ -2463,14 +2422,14 @@
           <img src="/images/ojan.jpg" alt="" width="28" height="28" loading="lazy">
           <div><b>Ojan</b><a href="https://mesindev.com" target="_blank" rel="noopener">mesindev.com</a></div>
         </div>
-        <div class="fb-thumbs" role="group" aria-label="Penilaian">
+        <div class="fb-thumbs" role="group" aria-label="Rating">
           <button type="button" id="fb-up" aria-pressed="false">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/></svg>
-            <span>Suka</span>
+            <span>Like</span>
           </button>
           <button type="button" id="fb-down" aria-pressed="false">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"/></svg>
-            <span>Kurang</span>
+            <span>Not great</span>
           </button>
         </div>
         <!-- PASTE, NOT UPLOAD (his ruling 2026-09-09: "gausah ada tombolnya,
@@ -2480,31 +2439,31 @@
              the whole reason this is defensible against the product's own "no
              uploads" claim, so a convenience button would not be a small
              addition, it would remove the argument. -->
-        <textarea id="fb-note" rows="3" placeholder="tulis feedbacknya di sini, atau boleh paste screenshot"></textarea>
+        <textarea id="fb-note" rows="3" placeholder="write your feedback here, or paste a screenshot"></textarea>
         <!-- The pasted image, shown back before it can be sent. A screenshot
              the sender never saw is a screenshot they did not really choose. -->
         <div id="fb-shot" hidden>
           <img id="fb-shot-img" alt="">
-          <button type="button" id="fb-shot-clear" aria-label="Hapus">×</button>
+          <button type="button" id="fb-shot-clear" aria-label="Delete">×</button>
         </div>
         <div class="fb-row">
-          <button type="button" id="fb-cancel">Batal</button>
-          <button type="button" id="fb-send" disabled>Kirim</button>
+          <button type="button" id="fb-cancel">Cancel</button>
+          <button type="button" id="fb-send" disabled>Send</button>
         </div>
       </div>
       <div class="fb-done" hidden>
-        <h2>terimakasih udah bantu pdflokal improve terus</h2>
+        <h2>thanks for helping pdflokal keep improving</h2>
       </div>
     </div>
   </dialog>
 
-  <dialog id="home-confirm" aria-label="Kembali ke beranda">
+  <dialog id="home-confirm" aria-label="Back to home">
     <div class="sheet hc-sheet">
-      <h2>Kembali ke beranda?</h2>
-      <p>Editanmu bakal hilang kalau belum kamu unduh.</p>
+      <h2>Back to home?</h2>
+      <p>Your edits will be lost if you haven't downloaded them.</p>
       <div class="hc-row">
-        <button id="hc-cancel">Batal</button>
-        <button id="hc-go">Ke Beranda</button>
+        <button id="hc-cancel">Cancel</button>
+        <button id="hc-go">Go Home</button>
       </div>
     </div>
   </dialog>
@@ -2531,62 +2490,45 @@
        engine downloads ONLY on an explicit tap of this button, NEVER from a
        page-load or a render path (js/v2/ocr-engine.js). Opt-in was always the
        larger half of that ruling. -->
-  <dialog id="scan-offer" aria-label="Halaman ini hasil scan">
+  <dialog id="scan-offer" aria-label="This page is a scan">
     <div class="sheet hc-sheet">
-      <h2>Halaman ini hasil scan</h2>
-      <p>File ini file gambar.</p>
+      <h2>This page is a scan</h2>
+      <p>This file is an image.</p>
       <div class="hc-row">
-        <button id="so-ocr">Scan tulisannya</button>
+        <button id="so-ocr">Scan the text</button>
       </div>
       <div class="hc-row">
-        <button id="so-dismiss">Nanti aja</button>
-        <button id="so-tipex">Tutup tulisan</button>
-        <button id="so-teks">Tulis di atasnya</button>
+        <button id="so-dismiss">Not now</button>
+        <button id="so-tipex">Cover the text</button>
+        <button id="so-teks">Write over it</button>
       </div>
     </div>
   </dialog>
 
-  <div id="support-card" role="dialog" aria-label="Dukung PDFLokal">
-    <button id="sc-close" aria-label="Tutup">
+  <div id="support-card" role="dialog" aria-label="Support PDFLokal">
+    <button id="sc-close" aria-label="Close">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     </button>
-    <div class="sc-head">Selesai, filemu udah jadi!</div>
-    <p class="sc-sub">PDFLokal gratis dan bakal terus gratis. Kalau kepakai, bantu saya sedikit ya:</p>
+    <div class="sc-head">Done, your file is ready.</div>
+    <p class="sc-sub">PDFLokal is free and will stay free. If it's useful to you, help me out a little:</p>
     <div class="sc-actions">
       <button id="sc-share">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></svg>
-        Bagikan ke teman
-      </button>
-      <button id="sc-donate">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/><line x1="14" y1="2" x2="14" y2="4"/></svg>
-        Traktir kopi
+        Share with a friend
       </button>
     </div>
-    <div class="sc-qr">
-      <img src="/images/qris-logo.svg" alt="QRIS" class="sc-qris-logo" width="150" height="24" loading="lazy">
-      <img src="/images/qris.png" alt="QRIS untuk traktir kopi" loading="lazy">
-      <p>Scan pakai e-wallet atau m-banking kamu.</p>
-      <div class="sc-performer">
-        <div class="sc-kepala">
-          <span class="sc-hat" aria-hidden="true">🎩</span>
-          <img src="/images/ojan.jpg" alt="Foto Ojan" class="sc-face" width="44" height="44" loading="lazy">
-        </div>
-        <b>Ojan</b>
-        <span>Fauzan Ahladzikri</span>
-      </div>
-    </div>
-    <button id="sc-never">jangan tampilkan lagi</button>
+    <button id="sc-never">don't show this again</button>
   </div>
 
   <!-- Install nudge: shown once, on a user's FIRST successful download, when the app
        is installable. Opened by the install chip; adapts to the browser — one-tap
        when armed, point-by-point steps otherwise (js/v2/install-prompt.js). -->
   <div id="install-card" role="dialog" aria-label="Install PDFLokal">
-    <button id="ic-close" aria-label="Tutup">
+    <button id="ic-close" aria-label="Close">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     </button>
-    <div class="sc-head">Install PDFLokal di hapemu</div>
-    <p class="sc-sub">Biar besok nggak usah nyari lagi, langsung ada di layar HP, tetap jalan walau lagi offline.</p>
+    <div class="sc-head">Install PDFLokal on your phone</div>
+    <p class="sc-sub">No need to search for it again tomorrow, it's right on your phone screen and works offline.</p>
     <div class="sc-actions" id="ic-onetap">
       <button id="ic-install">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m8 11 4 4 4-4"/><path d="M4 19h16"/></svg>
@@ -2598,9 +2540,9 @@
       <ol></ol>
       <!-- Always-current backstop: our steps are a friendly first-guess; this links
            to the browser vendor's official guide (exact labels drift by version). -->
-      <a id="ic-guide" class="ic-guide" target="_blank" rel="noopener" hidden>Lihat panduan resmi →</a>
+      <a id="ic-guide" class="ic-guide" target="_blank" rel="noopener" hidden>See the official guide →</a>
     </div>
-    <button id="ic-never">jangan tampilkan lagi</button>
+    <button id="ic-never">don't show this again</button>
   </div>
 
   <!-- TEMPORARY: Play Store demand-validation vote. Shown at the download moment
@@ -2609,79 +2551,79 @@
        tester opt-in for "Ya" voters only. Centered + scrim (founder call: more
        attention than the quiet bottom card). -->
   <div id="vote-card" aria-hidden="true">
-    <div class="vc-inner" role="dialog" aria-label="Mau PDFLokal di Play Store?">
-      <button id="vc-close" aria-label="Tutup">
+    <div class="vc-inner" role="dialog" aria-label="Want PDFLokal on the Play Store?">
+      <button id="vc-close" aria-label="Close">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
       <div class="vc-step vc-s1">
-        <span class="vc-eyebrow">Kabar PDFLokal</span>
-        <div class="vc-head">Mau PDFLokal ada di Play Store?</div>
-        <p class="vc-sub">Biar bisa kamu install sekali tap, jalan tanpa internet, layar penuh buat ngedit, dan tetap 100% di HP-mu.</p>
+        <span class="vc-eyebrow">PDFLokal news</span>
+        <div class="vc-head">Want PDFLokal on the Play Store?</div>
+        <p class="vc-sub">So you can install it with one tap, run it without internet, edit on a full screen, and still keep it 100% on your phone.</p>
         <div class="vc-actions">
-          <button id="vc-no">Nggak perlu</button>
-          <button id="vc-yes">Ya, mau</button>
+          <button id="vc-no">No need</button>
+          <button id="vc-yes">Yes, please</button>
         </div>
       </div>
       <div class="vc-step vc-s2">
         
-        <div class="vc-head">Mau bantu jadi tester?</div>
-        <p class="vc-sub">Google minta 15 orang nyoba dulu selama 2 minggu biar PDFLokal lolos. Gampang, cukup install &amp; sesekali dibuka.</p>
-        <a id="vc-tester" href="#" target="_blank" rel="noopener">Jadi tester &rarr;</a>
-        <button id="vc-later">Nanti aja</button>
+        <div class="vc-head">Want to help as a tester?</div>
+        <p class="vc-sub">Google asks for 15 people to try it for 2 weeks before PDFLokal can go through. Easy: just install it and open it now and then.</p>
+        <a id="vc-tester" href="#" target="_blank" rel="noopener">Become a tester &rarr;</a>
+        <button id="vc-later">Not now</button>
       </div>
     </div>
   </div>
 
-  <dialog id="pm-sheet" aria-label="Kelola halaman">
+  <dialog id="pm-sheet" aria-label="Manage pages">
     <div class="sheet pm-sheet-body">
       <div class="pm-head">
-        <h2>Kelola Halaman</h2>
-        <span class="pm-hint">Pilih halaman yang mau diambil</span>
-        <button class="btn-ghost" id="pm-close" aria-label="Tutup"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:14px;height:14px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+        <h2>Manage Pages</h2>
+        <span class="pm-hint">Select the pages you want to take</span>
+        <button class="btn-ghost" id="pm-close" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:14px;height:14px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
       </div>
       <div id="pm-grid" class="pm-grid"></div>
       <div id="pm-bulk" class="pm-bulk">
         <span class="pm-count"></span>
-        <button data-act="rotate">Putar</button>
-        <button data-act="extract">Ekstrak</button>
-        <button data-act="delete" class="danger">Hapus Halaman</button>
-        <button data-act="clear" class="btn-ghost">Batal</button>
+        <button data-act="rotate">Rotate</button>
+        <button data-act="extract">Extract</button>
+        <button data-act="delete" class="danger">Delete Pages</button>
+        <button data-act="clear" class="btn-ghost">Cancel</button>
       </div>
       <div id="pm-pickbar" class="pm-pickbar">
-        <span class="note">Pilih halaman yang mau diunduh</span>
-        <button class="btn-ghost" id="pm-pick-cancel">Batal</button>
-        <button class="btn-primary" id="pm-pick-ok">Pakai (0)</button>
+        <span class="note">Select the pages you want to download</span>
+        <button class="btn-ghost" id="pm-pick-cancel">Cancel</button>
+        <button class="btn-primary" id="pm-pick-ok">Use (0)</button>
       </div>
     </div>
   </dialog>
 
-  <dialog id="dl-sheet" class="bottomsheet" aria-label="Pilihan unduhan">
+  <dialog id="dl-sheet" class="bottomsheet" aria-label="Download options">
     <div class="sheet ds-body">
       <div class="ds-grab"></div>
       <div class="ds-title">
-        <h2>Unduh</h2>
+        <h2>Download</h2>
         <span class="ds-meta" id="ds-meta"></span>
-        <button class="btn-ghost" id="ds-close" aria-label="Tutup"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:14px;height:14px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+        <button class="btn-ghost" id="ds-close" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:14px;height:14px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
       </div>
 
       <div class="ds-row">
         <div class="ds-label">Format</div>
         <div class="ds-seg" id="ds-format">
           <button type="button" data-v="pdf" class="on">PDF</button>
-          <button type="button" data-v="img">Gambar<small>JPG / PNG</small></button>
+          <button type="button" data-v="img">Image<small>JPG / PNG</small></button>
         </div>
       </div>
 
       <div class="ds-row" id="ds-row-imgfmt" hidden>
-        <div class="ds-label">Jenis gambar</div>
+        <div class="ds-label">Image type</div>
         <div class="ds-seg" id="ds-imgfmt">
-          <button type="button" data-v="jpg" class="on">JPG<small>paling kompatibel</small></button>
-          <button type="button" data-v="png">PNG<small>tanpa kompresi</small></button>
+          <button type="button" data-v="jpg" class="on">JPG<small>most compatible</small></button>
+          <button type="button" data-v="png">PNG<small>no compression</small></button>
         </div>
       </div>
 
       <div class="ds-row">
-        <div class="ds-label">Ukuran</div>
+        <div class="ds-label">Size</div>
         <div class="ds-seg" id="ds-size"></div>
       </div>
 
@@ -2695,10 +2637,10 @@
       </div>
 
       <div class="ds-row">
-        <div class="ds-label">Halaman</div>
+        <div class="ds-label">Pages</div>
         <div class="ds-seg" id="ds-pages">
-          <button type="button" data-v="all" class="on">Semua<small id="ds-all-sub"></small></button>
-          <button type="button" data-v="some">Pilih…<small id="ds-some-sub"></small></button>
+          <button type="button" data-v="all" class="on">All<small id="ds-all-sub"></small></button>
+          <button type="button" data-v="some">Select…<small id="ds-some-sub"></small></button>
         </div>
       </div>
 
@@ -2717,36 +2659,36 @@
     </div>
   </dialog>
 
-  <dialog id="sig-modal" aria-label="Buat tanda tangan">
+  <dialog id="sig-modal" aria-label="Create signature">
     <div class="sheet">
       <div class="sig-tabs" role="tablist">
-        <button class="sig-tab on" data-tab="draw" role="tab" aria-selected="true">Gambar</button>
+        <button class="sig-tab on" data-tab="draw" role="tab" aria-selected="true">Draw</button>
         <button class="sig-tab" data-tab="upload" role="tab" aria-selected="false">Upload</button>
       </div>
       <div class="sig-pane-draw">
         <canvas id="sig-canvas"></canvas>
-        <button class="btn-ghost sig-inline" id="sig-clear">Ulangi</button>
+        <button class="btn-ghost sig-inline" id="sig-clear">Start over</button>
       </div>
       <div class="sig-pane-upload" style="display:none">
         <label class="sig-upload-drop">
           <input type="file" id="sig-file" accept="image/*" hidden>
-          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;vertical-align:-3px"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg> Pilih foto tanda tanganmu</span>
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;vertical-align:-3px"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg> Pick a photo of your signature</span>
         </label>
-        <label class="sig-check"><input type="checkbox" id="sig-removebg" checked> Hapus latar putih</label>
+        <label class="sig-check"><input type="checkbox" id="sig-removebg" checked> Remove white background</label>
         <div id="sig-preview" class="sig-preview"></div>
       </div>
-      <label class="sig-check"><input type="checkbox" id="sig-paraf"> Jadikan paraf (inisial, lebih kecil)</label>
-      <label class="sig-check"><input type="checkbox" id="sig-save"> Simpan tanda tangan</label>
+      <label class="sig-check"><input type="checkbox" id="sig-paraf"> Use as initials (smaller)</label>
+      <label class="sig-check"><input type="checkbox" id="sig-save"> Save signature</label>
       <div class="sheet-actions">
-        <button class="btn-ghost" id="sig-cancel">Batal</button>
-        <button class="btn-primary" id="sig-use">Pakai</button>
+        <button class="btn-ghost" id="sig-cancel">Cancel</button>
+        <button class="btn-primary" id="sig-use">Use</button>
       </div>
     </div>
   </dialog>
 
   <!-- aria-label: the input is `hidden` and driven by the dropzone button, so it has
        no visible <label>. Screen readers still announce it when it takes focus. -->
-  <input type="file" id="file-input" accept="application/pdf,image/*" multiple hidden aria-label="Pilih file PDF atau foto">
+  <input type="file" id="file-input" accept="application/pdf,image/*" multiple hidden aria-label="Choose PDF or photo files">
 
   <!-- WHY there are no vendor <script> tags here any more (Jul 2026, SEO pass):
        pdf.js + pdf-lib + fontkit + SignaturePad + fflate = ~1.6 MB that EVERY

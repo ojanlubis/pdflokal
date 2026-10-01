@@ -14,6 +14,10 @@
   <meta name="keywords"
     content="gabung pdf, merge pdf, kompres pdf, edit pdf, tanda tangan pdf, kompres gambar, gratis, indonesia, tanpa upload">
   <link rel="canonical" href="https://www.pdflokal.id/kompres-pdf">
+  <!-- hreflang: ONLY on `/` and `/en`, reciprocal (the same three links on both).
+       scripts/gen-seo-pages.js strips them from the 12 tool pages, which have no
+       English twin; scripts/gen-en-page.js reuses them verbatim on /en. x-default
+       is /en on purpose (docs: reference/seo-i18n-plan-2026-10-01.md section 4). -->
   <meta property="og:title" content="Kompres PDF Online Gratis - Perkecil Ukuran File PDF | PDFLokal">
   <meta property="og:description" content="Perkecil ukuran PDF supaya lolos batas upload. Gratis, tanpa watermark, tanpa akun. Diproses di browser, filemu tidak pernah diupload.">
   <meta property="og:image" content="https://www.pdflokal.id/images/og-image.png">
@@ -1106,16 +1110,12 @@
       .ld-hd-privasi-mobile:hover { color: var(--ink); }
     }
 
-    /* Language control — PLACEHOLDER, desktop only (mobile's equivalent lives
-       inside the burger drawer, above). Globe + "ID" + a dropdown offering
-       Indonesia (selected) and English (disabled, "segera"). Choosing nothing
-       changes anything: no lang attribute write on the root element, no
-       persistence, no translation wired up. WHY it is built this way: a
-       language switch that silently does
-       nothing is a false promise, and the founder rejects manufactured
-       reassurance — so this is built to visibly NOT function (English is
-       disabled, not just cosmetically greyed) rather than to quietly pretend
-       to work. */
+    /* Language control, desktop only (mobile's equivalent lives inside the
+       burger drawer, above). Globe + "ID" + a dropdown: the current language
+       (weight, not a control) and a real link to the other page (/en). It
+       writes nothing: no lang attribute on the root element, no persistence.
+       It used to be a placeholder with English disabled ("segera"); that was
+       honest while English did not exist, and is retired now that /en does. */
     .ld-lang { position: relative; display: none; }
     .ld-lang-btn {
       display: inline-flex; align-items: center; gap: var(--sp-4); list-style: none; cursor: pointer;
@@ -1152,11 +1152,8 @@
        every other red thing on the page teaches. Weight carries selection;
        colour stays reserved. */
     .ld-lang-opt.is-active { font-weight: 700; color: var(--ink); }
+    a.ld-lang-opt { text-decoration: none; }
     .ld-lang-opt:disabled { color: var(--muted); cursor: not-allowed; }
-    .ld-lang-soon {
-      font-size: var(--fs-n2); color: var(--muted); border: 1px solid var(--line);
-      border-radius: var(--r-pill); padding: 0 var(--sp-8);
-    }
     /* Centered hero (founder, Jul 5) — the document opens like a letter's
        title block, with the stamp pressed on its top-right corner. */
     /* padding-top (not h1 margin): a margin would collapse through the wrapper
@@ -2102,11 +2099,11 @@
           <!-- Mobile only — desktop hides this in favour of .ld-nav's Privasi link. -->
           <a href="/privasi" class="ld-hd-privasi-mobile">Privasi</a>
 
-          <!-- Language control — PLACEHOLDER. Desktop only; mobile's
-               equivalent lives inside the burger drawer. Indonesia is
-               selected, English is disabled ("segera") and inert on purpose —
-               see .ld-lang in the stylesheet for why it is built to visibly
-               NOT function rather than to quietly do nothing. -->
+          <!-- Language control. Desktop only; mobile's equivalent lives inside
+               the burger drawer. A plain link to the other language's page
+               (/en), never a script: one URL, one language, no redirect, no
+               stored choice. scripts/gen-en-page.js swaps which option is the
+               link on /en. -->
           <details class="ld-lang">
             <summary class="ld-lang-btn" aria-label="Pilih bahasa">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
@@ -2114,8 +2111,8 @@
               <svg class="ld-lang-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
             </summary>
             <div class="ld-lang-menu">
-              <button type="button" class="ld-lang-opt is-active">Indonesia</button>
-              <button type="button" class="ld-lang-opt" disabled aria-disabled="true">English <span class="ld-lang-soon">segera</span></button>
+              <span class="ld-lang-opt is-active" aria-current="true" lang="id">Indonesia</span>
+              <a class="ld-lang-opt" href="/en" hreflang="en" lang="en">English</a>
             </div>
           </details>
         </div>
@@ -2135,8 +2132,8 @@
         <div class="ld-burger-lang">
           <span class="ld-burger-lang-label">Bahasa</span>
           <div class="ld-burger-lang-opts">
-            <span class="ld-lang-opt is-active">Indonesia</span>
-            <span class="ld-lang-opt" aria-disabled="true">English <span class="ld-lang-soon">segera</span></span>
+            <span class="ld-lang-opt is-active" aria-current="true" lang="id">Indonesia</span>
+            <a class="ld-lang-opt" href="/en" hreflang="en" lang="en">English</a>
           </div>
         </div>
       </div>
