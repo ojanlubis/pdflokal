@@ -26,7 +26,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { TARGETS } from '../../js/v2/download-sheet.js';
+import { TARGETS, fmtMB } from '../../js/v2/download-sheet.js';
 import { compressToTargetBytes } from '../../js/core/compress.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -112,5 +112,23 @@ test('3. the ladder search, run against each preset, never lands over the decima
     }
   } finally {
     if (had === undefined) delete globalThis.OffscreenCanvas; else globalThis.OffscreenCanvas = had;
+  }
+});
+
+// DISPLAY AGREES WITH THE CAP. The sheet prints a result next to a preset label
+// ("204 KB, belum masuk 200 KB"). If fmtMB divided by 1024 the same 204,000 bytes
+// read "199 KB" beside "belum masuk 200 KB": the page contradicting itself.
+test('fmtMB is decimal: a result over a preset never displays at or under its label', () => {
+  assert.equal(fmtMB(204_000), '204 KB');
+  assert.equal(fmtMB(200_000), '200 KB');
+  assert.equal(fmtMB(199_999), '200 KB'); // rounds up to the label, never below the true size read in decimal
+  assert.equal(fmtMB(1_000_000), '1,0 MB');
+  assert.equal(fmtMB(1_048_576), '1,0 MB');
+  assert.equal(fmtMB(2_500_000), '2,5 MB');
+  assert.equal(fmtMB(1), '1 KB');
+  for (const t of PRESETS.filter((x) => x.label.endsWith('KB'))) {
+    const over = fmtMB(t.v + 4000);
+    const label = fmtMB(t.v);
+    assert.notEqual(over, label, `${t.label}: 4 KB over the cap must not display as the cap`);
   }
 });
