@@ -127,33 +127,15 @@ glyph operators (why: `decisions.md`). Two laws from that, both load-bearing:
 
 ## What is never yours
 
-**⛔ Client-facing copy · money · anything public-facing · anything user-visible — Fauzan's own hand**,
-and **per-turn verbal authorization is retired as a mechanism**: a relayed "he said yes" is a carry.
-
-**Push authority is `../specs/spec-low-risk-list.md`. Read it before pushing — it is the authority,
-not this file, which only points at it.** Both preconditions are now met (the telemetry suite exists;
-the list was ruled item by item), so as of **2026-08-09 INCLUDE 9a is ARMED**: the changes that list
-names — comment/doc fixes with zero executable lines, renames of module-private names, deletion of
-code with zero references and no dynamic-dispatch path, new tests each shown RED against a broken
-variant — **ship on a green `npm run gate`, no hand needed.** Conditions travel with it: **one
-concern per commit** (clean revert is the whole safety argument) and every shipped item reported to
-the PM with how to revert.
-
-**9b — moving code rather than describing it** (restructuring, extracting, de-duplicating,
-re-layering, changing any signature or module boundary) is still batched, and the seat rules those
-batches under Fauzan's 2026-08-09 delegation. The route from 9b to 9a is evidence, not assertion:
-byte-identical output over the wild corpus, red-on-revert on a test that covers the touched
-behaviour, or a characterisation test written *before* the refactor. *"Zero behaviour change" was
-struck from the list on 2026-07-29 because it is a claim, not a check.*
-
-**The list binds him too — a release grants pace, never scope.** If this file and the spec ever
-disagree, the spec wins and this paragraph is the bug; stop and reconcile before shipping.
+**Push authority is `../specs/spec-low-risk-list.md`. Read its current INCLUDE/EXCLUDE rows before
+every push — do not summarize it here or recall it from a summary.** Quoted summaries of it have gone
+stale twice and nearly refused work the list already allowed. Whatever ships, ship one concern per
+commit (clean revert is the safety argument) and report each item to the seat with how to revert.
 
 Also the seat's, not yours: deciding what is worth building, ruling on taste, client-facing words. You
 own build, test, refactor, the gate end-to-end, `docs/`, this file, and local commits on `main`.
 
-Permanent refusals: never attach GA4 to Ads tag `AW-17538923405` · no fabricated AggregateRating ·
-no server-dependent features · never hand-edit generated SEO pages.
+Permanent refusals: never attach GA4 to Ads tag `AW-17538923405` · no fabricated AggregateRating.
 
 ## Git
 
