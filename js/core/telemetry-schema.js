@@ -612,13 +612,15 @@ export const SCHEMA = {
   // change — never ahead of it.
   // ---------------------------------------------------------------------
   // RE-ADDED 2026-10-01 WITH its call sites (js/v2/app.js smartReplace and the
-  // paragraph editor's overflow guard), per the note above. One row per tap on
+  // paragraph editor's overflow guard, since removed), per the note above. One row per tap on
   // a line that paragraph-detect.js placed in a body-text block:
   //   outcome 'open'     — the whole paragraph opened for editing
   //           'decline'  — it could not be proven editable as one; the tap fell
   //                        back to today's per-line edit (decline_reason says why)
-  //           'overflow' — a keystroke was refused because the paragraph would
-  //                        have grown past the bottom of the page
+  //           'overflow' — NO LONGER EMITTED (2026-10-01): the page-bottom
+  //                        refusal is gone, a paragraph may leave the page. The
+  //                        value stays in the enum so rows already stored still
+  //                        validate; nothing fires it.
   //   decline_reason — core/block-edit.js BLOCK_DECLINE_REASONS, written out
   //                    here (api/t.js imports this file; it stays a leaf) and
   //                    pinned equal by tests/core/block-edit.test.mjs; present

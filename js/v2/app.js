@@ -93,10 +93,10 @@ import { planRunRemoval } from '../core/text-walk.js';
 import { extractFontProgram, lookupFontObject } from '../core/doc-fonts.js';
 import { textCoveredBy, nativeCandidate } from '../core/stamp.js';
 import { faceLadder, faceStyle } from '../core/line-font.js';
-import { loadFaceFont, startLineFont, refusalNote, replaceText } from './line-font-live.js';
+import { loadFaceFont, startLineFont, refusalNote } from './line-font-live.js';
 import { planBlockEdit, blockOfLine, blockAnnotation, blockExtent, logicalTextOf } from '../core/block-edit.js';
 import { totalPageRotation } from '../core/page-rotation.js';
-import { styleBlockEditor, placeBlockEditor, readEditorLines, editorLineCount } from './block-editor.js';
+import { styleBlockEditor, placeBlockEditor, readEditorLines } from './block-editor.js';
 import { resolveFontFingerprint, docFontFaceDescriptors, FAMILY_BUCKET_TO_CLONE, isInformativeBaseFont } from '../core/font-fingerprint.js';
 import { cloneFamilyFor } from '../core/font-decide.js';
 import { editSignature, pageEdits } from '../core/page-surgery.js';
@@ -2762,31 +2762,14 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
     draft.onFontShown = place;
     place();
     document.fonts?.ready?.then(place).catch(() => {});
-    // Width is law, height is not — but never past the page. A keystroke that
-    // would push the last line off the bottom of the page is undone, said
-    // once, and counted (decline-never-guess at input, the shape slice 1 set
-    // for a character no font can write).
-    const pageH = slot.page.height;
-    let lastGood = ed.textContent;
-    let composing = false;
-    const guard = () => {
-      if (composing || !ed.isConnected) return;
-      const lead = blockPlan.k * blockPlan.leading;
-      const lastBaseline = blockPlan.disp.y + (editorLineCount(ed, blockPlan) - 1) * lead;
-      if (lastBaseline + 0.25 * blockPlan.k * blockPlan.size > pageH) {
-        replaceText(ed, ed.textContent, lastGood);
-        draft.lineFont?.resync?.();
-        toast(tr('toast.blockPastPage'));
-        tel('block_edit', { outcome: 'overflow', block_lines: blockPlan.srcLines });
-      } else {
-        lastGood = ed.textContent;
-      }
-    };
-    // A microtask, so it judges the text AFTER line-font-live.js's own input
-    // handler has accepted or refused the keystroke.
-    ed.addEventListener('input', () => { Promise.resolve().then(guard); });
-    ed.addEventListener('compositionstart', () => { composing = true; });
-    ed.addEventListener('compositionend', () => { composing = false; Promise.resolve().then(guard); });
+    // Width is law, height is not — and the page's bottom is not a wall
+    // either (founder, 2026-10-01: "the user sees it leave the page, so the
+    // promise holds"). A paragraph may grow past the page; the editor paints
+    // the overflow on the grey canvas (no ancestor of .v2-text-edit clips:
+    // .pv-page and .pv-overlay set no overflow), the commit writes every
+    // line at its own baseline even where y < 0, and the file simply holds
+    // that text outside the page box. This used to refuse the keystroke with
+    // toast.blockPastPage; the refusal is gone, not softened.
   }
   // focus is what raises the keyboard, so the watch starts here and is released
   // in commit() above — the only path out of this editor.

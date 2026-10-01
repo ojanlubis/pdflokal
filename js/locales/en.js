@@ -44,8 +44,7 @@ export default {
     preparing: 'One moment, getting ready',
     fontSubstituteResult: 'Some text uses a similar substitute font in the saved file',
     fontSubstituteChar: 'This character uses a similar substitute font',
-    blockGrew: 'The text is now longer than the original paragraph',
-    blockPastPage: 'The text has reached the bottom of the page',
+    blockGrew: 'The paragraph is now longer than before and overlaps the text below it.',
     extractDone: {
       one: 'Done. {count} page extracted into a new PDF',
       other: 'Done. {count} pages extracted into a new PDF',

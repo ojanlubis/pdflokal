@@ -239,20 +239,102 @@ test('a committed paragraph reopens AS the paragraph, with its own text', async 
   expect(after[0].text).toBe(NEW);
 });
 
-test('a keystroke that would push the paragraph off the page is undone and said', async ({ page }) => {
+test('a paragraph may grow past the page bottom: typed, seen leaving the page, committed, and the file holds every line', async ({ page }) => {
+  // His ruling (seat decisions.md 2026-10-01): no refusal at the page bottom.
+  // "The user sees it leave the page, so the promise holds" — the editor paints
+  // the overflow on the grey canvas, and the file simply holds the text
+  // outside the page box (invisible in a viewer, but there, at its baselines).
+  // RED ON REVERT of the guard removal: the old guard undid the paste, so the
+  // editor text is PARAGRAPH, not the long text, and the first assertion fails.
+  const LAST = 'AKHIRPARAGRAFZZZ';
+  const LONG = `${`${NEW} `.repeat(14)}${LAST}`;
   await openFixture(page, 'paragraf-badan.pdf');
   await tapLine(page, { str: 'lingkungan kantor' });
   const ed = page.locator('.v2-text-edit');
   await expect(ed).toHaveText(PARAGRAPH);
-  // One paste far longer than the page can hold under this paragraph.
-  await page.keyboard.insertText(`${NEW} `.repeat(40));
-  // Refused whole: the editor holds what it held before the paste.
-  await expect(ed).toHaveText(PARAGRAPH);
+  await expect(ed).toHaveAttribute('data-font-path', 'native', { timeout: 10_000 });
+  await page.keyboard.insertText(LONG);
+  // Accepted whole, nothing said while typing.
+  await expect(ed).toHaveText(LONG);
+  expect(await page.locator('#toast').getAttribute('class')).not.toMatch(/show/);
+
+  // The part past the page is VISIBLE: the editor's box reaches below the
+  // page element's bottom, and a point down there, on the grey canvas, hits
+  // the editor itself (no ancestor clips it).
+  const geo = await page.evaluate(() => {
+    const e = document.querySelector('.v2-text-edit');
+    const view = e.closest('.pv-page');
+    e.closest('#v2-scroll').scrollTop = 1e7;
+    const er = e.getBoundingClientRect();
+    const vr = view.getBoundingClientRect();
+    const probe = { x: er.left + er.width / 2, y: (Math.max(vr.bottom, 0) + er.bottom) / 2 };
+    const hit = document.elementFromPoint(probe.x, probe.y);
+    return { edBottom: er.bottom, pageBottom: vr.bottom, hitsEditor: !!hit && (hit === e || e.contains(hit)), probeBelowPage: probe.y > vr.bottom };
+  });
+  expect(geo.edBottom, 'the editor reaches below the page').toBeGreaterThan(geo.pageBottom + 20);
+  expect(geo.probeBelowPage).toBe(true);
+  expect(geo.hitsEditor, 'the over-page text is on screen, not clipped').toBe(true);
+
+  const painted = await paintedLines(page);
+  expect(painted.join(' ')).toBe(LONG);
+  await page.keyboard.press('Enter');
+  await expect(ed).toHaveCount(0);
+  // It grew into the text under it: said once, in his words.
   await expect(page.locator('#toast')).toHaveClass(/show/);
-  await expect(page.locator('#toast')).toHaveText('Teksnya udah sampai ujung halaman');
-  const bottom = await ed.evaluate((el) => el.offsetTop + el.offsetHeight);
-  const pageH = await page.evaluate(() => window.v2.getDoc().pages[0].height);
-  expect(bottom).toBeLessThanOrEqual(pageH);
+  await expect(page.locator('#toast')).toHaveText('Paragrafnya jadi lebih panjang dari sebelumnya, sekarang numpuk sama tulisan di bawahnya.');
+  const anno = await page.evaluate(() => window.v2.getDoc().pages[0].annotations.find((a) => a.type === 'text'));
+  // Committed whole: every painted line is stored, none dropped.
+  expect(anno.text).toBe(LONG);
+  expect(anno.block.lines.map((l) => l.text)).toEqual(painted);
+
+  await page.click('#btn-download');
+  await expect(page.locator('#dl-sheet')).toBeVisible();
+  const { buf } = await downloadBytes(page, () => page.click('#ds-cta'));
+  expect(buf.subarray(0, 5).toString()).toBe('%PDF-');
+  // pdf.js's getTextContent culls everything outside the page box (measured:
+  // on this file it returns 51 of the 64 lines, the rest are below y=0), exactly
+  // like a viewer, so the file is read through a WIDER box: the same bytes,
+  // MediaBox/CropBox opened 400pt downward by pdf-lib, then asked pdf.js. The
+  // text it finds is the file's own; only the window onto it changed.
+  const file = await page.evaluate(async (arr) => {
+    const open = await window.PDFLib.PDFDocument.load(new Uint8Array(arr));
+    const pg0 = open.getPage(0);
+    const { width, height } = pg0.getSize();
+    pg0.setMediaBox(0, -400, width, height + 400);
+    pg0.setCropBox(0, -400, width, height + 400);
+    const wide = await open.save();
+    const doc = await window.pdfjsLib.getDocument({ data: wide }).promise;
+    const pg = await doc.getPage(1);
+    const tc = await pg.getTextContent();
+    const byY = new Map();
+    for (const it of tc.items) {
+      if (!it.str) continue;
+      const y = Math.round(it.transform[5] * 100) / 100;
+      if (!byY.has(y)) byY.set(y, []);
+      byY.get(y).push(it);
+    }
+    return { pageH: height, lines: [...byY.entries()].sort((a, b) => b[0] - a[0]).map(([y, items]) => {
+      items.sort((a, b) => a.transform[4] - b.transform[4]);
+      return { y, text: items.map((it) => it.str).join('').replace(/\s+/g, ' ').trim() };
+    }).filter((l) => l.text) };
+  }, Array.from(buf));
+  expect(file.pageH).toBe(842);
+  // The paragraph's lines, top down from its first baseline at 15pt leading:
+  // every one is in the file at its own baseline, including those below the
+  // page (y < 0). Found by baseline and matched by CONTAINMENT, because the
+  // grown paragraph overlaps the neighbour's lines (that is what the toast
+  // said), so two of its baselines carry the neighbour's words as well.
+  const missing = [];
+  painted.forEach((text, i) => {
+    const y = 740 - i * 15;
+    const hit = file.lines.find((l) => Math.abs(l.y - y) < 0.05);
+    if (!hit || !hit.text.includes(text)) missing.push({ i, y, text, got: hit?.text ?? null });
+  });
+  expect(painted.length, 'the paragraph is long enough to leave the page').toBeGreaterThan(55);
+  expect(missing, 'no over-page line was dropped or moved').toEqual([]);
+  const lastY = 740 - (painted.length - 1) * 15;
+  expect(lastY, 'the last line is outside the page box').toBeLessThan(0);
+  expect(file.lines.find((l) => Math.abs(l.y - lastY) < 0.05).text).toContain(LAST);
 });
 
 test('a paragraph that grows into the text below says so once, and keeps its width', async ({ page }) => {
@@ -264,7 +346,7 @@ test('a paragraph that grows into the text below says so once, and keeps its wid
   await page.keyboard.press('Enter');
   await expect(ed).toHaveCount(0);
   await expect(page.locator('#toast')).toHaveClass(/show/);
-  await expect(page.locator('#toast')).toHaveText('Teksnya jadi lebih panjang dari paragraf asli');
+  await expect(page.locator('#toast')).toHaveText('Paragrafnya jadi lebih panjang dari sebelumnya, sekarang numpuk sama tulisan di bawahnya.');
   const anno = await page.evaluate(() => window.v2.getDoc().pages[0].annotations.find((a) => a.type === 'text'));
   expect(anno.block.lines.length).toBeGreaterThan(6);
   expect(anno.block.width).toBeLessThan(338.2); // the box's own width, not grown sideways

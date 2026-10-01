@@ -73,12 +73,6 @@ export function placeBlockEditor(ed, plan) {
   return top;
 }
 
-// How many lines the editor is painting now.
-export function editorLineCount(ed, plan) {
-  const lead = plan.k * plan.leading;
-  return Math.max(1, Math.round(ed.offsetHeight / lead));
-}
-
 // The line breaks the editor PAINTED, read off the layout: [{ text, brk }],
 // where `brk` is exactly what the break consumed — the whitespace a soft wrap
 // hung at the line's end ('' when the browser broke after a hyphen), plus
