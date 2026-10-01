@@ -13,6 +13,7 @@
 
 import { ensureSignaturePad } from '../core/vendor.js';
 import { tel } from './telemetry.js';
+import { t as tr } from '../lib/i18n.js';
 
 const WHITE_THRESHOLD = 235; // r,g,b all above this → transparent
 
@@ -134,7 +135,7 @@ export function createSignatureModal({ modal, onReady, toast }) {
   // ink trim. When these were separate code paths in the old wing, paste and
   // upload could disagree about what a signature was.
   function acceptImageFile(f, { switchTab = false } = {}) {
-    if (!f || !f.type.startsWith('image/')) { toast('Pilih file gambar ya'); return; }
+    if (!f || !f.type.startsWith('image/')) { toast(tr('sig.pickImage')); return; }
     const img = new Image();
     img.onload = () => {
       URL.revokeObjectURL(img.src); // decoded — the blob URL has done its job
@@ -142,7 +143,7 @@ export function createSignatureModal({ modal, onReady, toast }) {
       if (switchTab) showTab('upload');
       renderUploadPreview();
     };
-    img.onerror = () => { URL.revokeObjectURL(img.src); toast('Gagal membaca gambar'); };
+    img.onerror = () => { URL.revokeObjectURL(img.src); toast(tr('sig.readFailed')); };
     img.src = URL.createObjectURL(f);
   }
 
@@ -258,13 +259,13 @@ export function createSignatureModal({ modal, onReady, toast }) {
       // touch the stroke data, a real stroke always does.
       art = restored;
     } else if (drawVisible) {
-      if (!pad || pad.isEmpty()) { toast('Gambar tanda tanganmu dulu ya'); return; }
+      if (!pad || pad.isEmpty()) { toast(tr('sig.drawFirst')); return; }
       art = fromCanvas(trimToInk(canvas));
     } else {
       art = fromCanvas(processUpload());
-      if (!art) { toast('Upload gambar tanda tanganmu dulu ya'); return; }
+      if (!art) { toast(tr('sig.uploadFirst')); return; }
     }
-    if (!art) { toast('Tanda tangan kosong'); return; }
+    if (!art) { toast(tr('sig.empty')); return; }
     // The checkbox IS the consent moment, and unchecking it is also the delete
     // control — that is what avoids inventing a second button and a second
     // string. Written only here, past every empty-source check, so Batal and a

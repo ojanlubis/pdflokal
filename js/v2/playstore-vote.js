@@ -22,6 +22,7 @@
  */
 
 import { track } from '../lib/analytics.js';
+import { t as tr } from '../lib/i18n.js';
 
 // The live tester sign-up form (Gmail + WhatsApp). Placeholder until it ships;
 // swap this ONE string for the real forms.gle/… link.
@@ -59,7 +60,7 @@ export function createPlaystoreVote(deps) {
   card.querySelector('#vc-no').addEventListener('click', () => {
     track('vote_playstore', { choice: 'no' });
     safeSet(VOTED_KEY, '1');
-    deps.toast('Oke, makasih masukannya!');
+    deps.toast(tr('playstore.thanksNo'));
     hide();
   });
 
@@ -78,7 +79,7 @@ export function createPlaystoreVote(deps) {
   });
 
   card.querySelector('#vc-later').addEventListener('click', () => {
-    deps.toast('Sip, makasih ya!');
+    deps.toast(tr('playstore.thanksLater'));
     hide();
   });
 

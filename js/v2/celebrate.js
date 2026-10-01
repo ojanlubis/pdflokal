@@ -15,6 +15,7 @@
 
 import { createPlaystoreVote } from './playstore-vote.js';
 import { track } from '../lib/analytics.js';
+import { t as tr } from '../lib/i18n.js';
 
 // TEMPORARY (founder call 2026-07-19): during the Play Store demand-validation
 // drive, the download moment shows the binary VOTE card instead of share/tip —
@@ -34,7 +35,8 @@ const LAST_SHOWN_KEY = 'pdflokal-support-last';
 // channel as source "share", instead of Unassigned.
 const SHARE_URL = 'https://www.pdflokal.id/?utm_source=share&utm_medium=referral';
 // Written the way a friend would actually send it, not like a brochure.
-const SHARE_TEXT = 'Eh coba deh pdflokal.id, bisa edit + tanda tangan PDF langsung di HP. Gratis, dan filenya nggak diupload ke mana-mana.';
+// Read at share time (shareText()), in the page's language, never frozen at import.
+const shareText = () => tr('celebrate.shareText');
 
 // Private-browsing-safe storage (localStorage throws in some private modes).
 function safeGet(key) {
@@ -122,8 +124,8 @@ export function createCelebration(deps) {
   window.addEventListener('offline', () => {
     if (offlineShown) return;
     offlineShown = true;
-    showStamp('Tetap jalan', { duration: 1800 });
-    deps.toast('Internet putus. Tenang, semuanya jalan di HP-mu, bukan di server.');
+    showStamp(tr('celebrate.stampOffline'), { duration: 1800 });
+    deps.toast(tr('celebrate.offlineToast'));
   });
 
   function hide() {
@@ -161,7 +163,7 @@ export function createCelebration(deps) {
   card.querySelector('#sc-never').addEventListener('click', () => {
     safeSet(OPTOUT_KEY, '1');
     hide();
-    deps.toast('Oke, nggak bakal muncul lagi');
+    deps.toast(tr('celebrate.neverToast'));
   });
 
   // share_card_shown → share_tap → share_sent is the funnel that says whether
@@ -173,11 +175,11 @@ export function createCelebration(deps) {
     track('share_tap', { method });
     try {
       if (navigator.share) {
-        await navigator.share({ title: 'PDFLokal', text: SHARE_TEXT, url: SHARE_URL });
+        await navigator.share({ title: 'PDFLokal', text: shareText(), url: SHARE_URL });
         hide();
       } else {
-        await navigator.clipboard.writeText(`${SHARE_TEXT} ${SHARE_URL}`);
-        deps.toast('Udah disalin, tinggal kirim ke temanmu');
+        await navigator.clipboard.writeText(`${shareText()} ${SHARE_URL}`);
+        deps.toast(tr('celebrate.copiedToast'));
         hide();
       }
       track('share_sent', { method });
@@ -194,7 +196,7 @@ export function createCelebration(deps) {
     onDownloadSuccess() {
       // Big, and ~1.2s late on purpose: Android Chrome's download dialog +
       // notification own the first second; we celebrate once the stage clears.
-      showStamp('Beres ✓', { big: true, delay: 1200, duration: 3000 });
+      showStamp(tr('celebrate.stampDone'), { big: true, delay: 1200, duration: 3000 });
       // During the drive, the vote takes this slot from share/tip. If it shows,
       // we stop here; if it declines (already voted / dismissed today), the
       // share/tip card runs as usual — so voters still get the normal invite.

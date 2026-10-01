@@ -1,5 +1,5 @@
 /*
- * PDFLokal — locales/en.js  (English)
+ * PDFLokal - locales/en.js  (English)
  * ============================================================================
  * Same keys as id.js (tests/core/i18n.test.mjs fails on any difference, and on
  * a different {slot} set). Plain, short, friendly product English: the meaning
@@ -260,5 +260,58 @@ export default {
     cropAfter: 'After',
     skip: 'No thanks',
     send: 'Send',
+  },
+
+  sig: {
+    pickImage: 'Pick an image file',
+    readFailed: "Couldn't read the image",
+    drawFirst: 'Draw your signature first',
+    uploadFirst: 'Upload an image of your signature first',
+    empty: 'The signature is empty',
+  },
+
+  celebrate: {
+    shareText: "Hey, try pdflokal.id. You can edit and sign PDFs right on your phone. It's free, and your files aren't uploaded anywhere.",
+    stampOffline: 'Still works',
+    stampDone: 'Done ✓',
+    offlineToast: "Internet connection lost. Don't worry, everything runs on your phone, not on a server.",
+    neverToast: "Okay, it won't show up again",
+    copiedToast: 'Copied, just send it to your friend',
+  },
+
+  playstore: {
+    thanksNo: 'Okay, thanks for the feedback',
+    thanksLater: 'Got it, thanks',
+  },
+
+  format: {
+    font: 'Font',
+    size: 'Font size',
+    bold: 'Bold',
+    italic: 'Italic',
+    color: 'Color {color}',
+    moreColors: 'More colors',
+  },
+
+  pm: {
+    page: 'Page {n}',
+    use: 'Use ({n})',
+    selected: '{count} selected',
+    deleted: {
+      one: '{count} page deleted. Wrong one? Just Undo',
+      other: '{count} pages deleted. Wrong ones? Just Undo',
+    },
+  },
+
+  bugPrompt: {
+    small: 'Hello, PDFLokal user',
+    big: 'Please let me know about any bugs, here',
+  },
+
+  render: { loading: 'loading…' },
+
+  theme: {
+    toLight: 'Switch to light mode',
+    toDark: 'Switch to dark mode',
   },
 };

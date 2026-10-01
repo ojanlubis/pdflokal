@@ -15,6 +15,7 @@ import { updateAnnotation } from '../core/operations.js';
 import { record } from '../core/history.js';
 import { FONT_CSS } from '../render/page-view.js';
 import { FONT_SIZE_PRESETS, parseFontSize, formatFontSize } from '../core/font-size.js';
+import { t as tr } from '../lib/i18n.js';
 
 const COLORS = ['#000000', '#d33131', '#1d6fdc', '#1d8a44', '#ffffff'];
 
@@ -42,7 +43,7 @@ export function createFormatBar(deps) {
 
   const fontSel = document.createElement('select');
   fontSel.className = 'fb-font';
-  fontSel.setAttribute('aria-label', 'Jenis huruf');
+  fontSel.setAttribute('aria-label', tr('format.font'));
   // The metric clones ARE authoring choices (founder ruling 2026-07-20
   // evening: "yes, add them" — overriding the keep-it-5 recommendation).
   // Their family names mean nothing to users, so each label carries the
@@ -73,7 +74,7 @@ export function createFormatBar(deps) {
   sizeIn.inputMode = 'decimal';
   sizeIn.autocomplete = 'off';
   sizeIn.className = 'fb-size';
-  sizeIn.setAttribute('aria-label', 'Ukuran huruf');
+  sizeIn.setAttribute('aria-label', tr('format.size'));
   const sizeList = document.createElement('datalist');
   sizeList.id = 'fb-size-presets';
   for (const s of FONT_SIZE_PRESETS) {
@@ -88,14 +89,14 @@ export function createFormatBar(deps) {
   const boldBtn = document.createElement('button');
   boldBtn.className = 'fb-toggle fb-bold';
   boldBtn.textContent = 'B';
-  boldBtn.setAttribute('aria-label', 'Tebal');
+  boldBtn.setAttribute('aria-label', tr('format.bold'));
   boldBtn.setAttribute('aria-pressed', 'false');
   el.appendChild(boldBtn);
 
   const italicBtn = document.createElement('button');
   italicBtn.className = 'fb-toggle fb-italic';
   italicBtn.textContent = 'I';
-  italicBtn.setAttribute('aria-label', 'Miring');
+  italicBtn.setAttribute('aria-label', tr('format.italic'));
   italicBtn.setAttribute('aria-pressed', 'false');
   el.appendChild(italicBtn);
 
@@ -105,7 +106,7 @@ export function createFormatBar(deps) {
     b.className = 'fb-color';
     b.dataset.color = c;
     b.style.background = c;
-    b.setAttribute('aria-label', `Warna ${c}`);
+    b.setAttribute('aria-label', tr('format.color', { color: c }));
     el.appendChild(b);
     swatches.push(b);
   }
@@ -114,8 +115,8 @@ export function createFormatBar(deps) {
   const customColor = document.createElement('input');
   customColor.type = 'color';
   customColor.className = 'fb-color fb-color-custom';
-  customColor.setAttribute('aria-label', 'Warna lainnya');
-  customColor.title = 'Warna lainnya';
+  customColor.setAttribute('aria-label', tr('format.moreColors'));
+  customColor.title = tr('format.moreColors');
   el.appendChild(customColor);
 
   // ---- state sync ---------------------------------------------------------------

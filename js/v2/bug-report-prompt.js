@@ -40,6 +40,7 @@
  * REFUSED it (2026-09-16: "engga. gpp dua ajakan. most user ignore the share
  * anyway"), so the two caps are independent on purpose. Do not merge them.
  */
+import { t as tr } from '../lib/i18n.js';
 
 const LAST_SHOWN_KEY = 'pdflokal_bugreport_last';
 const AUTO_DISMISS_MS = 9000;
@@ -74,11 +75,11 @@ export function createBugReportPrompt() {
 
     const small = document.createElement('div');
     small.className = 'bp-small';
-    small.textContent = 'Halo user PDFLokal';
+    small.textContent = tr('bugPrompt.small');
 
     const big = document.createElement('div');
     big.className = 'bp-big';
-    big.textContent = 'Mohon kabarin saya ya kalo ada bug, di sini';
+    big.textContent = tr('bugPrompt.big');
 
     // Not an <h1>: the page already has one, and the editor is CONSOLE mode
     // where display sizes are forbidden (specs/design-system.md). The founder

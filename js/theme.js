@@ -17,12 +17,14 @@
  * system value on load looks harmless and converts every visitor into someone
  * with an explicit preference they never expressed.
  *
- * ⚠️ NO IMPORTS, DELIBERATELY. This used to import js/lib/utils.js for two
- * localStorage helpers. js/lib/utils.js belongs to the OLD WING and dies at
+ * ⚠️ NO OLD-WING IMPORTS, DELIBERATELY. This used to import js/lib/utils.js for
+ * two localStorage helpers. js/lib/utils.js belongs to the OLD WING and dies at
  * demolition; index.html (v2) could not load this module without dragging the
  * old wing into v2's module graph. The helpers are eight lines and they live
- * here now so this file outlives that.
+ * here now so this file outlives that. The one import is lib/i18n.js (the toggle's
+ * aria-label), which pulls in only the two dictionaries.
  */
+import { t as tr } from './lib/i18n.js';
 
 const THEME_KEY = 'pdflokal_theme'; // 'light' | 'dark' | absent = follow the OS
 const THEME_ATTR = 'data-theme';
@@ -107,7 +109,7 @@ function updateToggleButton() {
   toggleCheckbox.checked = current === 'dark';
 
   if (toggleLabel) {
-    const label = current === 'dark' ? 'Ganti ke mode terang' : 'Ganti ke mode gelap';
+    const label = current === 'dark' ? tr('theme.toLight') : tr('theme.toDark');
     toggleLabel.setAttribute('aria-label', label);
     toggleLabel.setAttribute('title', label);
   }
