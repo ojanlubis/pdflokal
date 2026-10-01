@@ -1,8 +1,13 @@
 /*
  * Generate tests/fixtures/nasty/surat-paragraf.pdf — the PARAGRAPH-BLOCK
- * fixture for Rung D1 (core/text-blocks.js). Run: `node scripts/gen-fixture-paragraf.mjs`.
+ * fixture first built for Rung D1's clusterer (core/text-blocks.js, deleted
+ * 2026-10-01 in favour of core/paragraph-detect.js). Run:
+ * `node scripts/gen-fixture-paragraf.mjs`. Still used by the space-inference
+ * and live-surgery specs. NOTE: its word-by-word justified paragraph is NOT a
+ * paragraph-detect.js block (two lines' first gaps align, which reads as a
+ * table gutter); Rung D's own fixture is gen-fixture-paragraf-badan.mjs.
  *
- * WHY this fixture exists: text-blocks.js groups text-lines.js's Line[] into
+ * WHY this fixture exists: the clusterer grouped text-lines.js's Line[] into
  * paragraph Block[] by geometry (spec-rung-d-reflow.md §2). This fixture is
  * the real-PDF falsifier check the spec's §8 calls for ("check the nasty
  * corpus + 2-3 real PDFs BEFORE building D3-D5") — every region below is

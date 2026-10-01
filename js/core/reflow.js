@@ -144,23 +144,32 @@ function gapCount(text) {
 // fill the box) are all laid out as if align were 'left' for THAT line —
 // dx stays 0 (justify's dx is already 0 for every line, so there is no
 // visible dx change) and wordGapExtra is forced to 0.
-export function layoutLines(wrapped, { align, maxWidth, spaceWidthOf: _spaceWidthOf }) {
+//
+// `firstIndent` (Rung D, 2026-10-01): a first-line indent, the surat-resmi
+// paragraph convention. Left and justify only: the block's FIRST line starts
+// `firstIndent` right of the box's left edge and has that much less room, the
+// way CSS `text-indent` lays it out in the editor. Ignored for right/center
+// (an indented right-flush paragraph is not a layout this engine claims).
+export function layoutLines(wrapped, { align, maxWidth, spaceWidthOf: _spaceWidthOf, firstIndent = 0 }) {
   const lastIndex = wrapped.length - 1;
+  const indentable = align === 'left' || align === 'justify' || align === undefined;
 
   return wrapped.map((line, index) => {
     const { text, width, hardBreak } = line;
+    const indent = index === 0 && indentable ? firstIndent : 0;
+    const room = maxWidth - indent;
 
     let dx;
     if (align === 'right') dx = maxWidth - width;
     else if (align === 'center') dx = (maxWidth - width) / 2;
-    else dx = 0; // left and justify both start at the box's left edge
+    else dx = indent; // left and justify both start at the box's left edge (plus a first-line indent)
 
     let wordGapExtra = 0;
     if (align === 'justify') {
       const gaps = gapCount(text);
       const isLastLine = index === lastIndex;
       const exempt = isLastLine || gaps === 0 || hardBreak === true;
-      if (!exempt) wordGapExtra = (maxWidth - width) / gaps;
+      if (!exempt) wordGapExtra = (room - width) / gaps;
     }
 
     return { text, width, dx, wordGapExtra };

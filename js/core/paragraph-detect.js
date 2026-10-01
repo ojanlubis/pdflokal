@@ -31,13 +31,15 @@
  * margin. A piece with either gutter signature is a list/table, not prose,
  * and is not a block. (Reads run geometry only, never run text.)
  *
- * CONSUMER NOTE. Rung D (edit a whole paragraph) wants exactly this: block
+ * CONSUMER NOTE. Rung D (edit a whole paragraph) uses exactly this: block
  * ids per line plus the block's bbox. `detectParagraphs` returns both.
  * text-lines.js stamps `line.blockId` on every Line it returns, and
- * `blocksFromLines(lines)` regroups by that id. This is NOT text-blocks.js
- * (the D1 reflow clusterer): that one declines or accepts a block for reflow
- * with five gates and list/mixed-font rules; this one only answers "is this
- * line inside running prose", conservatively, so a split can be vetoed.
+ * `blocksFromLines(lines)` regroups by that id. This is the ONE paragraph
+ * detector (2026-10-01: the older D1 clusterer, text-blocks.js, was deleted
+ * when Rung D was wired, so a tap and the split guard cannot disagree about
+ * what a paragraph is). It only answers "is this line inside running prose",
+ * conservatively; core/block-edit.js then proves or declines the edit
+ * (alignment, rotation, sizes, columns, lists).
  *
  * HEADLESS on purpose (no DOM, no vendor imports), tested in tests/core/.
  */
