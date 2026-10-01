@@ -18,14 +18,14 @@ const FONT_NAME_MAP = {
 };
 
 const CUSTOM_FONT_URLS = {
-  'Montserrat': 'fonts/ttf/montserrat-regular.ttf',
-  'Montserrat-Bold': 'fonts/ttf/montserrat-bold.ttf',
-  'Montserrat-Italic': 'fonts/ttf/montserrat-italic.ttf',
-  'Montserrat-BoldItalic': 'fonts/ttf/montserrat-bolditalic.ttf',
-  'Carlito': 'fonts/ttf/carlito-regular.ttf',
-  'Carlito-Bold': 'fonts/ttf/carlito-bold.ttf',
-  'Carlito-Italic': 'fonts/ttf/carlito-italic.ttf',
-  'Carlito-BoldItalic': 'fonts/ttf/carlito-bolditalic.ttf'
+  'Montserrat': '/fonts/ttf/montserrat-regular.ttf',
+  'Montserrat-Bold': '/fonts/ttf/montserrat-bold.ttf',
+  'Montserrat-Italic': '/fonts/ttf/montserrat-italic.ttf',
+  'Montserrat-BoldItalic': '/fonts/ttf/montserrat-bolditalic.ttf',
+  'Carlito': '/fonts/ttf/carlito-regular.ttf',
+  'Carlito-Bold': '/fonts/ttf/carlito-bold.ttf',
+  'Carlito-Italic': '/fonts/ttf/carlito-italic.ttf',
+  'Carlito-BoldItalic': '/fonts/ttf/carlito-bolditalic.ttf'
 };
 
 const CUSTOM_FONT_FAMILIES = new Set(['Montserrat', 'Carlito']);

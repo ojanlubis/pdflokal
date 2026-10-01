@@ -50,10 +50,10 @@ const FONT_NAME_MAP = {
 };
 
 export const CUSTOM_FONT_URLS = {
-  'Montserrat': 'fonts/ttf/montserrat-regular.ttf',
-  'Montserrat-Bold': 'fonts/ttf/montserrat-bold.ttf',
-  'Montserrat-Italic': 'fonts/ttf/montserrat-italic.ttf',
-  'Montserrat-BoldItalic': 'fonts/ttf/montserrat-bolditalic.ttf',
+  'Montserrat': '/fonts/ttf/montserrat-regular.ttf',
+  'Montserrat-Bold': '/fonts/ttf/montserrat-bold.ttf',
+  'Montserrat-Italic': '/fonts/ttf/montserrat-italic.ttf',
+  'Montserrat-BoldItalic': '/fonts/ttf/montserrat-bolditalic.ttf',
   ...CLONE_FONT_URLS,
 };
 
