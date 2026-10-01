@@ -21,7 +21,7 @@ export const UPDATES = [
   {
     id: '2026-10-01-edit-isian',
     date: '2026-10-01',
-    text: 'Edit di formulir sekarang cuma ambil isiannya, label kayak "Nama :" nggak ikut keubah.',
+    text: 'Edit sekarang lebih pas di formulir dan daftar.',
     approved: false,
   },
   {
