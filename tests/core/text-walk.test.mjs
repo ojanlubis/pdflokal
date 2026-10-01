@@ -273,3 +273,43 @@ test('residual: per-run targets (the 39e0b9f shape) clear the whole line and rep
   const survivors = walkShowOps(content, fonts).filter((r) => r.tokens.some((t) => t.t === 'str'));
   assert.equal(survivors.length, 0);
 });
+
+// A run narrower than ~1pt (a thin glyph, a kerned-down marker) used to be
+// uncuttable: the in-span tolerance `len - min(1, 0.1*size)` goes negative when
+// len < tolerance, so even a record starting exactly at the run's own x0
+// (along = 0) failed it. page-surgery.js needs EVERY target of a line matched
+// before it drops the cover, so one such run left the original text in the
+// file under a white rectangle.
+test('narrow run: a sub-1pt run is cut, and a line containing one clears natively', () => {
+  const fonts = fontsWith({
+    F1: new Map([[65, 500], [66, 500]]),
+    F2: new Map([[73, 60]]), // 60/1000 * 12 = 0.72pt wide — narrower than the old 1pt tolerance
+  });
+  const src = 'BT /F1 12 Tf 72 700 Td (AB) Tj 12 0 Td /F2 12 Tf (I) Tj ET';
+  const narrow = { x0: 84, y0: 700, ux: 1, uy: 0, len: 0.72, size: 12 };
+  const normal = { x0: 72, y0: 700, ux: 1, uy: 0, len: 12, size: 12 };
+
+  const alone = planRunRemoval(src, fonts, [narrow]);
+  assert.equal(alone.results[0].matched, true, 'the sub-1pt run itself must match');
+  assert.equal(alone.removed, 1);
+
+  const line = planRunRemoval(src, fonts, [normal, narrow]);
+  assert.deepEqual(line.results.map((r) => r.matched), [true, true]);
+  assert.equal(line.results.every((r) => r.residual === 0), true);
+  const survivors = walkShowOps(line.content, fonts).filter((r) => r.tokens.some((t) => t.t === 'str'));
+  assert.equal(survivors.length, 0, 'no original text left in the stream');
+});
+
+test('narrow run: the widened tolerance still does not reach an adjacent run that starts at len', () => {
+  const fonts = fontsWith({
+    F1: new Map([[65, 500]]),
+    F2: new Map([[73, 60]]),
+  });
+  // narrow run at 84..84.72, then a normal run starting right where it ends
+  const src = 'BT /F2 12 Tf 84 700 Td (I) Tj 0.72 0 Td /F1 12 Tf (A) Tj ET';
+  const { results, content } = planRunRemoval(src, fonts, [{ x0: 84, y0: 700, ux: 1, uy: 0, len: 0.72, size: 12 }]);
+  assert.equal(results[0].matched, true);
+  const survivors = walkShowOps(content, fonts).filter((r) => r.tokens.some((t) => t.t === 'str'));
+  assert.equal(survivors.length, 1, 'the adjacent run is left alone');
+  assert.equal(survivors[0].tokens.find((t) => t.t === 'str') !== undefined, true);
+});

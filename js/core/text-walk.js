@@ -270,7 +270,13 @@ export function planRunRemoval(src, fonts, targets) {
       const vy = rec.y - t.y0;
       const along = vx * t.ux + vy * t.uy;
       const perp = Math.abs(vx * t.uy - vy * t.ux);
-      const alongOk = along >= -0.35 * t.size && along <= t.len - Math.min(1, t.size * 0.1);
+      // The far-edge slack keeps an ADJACENT run (starting at along === len) out of
+      // this target. It must scale with len: a fixed min(1, 0.1*size) exceeds the
+      // width of a sub-1pt run, so even a record starting exactly at the run's own
+      // x0 failed — and one unmatched target fails the whole line (page-surgery.js
+      // matched = every target), leaving the original text under a cover. The 0.5*len
+      // term only binds when len < 2pt; wider runs get the same slack as before.
+      const alongOk = along >= -0.35 * t.size && along <= t.len - Math.min(1, t.size * 0.1, 0.5 * t.len);
       if (perp > 0.4 * t.size || !alongOk) continue; // not inside this target at all
       insideByTarget[ti].push(rec);
       const sizeOk = rec.size >= 0.55 * t.size && rec.size <= 1.8 * t.size;
