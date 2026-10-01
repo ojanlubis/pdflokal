@@ -3,33 +3,22 @@
 100% client-side PDF + image tool for Indonesian users. Nothing is ever uploaded. `main` auto-deploys
 to pdflokal.id.
 
-> ⛔ **`vercel` WITH NO ARGUMENTS MEANS DEPLOY.** It is not a status command. Deploys happen by
-> pushing `main`; the CLI is never the route. **Read-only commands are `vercel ls`, `vercel inspect`,
-> `vercel project ls`** — those are safe. `vercel` and `vercel deploy` ship.
->
-> **The hazard is running it in the WRONG DIRECTORY.** On 2026-08-17 a bare `vercel` in the seat
-> (`../`, a sibling repo of markdown with no `package.json` and no `index.html`) linked the SEAT to
-> this project and began uploading 512 MB before being cancelled. **Nothing deployed, but it would
-> not have failed:** no framework to detect and no build command means Vercel serves the upload as
-> plain static files. `/` would 404 for want of an `index.html` and every doc would still be live at
-> its own path. **A wrong-directory deploy does not error, it succeeds and serves the wrong tree.**
->
-> It also writes `.vercel/project.json` pointing at the production project, which is the part that
-> outlives the mistake: a later `vercel --prod` there would replace pdflokal.id with a folder of
-> markdown. **If you ever find a `.vercel/` outside this directory, delete it.**
+> ⛔ **`vercel` WITH NO ARGUMENTS MEANS DEPLOY.** Deploys happen by pushing `main`; the CLI is never
+> the route. Read-only: `vercel ls`, `vercel inspect`, `vercel project ls`. **In the wrong directory
+> it does not error — it succeeds and serves the wrong tree** (a bare `vercel` in the seat once began
+> uploading 512 MB of markdown as pdflokal). It also writes `.vercel/project.json`; **if you ever
+> find a `.vercel/` outside this directory, delete it.**
 
 ## Hard constraints
 
 - **Vanilla JS, native ES modules, no build step, no bundler, no framework** — that constraint is the
   moat. **The CLIENT has no npm runtime deps and never will**; that is the half that is load-bearing,
   because it is what makes the product a folder of files a browser runs.
-  **`api/` has zero npm dependencies again since 2026-09-25**, when the rail left Neon for Turso
-  (`api/_turso.js`, plain `fetch` over Turso's documented SQL-over-HTTP). Neon's driver had been the
-  one exception, taken because Neon documented only the package, not the wire. **The bar for any
-  dependency: name what breaks without it.** `npm audit --omit=dev` is the check that this stays honest.
+  **`api/` has zero npm dependencies too** (Turso via plain `fetch`, `api/_turso.js`). **The bar for
+  any dependency: name what breaks without it.** `npm audit --omit=dev` keeps this honest.
 - **All vendor libs that touch the user's document are self-hosted in `js/vendor/`, zero CDN** — the
   named exception is third-party analytics, loaded from their own CDNs per the CSP in `vercel.json`.
-  See `docs/security.md` for CSP, headers, load order.
+  Why each CSP directive exists: `docs/security.md`.
 - **No server-dependent features, permanently** — no PDF↔Word, no server OCR. In-browser OCR is
   sanctioned. The only server code in the repo is `api/` — see `api/`, each file's header says what
   it is. `sentry-tunnel.js` is the one endpoint that forwards data to a third party (DSN-allowlisted).
@@ -48,8 +37,7 @@ to pdflokal.id.
   **Never hand-edit generated output.** Copy changes go through Fauzan.
 - **`alat-gambar.html` is the OLD wing** (noindexed) — `js/editor/`, `js/pdf-tools/`, `style.css`, the
   old `init*.js`, `ueState`, `js/changelog.js`. It exists only to keep the image tools alive until
-  absorption, and dies at demolition. Detail: `../reference/old-wing-code-reference.md`. Do not
-  build new surfaces on it.
+  absorption, and dies at demolition. Do not build new surfaces on it.
 - **⚠ Demolition is not free-standing:** `privasi` and `dukung` are on tokens but still borrow
   `style.css`'s header/footer/`.btn`. `css/legacy-bridge.css` maps the old names and **must load after
   `style.css`**.
@@ -171,8 +159,6 @@ gated on a worktree branch while `main` sat behind it would have shipped nothing
   `mobile-rendering.md`, `ga4-shared-tag-carrier.md`…). It is **not in this repo and you will not find
   it by searching.** Read `MEMORY.md` there before any deep work in `js/core/`, any guard, any test,
   or anything touching fonts, rendering or measurement.
-- **Before writing any durable fact, check whether it is already on disk** — if it is, update it
-  there. Do not create a second copy; two copies of one rule drift, and the wrong one gets read.
 - `docs/security.md` — CSP directives and why, the server surface, the worker-console trap.
 
 ## `.mcp.json` is project-scoped, and that is load-bearing
@@ -218,5 +204,3 @@ explicitly. Load the `google-measurement` skill before touching GA4, Ads or GTM.
 ---
 
 **PDFLokal exists to give Indonesian users a private, free, easy PDF tool. Every change serves that.**
-
-*Cited as doctrine: [Delivery & the write/read asymmetry](../../../engine/wiki/machine/delivery-pull-surfaces.md) · [Gate design](../../../engine/wiki/machine/gate-design.md) · [Taste governance](../../../engine/wiki/machine/taste-governance.md). This document is one of the instances that earned it.*
