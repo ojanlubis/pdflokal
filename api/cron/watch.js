@@ -2,10 +2,13 @@
  * PDFLokal — api/cron/watch.js  (THE DAILY WATCH — Vercel Cron, 10:00 WIB)
  * ============================================================================
  * Reads the rail (Turso), evaluates the rail floor + A1-A6 (api/_watch.js),
- * writes ONE row to `routine_runs` (routine = 'vercel-watch'), and emails
- * Fauzan through tolongingetin ONLY when something fired. Quiet when healthy:
- * the row is the proof it ran, and the cloud routine reads it (routine brief
- * §6.6, the watchmen).
+ * and writes ONE row to `routine_runs` (routine = 'vercel-watch') every day
+ * with every finding: the row is the proof it ran, and the cloud routine
+ * reads it (routine brief §6.1). It emails Fauzan through tolongingetin ONLY
+ * for user feedback (A4), users unhappy at scale (A5), or a dark rail (floor,
+ * A1, unreadable); A2, A3, A6 are recorded and never mailed (emailDecision in
+ * api/_watch.js, his ruling 2026-10-01). The row's `email` says which way it
+ * went: the send outcome, or `skipped: <why>`.
  *
  * Schedule: vercel.json `crons`. Declared in seat STATE.md (shared-scheduler
  * rule 2). KILL SWITCH: set WATCH_DISABLED=1 in Vercel env — the job then
@@ -19,7 +22,7 @@
  */
 import { cronAuthorized } from '../_cron.js';
 import { tursoQuery, tursoWrite, arg } from '../_turso.js';
-import { BASELINE_DAYS, floorFromDays, evaluateAlarms, composeEmail, jakartaDay, jakartaMidnight } from '../_watch.js';
+import { BASELINE_DAYS, floorFromDays, evaluateAlarms, emailDecision, composeEmail, jakartaDay, jakartaMidnight } from '../_watch.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 // seat specs/telemetry-alerts.md "Synthetic sessions": excluded from every read.
@@ -153,7 +156,7 @@ export default async function handler(req, res) {
       subject: 'pdflokal: data pengunjung nggak kebaca',
       body: `Pengecekan harian nggak bisa baca database pengunjung. Situsnya mungkin aman, tapi sampai ini beres, nggak ada yang ngawasin pdflokal.\n\nKode error: ${reason}`,
     });
-    const rec = await record('fail', { day, error: reason, email: sent }, 'rail unreadable');
+    const rec = await record('fail', { day, error: reason, email: sent, email_for: ['unreadable'] }, 'rail unreadable');
     res.status(500).json({ status: 'fail', error: reason, email: sent, record: rec });
     return;
   }
@@ -161,8 +164,14 @@ export default async function handler(req, res) {
   const fired = evaluateAlarms(m);
   const { notes, ...numbers } = m;
   const findings = { day, ...numbers, fired: fired.map((f) => f.id) };
-  let sent = 'not-needed';
-  if (fired.length) sent = await email({ day, ...composeEmail(m, fired, notes) });
+  const decision = emailDecision(fired);
+  let sent;
+  if (decision.send) {
+    sent = await email({ day, ...composeEmail(m, fired, notes) });
+    findings.email_for = decision.emailFor;
+  } else {
+    sent = `skipped: ${decision.reason}`;
+  }
   findings.email = sent;
   const status = fired.some((f) => f.id === 'floor' || f.id === 'A1') ? 'fail' : fired.length ? 'warn' : 'ok';
   const rec = await record(status, findings, fired.length ? fired.map((f) => f.id).join(',') : 'quiet');

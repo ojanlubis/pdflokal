@@ -25,9 +25,10 @@ Everything below serves those six. **Read this file as the authority, not your m
 ## 0 · The boundary — read before your first tool call
 
 **1. This repository is PUBLIC.** Never commit rail numbers, quota figures, or anything a user
-wrote. Your durable record is your `routine_runs` row (written through `POST /api/routine`, §7) and
-the notification you send. Code changes
-are the one thing that belongs in the repo, and §5 governs those.
+wrote. Your durable record is your `routine_runs` row (written through `POST /api/routine`, §7).
+**Wherever this brief says "report" or "your report", it means that row** — the seat reads it. He
+gets an email only in the cases §8 names, and by default he gets nothing. Code changes are the one
+thing that belongs in the repo, and §5 governs those.
 
 **2. You have NO database connection, since 2026-09-25.** The rail moved from Neon to Turso, and you
 reach it only through `https://www.pdflokal.id/api/routine` with `$ROUTINE_KEY` (§1). `GET` gives you
@@ -71,9 +72,9 @@ curl -s -H "Authorization: Bearer $ROUTINE_KEY" \
 Call it **once**, keep the JSON, and answer §2-§5 from it. The fields are named below where each
 section uses them. `since` defaults to 72 hours ago and is capped at 14 days.
 
-- **`$ROUTINE_KEY` missing** → you cannot read or record anything. Say so in the push
-  (`🔴 ROUTINE_KEY tidak ada, rail tidak terbaca`), send no email, and stop. Do not look for a key
-  anywhere else.
+- **`$ROUTINE_KEY` missing** → you cannot read or record anything, and setting it is his hand: email
+  him (§8, trigger 2; there is no row, so the `idem_key` is `pdflokal-routine:nokey:<UTC date>`),
+  then stop. Do not look for a key anywhere else.
 - **`401`** → the key is wrong or was rotated. Same as missing.
 - **`503 {"error":"rail_unreadable"}`** → the rail itself cannot be read. That is a **fail**, the same
   finding as §2's dark rail. Report it; do not report usage as zero.
@@ -185,15 +186,11 @@ event caught**, because it measures people giving up rather than the code notici
 Read `feedback`: `ts`, `rating`, `note` for every row in your window, newest first. The document
 crops are never in it (§0.3).
 
-Report the count by rating, and then **give him every `note`, verbatim, in the email.** Notes are the
-only place a user speaks to him in words rather than in counters; they are the highest-value rows in
-the database and a summary of them is worth less than the sentence itself. Do not paraphrase, do not
-translate, do not tidy the spelling.
+Record the count by rating (`feedback_up`, `feedback_down`). **Do not email the notes.** The daily
+watch (§6.1) already emails him every note verbatim the day it arrives; sending them again is the
+noise he stopped reading. The one exception is a note the watch failed to deliver (§8, trigger 3).
 
-If there are more than ten notes, give him all the 👎 ones verbatim and count the rest.
-
-**Notes never enter the push notification** (200 characters, and it lands on a lock screen) and
-**never enter a commit message or any file in this repo.** The email is the channel for them.
+**Notes never enter your row, a commit message, or any file in this repo.**
 
 ---
 
@@ -231,7 +228,7 @@ session fixes it. You may not widen this on your own reading.
 | e | The export path (`export.js`, `stamp.js`, `page-surgery.js`, `text-walk.js`, `text-lines.js`, the font ladder) | **red-on-revert proof, no exceptions, however obvious the fix looks** |
 | f | Adding a NEW telemetry field or event | additive only |
 | g | Additive migration — new table, column, index, view | additive only |
-| h | Layout, colour, motion, or the existence and placement of a control | **a rendered screenshot in your report.** He judges these live on deployment; he can only do that if he is shown |
+| h | Layout, colour, motion, or the existence and placement of a control | **a rendered screenshot, linked in the email** (§8). He judges these live on deployment; he can only do that if he is shown |
 
 **You may never touch:**
 
@@ -305,16 +302,23 @@ workaround is not.
 ### 6.1 The daily watch — did it run, and what did it find?
 
 Since 2026-09-25 a Vercel cron (`api/cron/watch.js`, 10:00 WIB daily) checks the rail floor and
-alerts A1-A6 (thresholds: seat `specs/telemetry-alerts.md`), writes one `routine_runs` row with
-`routine = 'vercel-watch'`, and emails him only when something fired. Its last 8 rows are `watch` in
-the digest.
+alerts A1-A6 (thresholds: seat `specs/telemetry-alerts.md`) and writes one `routine_runs` row with
+`routine = 'vercel-watch'` every day. **Since 2026-10-01 it emails him only for feedback (A4, every
+note verbatim), users unhappy at scale (A5), or a dark rail (floor, A1, unreadable).** A2, A3 and A6
+are recorded and never mailed. `findings.fired` lists what fired; `findings.email` is the send
+outcome (`ok`, `duplicate`, `no-key`, `http_*`, `timeout`, `network`) or `skipped: <why>`. Its last 8
+rows are `watch` in the digest.
 
 - **Newest `watch` row older than 26 hours → warn.** The watch stopped running. Name the last `ts`.
 - **Any row with `status: fail`** (rail floor breached, A1, or the rail unreadable) → carry it as a
   **fail** finding, with the day.
+- **A row whose `fired` includes `A4` and whose `email` is not `ok` or `duplicate`** → that feedback
+  never reached him. This is §8's trigger 3: send him those notes yourself, taken from your digest's
+  `feedback` rows with `ts` in the 24 hours before that watch row's `ts`. If that falls before your
+  window, `GET` once more with `since=` that row's `ts` minus 24 hours.
 - **`findings.email` of `no-key`** → the watch has no `TOLONGINGETIN_KEY` on Vercel, so its alarms reach
-  nobody but you. Say so, every run, until it changes. That env var is his hand.
-- Otherwise one line: how many days, which alarms fired and how often (`A6 ×3, A4 ×1`).
+  nobody. That env var is his hand (§8, trigger 2).
+- Record which alarms fired and how often (`watch_fired`, e.g. `A6 ×3, A4 ×1`).
 
 **Neon's CU-hour quota is no longer yours to watch.** The rail left Neon. While `api/t.js` still
 dual-writes there, a suspended Neon means a failed Neon write per batch and nothing else: the two
@@ -443,25 +447,31 @@ reaches localhost and nothing else. Page loads went 12,500ms → ~200ms and the 
 curl -s -X POST -H "Authorization: Bearer $ROUTINE_KEY" -H "Content-Type: application/json" \
   https://www.pdflokal.id/api/routine \
   -d '{"status":"<ok|warn|fail>","window_hours":<hours>,"findings":{...},"note":"<one line>"}'
-# → {"id": <n>}   that id is the email's idem_key (§8.2)
+# → {"id": <n>}   that id is the email's idem_key, if §8 sends one
 ```
 
 `findings` carries the numbers so the next run has something to diff:
 `sessions`, `sessions_prev`, `events`, `opened`, `exported`, `top_tools`, `devices`,
 `feedback_up`, `feedback_down`, `failures` (stage/reason → `{n, blocked}`), `last_event`, `n_window`,
 `browsers`, `watch_days`, `watch_fired`, `rev_live`, `rev_main`, `audit_high`,
-`gate_env`, `fix_pushed` (§5.4), `email` (§8.2).
+`gate_env`, `fix_pushed` (§5.4), `blocked_on` (§8, trigger 2), `email` (§8).
 
-**Insert this row BEFORE you send the email** — the row's `id` is the email's `idem_key`. Then set
-`findings.email` to the send outcome:
+Everything you measured, every warn, and everything you could NOT check goes here: **report what you
+could not check as loudly as what you checked.** "No network, so the deploy match was skipped" is a
+finding. Silently omitting a check manufactures a green.
+
+**If you will email, insert this row BEFORE you send** — the row's `id` is the email's `idem_key`.
+Then set `findings.email` to the send outcome. If you will not email, write `email` as
+`skipped: <why>` (`skipped: nothing for him`) in the row itself.
 
 ```bash
 curl -s -X POST -H "Authorization: Bearer $ROUTINE_KEY" -H "Content-Type: application/json" \
   https://www.pdflokal.id/api/routine -d '{"id":<n>,"email":"<ok|duplicate|http_429|...>"}'
 ```
 
-A `POST` that does not answer `200` means your record did not land. Say so in the push: a run whose
-row is missing is indistinguishable from a run that never happened.
+A `POST` that does not answer `200` means your record did not land: a run whose row is missing is
+indistinguishable from a run that never happened. Retry once. A `401` is the key (§1); anything else,
+say so in the email if you are sending one.
 
 **No note text and no document samples go in this row.** Counts only.
 
@@ -470,75 +480,65 @@ a missing row is indistinguishable from a run that never happened.
 
 ---
 
-## 8 · Notify him — his question 6
+## 8 · Tell him — only when it needs him
 
-Two channels, and they fail in opposite directions. **Send both, every run. Never two of either.**
+**Default: no email, no push.** His ruling, 2026-10-01: he reads traffic himself and stopped opening
+an email that came every run. Everything you measure goes into your row (§7); the seat reads that.
 
-### 8.1 The push — one line, Indonesian, under 200 characters
+### 8.1 The three triggers — nothing else earns an email
 
-It lands on a lock screen. It is the headline, not the report. Lead with the thing he would act on.
+1. **You shipped something** — a merged PR (§5.4: `merged` or `merged-not-yet-live`). One line per
+   change: what changed, how to revert (`git revert <sha>`), and a screenshot link when §5.2h applies.
+2. **Something only he can do is NEWLY blocking** — a key, secret or env var that is missing or
+   revoked (`ROUTINE_KEY`, the watch's `no-key`, a scheduled workflow's secret in §6.6), or a PR that
+   only he can merge (`open-no-gh`). Record each as a short tag in `findings.blocked_on`; **email only
+   for a tag that is not already in `last_run.findings.blocked_on`.** A blocker he has already been
+   told about stays in the row, not his inbox.
+3. **The watch failed to deliver feedback** (§6.1). Send those notes verbatim: do not paraphrase,
+   translate or tidy the spelling. If there are more than ten, send every 👎 and count the rest.
 
-- `ok` → `pdflokal 3 hari: 412 sesi, 88 ekspor, 2 👍. Watch 3/3 hari. Aman.`
-- `warn` → lead with the one thing that crossed: `⚠️ ekspor gagal 14× (stage: font) — naik dari 2. Detail di email.`
-- `fail` → `🔴 Rail mati sejak 23 Agt 11:40. Tidak ada data 3 hari terakhir.`
-- fix pushed → say so and link nothing (no room): `Fix ekspor font siap di-merge, cek email.`
+**Never re-send feedback the watch already emailed.** None of the three → no email, and `findings.email`
+is `skipped: <why>`.
 
-Several things crossed at once → name the worst, say how many others, send one push.
+If a push notification tool is available, send one line (under 200 characters) **only when you send
+the email**: its headline, nothing more. No email, no push.
 
-### 8.2 The email — send it through tolongingetin
+### 8.2 What the email looks like
 
-The machine already has a rail to his inbox. **Use it; do not invent a second one.**
+**Indonesian, casual, at most 6 lines, verdict first.** No tables, no JSON, no gate notes, no tool
+lists, no numbers he did not ask for. The whole email when one fix shipped:
+
+```
+pdflokal · aku benerin 1 hal
+Ekspor gagal di dokumen hasil gabung → sekarang jalan. Revert: `git revert abc1234`.
+Lainnya aman. Detail ada di catatan routine.
+```
+
+The first line is the subject; the rest is the body. **The 6-line cap is for your own words.** A
+quoted user note (trigger 3) is never shortened or dropped to fit it.
+
+### 8.3 The rail — tolongingetin, and its rules are not yours to relax
 
 ```
 POST https://tolongingetin.id/api/send
 Authorization: Bearer $TOLONGINGETIN_KEY
 Content-Type: application/json
 
-{"subject": "pdflokal — <one-phrase headline>",
- "body":    "<the report, plain text>",
+{"subject": "<the verdict line>", "body": "<the rest, plain text>",
  "idem_key": "pdflokal-routine:<the routine_runs id you just inserted>"}
 ```
 
-**The rules that come with that rail, and they are not yours to relax:**
-
-- **Plain text only.** No HTML, no attachments, no markdown tables. That shape is what survived
-  deliverability testing. Line breaks and blank lines are your only formatting.
-- **`body` max 10,000 characters, `subject` max 200.** If the feedback notes would overflow, keep
-  every 👎 note and count the rest — never truncate mid-sentence.
-- **`idem_key` is the row id you just wrote.** It makes a retry safe: a second call with the same key
-  returns `duplicate` and sends nothing. Insert the `routine_runs` row *first*, then send.
-- **One email per run.** Rp 25 each, a 50/day machine cap, and underneath it a daily budget **shared
-  with other products** — a runaway loop here goes dark in somebody else's product. Never retry in a
-  loop.
-- **Read the status code, don't read prose:** `401` the key is bad or revoked — stop, do not retry.
-  `429` the cap or the budget is spent — stop, try next run. `502` the provider rejected it and your
-  balance was already refunded — one retry is safe.
-- **Telling him must never break the report.** Short timeout, swallow the failure — but **write the
-  outcome into `findings.email`** (`ok`, `duplicate`, or the error code). A send that silently failed
-  must be visible to the next run, or the rail dies the same quiet way the laptop alarms did.
-- **No `TOLONGINGETIN_KEY` in the environment → `findings.email = "no-key"`, say so in the push, and
-  carry on.** Do not go looking for a key anywhere else. There is no recipient field in that API and
-  there never will be; a key *is* its inbox.
-
-### 8.3 What the email says — his six, in his order
-
-Short prose, not a data dump. He reads it on a phone.
-
-1. **Sesi** — this window vs last, and the direction.
-2. **What they used** — the top few tools, and anything that moved.
-3. **Feedback** — counts, then **every note verbatim** (§4).
-4. **What broke** — blocked failures first, with the change against last run.
-5. **What you fixed** — what changed, the PR link, `git revert <sha> && git push`, and a screenshot
-   when §5.2h applies. Or: what you found and chose not to fix, and why.
-6. **The boring line** — the daily watch (§6.1), deploy match, audit, **and the watchmen (§6.6)**. One line
-   unless something crossed. ⚠️ **A scheduled alarm that has NEVER succeeded is not a boring line** —
-   promote it to item 4, say how long it has been unarmed, and name the secret it is waiting on. An
-   alarm nobody armed is a failure of the same kind as a rail nobody watched.
-
-**Report what you could NOT check as loudly as what you checked.** "No network, so the deploy match
-was skipped" is a finding. Silently omitting a check manufactures a green, and this project has been
-bitten by exactly that more than once: an instrument pointed at the wrong process reported zero and
-it read like good news.
+- **Plain text only.** No HTML, no attachments, no markdown tables. `body` max 10,000 characters,
+  `subject` max 200.
+- **`idem_key` is the row id you just wrote,** so a retry returns `duplicate` and sends nothing.
+- **One email per run.** Rp 25 each, a 50/day machine cap, and a daily budget **shared with other
+  products**. Never retry in a loop.
+- **Read the status code:** `401` the key is bad, stop. `429` the cap or budget is spent, stop.
+  `502` the provider rejected it and refunded, one retry is safe.
+- **Telling him must never break the run.** Short timeout, swallow the failure, and **write the
+  outcome into `findings.email`** so the next run can see it.
+- **No `TOLONGINGETIN_KEY` → `findings.email = "no-key"`** and carry on. Do not look for a key
+  anywhere else; there is no recipient field, a key *is* its inbox.
 
 ---
 
