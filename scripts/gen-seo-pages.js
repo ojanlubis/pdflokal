@@ -256,6 +256,15 @@ function faqBlock(page) {
   return `<section class="ld-faq">\n          <h2>Sering ditanya</h2>\n          ${items}\n        </section>`;
 }
 
+// The page's language tag for schema.org. Today every page is Indonesian; the
+// map exists so a page that declares `lang` cannot silently inherit id-ID.
+const LOCALES = { id: 'id-ID', en: 'en-US' };
+function inLanguage(page) {
+  const tag = LOCALES[page.lang ?? 'id'];
+  if (!tag) throw new Error(`gen-seo-pages: ${page.slug} has lang "${page.lang}", no schema locale for it. Add it to LOCALES.`);
+  return tag;
+}
+
 function schema(page, url) {
   return JSON.stringify({
     '@context': 'https://schema.org',
@@ -268,7 +277,7 @@ function schema(page, url) {
         applicationCategory: 'UtilitiesApplication',
         operatingSystem: 'Chrome, Firefox, Safari, Edge',
         browserRequirements: 'Requires JavaScript',
-        inLanguage: 'id-ID',
+        inLanguage: inLanguage(page),
         isAccessibleForFree: true,
         offers: { '@type': 'Offer', price: '0', priceCurrency: 'IDR' },
         publisher: { '@type': 'Organization', name: brand, url: `${origin}/` },
@@ -304,6 +313,25 @@ for (const page of data.pages) {
   html = sub(html, /<meta name="twitter:title" content="[^"]*">/, `<meta name="twitter:title" content="${esc(page.title)}">`, 'twitter:title');
   html = sub(html, /<meta name="twitter:description" content="[^"]*">/, `<meta name="twitter:description" content="${esc(page.description)}">`, 'twitter:description');
   html = sub(html, /<script type="application\/ld\+json">[\s\S]*?<\/script>/, `<script type="application/ld+json">\n${schema(page, url)}\n</script>`, 'JSON-LD');
+
+  // ⚠️ THE FIRST sub() ABOVE REPLACES ONE BLOCK, AND index.html HAS TWO. The second
+  // is the landing's FAQPage, whose Q&As are on `/` and on no tool page. Left in,
+  // all 12 pages declared Q&As their visible text does not contain (structured data
+  // that disagrees with the page, which Google treats as spam) and the same FAQPage
+  // as the homepage. Strip every FAQPage block, found by parsed @type rather than by
+  // position, and shout unless exactly one ld+json block survives in the head.
+  html = html.replace(
+    /[ \t]*(?:<!-- FAQPage[\s\S]*?-->\s*)?<script type="application\/ld\+json">([\s\S]*?)<\/script>\n?/g,
+    (whole, json) => {
+      let type;
+      try { type = JSON.parse(json)['@type']; } catch { return whole; }
+      return type === 'FAQPage' ? '' : whole;
+    },
+  );
+  {
+    const left = html.slice(0, html.indexOf('</head>')).match(/<script type="application\/ld\+json">/g) || [];
+    if (left.length !== 1) throw new Error(`gen-seo-pages: ${page.slug}.html has ${left.length} ld+json blocks in <head>, expected exactly 1. The page's schema must match its own visible content, never the homepage's.`);
+  }
 
   // The intent hook: app.js reads document.body.dataset.intent, so landing on
   // /kompres-pdf and dropping a file opens the compress sheet with no click.
