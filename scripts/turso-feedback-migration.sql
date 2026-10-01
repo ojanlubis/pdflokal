@@ -1,5 +1,5 @@
 -- pdflokal telemetry rail — FEEDBACK, on Turso (libSQL / SQLite).
--- Port of the `feedback` half of scripts/neon-rail-migration.sql, 2026-09-16.
+-- Port of the `feedback` half of scripts/neon-rail-migration.sql (deleted 2026-10-01; git log -- scripts/neon-rail-migration.sql), 2026-09-16.
 --
 -- ⚠️ ITS OWN DATABASE ON PURPOSE, and this is the whole reason the split
 -- exists. This table is the ONE user-authored free field in the product, plus
