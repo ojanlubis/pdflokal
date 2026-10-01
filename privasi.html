@@ -11,19 +11,18 @@
        full note + the "is this ID alive?" curl check. NEVER attach a GA4 destination to the
        shared Ads tag AW-17538923405 (mesindev loads it too -> rebuilds the property leak). -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-7J8JF8XZ1Q"></script>
-  <script async src="https://www.googletagmanager.com/gtag/js?id=AW-17538923405"></script>
+  <!-- No Google Ads tag on /privasi (his ruling 2026-10-01): the page that lists the cookies sets none from Ads. -->
   <script>
     window.dataLayer = window.dataLayer || [];
     function gtag(){dataLayer.push(arguments);}
     gtag('js', new Date());
     if (location.hostname === 'pdflokal.id' || location.hostname === 'www.pdflokal.id') {
-      gtag('config', 'AW-17538923405');
       gtag('config', 'G-7J8JF8XZ1Q');
     }
   </script>
 
   <title>Kebijakan Privasi - PDFLokal</title>
-  <meta name="description" content="Kebijakan privasi PDFLokal. Semua file diproses 100% di browser kamu, tidak ada yang diupload ke server.">
+  <meta name="description" content="Kebijakan privasi PDFLokal. Semua file diproses 100% di browser kamu, filenya tidak pernah diupload ke server.">
 
   <!-- Fonts (self-hosted in css/page-base.css via @font-face) -->
 
@@ -174,6 +173,9 @@
       padding: 2px 6px;
       border-radius: 4px;
       font-size: 0.8125rem;
+      /* A key like pdflokal_changelog_last_closed has no break point, and at
+         375px it pushed the page to 406px wide (measured 2026-10-01). */
+      overflow-wrap: anywhere;
     }
 
     @media (max-width: 480px) {
@@ -311,15 +313,16 @@
         <h2>Prinsip Utama Saya</h2>
         <ul class="privacy-list">
           <li><strong>100% Client-Side Processing</strong>, Semua proses berjalan di browser kamu, bukan di server saya</li>
-          <li><strong>Tidak Ada Upload</strong>, File PDF dan gambar kamu tidak pernah dikirim ke server manapun</li>
+          <li><strong>Tidak Ada Upload</strong>, File PDF dan gambar yang kamu olah tidak pernah diupload. Yang bisa ikut terkirim cuma gambar yang kamu sendiri pilih untuk dikirim bersama masukan, dan kamu lihat dulu sebelum terkirim</li>
           <li><strong>Tidak Ada Penyimpanan</strong>, Saya tidak menyimpan file kamu di manapun, setelah tab ditutup file hilang</li>
           <li><strong>Open Source</strong>, Kode sumber terbuka, siapa saja bisa verifikasi klaim privasi saya</li>
         </ul>
 
         <div class="privacy-highlight">
           <p>
-            <strong>Cara mudah membuktikan:</strong> Coba matikan koneksi internet kamu, lalu gunakan PDFLokal.
-            Semua fitur tetap berjalan normal karena tidak ada data yang dikirim ke server.
+            <strong>Cara mudah membuktikan:</strong> Olah satu file seperti biasa. Lalu matikan internet,
+            buka lagi PDFLokal, dan buka, edit, lalu unduh file lain. Tetap jalan, karena filenya diolah
+            di perangkatmu sendiri.
           </p>
         </div>
       </div>
@@ -328,27 +331,35 @@
       <div class="privacy-section">
         <h2>Data yang TIDAK Saya Kumpulkan</h2>
         <ul class="privacy-list">
-          <li>File PDF atau gambar yang kamu proses</li>
-          <li>Isi dokumen, teks, atau tanda tangan</li>
+          <li>File PDF atau gambar yang kamu olah</li>
+          <li>Isi dokumen dan tanda tanganmu, kecuali yang kamu kirim sendiri lewat masukan, atau satu karakter yang kadang ikut di laporan error (lihat Perekaman Sesi)</li>
           <li>Informasi pribadi (nama, email, dll)</li>
-          <li>Data lokasi atau GPS</li>
-          <li>Riwayat penggunaan atau aktivitas</li>
+          <li>Lokasi GPS. Google Analytics dan Vercel memang menebak negara atau kotamu dari alamat internet</li>
         </ul>
+        <p style="color: var(--muted); line-height: 1.6; margin-top: var(--sp-16);">
+          Yang memang tercatat adalah cara PDFLokal dipakai: alat apa yang dibuka, berapa lama
+          prosesnya, dan rekaman layar dengan tulisanmu ditutup. Siapa yang menerima apa, ada di
+          bagian-bagian berikut.
+        </p>
       </div>
 
       <!-- Analytics -->
       <div class="privacy-section">
         <h2>Tentang Analytics</h2>
         <p style="color: var(--muted); line-height: 1.6; margin-bottom: var(--sp-16);">
-          Saya menggunakan Vercel Web Analytics untuk memahami berapa banyak orang yang menggunakan PDFLokal.
-          Analytics ini bersifat:
+          Untuk menghitung kunjungan dan melihat alat mana yang dipakai, saya memasang layanan
+          pihak ketiga ini:
         </p>
         <ul class="privacy-list">
-          <li><strong>Anonim</strong>, Tidak ada data pribadi yang dikumpulkan</li>
-          <li><strong>Agregat</strong>, Hanya statistik umum seperti jumlah kunjungan</li>
-          <li><strong>Tanpa Cookie Tracking</strong>, Tidak menggunakan cookie untuk melacak kamu</li>
-          <li><strong>Privacy-Focused</strong>, Tidak dijual ke pihak ketiga</li>
+          <li>Vercel Web Analytics, tanpa cookie</li>
+          <li>Google Analytics dan Google Ads. Keduanya memasang cookie, daftarnya ada di tabel di bawah</li>
+          <li>Mixpanel, yang juga merekam sesi (lihat Perekaman Sesi)</li>
         </ul>
+        <p style="color: var(--muted); line-height: 1.6; margin-top: var(--sp-16);">
+          Yang mereka terima: halaman yang kamu buka, alat yang kamu pakai (misalnya Teks, TTD,
+          Gabung), jenis file (PDF atau gambar), jumlah halaman, dan ID sesi acak. Nama file dan isi
+          dokumen nggak pernah ikut.
+        </p>
       </div>
 
       <!-- Telemetri Produk -->
@@ -366,17 +377,17 @@
         </ul>
         <div class="privacy-highlight">
           <p>
-            <strong>Yang TIDAK pernah saya kirim:</strong> isi dokumen, teks yang kamu tulis atau edit,
+            <strong>Yang TIDAK pernah ikut di telemetri ini:</strong> isi dokumen, teks yang kamu tulis atau edit,
             nama file, gambar, atau nama font asli. Prinsip "<em>filenya tidak pernah diunggah</em>"
             tetap 100% berlaku, telemetri ini cuma menghitung APA yang sebuah fitur lakukan, bukan
             APA isi dokumenmu.
           </p>
         </div>
         <p style="color: var(--muted); line-height: 1.6;">
-          Nggak ada cookie. Tiap sesi (dari kamu buka PDFLokal sampai kamu tutup tabnya) dapat ID
+          Telemetri ini nggak pakai cookie. Tiap sesi (dari kamu buka PDFLokal sampai kamu tutup tabnya) dapat ID
           acak sendiri yang nggak nyambung ke sesi lain. <strong>Satu pengecualian, dan saya sebut
           terus terang</strong>: ada satu ID lagi yang tersimpan di browsermu
-          (<code>pdflokal_visitor_id</code>, ada di tabel Local Storage di bawah) dan ikut terkirim
+          (<code>pdflokal_visitor_id</code>, ada di tabel di bawah) dan ikut terkirim
           ke sini, supaya saya tahu bedanya pengunjung baru dan yang sudah pernah datang. Cuma
           angka acak: bukan nama, bukan email, nggak nyambung ke apa pun di luar sini. Dan dia
           berhenti di server saya, Mixpanel, GA4, dan Sentry nggak pernah menerimanya.
@@ -422,18 +433,21 @@
            are in their own paragraph BECAUSE THEY DO NOT TRANSFER: `ip:false` and
            `disable_persistence` are Mixpanel keys, and Sentry's replay keeps a
            sticky session of its own. Do not merge that paragraph upward.
-           ⏳ EXPIRES WITH THE STUDY: on 2026-10-10 the Mixpanel half comes out
-           together with the record_* keys. tests/core/replay-study-expiry.test.mjs
-           goes red by itself if it does not. -->
+           ⚖ NO END DATE, BY HIS RULING 2026-10-01 (seat decisions.md): the
+           Mixpanel recorder was a one-month study ending 2026-10-10, and he ruled
+           it keeps running. The page says it is running and that it will be
+           updated if that changes. tests/core/replay-disclosure.test.mjs holds
+           this section and index.html's record_* keys together in BOTH
+           directions: recorder on means Mixpanel is named here with no end date,
+           recorder off means Mixpanel is not named here at all. -->
       <div class="privacy-section">
         <h2>Perekaman Sesi (Session Replay)</h2>
         <p style="color: var(--muted); line-height: 1.6; margin-bottom: var(--sp-16);">
-          Terus terang dulu: ada dua layanan yang merekam cara orang memakai PDFLokal, dan halaman
-          ini baru menyebut keduanya sekarang.
+          Ada dua layanan yang merekam cara orang memakai PDFLokal:
         </p>
         <ul class="privacy-list">
           <li><strong>Sentry</strong>, sudah jalan sejak akhir Mei 2026. Tugas utamanya menangkap error, tapi dia juga merekam sesi: sekarang 1 dari 10 kunjungan, plus setiap kunjungan yang ada error-nya</li>
-          <li><strong>Mixpanel</strong>, semua sesi, sampai <strong>10 Oktober 2026</strong>. Saya mau lihat sendiri apakah alur fitur Edit kepakai atau malah bikin bingung. Setelah tanggal itu perekamannya saya matikan</li>
+          <li><strong>Mixpanel</strong>, semua sesi, dan masih jalan. Saya pakai untuk melihat di langkah mana orang kesulitan waktu mengedit. Kalau perekamannya saya hentikan, halaman ini saya update</li>
         </ul>
         <p style="color: var(--muted); line-height: 1.6; margin-top: var(--sp-16);">
           Yang terekam cuma gerakan di layar: di mana kamu tap, ke mana kamu scroll, tombol mana
@@ -459,10 +473,14 @@
           dan lokasimu nggak ikut dicatat. ID pengunjung yang saya ceritakan di Telemetri Produk itu
           punya server saya sendiri, nggak pernah sampai ke Mixpanel maupun Sentry.
         </p>
+        <p style="color: var(--muted); line-height: 1.6; margin-top: var(--sp-16);">
+          Khusus Sentry: selain rekaman, dia mengirim laporan error, isinya pesan error dan langkah
+          sebelum error itu terjadi. Kadang pesan itu menyebut satu karakter dari teks yang kamu
+          ketik, misalnya huruf yang nggak bisa disimpan ke PDF.
+        </p>
         <div class="privacy-highlight">
           <p>
-            Dua-duanya pihak ketiga, bukan server saya sendiri seperti telemetri di atas. Itu
-            sebabnya Mixpanel saya kasih batas waktu, dan itu sebabnya keduanya saya tulis di sini.
+            Dua-duanya pihak ketiga, bukan server saya sendiri seperti telemetri di atas.
             Perekaman cuma jalan di halaman alat, bukan di halaman ini, dan file PDF-mu sendiri
             tetap tidak pernah saya kirim ke mana pun.
           </p>
@@ -477,13 +495,19 @@
            was true until this key existed and would be false the moment it
            shipped silently. Rewritten instead of just adding a row. -->
       <div class="privacy-section">
-        <h2>Penyimpanan Lokal (Local Storage)</h2>
+        <h2>Yang Tersimpan di Browsermu</h2>
         <p style="color: var(--muted); line-height: 1.6; margin-bottom: var(--sp-16);">
-          PDFLokal menyimpan beberapa preferensi di browser kamu menggunakan Local Storage.
-          Hampir semuanya cuma buat kamu sendiri, nggak pernah saya lihat dan nggak pernah
-          dikirim ke mana-mana. Satu kunci beda, dan saya tandai jelas di tabelnya.
+          PDFLokal menyimpan beberapa preferensi di browser kamu (Local Storage, dan satu di
+          Session Storage yang hilang waktu tab ditutup). Hampir semuanya cuma buat kamu sendiri,
+          nggak pernah saya lihat dan nggak pernah dikirim ke mana-mana. Satu kunci beda, dan saya
+          tandai jelas di tabelnya.
         </p>
-        <table class="storage-table">
+        <!-- ⚠️ tests/core/privasi-storage-keys.test.mjs scans the code for every
+             key PDFLokal itself writes and fails if one is missing from THIS
+             table, or if a pdflokal key here has no writer left. Third-party
+             keys go in the second table, which was MEASURED on pdflokal.id
+             (2026-10-01, 11 fresh visits), not read off vendor docs. -->
+        <table class="storage-table" id="storage-ours">
           <thead>
             <tr>
               <th>Key</th>
@@ -520,10 +544,61 @@
               <td>Mengingat bahwa ajakan pasang aplikasi sudah ditutup</td>
             </tr>
             <tr>
+              <td><code>pdflokal_maker_seen</code></td>
+              <td>Mengingat kabar terbaru dari saya yang sudah kamu lihat</td>
+            </tr>
+            <tr>
+              <td><code>pdflokal_bugreport_last</code></td>
+              <td>Mengingat tanggal ajakan melaporkan bug terakhir ditampilkan</td>
+            </tr>
+            <tr>
+              <td><code>pdflokal-support-last</code></td>
+              <td>Menyimpan kapan ajakan berbagi atau traktir terakhir ditampilkan</td>
+            </tr>
+            <tr>
+              <td><code>pdflokal-support-optout</code></td>
+              <td>Mengingat bahwa ajakan berbagi atau traktir sudah dimatikan</td>
+            </tr>
+            <tr>
+              <td><code>pdflokal_boot_healed</code></td>
+              <td>Session Storage, cuma kalau halaman gagal dimuat. Mencegah halaman memuat ulang dirinya lebih dari sekali</td>
+            </tr>
+            <tr>
               <td><code>pdflokal_visitor_id</code></td>
               <td>ID acak, dibikin sekali di perangkatmu dan dipakai lagi tiap kamu balik.
                 <strong>Satu-satunya baris di tabel ini yang ikut keluar dari browsermu</strong>,
                 ke server saya sendiri, ceritanya ada di Telemetri Produk di atas</td>
+            </tr>
+          </tbody>
+        </table>
+        <p style="color: var(--muted); line-height: 1.6; margin-top: var(--sp-24);">
+          Layanan pihak ketiga di atas juga menyimpan data di browsermu. Isinya bisa ikut terkirim
+          ke layanannya masing-masing:
+        </p>
+        <table class="storage-table" id="storage-pihak-ketiga">
+          <thead>
+            <tr>
+              <th>Key</th>
+              <th>Fungsi</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>_ga</code>, <code>_ga_7J8JF8XZ1Q</code></td>
+              <td>Cookie Google Analytics. Membedakan browsermu dari browser lain antar kunjungan</td>
+            </tr>
+            <tr>
+              <td><code>_gcl_au</code>, <code>_gcl_ls</code></td>
+              <td>Cookie dan Local Storage Google Ads, untuk mengukur iklan. Dipasang di halaman alat, bukan di halaman ini</td>
+            </tr>
+            <tr>
+              <td><code>IDE</code>, <code>test_cookie</code></td>
+              <td>Cookie Google Ads di domain doubleclick.net. Dipasang di halaman alat, bukan di halaman ini</td>
+            </tr>
+            <tr>
+              <td><code>sentryReplaySession</code></td>
+              <td>Session Storage Sentry, ditulis tiap kamu buka halaman alat. Menandai sesi
+                rekamannya, dan hilang waktu tab ditutup</td>
             </tr>
           </tbody>
         </table>
@@ -573,7 +648,7 @@
       <!-- Back Button -->
       <div style="text-align: center; padding: var(--sp-48) 0;">
         <p style="font-size: 1rem; color: var(--muted); margin-bottom: var(--sp-16);">
-          Terakhir diupdate: 10 September 2026
+          Terakhir diupdate: 1 Oktober 2026
         </p>
         <a href="/" class="pg-btn">
           Balik ke Tools

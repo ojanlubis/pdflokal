@@ -35,14 +35,23 @@ PDFLokal adalah tool PDF gratis untuk pengguna Indonesia. Semua proses berjalan 
 ## Privasi
 
 - **100% Client-side** — All file processing happens in the browser
-- **No uploads** — Files never leave your device
+- **No uploads** — The PDFs and images you work on are never uploaded
 - **Open source** — Code can be inspected by anyone
 - **Security headers** — CSP, X-Frame-Options, and more ([details](docs/security.md))
 
-The one exception, stated plainly: PDFLokal sends **anonymous, typed usage events** (which tool was
-used, how long an export took, what device class) to its own endpoint — never file contents, and the
-schema physically has no field that could carry them. The beta Edit feature can also send a small
-image crop of a single edited line, but **only** if you rate it 👎, see the exact crop, and tap Kirim.
+What does leave the browser, stated plainly:
+
+- Anonymous, typed usage events (which tool, how long an export took, device class) to PDFLokal's
+  own endpoint, with a random per-browser visitor id. The schema has no field that could carry file
+  contents.
+- Page views and the same kind of tool events to Vercel Web Analytics, Google Analytics, Google Ads
+  and Mixpanel. Google Analytics and Google Ads set cookies.
+- Session replay: Sentry (1 in 10 sessions, plus any session with an error) and Mixpanel (every
+  session, ongoing). Text is masked and document pages are blocked from the recording.
+- Sentry error reports, whose messages can quote a single character of text you typed.
+- Only what you choose to send as feedback: a typed note, a pasted screenshot, or, after a 👎 in the
+  Edit beta, a crop of one edited line that you see before tapping Kirim.
+
 Full detail in [privasi.html](privasi.html).
 
 ## Cara Pakai

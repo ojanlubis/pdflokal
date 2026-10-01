@@ -22,7 +22,7 @@ import { test, expect } from '@playwright/test';
 test.describe('privasi.html — Local Storage table, ratified rows', () => {
   test('lists the four keys added 2026-08-14, with his exact wording', async ({ page }) => {
     await page.goto('/privasi.html');
-    const table = page.locator('.storage-table');
+    const table = page.locator('#storage-ours');
     await expect(table).toBeVisible();
 
     const rows = [
@@ -44,7 +44,7 @@ test.describe('privasi.html — Local Storage table, ratified rows', () => {
 
   test('pdflokal_signature carries his ratified wording, character for character', async ({ page }) => {
     await page.goto('/privasi.html');
-    const table = page.locator('.storage-table');
+    const table = page.locator('#storage-ours');
     await expect(table).toBeVisible();
 
     // `text-is` on the <code> is exact, so it cannot match the longer
@@ -64,7 +64,7 @@ test.describe('privasi.html — Local Storage table, ratified rows', () => {
   // two tests here and cite the date.
   test('lists pdflokal_visitor_id, the one key that is not a pure local preference', async ({ page }) => {
     await page.goto('/privasi.html');
-    const table = page.locator('.storage-table');
+    const table = page.locator('#storage-ours');
     await expect(table).toBeVisible();
 
     const row = table.locator('tr', { has: page.locator('code:text-is("pdflokal_visitor_id")') });

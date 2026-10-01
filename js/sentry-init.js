@@ -94,6 +94,13 @@ if (window.Sentry) Sentry.init({
       beforeErrorSampling: (event) => event.tags?.stage !== 'commit-bake',
     }),
   ],
+  // Sentry's default console integration records console.warn/error ARGUMENTS
+  // as breadcrumbs, and js/core/export.js + page-surgery.js warn raw errors —
+  // pdf-lib's WinAnsi encoder error quotes the character the user typed. So a
+  // later error event could carry document text. Keep the breadcrumb (level +
+  // timestamp still help debugging); replace its message and drop its raw
+  // arguments. Every other category (ui.click, navigation, fetch) is untouched.
+  beforeBreadcrumb: (b) => (b.category === 'console' ? { ...b, message: `console.${b.level || 'log'}`, data: undefined } : b),
   beforeSend(event) {
     // Strip URL fragments before an event leaves the device — they can carry
     // UI state we never want in a third-party service. Privacy first, always.

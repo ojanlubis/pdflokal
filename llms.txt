@@ -1,0 +1,27 @@
+# PDFLokal
+
+> Alat PDF gratis buatan Indonesia yang jalan langsung di browser: edit, tanda tangan, gabung, pisah, dan kompres PDF tanpa mengupload file ke server.
+
+File PDF dan gambar diolah di perangkat pengguna, tidak pernah diupload. Gratis, tanpa akun, tanpa watermark. Bahasa antarmukanya Indonesia. Bisa dipasang sebagai aplikasi (PWA), dan setelah sekali dipakai, tetap bisa membuka, mengedit, dan mengunduh PDF tanpa internet.
+
+In English: free PDF tools in Indonesian that run entirely in the browser. Files are never uploaded.
+
+## Alat
+
+- [Edit PDF](https://www.pdflokal.id/edit-pdf): tambah teks, tutup tulisan, dan ubah tulisan yang sudah tercetak di PDF (beta), termasuk di hasil scan lewat OCR di browser
+- [Tanda Tangan PDF](https://www.pdflokal.id/tanda-tangan-pdf): gambar tanda tangan pakai jari, atau pakai foto tanda tangan
+- [Gabung PDF](https://www.pdflokal.id/gabung-pdf): satukan beberapa file PDF jadi satu
+- [Pisah PDF](https://www.pdflokal.id/pisah-pdf): ambil halaman tertentu jadi file baru
+- [Hapus Halaman PDF](https://www.pdflokal.id/hapus-halaman-pdf): hapus, urutkan ulang, atau putar halaman
+- [Kompres PDF](https://www.pdflokal.id/kompres-pdf): perkecil ukuran PDF, dengan target [100 KB](https://www.pdflokal.id/kompres-pdf-100kb), [200 KB](https://www.pdflokal.id/kompres-pdf-200kb), [500 KB](https://www.pdflokal.id/kompres-pdf-500kb), dan [1 MB](https://www.pdflokal.id/kompres-pdf-1mb)
+- [JPG ke PDF](https://www.pdflokal.id/jpg-ke-pdf): ubah foto atau hasil scan jadi satu PDF
+- [PDF ke JPG](https://www.pdflokal.id/pdf-ke-jpg): ubah halaman PDF jadi gambar JPG atau PNG
+
+## Privasi
+
+- [Kebijakan Privasi](https://www.pdflokal.id/privasi): apa yang tetap di perangkat, dan apa yang terkirim (analytics, perekaman sesi, laporan error, masukan)
+
+## Optional
+
+- [Dukung PDFLokal](https://www.pdflokal.id/dukung): dibuat oleh Fauzan Ahladzikri (Ojan)
+- [Kode sumber](https://github.com/ojanlubis/pdflokal)

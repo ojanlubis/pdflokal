@@ -238,3 +238,37 @@ test('a build throw AND a throwing onBakeFailure still resolve to null with stat
   assert.equal(page.editApplied, null, 'stale applied set must not survive a failed bake');
   assert.equal(page.editOutcomes, null, 'stale outcomes must not survive a failed bake');
 });
+
+// Privasi 2026-10-01: Sentry's default console integration records
+// console.warn/error ARGUMENTS as breadcrumbs. export.js and page-surgery.js
+// warn raw errors, and pdf-lib's WinAnsi encoder error quotes the character the
+// user typed — so a later error event could carry document text. Pins the
+// beforeBreadcrumb predicate as written in js/sentry-init.js (read from the
+// file) and checks the alat-gambar.html copy declares the same one.
+test('sentry-init: a console breadcrumb leaves the device content-free; other breadcrumbs are untouched', async () => {
+  const fs = await import('node:fs');
+  const src = fs.readFileSync(new URL('../../js/sentry-init.js', import.meta.url), 'utf8');
+  const m = /beforeBreadcrumb:\s*(\(b\)\s*=>[^\n]*?),\s*\n/.exec(src);
+  assert.ok(m, 'Sentry.init must declare beforeBreadcrumb');
+  // eslint-disable-next-line no-eval
+  const hook = (0, eval)(m[1]);
+
+  const consoleCrumb = {
+    category: 'console', level: 'warning', timestamp: 1,
+    message: 'WinAnsi cannot encode "é" (0x00e9)',
+    data: { arguments: ['WinAnsi cannot encode "é" (0x00e9)'], logger: 'console' },
+  };
+  const out = hook(consoleCrumb);
+  assert.ok(out, 'the breadcrumb itself is kept');
+  assert.equal(out.category, 'console');
+  assert.equal(out.level, 'warning');
+  assert.equal(out.timestamp, 1);
+  assert.ok(!JSON.stringify(out).includes('é'), 'no typed character survives anywhere in the breadcrumb');
+  assert.ok(!('arguments' in (out.data || {})), 'the raw arguments are dropped');
+
+  const click = { category: 'ui.click', message: 'body > button#go', data: { x: 1 } };
+  assert.deepEqual(hook(click), click, 'a non-console breadcrumb is untouched');
+
+  const html = fs.readFileSync(new URL('../../alat-gambar.html', import.meta.url), 'utf8');
+  assert.match(html, /beforeBreadcrumb:\s*\(b\)\s*=>[^\n]*category === 'console'/, 'the old wing carries the same hook');
+});

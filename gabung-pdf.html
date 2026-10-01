@@ -148,11 +148,15 @@
       gtag('config', 'G-7J8JF8XZ1Q');
     }
   </script>
-  <!-- MIXPANEL — ONE-MONTH SESSION-REPLAY STUDY. ENDS 2026-10-10.
+  <!-- MIXPANEL — SESSION REPLAY, ONGOING BY HIS RULING 2026-10-01.
        WHY IT EXISTS: to watch whether the editor's edit flow is actually usable
-       (seat decisions.md 2026-09-10). It is a UX instrument, not a marketing one,
-       and it is TEMPORARY: on 2026-10-10 the `record_*` keys below come out and
-       `mixpanel.init` keeps only the event fan-out in js/lib/analytics.js.
+       (seat decisions.md 2026-09-10). It is a UX instrument, not a marketing one.
+       It began as a one-month study that was to end 2026-10-10. On 2026-10-01 he
+       opened the replays, found them useful, and ruled it keeps running until he
+       says otherwise (seat decisions.md 2026-10-01 (sore)). There is no end date.
+       privasi.html's Perekaman Sesi section says it is running, with no date, and
+       tests/core/replay-disclosure.test.mjs goes red the day the `record_*` keys
+       below and that page disagree, in either direction.
 
        WHY THE TOKEN IS INLINE HERE: there is no build step, so the client has no
        env vars by construction. Same reason G-7J8JF8XZ1Q above is inline. This is
@@ -257,8 +261,8 @@
       track_pageview: false,     // GA4 already owns pageviews.
       ip: false,                 // Mixpanel geolocates from the request IP by
                                  // default and stores city/region. privasi.html's
-                                 // "Data yang TIDAK Saya Kumpulkan" list says
-                                 // "Data lokasi atau GPS", so this is not a
+                                 // "Khusus Mixpanel" paragraph says "lokasimu
+                                 // nggak ikut dicatat", so this is not a
                                  // preference either, it is that claim staying true.
       // ---- session replay: 100%, no sampling ----
       // ~5,000 sessions/month against a 10,000/month free-tier ceiling, so

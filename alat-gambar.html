@@ -1661,6 +1661,13 @@
         /QuotaExceededError: (The quota has been exceeded|.*setItem.*Storage)/i,
         "Internal error opening backing store for indexedDB.open"
       ],
+      // Sentry's default console integration records console.warn/error ARGUMENTS
+      // as breadcrumbs, and js/core/export.js + page-surgery.js warn raw errors —
+      // pdf-lib's WinAnsi encoder error quotes the character the user typed. So a
+      // later error event could carry document text. Keep the breadcrumb (level +
+      // timestamp still help debugging); replace its message and drop its raw
+      // arguments. Every other category (ui.click, navigation, fetch) is untouched.
+      beforeBreadcrumb: (b) => (b.category === 'console' ? { ...b, message: `console.${b.level || 'log'}`, data: undefined } : b),
       beforeSend(event) {
         // Strip URL fragments — they can carry sensitive UI state.
         // WHY split, not regex: SonarCloud S5852 flags greedy `.*$` as
