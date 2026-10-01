@@ -19,6 +19,18 @@
  */
 export const UPDATES = [
   {
+    id: '2026-10-01-english',
+    date: '2026-10-01',
+    text: 'PDFLokal sekarang ada versi bahasa Inggris.',
+    approved: true,
+  },
+  {
+    id: '2026-10-01-edit-sama-persis',
+    date: '2026-10-01',
+    text: 'Teks yang kamu edit sekarang tampil persis sama dengan hasil unduhannya.',
+    approved: true,
+  },
+  {
     id: '2026-10-01-edit-isian',
     date: '2026-10-01',
     text: 'Tools Edit sekarang bisa mendeteksi formulir dan list, supaya editnya lebih pas',
