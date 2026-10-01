@@ -1,17 +1,18 @@
 /*
  * PDFLokal - lib/analytics.js (ES Module)
  * THE THIRD-PARTY EVENT FAN-OUT. track(name, data) is the single call site the
- * whole app uses; this file decides who hears it. Four sinks, in order: a Sentry
- * breadcrumb, Vercel Web Analytics va(), GA4 gtag(), and (since 2026-09-10)
- * Mixpanel. Every one is guarded, so a blocked or unloaded SDK is a no-op, never
- * an error. ⚠️ This is NOT the first-party Neon rail - that is tel() in
+ * whole app uses; this file decides who hears it. Three sinks, in order: a Sentry
+ * breadcrumb, GA4 gtag(), and (since 2026-09-10) Mixpanel. Every one is guarded,
+ * so a blocked or unloaded SDK is a no-op, never an error.
+ * NOT Vercel Web Analytics: since 2026-10-01 it gets page views only (its script
+ * tag in each page), no custom events. Vercel bills per event and the September
+ * bill rose with them, while GA4 and Mixpanel already carry the same events. ⚠️ This is NOT the first-party Neon rail - that is tel() in
  * js/v2/telemetry.js, a different module with its own schema. The two rails are
  * never dual-written to the same event.
  * Generates a per-session ID to approximate user behavior patterns.
  *
- * WHY session ID: Vercel Analytics doesn't track sessions natively.
- * With session IDs, we can estimate heavy vs light users by counting
- * events per session in the dashboard.
+ * WHY session ID: counting events per session in the dashboard tells heavy
+ * from light users.
  *
  * Privacy: No personal data, no file names, no file content.
  * Only tool names, action types, and anonymous session IDs.
@@ -34,7 +35,7 @@ const sessionId = typeof crypto?.randomUUID === 'function'
 // Unassigned, stolen from Organic/Direct — every day from August until
 // 2026-09-25 (seat decisions.md 2026-09-02). Rewritten HERE, at the sink, so
 // the next call site that says `source` cannot bring it back. Only the GA4 copy
-// is renamed: Sentry, Vercel and Mixpanel keep the key they always had.
+// is renamed: Sentry and Mixpanel keep the key they always had.
 const GA4_RESERVED = new Set(['source', 'medium', 'campaign', 'term', 'content', 'gclid']);
 
 export function forGA4(data) {
@@ -46,13 +47,13 @@ export function forGA4(data) {
 }
 
 /**
- * Track a custom event via Vercel Web Analytics.
+ * Track a custom event: Sentry breadcrumb, GA4, Mixpanel.
  * @param {string} name - Event name (max 255 chars)
  * @param {Record<string, string|number|boolean|null>} [data] - Custom data (no nested objects)
  */
 export function track(name, data = {}) {
-  // WHY Sentry breadcrumb first: even if Vercel Analytics is blocked (ad
-  // blockers) or fails to load, we still get the breadcrumb attached to any
+  // WHY Sentry breadcrumb first: even if the analytics SDKs are blocked (ad
+  // blockers) or fail to load, we still get the breadcrumb attached to any
   // crash that follows. JAVASCRIPT-4 would have told us "user did X then Y
   // then crashed" instead of just "user tapped canvas then crashed".
   // Safe to call when SDK not loaded — guard the global.
@@ -65,15 +66,6 @@ export function track(name, data = {}) {
       data,
     });
   }
-
-  // WHY guard: va() only exists when Vercel Analytics script is loaded.
-  // In local dev (npx serve), it won't exist — fail silently.
-  if (typeof window.va !== 'function') return;
-
-  window.va('event', {
-    name,
-    data: { ...data, session: sessionId }
-  });
 
   // WHY: Send same events to GA4 so we can compare dashboards.
   // gtag() exists when Google tag script is loaded (not in local dev).
