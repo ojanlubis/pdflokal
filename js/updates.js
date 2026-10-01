@@ -19,6 +19,12 @@
  */
 export const UPDATES = [
   {
+    id: '2026-10-01-edit-isian',
+    date: '2026-10-01',
+    text: 'Tools Edit sekarang bisa mendeteksi formulir dan list, supaya editnya lebih pas',
+    approved: true,
+  },
+  {
     id: '2026-10-01-ukuran-bebas',
     date: '2026-10-01',
     text: 'Ukuran huruf Teks sekarang bisa kamu ketik sendiri, sekecil 1.',
