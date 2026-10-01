@@ -9,7 +9,7 @@
 
 | Tier | What | Catches | Cost |
 |------|------|---------|------|
-| 1 | Playwright `mobile-chrome` project (Pixel 7 descriptor: touch, 412×915, DPR 2.6) | layout, touch-event logic, viewport bugs | free, runs in CI on every PR (`npm run test:mobile`) |
+| 1 | Playwright `mobile-chrome` project (Pixel 7 descriptor: touch, 412×915, DPR 2.6) | layout, touch-event logic, viewport bugs | free, part of `npm run gate` and CI (`npm run test:mobile` alone) |
 | 2 | Android emulator (AVD) + real Chrome, driven via adb + CDP | compositor/GPU class, Android keyboard, real scrolling physics | local only, needs the emulator running |
 | final | Founder's physical phone (low-end reality, real network, real hands) | everything else | founder's time — spend it only on merge gates |
 
@@ -34,11 +34,11 @@ Installed via Homebrew + sdkmanager (~10GB total):
 # 1. boot the emulator (headless; ~15s)
 ~/Library/Android/sdk/emulator/emulator -avd pdflokal-test -no-window -no-audio -no-boot-anim &
 
-# 2. serve the app
+# 2. serve the app (5050 is also the gate's port — never while a sweep runs)
 npx serve -p 5050 --no-clipboard .
 
-# 3. drive real Chrome + screenshot (loads the 2-page fixture into editor-v2)
-node scripts/android-verify.mjs /editor-v2.html my-check
+# 3. drive real Chrome + screenshot (loads the 2-page fixture into the editor at /)
+node scripts/android-verify.mjs / my-check
 ```
 
 `scripts/android-verify.mjs` does the plumbing every run (idempotent):
