@@ -422,18 +422,21 @@
            are in their own paragraph BECAUSE THEY DO NOT TRANSFER: `ip:false` and
            `disable_persistence` are Mixpanel keys, and Sentry's replay keeps a
            sticky session of its own. Do not merge that paragraph upward.
-           ⏳ EXPIRES WITH THE STUDY: on 2026-10-10 the Mixpanel half comes out
-           together with the record_* keys. tests/core/replay-study-expiry.test.mjs
-           goes red by itself if it does not. -->
+           ⚖ NO END DATE, BY HIS RULING 2026-10-01 (seat decisions.md): the
+           Mixpanel recorder was a one-month study ending 2026-10-10, and he ruled
+           it keeps running. The page says it is running and that it will be
+           updated if that changes. tests/core/replay-disclosure.test.mjs holds
+           this section and index.html's record_* keys together in BOTH
+           directions: recorder on means Mixpanel is named here with no end date,
+           recorder off means Mixpanel is not named here at all. -->
       <div class="privacy-section">
         <h2>Perekaman Sesi (Session Replay)</h2>
         <p style="color: var(--muted); line-height: 1.6; margin-bottom: var(--sp-16);">
-          Terus terang dulu: ada dua layanan yang merekam cara orang memakai PDFLokal, dan halaman
-          ini baru menyebut keduanya sekarang.
+          Ada dua layanan yang merekam cara orang memakai PDFLokal:
         </p>
         <ul class="privacy-list">
           <li><strong>Sentry</strong>, sudah jalan sejak akhir Mei 2026. Tugas utamanya menangkap error, tapi dia juga merekam sesi: sekarang 1 dari 10 kunjungan, plus setiap kunjungan yang ada error-nya</li>
-          <li><strong>Mixpanel</strong>, semua sesi, sampai <strong>10 Oktober 2026</strong>. Saya mau lihat sendiri apakah alur fitur Edit kepakai atau malah bikin bingung. Setelah tanggal itu perekamannya saya matikan</li>
+          <li><strong>Mixpanel</strong>, semua sesi, dan masih jalan. Saya pakai untuk melihat di langkah mana orang kesulitan waktu mengedit. Kalau perekamannya saya hentikan, halaman ini saya update</li>
         </ul>
         <p style="color: var(--muted); line-height: 1.6; margin-top: var(--sp-16);">
           Yang terekam cuma gerakan di layar: di mana kamu tap, ke mana kamu scroll, tombol mana
@@ -461,8 +464,7 @@
         </p>
         <div class="privacy-highlight">
           <p>
-            Dua-duanya pihak ketiga, bukan server saya sendiri seperti telemetri di atas. Itu
-            sebabnya Mixpanel saya kasih batas waktu, dan itu sebabnya keduanya saya tulis di sini.
+            Dua-duanya pihak ketiga, bukan server saya sendiri seperti telemetri di atas.
             Perekaman cuma jalan di halaman alat, bukan di halaman ini, dan file PDF-mu sendiri
             tetap tidak pernah saya kirim ke mana pun.
           </p>
