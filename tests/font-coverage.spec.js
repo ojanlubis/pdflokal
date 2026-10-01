@@ -136,55 +136,40 @@ test.describe('font-coverage — lorem-full (full glyph set, native endpoint)', 
   });
 });
 
-test.describe('font-coverage — lorem-subset (genuinely uncoverable glyph, decline endpoint)', () => {
-  test('editing to introduce a foreign-script character (Cyrillic Ж): the honest substitute-font toast fires', async ({ page }) => {
+test.describe('font-coverage — lorem-subset (genuinely uncoverable glyph, refusal endpoint)', () => {
+  // REWRITTEN 2026-10-01 (edit font design slice 1, his answer 2: "a
+  // character no font can write is refused at input with a short note"). This
+  // test used to TYPE 'Ж', commit it, and expect the substitute toast plus a
+  // DOM twin overlay — i.e. the old behaviour where the line was written in
+  // the doc font with the twin painting 'Ж' per glyph. No bundled font covers
+  // Cyrillic either, so 'Ж' is now refused while typing: it never reaches the
+  // editor's text, the note names it, and the rest of the line commits in ONE
+  // decided font. The hard endpoint is unchanged in spirit — a genuinely
+  // uncoverable glyph never bakes — it is just enforced earlier.
+  test('typing a foreign-script character (Cyrillic Ж): REFUSED at input with the note, the rest commits in one decided font', async ({ page }) => {
     await openDoc(page, LOREM_SUBSET);
     await armGanti(page);
     await tapLine(page, { str: 'Nomor: 002' });
     await expect(page.locator('.v2-text-edit')).toHaveText('Nomor: 002/LOR/2026');
 
-    // Same wait as the lorem-full test: prepareDocFont must have landed
-    // (docFontkitFont populated) before commit, so the coverage check has a
-    // real fontkit font object to test 'Ж' against — not an unresolved
-    // promise that would make the assertion pass for the wrong reason.
-    await waitForDocFont(page);
+    // The live decision is in place (js/v2/line-font-live.js marks the face
+    // it paints) — refusal needs the loaded candidates to judge against.
+    await expect(page.locator('.v2-text-edit')).toHaveAttribute('data-font-path', /^(native|clone|substitute)$/, { timeout: 10_000 });
 
-    // 'Ж' (U+0416) has zero coverage in Montserrat at any weight (see
-    // gen-fixture-lorem-subset.mjs's header) — genuinely uncoverable, not a
-    // subset artifact that a wider re-embed could fix.
     await page.keyboard.type('Nomor: Ж02/BARU/2026');
+    await expect(page.locator('.v2-text-edit')).toHaveText('Nomor: 02/BARU/2026');
+    // The note's words are his (TODO(copy)) — read them from their one home
+    // rather than pinning a placeholder here.
+    const note = await page.evaluate(async () => (await import('/js/v2/line-font-live.js')).refusalNote('Ж'));
+    await expect(page.locator('#toast')).toHaveText(note);
+
     await page.keyboard.press('Enter');
     await expect(page.locator('.v2-text-edit')).toHaveCount(0); // committed
 
-    // HARD (permanent endpoint): the honest substitute toast, verbatim.
-    await expect(page.locator('#toast')).toHaveText(SUBSTITUTE_TOAST);
-
-    // BASELINE (current behavior) — font-engine may flip this to native/
-    // clone if it ever routes a declined native insert through a CLONE
-    // font's own native re-insert path instead of the twin DOM overlay.
-    // Today: surgery (removal of the original run) still succeeds
-    // independently of font coverage, so the cover is gone (true background
-    // shows through) but the replacement text, having declined NATIVE
-    // insert, stays a DOM-rendered twin overlay rather than baking into the
-    // raster (js/v2/app.js's editedPageProvider — buildEditedPageBytes'
-    // `applied` set only ever contains a text annotation's id when its OWN
-    // native insert succeeded; a font decline leaves it out, so page-view.js
-    // keeps drawing it as `.pv-anno-text`). If font-engine work changes this
-    // (e.g. bakes a clone-font native insert even for a fully foreign
-    // script), update this block — the toast assertion above stays true
-    // regardless.
-    await expect(page.locator('.pv-anno-whiteout')).toHaveCount(0, { timeout: 10_000 });
-    await expect(page.locator('.pv-anno-text')).toHaveCount(1);
-
-    // BASELINE (current behavior) — docFontFamily is set purely from a
-    // successful FontFace LOAD (loadDocFont), independent of whether the
-    // FINAL typed text is fully covered (see js/v2/app.js's prepareDocFont —
-    // it never checks coverage, only that the program parsed). It is NOT a
-    // reliable "native succeeded" signal on its own; the toast above is the
-    // decisive one. Documented here so a future reader isn't tempted to read
-    // docFontFamily as proof of coverage.
     const anno = await committedTextAnno(page);
-    expect(anno.docFontFamily).toBeTruthy();
+    expect(anno.text).toBe('Nomor: 02/BARU/2026');
+    expect(anno.text).not.toContain('Ж');
     expect(anno.replaceCoverId).toBeTruthy();
+    expect(['native', 'clone', 'substitute']).toContain(anno.fontDecision?.path);
   });
 });

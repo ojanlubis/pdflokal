@@ -186,7 +186,16 @@ test.describe('rung C — native re-insert (own-font replacement)', () => {
     expect(Math.abs(replacement.x - middle.x)).toBeLessThanOrEqual(1);
   });
 
-  test('fallback intact: Line A\'s multi-fragment geometry declines BOTH stamp rungs (mixed-fonts) — still exports via the twin path', async ({ page }) => {
+  // UPDATED 2026-10-01 (edit font design slice 1): with a live font decision
+  // on the annotation, the stamp no longer refuses a `mixed-fonts` line — it
+  // writes the whole line in the ONE font the editor showed (here Arimo, the
+  // clone of this line's unembedded Helvetica). Without a decision (a commit
+  // that beats the editor's font load) the old guard below still applies and
+  // the twin draws it. Both routes put the text in the text layer AND add a
+  // font resource, which is all this test asserts — so it is deliberately
+  // indifferent to which route won the race, and the decided route itself is
+  // pinned in tests/core/line-font-roundtrip.test.mjs.
+  test('Line A (multi-fragment, flagged mixed-fonts) still exports its text — in the decided font, or the twin when undecided', async ({ page }) => {
     // CORRECTED WHY (verified empirically against this exact fixture+edit via
     // window.v2.getDoc().pages[0].editOutcomes, not assumed): Line A is 3 kern
     // fragments (ganti-baris.spec.js's module header) — text-walk.js's walk
