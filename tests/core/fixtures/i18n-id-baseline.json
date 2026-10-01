@@ -1009,13 +1009,7 @@
     ]
   },
   "toast.blockGrew": {
-    "text": "Teksnya jadi lebih panjang dari paragraf asli",
-    "src": [
-      "js/v2/app.js"
-    ]
-  },
-  "toast.blockPastPage": {
-    "text": "Teksnya udah sampai ujung halaman",
+    "text": "Paragrafnya jadi lebih panjang dari sebelumnya, sekarang numpuk sama tulisan di bawahnya.",
     "src": [
       "js/v2/app.js"
     ]
