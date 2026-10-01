@@ -19,8 +19,6 @@ Key points for AI contributors:
 - **Vanilla JS, native ES modules, no build step, no frameworks**
 - **All UI text in Indonesian** (informal "kamu" tone)
 - **100% client-side** — files never leave the user's device
-- Use SSOT helpers (see `CLAUDE.md` > Common Helpers table)
-- New exports need barrel `index.js` entry + `window.*` bridge if used in HTML `onclick`
 - Test with `npx serve` + Ctrl+Shift+R (aggressive caching)
 
 ## Project Constraints
@@ -64,56 +62,13 @@ Use the [feature request template](https://github.com/ojanlubis/pdflokal/issues/
 - **Follows conventions** — read `CLAUDE.md` for patterns
 - **No scope creep** — don't refactor unrelated code
 
-## Code Architecture
-
-```
-js/
-├── init.js               # Entry point
-├── lib/
-│   ├── state.js          # State, constants, SSOT factories
-│   ├── utils.js          # Pure helpers (toast, download, file type checks)
-│   └── navigation.js     # Routing, modals, history management
-├── editor/               # Unified Editor (14 modules)
-│   ├── index.js          # Barrel exports + window bridges
-│   ├── canvas-events.js  # Mouse/touch event handling
-│   ├── file-loading.js   # PDF/image loading
-│   ├── annotations.js    # Annotation rendering
-│   ├── signatures.js     # Signature placement
-│   └── ...               # See CLAUDE.md for full list
-├── pdf-tools/            # PDF tool modals (7 modules)
-│   ├── index.js          # Barrel exports + window bridges
-│   └── ...
-└── vendor/               # Self-hosted libs (don't modify)
-```
-
-**SSOT Pattern:** We centralize repeated patterns into single helpers. Before writing inline object literals or boilerplate, check if a helper exists in `CLAUDE.md` > Common Helpers.
-
-## SSOT Helpers You Must Use
-
-| Instead of... | Use... | Location |
-|---------------|--------|----------|
-| `{ type: 'whiteout', x, y, ... }` | `createWhiteoutAnnotation({...})` | state.js |
-| `{ type: 'text', text, x, y, ... }` | `createTextAnnotation({...})` | state.js |
-| `{ type: 'signature', ... }` | `createSignatureAnnotation({...})` | state.js |
-| `el.classList.add('active'); pushModalState(id);` | `openModal(id)` | navigation.js |
-| `el.classList.remove('active'); history.back();` | `closeModal(id)` | navigation.js |
-| `file.type === 'application/pdf'` | `isPDF(file)` | utils.js |
-| `file.type.startsWith('image/')` | `isImage(file)` | utils.js |
-| `pdfjsLib.getDocument({data: bytes.slice()}).promise` | `loadPdfDocument(bytes)` | utils.js |
-| `{ pageNum, sourceIndex, ... }` | `createPageInfo({...})` | state.js |
-
 ## Testing
 
-There's no automated test suite (yet). Manual testing checklist:
-
-1. **Load PDF** — drop a multi-page PDF on the homepage
-2. **Annotations** — create whiteout, text, signature on different pages
-3. **Undo/redo** — verify Ctrl+Z / Ctrl+Y work for all annotation types
-4. **Modals** — open/close every modal, test backdrop click and Escape key
-5. **Page management** — reorder, rotate, delete pages in Gabungkan modal
-6. **Download** — download PDF and verify annotations render correctly
-7. **Mobile** — test on <=900px viewport (sidebar hidden, toolbar icons only)
-8. **Browser back** — verify back button navigates correctly (modal → workspace → home)
+```bash
+npm ci
+npm run lint && npm run test:core   # fast, headless
+npm run gate                        # the full sweep CI runs: lint, seo:check, core, Playwright
+```
 
 ## AI-Assisted Contributions
 
@@ -126,7 +81,7 @@ We actively welcome AI-assisted contributions. If you're using Claude, ChatGPT, 
 
 ## Code Style
 
-- **No semicolons** — we use semicolons (existing codebase convention)
+- **Semicolons** (existing codebase convention)
 - **Single quotes** for strings in JS
 - **2-space indentation**
 - **No TypeScript** — vanilla JS only
