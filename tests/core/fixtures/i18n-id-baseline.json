@@ -1,0 +1,226 @@
+{
+  "number.decimal": {
+    "text": ",",
+    "src": [
+      "js/v2/download-sheet.js"
+    ]
+  },
+  "page.short": {
+    "text": "Hal {n}",
+    "src": [
+      "js/lab.js",
+      "js/v2/app.js"
+    ]
+  },
+  "loading.count": {
+    "text": "{n} dari {total} file",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
+  "sigBar.initialsSelected": {
+    "text": "Paraf terpilih",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
+  "sigBar.signatureSelected": {
+    "text": "Tanda tangan terpilih",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
+  "sigBar.armed": {
+    "text": "Pilih tempat untuk menempatkan",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
+  "landing.hideTools": {
+    "text": "Sembunyikan",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
+  "landing.showTools": {
+    "text": "Lihat semua alat",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
+  "toast.armText": {
+    "text": "Pilih tempat untuk menulis",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
+  "toast.armWhiteout": {
+    "text": "Seret di halaman untuk menutup teks",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
+  "toast.armSignature": {
+    "text": "Pilih tempat untuk menempatkan tanda tangan",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
+  "toast.armInitials": {
+    "text": "Pilih tempat untuk menempatkan paraf",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
+  "toast.armEdit": {
+    "text": "Edit teks asli, fitur beta. Tap tulisan yang mau kamu ubah",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
+  "toast.armEditShort": {
+    "text": "Tap tulisan yang mau diubah",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
+  "toast.missedText": {
+    "text": "Nggak kena tulisan, tap tepat di teksnya ya",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
+  "toast.noReadableText": {
+    "text": "Nggak ada tulisan yang kebaca",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
+  "toast.scanFailed": {
+    "text": "Gagal scan, coba lagi ya",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
+  "toast.scanNotEditable": {
+    "text": "Halaman ini hasil scan/foto, teksnya belum bisa diedit",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
+  "toast.pickObject": {
+    "text": "Pilih objek yang mau dihapus",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
+  "toast.preparing": {
+    "text": "Sebentar, lagi disiapkan",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
+  "toast.fontSubstituteResult": {
+    "text": "Sebagian teks memakai font pengganti yang mirip di file hasil",
+    "src": [
+      "js/v2/app.js",
+      "js/v2/download-sheet.js"
+    ]
+  },
+  "toast.fontSubstituteChar": {
+    "text": "Huruf ini memakai font pengganti yang mirip",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
+  "toast.extractDone": {
+    "text": "Selesai! {count} halaman diekstrak jadi PDF baru",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
+  "toast.extractFailed": {
+    "text": "Waduh, gagal mengekstrak. Coba sekali lagi ya",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
+  "toast.signatureReplaced": {
+    "text": "Tanda tangan diganti",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
+  "toast.signatureCopied": {
+    "text": "Oke, ditaruh di {count} halaman lainnya juga",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
+  "toast.stillLoading": {
+    "text": "Sebentar ya, file sebelumnya masih dimuat",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
+  "toast.pickFile": {
+    "text": "Pilih file PDF atau gambar ya",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
+  "toast.tooBig": {
+    "text": "\"{name}\" terlalu besar (maks 100MB)",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
+  "toast.lockedReadOnly": {
+    "text": "PDF ini terkunci, bisa dibaca, tapi nggak bisa disimpan ulang",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
+  "toast.openLocked": {
+    "text": "File itu dikunci sandi, jadi nggak bisa dibuka di sini",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
+  "toast.openFailedOne": {
+    "text": "File itu nggak bisa dibuka, mungkin kosong atau rusak",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
+  "toast.openFailedAll": {
+    "text": "Nggak ada file yang bisa dibuka, mungkin kosong atau rusak",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
+  "toast.openFailed": {
+    "text": "Gagal membuka file",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
+  "toast.skipped": {
+    "text": "{count} file dilewati, kosong atau rusak",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
+  "toast.merged": {
+    "text": "Dijepit jadi satu, sekarang {count} halaman",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
+  "toast.addMoreFiles": {
+    "text": "Tambah file lainnya lewat menu File di kiri atas",
+    "src": [
+      "js/v2/app.js"
+    ]
+  }
+}

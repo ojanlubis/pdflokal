@@ -44,6 +44,7 @@ import { createPageManager } from './page-manager.js';
 import { createSignatureModal } from './signature-modal.js';
 import { createDownloadSheet } from './download-sheet.js';
 import { track } from '../lib/analytics.js';
+import { t as tr } from '../lib/i18n.js';
 // ⚠️ IMPORTED UNDER A DIFFERENT NAME, and the local `tel` below wraps it.
 // WHY: the bug-report prompt needs "the first COMMITTED edit of the day", and
 // there is no single commit chokepoint — outcomes fire from nine call sites
@@ -234,7 +235,7 @@ function updateProcessing(done, total) {
     // Determinate: count = file we're working on now; fill = files finished.
     lpFill.classList.remove('lp-indet');
     lpFill.style.width = Math.round((done / total) * 100) + '%';
-    lpCount.textContent = `${Math.min(done + 1, total)} dari ${total} file`;
+    lpCount.textContent = tr('loading.count', { n: Math.min(done + 1, total), total });
     lpCount.hidden = false;
   } else {
     // Single file: no honest sub-file count exists — indeterminate bar, no number.
@@ -709,7 +710,7 @@ function rebuildStage() {
   slots = doc.pages.map((page, i) => {
     const slot = createPageSlot(page, {
       activeId: doc.selection.annotationId,
-      label: `Hal ${i + 1}`,
+      label: tr('page.short', { n: i + 1 }),
     });
     stage.appendChild(slot.view);
     return slot;
@@ -834,15 +835,15 @@ for (const btn of document.querySelectorAll('#toolbar .tool[data-tool]')) {
     if (ARM_TOOL[t]) tel('tool_use', { tool: ARM_TOOL[t], action: 'arm' });
     if (t === 'signature' && !storedSignature) { signatureModal.open(); return; }
     setTool(t);
-    if (t === 'text') toast('Pilih tempat untuk menulis');
-    if (t === 'whiteout') toast('Seret di halaman untuk menutup teks');
-    if (t === 'signature') toast('Pilih tempat untuk menempatkan tanda tangan');
+    if (t === 'text') toast(tr('toast.armText'));
+    if (t === 'whiteout') toast(tr('toast.armWhiteout'));
+    if (t === 'signature') toast(tr('toast.armSignature'));
     // Beta note lives HERE (not just the button's title=) because a title tip
     // is desktop-hover only — ~half of pdflokal's traffic is mobile and would
     // never see "beta". The arm-toast announces it on every device, once per
     // arming, right as the user starts. Verb shifted ganti→edit to match the
     // renamed button (taste: the verb matches the interaction model everywhere).
-    if (t === 'ganti') toast('Edit teks asli, fitur beta. Tap tulisan yang mau kamu ubah');
+    if (t === 'ganti') toast(tr('toast.armEdit'));
   });
 }
 
@@ -1554,7 +1555,7 @@ async function smartReplace(pageId, x, y) {
   // page here in the first place.
   if (ocrIndex.hasLines(pageId)) {
     const ocrLine = ocrIndex.hitTest(pageId, x, y);
-    if (!ocrLine) { tel('ganti_tap', { hit: false }); toast('Nggak kena tulisan, tap tepat di teksnya ya'); return; }
+    if (!ocrLine) { tel('ganti_tap', { hit: false }); toast(tr('toast.missedText')); return; }
     tel('ganti_tap', { hit: true });
     ocrReplace(pageId, ocrLine);
     return;
@@ -1573,7 +1574,7 @@ async function smartReplace(pageId, x, y) {
       track('ganti_no_text_layer');
       showScanOffer(pageId);
     } else {
-      toast('Nggak kena tulisan, tap tepat di teksnya ya');
+      toast(tr('toast.missedText'));
     }
     return;
   }
@@ -1780,7 +1781,7 @@ async function runOcrOnPage(pageId) {
       // is the split that makes the duration number readable at all.
       engine_cached: engineWasCached,
     });
-    if (lines.length === 0) { toast('Nggak ada tulisan yang kebaca'); return; }
+    if (lines.length === 0) { toast(tr('toast.noReadableText')); return; }
     armOcrTap(pageId);
   } catch (err) {
     hideProcessing();
@@ -1796,7 +1797,7 @@ async function runOcrOnPage(pageId) {
     // error is pure added signal.
     tel('failure', { stage: 'ocr', reason: failureReason(err), class: 'none', blocked: true });
     tel('failure_cause', { stage: 'ocr', ...failureCause(err) });
-    toast('Gagal scan, coba lagi ya');
+    toast(tr('toast.scanFailed'));
   }
 }
 
@@ -1807,7 +1808,7 @@ async function runOcrOnPage(pageId) {
 // exists to keep.
 function armOcrTap() {
   setTool('ganti');
-  toast('Tap tulisan yang mau diubah');
+  toast(tr('toast.armEditShort'));
 }
 
 // ---- Ganti Teks steering highlight (press→steer→release-commit, 2026-07-19) ------
@@ -1902,7 +1903,7 @@ on('btn-delete-anno', 'click', () => {
   // outcome, and `tool_use`/hapus/delete already reports it.
   tel('tool_use', { tool: 'hapus', action: 'arm' });
   setTool('delete');
-  toast('Pilih objek yang mau dihapus');
+  toast(tr('toast.pickObject'));
 });
 
 // ---- Tip-Ex color matching -------------------------------------------------------
@@ -2111,7 +2112,7 @@ const pageManager = createPageManager({
   onExtract: async (pages) => {
     // Export ONLY the selected pages: a shallow Doc sharing the same sources.
     try {
-      toast('Sebentar, lagi disiapkan');
+      toast(tr('toast.preparing'));
       const { buildPdfArtifact } = await import('./pdf-builder.js');
       const subset = { sources: doc.sources, pages, selection: { pageId: null, annotationId: null } };
       // Same font-fallback witness the Unduh sheet carries (download-sheet.js,
@@ -2122,14 +2123,14 @@ const pageManager = createPageManager({
       download(new Blob([bytes], { type: 'application/pdf' }), `${baseName}-halaman-${pages.length}.pdf`);
       if (fontFallback) {
         // Ratified by Fauzan 2026-08-14 (PM STATE.md "RATIFIED 2026-08-14").
-        toast('Sebagian teks memakai font pengganti yang mirip di file hasil');
+        toast(tr('toast.fontSubstituteResult'));
         tel('failure', { stage: 'export', reason: 'font-fallback', class: 'none', blocked: false });
       } else {
-        toast(`Selesai! ${pages.length} halaman diekstrak jadi PDF baru`);
+        toast(tr('toast.extractDone', { count: pages.length }));
       }
     } catch (err) {
       console.error(err);
-      toast('Waduh, gagal mengekstrak. Coba sekali lagi ya');
+      toast(tr('toast.extractFailed'));
     }
   },
   toast,
@@ -2350,7 +2351,7 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
         // program + an exact metric clone routed = nothing real was
         // substituted — silent. See prepareDocFont for the fields' WHY.
         const nameOnlyClone = d.fontUnembedded && d.cloneRouted;
-        if (!covered && !nameOnlyClone) toast('Huruf ini memakai font pengganti yang mirip');
+        if (!covered && !nameOnlyClone) toast(tr('toast.fontSubstituteChar'));
         // font_path is 'doc-font' only when the document's OWN font paints
         // this — a name-only clone is still a substitute, so it reads as
         // 'twin' (the schema's font_path enum has no separate 'clone' value).
@@ -2599,13 +2600,13 @@ const signatureModal = createSignatureModal({
       found.anno.image = sig.dataUrl;
       found.anno.height = found.anno.width * (sig.height / sig.width);
       rebuildStage();
-      toast('Tanda tangan diganti');
+      toast(tr('toast.signatureReplaced'));
       return;
     }
     setTool('signature');
     toast(sig.subtype === 'paraf'
-      ? 'Pilih tempat untuk menempatkan paraf'
-      : 'Pilih tempat untuk menempatkan tanda tangan');
+      ? tr('toast.armInitials')
+      : tr('toast.armSignature'));
   },
 });
 
@@ -2632,8 +2633,8 @@ function syncSigBar() {
   allBtn.style.display = found && doc.pages.length > 1 ? '' : 'none';
   redrawBtn.style.display = (armed || found) ? '' : 'none';
   document.getElementById('sig-bar-label').textContent = found
-    ? (found.anno.subtype === 'paraf' ? 'Paraf terpilih' : 'Tanda tangan terpilih')
-    : (armed ? 'Pilih tempat untuk menempatkan' : '');
+    ? (found.anno.subtype === 'paraf' ? tr('sigBar.initialsSelected') : tr('sigBar.signatureSelected'))
+    : (armed ? tr('sigBar.armed') : '');
 }
 on('btn-redraw-sig', 'click', () => signatureModal.open());
 
@@ -2652,7 +2653,7 @@ on('btn-all-pages', 'click', () => {
     }));
   }
   rebuildStage();
-  toast(`Oke, ditaruh di ${doc.pages.length - 1} halaman lainnya juga`);
+  toast(tr('toast.signatureCopied', { count: doc.pages.length - 1 }));
 });
 
 // ---- delete / undo / redo ------------------------------------------------------------
@@ -2740,7 +2741,7 @@ const SIZE_BLOCK = 100 * 1024 * 1024;
 let loadingFiles = false; // re-entry guard: double-taps and rapid picks interleave imports
 
 async function loadFiles(files) {
-  if (loadingFiles) { toast('Sebentar ya, file sebelumnya masih dimuat'); return; }
+  if (loadingFiles) { toast(tr('toast.stillLoading')); return; }
   // A fresh document (first load / after Buka Baru) is a new editing session —
   // the beta feedback may be asked again. A merge-add into an open doc doesn't reset.
   if (doc.pages.length === 0) resetEditFeedback();
@@ -2758,9 +2759,9 @@ async function loadFilesInner(files) {
   const isImg = (f) => f.type.startsWith('image/');
   // In picker order: PDFs append their pages, images become one page each.
   const usable = [...files].filter((f) => isPdf(f) || isImg(f));
-  if (usable.length === 0) { toast('Pilih file PDF atau gambar ya'); return; }
+  if (usable.length === 0) { toast(tr('toast.pickFile')); return; }
   const oversize = usable.find((f) => f.size > SIZE_BLOCK);
-  if (oversize) { toast(`"${oversize.name}" terlalu besar (maks 100MB)`); return; }
+  if (oversize) { toast(tr('toast.tooBig', { name: oversize.name })); return; }
   const pagesBefore = doc.pages.length;
   const firstLoad = pagesBefore === 0;
   if (firstLoad) baseName = usable[0].name.replace(/\.[^.]+$/, '');
@@ -2807,7 +2808,7 @@ async function loadFilesInner(files) {
         //
         // COPY IS PLACEHOLDER — client-facing words are Fauzan's, per the seat.
         if (doc.sources.at(-1)?.encrypted) {
-          toast('PDF ini terkunci, bisa dibaca, tapi nggak bisa disimpan ulang'); // TODO(copy): his words
+          toast(tr('toast.lockedReadOnly')); // TODO(copy): his words
           // blocked:FALSE — this file OPENED and is fully editable. It shares
           // its stage and reason with the genuine decline further down (the
           // file that could not be opened at all), and until 2026-08-09 the
@@ -2896,10 +2897,10 @@ async function loadFilesInner(files) {
   if (doc.pages.length === 0) {
     const singleLocked = usable.length === 1 && lastFailureReason === 'encrypted';
     toast(singleLocked
-      ? 'File itu dikunci sandi, jadi nggak bisa dibuka di sini'
+      ? tr('toast.openLocked')
       : usable.length === 1
-        ? 'File itu nggak bisa dibuka, mungkin kosong atau rusak'
-        : 'Nggak ada file yang bisa dibuka, mungkin kosong atau rusak');
+        ? tr('toast.openFailedOne')
+        : tr('toast.openFailedAll'));
     return;
   }
 
@@ -2942,9 +2943,9 @@ async function loadFilesInner(files) {
   // Honest close-out: skips take priority over the merge tally — the user needs to
   // know something was left out more than they need the count.
   if (failed > 0) {
-    toast(`${failed} file dilewati, kosong atau rusak`);
+    toast(tr('toast.skipped', { count: failed }));
   } else if (!firstLoad) {
-    toast(`Dijepit jadi satu, sekarang ${doc.pages.length} halaman`);
+    toast(tr('toast.merged', { count: doc.pages.length }));
   }
   // If the Halaman sheet triggered this add, refresh its grid in place.
   if (document.getElementById('pm-sheet').open) pageManager.render();
@@ -2975,13 +2976,13 @@ function applyIntent(intent) {
     // opens to make one; otherwise arm placement.
     if (!storedSignature) { signatureModal.open(); return; }
     setTool('signature');
-    toast('Pilih tempat untuk menempatkan tanda tangan');
+    toast(tr('toast.armSignature'));
   } else if (intent === 'teks') {
     setTool('text');
-    toast('Pilih tempat untuk menulis');
+    toast(tr('toast.armText'));
   } else if (intent === 'tipex') {
     setTool('whiteout');
-    toast('Seret di halaman untuk menutup teks');
+    toast(tr('toast.armWhiteout'));
   } else if (intent === 'kompres') {
     // /kompres-pdf-500kb declares <body data-intent="kompres" data-target="500000">.
     // The sheet validates it against its own TARGETS list, so a junk value just
@@ -2991,7 +2992,7 @@ function applyIntent(intent) {
   }
   else if (intent === 'gambar') downloadSheet.open({ format: 'img' });
   else if (intent === 'split' || intent === 'halaman') pageManager.open();
-  else if (intent === 'gabung') toast('Tambah file lainnya lewat menu File di kiri atas');
+  else if (intent === 'gabung') toast(tr('toast.addMoreFiles'));
 }
 
 const fileInput = document.getElementById('file-input');
@@ -3064,7 +3065,7 @@ on(lihatBtn, 'click', () => {
   const open = moreGrid.hidden;
   moreGrid.hidden = !open;
   lihatBtn.setAttribute('aria-expanded', String(open));
-  lihatBtn.firstChild.textContent = open ? 'Sembunyikan' : 'Lihat semua alat';
+  lihatBtn.firstChild.textContent = open ? tr('landing.hideTools') : tr('landing.showTools');
 });
 
 // Mobile navbar burger — Github / Dukung / Bahasa live behind it below 900px.
@@ -3166,7 +3167,7 @@ on(fileInput, 'change', async (e) => {
   const files = e.target.files;
   if (files?.length) {
     if (pendingReplace) await resetDoc();
-    await loadFiles(files).catch((err) => { console.error(err); toast('Gagal membuka file'); });
+    await loadFiles(files).catch((err) => { console.error(err); toast(tr('toast.openFailed')); });
   }
   pendingReplace = false; // picker cancelled → nothing was destroyed
   fileInput.value = '';
@@ -3333,7 +3334,7 @@ window.v2 = {
 // QUERY over the sequence, which per-event timestamps now make answerable.
 function showScanOffer(pageId) {
   const dlg = document.getElementById('scan-offer');
-  if (!dlg) { toast('Halaman ini hasil scan/foto, teksnya belum bisa diedit'); return; }
+  if (!dlg) { toast(tr('toast.scanNotEditable')); return; }
   // The arm-toast from arming Ganti is still on screen and says the opposite of
   // what this sheet says. One message at a time.
   hideToast();
