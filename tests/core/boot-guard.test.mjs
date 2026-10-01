@@ -37,10 +37,10 @@ import {
   ROOT, PAGES, MARKER, APP_SCRIPT, guardOf, runGuard, SKEW_MESSAGES,
 } from './boot-guard-harness.mjs';
 
-test('1. all 13 app-loading pages carry exactly one boot guard, byte-identical', () => {
+test('1. all 14 app-loading pages carry exactly one boot guard, byte-identical', () => {
   // VACUITY GUARD: an empty page list would make every loop below pass having
   // checked nothing.
-  assert.equal(PAGES.length, 13, `expected 13 app-loading pages (landing + 12), got ${PAGES.length}`);
+  assert.equal(PAGES.length, 14, `expected 14 app-loading pages (landing + /en + 12), got ${PAGES.length}`);
 
   for (const file of PAGES) {
     const html = fs.readFileSync(path.join(ROOT, file), 'utf8');

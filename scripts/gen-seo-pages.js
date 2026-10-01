@@ -42,6 +42,7 @@ import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname } from 'node:path';
+import { renderEnPage, EN_PATH, EN_FILE } from './gen-en-page.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -275,6 +276,16 @@ for (const page of data.pages) {
     if (left.length !== 1) throw new Error(`gen-seo-pages: ${page.slug}.html has ${left.length} ld+json blocks in <head>, expected exactly 1. The page's schema must match its own visible content, never the homepage's.`);
   }
 
+  // ⚠️ HREFLANG IS NOT INHERITED. index.html is `/`, and carries the id/en/x-default
+  // set because it IS one half of that pair. These 12 pages have no English twin,
+  // so a copy of the set would declare `/` and `/en` as THEIR alternates (the
+  // FAQPage defect again: structured claims that are not this page's). Strip the
+  // block, shout if it was not there, and shout if any survives.
+  html = sub(html, /[ \t]*<link rel="alternate" hreflang="[^"]*" href="[^"]*">\n/g, '', 'hreflang links');
+  if (/hreflang=/.test(html.slice(0, html.indexOf('</head>')).replace(/<!--[\s\S]*?-->/g, ''))) {
+    throw new Error(`gen-seo-pages: ${page.slug}.html still carries hreflang. Only / and ${EN_PATH} may declare it.`);
+  }
+
   // The intent hook: app.js reads document.body.dataset.intent, so landing on
   // /kompres-pdf and dropping a file opens the compress sheet with no click.
   // NOTE: append the attribute, never rebuild the tag, index.html's <body> carries
@@ -421,10 +432,21 @@ for (const page of data.pages) {
   if (!CHECK) console.log(`  ✓ ${page.slug}.html  (${words} words of body copy)`);
 }
 
+// ---- the English editor (/en) ----------------------------------------------
+// One extra stage, same rules: committed output, `--check` compares it. The map
+// lives in i18n/markup.en.json; scripts/gen-en-page.js says what it throws on.
+{
+  const map = JSON.parse(readFileSync(join(ROOT, 'i18n/markup.en.json'), 'utf8'));
+  if (!CHECK) mkdirSync(join(ROOT, 'en'), { recursive: true });
+  emit(EN_FILE, renderEnPage(template, map, { origin }));
+  if (!CHECK) console.log(`  ✓ ${EN_FILE}  (${Object.keys(map).length} strings from i18n/markup.en.json)`);
+}
+
 // ---- sitemap ---------------------------------------------------------------
 // alat-gambar.html and lab.html are absent on purpose: both are noindex.
 const urls = [
   { loc: `${origin}/`, priority: '1.0', changefreq: 'weekly' },
+  { loc: `${origin}${EN_PATH}`, priority: '0.8', changefreq: 'monthly' },
   ...data.pages.map((p) => ({ loc: `${origin}/${p.slug}`, priority: '0.9', changefreq: 'monthly' })),
   { loc: `${origin}/privasi.html`, priority: '0.3', changefreq: 'yearly' },
   { loc: `${origin}/dukung.html`, priority: '0.3', changefreq: 'yearly' },

@@ -19,7 +19,7 @@ export const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '../
 
 // The pages that load js/v2/app.js — the landing plus the 12 generated tool
 // pages, which inherit index.html's head verbatim through the generator.
-export const PAGES = ['index.html', ...JSON.parse(fs.readFileSync(path.join(ROOT, 'seo/pages.json'), 'utf8'))
+export const PAGES = ['index.html', 'en/index.html', ...JSON.parse(fs.readFileSync(path.join(ROOT, 'seo/pages.json'), 'utf8'))
   .pages.map((p) => `${p.slug}.html`)];
 
 export const MARKER = 'pdflokal_boot_healed';

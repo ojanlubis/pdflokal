@@ -192,10 +192,10 @@ test('8. an unrelated error is NOT reported — the beacon must not become a gen
   assert.deepEqual(g.calls.beacons, [], 'the guard still reports after window load');
 });
 
-test('9. the emitter is in all 13 pages, byte-identical — the rail must not see only the landing', () => {
+test('9. the emitter is in all 14 pages, byte-identical — the rail must not see only the landing', () => {
   const bodies = JSON.parse(fs.readFileSync(path.join(ROOT, 'seo/pages.json'), 'utf8'))
     .pages.map((p) => `${p.slug}.html`);
-  for (const file of ['index.html', ...bodies]) {
+  for (const file of ['index.html', 'en/index.html', ...bodies]) {
     const g = guardOf(file);
     assert.equal(g.length, 1, `${file} carries ${g.length} boot guards`);
     assert.ok(g[0].includes('boot_failure'), `${file}'s boot guard sends no boot_failure event. Run \`npm run seo\`.`);

@@ -26,7 +26,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
 const SLUGS = JSON.parse(read('seo/pages.json')).pages.map((p) => p.slug);
-const SHELL_PAGES = ['index.html', ...SLUGS.map((s) => `${s}.html`)];
+const SHELL_PAGES = ['index.html', 'en/index.html', ...SLUGS.map((s) => `${s}.html`)];
 
 const ABSOLUTE = /^(?:\/|#|[a-z][a-z0-9+.-]*:|$)/i; // root-absolute, fragment, or has a scheme
 const moves = (ref) => new URL(ref, 'https://h/en/').pathname !== new URL(ref, 'https://h/').pathname;
@@ -77,7 +77,7 @@ test('0. the detectors flag a relative reference and pass an absolute one', () =
 });
 
 test('1. no shell page carries a document-relative asset reference', () => {
-  assert.equal(SHELL_PAGES.length, 13, `expected 13 shell pages, got ${SHELL_PAGES.length}`);
+  assert.equal(SHELL_PAGES.length, 14, `expected 14 shell pages (landing + /en + 12), got ${SHELL_PAGES.length}`);
   const bad = [];
   for (const f of SHELL_PAGES) {
     const refs = markupRefs(read(f));
