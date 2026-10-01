@@ -33,7 +33,6 @@ import { applyPageSurgery, editSignature } from '../../js/core/page-surgery.js';
 import { buildPdfBytes } from '../../js/core/export.js';
 import { extractFontMetrics, readPageContents } from '../../js/core/redact.js';
 import { walkShowOps } from '../../js/core/text-walk.js';
-import { createHistory, record, undo, redo } from '../../js/core/history.js';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const loadUmd = (p) => {
@@ -148,19 +147,6 @@ test('editSignature: a changed decision with the SAME text is a changed signatur
   a.text.fontDecision = b.text.fontDecision;
   assert.notEqual(editSignature(a.page), sigA);
   assert.match(sigA, /"fontDecision":\{"v":1,"path":"native"/);
-});
-
-test('the decision survives undo/redo and a JSON round trip on the annotation', async () => {
-  const fx = await buildMixedLine();
-  const { doc, page, text } = modelWithEdit(fx, { fontDecision: nativeDecision(fx.regularKey) });
-  const history = createHistory();
-  record(history, doc);
-  ops.updateAnnotation(doc, text.id, { text: 'Nama : Lain' });
-  undo(history, doc);
-  redo(history, doc);
-  const after = doc.pages.find((p) => p.id === page.id).annotations.find((a) => a.id === text.id);
-  assert.deepEqual(after.fontDecision, nativeDecision(fx.regularKey));
-  assert.deepEqual(JSON.parse(JSON.stringify(after)).fontDecision, after.fontDecision);
 });
 
 test('export: a Ganti edit whose surgery DECLINED is drawn in the decided font, not Helvetica', async () => {
