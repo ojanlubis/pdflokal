@@ -217,3 +217,24 @@ test('sentry-init: a commit-bake error never uploads a replay; any other error s
   assert.match(src, /replaysSessionSampleRate: 0\.10,/);
   assert.match(src, /replaysOnErrorSampleRate: 1\.0,/);
 });
+
+// Seat review 2026-10-01: the report used to run UNGUARDED and BEFORE the
+// state reset. A throwing onBakeFailure (e.g. a key computation that trips on
+// the same malformed page that broke the build) then rejected the provider and
+// left the previous bake's editApplied/editOutcomes standing — rasterization
+// broken by its own error witness.
+test('a build throw AND a throwing onBakeFailure still resolve to null with state reset', async () => {
+  const provider = createEditedPageProvider({
+    getSource: () => ({ id: 's1' }),
+    loadPdfLib: async () => ({ PDFLib: {}, fontkit: {} }),
+    getSrcDoc: async () => ({}),
+    build: async () => { throw new RangeError('bake'); },
+    onBakeFailure: () => { throw new TypeError('reporter'); },
+  });
+  const page = editedPage();
+  page.editApplied = new Set(['stale']);
+  page.editOutcomes = [{ coverId: 'stale' }];
+  assert.equal(await provider(page), null);
+  assert.equal(page.editApplied, null, 'stale applied set must not survive a failed bake');
+  assert.equal(page.editOutcomes, null, 'stale outcomes must not survive a failed bake');
+});

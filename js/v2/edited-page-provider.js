@@ -61,9 +61,12 @@ export function createEditedPageProvider({
       // and simply fires nothing, which is exactly how 4 sessions lost every
       // download with the rail silent until export. onBakeFailure dedupes per
       // edit signature, so a re-render of the same broken state is one report.
-      onBakeFailure(err, page);
+      // State first, report second, report GUARDED: the fallback must hold
+      // even when the reporter cannot (a malformed page that made the build
+      // throw can make the reporter's own key computation throw too).
       page.editApplied = null;
       page.editOutcomes = null;
+      try { onBakeFailure(err, page); } catch { /* reporting never breaks the fallback */ }
       return null;
     }
   };

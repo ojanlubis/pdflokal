@@ -898,7 +898,11 @@ const editedPageProvider = createEditedPageProvider({
     // The SCRUBBED error, not `err`: Sentry turns console calls into
     // breadcrumbs, and a raw message can quote the document (bake-failure.js).
     console.warn('editedPageProvider gagal, pakai raster asli:', scrubbedError(err));
-    reportBakeFailure(err, `${page.id}:${editSignature(page)}`);
+    // The key must not throw: the page that broke the build may be the very
+    // thing editSignature cannot read.
+    let sig = '?';
+    try { sig = editSignature(page); } catch { /* keep '?' */ }
+    reportBakeFailure(err, `${page.id}:${sig}`);
   },
 });
 
