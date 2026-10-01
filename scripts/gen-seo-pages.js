@@ -398,7 +398,7 @@ for (const page of data.pages) {
     ['the landing container (#empty)', /id="empty"/],
     ['the landing wrapper (.ld)', /<div class="ld">/],
     ['the dropzone', /class="dropzone"/],
-    ['the app module script', /<script type="module" src="js\/v2\/app\.js">/],
+    ['the app module script', /<script type="module" src="\/js\/v2\/app\.js">/],
   ];
   /*
    * ⚠️ PRESENCE IS NOT LANDING, and this is the assertion whose absence let the

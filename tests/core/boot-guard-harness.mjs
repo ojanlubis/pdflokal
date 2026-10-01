@@ -30,7 +30,7 @@ export const MARKER = 'pdflokal_boot_healed';
 // script that catches it, and this harness's first draft failed a correct page for
 // it. Same scar the SEO generator carries (see gen-seo-pages.js's split note):
 // an anchor that also occurs as prose is not an anchor.
-export const APP_SCRIPT = /<script type="module" src="js\/v2\/app\.js">/;
+export const APP_SCRIPT = /<script type="module" src="\/js\/v2\/app\.js">/;
 
 // Lift the snippet BODY out of a page. Deliberately not one giant regex, for the
 // same reason: splitting on the tags and selecting by marker cannot pick up a
