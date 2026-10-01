@@ -3294,7 +3294,9 @@ on('hc-cancel', 'click', () => {
   document.getElementById('home-confirm').close();
 });
 on('hc-go', 'click', () => {
-  window.location.assign('/');
+  // The wordmark's own href is this page's home ('/' or '/en'), so /en does not
+  // send an English reader to the Indonesian page.
+  window.location.assign(document.querySelector('a.ld-mark')?.getAttribute('href') || '/');
 });
 
 // ---- Android back button: closes the open sheet OR asks before leaving, never

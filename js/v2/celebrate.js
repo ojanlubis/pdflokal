@@ -33,7 +33,9 @@ const LAST_SHOWN_KEY = 'pdflokal-support-last';
 // GA4's Direct beside people who typed the address — the card's reach was
 // invisible. utm_medium=referral puts these arrivals in GA4's Referral
 // channel as source "share", instead of Unassigned.
-const SHARE_URL = 'https://www.pdflokal.id/?utm_source=share&utm_medium=referral';
+// The link follows the page's language: an English share text must not land a
+// friend on the Indonesian page. Read at share time, like shareText().
+const shareUrl = () => `https://www.pdflokal.id${document.documentElement.lang === 'en' ? '/en' : '/'}?utm_source=share&utm_medium=referral`;
 // Written the way a friend would actually send it, not like a brochure.
 // Read at share time (shareText()), in the page's language, never frozen at import.
 const shareText = () => tr('celebrate.shareText');
@@ -175,10 +177,10 @@ export function createCelebration(deps) {
     track('share_tap', { method });
     try {
       if (navigator.share) {
-        await navigator.share({ title: 'PDFLokal', text: shareText(), url: SHARE_URL });
+        await navigator.share({ title: 'PDFLokal', text: shareText(), url: shareUrl() });
         hide();
       } else {
-        await navigator.clipboard.writeText(`${shareText()} ${SHARE_URL}`);
+        await navigator.clipboard.writeText(`${shareText()} ${shareUrl()}`);
         deps.toast(tr('celebrate.copiedToast'));
         hide();
       }
@@ -186,7 +188,10 @@ export function createCelebration(deps) {
     } catch { /* user cancelled the share sheet; keep the card, no nagging */ }
   });
 
-  card.querySelector('#sc-donate').addEventListener('click', () => {
+  // /en ships without the donate button and the QR (the money rail is Indonesian-
+  // only), so the element may legitimately be absent. Optional chaining, not a guard
+  // on the language: the markup is the single source of what the page offers.
+  card.querySelector('#sc-donate')?.addEventListener('click', () => {
     // Reveal the QR INLINE, never leave the editor (founder-locked).
     card.classList.add('qr-open');
   });
