@@ -191,7 +191,7 @@ gated on a worktree branch while `main` sat behind it would have shipped nothing
   or anything touching fonts, rendering or measurement.
 - **Before writing any durable fact, check whether it is already on disk** — if it is, update it
   there. Do not create a second copy; two copies of one rule drift, and the wrong one gets read.
-- `docs/security.md` (CSP, headers, libraries) · `docs/strengths.md` (why vanilla, why no framework).
+- `docs/security.md` — CSP directives and why, the server surface, the worker-console trap.
 
 ## `.mcp.json` is project-scoped, and that is load-bearing
 
