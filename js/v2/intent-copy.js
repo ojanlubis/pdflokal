@@ -30,68 +30,73 @@
  * field is optional and falls back to the markup.
  */
 
-// Keys map to the intents in app.js applyIntent() / the landing cards' data-intent.
-export const INTENT_COPY = {
-  gabung: {
-    dzTitle: 'Seret semua PDF yang mau digabung',
-    dzHint: 'Boleh banyak file sekaligus, urutannya bisa diatur setelah ini',
-    pmTitle: 'Atur Urutan',
-    pmHint: 'Tahan lalu geser buat mengurutkan · buang halaman yang nggak perlu',
-  },
+import { t as tr } from '../lib/i18n.js';
 
-  split: {
-    dzTitle: 'Seret PDF yang mau dipisah',
-    dzHint: 'Habis ini kamu tinggal centang halaman yang mau diambil',
-    pmTitle: 'Pilih Halaman',
-    pmHint: 'Centang halaman yang mau dipisah jadi file PDF baru',
+// Keys map to the intents in app.js applyIntent() / the landing cards' data-intent.
+// Each intent is a function so the copy is read at apply time, in the page's
+// language, never frozen at import. The words live in js/locales/*.js under
+// intent.<intent>.<field>.
+export const INTENT_COPY = {
+  gabung: () => ({
+    dzTitle: tr('intent.gabung.dzTitle'),
+    dzHint: tr('intent.gabung.dzHint'),
+    pmTitle: tr('intent.gabung.pmTitle'),
+    pmHint: tr('intent.gabung.pmHint'),
+  }),
+
+  split: () => ({
+    dzTitle: tr('intent.split.dzTitle'),
+    dzHint: tr('intent.split.dzHint'),
+    pmTitle: tr('intent.split.pmTitle'),
+    pmHint: tr('intent.split.pmHint'),
     // THE one that mattered: "Ekstrak" never said "pisah" to someone who came to
     // split. Same action, the user's word.
-    extract: 'Pisah',
-  },
+    extract: tr('intent.split.extract'),
+  }),
 
-  halaman: {
-    dzTitle: 'Seret PDF yang halamannya mau dirapikan',
-    dzHint: 'Buang halaman kosong, urutkan ulang, putar yang miring',
-    pmTitle: 'Kelola Halaman',
-    pmHint: 'Centang halaman yang mau dibuang',
-  },
+  halaman: () => ({
+    dzTitle: tr('intent.halaman.dzTitle'),
+    dzHint: tr('intent.halaman.dzHint'),
+    pmTitle: tr('intent.halaman.pmTitle'),
+    pmHint: tr('intent.halaman.pmHint'),
+  }),
 
-  kompres: {
-    dzTitle: 'Seret PDF yang mau dikompres',
-    dzHint: 'Ukuran hasilnya saya tunjukkan sebelum kamu unduh',
-  },
+  kompres: () => ({
+    dzTitle: tr('intent.kompres.dzTitle'),
+    dzHint: tr('intent.kompres.dzHint'),
+  }),
 
-  ttd: {
-    dzTitle: 'Seret PDF yang mau ditandatangani',
-    dzHint: 'Habis ini kamu bisa gambar tanda tangan, atau pakai fotonya',
-  },
+  ttd: () => ({
+    dzTitle: tr('intent.ttd.dzTitle'),
+    dzHint: tr('intent.ttd.dzHint'),
+  }),
 
-  paraf: {
-    dzTitle: 'Seret PDF yang mau diparaf',
-    dzHint: 'Paraf bisa disalin ke semua halaman sekaligus',
-  },
+  paraf: () => ({
+    dzTitle: tr('intent.paraf.dzTitle'),
+    dzHint: tr('intent.paraf.dzHint'),
+  }),
 
-  teks: {
-    dzTitle: 'Seret PDF yang mau ditambahi teks',
-    dzHint: 'Ketuk di mana pun di halaman untuk mulai menulis',
-  },
+  teks: () => ({
+    dzTitle: tr('intent.teks.dzTitle'),
+    dzHint: tr('intent.teks.dzHint'),
+  }),
 
-  tipex: {
-    dzTitle: 'Seret PDF yang tulisannya mau ditutup',
-    dzHint: 'Seret di atas bagian yang salah, seperti tip-ex di kertas',
-  },
+  tipex: () => ({
+    dzTitle: tr('intent.tipex.dzTitle'),
+    dzHint: tr('intent.tipex.dzHint'),
+  }),
 
-  gambar: {
-    dzTitle: 'Seret PDF yang mau diubah jadi gambar',
-    dzHint: 'Tiap halaman jadi satu file JPG atau PNG',
-  },
+  gambar: () => ({
+    dzTitle: tr('intent.gambar.dzTitle'),
+    dzHint: tr('intent.gambar.dzHint'),
+  }),
 
-  foto: {
-    dzTitle: 'Seret foto yang mau dijadikan PDF',
-    dzHint: 'Boleh banyak sekaligus, urutannya bisa diatur setelah ini',
-    pmTitle: 'Atur Urutan',
-    pmHint: 'Tahan lalu geser buat mengurutkan · putar foto yang miring',
-  },
+  foto: () => ({
+    dzTitle: tr('intent.foto.dzTitle'),
+    dzHint: tr('intent.foto.dzHint'),
+    pmTitle: tr('intent.foto.pmTitle'),
+    pmHint: tr('intent.foto.pmHint'),
+  }),
 };
 
 // Set text ONLY when we have an override and the element exists. A missing element
@@ -106,8 +111,9 @@ function say(sel, text) {
 // Re-word the editor around a known job. Safe to call more than once (a tool-card
 // click re-arms a different intent), and safe to call with an unknown/null intent.
 export function applyIntentCopy(intent) {
-  const c = INTENT_COPY[intent];
-  if (!c) return;
+  const build = INTENT_COPY[intent];
+  if (!build) return;
+  const c = build();
 
   say('.dz-title', c.dzTitle);
   say('.dz-hint', c.dzHint);

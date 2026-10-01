@@ -222,5 +222,620 @@
     "src": [
       "js/v2/app.js"
     ]
+  },
+  "sheet.fail.retry": {
+    "text": "Waduh, gagal membuat file. Coba sekali lagi ya",
+    "src": [
+      "js/v2/download-sheet.js"
+    ]
+  },
+  "sheet.fail.encrypted": {
+    "text": "PDF ini terkunci, jadi nggak bisa disimpan ulang",
+    "src": [
+      "js/v2/download-sheet.js"
+    ]
+  },
+  "sheet.fail.corrupt": {
+    "text": "File PDF ini rusak, jadi nggak bisa dibuat ulang",
+    "src": [
+      "js/v2/download-sheet.js"
+    ]
+  },
+  "sheet.fail.unsupported": {
+    "text": "Ada huruf yang nggak bisa disimpan. Cek teks yang kamu tulis ya",
+    "src": [
+      "js/v2/download-sheet.js"
+    ]
+  },
+  "sheet.fail.unknown": {
+    "text": "Waduh, gagal membuat file",
+    "src": [
+      "js/v2/download-sheet.js"
+    ]
+  },
+  "sheet.signedNote": {
+    "text": "Dokumen ini punya meterai atau tanda tangan digital. Kalau disimpan dari sini, segelnya rusak dan dokumen bisa gagal diverifikasi. File aslimu nggak berubah.",
+    "src": [
+      "js/v2/download-sheet.js"
+    ]
+  },
+  "sheet.auto": {
+    "text": "Otomatis",
+    "src": [
+      "js/v2/download-sheet.js"
+    ]
+  },
+  "sheet.compressFailed": {
+    "text": "Kompres gagal, saya pakai ukuran asli ya",
+    "src": [
+      "js/v2/download-sheet.js"
+    ]
+  },
+  "sheet.meta": {
+    "text": "{name}.pdf · {count} hal",
+    "src": [
+      "js/v2/download-sheet.js"
+    ]
+  },
+  "sheet.pagesAll": {
+    "text": "{count} halaman",
+    "src": [
+      "js/v2/download-sheet.js"
+    ]
+  },
+  "sheet.pagesPicked": {
+    "text": "{count} dipilih",
+    "src": [
+      "js/v2/download-sheet.js",
+      "js/v2/page-manager.js"
+    ]
+  },
+  "sheet.stamp.optimal": {
+    "text": "Sudah optimal",
+    "src": [
+      "js/v2/download-sheet.js"
+    ]
+  },
+  "sheet.progress.search": {
+    "text": "Mencari ukuran yang pas… (percobaan {pass})",
+    "src": [
+      "js/v2/download-sheet.js"
+    ]
+  },
+  "sheet.progress.images": {
+    "text": "Menyiapkan gambar {done}/{total}…",
+    "src": [
+      "js/v2/download-sheet.js"
+    ]
+  },
+  "sheet.progress.zip": {
+    "text": "Membungkus jadi ZIP…",
+    "src": [
+      "js/v2/download-sheet.js"
+    ]
+  },
+  "sheet.size.original": {
+    "text": "Asli",
+    "src": [
+      "js/v2/download-sheet.js",
+      "js/v2/edit-feedback.js"
+    ]
+  },
+  "sheet.size.medium": {
+    "text": "Sedang",
+    "src": [
+      "js/v2/download-sheet.js"
+    ]
+  },
+  "sheet.size.small": {
+    "text": "Kecil",
+    "src": [
+      "js/v2/download-sheet.js"
+    ]
+  },
+  "sheet.size.compress": {
+    "text": "Compress",
+    "src": [
+      "js/v2/download-sheet.js"
+    ]
+  },
+  "sheet.size.smaller": {
+    "text": "file lebih kecil",
+    "src": [
+      "js/v2/download-sheet.js"
+    ]
+  },
+  "sheet.size.calculating": {
+    "text": "menghitung…",
+    "src": [
+      "js/v2/download-sheet.js"
+    ],
+    "partOf": true
+  },
+  "sheet.size.optimal": {
+    "text": "file sudah optimal",
+    "src": [
+      "js/v2/download-sheet.js"
+    ]
+  },
+  "sheet.size.saved": {
+    "text": "hemat {pct}%",
+    "src": [
+      "js/image-tools.js",
+      "js/v2/download-sheet.js"
+    ],
+    "partOf": true
+  },
+  "sheet.cta.pdf": {
+    "text": "Unduh PDF",
+    "src": [
+      "js/v2/download-sheet.js"
+    ],
+    "partOf": true
+  },
+  "sheet.cta.pages": {
+    "text": "({count} hal.)",
+    "src": [
+      "js/v2/download-sheet.js"
+    ],
+    "partOf": true
+  },
+  "sheet.cta.imageOne": {
+    "text": "Unduh 1 Gambar",
+    "src": [
+      "js/v2/download-sheet.js"
+    ]
+  },
+  "sheet.cta.imageZip": {
+    "text": "Unduh {count} Gambar · ZIP",
+    "src": [
+      "js/v2/download-sheet.js"
+    ]
+  },
+  "sheet.sub.missed": {
+    "text": "paling kecil yang bisa: {size}, belum masuk {cap}. Coba buang halaman yang nggak perlu.",
+    "src": [
+      "js/v2/download-sheet.js"
+    ]
+  },
+  "sheet.sub.fits": {
+    "text": "{size}, muat di bawah {cap}",
+    "src": [
+      "js/v2/download-sheet.js"
+    ]
+  },
+  "sheet.sub.saved": {
+    "text": "hemat {pct}% dari {size}",
+    "src": [
+      "js/v2/download-sheet.js"
+    ]
+  },
+  "sheet.sub.alreadySmallest": {
+    "text": "udah paling kecil, nggak bisa dikompres lagi tanpa merusak",
+    "src": [
+      "js/v2/download-sheet.js"
+    ]
+  },
+  "sheet.sub.originalSize": {
+    "text": "ukuran asli",
+    "src": [
+      "js/v2/download-sheet.js"
+    ]
+  },
+  "sheet.toast.zipDone": {
+    "text": "Selesai! {count} gambar dibungkus jadi satu ZIP",
+    "src": [
+      "js/v2/download-sheet.js"
+    ]
+  },
+  "intent.gabung.dzTitle": {
+    "text": "Seret semua PDF yang mau digabung",
+    "src": [
+      "js/v2/intent-copy.js"
+    ]
+  },
+  "intent.gabung.dzHint": {
+    "text": "Boleh banyak file sekaligus, urutannya bisa diatur setelah ini",
+    "src": [
+      "js/v2/intent-copy.js"
+    ]
+  },
+  "intent.gabung.pmTitle": {
+    "text": "Atur Urutan",
+    "src": [
+      "js/v2/intent-copy.js"
+    ]
+  },
+  "intent.gabung.pmHint": {
+    "text": "Tahan lalu geser buat mengurutkan · buang halaman yang nggak perlu",
+    "src": [
+      "js/v2/intent-copy.js"
+    ]
+  },
+  "intent.split.dzTitle": {
+    "text": "Seret PDF yang mau dipisah",
+    "src": [
+      "js/v2/intent-copy.js"
+    ]
+  },
+  "intent.split.dzHint": {
+    "text": "Habis ini kamu tinggal centang halaman yang mau diambil",
+    "src": [
+      "js/v2/intent-copy.js"
+    ]
+  },
+  "intent.split.pmTitle": {
+    "text": "Pilih Halaman",
+    "src": [
+      "js/v2/intent-copy.js"
+    ]
+  },
+  "intent.split.pmHint": {
+    "text": "Centang halaman yang mau dipisah jadi file PDF baru",
+    "src": [
+      "js/v2/intent-copy.js"
+    ]
+  },
+  "intent.split.extract": {
+    "text": "Pisah",
+    "src": [
+      "js/v2/intent-copy.js"
+    ]
+  },
+  "intent.halaman.dzTitle": {
+    "text": "Seret PDF yang halamannya mau dirapikan",
+    "src": [
+      "js/v2/intent-copy.js"
+    ]
+  },
+  "intent.halaman.dzHint": {
+    "text": "Buang halaman kosong, urutkan ulang, putar yang miring",
+    "src": [
+      "js/v2/intent-copy.js"
+    ]
+  },
+  "intent.halaman.pmTitle": {
+    "text": "Kelola Halaman",
+    "src": [
+      "js/v2/intent-copy.js"
+    ]
+  },
+  "intent.halaman.pmHint": {
+    "text": "Centang halaman yang mau dibuang",
+    "src": [
+      "js/v2/intent-copy.js"
+    ]
+  },
+  "intent.kompres.dzTitle": {
+    "text": "Seret PDF yang mau dikompres",
+    "src": [
+      "js/v2/intent-copy.js"
+    ]
+  },
+  "intent.kompres.dzHint": {
+    "text": "Ukuran hasilnya saya tunjukkan sebelum kamu unduh",
+    "src": [
+      "js/v2/intent-copy.js"
+    ]
+  },
+  "intent.ttd.dzTitle": {
+    "text": "Seret PDF yang mau ditandatangani",
+    "src": [
+      "js/v2/intent-copy.js"
+    ]
+  },
+  "intent.ttd.dzHint": {
+    "text": "Habis ini kamu bisa gambar tanda tangan, atau pakai fotonya",
+    "src": [
+      "js/v2/intent-copy.js"
+    ]
+  },
+  "intent.paraf.dzTitle": {
+    "text": "Seret PDF yang mau diparaf",
+    "src": [
+      "js/v2/intent-copy.js"
+    ]
+  },
+  "intent.paraf.dzHint": {
+    "text": "Paraf bisa disalin ke semua halaman sekaligus",
+    "src": [
+      "js/v2/intent-copy.js"
+    ]
+  },
+  "intent.teks.dzTitle": {
+    "text": "Seret PDF yang mau ditambahi teks",
+    "src": [
+      "js/v2/intent-copy.js"
+    ]
+  },
+  "intent.teks.dzHint": {
+    "text": "Ketuk di mana pun di halaman untuk mulai menulis",
+    "src": [
+      "js/v2/intent-copy.js"
+    ]
+  },
+  "intent.tipex.dzTitle": {
+    "text": "Seret PDF yang tulisannya mau ditutup",
+    "src": [
+      "js/v2/intent-copy.js"
+    ]
+  },
+  "intent.tipex.dzHint": {
+    "text": "Seret di atas bagian yang salah, seperti tip-ex di kertas",
+    "src": [
+      "js/v2/intent-copy.js"
+    ]
+  },
+  "intent.gambar.dzTitle": {
+    "text": "Seret PDF yang mau diubah jadi gambar",
+    "src": [
+      "js/v2/intent-copy.js"
+    ]
+  },
+  "intent.gambar.dzHint": {
+    "text": "Tiap halaman jadi satu file JPG atau PNG",
+    "src": [
+      "js/v2/intent-copy.js"
+    ]
+  },
+  "intent.foto.dzTitle": {
+    "text": "Seret foto yang mau dijadikan PDF",
+    "src": [
+      "js/v2/intent-copy.js"
+    ]
+  },
+  "intent.foto.dzHint": {
+    "text": "Boleh banyak sekaligus, urutannya bisa diatur setelah ini",
+    "src": [
+      "js/v2/intent-copy.js"
+    ]
+  },
+  "intent.foto.pmTitle": {
+    "text": "Atur Urutan",
+    "src": [
+      "js/v2/intent-copy.js"
+    ]
+  },
+  "intent.foto.pmHint": {
+    "text": "Tahan lalu geser buat mengurutkan · putar foto yang miring",
+    "src": [
+      "js/v2/intent-copy.js"
+    ]
+  },
+  "install.chip": {
+    "text": "Install PDFLokal di {where}",
+    "src": [
+      "js/v2/install-prompt.js"
+    ]
+  },
+  "install.cardTitle": {
+    "text": "Install PDFLokal di {where}",
+    "src": [
+      "js/v2/install-prompt.js"
+    ]
+  },
+  "install.cardSub": {
+    "text": "Biar besok nggak usah nyari lagi, langsung ada di {screen}, tetap jalan walau lagi offline.",
+    "src": [
+      "js/v2/install-prompt.js"
+    ]
+  },
+  "install.device.mobile": {
+    "text": "hapemu",
+    "src": [
+      "js/v2/install-prompt.js"
+    ]
+  },
+  "install.device.desktop": {
+    "text": "komputermu",
+    "src": [
+      "js/v2/install-prompt.js"
+    ]
+  },
+  "install.screen.mobile": {
+    "text": "layar HP",
+    "src": [
+      "js/v2/install-prompt.js"
+    ]
+  },
+  "install.screen.desktop": {
+    "text": "desktop",
+    "src": [
+      "js/v2/install-prompt.js"
+    ]
+  },
+  "install.guideLang": {
+    "text": "id",
+    "src": [
+      "js/v2/install-prompt.js"
+    ],
+    "partOf": true
+  },
+  "install.ios.title": {
+    "text": "Caranya di iPhone/iPad:",
+    "src": [
+      "js/v2/install-prompt.js"
+    ]
+  },
+  "install.ios.steps": {
+    "text": [
+      "Tap ikon Share (kotak dengan panah ke atas) di bawah.",
+      "Scroll ke bawah, tap “Add to Home Screen”.",
+      "Tap “Add” di kanan atas."
+    ],
+    "src": [
+      "js/v2/install-prompt.js"
+    ]
+  },
+  "install.androidFirefox.title": {
+    "text": "Caranya di Firefox:",
+    "src": [
+      "js/v2/install-prompt.js"
+    ]
+  },
+  "install.androidFirefox.steps": {
+    "text": [
+      "Tap menu titik-tiga di kanan atas.",
+      "Pilih “Install”."
+    ],
+    "src": [
+      "js/v2/install-prompt.js"
+    ]
+  },
+  "install.androidSamsung.title": {
+    "text": "Caranya di Samsung Internet:",
+    "src": [
+      "js/v2/install-prompt.js"
+    ]
+  },
+  "install.androidSamsung.steps": {
+    "text": [
+      "Tap menu di bawah.",
+      "Pilih “Add page to” → “Home screen”."
+    ],
+    "src": [
+      "js/v2/install-prompt.js"
+    ]
+  },
+  "install.androidChrome.title": {
+    "text": "Caranya di Chrome:",
+    "src": [
+      "js/v2/install-prompt.js"
+    ]
+  },
+  "install.androidChrome.steps": {
+    "text": [
+      "Tap menu titik-tiga di kanan address bar.",
+      "Pilih “Add to Home screen”.",
+      "Tap “Install”."
+    ],
+    "src": [
+      "js/v2/install-prompt.js"
+    ]
+  },
+  "install.desktopChromium.title": {
+    "text": "Caranya di Chrome/Edge:",
+    "src": [
+      "js/v2/install-prompt.js"
+    ]
+  },
+  "install.desktopChromium.steps": {
+    "text": [
+      "Klik ikon Install (layar kecil dengan panah) di ujung kanan address bar, kalau ada.",
+      "Atau: menu titik-tiga → “Cast, save, and share” → “Install page as app…”.",
+      "Klik “Install”."
+    ],
+    "src": [
+      "js/v2/install-prompt.js"
+    ]
+  },
+  "install.desktopSafari.title": {
+    "text": "Caranya di Safari (Mac):",
+    "src": [
+      "js/v2/install-prompt.js"
+    ]
+  },
+  "install.desktopSafari.steps": {
+    "text": [
+      "Dari menu “File”, pilih “Add to Dock”.",
+      "Klik “Add”."
+    ],
+    "src": [
+      "js/v2/install-prompt.js"
+    ]
+  },
+  "install.fallback.title": {
+    "text": "Biar gampang dibuka lagi:",
+    "src": [
+      "js/v2/install-prompt.js"
+    ]
+  },
+  "install.fallback.steps": {
+    "text": [
+      "Tekan Ctrl+D (atau ⌘D) buat bookmark halaman ini.",
+      "Atau buka pdflokal.id lewat Chrome/Edge buat install jadi app."
+    ],
+    "src": [
+      "js/v2/install-prompt.js"
+    ]
+  },
+  "editFeedback.ask": {
+    "text": "Gimana hasil editnya?",
+    "src": [
+      "js/v2/edit-feedback.js"
+    ]
+  },
+  "editFeedback.up": {
+    "text": "Bagus",
+    "src": [
+      "js/v2/edit-feedback.js"
+    ]
+  },
+  "editFeedback.down": {
+    "text": "Kurang pas",
+    "src": [
+      "js/v2/edit-feedback.js"
+    ]
+  },
+  "editFeedback.thanks": {
+    "text": "Makasih, masukanmu ngebantu saya 🙏",
+    "src": [
+      "js/v2/edit-feedback.js"
+    ]
+  },
+  "editFeedback.noteQuestion": {
+    "text": "Apa yang kurang pas?",
+    "src": [
+      "js/v2/edit-feedback.js"
+    ]
+  },
+  "editFeedback.notePlaceholder": {
+    "text": "isi feedback biar kita bisa improve",
+    "src": [
+      "js/v2/edit-feedback.js"
+    ]
+  },
+  "editFeedback.noteLabel": {
+    "text": "Ceritakan apa yang kurang pas",
+    "src": [
+      "js/v2/edit-feedback.js"
+    ]
+  },
+  "editFeedback.askTitle": {
+    "text": "Boleh saya minta dua potongan ini?",
+    "src": [
+      "js/v2/edit-feedback.js"
+    ]
+  },
+  "editFeedback.askSub": {
+    "text": "Sebelum dan sesudahnya, biar saya bisa analisis fiturnya kurang di mana. Nggak ada isi file lain.",
+    "src": [
+      "js/v2/edit-feedback.js"
+    ]
+  },
+  "editFeedback.cropBefore": {
+    "text": "Asli",
+    "src": [
+      "js/v2/download-sheet.js",
+      "js/v2/edit-feedback.js"
+    ]
+  },
+  "editFeedback.cropAfter": {
+    "text": "Hasil",
+    "src": [
+      "js/v2/edit-feedback.js"
+    ]
+  },
+  "editFeedback.skip": {
+    "text": "Nggak usah",
+    "src": [
+      "js/v2/edit-feedback.js"
+    ]
+  },
+  "editFeedback.send": {
+    "text": "Kirim",
+    "src": [
+      "js/v2/edit-feedback.js"
+    ]
   }
 }

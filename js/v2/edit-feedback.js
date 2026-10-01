@@ -34,6 +34,7 @@
  *     never held across edits.
  */
 import { feedback } from './telemetry.js';
+import { t as tr } from '../lib/i18n.js';
 
 const ASK_MS = 7000;   // ignored ask → vanish, no vote recorded
 const NOTE_MS = 25000; // ignored open note box → record the 👎 without a note
@@ -156,7 +157,7 @@ function el(tag, cls, text) {
 
 function renderThanks() {
   clear();
-  body.appendChild(el('span', 'ef-q', 'Makasih, masukanmu ngebantu saya 🙏'));
+  body.appendChild(el('span', 'ef-q', tr('editFeedback.thanks')));
   clearTimer();
   hideTimer = setTimeout(hide, 1700);
 }
@@ -198,25 +199,25 @@ function renderBottom() {
   if (pendingSample) {
     // Founder's copy, VERBATIM — do not improve it (spec-edit-fidelity-
     // instrumentation.md Increment D, decisions.md 2026-07-27).
-    bottomEl.appendChild(el('div', 'ef-ask-q', 'Boleh saya minta dua potongan ini?'));
+    bottomEl.appendChild(el('div', 'ef-ask-q', tr('editFeedback.askTitle')));
     bottomEl.appendChild(el('div', 'ef-ask-sub',
-      'Sebelum dan sesudahnya, biar saya bisa analisis fiturnya kurang di mana. Nggak ada isi file lain.'));
+      tr('editFeedback.askSub')));
     const crops = el('div', 'ef-crops');
-    crops.appendChild(cropRow('Asli', pendingSample.before));
-    crops.appendChild(cropRow('Hasil', pendingSample.after));
+    crops.appendChild(cropRow(tr('editFeedback.cropBefore'), pendingSample.before));
+    crops.appendChild(cropRow(tr('editFeedback.cropAfter'), pendingSample.after));
     bottomEl.appendChild(crops);
     const btns = el('div', 'ef-btnrow');
-    const skip = el('button', 'ef-skip', 'Nggak usah');
+    const skip = el('button', 'ef-skip', tr('editFeedback.skip'));
     skip.type = 'button';
     skip.addEventListener('click', () => submitDown(false));
-    const send = el('button', 'ef-send', 'Kirim');
+    const send = el('button', 'ef-send', tr('editFeedback.send'));
     send.type = 'button';
     send.addEventListener('click', () => submitDown(true));
     btns.appendChild(skip);
     btns.appendChild(send);
     bottomEl.appendChild(btns);
   } else {
-    const send = el('button', 'ef-send', 'Kirim');
+    const send = el('button', 'ef-send', tr('editFeedback.send'));
     send.type = 'button';
     send.addEventListener('click', () => submitDown(false));
     bottomEl.appendChild(send);
@@ -227,14 +228,14 @@ function renderNote() {
   clear();
   const wrap = el('div', 'ef-notewrap');
   const row = el('div', 'ef-row');
-  row.appendChild(el('span', 'ef-q', 'Apa yang kurang pas?'));
+  row.appendChild(el('span', 'ef-q', tr('editFeedback.noteQuestion')));
   const input = el('input', 'ef-note');
   input.type = 'text';
   input.maxLength = NOTE_MAXLEN;
   // Founder ruling 2026-07-22: the placeholder ASKS for the detail, not "boleh
   // kosong" — we want the reason, and telemetry only works if the signal comes.
-  input.placeholder = 'isi feedback biar kita bisa improve';
-  input.setAttribute('aria-label', 'Ceritakan apa yang kurang pas');
+  input.placeholder = tr('editFeedback.notePlaceholder');
+  input.setAttribute('aria-label', tr('editFeedback.noteLabel'));
   row.appendChild(input);
   wrap.appendChild(row);
 
@@ -257,9 +258,9 @@ function renderNote() {
 
 function renderAsk() {
   clear();
-  body.appendChild(el('span', 'ef-q', 'Gimana hasil editnya?'));
+  body.appendChild(el('span', 'ef-q', tr('editFeedback.ask')));
   const up = el('button', 'ef-thumb', '👍');
-  up.type = 'button'; up.setAttribute('aria-label', 'Bagus');
+  up.type = 'button'; up.setAttribute('aria-label', tr('editFeedback.up'));
   up.addEventListener('click', () => {
     if (resolved) return;
     resolved = true;
@@ -268,7 +269,7 @@ function renderAsk() {
     renderThanks();
   });
   const down = el('button', 'ef-thumb', '👎');
-  down.type = 'button'; down.setAttribute('aria-label', 'Kurang pas');
+  down.type = 'button'; down.setAttribute('aria-label', tr('editFeedback.down'));
   down.addEventListener('click', () => { downPending = true; renderNote(); });
   body.appendChild(up);
   body.appendChild(down);
