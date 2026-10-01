@@ -19,6 +19,12 @@
  */
 export const UPDATES = [
   {
+    id: '2026-10-01-edit-paragraf',
+    date: '2026-10-01',
+    text: 'Sekarang kamu bisa edit satu paragraf sekaligus.',
+    approved: true,
+  },
+  {
     id: '2026-10-01-english',
     date: '2026-10-01',
     text: 'PDFLokal sekarang ada versi bahasa Inggris.',
