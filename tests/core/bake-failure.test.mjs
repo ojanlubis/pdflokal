@@ -188,3 +188,32 @@ test('app.js wires the bake-failure reporter into the edited-page provider', asy
   assert.match(body, /reportBakeFailure\(err,/, 'onBakeFailure must call the reporter');
   assert.match(src, /createPageRasterizer\(doc, \{ editedPageProvider \}\)/, 'the rasterizer must use this provider');
 });
+
+// Seat ruling 2026-10-01: a commit-bake capture must NOT trigger the on-error
+// replay upload; every other error keeps it. In the vendored 10.55.0 bundle,
+// replayIntegration calls beforeErrorSampling from its afterSendEvent handler
+// with the SENT event, where captureException's tags sit at event.tags —
+// probed against the bundle, with a normal error as control. This pins the
+// predicate as written in js/sentry-init.js (read from the file, not retyped)
+// against the tag the reporter actually sends.
+test('sentry-init: a commit-bake error never uploads a replay; any other error still does', async () => {
+  const fs = await import('node:fs');
+  const src = fs.readFileSync(new URL('../../js/sentry-init.js', import.meta.url), 'utf8');
+  const m = /beforeErrorSampling:\s*(\(event\)\s*=>[^\n]*?),\s*\n/.exec(src);
+  assert.ok(m, 'replayIntegration must declare beforeErrorSampling');
+  // eslint-disable-next-line no-eval
+  const predicate = (0, eval)(m[1]);
+
+  let sentTags;
+  const report = createBakeFailureReporter({
+    tel: () => {},
+    getSentry: () => ({ withScope: (fn) => fn({ addEventProcessor() {} }), captureException: (e, ctx) => { sentTags = ctx.tags; } }),
+  });
+  report(new RangeError('x'), 'k');
+  assert.equal(predicate({ tags: { ...sentTags, replayId: 'r' } }), false, 'commit-bake must not upload a replay');
+  assert.equal(predicate({ tags: { replayId: 'r' } }), true, 'an ordinary error still uploads');
+  assert.equal(predicate({}), true, 'an untagged error still uploads');
+  // The rest of the replay config is untouched.
+  assert.match(src, /replaysSessionSampleRate: 0\.10,/);
+  assert.match(src, /replaysOnErrorSampleRate: 1\.0,/);
+});
