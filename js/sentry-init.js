@@ -83,6 +83,15 @@ if (window.Sentry) Sentry.init({
       // (page images) and signature images, or replays would record user
       // documents. Privacy first, always.
       block: ['canvas', '.pv-bg', '.pv-anno img', '.pm-thumb', '#sig-preview'],
+      // A commit-time bake failure (js/v2/bake-failure.js, 2026-10-01) is
+      // captured so the next one brings a stack — NOT so it ships a replay.
+      // Those events did not exist before, and an on-error replay upload for
+      // them would be new privacy surface (masking is not a superset). Seat
+      // ruling 2026-10-01: they never trigger the buffered upload. Every other
+      // error keeps replaysOnErrorSampleRate exactly as above. In 10.55.0 this
+      // hook runs in the replay's afterSendEvent handler and receives the sent
+      // event, where the capture's tag sits at event.tags.stage (probed).
+      beforeErrorSampling: (event) => event.tags?.stage !== 'commit-bake',
     }),
   ],
   beforeSend(event) {
