@@ -326,6 +326,14 @@ function distanceToBox(x, y, bx, by, bw, bh) {
   return Math.hypot(x - cx, y - cy);
 }
 
+// The font size a Ganti Teks draft starts with, from the replaced line's own
+// size. The editor accepts 6..120; the size is KEPT FRACTIONAL on purpose: the
+// twin (overlay and export) paints at exactly this size, and rounding 7.395 to
+// 7 made every twin-painted replacement 5% smaller than the line it replaced.
+export function draftFontSize(lineSize) {
+  return Math.min(120, Math.max(6, lineSize));
+}
+
 // Tap → line. `lines` carry display-space { x, y, w, h } top-left boxes in
 // the same frame as the tap point (x, y) — js/v2/text-runs.js's Line[], or
 // any plain objects shaped like one (tests build these directly). `minHit`

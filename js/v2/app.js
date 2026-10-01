@@ -39,7 +39,7 @@ import { RASTER_BASE, sharpenScale, maxPixelsFor } from '../render/sharpen.js';
 import { createInteraction } from '../render/interaction.js';
 import { createFormatBar } from './format-bar.js';
 import { createTextRunIndex, mapRunFont, MIN_HIT } from './text-runs.js';
-import { resolveTap } from '../core/text-lines.js';
+import { resolveTap, draftFontSize } from '../core/text-lines.js';
 import { createPageManager } from './page-manager.js';
 import { createSignatureModal } from './signature-modal.js';
 import { createDownloadSheet } from './download-sheet.js';
@@ -1612,7 +1612,7 @@ async function smartReplace(pageId, x, y) {
   track('editor_action', { action: 'ganti_teks' });
   const draft = {
     text: line.str,
-    fontSize: Math.min(120, Math.max(6, Math.round(line.size))),
+    fontSize: draftFontSize(line.size),
     fontFamily: mapRunFont(line.fontFamily, line.fontName),
     recorded: true,
     // Rung C (core/export.js): pairs the committed TEXT annotation with the

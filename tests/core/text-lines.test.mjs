@@ -8,7 +8,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { groupRunsIntoLines, resolveTap } from '../../js/core/text-lines.js';
+import { groupRunsIntoLines, resolveTap, draftFontSize } from '../../js/core/text-lines.js';
 
 // Build one synthetic run. Horizontal by default (ux=1, uy=0); pass
 // { ux, uy } for other directions. Display fields mirror the pdf geometry
@@ -388,4 +388,27 @@ test('19. empty lines array -> null; tap far from every line -> null', () => {
 
   const line = box(0, 0, 40, 12);
   assert.equal(resolveTap([line], 5000, 5000, minHit), null);
+});
+
+// ---- draftFontSize: the twin must paint at the line's own size ----------------
+
+test('draftFontSize keeps the line\'s fractional size (7.395 must not become 7)', () => {
+  assert.equal(draftFontSize(7.395), 7.395);
+  assert.equal(draftFontSize(11.04), 11.04);
+  assert.equal(draftFontSize(12), 12);
+});
+
+test('draftFontSize still clamps to the editor\'s 6..120 range', () => {
+  assert.equal(draftFontSize(3.2), 6);
+  assert.equal(draftFontSize(5.99), 6);
+  assert.equal(draftFontSize(400), 120);
+});
+
+test('smartReplace builds its draft size through draftFontSize, never a whole-point round', async () => {
+  // app.js cannot be imported headless, so pin the wiring at its source: the
+  // one place a Ganti Teks draft takes its size from the replaced line.
+  const { readFileSync } = await import('node:fs');
+  const app = readFileSync(new URL('../../js/v2/app.js', import.meta.url), 'utf8');
+  assert.match(app, /fontSize: draftFontSize\(line\.size\)/);
+  assert.doesNotMatch(app, /Math\.round\(line\.size\)/);
 });
