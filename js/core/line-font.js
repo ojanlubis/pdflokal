@@ -163,6 +163,10 @@ export function describeCandidate(c) {
   if (c.face != null) out.face = c.face;
   if (c.css != null) out.css = c.css;
   if (c.evidence != null) out.evidence = c.evidence;
+  // The weight/style the face was REGISTERED with in the browser, so CSS can
+  // ask for exactly that face (never a synthesised bold of a regular one).
+  if (c.bold) out.bold = true;
+  if (c.italic) out.italic = true;
   return out;
 }
 

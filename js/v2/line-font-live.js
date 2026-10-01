@@ -19,7 +19,7 @@
  * what the file will contain.
  */
 
-import { acceptLineInput, decideLineFont, faceCssFamily, storedDecision } from '../core/line-font.js';
+import { acceptLineInput, decideLineFont, faceCssFamily, faceStyle, storedDecision } from '../core/line-font.js';
 import { CLONE_FONT_URLS, isSfntFontProgram } from '../core/clone-fonts.js';
 import { applyTextFont } from '../render/page-view.js';
 
@@ -36,11 +36,8 @@ const faceCache = new Map(); // pdf-lib font name -> Promise<{face, css, parsed}
 
 // Load one bundled face ('Carlito-Bold') as BOTH a parsed fontkit program (what
 // decideLineFont judges coverage on) and a FontFace (what the editor paints
-// with), from one fetch of the TTF core/stamp.js embeds. Registered at the
-// default 400/normal descriptors on purpose: every decided element asks for
-// 400/normal (render/page-view.js textFontCss), and a family holding exactly
-// one face can then never be synthesised bolder or slanted. null on any
-// decline — a face that fails to load is simply not offered as a candidate.
+// with), from one fetch of the TTF core/stamp.js embeds. null on any decline —
+// a face that fails to load is simply not offered as a candidate.
 export function loadFaceFont(face, fontkit) {
   const url = CLONE_FONT_URLS[face];
   if (!url || !fontkit || typeof FontFace !== 'function') return Promise.resolve(null);
@@ -62,10 +59,17 @@ export function loadFaceFont(face, fontkit) {
       if (!isSfntFontProgram(bytes)) throw new Error(`${url} is not an sfnt font program`);
       const parsed = fontkit.create(bytes);
       const css = faceCssFamily(face);
-      const ff = new FontFace(css, bytes);
+      // Registered at the face's TRUE weight/style, and every decided element
+      // asks for exactly those (render/page-view.js textFontCss), so CSS
+      // matches the one face present and never synthesises a bolder or
+      // slanted copy of it (applyTextFont also sets font-synthesis:none).
+      const style = faceStyle(face) || { bold: false, italic: false };
+      const ff = new FontFace(css, bytes, {
+        weight: style.bold ? '700' : '400', style: style.italic ? 'italic' : 'normal',
+      });
       await ff.load();
       document.fonts.add(ff);
-      return { face, css, parsed };
+      return { face, css, parsed, bold: style.bold, italic: style.italic };
     })().catch(() => {
       faceCache.delete(face); // a transient failure must not poison later taps
       return null;

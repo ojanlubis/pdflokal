@@ -182,13 +182,17 @@ export function textFontCss(anno) {
   // THE EDIT PRINCIPLE (seat decisions.md 2026-10-01): a decided line renders
   // in exactly ONE family — no stack, so the browser has no second font to
   // fall back to per glyph (the decision already proved this face paints
-  // every char). Always `400 normal`: the face itself IS the weight/style, and
-  // asking for 700 against a regular face would make the browser fake-bold
-  // it — a second font in disguise. applyTextFont below also turns kerning and
+  // every char). Weight/style are the ones the face was REGISTERED with
+  // (carried on the decision), so CSS matches the one face present; asking
+  // for 700 against a regular face would make the browser fake-bold it — a
+  // second font in disguise. applyTextFont below also turns kerning and
   // synthesis off, because pdf-lib's drawText applies neither (it sums raw
   // advances), so the screen must not either.
   const decided = decidedFontFamily(anno);
-  if (decided) return `400 ${anno.fontSize || 24}px "${decided}"`;
+  if (decided) {
+    const d = anno.fontDecision;
+    return `${d.italic ? 'italic ' : ''}${d.bold ? '700 ' : '400 '}${anno.fontSize || 24}px "${decided}"`;
+  }
   const family = FONT_CSS[anno.fontFamily] || FONT_CSS['Helvetica'];
   // Rung C live-font-preview (2026-07-19): a committed Ganti replacement whose
   // draft successfully loaded the document's OWN embedded font (js/v2/app.js's

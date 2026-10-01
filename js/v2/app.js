@@ -1218,7 +1218,13 @@ function loadDocFont(sourceId, fontName, pdfPage, PDFLib, fontkit, facts) {
       // bytes ride along for core/stamp.js's nativeCandidate gates (sfnt +
       // save-time readiness) — the editor may only offer the doc font if the
       // stamp would embed these exact bytes.
-      return { cssFamily, fontkitFont, flavor, bytes: extracted.bytes };
+      // bold/italic: the descriptors this FontFace was REGISTERED with, so a
+      // decided line can ask CSS for exactly that face (render/page-view.js).
+      const descriptors = docFontFaceDescriptors(facts);
+      return {
+        cssFamily, fontkitFont, flavor, bytes: extracted.bytes,
+        bold: descriptors.weight === '700', italic: descriptors.style === 'italic',
+      };
     })().catch(() => null));
   }
   return docFontCache.get(key);
@@ -1414,7 +1420,9 @@ async function prepareDocFont(pageId, line, draft, seed = null) {
       ? seed.ladder.filter((c) => c.path === 'clone' || c.path === 'substitute')
       : faceLadder(fp.ok ? fp : null);
     const facesLoading = Promise.all(faces.map((f) => loadFaceFont(f.face, fontkit)
-      .then((r) => (r ? { path: f.path, face: f.face, evidence: f.evidence, css: r.css, parsed: r.parsed } : null))));
+      .then((r) => (r ? {
+        path: f.path, face: f.face, evidence: f.evidence, css: r.css, parsed: r.parsed, bold: r.bold, italic: r.italic,
+      } : null))));
 
     const result = fontName ? await loadDocFont(page.sourceId, fontName, pdfPage, PDFLib, fontkit, fp) : null;
     // font_seen (spec-telemetry.md §3, widened spec-edit-fidelity-
@@ -1448,6 +1456,7 @@ async function prepareDocFont(pageId, line, draft, seed = null) {
     const native = result
       ? nativeCandidate({ parsed: result.fontkitFont, bytes: result.bytes, key: fontName, css: result.cssFamily })
       : null;
+    if (native) Object.assign(native, { bold: result.bold, italic: result.italic });
     const faceCandidates = await facesLoading;
     // Guard: the draft may have been cancelled/committed already, or a NEWER
     // tap may have replaced it — startLineFont declines a detached editor.
