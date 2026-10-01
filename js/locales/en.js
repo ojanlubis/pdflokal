@@ -72,4 +72,193 @@ export default {
     },
     addMoreFiles: 'Add more files from the File menu, top left',
   },
+
+  sheet: {
+    fail: {
+      retry: "Couldn't create the file. Try again",
+      encrypted: "This PDF is locked, so it can't be saved again",
+      corrupt: "This PDF is damaged, so it can't be rebuilt",
+      unsupported: "Some characters can't be saved. Check the text you wrote",
+      unknown: "Couldn't create the file",
+    },
+    signedNote: "This document has a meterai (Indonesian stamp duty seal) or a digital signature. If you save it from here, the seal breaks and the document may fail verification. Your original file doesn't change.",
+    auto: 'Auto',
+    compressFailed: 'Compress failed, using the original size',
+    meta: {
+      one: '{name}.pdf · {count} page',
+      other: '{name}.pdf · {count} pages',
+    },
+    pagesAll: {
+      one: '{count} page',
+      other: '{count} pages',
+    },
+    pagesPicked: '{count} selected',
+    stamp: { optimal: 'Already optimal' },
+    progress: {
+      search: 'Finding the right size… (attempt {pass})',
+      images: 'Preparing images {done}/{total}…',
+      zip: 'Packing into a ZIP…',
+    },
+    size: {
+      original: 'Original',
+      medium: 'Medium',
+      small: 'Small',
+      compress: 'Compress',
+      smaller: 'smaller file',
+      calculating: 'calculating…',
+      optimal: 'file already optimal',
+      saved: 'saves {pct}%',
+    },
+    cta: {
+      pdf: 'Download PDF',
+      pages: {
+        one: '({count} page)',
+        other: '({count} pages)',
+      },
+      imageOne: 'Download 1 Image',
+      imageZip: 'Download {count} Images · ZIP',
+    },
+    sub: {
+      missed: "smallest possible: {size}, still over {cap}. Try removing pages you don't need.",
+      fits: '{size}, fits under {cap}',
+      saved: 'saves {pct}% of {size}',
+      alreadySmallest: "already as small as it gets, can't be compressed further without damaging it",
+      originalSize: 'original size',
+    },
+    toast: {
+      zipDone: {
+        one: 'Done. {count} image packed into one ZIP',
+        other: 'Done. {count} images packed into one ZIP',
+      },
+    },
+  },
+
+  intent: {
+    gabung: {
+      dzTitle: 'Drag in all the PDFs you want to merge',
+      dzHint: 'Add as many files as you like, you can set the order next',
+      pmTitle: 'Set Order',
+      pmHint: "Hold, then drag to reorder · delete pages you don't need",
+    },
+    split: {
+      dzTitle: 'Drag in the PDF you want to split',
+      dzHint: 'Next, check the pages you want to take',
+      pmTitle: 'Select Pages',
+      pmHint: 'Check the pages you want to split into a new PDF file',
+      extract: 'Split',
+    },
+    halaman: {
+      dzTitle: 'Drag in the PDF whose pages you want to tidy up',
+      dzHint: 'Delete blank pages, reorder, rotate the tilted ones',
+      pmTitle: 'Manage Pages',
+      pmHint: 'Check the pages you want to delete',
+    },
+    kompres: {
+      dzTitle: 'Drag in the PDF you want to compress',
+      dzHint: 'You see the result size before you download',
+    },
+    ttd: {
+      dzTitle: 'Drag in the PDF you want to sign',
+      dzHint: 'Next, you can draw your signature or use a photo of it',
+    },
+    paraf: {
+      dzTitle: 'Drag in the PDF you want to initial',
+      dzHint: 'Initials can be copied to every page at once',
+    },
+    teks: {
+      dzTitle: 'Drag in the PDF you want to add text to',
+      dzHint: 'Tap anywhere on the page to start writing',
+    },
+    tipex: {
+      dzTitle: 'Drag in the PDF with text you want to cover',
+      dzHint: 'Drag over the wrong part, like whiteout on paper',
+    },
+    gambar: {
+      dzTitle: 'Drag in the PDF you want to turn into images',
+      dzHint: 'Each page becomes one JPG or PNG file',
+    },
+    foto: {
+      dzTitle: 'Drag in the photos you want to turn into a PDF',
+      dzHint: 'Add as many as you like, you can set the order next',
+      pmTitle: 'Set Order',
+      pmHint: 'Hold, then drag to reorder · rotate tilted photos',
+    },
+  },
+
+  install: {
+    chip: 'Install PDFLokal on {where}',
+    cardTitle: 'Install PDFLokal on {where}',
+    cardSub: "No need to search for it again tomorrow, it's right on {screen} and works offline.",
+    device: { mobile: 'your phone', desktop: 'your computer' },
+    screen: { mobile: 'your phone screen', desktop: 'your desktop' },
+    guideLang: 'en',
+    ios: {
+      title: 'Steps on iPhone/iPad:',
+      steps: [
+        'Tap the Share icon (a box with an arrow pointing up) at the bottom.',
+        'Scroll down, tap “Add to Home Screen”.',
+        'Tap “Add” at the top right.',
+      ],
+    },
+    androidFirefox: {
+      title: 'Steps on Firefox:',
+      steps: [
+        'Tap the three-dot menu at the top right.',
+        'Choose “Install”.',
+      ],
+    },
+    androidSamsung: {
+      title: 'Steps on Samsung Internet:',
+      steps: [
+        'Tap the menu at the bottom.',
+        'Choose “Add page to” → “Home screen”.',
+      ],
+    },
+    androidChrome: {
+      title: 'Steps on Chrome:',
+      steps: [
+        'Tap the three-dot menu to the right of the address bar.',
+        'Choose “Add to Home screen”.',
+        'Tap “Install”.',
+      ],
+    },
+    desktopChromium: {
+      title: 'Steps on Chrome/Edge:',
+      steps: [
+        'Click the Install icon (a small screen with an arrow) at the right end of the address bar, if you see it.',
+        'Or: three-dot menu → “Cast, save, and share” → “Install page as app…”.',
+        'Click “Install”.',
+      ],
+    },
+    desktopSafari: {
+      title: 'Steps on Safari (Mac):',
+      steps: [
+        'From the “File” menu, choose “Add to Dock”.',
+        'Click “Add”.',
+      ],
+    },
+    fallback: {
+      title: "So it's easy to open again:",
+      steps: [
+        'Press Ctrl+D (or ⌘D) to bookmark this page.',
+        'Or open pdflokal.id in Chrome/Edge to install it as an app.',
+      ],
+    },
+  },
+
+  editFeedback: {
+    ask: 'How did the edit turn out?',
+    up: 'Good',
+    down: 'Not quite right',
+    thanks: 'Thanks, your feedback helps me 🙏',
+    noteQuestion: "What's not quite right?",
+    notePlaceholder: 'add feedback so we can improve',
+    noteLabel: "Tell us what's not quite right",
+    askTitle: 'Can I have these two crops?',
+    askSub: 'Before and after, so I can analyse where the feature falls short. Nothing else from the file is included.',
+    cropBefore: 'Before',
+    cropAfter: 'After',
+    skip: 'No thanks',
+    send: 'Send',
+  },
 };

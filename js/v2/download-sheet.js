@@ -17,6 +17,7 @@
 import { ensurePdfJs, ensurePdfLib, ensureFflate } from '../core/vendor.js';
 import { track } from '../lib/analytics.js';
 import { tel } from './telemetry.js';
+import { t as tr, formatDecimal } from '../lib/i18n.js';
 import { failureReason, failureCause } from '../core/failure-reason.js';
 import { durationBucket, pagesBucket } from '../core/telemetry-schema.js';
 import { showStamp } from './celebrate.js';
@@ -36,12 +37,12 @@ export const RETRYABLE = new Set(['unknown', 'timeout', 'out-of-memory']);
 export function failMessage(reason) {
   // The retry sentence is gated on the SET, never on a default branch, so a new
   // reason added to the schema cannot quietly inherit "try again".
-  if (RETRYABLE.has(reason)) return 'Waduh, gagal membuat file. Coba sekali lagi ya'; // TODO(copy)
+  if (RETRYABLE.has(reason)) return tr('sheet.fail.retry'); // TODO(copy)
   switch (reason) {
-    case 'encrypted': return 'PDF ini terkunci, jadi nggak bisa disimpan ulang'; // TODO(copy)
-    case 'corrupt': return 'File PDF ini rusak, jadi nggak bisa dibuat ulang'; // TODO(copy)
-    case 'unsupported': return 'Ada huruf yang nggak bisa disimpan. Cek teks yang kamu tulis ya'; // TODO(copy)
-    default: return 'Waduh, gagal membuat file'; // TODO(copy) - no retry advice for an unknown-to-us reason
+    case 'encrypted': return tr('sheet.fail.encrypted'); // TODO(copy)
+    case 'corrupt': return tr('sheet.fail.corrupt'); // TODO(copy)
+    case 'unsupported': return tr('sheet.fail.unsupported'); // TODO(copy)
+    default: return tr('sheet.fail.unknown'); // TODO(copy) - no retry advice for an unknown-to-us reason
   }
 }
 
@@ -55,7 +56,7 @@ export function failMessage(reason) {
 // RULED BY FAUZAN 2026-09-09 ("ok the copy is approved"), drafted by the seat so
 // authoring became approving. Recorded in the seat's decisions.md 2026-09-09, and
 // asserted VERBATIM in tests/pdf-bermeterai.spec.js so nothing tidies it later.
-const SIGNED_NOTE = 'Dokumen ini punya meterai atau tanda tangan digital. Kalau disimpan dari sini, segelnya rusak dan dokumen bisa gagal diverifikasi. File aslimu nggak berubah.';
+// The seal note's copy is the key 'sheet.signedNote', read at render time (below).
 
 const COMPRESS_QUALITY = 0.72; // the "Otomatis" preset — one sane default, still
 const COMPRESS_MAXDIM = 1600;  // the right answer when the user has no hard cap.
@@ -74,7 +75,7 @@ const COMPRESS_MAXDIM = 1600;  // the right answer when the user has no hard cap
 // portal enforces is not measured here; this is the safe side of not knowing.)
 // Exported so tests/core/size-caps.test.mjs can hold the table to that rule.
 export const TARGETS = [
-  { v: null, label: 'Otomatis' },
+  { v: null, get label() { return tr('sheet.auto'); } },
   { v: 2_000_000, label: '2 MB' },
   { v: 1_000_000, label: '1 MB' },
   { v: 500_000, label: '500 KB' },
@@ -93,7 +94,7 @@ const IMG_DIMS = { asli: null, sedang: 1500, kecil: 800 };
 export function fmtMB(bytes) {
   const mb = bytes / 1_000_000;
   if (mb < 1) return `${Math.max(1, Math.round(bytes / 1000))} KB`;
-  return `${mb.toFixed(1).replace('.', ',')} MB`;
+  return `${formatDecimal(mb, 1)} MB`;
 }
 
 // deps = {
@@ -292,7 +293,7 @@ export function createDownloadSheet(deps) {
           onProgress: ({ pass }) => {
             if (seq !== state.seq) return;
             const m = el('#ds-cta-main');
-            if (m) m.textContent = `Mencari ukuran yang pas… (percobaan ${pass})`;
+            if (m) m.textContent = tr('sheet.progress.search', { pass });
           },
         })
         : await compressPdfBytes(state.base.bytes, {
@@ -311,11 +312,11 @@ export function createDownloadSheet(deps) {
       // small as it honestly gets — we say so with a stamp instead of faking
       // savings. Stamped INTO the dialog (top layer covers body-fixed elements).
       if (out.unchanged && modal.open) {
-        showStamp('Sudah optimal', { duration: 1300, host: modal });
+        showStamp(tr('sheet.stamp.optimal'), { duration: 1300, host: modal });
       }
     } catch (err) {
       console.error(err);
-      if (seq === state.seq) { state.size = 'asli'; deps.toast('Kompres gagal, saya pakai ukuran asli ya'); }
+      if (seq === state.seq) { state.size = 'asli'; deps.toast(tr('sheet.compressFailed')); }
     } finally {
       // Clear the flag UNCONDITIONALLY (review H1): a run superseded by ++seq
       // must not leave `compressing` wedged true — that blocked every future
@@ -346,7 +347,7 @@ export function createDownloadSheet(deps) {
     const nAll = doc.pages.length;
     const n = state.picked ? state.picked.length : nAll;
 
-    el('#ds-meta').textContent = `${deps.getBaseName()}.pdf · ${nAll} hal` +
+    el('#ds-meta').textContent = tr('sheet.meta', { name: deps.getBaseName(), count: nAll }) +
       (state.base ? ` · ${fmtMB(state.base.size)}` : '');
 
     segSync('#ds-format', state.format);
@@ -371,21 +372,21 @@ export function createDownloadSheet(deps) {
     };
     if (state.format === 'pdf') {
       if (!['asli', 'kompres'].includes(state.size)) state.size = 'asli';
-      mkBtn('asli', 'Asli', state.base ? fmtMB(state.base.size) : '<span class="ds-spin"></span>');
-      let sub = 'file lebih kecil';
-      if (state.compressing) sub = '<span class="ds-spin"></span> menghitung…';
+      mkBtn('asli', tr('sheet.size.original'), state.base ? fmtMB(state.base.size) : '<span class="ds-spin"></span>');
+      let sub = tr('sheet.size.smaller');
+      if (state.compressing) sub = `<span class="ds-spin"></span> ${tr('sheet.size.calculating')}`;
       else if (state.compressed) {
         sub = state.compressed.unchanged
-          ? 'file sudah optimal'
-          : `${fmtMB(state.compressed.size)} · <span class="ds-hemat">hemat ${Math.round((1 - state.compressed.size / state.base.size) * 100)}%</span>`;
+          ? tr('sheet.size.optimal')
+          : `${fmtMB(state.compressed.size)} · <span class="ds-hemat">${tr('sheet.size.saved', { pct: Math.round((1 - state.compressed.size / state.base.size) * 100) })}</span>`;
       }
-      mkBtn('kompres', 'Compress', sub);
+      mkBtn('kompres', tr('sheet.size.compress'), sub);
     } else {
       state.target = null; // image export has its own size row; no PDF cap applies
       if (!['asli', 'sedang', 'kecil'].includes(state.size)) state.size = 'sedang';
-      mkBtn('asli', 'Asli', '100%');
-      mkBtn('sedang', 'Sedang', '1500px');
-      mkBtn('kecil', 'Kecil', '800px');
+      mkBtn('asli', tr('sheet.size.original'), '100%');
+      mkBtn('sedang', tr('sheet.size.medium'), '1500px');
+      mkBtn('kecil', tr('sheet.size.small'), '800px');
     }
 
     // Target row: only meaningful when compressing a PDF.
@@ -410,7 +411,7 @@ export function createDownloadSheet(deps) {
       }
     }
 
-    // The seal note (see SIGNED_NOTE). Narrower than "the document is signed"
+    // The seal note (key sheet.signedNote). Narrower than "the document is signed"
     // on purpose: on PDF, Asli, whole document, untouched, core/export.js
     // hands the original bytes straight back and the seal is fine — telling
     // them it breaks would be false at the exact moment it is not.
@@ -418,45 +419,45 @@ export function createDownloadSheet(deps) {
     const anySigned = (doc.sources || []).some((src) => src.signed);
     // textContent, never innerHTML: the same rule showToast follows, and it
     // keeps this a string the copy ruling can replace without re-reading HTML.
-    if (anySigned) noteEl.textContent = SIGNED_NOTE;
+    if (anySigned) noteEl.textContent = tr('sheet.signedNote');
     noteEl.hidden = !anySigned || sealSurvivesThisDownload();
 
     segSync('#ds-pages', state.picked ? 'some' : 'all');
-    el('#ds-all-sub').textContent = `${nAll} halaman`;
-    el('#ds-some-sub').textContent = state.picked ? `${n} dipilih` : '';
+    el('#ds-all-sub').textContent = tr('sheet.pagesAll', { count: nAll });
+    el('#ds-some-sub').textContent = state.picked ? tr('sheet.pagesPicked', { count: n }) : '';
 
     // CTA
     const main = el('#ds-cta-main');
     const sub = el('#ds-cta-sub');
-    const halTxt = state.picked ? ` (${n} hal.)` : '';
+    const halTxt = state.picked ? ` ${tr('sheet.cta.pages', { count: n })}` : '';
     if (state.format === 'pdf') {
       const src = state.size === 'kompres' ? state.compressed : state.base;
       const busy = state.size === 'kompres' ? (state.compressing || state.building) : state.building;
-      main.innerHTML = `Unduh PDF${halTxt}${busy ? ' · <span class="ds-spin ds-spin-lite"></span>' : (src ? ` · ${fmtMB(src.size)}` : '')}`;
+      main.innerHTML = `${tr('sheet.cta.pdf')}${halTxt}${busy ? ' · <span class="ds-spin ds-spin-lite"></span>' : (src ? ` · ${fmtMB(src.size)}` : '')}`;
       const c = state.compressed;
       if (state.size === 'kompres' && c && c.target && !c.reachedTarget) {
         // THE HONEST MISS. We could not get under the cap. Say so plainly and give
         // the user the one lever that actually works next (fewer pages) — never
         // imply the berkas will pass when it won't.
         const cap = TARGETS.find((t) => t.v === c.target)?.label ?? fmtMB(c.target);
-        sub.textContent = `paling kecil yang bisa: ${fmtMB(c.size)}, belum masuk ${cap}. Coba buang halaman yang nggak perlu.`;
+        sub.textContent = tr('sheet.sub.missed', { size: fmtMB(c.size), cap });
         sub.hidden = false;
       } else if (state.size === 'kompres' && c && c.target && c.reachedTarget) {
         const cap = TARGETS.find((t) => t.v === c.target)?.label ?? fmtMB(c.target);
-        sub.textContent = `${fmtMB(c.size)}, muat di bawah ${cap}`;
+        sub.textContent = tr('sheet.sub.fits', { size: fmtMB(c.size), cap });
         sub.hidden = false;
       } else if (state.size === 'kompres' && c && !c.unchanged) {
-        sub.textContent = `hemat ${Math.round((1 - c.size / state.base.size) * 100)}% dari ${fmtMB(state.base.size)}`;
+        sub.textContent = tr('sheet.sub.saved', { pct: Math.round((1 - c.size / state.base.size) * 100), size: fmtMB(state.base.size) });
         sub.hidden = false;
       } else if (state.size === 'kompres' && c?.unchanged) {
-        sub.textContent = 'udah paling kecil, nggak bisa dikompres lagi tanpa merusak';
+        sub.textContent = tr('sheet.sub.alreadySmallest');
         sub.hidden = false;
       } else {
         sub.hidden = true;
       }
     } else {
-      main.textContent = n === 1 ? 'Unduh 1 Gambar' : `Unduh ${n} Gambar · ZIP`;
-      sub.textContent = `${state.imgfmt.toUpperCase()} · ${state.size === 'asli' ? 'ukuran asli' : `${IMG_DIMS[state.size]}px`}`;
+      main.textContent = n === 1 ? tr('sheet.cta.imageOne') : tr('sheet.cta.imageZip', { count: n });
+      sub.textContent = `${state.imgfmt.toUpperCase()} · ${state.size === 'asli' ? tr('sheet.sub.originalSize') : `${IMG_DIMS[state.size]}px`}`;
       sub.hidden = false;
     }
     el('#ds-cta').disabled = state.exporting;
@@ -548,7 +549,7 @@ export function createDownloadSheet(deps) {
           // the selected pages, in order, so its own 1..n IS the selection.
           pageNumbers: fallback ? fallback.pageNumbers : null,
           onProgress: ({ done, total }) => {
-            main.textContent = `Menyiapkan gambar ${done}/${total}…`;
+            main.textContent = tr('sheet.progress.images', { done, total });
           },
         });
         if (seq !== state.seq) return;
@@ -566,11 +567,11 @@ export function createDownloadSheet(deps) {
           const mime = state.imgfmt === 'png' ? 'image/png' : 'image/jpeg';
           deps.download(new Blob([files[0].bytes], { type: mime }), files[0].name);
         } else {
-          main.textContent = 'Membungkus jadi ZIP…';
+          main.textContent = tr('sheet.progress.zip');
           await new Promise((r) => setTimeout(r, 30)); // let the label paint before the sync zip
           const zip = zipFiles(files);
           deps.download(new Blob([zip], { type: 'application/zip' }), `${baseName}-gambar.zip`);
-          deps.toast(`Selesai! ${n} gambar dibungkus jadi satu ZIP`);
+          deps.toast(tr('sheet.toast.zipDone', { count: n }));
         }
       }
       // A font fell back to Helvetica during the base build — the kept file's
@@ -582,7 +583,7 @@ export function createDownloadSheet(deps) {
       // bytes, so the substitution rides along.
       // Ratified by Fauzan 2026-08-14 (PM STATE.md "RATIFIED 2026-08-14").
       if (state.base?.fontFallback) {
-        deps.toast('Sebagian teks memakai font pengganti yang mirip di file hasil');
+        deps.toast(tr('toast.fontSubstituteResult'));
         tel('failure', { stage: 'export', reason: 'font-fallback', class: 'none', blocked: false });
       }
       // Richer than the old event: the CHOICES are the product signal now.

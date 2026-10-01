@@ -11,6 +11,7 @@
  * free (GA4 finding: paid users complete the task but don't return unprompted).
  */
 import { track } from '../lib/analytics.js';
+import { t as tr } from '../lib/i18n.js';
 
 const DISMISS_KEY = 'pdflokal-install-dismissed';
 
@@ -41,19 +42,23 @@ function isIOS() {
 function isMobile() {
   return isIOS() || /android/i.test(navigator.userAgent) || navigator.maxTouchPoints > 1;
 }
-function deviceWord() { return isMobile() ? 'hapemu' : 'komputermu'; }
+function deviceWord() { return isMobile() ? tr('install.device.mobile') : tr('install.device.desktop'); }
 
 
 // Official install guides — the authoritative source for the EXACT, current UI
 // labels (which drift by browser version + OS + locale). We keep a friendly
-// Indonesian first-guess AND link out to these. Step labels below were verified
+// first-guess AND link out to these. Step labels below were verified
 // against the live pages on 2026-07-18; re-check periodically — see the memory note
 // pwa-install-instructions-maintenance. (The link is the always-current backstop.)
-const GUIDE = {
-  ios: 'https://support.apple.com/guide/iphone/open-as-web-app-iphea86e5236/ios',
-  android: 'https://support.google.com/chrome/answer/9658361?hl=id&co=GENIE.Platform%3DAndroid',
-  desktop: 'https://support.google.com/chrome/answer/9658361?hl=id&co=GENIE.Platform%3DDesktop',
-};
+// The help pages take the page's language (hl=), so /en/ links the English guide.
+function guideUrl(kind) {
+  const hl = tr('install.guideLang');
+  return {
+    ios: 'https://support.apple.com/guide/iphone/open-as-web-app-iphea86e5236/ios',
+    android: `https://support.google.com/chrome/answer/9658361?hl=${hl}&co=GENIE.Platform%3DAndroid`,
+    desktop: `https://support.google.com/chrome/answer/9658361?hl=${hl}&co=GENIE.Platform%3DDesktop`,
+  }[kind];
+}
 
 // The sophisticated bit: what CAN this browser do, and if not one-tap, how exactly?
 function detectInstall() {
@@ -64,52 +69,28 @@ function detectInstall() {
   const chromium = /chrome|crios|chromium|edg/i.test(ua) && !firefox;
 
   if (isIOS()) {
-    return { kind: 'steps', title: 'Caranya di iPhone/iPad:', url: GUIDE.ios, steps: [
-      'Tap ikon Share (kotak dengan panah ke atas) di bawah.',
-      'Scroll ke bawah, tap “Add to Home Screen”.',
-      'Tap “Add” di kanan atas.',
-    ] };
+    return { kind: 'steps', title: tr('install.ios.title'), url: guideUrl('ios'), steps: tr('install.ios.steps') };
   }
   if (/android/i.test(ua)) {
     if (firefox) {
-      return { kind: 'steps', title: 'Caranya di Firefox:', steps: [
-        'Tap menu titik-tiga di kanan atas.',
-        'Pilih “Install”.',
-      ] };
+      return { kind: 'steps', title: tr('install.androidFirefox.title'), steps: tr('install.androidFirefox.steps') };
     }
     if (samsung) {
-      return { kind: 'steps', title: 'Caranya di Samsung Internet:', steps: [
-        'Tap menu di bawah.',
-        'Pilih “Add page to” → “Home screen”.',
-      ] };
+      return { kind: 'steps', title: tr('install.androidSamsung.title'), steps: tr('install.androidSamsung.steps') };
     }
     // Official (Chrome Help, 2026-07-18): ⋮ More → "Add to home screen" → "Install".
-    return { kind: 'steps', title: 'Caranya di Chrome:', url: GUIDE.android, steps: [
-      'Tap menu titik-tiga di kanan address bar.',
-      'Pilih “Add to Home screen”.',
-      'Tap “Install”.',
-    ] };
+    return { kind: 'steps', title: tr('install.androidChrome.title'), url: guideUrl('android'), steps: tr('install.androidChrome.steps') };
   }
   // Desktop. Official (Chrome Help, 2026-07-18): the address-bar install icon, OR
   // ⋮ → "Cast, save, and share" → "Install page as app…" (the menu path moved —
   // it used to be a top-level "Install…").
   if (chromium) {
-    return { kind: 'steps', title: 'Caranya di Chrome/Edge:', url: GUIDE.desktop, steps: [
-      'Klik ikon Install (layar kecil dengan panah) di ujung kanan address bar, kalau ada.',
-      'Atau: menu titik-tiga → “Cast, save, and share” → “Install page as app…”.',
-      'Klik “Install”.',
-    ] };
+    return { kind: 'steps', title: tr('install.desktopChromium.title'), url: guideUrl('desktop'), steps: tr('install.desktopChromium.steps') };
   }
   if (/safari/i.test(ua)) {
-    return { kind: 'steps', title: 'Caranya di Safari (Mac):', steps: [
-      'Dari menu “File”, pilih “Add to Dock”.',
-      'Klik “Add”.',
-    ] };
+    return { kind: 'steps', title: tr('install.desktopSafari.title'), steps: tr('install.desktopSafari.steps') };
   }
-  return { kind: 'steps', title: 'Biar gampang dibuka lagi:', steps: [
-    'Tekan Ctrl+D (atau ⌘D) buat bookmark halaman ini.',
-    'Atau buka pdflokal.id lewat Chrome/Edge buat install jadi app.',
-  ] };
+  return { kind: 'steps', title: tr('install.fallback.title'), steps: tr('install.fallback.steps') };
 }
 
 export function initInstallPrompt() {
@@ -128,10 +109,10 @@ export function initInstallPrompt() {
   const installBtn = card.querySelector('#ic-install');
 
   const where = deviceWord();                          // hapemu | komputermu
-  const screen = isMobile() ? 'layar HP' : 'desktop';  // where the icon lands
-  chipLabel.textContent = `Install PDFLokal di ${where}`;
-  cardTitle.textContent = `Install PDFLokal di ${where}`;
-  cardSub.textContent = `Biar besok nggak usah nyari lagi, langsung ada di ${screen}, tetap jalan walau lagi offline.`;
+  const screen = isMobile() ? tr('install.screen.mobile') : tr('install.screen.desktop');  // where the icon lands
+  chipLabel.textContent = tr('install.chip', { where });
+  cardTitle.textContent = tr('install.cardTitle', { where });
+  cardSub.textContent = tr('install.cardSub', { screen });
 
   function hideCard() { card.classList.remove('show'); }
   function openCard() {
