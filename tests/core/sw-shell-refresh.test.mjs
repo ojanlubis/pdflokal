@@ -46,13 +46,18 @@ const key = (req) => new URL(typeof req === 'string' ? req : req.url, ORIGIN).hr
 const text = async (res) => (res ? res.text() : null);
 
 // Load sw.js into a fresh worker-shaped global. `fetchImpl` is the network.
-function loadWorker(fetchImpl, { online = true } = {}) {
+function loadWorker(fetchImpl, { online = true, failAdd = [] } = {}) {
   const listeners = {};
   const store = new Map();
   const cache = {
     put: async (req, res) => { store.set(key(req), res); },
     match: async (req) => store.get(key(req)),
     addAll: async (urls) => { for (const u of urls) store.set(key(u), basic(`precached ${u}`)); },
+    // add() rejects for the URLs in `failAdd`: a /en that 404s or redirects at install.
+    add: async (u) => {
+      if (failAdd.includes(u)) throw new TypeError('bad response');
+      store.set(key(u), basic(`precached ${u}`));
+    },
   };
   const caches = {
     open: async () => cache,
@@ -158,4 +163,52 @@ test('6. VACUITY GUARD: the harness can see a real failure — a body the handle
   assert.equal(await text(worker.store.get(key('/never'))), null);
   const res = await dispatch(worker, navigate('/?buat=kompres'));
   assert.equal(await text(res), 'x');
+});
+
+// ---- the English shell (/en) -------------------------------------------------
+// The worker keeps one last-resort shell PER LANGUAGE. Without this, an offline
+// navigation to /en/anything is served the Indonesian `/`, and the English
+// editor is silently Indonesian the moment the network goes.
+
+async function install(worker) {
+  let done = null;
+  worker.listeners.install({ waitUntil: (p) => { done = p; } });
+  await done;
+}
+
+test('7. install precaches /en beside /', async () => {
+  const worker = loadWorker(async () => basic('x'));
+  await install(worker);
+  assert.equal(await text(worker.store.get(key('/en'))), 'precached /en', 'the English shell is not precached');
+  assert.equal(await text(worker.store.get(key('/'))), 'precached /', 'the Indonesian shell is not precached');
+});
+
+test('8. a /en that cannot be precached does not abort the install (the Indonesian shell must survive it)', async () => {
+  const worker = loadWorker(async () => basic('x'), { failAdd: ['/en'] });
+  await assert.doesNotReject(() => install(worker));
+  assert.equal(await text(worker.store.get(key('/'))), 'precached /', 'a bad /en took the root shell down with it');
+});
+
+test('9. an offline navigation under /en lands on /en, never on the Indonesian /', async () => {
+  const worker = loadWorker(async () => { throw new TypeError('Failed to fetch'); }, { online: false });
+  // A stored Response body can be read once, so each navigation reseeds the shells.
+  const go = async (url) => {
+    worker.seed('/', 'indonesian shell');
+    worker.seed('/en', 'english shell');
+    return text(await dispatch(worker, navigate(url)));
+  };
+  assert.equal(await go('/en'), 'english shell');
+  assert.equal(await go('/en/merge-pdf'), 'english shell', 'a path under /en/ fell back to the Indonesian shell');
+  // CONTROL: the prefix is /en/ or exactly /en, not any path that merely starts with the letters.
+  assert.equal(await go('/english-notes'), 'indonesian shell', '/english-notes is not under /en/');
+  assert.equal(await go('/gabung-pdf'), 'indonesian shell', 'the Indonesian fallback regressed');
+});
+
+test('10. a successful /en navigation with a query string refreshes /en, and leaves / alone', async () => {
+  const worker = loadWorker(async () => basic('english of today'));
+  worker.seed('/', 'indonesian from install day');
+  worker.seed('/en', 'english from install day');
+  await dispatch(worker, navigate('/en?utm_source=pwa'));
+  assert.equal(await text(worker.store.get(key('/en'))), 'english of today', 'the /en shell stayed at install-day bytes');
+  assert.equal(await text(worker.store.get(key('/'))), 'indonesian from install day', 'an /en navigation overwrote the Indonesian shell');
 });

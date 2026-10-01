@@ -46,7 +46,17 @@
 // same way; tests/core/sw-shell-refresh.test.mjs drives both. `v4` is skipped
 // on purpose: a seat session bumped to it on a local branch the same day, and
 // a generation name is never reused, so the two fixes cannot collide on one.
-const CACHE = 'pdflokal-shell-v5';
+//
+// Bumped v5 -> v6 on 2026-10-01 for the English editor (/en). A worker that does
+// not know /en would serve it the Indonesian `/` shell as the offline fallback,
+// and a v5 cache holds no /en entry to evict. The bump makes every returning
+// device reinstall, which is when /en is precached (see PRECACHE_LANG below).
+const CACHE = 'pdflokal-shell-v6';
+// The two language homes. Each is the last-resort shell for its own subtree: an
+// offline navigation under /en must land on /en, never on the Indonesian `/`.
+const HOME = '/';
+const HOME_EN = '/en';
+const homeFor = (pathname) => (pathname === HOME_EN || pathname.startsWith(HOME_EN + '/') ? HOME_EN : HOME);
 const PRECACHE = [
   '/',
   '/manifest.webmanifest',
@@ -57,7 +67,14 @@ const PRECACHE = [
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE).then((c) => c.addAll(PRECACHE)).then(() => self.skipWaiting()),
+    caches.open(CACHE)
+      .then((c) => c.addAll(PRECACHE)
+        // PRECACHE_LANG: the English shell is added on its own, and a failure to
+        // fetch it is swallowed. addAll is all-or-nothing, so putting /en in
+        // PRECACHE would let a bad /en response abort the install of the whole
+        // worker and take the Indonesian offline shell with it.
+        .then(() => c.add(HOME_EN).catch(() => {})))
+      .then(() => self.skipWaiting()),
   );
 });
 
@@ -160,16 +177,18 @@ self.addEventListener('fetch', (event) => {
             // (Sentry JAVASCRIPT-10/13: a shell without #ds-signed beside a
             // download-sheet.js that needs it). Any successful root
             // navigation now refreshes it, whatever its query string.
-            const shell = url.pathname === '/' && url.search ? res.clone() : null;
+            // The same holds per language: `/en?utm_source=pwa` refreshes `/en`.
+            const home = homeFor(url.pathname);
+            const shell = url.pathname === home && url.search ? res.clone() : null;
             caches.open(CACHE).then((c) => Promise.all([
               c.put(request, copy),
-              shell && c.put('/', shell),
+              shell && c.put(home, shell),
             ]));
           }
           return res;
         })
         .catch(async () => (await caches.match(request))
-          || (await caches.match('/'))
+          || (await caches.match(homeFor(url.pathname)))
           || Response.error()),
     );
     return;
