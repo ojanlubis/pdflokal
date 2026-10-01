@@ -91,7 +91,7 @@ function tel(event, props) {
 import { planRunRemoval } from '../core/text-walk.js';
 import { extractFontProgram, lookupFontObject } from '../core/doc-fonts.js';
 import { textCoveredBy } from '../core/stamp.js';
-import { resolveFontFingerprint, FAMILY_BUCKET_TO_CLONE, isInformativeBaseFont } from '../core/font-fingerprint.js';
+import { resolveFontFingerprint, docFontFaceDescriptors, FAMILY_BUCKET_TO_CLONE, isInformativeBaseFont } from '../core/font-fingerprint.js';
 import { cloneFamilyFor } from '../core/font-decide.js';
 import { editSignature, pageEdits } from '../core/page-surgery.js';
 import { createEditedPageProvider } from './edited-page-provider.js';
@@ -1169,7 +1169,7 @@ function sanitizeForCssIdent(s) {
 // failure, fontkit parse failure, or the FontFace API itself refusing the
 // bytes are all the same honest "no live preview for this line", the twin
 // stays exactly as it already was.
-function loadDocFont(sourceId, fontName, pdfPage, PDFLib, fontkit) {
+function loadDocFont(sourceId, fontName, pdfPage, PDFLib, fontkit, facts) {
   const key = `${sourceId}:${fontName}`;
   if (!docFontCache.has(key)) {
     docFontCache.set(key, (async () => {
@@ -1200,7 +1200,9 @@ function loadDocFont(sourceId, fontName, pdfPage, PDFLib, fontkit) {
       const cssFamily = `pdflokal-doc-${sanitizeForCssIdent(sourceId)}-${sanitizeForCssIdent(fontName)}`;
       let face;
       try {
-        face = new FontFace(cssFamily, extracted.bytes);
+        // Descriptors from the font's own facts, or a bold program is faux-bolded
+        // again by CSS font-weight:700 (see core/font-fingerprint.js).
+        face = new FontFace(cssFamily, extracted.bytes, docFontFaceDescriptors(facts));
         await face.load();
       } catch (_err) {
         // Some CFF shapes need an explicit sfnt/OpenType wrap the FontFace
@@ -1367,7 +1369,7 @@ async function prepareDocFont(pageId, line, draft) {
       draft.cloneRouted = !!cloneFamilyFor(fp.baseFont);
     }
 
-    const result = await loadDocFont(page.sourceId, fontName, pdfPage, PDFLib, fontkit);
+    const result = await loadDocFont(page.sourceId, fontName, pdfPage, PDFLib, fontkit, fp);
     // font_seen (spec-telemetry.md §3, widened spec-edit-fidelity-
     // instrumentation.md Increment B): the doc font we tried to load for this
     // edit, PLUS the font-fact fields the fingerprint ladder above already

@@ -24,7 +24,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   isInformativeBaseFont, fingerprintProgramBytes,
-  resolveFontFingerprint, FAMILY_BUCKET_TO_CLONE,
+  resolveFontFingerprint, FAMILY_BUCKET_TO_CLONE, docFontFaceDescriptors,
 } from '../../js/core/font-fingerprint.js';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -179,4 +179,29 @@ test('resolveFontFingerprint: an INFORMATIVE wrapper name still wins at rung 1 â
   assert.equal(fp.ok, true);
   assert.equal(fp.styleSource, 'pdf-name'); // rung 1, not rung 2
   assert.equal(fp.bold, true);
+});
+
+// ---- docFontFaceDescriptors: the doc FontFace must declare its own weight ----
+
+test('docFontFaceDescriptors: a bold program registers as weight 700, so CSS 700 does not faux-bold it', () => {
+  // Real facts off a real bold program, not a hand-typed {bold:true}.
+  const fp = fingerprintProgramBytes(fontkit, loadFontBytes('fonts/montserrat-bold.woff2'));
+  assert.deepEqual(docFontFaceDescriptors(fp), { weight: '700', style: 'normal' });
+});
+
+test('docFontFaceDescriptors: italic and regular facts map to style/weight, an undecided fingerprint to the old defaults', () => {
+  assert.deepEqual(docFontFaceDescriptors({ ok: true, bold: true, italic: true }), { weight: '700', style: 'italic' });
+  assert.deepEqual(docFontFaceDescriptors({ ok: true, bold: false, italic: true }), { weight: '400', style: 'italic' });
+  const regular = fingerprintProgramBytes(fontkit, loadFontBytes('tests/fixtures/nasty/carlito-subset.ttf'));
+  assert.deepEqual(docFontFaceDescriptors(regular), { weight: '400', style: 'normal' });
+  assert.deepEqual(docFontFaceDescriptors({ ok: false, bold: false, italic: false }), { weight: '400', style: 'normal' });
+  assert.deepEqual(docFontFaceDescriptors(undefined), { weight: '400', style: 'normal' });
+});
+
+test('loadDocFont registers the FontFace WITH the descriptors and is handed the font facts', () => {
+  // app.js cannot be imported headless; pin the wiring at its source â€” the one
+  // FontFace constructed for a document font, and its one caller.
+  const app = fs.readFileSync(path.join(root, 'js', 'v2', 'app.js'), 'utf8');
+  assert.match(app, /new FontFace\(cssFamily, extracted\.bytes, docFontFaceDescriptors\(facts\)\)/);
+  assert.match(app, /await loadDocFont\(page\.sourceId, fontName, pdfPage, PDFLib, fontkit, fp\)/);
 });
