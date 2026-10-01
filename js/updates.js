@@ -19,6 +19,12 @@
  */
 export const UPDATES = [
   {
+    id: '2026-10-01-edit-isian',
+    date: '2026-10-01',
+    text: 'Edit di formulir sekarang cuma ambil isiannya, label kayak "Nama :" nggak ikut keubah.',
+    approved: false,
+  },
+  {
     id: '2026-10-01-ukuran-bebas',
     date: '2026-10-01',
     text: 'Ukuran huruf Teks sekarang bisa kamu ketik sendiri, sekecil 1.',
