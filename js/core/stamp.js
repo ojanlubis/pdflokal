@@ -25,6 +25,13 @@
  *      (page-surgery.js) leaves the edit to today's twin drawer. Zero new
  *      code for that tier — it already exists.
  *
+ * ONE FONT PER LINE (2026-10-01): when the committed annotation carries the
+ * editor's fontDecision (core/line-font.js), the ladder above does not run —
+ * the stamp embeds exactly the decided font after re-verifying it with the
+ * same decideLineFont, so the file holds the face the user watched while
+ * typing. The ladder remains for edits committed without a decision, and as
+ * the fallback when a decision fails to verify (reported, never silent).
+ *
  * Reason vocabulary is telemetry-schema.js's `insert.reason` enum, reused
  * verbatim wherever an existing value fits (decline-never-guess extends to
  * "don't invent a new enum value when an old one already means this").
@@ -36,6 +43,7 @@ import { getFontStyleInfo } from './font-style.js';
 import { cloneFamilyFor } from './font-decide.js';
 import { CLONE_FONT_VARIANTS, CLONE_FONT_URLS, isSfntFontProgram } from './clone-fonts.js';
 import { fingerprintProgram, FAMILY_BUCKET_TO_CLONE } from './font-fingerprint.js';
+import { textCoveredBy, countMissingGlyphs, decideLineFont } from './line-font.js';
 
 // ---- shared little helpers ---------------------------------------------------
 
@@ -51,70 +59,12 @@ export function hexToRgb01(hex) {
   ];
 }
 
-// Does `cp` map to a glyph that will ACTUALLY PAINT in this program? Mirrors
-// reinsert.js's glyphPaints EXACTLY (module header's "keep the glyphPaints
-// lesson: cmap presence lies" — a subset font's cmap can claim a codepoint
-// whose outline the subsetter dropped or re-indexed, resolving to .notdef or
-// an empty contour, which bakes as INVISIBLE text). Space (cp 32) is exempt
-// from the contour check — a space glyph legitimately has none — but NOT
-// from the hasGlyphForCodePoint check itself: if the subset has no space
-// entry at all, pdf-lib has nothing to encode that codepoint with, so this
-// still declines (spec §3 rung 1's own space carve-out, stated the same way).
-// WHY hasGlyphForCodePoint IS INSIDE THE try (Sentry JAVASCRIPT-S, Aug 2026):
-// it used to sit one line above it, and fontkit parses LAZILY — a wild font
-// whose tables only fault when a cmap is first consulted threw
-// `undefined is not an object (evaluating 'e.tables')` from INSIDE this call,
-// straight past a catch that only ever covered the two lines below. It
-// surfaced on app.js's commit-time notice prediction, which is not armored,
-// so commit() died and the user's replacement silently never applied.
-// Declining (false) is the correct answer to a fault, not a rethrow: it makes
-// rung 1 fall through to clone/twin, and a font we cannot interrogate is by
-// definition one we cannot PROVE is right.
-function glyphPaints(font, cp) {
-  try {
-    if (!font.hasGlyphForCodePoint(cp)) return false;
-    if (cp === 32) return true;
-    const g = font.glyphForCodePoint(cp);
-    if (!g || g.id === 0) return false; // .notdef
-    const cmds = g.path && g.path.commands;
-    return Array.isArray(cmds) && cmds.length > 0;
-  } catch {
-    return false;
-  }
-}
-
-// Does `parsedFont` (a fontkit-parsed program) cover EVERY char of `text`?
-// EXPORTED (spec-edit-rebuild-composite.md increment 2): js/v2/app.js's
-// draft-time notice prediction needs the EXACT same answer this module's own
-// rung 1 (tryNativeSubset) uses at commit time — the toast may not lie about
-// what export will do, so the two call sites share this ONE implementation
-// rather than each hand-rolling their own coverage loop that could drift
-// apart. Same NFC normalize (a user typing e + combining-acute means é —
-// judge coverage on the composed form, one char at a time) and the same
-// space carve-out glyphPaints already gives (cp 32 is exempt from the
-// contour check, but still gated on the font actually having a cmap entry
-// for it).
-export function textCoveredBy(parsedFont, text) {
-  for (const ch of text.normalize('NFC')) {
-    if (!glyphPaints(parsedFont, ch.codePointAt(0))) return false;
-  }
-  return true;
-}
-
-// spec-edit-fidelity-instrumentation.md Increment B: the `insert` telemetry
-// event's glyph-shortfall count — "how many chars did the doc's OWN subset
-// lack" (the "why did rung 1 decline" signal). Same NFC-normalize + coverage
-// test as textCoveredBy, just counting instead of short-circuiting on the
-// first miss — deliberately a SEPARATE pass (not a byproduct of
-// textCoveredBy) so the common case (fully covered, the overwhelming
-// majority of edits) never pays for a count it doesn't need.
-export function countMissingGlyphs(parsedFont, text) {
-  let n = 0;
-  for (const ch of text.normalize('NFC')) {
-    if (!glyphPaints(parsedFont, ch.codePointAt(0))) n += 1;
-  }
-  return n;
-}
+// Coverage (glyphPaints / textCoveredBy / countMissingGlyphs) MOVED to
+// core/line-font.js on 2026-10-01: decideLineFont needs it, and this module now
+// calls decideLineFont as its verifier — two homes would import each other.
+// Re-exported here so js/v2/app.js's commit-time prediction and every existing
+// test keep importing it from the module whose rung 1 it describes.
+export { textCoveredBy, countMissingGlyphs };
 
 // ---- per-document embed cache -------------------------------------------------
 
@@ -236,6 +186,77 @@ async function tryNativeSubset(pdfPage, PDFLib, fontkit, insert, text, cache) {
     return { ok: false, reason: 'unsupported-font' };
   }
 }
+
+// ---- the live decision's font (core/line-font.js) -----------------------------
+
+// The SAME gates tryNativeSubset applies before embedding a document's own
+// program, packaged as a decideLineFont candidate that the editor
+// (js/v2/line-font-live.js) and the stamp both build. WHY one helper: if the
+// editor offered a native candidate this module would then refuse to embed,
+// the editor would show the document's font while the file got another one —
+// the seeing ≠ file the decision exists to remove. null = not offered.
+export function nativeCandidate({ parsed, bytes, key, css }) {
+  if (!parsed || !bytes) return null;
+  if (!fontEmbedsAtSave(parsed)) return null;
+  if (!isSfntFontProgram(bytes)) return null;
+  return { path: 'native', parsed, key, ...(css ? { css } : {}) };
+}
+
+// Embed exactly the font a stored decision names, after VERIFYING it with the
+// same decideLineFont the editor decided with, on the same bytes: the doc's
+// own program read off THIS page by resource key (native), or the bundled TTF
+// the editor loaded its FontFace from (clone/substitute). { ok:true, font } or
+// { ok:false } — never throws, never substitutes: a failed verify is the
+// caller's to report. Exported for core/export.js, which draws a declined
+// Ganti edit with this same font instead of the twin's Helvetica.
+export async function resolveDecidedFont(pdfPage, PDFLib, fontkit, decision, text) {
+  if (!fontkit || !decision || decision.v !== 1) return { ok: false };
+  const cache = getDocCache(pdfPage.doc);
+  try {
+    let entry;
+    let candidate = null;
+    if (decision.path === 'native') {
+      if (!decision.key) return { ok: false };
+      const got = getOrParseFont(pdfPage, PDFLib, fontkit, decision.key, cache);
+      if (!got.ok) return { ok: false };
+      entry = got.entry;
+      candidate = entry.embedded
+        ? { path: 'native', parsed: entry.parsed, key: decision.key }
+        : nativeCandidate({ parsed: entry.parsed, bytes: entry.bytes, key: decision.key });
+    } else if (decision.path === 'clone' || decision.path === 'substitute') {
+      if (!CLONE_FONT_URLS[decision.face] || typeof fetch !== 'function') return { ok: false };
+      const key = `clone:${decision.face}`; // the same cache slot tryClone fills
+      entry = cache.get(key);
+      if (!entry) {
+        const bytes = await fetchCloneFontBytes(decision.face);
+        entry = { bytes, parsed: fontkit.create(bytes), embedded: null };
+        cache.set(key, entry);
+      }
+      candidate = { path: decision.path, parsed: entry.parsed, face: decision.face };
+    }
+    if (!candidate) return { ok: false };
+    if (decideLineFont(text, [candidate]).path === 'none') return { ok: false };
+    if (!entry.embedded) entry.embedded = await pdfPage.doc.embedFont(entry.bytes);
+    return { ok: true, font: entry.embedded };
+  } catch {
+    return { ok: false };
+  }
+}
+
+// Rung 1's own diagnostic without rung 1's side effect: how many chars the
+// first run's embedded subset lacks, behind the same gates, WITHOUT embedding
+// it (a decided clone must not drag an unused doc font into the file). Keeps
+// `insert.glyph_shortfall` meaning exactly what it meant before decisions.
+function nativeShortfall(pdfPage, PDFLib, fontkit, fontName, text, cache) {
+  if (!fontkit) return 0;
+  const got = getOrParseFont(pdfPage, PDFLib, fontkit, fontName, cache);
+  if (!got.ok) return 0;
+  const { entry } = got;
+  if (!entry.embedded && (!fontEmbedsAtSave(entry.parsed) || !isSfntFontProgram(entry.bytes))) return 0;
+  return textCoveredBy(entry.parsed, text) ? 0 : countMissingGlyphs(entry.parsed, text);
+}
+
+const DECIDED_PATHS = new Set(['native', 'clone', 'substitute']);
 
 // ---- rung 2: clone -------------------------------------------------------------
 
@@ -374,19 +395,34 @@ async function tryClone(pdfPage, PDFLib, fontkit, insert, text, resolvedStyle, c
 // necessarily authoritative: resolveAuthoritativeStyle re-derives it against
 // the real document whenever styleSource is absent/'none', so a lost
 // draft-time race (js/v2/app.js's prepareDocFont, unawaited) can never pick
-// the wrong clone weight file).
-// Returns { ok:true, font, path:'native'|'clone' } or { ok:false, reason } —
-// never throws (every internal failure is caught and typed above).
-export async function resolveStampFont(pdfPage, PDFLib, fontkit, insert, text, style) {
+// the wrong clone weight file), decision (the annotation's fontDecision from
+// core/line-font.js, or null for an edit committed before decisions existed
+// or before the editor's fonts loaded).
+//
+// WITH a decision, the stamp FOLLOWS it: the font the user watched while
+// typing is the font embedded, re-verified here with the same decideLineFont
+// on the same bytes. The `mixed-fonts` decline does not apply — a decision is
+// by construction ONE font for the whole line (his answer 1: the bold word
+// un-bolds), so "the line's runs use several fonts" no longer stops the stamp.
+// A failed verify falls to the old ladder and says so (`decidedLive:false`).
+// Returns { ok:true, font, path:'native'|'clone', decision, decidedLive } or
+// { ok:false, reason, decision:'none', decidedLive } — never throws. A
+// substitute bakes as path 'clone' (the telemetry `path` enum keeps its
+// meaning); `decision` carries the finer value.
+export async function resolveStampFont(pdfPage, PDFLib, fontkit, insert, text, style, decision = null) {
   // Structural guards FIRST, exactly reinsert.js's own order, and BEFORE any
   // font work at all (incl. the authoritative style resolve below) — a
   // single pdfPage.drawText() call paints ONE baseline in ONE font for the
   // WHOLE string regardless of which rung supplies that font, so these
   // declines never even need to know what the font is.
   const styleSourceHint = style?.styleSource || 'none';
-  if (insert.mixedFonts) return { ok: false, reason: 'mixed-fonts', styleSource: styleSourceHint, glyphShortfall: 0 };
-  if (text.includes('\n')) return { ok: false, reason: 'multiline', styleSource: styleSourceHint, glyphShortfall: 0 };
-  if (text.length === 0) return { ok: false, reason: 'empty', styleSource: styleSourceHint, glyphShortfall: 0 };
+  const decided = !!decision && decision.v === 1 && DECIDED_PATHS.has(decision.path);
+  const decline = (reason, styleSource, glyphShortfall) => ({
+    ok: false, reason, styleSource, glyphShortfall, decision: 'none', decidedLive: false,
+  });
+  if (insert.mixedFonts && !decided) return decline('mixed-fonts', styleSourceHint, 0);
+  if (text.includes('\n')) return decline('multiline', styleSourceHint, 0);
+  if (text.length === 0) return decline('empty', styleSourceHint, 0);
 
   const cache = getDocCache(pdfPage.doc);
 
@@ -399,18 +435,37 @@ export async function resolveStampFont(pdfPage, PDFLib, fontkit, insert, text, s
   const resolved = resolveAuthoritativeStyle(pdfPage, PDFLib, fontkit, insert.fontName, style, cache);
   const styleSource = resolved.styleSource;
 
+  if (decided) {
+    const r = await resolveDecidedFont(pdfPage, PDFLib, fontkit, decision, text);
+    if (r.ok) {
+      const glyphShortfall = decision.path === 'native'
+        ? 0 : nativeShortfall(pdfPage, PDFLib, fontkit, insert.fontName, text, cache);
+      return {
+        ok: true, font: r.font, path: decision.path === 'native' ? 'native' : 'clone',
+        decision: decision.path, decidedLive: true, styleSource, glyphShortfall,
+      };
+    }
+    // The decision did not verify against the document: the old ladder runs,
+    // guards included, and the telemetry says the editor's choice did not hold.
+    if (insert.mixedFonts) return decline('mixed-fonts', styleSource, 0);
+  }
+
   const rung1 = await tryNativeSubset(pdfPage, PDFLib, fontkit, insert, text, cache);
-  if (rung1.ok) return { ok: true, font: rung1.font, path: 'native', styleSource, glyphShortfall: 0 };
+  if (rung1.ok) {
+    return { ok: true, font: rung1.font, path: 'native', decision: 'native', decidedLive: false, styleSource, glyphShortfall: 0 };
+  }
   const shortfall = rung1.glyphShortfall || 0;
 
   const rung2 = await tryClone(pdfPage, PDFLib, fontkit, insert, text, resolved, cache);
-  if (rung2.ok) return { ok: true, font: rung2.font, path: 'clone', styleSource, glyphShortfall: shortfall };
+  if (rung2.ok) {
+    return { ok: true, font: rung2.font, path: 'clone', decision: 'clone', decidedLive: false, styleSource, glyphShortfall: shortfall };
+  }
 
   // The FINAL decline is rung 2's own reason — rung 1's reason was only ever
   // a "try the next rung" signal, never surfaced past this point (mirrors
   // planNativeInserts' old missing-glyph -> compose -> twin chain, just one
   // rung further now).
-  return { ok: false, reason: rung2.reason, styleSource, glyphShortfall: shortfall };
+  return decline(rung2.reason, styleSource, shortfall);
 }
 
 // One pdfPage.drawText() call — position/size/direction come from the walk

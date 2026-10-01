@@ -47,7 +47,12 @@ const VALID_PROPS = {
   ganti_tap: { hit: true },
   ganti_commit: { outcome: 'commit', font_path: 'doc-font' },
   surgery: { matched: true, reason: 'clean' },
-  insert: { path: 'native', reason: 'clean', style_source: 'pdf-name', glyph_shortfall: 0 },
+  // decision/decided_live added 2026-10-01 (edit font design B8),
+  // ADDITIVE and therefore required — same no-optionals cost as failure below.
+  insert: {
+    path: 'native', reason: 'clean', style_source: 'pdf-name', glyph_shortfall: 0,
+    decision: 'native', decided_live: true,
+  },
   commit_paint: { duration: 250, pages: '2-5', device: 'phone' },
   // failure — the rail's export/commit blind spot, closed 2026-07-28 with its
   // own first case (a protected PDF that views fine and can never be written).

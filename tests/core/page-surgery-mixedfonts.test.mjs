@@ -136,5 +136,6 @@ test('runSurgery+planNativeInserts: two different embedded fonts sharing one bas
   assert.equal(result.skipDraw.has(text.id), false, 'native/clone stamp must decline on a mixed-font line');
   assert.deepEqual(result.insertOutcomes.get(text.id), {
     path: 'twin', reason: 'mixed-fonts', style_source: 'none', glyph_shortfall: 0,
+    decision: 'none', decided_live: false,
   });
 });

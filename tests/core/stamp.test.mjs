@@ -90,17 +90,19 @@ test('resolveStampFont: structural guards decline BEFORE either rung is attempte
   // Increment B): every return now echoes these through — 'none'/0 here
   // since the structural guards decline before either rung (and the
   // fingerprint ladder) ever runs, and the caller passed no styleSource.
+  // decision/decidedLive (2026-10-01, additive): no decision was passed, so
+  // these are the old ladder's — and a guard decline wrote nothing ('none').
   assert.deepEqual(
     await resolveStampFont(pdfPage, PDFLib, fontkit, { ...insert, mixedFonts: true }, 'Halo', {}),
-    { ok: false, reason: 'mixed-fonts', styleSource: 'none', glyphShortfall: 0 },
+    { ok: false, reason: 'mixed-fonts', styleSource: 'none', glyphShortfall: 0, decision: 'none', decidedLive: false },
   );
   assert.deepEqual(
     await resolveStampFont(pdfPage, PDFLib, fontkit, insert, 'Halo\nDunia', {}),
-    { ok: false, reason: 'multiline', styleSource: 'none', glyphShortfall: 0 },
+    { ok: false, reason: 'multiline', styleSource: 'none', glyphShortfall: 0, decision: 'none', decidedLive: false },
   );
   assert.deepEqual(
     await resolveStampFont(pdfPage, PDFLib, fontkit, insert, '', {}),
-    { ok: false, reason: 'empty', styleSource: 'none', glyphShortfall: 0 },
+    { ok: false, reason: 'empty', styleSource: 'none', glyphShortfall: 0, decision: 'none', decidedLive: false },
   );
 });
 

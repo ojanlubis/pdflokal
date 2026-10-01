@@ -164,8 +164,11 @@ test('buildEditedPageBytes: undangan-cid.pdf — target line surgically cut + na
   // /BaseFont, so rung 1 of the STYLE ladder alone resolves it: 'pdf-name',
   // never 'none'. glyph_shortfall is 0 (rung 1 of the WRITE ladder succeeded
   // outright, native).
+  // decision/decided_live (2026-10-01, additive): this annotation carries no
+  // fontDecision, so the old ladder decided ('native') and nothing was live.
   assert.deepEqual(result.outcomes[0].insert, {
     path: 'native', reason: 'clean', style_source: 'pdf-name', glyph_shortfall: 0,
+    decision: 'native', decided_live: false,
   });
 
   const outPdfDoc = await PDFLib.PDFDocument.load(result.bytes);
