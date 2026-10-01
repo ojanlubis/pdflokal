@@ -51,12 +51,15 @@ export function loadFaceFont(face, fontkit) {
       let bytes;
       try {
         const res = await fetch(url, { signal: controller.signal });
-        if (!res.ok) return null;
+        // Throw, never return null: the .catch below evicts a failure, so a
+        // transient 404 or offline moment is retried on the next tap instead
+        // of being cached as "this face does not exist" for the session.
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         bytes = new Uint8Array(await res.arrayBuffer());
       } finally {
         clearTimeout(timer);
       }
-      if (!isSfntFontProgram(bytes)) return null;
+      if (!isSfntFontProgram(bytes)) throw new Error(`${url} is not an sfnt font program`);
       const parsed = fontkit.create(bytes);
       const css = faceCssFamily(face);
       const ff = new FontFace(css, bytes);
@@ -123,6 +126,12 @@ export function startLineFont({ draft, candidates, lineKey = null, onRefuse }) {
   const ed = draft && draft.editorEl;
   if (!ed || !ed.isConnected) return null;
   const live = candidates.filter(Boolean);
+  // No font loaded at all (a name-only standard-14 line while the bundled
+  // TTFs cannot be fetched — sw.js does not precache fonts/ttf/, so an
+  // offline PWA lands here). Judging against nothing would refuse EVERY
+  // keystroke; instead the editor stays as it was and the commit carries no
+  // decision, so the old ladder decides (decided_live:false on the rail).
+  if (live.length === 0) return null;
   const stored = (d) => {
     const s = storedDecision(d);
     return s && lineKey != null ? { ...s, lineKey } : s;

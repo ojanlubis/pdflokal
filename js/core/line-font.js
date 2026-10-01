@@ -219,6 +219,10 @@ export function storedDecision(decision) {
 // that broke the line is undone.
 export function acceptLineInput(prev, next, candidates) {
   const decision = decideLineFont(next, candidates);
+  // No candidate loaded means no judgment can be made — never a reason to
+  // refuse the user's typing (the editor does not attach without fonts; this
+  // keeps the rule true for any other caller too).
+  if (!(candidates || []).some((c) => c && c.parsed)) return { text: next, decision, refused: null };
   if (decision.path !== 'none') return { text: next, decision, refused: null };
 
   if (decision.blocked.length) {

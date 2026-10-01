@@ -153,6 +153,16 @@ test('acceptLineInput: writable by SOME font but by no single one → the keystr
   assert.equal(r.decision.path, 'native');
 });
 
+test('acceptLineInput: with NO candidate loaded nothing is judged, so nothing is refused', () => {
+  // An offline PWA on a name-only standard-14 line: no doc program, no TTF.
+  // Refusing here would block every keystroke; the old ladder decides at bake.
+  const r = acceptLineInput('Kaf', 'Kafe', []);
+  assert.equal(r.text, 'Kafe');
+  assert.equal(r.refused, null);
+  assert.equal(r.decision.path, 'none');
+  assert.equal(acceptLineInput('Kaf', 'Kafe', [null, { path: 'clone', parsed: null }]).refused, null);
+});
+
 test('acceptLineInput: a writable edit passes through untouched, flipping the face if it must', async () => {
   const c = await realCandidates();
   const r = acceptLineInput('Kafé', 'KAFÉ', c);
