@@ -1,10 +1,14 @@
 name: E2E (Playwright)
 
+# PRs are the gate. main is not re-run after every merge (the PR already ran
+# the same suite); it runs once a night instead, as the safety net for a merge
+# whose PR base had gone stale. Ruled by Fauzan 2026-10-01: CI "secukupnya".
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
+  schedule:
+    - cron: '0 18 * * *'   # 01:00 WIB
+  workflow_dispatch:
 
 # A new push to a PR cancels that PR's older, superseded run: on 2026-10-01
 # alone 56 e2e runs queued, many for heads that were already replaced. Runs on
@@ -15,6 +19,8 @@ concurrency:
 
 jobs:
   changes:
+    # Only a PR has a diff to filter; the nightly run always runs everything.
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     outputs:
       runnable: ${{ steps.filter.outputs.runnable }}
@@ -48,7 +54,7 @@ jobs:
 
   e2e:
     needs: changes
-    if: needs.changes.outputs.runnable == 'true'
+    if: always() && (github.event_name != 'pull_request' || needs.changes.outputs.runnable == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
