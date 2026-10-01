@@ -71,12 +71,12 @@ export function floorFromDays(byDay, now) {
 }
 
 // ---- A1-A6 (seat specs/telemetry-alerts.md) --------------------------------
+// Every alarm is evaluated and recorded every day; only some of them email.
 // The email is read by Fauzan on his phone. His verdict on the first one
 // (2026-09-25): "the copywriting is bad and hard for me to understand". So:
 // no alarm codes, no "sesi"/"median", no file paths, times in WIB, and every
 // line says what happened in the product's own words (the tool is "Edit").
 // `short` builds the subject, `line` the body.
-const pct = (a, b) => Math.round((100 * a) / b);
 const nf = (n) => new Intl.NumberFormat('id-ID').format(n);
 
 /** `m` is the measured numbers; returns the alarms that fired, worst first. */
@@ -90,18 +90,11 @@ export function evaluateAlarms(m) {
     fired.push({ id: 'A1', short: 'Edit nggak kepakai 2 hari',
       line: 'Dua hari ini nggak ada satu pun yang pakai Edit. Biasanya ribuan kali sehari, jadi kemungkinan pencatatnya mati.' });
   }
-  if (m.a6 >= 1) {
-    fired.push({ id: 'A6', short: `${m.a6}x orang gagal dapet file`,
-      line: `${m.a6} kali ada orang yang udah ngedit, ketemu error, lalu pergi tanpa dapet filenya (24 jam terakhir).` });
-  }
-  if (m.a2 && m.a2.n >= 10 && m.a2.low / m.a2.n > 0.20) {
-    fired.push({ id: 'A2', short: 'hasil Edit sering lebih tipis',
-      line: `${pct(m.a2.low, m.a2.n)}% hasil Edit keliatan lebih tipis dari tulisan aslinya (7 hari terakhir, normalnya di bawah 20%).` });
-  }
-  if (m.a3 && m.a3.n >= 10 && m.a3.twin / m.a3.n > 0.30) {
-    fired.push({ id: 'A3', short: 'Edit sering salah font',
-      line: `${pct(m.a3.twin, m.a3.n)}% Edit nggak nemu font yang sama dan pakai font pengganti (7 hari terakhir, normalnya di bawah 30%).` });
-  }
+  // A6, A2, A3 carry no words on purpose: they never email (emailDecision
+  // below), so they have nothing to say to him. They live in the row.
+  if (m.a6 >= 1) fired.push({ id: 'A6' });
+  if (m.a2 && m.a2.n >= 10 && m.a2.low / m.a2.n > 0.20) fired.push({ id: 'A2' });
+  if (m.a3 && m.a3.n >= 10 && m.a3.twin / m.a3.n > 0.30) fired.push({ id: 'A3' });
   if (m.a5 && m.a5.total >= 5 && m.a5.down / m.a5.total > 0.40) {
     fired.push({ id: 'A5', short: 'banyak jempol bawah',
       line: `${m.a5.down} dari ${m.a5.total} feedback minggu ini jempol bawah.` });
@@ -110,6 +103,30 @@ export function evaluateAlarms(m) {
     fired.push({ id: 'A4', short: `${m.a4} feedback baru`, line: null });
   }
   return fired;
+}
+
+// ---- who gets to reach his inbox --------------------------------------------
+// WHY (seat decisions.md 2026-10-01 (sore), item 4, his ruling): he reads
+// traffic himself and had stopped opening a watch email that came nearly every
+// day, because A6 sits at threshold 1. An email now means one of two things:
+// a human wrote us words (A4), or the rail is dark (floor, A1; the unreadable
+// rail emails from the handler before any alarm is evaluated). A5, users
+// unhappy at scale, also earns one. A2, A3 and A6 still fire and are still
+// recorded in the row every day; they just stop mailing him. The thresholds
+// are unchanged and stay the spec's.
+// SINGLE SOURCE OF TRUTH for which alarm may email.
+export const EMAILING_ALARMS = Object.freeze(['floor', 'A1', 'A4', 'A5']);
+
+/**
+ * `fired` from evaluateAlarms → { send, emailFor, reason }.
+ * `emailFor` is the subset that earned the email (worst first); `reason` is
+ * what the row records when nothing is sent: `quiet`, or `only A6` etc.
+ */
+export function emailDecision(fired) {
+  const emailFor = fired.filter((f) => EMAILING_ALARMS.includes(f.id)).map((f) => f.id);
+  if (emailFor.length) return { send: true, emailFor, reason: null };
+  if (!fired.length) return { send: false, emailFor, reason: 'quiet' };
+  return { send: false, emailFor, reason: `only ${fired.map((f) => f.id).join(',')}` };
 }
 
 /** "25 Sep, 14.12 WIB" from the rail's UTC ts. */
@@ -121,10 +138,13 @@ export function wibTime(ts) {
 }
 
 /**
- * The email, pure. `notes` are [ts, rating, note] rows; note text is quoted
- * exactly as the user wrote it (routine brief §4: never paraphrased).
+ * The email, pure. Built from the emailing alarms only: one that does not
+ * email (A2, A3, A6) must not ride along in one that does. `notes` are
+ * [ts, rating, note] rows, quoted exactly as the user wrote them: never
+ * paraphrased, translated or tidied. This email is the only place a note goes.
  */
-export function composeEmail(m, fired, notes = []) {
+export function composeEmail(m, allFired, notes = []) {
+  const fired = allFired.filter((f) => EMAILING_ALARMS.includes(f.id));
   // A phone shows ~40 characters of subject: the worst two, then a count.
   const head = fired.slice(0, 2).map((f) => f.short).join(', ');
   const subject = `pdflokal: ${head}${fired.length > 2 ? `, dan ${fired.length - 2} lainnya` : ''}`;
@@ -134,6 +154,10 @@ export function composeEmail(m, fired, notes = []) {
   if (notes.length) {
     parts.push(`Feedback baru:\n${notes.map(([ts, rating, note]) => `${rating === 'down' ? '👎' : '👍'} "${note}"\n${wibTime(ts)}`).join('\n\n')}`);
   }
-  if (m.visitorsYesterday != null) parts.push(`Kemarin ada ${nf(m.visitorsYesterday)} pengunjung.`);
+  // The thumbs that came with the words, labelled with their window: a5 is the
+  // 7-day count A5 already reads, so this costs no extra query.
+  if (fired.some((f) => f.id === 'A4') && m.a5 && m.a5.total > 0) {
+    parts.push(`7 hari terakhir: ${nf(m.a5.total - m.a5.down)} 👍, ${nf(m.a5.down)} 👎.`);
+  }
   return { subject, body: parts.join('\n\n') };
 }

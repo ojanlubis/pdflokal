@@ -131,7 +131,7 @@ test('evaluateAlarms: the rail-dead signals come first', () => {
 
 // ── the email he reads on his phone (his verdict 2026-09-25: "the copywriting
 // is bad and hard for me to understand") ─────────────────────────────────────
-import { composeEmail, wibTime } from '../../api/_watch.js';
+import { composeEmail, wibTime, emailDecision, EMAILING_ALARMS } from '../../api/_watch.js';
 
 const ALL = {
   floor: { breached: true, yesterday: 3, baseline: 215 }, visitorsYesterday: 2, a1: 0,
@@ -145,14 +145,47 @@ test('email: no internal codes, jargon, paths or em-dashes reach him', () => {
   assert.doesNotMatch(text, /\bsesi\b|median|\/api\/|specs\/|UTC/i);
   assert.doesNotMatch(text, /—/);
   assert.match(e.body, /"font tidak bisa dikecil kan"\n25 Sep, 14\.12 WIB/, 'the note verbatim, the time in WIB');
-  assert.match(e.body, /Kemarin ada 2 pengunjung\./);
+  assert.match(e.body, /7 hari terakhir: 4 👍, 6 👎\./, 'the thumbs ride with the words, window named');
+  assert.doesNotMatch(e.body, /pengunjung\./, 'traffic is his to read, not the email\'s (ruling 2026-10-01)');
 });
 
-test('email: the subject keeps the worst two and counts the rest', () => {
+test('email: the subject keeps the worst two EMAILING alarms and counts the rest', () => {
   const e = composeEmail(ALL, evaluateAlarms(ALL));
-  assert.equal(e.subject, 'pdflokal: data pengunjung anjlok, Edit nggak kepakai 2 hari, dan 5 lainnya');
-  const one = { ...QUIET, a6: 2, visitorsYesterday: 185 };
-  assert.equal(composeEmail(one, evaluateAlarms(one)).subject, 'pdflokal: 2x orang gagal dapet file');
+  // ALL fires 7; A2, A3, A6 do not email, so the rest is A5 + A4 = 2, not 5.
+  assert.equal(e.subject, 'pdflokal: data pengunjung anjlok, Edit nggak kepakai 2 hari, dan 2 lainnya');
+});
+
+// ── who reaches his inbox (seat decisions.md 2026-10-01 (sore), item 4) ──────
+// Every alarm still fires and is still recorded; only feedback, unhappy users
+// at scale, and a dark rail email him. A6 at threshold 1 mailed him nearly
+// every day and he stopped reading.
+
+const decide = (m) => emailDecision(evaluateAlarms({ ...QUIET, ...m }));
+
+test('emailDecision: the table, alarm by alarm', () => {
+  const floor = { breached: true, yesterday: 0, floor: 23, baseline: 90 };
+  assert.deepEqual(decide({}), { send: false, emailFor: [], reason: 'quiet' });
+  assert.deepEqual(decide({ a6: 4 }), { send: false, emailFor: [], reason: 'only A6' }, 'A6 never emails');
+  assert.deepEqual(decide({ a2: { n: 10, low: 3 } }), { send: false, emailFor: [], reason: 'only A2' });
+  assert.deepEqual(decide({ a3: { n: 10, twin: 4 } }), { send: false, emailFor: [], reason: 'only A3' });
+  assert.deepEqual(decide({ a6: 1, a2: { n: 10, low: 3 }, a3: { n: 10, twin: 4 } }),
+    { send: false, emailFor: [], reason: 'only A6,A2,A3' });
+  assert.deepEqual(decide({ a4: 1 }), { send: true, emailFor: ['A4'], reason: null }, 'a human wrote words');
+  assert.deepEqual(decide({ floor }), { send: true, emailFor: ['floor'], reason: null }, 'dark rail');
+  assert.deepEqual(decide({ a1: 0 }), { send: true, emailFor: ['A1'], reason: null }, 'rail went quiet');
+  assert.deepEqual(decide({ a5: { total: 5, down: 3 } }), { send: true, emailFor: ['A5'], reason: null });
+  assert.deepEqual(decide({ a4: 1, a6: 3 }), { send: true, emailFor: ['A4'], reason: null },
+    'A6 is recorded, never the reason for an email');
+  assert.deepEqual([...EMAILING_ALARMS].sort(), ['A1', 'A4', 'A5', 'floor']);
+});
+
+test('email: an A4 email carries the note and nothing about A6 riding along', () => {
+  const m = { ...QUIET, a4: 1, a6: 3, a5: { total: 20, down: 2 } };
+  const e = composeEmail(m, evaluateAlarms(m), [['2026-09-25T07:12:03.000Z', 'down', 'gak bisa download']]);
+  assert.equal(e.subject, 'pdflokal: 1 feedback baru');
+  assert.match(e.body, /👎 "gak bisa download"/);
+  assert.match(e.body, /7 hari terakhir: 18 👍, 2 👎\./);
+  assert.doesNotMatch(e.body, /gagal dapet file|undefined/, 'A6 stays in the row');
 });
 
 test('wibTime: UTC in, Jakarta clock out, across midnight', () => {
