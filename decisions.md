@@ -41,8 +41,8 @@ Two laws came out of that deletion, and both now live in `CLAUDE.md` as instruct
 Items 1 (reactive state layer, `js/lib/events.js` pub/sub) and 1b (`PageRenderer` class in
 `page-rendering.js`) were **completed in March 2026**; a completed plan item read as an open one for
 four months. Item 2 (Web Workers for PDF export + compression) is still future work and belongs in
-the seat's queue, not in a code-guidance file. The document itself remains at
-`docs/legacy/future-architecture.md` for anyone starting a major refactor.
+the seat's queue, not in a code-guidance file. The document was deleted with the rest of
+`docs/legacy/` on 2026-10-01; `git log -- docs/legacy/` holds it.
 
 ---
 

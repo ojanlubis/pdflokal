@@ -48,8 +48,8 @@ to pdflokal.id.
   **Never hand-edit generated output.** Copy changes go through Fauzan.
 - **`alat-gambar.html` is the OLD wing** (noindexed) — `js/editor/`, `js/pdf-tools/`, `style.css`, the
   old `init*.js`, `ueState`, `js/changelog.js`. It exists only to keep the image tools alive until
-  absorption, and dies at demolition. Detail: `../reference/old-wing-code-reference.md` and the
-  banner'd `docs/legacy/`. Do not build new surfaces on it.
+  absorption, and dies at demolition. Detail: `../reference/old-wing-code-reference.md`. Do not
+  build new surfaces on it.
 - **⚠ Demolition is not free-standing:** `privasi` and `dukung` are on tokens but still borrow
   `style.css`'s header/footer/`.btn`. `css/legacy-bridge.css` maps the old names and **must load after
   `style.css`**.
@@ -191,8 +191,7 @@ gated on a worktree branch while `main` sat behind it would have shipped nothing
   or anything touching fonts, rendering or measurement.
 - **Before writing any durable fact, check whether it is already on disk** — if it is, update it
   there. Do not create a second copy; two copies of one rule drift, and the wrong one gets read.
-- `docs/security.md` (CSP, headers, libraries) · `docs/strengths.md` (why vanilla, why no framework) ·
-  `docs/legacy/` = old wing, banner'd, not current.
+- `docs/security.md` (CSP, headers, libraries) · `docs/strengths.md` (why vanilla, why no framework).
 
 ## `.mcp.json` is project-scoped, and that is load-bearing
 
