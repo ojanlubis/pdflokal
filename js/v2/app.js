@@ -33,7 +33,7 @@ import { compareRegions } from '../core/visual-oracle.js';
 import { createOcrIndex, ocrEngineLoaded } from './ocr-runs.js';
 import { scanAppearance } from './scan-appearance.js';
 import { validateSample } from '../core/feedback-sample.js';
-import { createPageSlot, syncOverlay, textFontCss, measureTextAnnoWidth } from '../render/page-view.js';
+import { createPageSlot, syncOverlay, textFontCss, applyTextFont, measureTextAnnoWidth } from '../render/page-view.js';
 import { createViewportStream } from '../render/viewport.js';
 import { RASTER_BASE, sharpenScale, maxPixelsFor } from '../render/sharpen.js';
 import { createInteraction } from '../render/interaction.js';
@@ -91,7 +91,9 @@ function tel(event, props) {
 }
 import { planRunRemoval } from '../core/text-walk.js';
 import { extractFontProgram, lookupFontObject } from '../core/doc-fonts.js';
-import { textCoveredBy } from '../core/stamp.js';
+import { textCoveredBy, nativeCandidate } from '../core/stamp.js';
+import { faceLadder, faceStyle } from '../core/line-font.js';
+import { loadFaceFont, startLineFont, refusalNote } from './line-font-live.js';
 import { resolveFontFingerprint, docFontFaceDescriptors, FAMILY_BUCKET_TO_CLONE, isInformativeBaseFont } from '../core/font-fingerprint.js';
 import { cloneFamilyFor } from '../core/font-decide.js';
 import { editSignature, pageEdits } from '../core/page-surgery.js';
@@ -1213,10 +1215,83 @@ function loadDocFont(sourceId, fontName, pdfPage, PDFLib, fontkit, facts) {
       }
       document.fonts.add(face);
       addedFontFaces.add(face);
-      return { cssFamily, fontkitFont, flavor };
+      // bytes ride along for core/stamp.js's nativeCandidate gates (sfnt +
+      // save-time readiness) — the editor may only offer the doc font if the
+      // stamp would embed these exact bytes.
+      // bold/italic: the descriptors this FontFace was REGISTERED with, so a
+      // decided line can ask CSS for exactly that face (render/page-view.js).
+      const descriptors = docFontFaceDescriptors(facts);
+      return {
+        cssFamily, fontkitFont, flavor, bytes: extracted.bytes,
+        bold: descriptors.weight === '700', italic: descriptors.style === 'italic',
+      };
     })().catch(() => null));
   }
   return docFontCache.get(key);
+}
+
+// Which /Font resource paints this line (its DOMINANT run), and does the line
+// mix resources? A dry run against the SOURCE page. Moved out of prepareDocFont
+// unchanged (2026-10-01) so the re-edit path can skip it and seed from the
+// stored decision instead.
+function dominantLineFont(pdfPage, PDFLib, line) {
+  // DRY RUN ONLY: learns the resource font name painting this line on the
+  // SOURCE page. Nothing here is written back anywhere — same throwaway
+  // read core/redact.js's own removeRunsFromPdfPage performs for real at
+  // export time, run here purely to look.
+  const joined = readPageContents(pdfPage, PDFLib);
+  const fonts = extractFontMetrics(pdfPage, PDFLib);
+  // ONE TARGET PER CONSTITUENT RUN, not one blended target — the same
+  // correction 39e0b9f made to smartReplace's surgery geometry at the
+  // bottom of this file. This call site was missed by that fix.
+  //
+  // WHY it matters here: a blended target takes its `size` from the LINE
+  // (text-lines.js's dominant run), so planRunRemoval's per-target sizeOk
+  // gate silently rejects any run painted at a materially different size,
+  // and `insert` then describes only whichever ops survived that filter.
+  // With per-run targets each run keeps its own size and is matched on its
+  // own terms, so the answer is correct BY CONSTRUCTION rather than by
+  // luck — and, just as importantly, the per-run results make a
+  // multi-font line VISIBLE instead of collapsing it to one blended guess.
+  //
+  // Byte-identical no-op on a single-run line (the overwhelming common
+  // case): `line.runs` has one entry whose `.pdf` IS `line.pdf`.
+  const targets = line.runs?.length ? line.runs.map((r) => r.pdf) : [line.pdf];
+  const { results } = planRunRemoval(joined, fonts, targets);
+  const names = results.map((r) => r.insert?.fontName || null);
+
+  // WHICH run's font represents the line — and what that entitles us to say
+  // about it. Seat ruling 2026-07-28 (option C): the two halves of "the
+  // line's font" have DIFFERENT epistemic status, so they get different
+  // policies.
+  //
+  // FAMILY is answerable. The draft has to render in something, and the
+  // DOMINANT run (widest by pdf.len) is defensible: it is already what
+  // core/text-lines.js calls this line's font, it is what the hover glow
+  // implies, and it is most of the glyphs. Note it is a proxy — a dash
+  // leader can out-width the text it trails — but it is the same proxy the
+  // rest of the system already uses, so this stays consistent rather than
+  // inventing a third answer to a question that already had two.
+  //
+  // WEIGHT is NOT answerable on a line whose runs use different fonts. It
+  // was being taken from planRunRemoval's `insert`, which reports the FIRST
+  // run BY CONTENT-STREAM POSITION — a different selector from the dominant
+  // one, so on `Nama : Budi` (bold label painted first, regular value wider)
+  // the two disagreed and `draft.bold = draft.bold || fp.bold` bolded the
+  // ENTIRE replacement, value included. Since a mixed-font line also makes
+  // the native stamp decline, the twin fallback then RENDERED that wrong
+  // flag — a visible defect, not just a telemetry one.
+  //
+  // So: answer what's answerable, decline what isn't. One policy for both is
+  // what produced the defect.
+  let domIdx = 0;
+  for (let i = 1; i < targets.length; i += 1) {
+    if ((targets[i]?.len ?? 0) > (targets[domIdx]?.len ?? 0)) domIdx = i;
+  }
+  return {
+    fontName: names[domIdx] || names.find(Boolean) || null,
+    mixedFonts: new Set(names.filter(Boolean)).size > 1,
+  };
 }
 
 // Fire-and-forget from smartReplace: never blocks the editor opening (the
@@ -1224,7 +1299,17 @@ function loadDocFont(sourceId, fontName, pdfPage, PDFLib, fontkit, facts) {
 // the SAME object handed to openTextEditor — mutated in place once the doc
 // font lands, so the commit path (reading draft fields at blur/Enter time)
 // picks it up for free if it arrives before the user finishes typing.
-async function prepareDocFont(pageId, line, draft) {
+//
+// ONE FONT PER LINE (2026-10-01, the founder's edit principle): this used to
+// end by PREPENDING the doc font to the twin's CSS stack, so a char the doc
+// subset lacked painted in the twin — one letter in another font while
+// typing, then the whole line in the clone after the bake. Now it loads every
+// candidate (doc font, clone, substitute) from the bytes the stamp embeds and
+// hands them to js/v2/line-font-live.js, which renders ONE face per decision.
+//
+// `seed` is a committed edit's stored fontDecision (re-edit): the line's
+// resource key and its bundled faces come from it instead of being re-derived.
+async function prepareDocFont(pageId, line, draft, seed = null) {
   try {
     const page = getPage(doc, pageId);
     const source = page && getSource(doc, page.sourceId);
@@ -1233,62 +1318,22 @@ async function prepareDocFont(pageId, line, draft) {
     const srcDoc = await getDryRunDoc(PDFLib, source);
     const pdfPage = srcDoc.getPages()[page.sourcePageNum];
     if (!pdfPage) return;
-    // DRY RUN ONLY: learns the resource font name painting this line on the
-    // SOURCE page. Nothing here is written back anywhere — same throwaway
-    // read core/redact.js's own removeRunsFromPdfPage performs for real at
-    // export time, run here purely to look.
-    const joined = readPageContents(pdfPage, PDFLib);
-    const fonts = extractFontMetrics(pdfPage, PDFLib);
-    // ONE TARGET PER CONSTITUENT RUN, not one blended target — the same
-    // correction 39e0b9f made to smartReplace's surgery geometry at the
-    // bottom of this file. This call site was missed by that fix.
-    //
-    // WHY it matters here: a blended target takes its `size` from the LINE
-    // (text-lines.js's dominant run), so planRunRemoval's per-target sizeOk
-    // gate silently rejects any run painted at a materially different size,
-    // and `insert` then describes only whichever ops survived that filter.
-    // With per-run targets each run keeps its own size and is matched on its
-    // own terms, so the answer is correct BY CONSTRUCTION rather than by
-    // luck — and, just as importantly, the per-run results make a
-    // multi-font line VISIBLE instead of collapsing it to one blended guess.
-    //
-    // Byte-identical no-op on a single-run line (the overwhelming common
-    // case): `line.runs` has one entry whose `.pdf` IS `line.pdf`.
-    const targets = line.runs?.length ? line.runs.map((r) => r.pdf) : [line.pdf];
-    const { results } = planRunRemoval(joined, fonts, targets);
-    const names = results.map((r) => r.insert?.fontName || null);
-
-    // WHICH run's font represents the line — and what that entitles us to say
-    // about it. Seat ruling 2026-07-28 (option C): the two halves of "the
-    // line's font" have DIFFERENT epistemic status, so they get different
-    // policies.
-    //
-    // FAMILY is answerable. The draft has to render in something, and the
-    // DOMINANT run (widest by pdf.len) is defensible: it is already what
-    // core/text-lines.js calls this line's font, it is what the hover glow
-    // implies, and it is most of the glyphs. Note it is a proxy — a dash
-    // leader can out-width the text it trails — but it is the same proxy the
-    // rest of the system already uses, so this stays consistent rather than
-    // inventing a third answer to a question that already had two.
-    //
-    // WEIGHT is NOT answerable on a line whose runs use different fonts. It
-    // was being taken from planRunRemoval's `insert`, which reports the FIRST
-    // run BY CONTENT-STREAM POSITION — a different selector from the dominant
-    // one, so on `Nama : Budi` (bold label painted first, regular value wider)
-    // the two disagreed and `draft.bold = draft.bold || fp.bold` bolded the
-    // ENTIRE replacement, value included. Since a mixed-font line also makes
-    // the native stamp decline, the twin fallback then RENDERED that wrong
-    // flag — a visible defect, not just a telemetry one.
-    //
-    // So: answer what's answerable, decline what isn't. One policy for both is
-    // what produced the defect.
-    let domIdx = 0;
-    for (let i = 1; i < targets.length; i += 1) {
-      if ((targets[i]?.len ?? 0) > (targets[domIdx]?.len ?? 0)) domIdx = i;
+    let fontName = null;
+    let mixedFonts = false;
+    if (seed) {
+      // RE-EDIT, seeded from the stored decision. Before 2026-10-01 a re-edit
+      // re-ran the dry run below on cover.replaceTargets[0] alone — on a
+      // multi-run line that is the first-painted run, not the dominant one,
+      // so a re-edit could load a different font than the edit was made in.
+      fontName = seed.lineKey ?? seed.ladder?.find((c) => c.path === 'native')?.key ?? null;
+    } else {
+      ({ fontName, mixedFonts } = dominantLineFont(pdfPage, PDFLib, line));
     }
-    const fontName = names[domIdx] || names.find(Boolean);
-    if (!fontName) return; // unmatched / declined run — no font to learn
-    const mixedFonts = new Set(names.filter(Boolean)).size > 1;
+    // An unmatched line has no font of its own to learn — it still gets a
+    // decision (the default substitute below), never the twin's stack.
+    const fp = fontName
+      ? resolveFontFingerprint(pdfPage, PDFLib, fontkit, fontName)
+      : { ok: false };
 
     // BUG FIX (founder field test, 2026-07-19, bold Arial headings): pdf.js's
     // OWN getTextContent() never exposes the real font name to the main
@@ -1309,14 +1354,13 @@ async function prepareDocFont(pageId, line, draft) {
     // when rung 1 is genuinely uninformative (an 'CIDFont+F1'-shaped wrapper
     // name with no corroborating Flags/FontWeight) — never guessing "regular"
     // just because the WRAPPER stayed silent.
-    const fp = resolveFontFingerprint(pdfPage, PDFLib, fontkit, fontName);
     if (fp.ok && !mixedFonts && (fp.bold || fp.italic)) {
       draft.bold = draft.bold || fp.bold;
       draft.italic = draft.italic || fp.italic;
       // Live-restyle the open draft the same way docFontFamily does below —
       // the twin font stays, only weight/style changes, so this is safe to
       // apply even if the doc-font FontFace load (next) ultimately declines.
-      if (draft.editorEl && draft.editorEl.isConnected) draft.editorEl.style.font = textFontCss(draft);
+      if (draft.editorEl && draft.editorEl.isConnected) applyTextFont(draft.editorEl, draft);
     }
     if (fp.ok) {
       // styleSource rides the draft -> the committed text annotation's own
@@ -1356,7 +1400,7 @@ async function prepareDocFont(pageId, line, draft) {
       const clone = cloneFamilyFor(fp.baseFont) || FAMILY_BUCKET_TO_CLONE[fp.family] || null;
       if (clone) {
         draft.fontFamily = clone;
-        if (draft.editorEl && draft.editorEl.isConnected) draft.editorEl.style.font = textFontCss(draft);
+        if (draft.editorEl && draft.editorEl.isConnected) applyTextFont(draft.editorEl, draft);
       }
       // Name-only ruling (founder, 2026-07-20 evening — the e-AHU case): a
       // font that provably embeds NO program has no outlines of its own —
@@ -1370,7 +1414,17 @@ async function prepareDocFont(pageId, line, draft) {
       draft.cloneRouted = !!cloneFamilyFor(fp.baseFont);
     }
 
-    const result = await loadDocFont(page.sourceId, fontName, pdfPage, PDFLib, fontkit, fp);
+    // The line's bundled faces (clone by name, substitute by evidence), loading
+    // in parallel with the doc font — from the stored ladder on a re-edit.
+    const faces = seed?.ladder
+      ? seed.ladder.filter((c) => c.path === 'clone' || c.path === 'substitute')
+      : faceLadder(fp.ok ? fp : null);
+    const facesLoading = Promise.all(faces.map((f) => loadFaceFont(f.face, fontkit)
+      .then((r) => (r ? {
+        path: f.path, face: f.face, evidence: f.evidence, css: r.css, parsed: r.parsed, bold: r.bold, italic: r.italic,
+      } : null))));
+
+    const result = fontName ? await loadDocFont(page.sourceId, fontName, pdfPage, PDFLib, fontkit, fp) : null;
     // font_seen (spec-telemetry.md §3, widened spec-edit-fidelity-
     // instrumentation.md Increment B): the doc font we tried to load for this
     // edit, PLUS the font-fact fields the fingerprint ladder above already
@@ -1381,30 +1435,37 @@ async function prepareDocFont(pageId, line, draft) {
     // on success) — collapsed to 'other', a conscious v1 simplification (the
     // primary signal is the ok-rate + the flavor of docs that DO load). A
     // finer failed/declined split is an easy follow-up if the data warrants it.
-    tel('font_seen', {
-      flavor: result?.flavor === 'type0' ? 'type0-identity-h'
-        : result?.flavor === 'truetype' ? 'truetype-simple' : 'other',
-      extract: result ? 'ok' : 'declined',
-      embedded: fp.ok ? fp.embedded : false,
-      subtype: fp.ok ? fp.subtype : 'other',
-      name_informative: fp.ok ? isInformativeBaseFont(fp.baseFont) : false,
-      bold: fp.ok ? fp.bold : false,
-      style_source: fp.ok ? fp.styleSource : 'none',
-    });
-    if (!result) return; // extraction/parse/FontFace decline — twin stays, honestly
-
-    // Guard: the draft may have been cancelled/committed already, or a NEWER
-    // tap may have replaced it — only this draft's own reference matters.
-    draft.docFontFamily = result.cssFamily;
-    draft.docFontkitFont = result.fontkitFont; // commit-time coverage check (see commit())
-    if (draft.editorEl && draft.editorEl.isConnected) {
-      // Progressive swap: prepend the doc font ahead of whatever twin stack
-      // is already set — the browser's own per-glyph fallback to that twin
-      // for any char the doc font doesn't cover is EXACTLY the honest
-      // preview of what export will do.
-      const twinStack = draft.editorEl.style.fontFamily;
-      draft.editorEl.style.fontFamily = `"${result.cssFamily}", ${twinStack}`;
+    if (fontName) {
+      tel('font_seen', {
+        flavor: result?.flavor === 'type0' ? 'type0-identity-h'
+          : result?.flavor === 'truetype' ? 'truetype-simple' : 'other',
+        extract: result ? 'ok' : 'declined',
+        embedded: fp.ok ? fp.embedded : false,
+        subtype: fp.ok ? fp.subtype : 'other',
+        name_informative: fp.ok ? isInformativeBaseFont(fp.baseFont) : false,
+        bold: fp.ok ? fp.bold : false,
+        style_source: fp.ok ? fp.styleSource : 'none',
+      });
     }
+    if (result) {
+      draft.docFontFamily = result.cssFamily;
+      draft.docFontkitFont = result.fontkitFont; // commit-time coverage check (see commit())
+    }
+    // The doc font is a candidate only behind the stamp's OWN embed gates —
+    // offering one the stamp would refuse is seeing ≠ file again.
+    const native = result
+      ? nativeCandidate({ parsed: result.fontkitFont, bytes: result.bytes, key: fontName, css: result.cssFamily })
+      : null;
+    if (native) Object.assign(native, { bold: result.bold, italic: result.italic });
+    const faceCandidates = await facesLoading;
+    // Guard: the draft may have been cancelled/committed already, or a NEWER
+    // tap may have replaced it — startLineFont declines a detached editor.
+    draft.lineFont = startLineFont({
+      draft,
+      candidates: [native, ...faceCandidates],
+      lineKey: fontName,
+      onRefuse: (ch) => toast(refusalNote(ch)),
+    });
   } catch (err) {
     console.warn('prepareDocFont gagal:', err);
   } finally {
@@ -1487,11 +1548,10 @@ function hitTestEditedLine(page, x, y) {
 // discipline smartReplace's own onCancel gives a fresh replace.
 // Font-fidelity note: the prefill's fontFamily/bold/italic/docFontFamily are
 // only the SYNCHRONOUS starting point (whatever the previous commit landed
-// with) — prepareDocFont below re-derives the doc-font/clone-routing decision
-// from scratch off cover.replaceTargets[0] (the pristine-source line), same
-// as a fresh smartReplace, since that pristine target is the one durable
-// truth a re-edit can trust (the committed replacement carries no cached
-// docFontkitFont/flavor/coverage fields to reuse).
+// with); its fontDecision (2026-10-01) is the face the editor opens in. The
+// candidates are re-loaded by prepareDocFont below, seeded from that stored
+// decision (see the call's own note) — the committed replacement carries no
+// live font objects to reuse.
 function reEditLine(pageId, cover, replacement) {
   const box = cover.replaceBox;
   track('editor_action', { action: 'ganti_teks_reedit' });
@@ -1503,6 +1563,10 @@ function reEditLine(pageId, cover, replacement) {
     italic: !!replacement?.italic,
     color: replacement?.color,
     docFontFamily: replacement?.docFontFamily,
+    // The committed edit's font decision: the editor opens IN that face (its
+    // FontFace is still registered), and prepareDocFont re-loads the same
+    // candidates from it rather than re-deriving them.
+    ...(replacement?.fontDecision ? { fontDecision: replacement.fontDecision } : {}),
     // Everything commit's `draft.reEdit` branch needs to remove the PREVIOUS
     // edit and reapply a fresh one against the SAME pristine-source target
     // (Decision 3: drop-and-reapply, never surgery-on-surgery).
@@ -1517,13 +1581,15 @@ function reEditLine(pageId, cover, replacement) {
   openTextEditor({ pageId, x: box.x, y: box.y, anno: null, draft });
   setTool('select');
   toastEl.classList.remove('show');
-  // Re-derive the doc font / coverage-check / clone-routing decision the same
-  // way smartReplace does (prepareDocFont only ever reads `line.pdf` —
-  // cover.replaceTargets[0] IS that same pdf-space target, captured at the
-  // original edit's birth). Fire-and-forget: the twin (already showing via
-  // draft.fontFamily) is the honest fallback until/unless this resolves.
-  if (cover.replaceTargets?.[0]) {
-    prepareDocFont(pageId, { pdf: cover.replaceTargets[0] }, draft);
+  // Seed font preparation from the STORED decision (edit font design, Gaps):
+  // it names the line's own resource and the bundled faces the edit was made
+  // with. An edit committed before decisions existed has none — then the
+  // dry run sees ALL of the line's targets, so it finds the same dominant run
+  // a fresh tap does (it used to see replaceTargets[0] only).
+  if (replacement?.fontDecision) {
+    void prepareDocFont(pageId, null, draft, replacement.fontDecision); // never rejects: try/catch inside
+  } else if (cover.replaceTargets?.length) {
+    void prepareDocFont(pageId, { runs: cover.replaceTargets.map((pdf) => ({ pdf })) }, draft);
   }
 }
 
@@ -2170,7 +2236,7 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
   ed.contentEditable = 'true';
   ed.style.left = (anno ? anno.x : x) + 'px';
   ed.style.top = (anno ? anno.y : y) + 'px';
-  ed.style.font = textFontCss(style);
+  applyTextFont(ed, style);
   ed.style.color = style.color || '#000';
   ed.textContent = anno?.text || draft?.text || '';
 
@@ -2221,6 +2287,7 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
     let gantiOutcome = null;
     let gantiCoverId = null;
     let gantiDocFont = false;
+    let gantiFlips = 0; // whole-line face changes while typing, for `insert`
     if (anno) {
       if (text && text !== anno.text) {
         record(history, doc);
@@ -2329,6 +2396,17 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
       // without re-deriving anything. Same omit-if-absent shape as
       // docFontProps — ordinary authored text never carries a styleSource.
       const styleSourceProps = d.styleSource ? { styleSource: d.styleSource } : {};
+      // THE LINE'S FONT DECISION (core/line-font.js), decided on the text being
+      // committed — the one face the editor painted, which the stamp follows
+      // and re-verifies and export draws when surgery declines. A bundled face
+      // also sets fontFamily/bold/italic to match it, so even the twin drawer's
+      // last resort draws the face the user saw. Absent when the editor's fonts
+      // had not loaded yet: the old ladder decides, as before (decided_live
+      // false on the rail).
+      const fontDecision = d.replaceCoverId && draft?.lineFont ? draft.lineFont.decideNow(text) : null;
+      const faceProps = fontDecision?.face ? faceStyle(fontDecision.face) : null;
+      const fontDecisionProps = fontDecision ? { fontDecision } : {};
+      if (fontDecision) gantiFlips = draft.lineFont.flips;
       // Founder ruling (2026-07-19): when a substitute font WILL be used for
       // this Ganti replacement, say so plainly at commit — decided with
       // whatever prepareDocFont has managed to load by NOW (it's async; a
@@ -2361,12 +2439,13 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
       }
       const created = addAnnotation(doc, pageId, createAnnotation('text', {
         text, x: d.scanPlacement?.x ?? x, y: d.scanPlacement?.y ?? y,
-        fontSize: d.fontSize, fontFamily: d.fontFamily,
-        bold: d.bold, italic: d.italic, color: d.color,
+        fontSize: d.fontSize, fontFamily: faceProps?.family ?? d.fontFamily,
+        bold: faceProps ? faceProps.bold : d.bold, italic: faceProps ? faceProps.italic : d.italic, color: d.color,
         ...replaceProps,
         ...ocrProps,
         ...docFontProps,
         ...styleSourceProps,
+        ...fontDecisionProps,
       }));
       // Authored text stays SELECTED (the user sees it's an object; a format
       // tweak right after the blur-commit still lands). A Ganti Teks commit
@@ -2500,7 +2579,9 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
         const oc = gantiCoverId && page?.editOutcomes?.find((o) => o.coverId === gantiCoverId);
         if (oc) {
           tel('surgery', oc.surgery);
-          if (oc.insert) tel('insert', oc.insert);
+          // flips is editor state (js/v2/line-font-live.js), so it joins the
+          // stamp's outcome here rather than riding the model.
+          if (oc.insert) tel('insert', { ...oc.insert, flips: gantiFlips });
         }
         // BUG 1 FIX (2026-07-27, founder field test on a 444-page doc): the
         // "after" raster for the oracle/sample MUST be what rebakePage()

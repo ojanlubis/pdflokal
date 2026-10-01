@@ -47,7 +47,12 @@ const VALID_PROPS = {
   ganti_tap: { hit: true },
   ganti_commit: { outcome: 'commit', font_path: 'doc-font' },
   surgery: { matched: true, reason: 'clean' },
-  insert: { path: 'native', reason: 'clean', style_source: 'pdf-name', glyph_shortfall: 0 },
+  // decision/decided_live/flips added 2026-10-01 (edit font design B8),
+  // ADDITIVE and OPTIONAL (OPTIONAL_PROPS; seat ruling: a new prop is never required).
+  insert: {
+    path: 'native', reason: 'clean', style_source: 'pdf-name', glyph_shortfall: 0,
+    decision: 'native', decided_live: true, flips: 0,
+  },
   commit_paint: { duration: 250, pages: '2-5', device: 'phone' },
   // failure — the rail's export/commit blind spot, closed 2026-07-28 with its
   // own first case (a protected PDF that views fine and can never be written).
@@ -397,4 +402,26 @@ test('REGRESSION (the 2026-07-28 incident number, 863/669): ratioBucket calls it
   // The fix: inkRatioBucket's tighter 1.1 cut does NOT call this near-parity.
   assert.equal(inkRatioBucket(incidentRatio), 'higher');
   assert.notEqual(inkRatioBucket(incidentRatio), 'near-parity');
+});
+
+// ---- optional props (seat ruling 2026-10-01: a new prop is never required) ----
+// The insert event gained decision/decided_live/flips. api/t.js validates with
+// this module, so if they were required every cached PWA client — sending the
+// pre-2026-10-01 shape — would lose the WHOLE insert event until it refreshed.
+const OLD_INSERT = { path: 'native', reason: 'clean', style_source: 'pdf-name', glyph_shortfall: 0 };
+
+test('an OLD-shape insert (no decision/decided_live/flips) still validates and lands intact', () => {
+  const r = validateEvent('insert', OLD_INSERT);
+  assert.equal(r.ok, true, 'a cached client\'s insert must not be dropped');
+  assert.deepEqual(r.clean, OLD_INSERT, 'absent optional props are not invented');
+});
+
+test('optional props are still TYPE-checked when present, and only those three may be absent', () => {
+  assert.equal(validateEvent('insert', { ...OLD_INSERT, decision: 'substitute' }).ok, true);
+  assert.equal(validateEvent('insert', { ...OLD_INSERT, decision: 'helvetica' }).ok, false);
+  assert.equal(validateEvent('insert', { ...OLD_INSERT, flips: -1 }).ok, false);
+  assert.equal(validateEvent('insert', { ...OLD_INSERT, decided_live: 'yes' }).ok, false);
+  const { glyph_shortfall: _g, ...noShortfall } = OLD_INSERT;
+  assert.equal(validateEvent('insert', noShortfall).ok, false, 'an OLD prop stays required');
+  assert.equal(validateEvent('surgery', { matched: true }).ok, false, 'no other event gained optionals');
 });

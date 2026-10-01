@@ -198,9 +198,21 @@ test.describe('edit beta: rename + first-commit feedback', () => {
     // the real document on every path — undangan-cid.pdf's Montserrat font
     // has an informative /BaseFont, so this resolves cleanly to 'pdf-name'
     // every run.
-    expect(evs.find((e) => e.event === 'insert').props).toEqual({
-      path: 'native', reason: 'clean', style_source: 'pdf-name', glyph_shortfall: 0,
+    // decision/decided_live (2026-10-01, edit font design B8) are ADDITIVE.
+    // decision must be 'native': the one-font decision may never demote a line
+    // the doc font covers. decided_live is true when the editor's fonts loaded
+    // before the commit and false when the commit beat them (the old ladder
+    // then decided) — a real race, so only its type is pinned. The key set is
+    // still pinned exactly, so no OTHER prop can creep in.
+    const insert = evs.find((e) => e.event === 'insert').props;
+    expect(insert).toMatchObject({
+      path: 'native', reason: 'clean', style_source: 'pdf-name', glyph_shortfall: 0, decision: 'native',
     });
+    expect(typeof insert.decided_live).toBe('boolean');
+    expect(Number.isInteger(insert.flips)).toBe(true);
+    expect(Object.keys(insert).sort()).toEqual(
+      ['decided_live', 'decision', 'flips', 'glyph_shortfall', 'path', 'reason', 'style_source'],
+    );
   });
 });
 

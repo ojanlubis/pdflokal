@@ -23,6 +23,7 @@
 
 import { buildExportPlan } from './operations.js';
 import { applyPageSurgery } from './page-surgery.js';
+import { resolveDecidedFont } from './stamp.js';
 import { CLONE_FONT_VARIANTS, CLONE_FONT_URLS, isSfntFontProgram } from './clone-fonts.js';
 import { toStandardFontSafe, drawTextSafe, unencodableInStandardFont } from './text-encode.js';
 import { totalPageRotation } from './page-rotation.js';
@@ -282,8 +283,22 @@ async function drawTextAsImage(pdfPage, anno, frame, env, text) {
   return true;
 }
 
+// A Ganti replacement whose stamp did NOT bake (its cover's surgery declined:
+// no match, a moved cover, an encrypted source) still carries the font the
+// user watched while typing (core/line-font.js). Draw it in THAT font — the
+// doc's own program off this copied page, or the bundled TTF — re-verified by
+// the same resolveDecidedFont the stamp uses. Before 2026-10-01 this path drew
+// the twin's family, which for most edits was whole-line Helvetica: a face the
+// user never saw. null = no decision, or it did not verify → the twin as before.
+async function decidedFontFor(pdfPage, anno, env, text) {
+  if (!anno.replaceCoverId || !anno.fontDecision || !env.fontkit) return null;
+  const r = await resolveDecidedFont(pdfPage, env.PDFLib, env.fontkit, anno.fontDecision, text);
+  return r.ok ? r.font : null;
+}
+
 async function drawText(pdfPage, anno, frame, env) {
-  const font = await env.getFont(anno.fontFamily, anno.bold, anno.italic);
+  const font = await decidedFontFor(pdfPage, anno, env, toStandardFontSafe(anno.text))
+    || await env.getFont(anno.fontFamily, anno.bold, anno.italic);
   const color = parseHexColor(env.PDFLib, anno.color);
   const rotate = env.PDFLib.degrees(frame.rotation);
   const size = anno.fontSize || DEFAULT_FONT_SIZE.text;

@@ -211,18 +211,27 @@ export async function planNativeInserts(pdfPage, PDFLib, fontkit, annotations, s
       // text annotation's own field) — stamp.js never re-derives style, only
       // echoes this through for the `insert` telemetry event.
       const style = { bold: !!anno.bold, italic: !!anno.italic, styleSource: anno.styleSource || 'none' };
-      const resolved = await resolveStampFont(pdfPage, PDFLib, fontkit, insert, text, style);
+      // fontDecision (core/line-font.js): the ONE font the editor showed while
+      // the user typed. The stamp follows it and re-verifies it; null for an
+      // edit committed before its fonts loaded (old ladder, as before).
+      const resolved = await resolveStampFont(pdfPage, PDFLib, fontkit, insert, text, style, anno.fontDecision || null);
       const styleSource = resolved.styleSource || 'none';
       const glyphShortfall = glyphShortfallBucket(resolved.glyphShortfall);
+      // decision/decided_live are ADDITIVE (B8): path/reason keep their
+      // meaning; `decision` adds the substitute rung `path` cannot name, and
+      // decided_live says whether the editor's choice is what got baked.
+      const decisionProps = { decision: resolved.decision || 'none', decided_live: !!resolved.decidedLive };
       if (resolved.ok) {
         stampText(pdfPage, PDFLib, resolved.font, insert, text, anno.color);
         skipDraw.add(anno.id);
         insertOutcomes.set(anno.id, {
           path: resolved.path, reason: 'clean', style_source: styleSource, glyph_shortfall: glyphShortfall,
+          ...decisionProps,
         });
       } else {
         insertOutcomes.set(anno.id, {
           path: 'twin', reason: resolved.reason, style_source: styleSource, glyph_shortfall: glyphShortfall,
+          ...decisionProps,
         });
       }
     } catch (err) {
@@ -323,6 +332,9 @@ export function editSignature(page) {
         color: replacement.color,
       }
       : null,
+    // The line's font decision changes what the stamp embeds, so a changed
+    // decision with identical text MUST re-bake (B1).
+    fontDecision: replacement?.fontDecision ?? null,
   }));
   return JSON.stringify(parts);
 }
