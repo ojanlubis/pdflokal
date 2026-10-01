@@ -214,6 +214,12 @@ export function textFontCss(anno) {
 // reads kerning) or the editor's word is wider/narrower than the file's.
 export function applyTextFont(el, anno) {
   el.style.font = textFontCss(anno);
+  // The `font` shorthand above resets line-height. A paragraph (Rung D,
+  // core/block-edit.js) is laid out at its OWN leading — the editor and the
+  // committed overlay both — so it is re-applied here, the one place every
+  // font change passes through.
+  const lead = blockLineHeight(anno);
+  if (lead) el.style.lineHeight = `${lead}px`;
   if (decidedFontFamily(anno)) {
     el.style.fontKerning = 'none';
     el.style.fontSynthesis = 'none';
@@ -222,6 +228,39 @@ export function applyTextFont(el, anno) {
     el.style.fontSynthesis = '';
     delete el.dataset.fontDecided;
   }
+}
+
+// A paragraph's line height in display px (its own leading), or null. Reads a
+// committed annotation's `block` or a paragraph draft's plan — same fields.
+export function blockLineHeight(anno) {
+  const b = anno && anno.block;
+  return b && b.k > 0 && b.leading > 0 ? b.k * b.leading : null;
+}
+
+// Rung D: a committed paragraph, one absolutely placed row per PAINTED line
+// (block.lines, the breaks the editor showed), each laid out by the same CSS
+// the paragraph editor used — same face, size, line height, alignment — so the
+// rows' baselines and justified edges are the editor's own. A row is
+// justified exactly when core/reflow.js layoutLines would stretch it: not the
+// last line, not before a typed break, and it has a space to stretch.
+function renderBlockRows(el, anno) {
+  const b = anno.block;
+  const lead = b.k * b.leading;
+  const last = b.lines.length - 1;
+  b.lines.forEach((line, i) => {
+    const row = document.createElement('div');
+    const indent = i === 0 && b.align !== 'right' ? b.k * (b.indent || 0) : 0;
+    applyTextFont(row, anno);
+    const stretch = b.align === 'justify' && i !== last && !line.hard && line.text.includes(' ');
+    const align = b.align === 'justify' ? 'left' : b.align;
+    row.style.cssText += `;position:absolute;left:${indent}px;top:${i * lead}px;width:${b.k * b.width - indent}px;`
+      + `height:${lead}px;white-space:pre;text-align:${stretch ? 'justify' : align};`
+      + `text-align-last:${stretch ? 'justify' : align}`;
+    row.textContent = line.text;
+    el.appendChild(row);
+  });
+  el.style.width = `${b.k * b.width}px`;
+  el.style.height = `${b.lines.length * lead}px`;
 }
 
 // SINGLE SOURCE OF TRUTH for how WIDE a text annotation paints, in page-space
@@ -262,7 +301,10 @@ export function renderAnnotationEl(anno) {
   // release (interaction.js tap-candidate). decorateSelected() sets
   // touch-action:none so the SELECTED object drags instead of scrolling.
 
-  if (anno.type === 'text') {
+  if (anno.type === 'text' && anno.block && Array.isArray(anno.block.lines)) {
+    el.style.color = anno.color || '#000';
+    renderBlockRows(el, anno);
+  } else if (anno.type === 'text') {
     el.textContent = anno.text || '';
     applyTextFont(el, anno);
     el.style.color = anno.color || '#000';

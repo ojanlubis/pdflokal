@@ -1007,5 +1007,17 @@
     "src": [
       "js/theme.js"
     ]
+  },
+  "toast.blockGrew": {
+    "text": "Teksnya jadi lebih panjang dari paragraf asli",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
+  "toast.blockPastPage": {
+    "text": "Teksnya udah sampai ujung halaman",
+    "src": [
+      "js/v2/app.js"
+    ]
   }
 }

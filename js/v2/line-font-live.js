@@ -95,7 +95,7 @@ function caretOffset(ed) {
 // was. Refusal only ever REMOVES characters at or before the caret (the key
 // just pressed, or the unwritable chars of a paste the caret sits after), so
 // shifting the offset left by the length difference lands it right.
-function replaceText(ed, before, after) {
+export function replaceText(ed, before, after) {
   const offset = caretOffset(ed);
   ed.textContent = after;
   const node = ed.firstChild;
@@ -126,7 +126,10 @@ function faceId(decision) {
 // stack. `lineKey` is the line's own /Font resource (rides the stored decision
 // so a re-edit can re-load the doc font without re-deriving the line).
 // Returns { decideNow(text), flips } or null when the editor is already gone.
-export function startLineFont({ draft, candidates, lineKey = null, onRefuse }) {
+// `onShow(decision)` (optional, Rung D) runs after every face the editor
+// switches to — the paragraph editor re-measures its baseline then, because a
+// different face has a different ascent.
+export function startLineFont({ draft, candidates, lineKey = null, onRefuse, onShow }) {
   const ed = draft && draft.editorEl;
   if (!ed || !ed.isConnected) return null;
   const live = candidates.filter(Boolean);
@@ -152,6 +155,7 @@ export function startLineFont({ draft, candidates, lineKey = null, onRefuse }) {
     // Read by tests and by nothing else: which face the editor is painting.
     ed.dataset.fontPath = decision.path;
     ed.dataset.fontFace = decision.face || decision.key || '';
+    if (onShow) onShow(decision);
   };
 
   // First decision, on whatever the editor holds now (normally the untouched
@@ -199,5 +203,12 @@ export function startLineFont({ draft, candidates, lineKey = null, onRefuse }) {
       return stored(decideLineFont(text, live));
     },
     get flips() { return state.flips; },
+    // Re-judge whatever the editor holds NOW and make it the accepted text —
+    // for a caller that changed the text itself (the paragraph editor undoing
+    // a keystroke that would run off the page).
+    resync() {
+      state.accepted = ed.textContent;
+      show(decideLineFont(state.accepted, live));
+    },
   };
 }

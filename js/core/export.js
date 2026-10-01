@@ -23,7 +23,8 @@
 
 import { buildExportPlan } from './operations.js';
 import { applyPageSurgery } from './page-surgery.js';
-import { resolveDecidedFont } from './stamp.js';
+import { resolveDecidedFont, blockText } from './stamp.js';
+import { placeBlockLines } from './block-edit.js';
 import { CLONE_FONT_VARIANTS, CLONE_FONT_URLS, isSfntFontProgram } from './clone-fonts.js';
 import { toStandardFontSafe, drawTextSafe, unencodableInStandardFont } from './text-encode.js';
 import { totalPageRotation } from './page-rotation.js';
@@ -296,7 +297,36 @@ async function decidedFontFor(pdfPage, anno, env, text) {
   return r.ok ? r.font : null;
 }
 
+// RUNG D: a whole-paragraph edit whose stamp did not bake (its cover's
+// surgery declined) still draws its painted lines at the block's own leading
+// and alignment, in PDF user space — never at the twin's 1.2 line height from
+// `anno.y`. Same placement function the stamp uses (core/block-edit.js), with
+// this font's widths. The block's coordinates are the SOURCE page's user
+// space, which is the frame annotations are drawn in here (rotation is /Rotate
+// metadata; a merged page is drawn at native scale and scaled afterwards), so
+// they are neither transformed nor scaled.
+async function drawBlockText(pdfPage, anno, env) {
+  const block = anno.block;
+  const joined = toStandardFontSafe(blockText(block));
+  const font = await decidedFontFor(pdfPage, anno, env, joined)
+    || await env.getFont(anno.fontFamily, anno.bold, anno.italic);
+  const color = parseHexColor(env.PDFLib, anno.color);
+  if (typeof env.rasterizeText === 'function' && !fontCanPaint(font, joined)) {
+    const asLines = block.lines.map((l) => l.text).join('\n');
+    if (await drawTextAsImage(pdfPage, { ...anno, fontSize: anno.fontSize || DEFAULT_FONT_SIZE.text }, env.frame, env, asLines)) return;
+  }
+  const size = block.size;
+  const widthOf = (str) => font.widthOfTextAtSize(toStandardFontSafe(str), size);
+  for (const line of placeBlockLines(block, widthOf)) {
+    for (const seg of line.segments) drawTextSafe(pdfPage, seg.text, { x: seg.x, y: line.y, size, font, color });
+  }
+}
+
 async function drawText(pdfPage, anno, frame, env) {
+  if (anno.block && Array.isArray(anno.block.lines) && anno.block.lines.length) {
+    await drawBlockText(pdfPage, anno, { ...env, frame });
+    return;
+  }
   const font = await decidedFontFor(pdfPage, anno, env, toStandardFontSafe(anno.text))
     || await env.getFont(anno.fontFamily, anno.bold, anno.italic);
   const color = parseHexColor(env.PDFLib, anno.color);

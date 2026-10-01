@@ -29,7 +29,7 @@
  * branch, as those code paths stabilize. Their enum values were checked
  * against the actual ladder code on feat/edit-teks-asli where it already
  * exists (reinsert.js's decline reasons, text-walk.js's match/decline paths,
- * text-blocks.js's align classifier) — see the telemetry PR notes for the
+ * the D1 block clusterer's align classifier) — see the telemetry PR notes for the
  * one enum that's a best-effort naming (surgery.reason) rather than a
  * verbatim existing constant, since the match step itself has no named
  * reason in the code today, only a matched:boolean.
@@ -575,6 +575,14 @@ export const SCHEMA = {
     decision: ['native', 'clone', 'substitute', 'none'],
     decided_live: 'bool',
     flips: 'int',
+    // ---- two props added 2026-10-01 (Rung D, whole-paragraph edit), ADDITIVE
+    // and OPTIONAL: present only when the replacement is a paragraph.
+    //   block_lines — lines the paragraph was written in (its painted breaks).
+    //   reflowed    — the breaks MOVED: a different line count, or a line
+    //                 holding a different number of words than the original
+    //                 line in its slot (core/block-edit.js blockAnnotation).
+    block_lines: 'int',
+    reflowed: 'bool',
   },
   // ---------------------------------------------------------------------
   // `block_edit` was DELETED here on 2026-07-28. Read this before re-adding it.
@@ -603,6 +611,25 @@ export const SCHEMA = {
   // construction. If Rung D ships, re-add it WITH its call site in the same
   // change — never ahead of it.
   // ---------------------------------------------------------------------
+  // RE-ADDED 2026-10-01 WITH its call sites (js/v2/app.js smartReplace and the
+  // paragraph editor's overflow guard), per the note above. One row per tap on
+  // a line that paragraph-detect.js placed in a body-text block:
+  //   outcome 'open'     — the whole paragraph opened for editing
+  //           'decline'  — it could not be proven editable as one; the tap fell
+  //                        back to today's per-line edit (decline_reason says why)
+  //           'overflow' — a keystroke was refused because the paragraph would
+  //                        have grown past the bottom of the page
+  //   decline_reason — core/block-edit.js BLOCK_DECLINE_REASONS, written out
+  //                    here (api/t.js imports this file; it stays a leaf) and
+  //                    pinned equal by tests/core/block-edit.test.mjs; present
+  //                    only with outcome 'decline' (OPTIONAL_PROPS)
+  //   block_lines    — the paragraph's ORIGINAL line count
+  // The commit's own outcome rides `insert` (block_lines, reflowed).
+  block_edit: {
+    outcome: ['open', 'decline', 'overflow'],
+    decline_reason: ['rotated', 'mixed-sizes', 'columns', 'list', 'not-prose', 'heading', 'align-unknown'],
+    block_lines: 'int',
+  },
   commit_paint: {
     duration: 'duration',
     pages: PAGES_BUCKET,
@@ -809,7 +836,8 @@ function validateProp(descriptor, value) {
 // table, not a descriptor wrapper, so every descriptor in SCHEMA keeps its
 // enum/bool/int shape (the no-string-prop law walks them).
 export const OPTIONAL_PROPS = {
-  insert: new Set(['decision', 'decided_live', 'flips']),
+  insert: new Set(['decision', 'decided_live', 'flips', 'block_lines', 'reflowed']),
+  block_edit: new Set(['decline_reason']),
 };
 
 // Pure, no I/O. {ok:true, clean} | {ok:false}. Strict on every axis the spec

@@ -52,7 +52,12 @@ const VALID_PROPS = {
   insert: {
     path: 'native', reason: 'clean', style_source: 'pdf-name', glyph_shortfall: 0,
     decision: 'native', decided_live: true, flips: 0,
+    // block_lines/reflowed added 2026-10-01 (Rung D), ADDITIVE and OPTIONAL.
+    block_lines: 5, reflowed: true,
   },
+  // block_edit (2026-10-01, Rung D): re-added WITH its call sites.
+  // decline_reason is OPTIONAL (present only on outcome 'decline').
+  block_edit: { outcome: 'decline', decline_reason: 'columns', block_lines: 4 },
   commit_paint: { duration: 250, pages: '2-5', device: 'phone' },
   // failure — the rail's export/commit blind spot, closed 2026-07-28 with its
   // own first case (a protected PDF that views fine and can never be written).

@@ -38,12 +38,13 @@
  */
 
 import { extractFontProgram, lookupFontObject } from './doc-fonts.js';
-import { drawTextSafe } from './text-encode.js';
+import { drawTextSafe, toStandardFontSafe } from './text-encode.js';
 import { getFontStyleInfo } from './font-style.js';
 import { cloneFamilyFor } from './font-decide.js';
 import { CLONE_FONT_VARIANTS, CLONE_FONT_URLS, isSfntFontProgram } from './clone-fonts.js';
 import { fingerprintProgram, FAMILY_BUCKET_TO_CLONE } from './font-fingerprint.js';
 import { textCoveredBy, countMissingGlyphs, decideLineFont } from './line-font.js';
+import { placeBlockLines } from './block-edit.js';
 
 // ---- shared little helpers ---------------------------------------------------
 
@@ -492,4 +493,26 @@ export function stampText(pdfPage, PDFLib, font, insert, text, color) {
   // 2026-07-29 live breakage, on a build that already "fixed" WinAnsi at a
   // different call site. See text-encode.js's drawTextSafe.
   drawTextSafe(pdfPage, text, opts);
+}
+
+// RUNG D: a whole paragraph, one drawText per stored line (per word on a
+// justified line), at the positions core/block-edit.js places them with THIS
+// font's own advance widths. `block` is the committed annotation's `block`:
+// its lines are the breaks the editor painted, never re-wrapped here.
+// Horizontal by construction (a rotated block declines at tap time).
+export function stampBlock(pdfPage, PDFLib, font, block, color) {
+  const [r, g, b] = hexToRgb01(color);
+  const size = block.size;
+  // Measure exactly the string drawTextSafe will hand pdf-lib.
+  const widthOf = (str) => font.widthOfTextAtSize(toStandardFontSafe(str), size);
+  for (const line of placeBlockLines(block, widthOf)) {
+    for (const seg of line.segments) {
+      drawTextSafe(pdfPage, seg.text, { x: seg.x, y: line.y, size, font, color: PDFLib.rgb(r, g, b) });
+    }
+  }
+}
+
+// The text a block's font must cover: every painted line, breaks dropped.
+export function blockText(block) {
+  return block.lines.map((l) => l.text).join(' ');
 }

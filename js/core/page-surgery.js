@@ -32,7 +32,7 @@
  */
 
 import { removeRunsFromPdfPage } from './redact.js';
-import { resolveStampFont, stampText } from './stamp.js';
+import { resolveStampFont, stampText, stampBlock, blockText } from './stamp.js';
 import { glyphShortfallBucket } from './telemetry-schema.js';
 import { totalPageRotation } from './page-rotation.js';
 
@@ -204,7 +204,13 @@ export async function planNativeInserts(pdfPage, PDFLib, fontkit, annotations, s
     const insert = insertByCover.get(anno.replaceCoverId);
     if (!insert) continue;
     try {
-      const text = anno.text ?? '';
+      // RUNG D: a whole-paragraph edit carries its painted lines on `block`.
+      // The font is resolved (and the decision re-verified) over the lines
+      // joined — the same characters, minus breaks, so the stamp's single-line
+      // `multiline` guard is not what decides a paragraph — then every line
+      // is stamped at its own baseline (core/block-edit.js placeBlockLines).
+      const isBlock = !!(anno.block && Array.isArray(anno.block.lines) && anno.block.lines.length);
+      const text = isBlock ? blockText(anno.block) : (anno.text ?? '');
       // styleSource (spec-edit-fidelity-instrumentation.md Increment B):
       // riding on the annotation since js/v2/app.js's prepareDocFont is the
       // ONLY place that ever decides it (draft.styleSource -> the committed
@@ -221,8 +227,12 @@ export async function planNativeInserts(pdfPage, PDFLib, fontkit, annotations, s
       // meaning; `decision` adds the substitute rung `path` cannot name, and
       // decided_live says whether the editor's choice is what got baked.
       const decisionProps = { decision: resolved.decision || 'none', decided_live: !!resolved.decidedLive };
+      // block_lines/reflowed: OPTIONAL `insert` props (telemetry-schema.js
+      // OPTIONAL_PROPS), present only for a paragraph edit.
+      if (isBlock) Object.assign(decisionProps, { block_lines: anno.block.lines.length, reflowed: !!anno.block.reflowed });
       if (resolved.ok) {
-        stampText(pdfPage, PDFLib, resolved.font, insert, text, anno.color);
+        if (isBlock) stampBlock(pdfPage, PDFLib, resolved.font, anno.block, anno.color);
+        else stampText(pdfPage, PDFLib, resolved.font, insert, text, anno.color);
         skipDraw.add(anno.id);
         insertOutcomes.set(anno.id, {
           path: resolved.path, reason: 'clean', style_source: styleSource, glyph_shortfall: glyphShortfall,
@@ -335,6 +345,9 @@ export function editSignature(page) {
     // The line's font decision changes what the stamp embeds, so a changed
     // decision with identical text MUST re-bake (B1).
     fontDecision: replacement?.fontDecision ?? null,
+    // RUNG D: a paragraph's painted line breaks are what the stamp draws; the
+    // same words broken differently must re-bake.
+    block: replacement?.block ?? null,
   }));
   return JSON.stringify(parts);
 }

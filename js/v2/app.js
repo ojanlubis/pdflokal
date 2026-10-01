@@ -93,7 +93,10 @@ import { planRunRemoval } from '../core/text-walk.js';
 import { extractFontProgram, lookupFontObject } from '../core/doc-fonts.js';
 import { textCoveredBy, nativeCandidate } from '../core/stamp.js';
 import { faceLadder, faceStyle } from '../core/line-font.js';
-import { loadFaceFont, startLineFont, refusalNote } from './line-font-live.js';
+import { loadFaceFont, startLineFont, refusalNote, replaceText } from './line-font-live.js';
+import { planBlockEdit, blockOfLine, blockAnnotation, blockExtent, logicalTextOf } from '../core/block-edit.js';
+import { totalPageRotation } from '../core/page-rotation.js';
+import { styleBlockEditor, placeBlockEditor, readEditorLines, editorLineCount } from './block-editor.js';
 import { resolveFontFingerprint, docFontFaceDescriptors, FAMILY_BUCKET_TO_CLONE, isInformativeBaseFont } from '../core/font-fingerprint.js';
 import { cloneFamilyFor } from '../core/font-decide.js';
 import { editSignature, pageEdits } from '../core/page-surgery.js';
@@ -1465,6 +1468,8 @@ async function prepareDocFont(pageId, line, draft, seed = null) {
       candidates: [native, ...faceCandidates],
       lineKey: fontName,
       onRefuse: (ch) => toast(refusalNote(ch)),
+      // Rung D: a paragraph editor re-seats its first baseline on every face.
+      onShow: () => draft.onFontShown?.(),
     });
   } catch (err) {
     console.warn('prepareDocFont gagal:', err);
@@ -1480,7 +1485,12 @@ async function prepareDocFont(pageId, line, draft, seed = null) {
     // in `finally` so every early return and every throw still resolves it;
     // a signal that only fires on the happy path is the kind of green that
     // can't go red.
-    if (draft?.editorEl?.isConnected) draft.editorEl.dataset.stylePrepared = '1';
+    if (draft?.editorEl?.isConnected) {
+      // A paragraph editor's face may have changed above without a decision
+      // (no candidate loaded): re-seat its baseline on whatever it paints now.
+      draft.onFontShown?.();
+      draft.editorEl.dataset.stylePrepared = '1';
+    }
   }
 }
 
@@ -1504,6 +1514,15 @@ function hitTestEditedLine(page, x, y) {
   if (edits.length === 0) return null;
   const boxes = edits.map((edit) => {
     const b = edit.cover.replaceBox;
+    // RUNG D: a committed paragraph paints as its block — box width, one
+    // leading per painted line — not as one long line of its whole text.
+    const blk = edit.replacement?.block;
+    if (blk && Array.isArray(blk.lines)) {
+      const e = blockExtent(blk, edit.replacement.y);
+      const x0 = Math.min(b.x, e.x);
+      const y0 = Math.min(b.y, e.y);
+      return { x: x0, y: y0, w: Math.max(b.x + b.w, e.x + e.w) - x0, h: Math.max(b.y + b.h, e.y + e.h) - y0, edit };
+    }
     // FIELD REPORT 2026-08-26: the birth box ALONE is not the whole target.
     // Everything above is still true — the box is the honest ANCHOR, and a
     // committed edit never drags — but the REPLACEMENT is free to be longer
@@ -1567,6 +1586,10 @@ function reEditLine(pageId, cover, replacement) {
     // FontFace is still registered), and prepareDocFont re-loads the same
     // candidates from it rather than re-deriving them.
     ...(replacement?.fontDecision ? { fontDecision: replacement.fontDecision } : {}),
+    // RUNG D: a committed paragraph reopens as the paragraph — the stored
+    // geometry IS the plan (core/block-edit.js blockAnnotation), and the box
+    // is the cover's birth box.
+    ...(replacement?.block ? { block: { ...replacement.block, box: { ...box } } } : {}),
     // Everything commit's `draft.reEdit` branch needs to remove the PREVIOUS
     // edit and reapply a fresh one against the SAME pristine-source target
     // (Decision 3: drop-and-reapply, never surgery-on-surgery).
@@ -1578,7 +1601,7 @@ function reEditLine(pageId, cover, replacement) {
       coverColor: cover.color,
     },
   };
-  openTextEditor({ pageId, x: box.x, y: box.y, anno: null, draft });
+  openTextEditor({ pageId, x: draft.block ? draft.block.disp.x : box.x, y: box.y, anno: null, draft });
   setTool('select');
   toastEl.classList.remove('show');
   // Seed font preparation from the STORED decision (edit font design, Gaps):
@@ -1645,6 +1668,25 @@ async function smartReplace(pageId, x, y) {
     return;
   }
   tel('ganti_tap', { hit: true });
+  // RUNG D (his call, seat decisions.md 2026-10-01 malam final): "if paragraph,
+  // edit the whole paragraph". A line paragraph-detect.js placed in a
+  // body-text block opens the WHOLE block when core/block-edit.js can prove it
+  // (alignment, no rotation, one size, nothing else inside the box, not a
+  // list). Anything it cannot prove declines, named on the rail, to exactly
+  // the per-line edit below — never a guess.
+  if (line.blockId !== null && line.blockId !== undefined) {
+    const pageLines = await textRuns.getLines(pageId);
+    const block = blockOfLine(pageLines, line);
+    if (block) {
+      const verdict = planBlockEdit(block, pageLines, { rotation: page ? totalPageRotation(page) : 0 });
+      if (verdict.ok) {
+        tel('block_edit', { outcome: 'open', block_lines: block.lines.length });
+        openBlockReplace(pageId, line, verdict.plan);
+        return;
+      }
+      tel('block_edit', { outcome: 'decline', decline_reason: verdict.reason, block_lines: block.lines.length });
+    }
+  }
   record(history, doc);
   const cover = addAnnotation(doc, pageId, createAnnotation('whiteout', {
     x: line.x, y: line.y, width: line.w, height: line.h,
@@ -1703,6 +1745,38 @@ async function smartReplace(pageId, x, y) {
   toastEl.classList.remove('show');
   matchReplaceColors(cover, draft, pageId, line); // async; colors land live
   prepareDocFont(pageId, line, draft); // async; never blocks the editor opening
+}
+
+// RUNG D: smartReplace's tail for a whole paragraph. Same one-undo-step cover +
+// prefilled editor + colour match + font preparation as a line; what differs
+// is the target (every run of every line of the block — replaceTargets was
+// always an array), the box (the block's), and the draft's `block` plan, which
+// openTextEditor turns into the paragraph's box.
+function openBlockReplace(pageId, line, plan) {
+  record(history, doc);
+  const cover = addAnnotation(doc, pageId, createAnnotation('whiteout', {
+    x: plan.box.x, y: plan.box.y, width: plan.box.w, height: plan.box.h,
+    replaceTargets: plan.targets,
+    replaceBox: { x: plan.box.x, y: plan.box.y, w: plan.box.w, h: plan.box.h },
+  }));
+  syncPage(pageId);
+  track('editor_action', { action: 'ganti_teks' });
+  const draft = {
+    text: plan.text,
+    fontSize: plan.k * plan.size,
+    fontFamily: mapRunFont(line.fontFamily, line.fontName),
+    recorded: true,
+    replaceCoverId: cover.id,
+    onCancel: () => { removeAnnotation(doc, cover.id); syncPage(pageId); },
+    block: plan,
+  };
+  openTextEditor({ pageId, x: plan.disp.x, y: plan.box.y, anno: null, draft });
+  setTool('select');
+  toastEl.classList.remove('show');
+  matchReplaceColors(cover, draft, pageId, line); // async; colors land live
+  // The font is decided over the WHOLE paragraph: every run of every line goes
+  // to the dry run, so its dominant run is the paragraph's, not the tapped line's.
+  prepareDocFont(pageId, { runs: plan.runs }, draft);
 }
 
 // ---- Rung S2: the same gesture on a scan (spec-edit-dokumen-foto.md §3) -------------
@@ -2239,6 +2313,10 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
   applyTextFont(ed, style);
   ed.style.color = style.color || '#000';
   ed.textContent = anno?.text || draft?.text || '';
+  // RUNG D: a paragraph draft turns the editor into the paragraph's box (its
+  // width, alignment, indent; line height comes with the font, above).
+  const blockPlan = draft?.block || null;
+  if (blockPlan) styleBlockEditor(ed, blockPlan);
 
   // Hide the original while editing (the editor visually replaces it).
   const origEl = anno ? overlay.querySelector(`[data-anno-id="${anno.id}"]`) : null;
@@ -2266,7 +2344,11 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
     if (committed) return;
     committed = true;
     releaseKeyboardWatch(); // before ed.remove(), so the listener never outlives its element
-    const text = ed.textContent.trim();
+    // RUNG D: read the paragraph's line breaks off the editor BEFORE it leaves
+    // the DOM — they are what the file will hold (js/v2/block-editor.js).
+    const blockLines = blockPlan ? readEditorLines(ed) : null;
+    const blockTop = blockPlan ? parseFloat(ed.style.top) : null;
+    const text = blockLines ? logicalTextOf(blockLines) : ed.textContent.trim();
     ed.remove();
     editingAnno = null;
     editingEl = null;
@@ -2424,7 +2506,9 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
       // (ratified over per-tier wording). Ordinary (non-Ganti) text never
       // carries replaceCoverId, so never toasts here.
       if (d.replaceCoverId) {
-        const covered = !!d.docFontkitFont && textCoveredBy(d.docFontkitFont, text);
+        // A paragraph's typed line breaks are layout, not glyphs to cover.
+        const coverText = blockLines ? text.replace(/[\r\n]/g, '') : text;
+        const covered = !!d.docFontkitFont && textCoveredBy(d.docFontkitFont, coverText);
         // Name-only ruling (2026-07-20 evening): a file with NO embedded
         // program + an exact metric clone routed = nothing real was
         // substituted — silent. See prepareDocFont for the fields' WHY.
@@ -2437,8 +2521,14 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
         gantiCoverId = d.replaceCoverId;
         gantiDocFont = covered;
       }
+      // RUNG D: the painted lines + the paragraph's geometry ride the
+      // replacement (core/block-edit.js blockAnnotation); it sits where the
+      // editor sat.
+      const blockProps = blockLines && d.replaceCoverId ? { block: blockAnnotation(draft.block, blockLines) } : {};
       const created = addAnnotation(doc, pageId, createAnnotation('text', {
-        text, x: d.scanPlacement?.x ?? x, y: d.scanPlacement?.y ?? y,
+        text,
+        x: blockProps.block ? draft.block.disp.x : (d.scanPlacement?.x ?? x),
+        y: blockProps.block ? blockTop : (d.scanPlacement?.y ?? y),
         fontSize: d.fontSize, fontFamily: faceProps?.family ?? d.fontFamily,
         bold: faceProps ? faceProps.bold : d.bold, italic: faceProps ? faceProps.italic : d.italic, color: d.color,
         ...replaceProps,
@@ -2446,7 +2536,19 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
         ...docFontProps,
         ...styleSourceProps,
         ...fontDecisionProps,
+        ...blockProps,
       }));
+      // RUNG D, spec §6 (his ⚖, recommended default): width is law, height is
+      // not. A paragraph that grew past its own lines into the text below it
+      // says so once, plainly; nothing is shrunk or clipped.
+      if (blockProps.block) {
+        const b = blockProps.block;
+        // Ink, not line boxes: the last baseline plus a descender (the same
+        // measure the page-bottom guard uses), against the top of the box of
+        // the nearest line below.
+        const grownBottom = b.disp.y + (b.lines.length - 1) * b.k * b.leading + 0.25 * b.k * b.size;
+        if (b.lines.length > b.srcLines && b.below !== null && grownBottom > b.below) toast(tr('toast.blockGrew'));
+      }
       // Authored text stays SELECTED (the user sees it's an object; a format
       // tweak right after the blur-commit still lands). A Ganti Teks commit
       // does NOT auto-select: post-commit selection resurfaces the format bar
@@ -2652,6 +2754,40 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
 
   overlay.appendChild(ed);
   ed.focus();
+  if (blockPlan) {
+    // First baseline onto the paragraph's first baseline — now, once the
+    // editor has a layout, and again on every face change (prepareDocFont /
+    // line-font-live.js call draft.onFontShown) or late web-font load.
+    const place = () => placeBlockEditor(ed, blockPlan);
+    draft.onFontShown = place;
+    place();
+    document.fonts?.ready?.then(place).catch(() => {});
+    // Width is law, height is not — but never past the page. A keystroke that
+    // would push the last line off the bottom of the page is undone, said
+    // once, and counted (decline-never-guess at input, the shape slice 1 set
+    // for a character no font can write).
+    const pageH = slot.page.height;
+    let lastGood = ed.textContent;
+    let composing = false;
+    const guard = () => {
+      if (composing || !ed.isConnected) return;
+      const lead = blockPlan.k * blockPlan.leading;
+      const lastBaseline = blockPlan.disp.y + (editorLineCount(ed, blockPlan) - 1) * lead;
+      if (lastBaseline + 0.25 * blockPlan.k * blockPlan.size > pageH) {
+        replaceText(ed, ed.textContent, lastGood);
+        draft.lineFont?.resync?.();
+        toast(tr('toast.blockPastPage'));
+        tel('block_edit', { outcome: 'overflow', block_lines: blockPlan.srcLines });
+      } else {
+        lastGood = ed.textContent;
+      }
+    };
+    // A microtask, so it judges the text AFTER line-font-live.js's own input
+    // handler has accepted or refused the keystroke.
+    ed.addEventListener('input', () => { Promise.resolve().then(guard); });
+    ed.addEventListener('compositionstart', () => { composing = true; });
+    ed.addEventListener('compositionend', () => { composing = false; Promise.resolve().then(guard); });
+  }
   // focus is what raises the keyboard, so the watch starts here and is released
   // in commit() above — the only path out of this editor.
   releaseKeyboardWatch = keepAboveKeyboard(ed);
