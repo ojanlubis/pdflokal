@@ -54,6 +54,11 @@ export default {
     preparing: 'Sebentar, lagi disiapkan',
     fontSubstituteResult: 'Sebagian teks memakai font pengganti yang mirip di file hasil',
     fontSubstituteChar: 'Huruf ini memakai font pengganti yang mirip',
+    // Rung D, the whole-paragraph edit. TODO(copy): both are placeholders for his words.
+    // blockGrew is spec-rung-d-reflow.md §6's draft line (a grown paragraph now reaches
+    // the text under it); blockPastPage refuses a keystroke that would leave the page.
+    blockGrew: 'Teksnya jadi lebih panjang dari paragraf asli', // TODO(copy)
+    blockPastPage: 'Teksnya udah sampai ujung halaman', // TODO(copy)
     extractDone: 'Selesai! {count} halaman diekstrak jadi PDF baru',
     extractFailed: 'Waduh, gagal mengekstrak. Coba sekali lagi ya',
     signatureReplaced: 'Tanda tangan diganti',

@@ -125,6 +125,11 @@ export function createTextRunIndex({ getDoc }) {
       // (it walks the content stream directly, never the display viewport);
       // `m` above is the viewport-projected matrix and must never feed it.
       const [ux, uy] = normalize(item.transform[0], item.transform[1]);
+      // org: the run's BASELINE ORIGIN in display (page-space) px — the
+      // transform applied to (0,0). Rung D (core/block-edit.js) places the
+      // paragraph editor on the original first baseline from it, instead of
+      // inverting the box arithmetic above from a second file.
+      const org = pdfjs.Util.applyTransform([0, 0], m);
       runs.push({
         str: item.str,
         x: Math.min(...xs) - pad,
@@ -134,6 +139,7 @@ export function createTextRunIndex({ getDoc }) {
         size: fh,
         fontName: item.fontName,
         fontFamily: style.fontFamily || '',
+        org: { x: org[0], y: org[1] },
         pdf: {
           x0: item.transform[4], y0: item.transform[5],
           ux, uy,

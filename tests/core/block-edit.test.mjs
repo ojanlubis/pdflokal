@@ -25,7 +25,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
-  planBlockEdit, placeBlockLines, blockAnnotation, prefillText, blockOfLine, blockExtent,
+  planBlockEdit, placeBlockLines, blockAnnotation, prefillText, blockOfLine, blockExtent, logicalTextOf,
   BLOCK_DECLINE_REASONS,
 } from '../../js/core/block-edit.js';
 import { wrapText } from '../../js/core/reflow.js';
@@ -106,14 +106,14 @@ test('1. a justified paragraph opens: alignment, box, leading, size, origin, dis
 test('2. ragged right is left; ragged left is right; a first-line indent is carried', () => {
   const left = [
     mkLine('Lorem ipsum dolor sit amet', 72, 700, 280),
-    mkLine('consectetur adipiscing elit sed', 72, 685, 220),
+    mkLine('consectetur adipiscing elit sed', 72, 685, 265),
     mkLine('do eiusmod tempor', 72, 670, 150),
   ];
   assert.equal(planBlockEdit(blockOf(left), left).plan.align, 'left');
 
   const right = [
     mkLine('Lorem ipsum dolor sit amet', 92, 700, 280),
-    mkLine('consectetur adipiscing elit sed', 152, 685, 220),
+    mkLine('consectetur adipiscing elit sed', 100, 685, 272),
     mkLine('do eiusmod tempor', 222, 670, 150),
   ];
   const r = planBlockEdit(blockOf(right), right);
@@ -160,16 +160,71 @@ test('3. each decline reason fires on its case (and the enum matches the telemet
   ];
   assert.deepEqual(planBlockEdit(blockOf(ragged), ragged), { ok: false, reason: 'align-unknown' });
 
-  // columns: another line (not in the block) sits inside the block's band
+  // columns: another line (not in the block) sits inside the block's band,
+  // off the block's baselines
   const para = justified();
-  const intruder = { ...mkLine('Kolom', 300, 685, 40), blockId: null };
+  const intruder = { ...mkLine('Kolom', 300, 692, 40), blockId: null };
   assert.deepEqual(planBlockEdit(blockOf(para), [...para, intruder]), { ok: false, reason: 'columns' });
+  // ...a SMALLER one there is a footnote marker inside the paragraph
+  const marker = { ...mkLine('2', 372, 690, 4, 7), blockId: null };
+  assert.deepEqual(planBlockEdit(blockOf(para), [...para, marker]), { ok: false, reason: 'mixed-sizes' });
+
+  // not-prose: a column of numbers / one-word cells
+  const nums = [mkLine('15', 72, 700, 10), mkLine('694', 72, 685, 15), mkLine('850', 72, 670, 15)];
+  assert.deepEqual(planBlockEdit(blockOf(nums), nums), { ok: false, reason: 'not-prose' });
+
+  // not-prose: a table of contents (dot leaders to page numbers)
+  const toc = justified().map((l) => mkLine(`${l.str.slice(0, 20)} ........................ 1`, 72, l.pdf.y0, l.pdf.len));
+  assert.deepEqual(planBlockEdit(blockOf(toc), toc), { ok: false, reason: 'not-prose' });
+  // list: multi-level numbering
+  const num = justified();
+  num[0] = mkLine('14.1 Lorem ipsum dolor sit amet consectetur', 72, 700, 300);
+  assert.deepEqual(planBlockEdit(blockOf(num), num), { ok: false, reason: 'list' });
+
+  // list: a column of form values
+  const values = [
+    mkLine(': Staf Administrasi Umum', 140, 700, 120), mkLine(': 3201234567890001 nomor', 140, 685, 120),
+    mkLine(': Budi Santoso', 140, 670, 80),
+  ];
+  assert.deepEqual(planBlockEdit(blockOf(values), values), { ok: false, reason: 'list' });
+  // list: the line above is this item's marker line, hanging at the margin
+  const tail = justified().map((l) => mkLine(l.str, 92, l.pdf.y0, l.pdf.len - 20));
+  const itemHead = { ...mkLine('(3) Peraturan Pemerintah Daerah yang dimaksud', 72, 715, 300), blockId: null };
+  assert.deepEqual(planBlockEdit(blockOf(tail), [...tail, itemHead]), { ok: false, reason: 'list' });
+
+  // not-prose: stacked labels — each line ends with room for the next word
+  const labels = [
+    mkLine('Warga Negara Indonesia', 72, 700, 130), mkLine('Warga Negara Asing', 72, 685, 95),
+    mkLine('Dwi Kewarganegaraan', 72, 670, 110),
+  ];
+  assert.deepEqual(planBlockEdit(blockOf(labels), labels), { ok: false, reason: 'not-prose' });
+
+  // list: a marker the soft split cut off, on the first line's baseline
+  const item = justified();
+  const cut = { ...mkLine('1)', 52, 700, 10), blockId: null };
+  assert.deepEqual(planBlockEdit(blockOf(item), [...item, cut]), { ok: false, reason: 'list' });
+
+  // heading: the first line in its own face over a body that shares one
+  const head = justified().map((l, i) => ({ ...l, fontName: i === 0 ? 'g_d0_f3' : 'g_d0_f2' }));
+  assert.deepEqual(planBlockEdit(blockOf(head), head), { ok: false, reason: 'heading' });
   // ...but a line beside the box, or below it, is not a column
   const beside = { ...mkLine('Kolom', 400, 685, 40), blockId: null };
   const below = { ...mkLine('Penutup', 72, 600, 80), blockId: null };
   const ok = planBlockEdit(blockOf(para), [...para, beside, below]);
   assert.equal(ok.ok, true, ok.reason);
   assert.equal(ok.plan.below, below.y, 'the nearest line under the block is the grow-down limit');
+});
+
+test('3b. a justified line cut in two by the column guard is absorbed: its far piece joins the line', () => {
+  const lines = justified();
+  // Line 1 arrives as two Lines: 72..250 in the block, 270..372 left out.
+  lines[1] = mkLine('adipiscing elit sed do', 72, 685, 178);
+  const piece = { ...mkLine('eiusmod tempor', 270, 685, 102), blockId: null };
+  const r = planBlockEdit(blockOf(lines), [...lines, piece]);
+  assert.equal(r.ok, true, r.reason);
+  assert.equal(r.plan.align, 'justify', 'with its piece back, line 1 reaches the right edge again');
+  assert.equal(r.plan.targets.length, 5, 'the piece is cut too');
+  assert.ok(r.plan.text.includes('adipiscing elit sed do eiusmod tempor incididunt'));
 });
 
 test('4. prefill joins lines with a space, a hyphenated line end with none, drops a soft hyphen', () => {
@@ -423,4 +478,61 @@ test('10. ROUND TRIP: a 4-line justified paragraph, re-written longer, stamps na
   for (const gone of ['Sehubungan', 'lingkungan kantor', 'masing sesuai']) assert.ok(!all.includes(gone), `"${gone}" survived`);
   assert.ok(all.includes('Pemberitahuan Kegiatan'));
   assert.ok(all.includes('Panitia Kerja Bakti'));
+});
+
+test('11. EXPORT TWIN: a paragraph the stamp did not bake is still drawn line by line at its own baselines, justified to its box', async () => {
+  const PDFLib = loadUmd('js/vendor/pdf-lib.min.js');
+  const fontkit = loadUmd('js/vendor/fontkit.umd.min.js');
+  globalThis.pdfjsWorker = loadUmd('js/vendor/pdf.worker.min.js');
+  const pdfjs = loadUmd('js/vendor/pdf.min.js');
+  const model = await import('../../js/core/model.js');
+  const ops = await import('../../js/core/operations.js');
+  const { buildPdfBytes } = await import('../../js/core/export.js');
+
+  // A blank page and a paragraph annotation with no surgery behind it: export's
+  // drawText takes it, in the twin's standard Helvetica (no fetch needed).
+  const blank = await PDFLib.PDFDocument.create();
+  blank.addPage([595, 842]);
+  const bytes = await blank.save();
+  const doc = model.createDoc();
+  const source = ops.addSource(doc, model.createSource({ name: 'blank.pdf', bytes, numPages: 1 }));
+  const page = model.createPage({ source, sourcePageNum: 0, width: 595, height: 842, rotation: 0 });
+  ops.addPages(doc, [page]);
+  const lines = [
+    { text: 'Satu dua tiga empat lima', brk: ' ' },
+    { text: 'enam tujuh delapan', brk: '\n' },
+    { text: 'sembilan sepuluh', brk: '' },
+  ];
+  const block = {
+    v: 1, align: 'justify', indent: 0, width: 220, leading: 16, size: 12,
+    origin: { x: 100, y: 600 }, k: 1, disp: { x: 100, y: 242 }, srcLines: 3, srcWords: [5, 3, 2], below: null,
+    lines: lines.map((l) => ({ ...l, hard: l.brk.includes('\n') })), reflowed: false,
+  };
+  ops.addAnnotation(doc, page.id, model.createAnnotation('text', {
+    text: logicalTextOf(lines), x: 100, y: 230, fontSize: 12, fontFamily: 'Helvetica', block,
+  }));
+  const out = await buildPdfBytes(doc, { PDFLib, fontkit });
+  const read = await readLines(pdfjs, out);
+  assert.deepEqual(read.map((l) => l.text), lines.map((l) => l.text));
+  assert.deepEqual(read.map((l) => l.y), [600, 584, 568]);
+  read.forEach((l) => assert.ok(Math.abs(l.x0 - 100) < 0.01));
+  // Line 1 is stretched to the box edge; line 2 ends at a typed break and the
+  // last line is the last: neither is.
+  assert.ok(Math.abs(read[0].x1 - 320) < 0.05, `line 0 ends at ${read[0].x1}`);
+  assert.ok(read[1].x1 < 300 && read[2].x1 < 300);
+});
+
+test('12. the committed text and the painted lines are one fact (logicalTextOf)', () => {
+  assert.equal(logicalTextOf([
+    { text: 'kerja bakti hari', brk: ' ' },
+    { text: 'sehari-', brk: '' },
+    { text: 'hari pukul', brk: '\n' },
+    { text: 'tujuh.', brk: '' },
+  ]), 'kerja bakti hari sehari-hari pukul\ntujuh.');
+  const lines = justified();
+  const { plan } = planBlockEdit(blockOf(lines), lines);
+  const painted = [{ text: 'a b', brk: ' ' }, { text: 'c', brk: '\n' }, { text: 'd', brk: '' }];
+  const b = blockAnnotation(plan, painted);
+  assert.equal(logicalTextOf(b.lines), 'a b c\nd');
+  assert.deepEqual(b.lines.map((l) => l.hard), [false, true, false]);
 });

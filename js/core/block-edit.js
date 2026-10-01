@@ -28,7 +28,8 @@
  *   blockExtent(block)                    -> { x, y, w, h } display px
  *
  * Decline-never-guess reasons (BLOCK_DECLINE_REASONS, the `block_edit`
- * telemetry enum): rotated · mixed-sizes · columns · list · align-unknown.
+ * telemetry enum): rotated · mixed-sizes · columns · list · not-prose ·
+ * heading · align-unknown.
  * Mixed FONTS are not a decline: his answer 1 (same day) writes a line, and so
  * a block, in ONE font while editing; a bold word un-bolds.
  *
@@ -40,12 +41,39 @@
 import { blocksFromLines } from './paragraph-detect.js';
 import { layoutLines } from './reflow.js';
 
-export const BLOCK_DECLINE_REASONS = ['rotated', 'mixed-sizes', 'columns', 'list', 'align-unknown'];
+export const BLOCK_DECLINE_REASONS = ['rotated', 'mixed-sizes', 'columns', 'list', 'not-prose', 'heading', 'align-unknown'];
 
 // A list's first line starts with a marker. Reflowing a list would carry the
 // markers into the middle of lines. MOVED here from text-blocks.js (the D1
 // clusterer, deleted 2026-10-01 in favour of paragraph-detect.js), verbatim.
-const LIST_MARKER_RE = /^\s*([-•*·]|\d{1,3}[.)]|[a-z][.)])\s/;
+// Widened 2026-10-01 to parenthesised markers ("(3)", "(a)"), which open
+// numbered clauses in Indonesian regulations.
+// Multi-level numbering ("14.1", "2.3.1") too.
+const LIST_MARKER_RE = /^\s*([-•*·]|\(?\d{1,3}[.)]|\d{1,3}(\.\d{1,3})+\.?|\(?[a-z][.)])\s/;
+
+// A column of form values (": Budi Santoso" under ": Staf Administrasi") is
+// laid out like prose — one left edge, regular leading — and is a list of
+// entries. Two lines opening with a colon make it one.
+const VALUE_COLUMN_RE = /^\s*:/;
+const VALUE_COLUMN_MIN = 2;
+
+// A marker standing ALONE: text-lines.js's soft split cuts "b." or "1)" or a
+// form's ":" off the text it introduces, so the marker arrives as its own
+// Line beside (or one line above) the block. Same markers as LIST_MARKER_RE,
+// plus the colon, and the marker may be the whole string.
+const MARKER_PIECE_RE = /^\s*([-•*·:]|\(?\d{1,3}[.)]|\(?[a-zA-Z][.)])(\s|$)/;
+
+// Running prose has words. Measured on the public web corpus (2026-10-01):
+// of 4,546 blocks paragraph-detect.js accepted, 977 carry ONE word per line —
+// table columns of numbers, org-chart boxes — and 107 two. Editing one cell of
+// such a column must not pour the column into a paragraph. A block whose lines
+// (the last excepted) hold fewer than PROSE_MIN_WORDS words at the median, or
+// whose words are mostly letterless (numbers, codes), is not prose.
+const PROSE_MIN_WORDS = 3;
+const PROSE_MIN_LETTERED = 0.5;
+// Dot leaders and fill-in blanks: a table of contents or a form, not prose.
+const LEADER_RE = /\.{4,}|…{2,}|_{4,}/;
+const wordsOf = (s) => String(s || '').trim().split(/\s+/).filter(Boolean);
 
 // A run counts as horizontal when its baseline direction is within ~0.6° of +x.
 const HORIZONTAL_UY_MAX = 0.01;
@@ -66,6 +94,12 @@ const EDGE_TOLERANCE_EM = 0.6;
 // same edge.
 const WIDTH_SLACK_PT = 0.5;
 
+// An interword space, in em, for the wrap-evidence estimate.
+const SPACE_EM = 0.25;
+
+// How far left of the box a marker piece may start and still introduce it.
+const FIRST_LINE_REACH_EM = 4;
+
 // Below this a baseline step is not leading (degenerate input).
 const MIN_LEADING_EM = 0.5;
 
@@ -76,6 +110,41 @@ function median(values) {
 }
 
 const decline = (reason) => ({ ok: false, reason });
+
+const isHorizontal = (r) => r.pdf.ux > 0 && Math.abs(r.pdf.uy) <= HORIZONTAL_UY_MAX;
+
+// Two baselines are the same line within this many em.
+const BASELINE_SAME_EM = 0.1;
+
+// A line this much smaller than the paragraph's text, inside its box, is a
+// superscript/subscript (a footnote marker), not another column.
+const SIZE_AGREEMENT_EM = 0.15;
+
+// One Line from several on the same baseline, in along order.
+function mergeLines(ls) {
+  const sorted = [...ls].sort((a, b) => lineGeom(a).a0 - lineGeom(b).a0);
+  const runs = sorted.flatMap(runsOf);
+  const a0 = Math.min(...runs.map((r) => r.pdf.x0));
+  const a1 = Math.max(...runs.map((r) => r.pdf.x0 + r.pdf.len));
+  const box = unionBox(sorted.map((l) => ({ x: l.x, y: l.y, w: l.w, h: l.h })));
+  return {
+    ...sorted[0],
+    str: sorted.map((l) => String(l.str || '').trim()).join(' '),
+    x: box.x, y: box.y, w: box.w, h: box.h,
+    pdf: { ...sorted[0].pdf, x0: a0, len: a1 - a0 },
+    runs,
+  };
+}
+
+function unionBox(boxes) {
+  const x = Math.min(...boxes.map((b) => b.x));
+  const y = Math.min(...boxes.map((b) => b.y));
+  return {
+    x, y,
+    w: Math.max(...boxes.map((b) => b.x + b.w)) - x,
+    h: Math.max(...boxes.map((b) => b.y + b.h)) - y,
+  };
+}
 
 function runsOf(line) {
   return line.runs && line.runs.length ? line.runs : [{ ...line, pdf: line.pdf }];
@@ -100,7 +169,7 @@ export function prefillText(lines) {
     const s = String(line.str || '').replace(/\s+/g, ' ').trim();
     if (!s) continue;
     if (!out) { out = s; continue; }
-    if (out.endsWith('­')) out = out.slice(0, -1) + s;
+    if (out.endsWith('\u00AD')) out = out.slice(0, -1) + s;
     else if (out.endsWith('-')) out += s;
     else out += ` ${s}`;
   }
@@ -134,21 +203,62 @@ export function blockOfLine(pageLines, line) {
 // plus, NOT stored: text (prefill), targets (one surgery target per run),
 // runs (for the font decision), box (display bbox, the cover).
 export function planBlockEdit(block, pageLines, opts = {}) {
-  const lines = block && block.lines;
-  if (!lines || lines.length < 2) return decline('align-unknown');
-  const runs = lines.flatMap(runsOf);
+  const src = block && block.lines;
+  if (!src || src.length < 2) return decline('align-unknown');
+  const others = (pageLines || []).filter((l) => l && l.pdf && !src.includes(l));
 
   if ((((opts.rotation || 0) % 360) + 360) % 360 !== 0) return decline('rotated');
-  if (runs.some((r) => !(r.pdf.ux > 0) || Math.abs(r.pdf.uy) > HORIZONTAL_UY_MAX)) return decline('rotated');
+  if (src.flatMap(runsOf).some((r) => !isHorizontal(r))) return decline('rotated');
+  const size = median(src.flatMap(runsOf).map((r) => r.pdf.size));
+  if (!(size > 0)) return decline('mixed-sizes');
+  const tol = EDGE_TOLERANCE_EM * size;
 
-  const size = median(runs.map((r) => r.pdf.size));
-  if (!(size > 0) || runs.some((r) => Math.abs(r.pdf.size - size) / size > SIZE_TOLERANCE)) return decline('mixed-sizes');
+  // ---- absorb the paragraph's own fragments ---------------------------------
+  // text-lines.js cuts a line at a gap wider than 1.5em (its column guard); a
+  // justified line stretched that far arrives as two Lines, and paragraph-
+  // detect.js holds only the piece that fits the block's edges. A piece on the
+  // SAME baseline as a block line, at the same size, inside the block's along
+  // range, is that line's own text: it joins the line (its runs become targets
+  // too). Measured on the web corpus 2026-10-01: 13 of the first 40 'columns'
+  // declines were exactly this.
+  const g0 = src.map(lineGeom);
+  const left0 = Math.min(...g0.map((g) => g.a0));
+  const right0 = Math.max(...g0.map((g) => g.a1));
+  const parts = src.map((l) => [l]);
+  const absorbed = new Set();
+  for (const o of others) {
+    if (!runsOf(o).every(isHorizontal)) continue;
+    if (Math.abs(o.pdf.size - size) / size > SIZE_TOLERANCE) continue;
+    const h = lineGeom(o);
+    if (h.a0 < left0 - tol || h.a1 > right0 + tol) continue;
+    const i = g0.findIndex((g) => Math.abs(g.p - h.p) <= BASELINE_SAME_EM * size);
+    if (i < 0) continue;
+    parts[i].push(o);
+    absorbed.add(o);
+  }
+  const lines = parts.map((ps) => (ps.length === 1 ? ps[0] : mergeLines(ps)));
+  const runs = lines.flatMap(runsOf);
+  const rest = others.filter((o) => !absorbed.has(o));
+
+  if (runs.some((r) => Math.abs(r.pdf.size - size) / size > SIZE_TOLERANCE)) return decline('mixed-sizes');
 
   if (LIST_MARKER_RE.test(lines[0].str || '')) return decline('list');
+  if (lines.filter((l) => VALUE_COLUMN_RE.test(l.str || '')).length >= VALUE_COLUMN_MIN) return decline('list');
+
+  const medWords = median(lines.slice(0, -1).map((l) => wordsOf(l.str).length));
+  const tokens = lines.flatMap((l) => wordsOf(l.str));
+  const lettered = tokens.filter((t) => /\p{L}/u.test(t)).length;
+  if (medWords < PROSE_MIN_WORDS || lettered < PROSE_MIN_LETTERED * tokens.length) return decline('not-prose');
+  if (lines.some((l) => LEADER_RE.test(l.str || ''))) return decline('not-prose');
+
+  // A heading the detector stacked on top of its body (same size, its own
+  // face): the first line's font is not the one every other line shares.
+  // Editing them as one would pour the heading into the paragraph.
+  const bodyFonts = new Set(lines.slice(1).map((l) => l.fontName));
+  if (lines[0].fontName && bodyFonts.size === 1 && !bodyFonts.has(lines[0].fontName)) return decline('heading');
 
   // ---- alignment, from the lines' own edges --------------------------------
   const geoms = lines.map(lineGeom);
-  const tol = EDGE_TOLERANCE_EM * size;
   const last = geoms.length - 1;
   const left = median(geoms.slice(1).map((g) => g.a0));
   const right = Math.max(...geoms.map((g) => g.a1));
@@ -172,19 +282,61 @@ export function planBlockEdit(block, pageLines, opts = {}) {
   const leading = median(steps);
   if (!(leading > MIN_LEADING_EM * size)) return decline('align-unknown');
 
-  // ---- columns: nothing else may sit inside the box ---------------------------
-  // A line that is not part of the block but whose baseline falls inside the
-  // block's band and overlaps its along-range is another column (or a table
-  // cell) the box would swallow: the edit would cover it and write over it.
-  const inBlock = new Set(lines);
+  // ---- wrapped prose, not stacked entries ------------------------------------
+  // A paragraph's line ends because the next word did not fit. A stack of
+  // labels ("Warga Negara Indonesia / Warga Negara Asing / ...") has one left
+  // edge and regular leading too, but its lines end where the entry ends, with
+  // room to spare. Every line but the last must show that the next line's
+  // first word would have overflowed the box (with half an em of slack: the
+  // word's width is estimated from its share of its line's characters).
+  for (let i = 0; i < last; i += 1) {
+    const next = lines[i + 1];
+    const first = wordsOf(next.str)[0] || '';
+    const chars = String(next.str || '').trim().length || 1;
+    const wFirst = (geoms[i + 1].a1 - geoms[i + 1].a0) * (first.length / chars);
+    const need = wFirst + SPACE_EM * size;
+    const fits = align === 'right'
+      ? geoms[i].a0 - need >= boxLeft + 0.5 * size
+      : geoms[i].a1 + need <= right - 0.5 * size;
+    if (fits) return decline('not-prose');
+  }
+
+  // ---- nothing else may sit inside the box ----------------------------------
+  // A line outside the block whose baseline falls inside the block's band and
+  // overlaps its along-range would be covered and written over. Smaller than
+  // the paragraph's text, it is a superscript or footnote marker INSIDE the
+  // paragraph (mixed sizes); otherwise another column or a table cell.
   const pTop = geoms[0].p;
   const pBottom = geoms[last].p;
-  for (const other of pageLines || []) {
-    if (inBlock.has(other) || !other.pdf) continue;
+  for (const other of rest) {
     const g = lineGeom(other);
     const inBand = g.p <= pTop + 0.8 * size && g.p >= pBottom - 0.3 * size;
-    const overlaps = Math.min(g.a1, right) - Math.max(g.a0, boxLeft) > 0;
-    if (inBand && overlaps) return decline('columns');
+    if (!inBand) continue;
+    const small = other.pdf.size < (1 - SIZE_AGREEMENT_EM) * size;
+    // A marker hangs just past the last word of a full line, so for a small
+    // line the box counts an edge tolerance wider on each side.
+    const pad = small ? tol : 0;
+    if (Math.min(g.a1, right + pad) - Math.max(g.a0, boxLeft - pad) <= 0) continue;
+    return decline(small ? 'mixed-sizes' : 'columns');
+  }
+
+  // A list marker or form colon that introduces this block, cut off by the
+  // soft split: a Line on the first line's baseline, or one leading above,
+  // that starts left of the box and is (or starts with) a marker. The block
+  // would be the item's tail: "(3) Peraturan ..." at the margin, its wrapped
+  // lines under the text. Measured on the web corpus 2026-10-01: the most
+  // common wrong open before this check.
+  for (const other of rest) {
+    const g = lineGeom(other);
+    const up = g.p - pTop;
+    const sameLine = Math.abs(up) <= BASELINE_SAME_EM * size;
+    // Exactly one leading: a hanging item's own first line. A numbered
+    // HEADING sits further above its paragraph and is not this case.
+    const lineAbove = up >= 0.85 * leading && up <= 1.15 * leading;
+    if (!sameLine && !lineAbove) continue;
+    if (g.a0 >= boxLeft - tol || g.a1 < boxLeft - FIRST_LINE_REACH_EM * size) continue;
+    if (Math.abs(other.pdf.size - size) / size > SIZE_TOLERANCE) continue;
+    if (MARKER_PIECE_RE.test(other.str || '')) return decline('list');
   }
 
   // ---- display mapping ---------------------------------------------------------
@@ -199,8 +351,7 @@ export function planBlockEdit(block, pageLines, opts = {}) {
   // The nearest other line BELOW the block that shares its columns: where a
   // grown block starts writing over something (spec §6's collision toast).
   let below = null;
-  for (const other of pageLines || []) {
-    if (inBlock.has(other) || !other.pdf) continue;
+  for (const other of rest) {
     const g = lineGeom(other);
     if (g.p >= pBottom - 0.3 * size) continue;
     if (Math.min(g.a1, right) - Math.max(g.a0, boxLeft) <= 0) continue;
@@ -222,14 +373,24 @@ export function planBlockEdit(block, pageLines, opts = {}) {
     text: prefillText(lines),
     targets: runs.map((r) => r.pdf),
     runs,
-    box: block.bbox,
+    box: unionBox([block.bbox, ...[...absorbed].map((l) => ({ x: l.x, y: l.y, w: l.w, h: l.h }))]),
   };
   return { ok: true, plan };
 }
 
+// The paragraph's text as ONE string, from its painted lines: each line plus
+// the exact characters the break consumed (`brk`: the spaces a soft break hung,
+// '' after a hyphen the browser broke at, '\n' for a typed break). SINGLE
+// SOURCE OF TRUTH for a committed block's `text`, so the re-edit prefill and
+// the stamped lines are one fact, never two that can drift.
+export function logicalTextOf(lines) {
+  return lines.map((l) => l.text + (l.brk ?? (l.hard ? '\n' : ' '))).join('').replace(/\s+$/, '');
+}
+
 // The stored (JSON) half of a plan, plus the painted lines: what rides the
-// committed text annotation as `block`. `lines` = [{ text, hard }] exactly as
-// the editor painted them (hard: the line ended at a typed line break).
+// committed text annotation as `block`. `lines` = [{ text, brk }] exactly as
+// the editor painted them (js/v2/block-editor.js readEditorLines); `hard` is
+// derived from `brk` (the line ended at a typed line break).
 export function blockAnnotation(plan, lines) {
   const words = (s) => String(s).trim().split(/\s+/).filter(Boolean).length;
   const src = plan.srcWords || null;
@@ -245,7 +406,11 @@ export function blockAnnotation(plan, lines) {
     disp: { ...plan.disp },
     srcLines: plan.srcLines,
     srcWords: src ? [...src] : null,
-    lines: lines.map((l) => ({ text: l.text, hard: !!l.hard })),
+    below: plan.below ?? null,
+    lines: lines.map((l) => {
+      const brk = l.brk ?? (l.hard ? '\n' : ' ');
+      return { text: l.text, brk, hard: brk.includes('\n') };
+    }),
     // Did the line breaks MOVE? (telemetry `insert.reflowed`, content-blind):
     // a different line count, or any line holding a different number of words
     // than the original line in that slot.

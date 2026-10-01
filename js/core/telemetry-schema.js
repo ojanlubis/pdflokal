@@ -627,7 +627,7 @@ export const SCHEMA = {
   // The commit's own outcome rides `insert` (block_lines, reflowed).
   block_edit: {
     outcome: ['open', 'decline', 'overflow'],
-    decline_reason: ['rotated', 'mixed-sizes', 'columns', 'list', 'align-unknown'],
+    decline_reason: ['rotated', 'mixed-sizes', 'columns', 'list', 'not-prose', 'heading', 'align-unknown'],
     block_lines: 'int',
   },
   commit_paint: {
