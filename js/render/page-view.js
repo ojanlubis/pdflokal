@@ -169,8 +169,26 @@ export const FONT_CSS = {
   'Caladea': 'Caladea, Cambria, serif',
 };
 
+// The ONE face a decided line paints in (core/line-font.js), or null. A
+// decision names the CSS family the editor registered from the very bytes the
+// stamp embeds; 'none' is never stored, so any stored decision has one.
+export function decidedFontFamily(anno) {
+  const d = anno && anno.fontDecision;
+  return d && d.path && d.path !== 'none' && d.css ? d.css : null;
+}
+
 // SSOT for a text annotation's CSS font string (page-view + inline editor).
 export function textFontCss(anno) {
+  // THE EDIT PRINCIPLE (seat decisions.md 2026-10-01): a decided line renders
+  // in exactly ONE family — no stack, so the browser has no second font to
+  // fall back to per glyph (the decision already proved this face paints
+  // every char). Always `400 normal`: the face itself IS the weight/style, and
+  // asking for 700 against a regular face would make the browser fake-bold
+  // it — a second font in disguise. applyTextFont below also turns kerning and
+  // synthesis off, because pdf-lib's drawText applies neither (it sums raw
+  // advances), so the screen must not either.
+  const decided = decidedFontFamily(anno);
+  if (decided) return `400 ${anno.fontSize || 24}px "${decided}"`;
   const family = FONT_CSS[anno.fontFamily] || FONT_CSS['Helvetica'];
   // Rung C live-font-preview (2026-07-19): a committed Ganti replacement whose
   // draft successfully loaded the document's OWN embedded font (js/v2/app.js's
@@ -182,6 +200,24 @@ export function textFontCss(anno) {
   // preview export's own coverage check performs).
   const stack = anno.docFontFamily ? `"${anno.docFontFamily}", ${family}` : family;
   return `${anno.italic ? 'italic ' : ''}${anno.bold ? '700 ' : '400 '}${anno.fontSize || 24}px ${stack}`;
+}
+
+// Put a text annotation's font on an element — the overlay's text and the
+// inline editor both go through here. WHY not just `el.style.font = …`: the
+// `font` shorthand resets font-kerning back to `auto` on every assignment, and
+// a decided line must paint with kerning OFF (pdf-lib's drawText sums raw
+// glyph advances — verified in the vendored CustomFontEmbedder, which never
+// reads kerning) or the editor's word is wider/narrower than the file's.
+export function applyTextFont(el, anno) {
+  el.style.font = textFontCss(anno);
+  if (decidedFontFamily(anno)) {
+    el.style.fontKerning = 'none';
+    el.style.fontSynthesis = 'none';
+    el.dataset.fontDecided = '1';
+  } else {
+    el.style.fontSynthesis = '';
+    delete el.dataset.fontDecided;
+  }
 }
 
 // SINGLE SOURCE OF TRUTH for how WIDE a text annotation paints, in page-space
@@ -205,6 +241,9 @@ export function measureTextAnnoWidth(anno) {
   if (!anno || anno.type !== 'text' || !anno.text) return 0;
   measureCtx = measureCtx || document.createElement('canvas').getContext('2d');
   measureCtx.font = textFontCss(anno);
+  // Same no-kerning rule as applyTextFont, or this measures a width the
+  // overlay does not paint.
+  if ('fontKerning' in measureCtx) measureCtx.fontKerning = decidedFontFamily(anno) ? 'none' : 'auto';
   return measureCtx.measureText(anno.text).width;
 }
 
@@ -221,7 +260,7 @@ export function renderAnnotationEl(anno) {
 
   if (anno.type === 'text') {
     el.textContent = anno.text || '';
-    el.style.font = textFontCss(anno);
+    applyTextFont(el, anno);
     el.style.color = anno.color || '#000';
     el.style.whiteSpace = 'pre';
     el.style.lineHeight = '1.2';

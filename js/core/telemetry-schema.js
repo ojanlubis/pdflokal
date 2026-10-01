@@ -556,7 +556,7 @@ export const SCHEMA = {
     // rung 1 succeeded, or never got the chance to check at all).
     style_source: STYLE_SOURCE,
     glyph_shortfall: 'int',
-    // ---- props added 2026-10-01 (edit font design B8), ADDITIVE ----
+    // ---- three props added 2026-10-01 (edit font design B8), ADDITIVE ----
     // core/line-font.js decides ONE font per line while the user types; the
     // stamp follows that decision and re-verifies it. path/reason above keep
     // exactly their meaning (a substitute bakes as path 'clone').
@@ -566,14 +566,18 @@ export const SCHEMA = {
     //   decided_live — true only when the editor decided AND the stamp's
     //                  re-verify passed. false = an edit committed before its
     //                  fonts loaded, or a decision the document refused.
+    //   flips        — whole-line face changes while typing (js/v2/
+    //                  line-font-live.js). Measures whether the decision
+    //                  should become monotone (B3, proposed, not ruled).
     // ⚠️ CLIENT SKEW, accepted with eyes open, same as doc_open.signed above:
     // every prop is required, so a cached PWA still on the old JS sends
-    // `insert` without these and loses the WHOLE event until it
+    // `insert` without these three and loses the WHOLE event until it
     // refreshes. The alternative (a separate event, failure_cause's shape) was
     // weighed and set aside because the design names these as `insert`
     // fields; the seat ratifies that trade in the PR.
     decision: ['native', 'clone', 'substitute', 'none'],
     decided_live: 'bool',
+    flips: 'int',
   },
   // ---------------------------------------------------------------------
   // `block_edit` was DELETED here on 2026-07-28. Read this before re-adding it.
