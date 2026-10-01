@@ -57,15 +57,15 @@ an `'unsafe-eval'` the live policy never had. What must stay true of the policy 
   for data to leave the device and does not touch the privacy claim. `img-src` has carried `data:`
   since long before this, for the same reason.
 
-**Two hosts for the one-month Mixpanel session-replay study** (seat `decisions.md` 2026-09-10).
-**BOTH COME OUT WHEN THE STUDY ENDS, 2026-10-10.**
+**Two hosts for the Mixpanel session replay** (seat `decisions.md` 2026-09-10). Replay is ongoing by his
+ruling 2026-10-01, so both hosts stay.
 
 - **`script-src https://cdn.mxpnl.com`** — the Mixpanel loader snippet in `index.html`'s head
   fetches `mixpanel-2-latest.min.js` from there, and the SDK lazily fetches its rrweb-based
   recorder bundle from the same host. This is the FIRST CDN script in this product that is not
   Google's. It does not weaken the "all vendor libs self-hosted, zero CDN" rule, which is about
   the libraries that touch the user's document (pdf-lib, PDF.js, tesseract) — but it is the
-  closest anything has come, and it is temporary for that reason.
+  closest anything has come. It was meant to be temporary for that reason; since 2026-10-01 it is not.
 - **`connect-src https://api-js.mixpanel.com https://api.mixpanel.com`** — where events and replay
   payloads go. Both are listed because the SDK's default host has moved between versions and a
   pinned-to-latest bundle may change it under us; a wrong single host fails SILENTLY under CSP.
