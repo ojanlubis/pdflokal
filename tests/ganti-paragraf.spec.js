@@ -24,7 +24,7 @@
 import { test, expect } from '@playwright/test';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { armGanti, tapLine } from './helpers/lines.js';
+import { armGanti, tapLine, marginPoint } from './helpers/lines.js';
 import { expectFirstPage } from './helpers/render.js';
 import { downloadBytes } from './helpers/download-bytes.js';
 
@@ -268,4 +268,19 @@ test('a paragraph that grows into the text below says so once, and keeps its wid
   const anno = await page.evaluate(() => window.v2.getDoc().pages[0].annotations.find((a) => a.type === 'text'));
   expect(anno.block.lines.length).toBeGreaterThan(6);
   expect(anno.block.width).toBeLessThan(338.2); // the box's own width, not grown sideways
+});
+
+test('tap a paragraph, change nothing, tap away: nothing happens (no cover, no replacement)', async ({ page }) => {
+  // The 2026-07-19 bug class, one level up: the commit compares the text READ
+  // BACK off the painted lines with the prefill. If that read did not
+  // round-trip the prefill exactly, an untouched paragraph would be re-written.
+  await openFixture(page, 'paragraf-badan.pdf');
+  await tapLine(page, { str: 'lingkungan kantor' });
+  const ed = page.locator('.v2-text-edit');
+  await expect(ed).toHaveAttribute('data-font-path', 'native', { timeout: 10_000 });
+  const pt = await marginPoint(page);
+  await page.mouse.click(pt.x, pt.y);
+  await expect(ed).toHaveCount(0);
+  const annos = await page.evaluate(() => window.v2.getDoc().pages[0].annotations.length);
+  expect(annos).toBe(0);
 });
