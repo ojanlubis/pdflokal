@@ -55,7 +55,7 @@ async function measure(page) {
 test('a char the doc font lacks moves the WHOLE line to one face — painted width = the file\'s advance width', async ({ page }) => {
   await page.goto('/');
   await page.setInputFiles('#file-input', {
-    name: 'unrouted-subset.pdf', mimeType: 'application/pdf', buffer: await unroutedSubsetPdf(),
+    name: 'unrouted-subset.pdf', mimeType: 'application/pdf', buffer: await unroutedSubsetPdf(page),
   });
   await expectFirstPage(page);
   await armGanti(page);

@@ -1578,9 +1578,9 @@ function reEditLine(pageId, cover, replacement) {
   // dry run sees ALL of the line's targets, so it finds the same dominant run
   // a fresh tap does (it used to see replaceTargets[0] only).
   if (replacement?.fontDecision) {
-    prepareDocFont(pageId, null, draft, replacement.fontDecision);
+    void prepareDocFont(pageId, null, draft, replacement.fontDecision); // never rejects: try/catch inside
   } else if (cover.replaceTargets?.length) {
-    prepareDocFont(pageId, { runs: cover.replaceTargets.map((pdf) => ({ pdf })) }, draft);
+    void prepareDocFont(pageId, { runs: cover.replaceTargets.map((pdf) => ({ pdf })) }, draft);
   }
 }
 

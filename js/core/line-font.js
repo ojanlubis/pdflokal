@@ -203,7 +203,8 @@ export function decideLineFont(text, candidates) {
 // first), and the stamp treats a missing decision as "decide the old way".
 export function storedDecision(decision) {
   if (!decision || decision.v !== 1 || decision.path === 'none') return null;
-  const { blocked: _blocked, ...rest } = decision;
+  const rest = { ...decision };
+  delete rest.blocked;
   return rest;
 }
 
@@ -281,7 +282,7 @@ export function faceLadder(fp) {
 export function faceStyle(face) {
   for (const [family, variants] of Object.entries(CLONE_FONT_VARIANTS)) {
     for (const [v, name] of Object.entries(variants)) {
-      if (name === face) return { family, bold: v[0] === '1', italic: v[1] === '1' };
+      if (name === face) return { family, bold: v.startsWith('1'), italic: v.endsWith('1') };
     }
   }
   return null;

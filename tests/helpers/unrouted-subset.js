@@ -12,43 +12,32 @@
  * paint measurably different widths. Built at test time from repo assets so
  * no new binary fixture is committed.
  *
- * Line: 'Kafé Andréa, Jakarta Selatan' at x=72 y=720 size=12 (as nota-subset).
+ * Built INSIDE the page with the app's own vendored pdf-lib (the test server
+ * serves the repo root, fixtures included), then handed back as a Buffer for
+ * setInputFiles. Line: 'Kafé Andréa, Jakarta Selatan' at x=72 y=720 size=12.
  */
-import fs from 'node:fs';
 import { Buffer } from 'node:buffer';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
-const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const loadUmd = (p) => {
-  const module = { exports: {} };
-  new Function('module', 'exports', 'self', 'window', 'global',
-    fs.readFileSync(path.join(root, p), 'utf8'))(module, module.exports, globalThis, undefined, globalThis);
-  return module.exports;
-};
-
-export async function unroutedSubsetPdf() {
-  const PDFLib = loadUmd('js/vendor/pdf-lib.min.js');
-  const fontkit = loadUmd('js/vendor/fontkit.umd.min.js');
-  const doc = await PDFLib.PDFDocument.create();
-  doc.registerFontkit(fontkit);
-  const font = await doc.embedFont(
-    new Uint8Array(fs.readFileSync(path.join(root, 'tests/fixtures/nasty/carlito-subset.ttf'))),
-    { subset: false },
-  );
-  const page = doc.addPage([595, 842]);
-  page.drawText('Kafé Andréa, Jakarta Selatan', { x: 72, y: 720, size: 12, font });
-  const first = await doc.save();
-
-  // Rename every name a font router could read: the Type0 wrapper, its
-  // descendant, and the descriptor.
-  const re = await PDFLib.PDFDocument.load(first);
-  const { PDFName, PDFDict } = PDFLib;
-  const name = PDFName.of('Zeta-Regular');
-  for (const [, obj] of re.context.enumerateIndirectObjects()) {
-    if (!(obj instanceof PDFDict)) continue;
-    if (obj.get(PDFName.of('BaseFont'))) obj.set(PDFName.of('BaseFont'), name);
-    if (obj.get(PDFName.of('FontName'))) obj.set(PDFName.of('FontName'), name);
-  }
-  return Buffer.from(await re.save());
+export async function unroutedSubsetPdf(page) {
+  const bytes = await page.evaluate(async () => {
+    const { ensurePdfLib } = await import('/js/core/vendor.js');
+    const { PDFLib, fontkit } = await ensurePdfLib();
+    const ttf = await (await fetch('/tests/fixtures/nasty/carlito-subset.ttf')).arrayBuffer();
+    const doc = await PDFLib.PDFDocument.create();
+    doc.registerFontkit(fontkit);
+    const font = await doc.embedFont(ttf, { subset: false });
+    doc.addPage([595, 842]).drawText('Kafé Andréa, Jakarta Selatan', { x: 72, y: 720, size: 12, font });
+    const re = await PDFLib.PDFDocument.load(await doc.save());
+    // Rename every name a font router could read: the Type0 wrapper, its
+    // descendant, and the descriptor.
+    const { PDFName, PDFDict } = PDFLib;
+    const name = PDFName.of('Zeta-Regular');
+    for (const [, obj] of re.context.enumerateIndirectObjects()) {
+      if (!(obj instanceof PDFDict)) continue;
+      if (obj.get(PDFName.of('BaseFont'))) obj.set(PDFName.of('BaseFont'), name);
+      if (obj.get(PDFName.of('FontName'))) obj.set(PDFName.of('FontName'), name);
+    }
+    return Array.from(await re.save());
+  });
+  return Buffer.from(bytes);
 }
