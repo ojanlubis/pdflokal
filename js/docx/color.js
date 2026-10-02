@@ -38,6 +38,7 @@ export function analyzeColor(ctx) {
 }
 
 // A filled rectangle anchored to the page, behind the text.
+// relativeHeight: see the KNOWN GAP note in writer.js imgXml (small values stack erratically in LibreOffice).
 function shapeXml(s, w) {
   w.useNamespace('wps', 'http://schemas.microsoft.com/office/word/2010/wordprocessingShape');
   const id = w.nextId();

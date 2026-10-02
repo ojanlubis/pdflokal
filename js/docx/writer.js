@@ -160,6 +160,12 @@ function imgXml(b, w, sect) {
     + '</pic:pic></a:graphicData></a:graphic>';
   if (b.anchor) {
     // Absolute on the page, behind the text.
+    // KNOWN GAP (the spike's behaviour, kept so the baseline stays comparable): relativeHeight is the
+    // bare drawing id (1, 2, 3...). MEASURED 2026-10-02 in LibreOffice 26.2: with such small values the
+    // stacking of two behind-text anchors is erratic (ids 1,2 hid the upper shape; 2,1 showed it; 50,100
+    // showed it), while Word-style values (251658240 + n) stack exactly as the spec says (higher on top).
+    // Whoever stacks pictures and shapes (images/colour lanes) should write 251658240 + z-rank and
+    // re-record the baseline in the same commit.
     return `<w:r><w:drawing><wp:anchor distT="0" distB="0" distL="0" distR="0" simplePos="0" relativeHeight="${id}" behindDoc="1" locked="0" layoutInCell="1" allowOverlap="1">`
       + '<wp:simplePos x="0" y="0"/>'
       + `<wp:positionH relativeFrom="page"><wp:posOffset>${emu(b.anchor.x)}</wp:posOffset></wp:positionH>`
