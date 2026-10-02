@@ -360,6 +360,8 @@ export async function rasterizePage(doc, page, opts = {}) {
 // kept OUT of this headless-adjacent I/O adapter. `editSignature` itself is
 // imported directly (pure core, zero vendor deps, not "v2 code") purely so
 // this cache can know WHEN to ask again.
+//
+// `opts.renderToCanvas`: a test seam, see renderToCanvas below. Not for production.
 export function createPageRasterizer(doc, opts = {}) {
   const docCache = new Map(); // sourceId -> PDF.js document promise
   const imgCache = new Map(); // sourceId -> ImageBitmap promise (image sources)
@@ -490,9 +492,16 @@ export function createPageRasterizer(doc, opts = {}) {
     return canvas;
   }
 
-  function renderToCanvas(page, scale) {
+  function renderPageToCanvas(page, scale) {
     return page.isFromImage ? renderImageToCanvas(page, scale) : renderPdfToCanvas(page, scale);
   }
+  // INJECTABLE so the renderSeq stale-guard below can be proven headless and
+  // deterministically: a test hands in a render whose resolution order it
+  // controls, instead of hoping two real pdf.js renders happen to overlap
+  // (tests/zoom-sharpen.spec.js measured they never do). Production never
+  // passes it. `(page, scale) => canvas | Promise<canvas>`; the result only
+  // needs width, height and toDataURL().
+  const renderToCanvas = opts.renderToCanvas || renderPageToCanvas;
 
   return {
     async rasterize(page, { scale = 2 } = {}) {
