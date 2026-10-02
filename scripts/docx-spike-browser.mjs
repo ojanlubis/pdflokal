@@ -127,6 +127,10 @@ for (const id of IDS) {
   for (const rate of THROTTLE) {
     await cdp.send('Emulation.setCPUThrottlingRate', { rate });
     const r = await page.evaluate(runner, { url: `/__corpus/${id}.pdf`, maxPages: n, useOcr: false });
+    if (rate === 1 && argv.includes('--save')) {
+      fs.mkdirSync(path.join(OUT, 'docx-browser'), { recursive: true });
+      fs.writeFileSync(path.join(OUT, 'docx-browser', `${id}.docx`), Buffer.from(r.b64, 'base64'));
+    }
     results.timing.push({ id, pages: n, throttle: rate, ms: Math.round(r.ms), msPerPage: Math.round(r.ms / n), docxBytes: r.bytes, heapMB: r.heap ? Math.round(r.heap / 1e6) : null });
     console.log(`timing ${id} ${n}p x${rate}: ${Math.round(r.ms)} ms (${Math.round(r.ms / n)} ms/page), heap ${r.heap ? Math.round(r.heap / 1e6) : '?'} MB`);
   }
