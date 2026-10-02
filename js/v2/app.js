@@ -2026,7 +2026,7 @@ const FINE_POINTER = window.matchMedia('(pointer: fine)').matches;
 
 document.addEventListener('pointermove', (e) => {
   if (FINE_POINTER && tool === 'signature' && storedSignature) {
-    const w = (storedSignature.subtype === 'paraf' ? 80 : 150) * zoom;
+    const w = 150 * zoom;
     const h = w * (storedSignature.height / storedSignature.width);
     if (sigGhost.dataset.sig !== storedSignature.dataUrl.slice(-40)) {
       sigGhost.src = storedSignature.dataUrl;
@@ -2222,15 +2222,14 @@ const interaction = createInteraction({
       smartReplace(pageId, x, y); // async: extraction may need a moment on first tap
     } else if (t === 'signature' && storedSignature) {
       record(history, doc);
-      // Paraf places small (initials), signature at document scale.
-      const w = storedSignature.subtype === 'paraf' ? 80 : 150;
+      const w = 150; // signature at document scale
       const h = w * (storedSignature.height / storedSignature.width);
       const created = addAnnotation(doc, pageId, createAnnotation('signature', {
-        image: storedSignature.dataUrl, subtype: storedSignature.subtype,
+        image: storedSignature.dataUrl,
         x: Math.max(0, x - w / 2), y: Math.max(0, y - h / 2), width: w, height: h,
       }));
-      track('editor_action', { action: storedSignature.subtype === 'paraf' ? 'paraf' : 'signature' });
-      tel('tool_use', { tool: 'ttd', action: storedSignature.subtype === 'paraf' ? 'paraf' : 'signature' });
+      track('editor_action', { action: 'signature' });
+      tel('tool_use', { tool: 'ttd', action: 'signature' });
       selectAnnotation(doc, created.id); // selected → "Semua Hal." is one tap away
       syncPage(pageId);
       setTool('select'); // tools are verbs; back home
@@ -2817,12 +2816,12 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
   if (!draft && sel.rangeCount > 0) sel.collapseToEnd();
 }
 
-// ---- signature modal (draw / upload / paraf) --------------------------------------------
+// ---- signature modal (draw / upload) --------------------------------------------
 const signatureModal = createSignatureModal({
   modal: document.getElementById('sig-modal'),
   toast,
   onReady: (sig) => {
-    storedSignature = sig; // { dataUrl, width, height, subtype }
+    storedSignature = sig; // { dataUrl, width, height }
     // Founder punch list #1: if a placed signature is SELECTED when the user
     // redraws, they're fixing THAT one — swap its image in place instead of
     // making them delete + re-place. Otherwise arm placement as before.
@@ -2836,13 +2835,11 @@ const signatureModal = createSignatureModal({
       return;
     }
     setTool('signature');
-    toast(sig.subtype === 'paraf'
-      ? tr('toast.armInitials')
-      : tr('toast.armSignature'));
+    toast(tr('toast.armSignature'));
   },
 });
 
-// ---- "Semua Hal." — copy the selected signature/paraf to every page ----------------------
+// ---- "Semua Hal." — copy the selected signature to every page ----------------------
 function selectedSignatureAnno() {
   const id = doc.selection.annotationId;
   const found = id ? findAnnotation(doc, id) : null;
@@ -2865,7 +2862,7 @@ function syncSigBar() {
   allBtn.style.display = found && doc.pages.length > 1 ? '' : 'none';
   redrawBtn.style.display = (armed || found) ? '' : 'none';
   document.getElementById('sig-bar-label').textContent = found
-    ? (found.anno.subtype === 'paraf' ? tr('sigBar.initialsSelected') : tr('sigBar.signatureSelected'))
+    ? tr('sigBar.signatureSelected')
     : (armed ? tr('sigBar.armed') : '');
 }
 on('btn-redraw-sig', 'click', () => signatureModal.open());
@@ -2880,7 +2877,7 @@ on('btn-all-pages', 'click', () => {
     // Same position on every page; each copy is its OWN object (new id) so it
     // moves/deletes independently afterwards.
     addAnnotation(doc, page.id, createAnnotation('signature', {
-      image: anno.image, subtype: anno.subtype,
+      image: anno.image,
       x: anno.x, y: anno.y, width: anno.width, height: anno.height,
     }));
   }

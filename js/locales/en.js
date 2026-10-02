@@ -19,7 +19,6 @@ export default {
   loading: { count: '{n} of {total} files' },
 
   sigBar: {
-    initialsSelected: 'Initials selected',
     signatureSelected: 'Signature selected',
     armed: 'Pick a spot to place',
   },
@@ -33,7 +32,6 @@ export default {
     armText: 'Pick a spot to write',
     armWhiteout: 'Drag on the page to cover text',
     armSignature: 'Pick a spot to place the signature',
-    armInitials: 'Pick a spot to place the initials',
     armEdit: 'Edit original text, a beta feature. Tap the text you want to change',
     armEditShort: 'Tap the text you want to change',
     missedText: 'Missed the text. Tap right on it',
