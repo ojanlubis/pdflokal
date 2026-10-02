@@ -242,22 +242,14 @@ test.describe('editor v2 — zoom sharpening (desktop)', () => {
     expect(s.issued).toBeGreaterThan(0);
     expect(s.applied + s.superseded + s.standDown).toBe(s.issued);
 
-    // ---- ⚠️ THE SUPERSEDE BRANCH IS NOT PROVEN BY THIS FILE -----------------
-    // The original author marked `expect(s.superseded).toBeGreaterThan(0)` RACY
-    // and said: if it is the only failure, widen the loop, do not delete it.
-    // The loop was widened — 20x CPU throttling, which is stronger than more
-    // iterations — and it still never fired, for the structural reason above.
-    // So it is recorded as an UNPROVEN CLAIM rather than deleted quietly or
-    // kept as a green nobody can rely on.
-    //
-    // core/import.js's renderSeq guard has NO deterministic coverage anywhere,
-    // and its own comment says it is what stopped the intermittent doubling the
-    // founder saw. Proving it needs a unit test over the guard, which today
-    // means making `renderToCanvas` injectable — a product change, with its own
-    // red-on-revert, and not something to smuggle into a test fix.
-    // Queued in ../TODO.md. Do not re-add the assertion here without first
-    // making the overlap deterministic; a flaky guard on a real mechanism
-    // teaches people to ignore it.
+    // ---- THE SUPERSEDE BRANCH IS NOT PROVEN BY THIS FILE --------------------
+    // Under 20x CPU throttling this still never fires (issued 10, applied 10),
+    // for the structural reason above: `sharpenIntent` prevents the overlap
+    // before a second rasterize is issued. core/import.js's renderSeq guard is
+    // proven DETERMINISTICALLY elsewhere: tests/core/render-seq.test.mjs injects
+    // `renderToCanvas` (createPageRasterizer opts) and resolves the renders in a
+    // chosen order, no timing. Do not re-add a `superseded > 0` assertion here:
+    // a flaky guard on a real mechanism teaches people to ignore it.
 
   });
 });
