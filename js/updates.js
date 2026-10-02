@@ -33,7 +33,7 @@ export const UPDATES = [
     date: '2026-10-02',
     text: 'PDFLokal sekarang otomatis terbuka dalam bahasa browser-mu.',
     en: 'PDFLokal now opens in your browser language.',
-    approved: false, // awaiting Fauzan
+    approved: true, // Fauzan, 2026-10-02: approved as is
   },
   {
     id: '2026-10-01-edit-paragraf',
