@@ -15,7 +15,7 @@ libraries. This file holds only the why and the traps. See [CLAUDE.md](../CLAUDE
 ## Server surface
 
 All *file processing* is client-side. `api/` is the only code that runs off-device (each file's
-header says what it is); none of it ever receives a PDF. The two that take user-originated data:
+header says what it is); none of it ever receives a PDF. The ones that take user-originated data:
 
 - **`api/t.js`** — typed, content-blind telemetry. Every event is validated against
   `js/core/telemetry-schema.js` and **dropped if off-schema**. The schema has no free-string field,
@@ -26,6 +26,18 @@ header says what it is); none of it ever receives a PDF. The two that take user-
   Sent only when the user rates 👎, *sees the exact crops*, and taps Kirim. Size-capped client-side,
   re-checked server-side (never trust the client), and constrained again by table CHECK constraints
   (`scripts/turso-feedback-migration.sql`).
+  It also takes the **feature vote's free-text idea** (`kind: 'feature_request'`): the text the
+  person typed, the ids they voted for (`js/core/features.js`: at most 3, from the fixed list),
+  their `visitor_id` and the page language, filed in its **own table** `feature_requests` in the
+  same database, never in `feedback`. No images are read on that path. The table is created by
+  `scripts/turso-feedback-migration.sql` (idempotent) and **must exist before the code that writes
+  it ships**; until then the insert fails, logged content-blind, and the idea is lost.
+- **`api/votes.js`** — GET only, no input. The feature vote's result: counts per feature id from the
+  `feature_vote` events on the rail, **one vote per feature per visitor** (the latest vote per
+  `visitor_id`, or `session_id` when there is none, wins; deduped at read time). Aggregates only:
+  no id, no row, no text, and nothing at all under 10 voters. Cached at the CDN for 10 minutes;
+  on any failure it answers `{voters:null,counts:null}`. It reads `events` only, so it cannot reach
+  `feedback` or `feature_requests`.
 
 Both **fail closed**: if their env vars are absent the endpoint 204s and writes nothing. That
 property is load-bearing and also a trap — it silently swallowed a week of preview telemetry in

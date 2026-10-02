@@ -190,6 +190,13 @@ Record the count by rating (`feedback_up`, `feedback_down`). **Do not email the 
 watch (§6.1) already emails him every note verbatim the day it arrives; sending them again is the
 noise he stopped reading. The one exception is a note the watch failed to deliver (§8, trigger 3).
 
+The digest also carries **`feature_requests`**, the count of free-text ideas from the feature vote in
+your window (its own table, `feature_requests`; never part of `feedback`, so never in `feedback_up`,
+`feedback_down` or the notes above). Record the number as `feature_requests` in your row. **`null`
+means the table is not there yet** (the migration is not applied), not zero: say "not counted", do
+not report no ideas. Never email the ideas and never quote them; they are read from the database
+by him.
+
 **Notes never enter your row, a commit message, or any file in this repo.**
 
 ---
@@ -452,7 +459,7 @@ curl -s -X POST -H "Authorization: Bearer $ROUTINE_KEY" -H "Content-Type: applic
 
 `findings` carries the numbers so the next run has something to diff:
 `sessions`, `sessions_prev`, `events`, `opened`, `exported`, `top_tools`, `devices`,
-`feedback_up`, `feedback_down`, `failures` (stage/reason → `{n, blocked}`), `last_event`, `n_window`,
+`feedback_up`, `feedback_down`, `feature_requests`, `failures` (stage/reason → `{n, blocked}`), `last_event`, `n_window`,
 `browsers`, `watch_days`, `watch_fired`, `rev_live`, `rev_main`, `audit_high`,
 `gate_env`, `fix_pushed` (§5.4), `blocked_on` (§8, trigger 2), `email` (§8).
 
