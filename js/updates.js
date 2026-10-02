@@ -29,6 +29,20 @@ import { getLocale } from './lib/i18n.js';
 
 export const UPDATES = [
   {
+    id: '2026-10-02-hapus-tulisan-asli',
+    date: '2026-10-02',
+    text: 'Sekarang kamu bisa hapus tulisan asli PDF: nyalain Hapus, terus tap barisnya.',
+    en: "You can now delete the PDF's own text: turn on Delete, then tap the line.",
+    approved: false, // awaiting Fauzan
+  },
+  {
+    id: '2026-10-02-gabung-cek-awal',
+    date: '2026-10-02',
+    text: 'Gabung PDF sekarang ngasih tahu dari awal kalau ada file yang nggak bisa digabung.',
+    en: "Merge now tells you right away when a file can't be merged.",
+    approved: false, // awaiting Fauzan
+  },
+  {
     id: '2026-10-02-unduh-coba-ulang',
     date: '2026-10-02',
     text: 'Unduh nggak gagal lagi cuma karena sinyal putus sebentar.',
