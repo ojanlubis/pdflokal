@@ -458,11 +458,14 @@ export const SCHEMA = {
   // left was 566 of 1779 editing sessions (see export_intent) and the rail could
   // not say whether the person gave up waiting or closed it by accident.
   //   how:       what closed it. 'x' the close button · 'backdrop' a tap outside
-  //              · 'escape' the Esc key · 'export' it closed itself after a
-  //              download. 'other' is whatever the sheet cannot see, which is
-  //              overwhelmingly the Android hardware/gesture BACK (app.js's
-  //              wireDialogHistory closes the dialog from popstate); it is not
-  //              broken out because the sheet has no witness for it.
+  //              · 'escape' anything that fires the dialog's `cancel` (the Esc
+  //              key; possibly the Android back gesture on browsers that route it
+  //              as a close request) · 'export' it closed itself after a
+  //              download · 'other' a close nothing in the sheet marked, which is
+  //              at minimum app.js's wireDialogHistory popstate path. WHICH of
+  //              'escape' / 'other' the Android back actually lands in is
+  //              UNMEASURED (it needs a real device); do not read either bucket
+  //              as "back" until someone has pressed it.
   //   built:     did the big button have bytes to hand over at that instant? The
   //              PDF path means the selected size's bytes (compressed when Kompres
   //              is chosen), the image path means the built PDF or the locked-PDF
