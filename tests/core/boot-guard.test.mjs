@@ -9,7 +9,8 @@
  * recovers and nothing tells the user.
  *
  * The guard is an inline <head> script that, on a module-load-class error,
- * empties every cache, unregisters the service worker, and reloads ONCE.
+ * empties every cache except sw.js's complete generations, unregisters the
+ * service worker, and reloads ONCE.
  *
  * ⚠️ WHAT THIS FILE PROVES AND WHAT IT DOES NOT.
  *   PROVES — the guard's LOGIC, by running the actual snippet lifted out of
@@ -74,12 +75,15 @@ test('2. the guard is in the HEAD, before anything that could die', () => {
     'the boot guard now appears after the module script it exists to catch');
 });
 
-test('3. every measured skew message heals: caches emptied, SW unregistered, ONE reload', async () => {
+test('3. every measured skew message heals: old caches emptied, generations kept, SW unregistered, ONE reload', async () => {
   for (const msg of SKEW_MESSAGES) {
     const g = runGuard();
     await g.error(msg);
     assert.equal(g.calls.reloads, 1, `no reload for: ${msg}`);
-    assert.deepEqual(g.calls.cachesDeleted, ['pdflokal-shell-v2', 'pdflokal-shell-v3'], `caches not emptied for: ${msg}`);
+    assert.deepEqual(g.calls.cachesDeleted, ['pdflokal-shell-v2', 'pdflokal-shell-v3'],
+      `for: ${msg} — the heal must empty every old cache and keep sw.js's generations. Deleting a `
+      + 'generation leaves a heal on a flaky link with no worker, no cache and a dead page '
+      + '(tests/sw-generation.spec.js measures it); it cannot be the skew, because only a load that booted completes one.');
     assert.equal(g.calls.unregisters, 1, `service worker not unregistered for: ${msg}`);
   }
 });
