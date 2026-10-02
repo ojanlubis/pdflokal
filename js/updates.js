@@ -29,6 +29,20 @@ import { getLocale } from './lib/i18n.js';
 
 export const UPDATES = [
   {
+    id: '2026-10-02-unduh-coba-ulang',
+    date: '2026-10-02',
+    text: 'Unduh nggak gagal lagi cuma karena sinyal putus sebentar.',
+    en: 'Download no longer fails just because the signal dropped for a moment.',
+    approved: false, // awaiting Fauzan
+  },
+  {
+    id: '2026-10-02-kelola-keyboard',
+    date: '2026-10-02',
+    text: 'Tombol Putar, Ekstrak, dan Hapus Halaman di Kelola Halaman sekarang bisa pakai keyboard.',
+    en: 'In Manage Pages, Rotate, Extract and Delete Pages can now be reached with the keyboard.',
+    approved: false, // awaiting Fauzan
+  },
+  {
     id: '2026-10-02-bahasa-browser',
     date: '2026-10-02',
     text: 'PDFLokal sekarang otomatis terbuka dalam bahasa browser-mu.',
