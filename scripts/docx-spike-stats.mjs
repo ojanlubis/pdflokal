@@ -17,7 +17,7 @@ function dist(rs, key, d = 3) {
   if (!v.length) return `| ${key} | 0 | - | - | - | - | - | - | - |`;
   return `| ${key} | ${v.length} | ${f(Math.min(...v), d)} | ${f(pct(v, 0.1), d)} | ${f(pct(v, 0.25), d)} | ${f(pct(v, 0.5), d)} | ${f(pct(v, 0.75), d)} | ${f(pct(v, 0.9), d)} | ${f(Math.max(...v), d)} |`;
 }
-const metrics = [['recallLcs', 3], ['recallBag', 3], ['recallLcsPoppler', 3], ['recallBagPoppler', 3], ['recallRendered', 3], ['visGrid', 3], ['visBody', 3], ['visRows', 3], ['inkRatio', 2], ['paraPerLayoutLine', 2], ['wordsPerPara', 1], ['pageRatio', 2], ['bytesRatio', 2], ['ms', 0], ['msPerPage', 0], ['renderMs', 0]];
+const metrics = [['recallLcs', 3], ['recallBag', 3], ['recallLcsPoppler', 3], ['recallBagPoppler', 3], ['recallRendered', 3], ['visGrid', 3], ['visCoarse', 3], ['visBody', 3], ['visBodyCoarse', 3], ['visRows', 3], ['inkRatio', 2], ['paraPerLayoutLine', 2], ['wordsPerPara', 1], ['pageRatio', 2], ['bytesRatio', 2], ['ms', 0], ['msPerPage', 0], ['renderMs', 0]];
 const groups = [['ALL', rows], ['text-born', rows.filter((r) => r.class === 'text-born')], ['searchable-scan', rows.filter((r) => r.class === 'searchable-scan')], ['scan', rows.filter((r) => r.class === 'scan')],
   ['columns=yes', rows.filter((r) => r.columns === 'yes')], ['tables=yes', rows.filter((r) => r.tables === 'yes')], ['columns=no,tables=no (text-born)', rows.filter((r) => r.class === 'text-born' && r.columns === 'no' && r.tables === 'no')]];
 for (const c of new Set(rows.map((r) => r.category))) groups.push([`category=${c || '(none)'}`, rows.filter((r) => r.category === c)]);

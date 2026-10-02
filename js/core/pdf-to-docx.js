@@ -400,7 +400,11 @@ function buildPageBlocks(lines, images, vp, kind) {
 
   const H_OF = (sz) => sz * 1.2;
   let cursor = null; // estimated bottom (y, page pt) of the previous block
-  const place = (target, height) => {
+  // A footer / page number sits at the very bottom of the page; the page's own
+  // bottom margin would push it onto an extra page. Pull any block up so it ends
+  // inside the page (the section's bottom margin is 0 for the same reason).
+  const place = (target0, height) => {
+    const target = Math.min(target0, H - height - 1);
     const sb = cursor === null ? 0 : Math.max(0, target - cursor);
     cursor = (cursor === null ? target : cursor + sb) + height;
     return sb;
@@ -413,7 +417,7 @@ function buildPageBlocks(lines, images, vp, kind) {
     // Single-column segments share the PAGE margins; only a column band gets its own.
     const marginL = seg.cols > 1 ? Math.max(12, Math.min(Math.min(...segItems.map((g) => g.x0)), W * 0.4)) : pageMarginL;
     const marginR = seg.cols > 1 ? Math.max(12, Math.min(W - Math.max(...segItems.map((g) => g.x1)), W * 0.4)) : pageMarginR;
-    const out = { cols: seg.cols, space: 0, marginPt: { top: 0, right: marginR, bottom: 18, left: marginL }, blocks: [] };
+    const out = { cols: seg.cols, space: 0, marginPt: { top: 0, right: marginR, bottom: 0, left: marginL }, blocks: [] };
     if (seg.cols > 1) {
       const gaps = [];
       for (let k = 1; k < seg.runs.length; k += 1) gaps.push(seg.runs[k].x0 - seg.runs[k - 1].x1);
@@ -475,7 +479,7 @@ function buildPageBlocks(lines, images, vp, kind) {
     if (seg.cols > 1) cursor = bandEnd;
     segments.push(out);
   }
-  if (!segments.length) segments.push({ cols: 1, space: 0, marginPt: { top: 36, right: pageMarginR, bottom: 18, left: pageMarginL }, blocks: [] });
+  if (!segments.length) segments.push({ cols: 1, space: 0, marginPt: { top: 36, right: pageMarginR, bottom: 0, left: pageMarginL }, blocks: [] });
   segments[0].marginPt.top = Math.max(0, Math.min(firstTop === null ? 36 : firstTop, H * 0.5));
   for (let k = 1; k < segments.length; k += 1) segments[k].marginPt.top = segments[0].marginPt.top;
   return { segments, anchors, stats: { anchored: anchors.length, droppedBackground: dropped, columnBands: segments.filter((s) => s.cols > 1).length } };

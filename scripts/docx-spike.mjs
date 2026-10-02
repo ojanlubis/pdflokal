@@ -337,6 +337,7 @@ function pageInk(pngPath, gw, gh) {
   for (let i = 0; i < grid.length; i += 1) { grid[i] /= cnt[i] || 1; total += grid[i]; }
   return { grid, total: total / grid.length };
 }
+const pool2 = (g, gw, gh) => { const out = new Float64Array((gw >> 1) * (gh >> 1)); for (let y = 0; y < gh >> 1; y += 1) for (let x = 0; x < gw >> 1; x += 1) out[y * (gw >> 1) + x] = (g[2 * y * gw + 2 * x] + g[2 * y * gw + 2 * x + 1] + g[(2 * y + 1) * gw + 2 * x] + g[(2 * y + 1) * gw + 2 * x + 1]) / 4; return out; };
 function pearson(a, b) {
   const n = a.length;
   let ma = 0;
@@ -404,6 +405,7 @@ async function main() {
           const A = pageInk(`${a}.png`, GW, GH);
           const B = pageInk(`${b}.png`, GW, GH);
           row.visGrid = pearson(A.grid, B.grid);
+          row.visCoarse = pearson(pool2(A.grid, GW, GH), pool2(B.grid, GW, GH));
           row.visRows = pearson(rowProfile(A.grid, GW, GH), rowProfile(B.grid, GW, GH));
           row.inkRatio = A.total > 0 ? B.total / A.total : null;
         } catch (e) { row.visError = String(e.message).slice(0, 100); }
@@ -422,6 +424,7 @@ async function main() {
             const A2 = pageInk(`${a2}.png`, 40, 52);
             const B2 = pageInk(`${b2}.png`, 40, 52);
             row.visBody = pearson(A2.grid, B2.grid);
+            row.visBodyCoarse = pearson(pool2(A2.grid, 40, 52), pool2(B2.grid, 40, 52));
             row.inkBody = A2.total > 0 ? B2.total / A2.total : null;
           } catch { /* leave empty */ }
         }
@@ -480,7 +483,7 @@ async function main() {
     o.wordsPerPara = r.docxParas ? (o.docxWords / r.docxParas).toFixed(1) : '';
     o.pdfWordsPerLine = r.pdfLayoutLines ? (o.refWords / r.pdfLayoutLines).toFixed(1) : '';
     // line-per-paragraph regression: nearly one paragraph per visual line on a prose document
-    o.linePerParaFlag = r.docxParas && r.pdfLayoutLines >= 20 && r.docxParas / r.pdfLayoutLines > 0.8 && (o.docxWords / r.docxParas) < 2.2 * (o.refWords / r.pdfLayoutLines) ? 1 : 0;
+    o.linePerParaFlag = r.docxParas && r.pdfLayoutLines >= 20 && r.docxParas / r.pdfLayoutLines > 0.8 && o.refWords / r.pdfLayoutLines >= 8 ? 1 : 0;
     o.pdfBold = r.pdfBold ?? '';
     o.docxBold = r.docxBold ?? '';
     o.pdfItalic = r.pdfItalic ?? '';
@@ -502,6 +505,8 @@ async function main() {
     o.bodyPage = r.bodyPage || '';
     o.bodyFound = r.bodyFound ?? '';
     o.visBody = r.visBody == null ? '' : r.visBody.toFixed(4);
+    o.visCoarse = r.visCoarse == null ? '' : r.visCoarse.toFixed(4);
+    o.visBodyCoarse = r.visBodyCoarse == null ? '' : r.visBodyCoarse.toFixed(4);
     o.inkBody = r.inkBody == null ? '' : r.inkBody.toFixed(3);
     o.columnBands = st.columnBands ?? '';
     return o;
