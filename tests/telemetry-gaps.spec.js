@@ -3,6 +3,10 @@
  * ============================================================================
  *   R4  split / Ekstrak: the tap, the file it produces, and the Halaman sheet
  *       opened FOR the user by an intent (/pisah-pdf, the Halaman card).
+ *   R5  the Unduh sheet's close: how it closed, whether bytes were ready, how
+ *       long it was open — so "build never finished" and "closed by accident"
+ *       stop looking identical.
+ *   0a  the +/- zoom buttons, so the fit-width opening (913eb38) can be judged.
  *
  * The unit tests (tests/core/telemetry-schema.test.mjs, telemetry-delivery) pin
  * what the SCHEMA and api/t.js accept. This file pins that the EDITOR EMITS them:
@@ -116,5 +120,88 @@ test.describe('R4 split / Ekstrak on the rail', () => {
     expect(tools.filter((a) => a === 'pages_open')).toHaveLength(1);
     expect(tools).not.toContain('extract');
     expect(named(ev, 'extract_export')).toHaveLength(0);
+  });
+});
+
+test.describe('R5 export_sheet_close', () => {
+  test('X: how "x", built true once the size is on the button, waited_ms is a real duration', async ({ page }) => {
+    await openDoc(page);
+    await page.click('#btn-download');
+    await sheetReady(page);
+    await page.click('#ds-close');
+    await expect(page.locator('#dl-sheet')).toBeHidden();
+
+    const ev = await railUntil(page, 'export_sheet_close');
+    const closes = named(ev, 'export_sheet_close');
+    expect(closes).toHaveLength(1);
+    expect(closes[0].props).toMatchObject({ how: 'x', built: true });
+    expect(closes[0].props.waited_ms).toBeGreaterThan(0);
+    // The pairing the schema note promises: one open, one close.
+    expect(named(ev, 'export_intent')).toHaveLength(1);
+  });
+
+  test('Escape and backdrop are told apart from the X', async ({ page }) => {
+    await openDoc(page);
+
+    await page.click('#btn-download');
+    await sheetReady(page);
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#dl-sheet')).toBeHidden();
+
+    await page.click('#btn-download');
+    await sheetReady(page);
+    // A click ON the <dialog> itself (outside the sheet's content) is the backdrop.
+    await page.evaluate(() => document.getElementById('dl-sheet').click());
+    await expect(page.locator('#dl-sheet')).toBeHidden();
+
+    const closes = named(await railUntil(page, 'export_sheet_close', 2), 'export_sheet_close').map((e) => e.props.how);
+    expect(closes).toEqual(['escape', 'backdrop']);
+  });
+
+  test('a download closes the sheet itself: how "export", and the export event fires too', async ({ page }) => {
+    await openDoc(page);
+    await page.click('#btn-download');
+    await sheetReady(page);
+    await downloadBytes(page, () => page.click('#ds-cta'));
+    await expect(page.locator('#dl-sheet')).toBeHidden();
+
+    const ev = await railUntil(page, 'export_sheet_close');
+    expect(named(ev, 'export')).toHaveLength(1);
+    const closes = named(ev, 'export_sheet_close');
+    expect(closes).toHaveLength(1);
+    expect(closes[0].props).toMatchObject({ how: 'export', built: true });
+  });
+
+  test('closed BEFORE the build finished: built is false (the case the rail could not separate)', async ({ page }) => {
+    await openDoc(page);
+    // An untouched single-source PDF is handed back as its original bytes
+    // (core/export.js passThroughSource) and never reaches pdf-lib, so there would
+    // be no build to hold. One text annotation forces the real rebuild.
+    await page.click('[data-tool="text"]');
+    await page.click('.pv-page >> nth=0', { position: { x: 120, y: 180 } });
+    await page.keyboard.type('Uji tutup');
+    await page.keyboard.press('Enter');
+    // Hold the build back for real: buildBase() cannot finish until the gate
+    // opens, so a close inside that window is a genuine "build never finished",
+    // not a flag set by the test. (Routing pdf-lib's script was tried first and
+    // proved nothing: the library is already loaded by the time a document is open.)
+    await page.evaluate(async () => {
+      const { ensurePdfLib } = await import('/js/core/vendor.js');
+      const { PDFLib } = await ensurePdfLib();
+      const gate = new Promise((r) => { window.__releaseBuild = r; });
+      const orig = PDFLib.PDFDocument.create.bind(PDFLib.PDFDocument);
+      PDFLib.PDFDocument.create = async (...a) => { await gate; return orig(...a); };
+    });
+
+    await page.click('#btn-download');
+    await expect(page.locator('#dl-sheet')).toBeVisible();
+    await expect(page.locator('#ds-cta-main .ds-spin')).toBeVisible(); // still building
+    await page.click('#ds-close');
+    await expect(page.locator('#dl-sheet')).toBeHidden();
+    await page.evaluate(() => window.__releaseBuild());
+
+    const closes = named(await railUntil(page, 'export_sheet_close'), 'export_sheet_close');
+    expect(closes).toHaveLength(1);
+    expect(closes[0].props).toMatchObject({ how: 'x', built: false });
   });
 });
