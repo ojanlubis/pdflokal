@@ -140,6 +140,24 @@ test('DELIVERY: a valid event actually reaches the insert, with its props intact
   assert.deepEqual(rows[0].props, { text_layer: true, signed: false, pages: '1', device: 'desktop', intent: 'none', display_mode: 'browser' });
 });
 
+// ---- 2026-10-02: the three telemetry gaps. One test per concern, so each can be
+// reverted with its commit. Each proves the SERVER accepts the event (api/t.js
+// validates with the same module) and that the props reach the insert intact.
+async function deliversIntact(events) {
+  const { calls } = await run({ ...VALID, events });
+  assert.equal(calls.length, 1, 'the batch never reached the insert');
+  const rows = calls[0].body;
+  assert.deepEqual(rows.map((r) => r.event), events.map((e) => e.event), 'a new event was dropped by the server');
+  for (let i = 0; i < events.length; i += 1) assert.deepEqual(rows[i].props, events[i].props);
+}
+
+test('DELIVERY (R4): tool_use halaman/extract and extract_export survive api/t.js', async () => {
+  await deliversIntact([
+    { event: 'tool_use', props: { tool: 'halaman', action: 'extract' } },
+    { event: 'extract_export', props: { duration: 450, pages: '2-5', pages_scope: 'some' } },
+  ]);
+});
+
 // ---------------------------------------------------------------------------
 // visitor_id (2026-09-10). Additive and DELIBERATELY not part of the
 // envelope-trust check that session_id/app_version sit behind — an invalid

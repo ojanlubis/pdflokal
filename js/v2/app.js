@@ -2250,6 +2250,13 @@ const pageManager = createPageManager({
   onDocChanged: () => { textRuns.invalidateAll(); ocrIndex.invalidateAll(); rebuildStage(); },
   onAddFiles: () => document.getElementById('file-input').click(),
   onExtract: async (pages) => {
+    // The tap, on the rail (2026-10-02). Split/Ekstrak was invisible to it: GA4's
+    // editor_action/split is the only other trace and GA4 is ad-blocked wholesale
+    // for a large share of users. Fired here, not in page-manager.js, which has no
+    // tel import and whose only job is the selection. An intent-side action like
+    // 'arm' — it is deliberately NOT in COMMIT_ACTIONS (nothing was edited).
+    tel('tool_use', { tool: 'halaman', action: 'extract' });
+    const t0 = performance.now(); // extract_export.duration — tap to bytes-in-hand
     // Export ONLY the selected pages: a shallow Doc sharing the same sources.
     try {
       toast(tr('toast.preparing'));
@@ -2261,6 +2268,14 @@ const pageManager = createPageManager({
       // the success one (same "skips take priority" law as the load loop).
       const { bytes, fontFallback } = await buildPdfArtifact(subset);
       download(new Blob([bytes], { type: 'application/pdf' }), `${baseName}-halaman-${pages.length}.pdf`);
+      // The file exists now — whatever the toast below says. Its own event rather
+      // than an `export`: see extract_export in core/telemetry-schema.js for why
+      // folding it into the Unduh sheet's event would corrupt that funnel.
+      tel('extract_export', {
+        duration: durationBucket(performance.now() - t0),
+        pages: pagesBucket(pages.length),
+        pages_scope: pages.length >= doc.pages.length ? 'all' : 'some',
+      });
       if (fontFallback) {
         // Ratified by Fauzan 2026-08-14 (PM STATE.md "RATIFIED 2026-08-14").
         toast(tr('toast.fontSubstituteResult'));
@@ -3191,7 +3206,12 @@ function applyIntent(intent) {
     downloadSheet.open({ size: 'kompres', target });
   }
   else if (intent === 'gambar') downloadSheet.open({ format: 'img' });
-  else if (intent === 'split' || intent === 'halaman') pageManager.open();
+  // openPagesSheet(), not pageManager.open(): the sheet opening is what
+  // tool_use/pages_open counts, and an intent that opens it for the user (the
+  // /pisah-pdf and Halaman cards) was the one route to it the rail could not see.
+  // The population of that action now includes auto-opens; doc_open.intent in the
+  // same session is what separates them from a deliberate press.
+  else if (intent === 'split' || intent === 'halaman') openPagesSheet();
   else if (intent === 'gabung') toast(tr('toast.addMoreFiles'));
 }
 

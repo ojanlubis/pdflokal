@@ -78,6 +78,8 @@ const VALID_PROPS = {
   boot_failure: { kind: 'missing-export', action: 'heal' },
   // failure_cause (2026-09-06): the two enums failureCause() can return.
   failure_cause: { stage: 'export', name: 'TypeError', hint: 'undefined-prop' },
+  // 2026-10-02, the three gaps (split/Ekstrak, the sheet's close, the +/- buttons).
+  extract_export: { duration: 450, pages: '2-5', pages_scope: 'some' },
 };
 
 test('every SCHEMA event has a VALID_PROPS fixture (test coverage stays complete as events are added)', () => {
@@ -430,3 +432,29 @@ test('optional props are still TYPE-checked when present, and only those three m
   assert.equal(validateEvent('insert', noShortfall).ok, false, 'an OLD prop stays required');
   assert.equal(validateEvent('surgery', { matched: true }).ok, false, 'no other event gained optionals');
 });
+
+// ---- 2026-10-02: the three telemetry gaps (R4 split/Ekstrak, R5 sheet close, 0a zoom) ----
+
+test("tool_use accepts 'extract' on halaman, and old clients' actions still validate (skew)", () => {
+  assert.equal(validateEvent('tool_use', { tool: 'halaman', action: 'extract' }).ok, true);
+  // An enum ADDITION must not disturb what a cached client already sends.
+  for (const action of ['select', 'whiteout', 'text', 'text_inline', 'signature', 'paraf', 'delete', 'pages_open', 'merge', 'arm', 'sig_modal_open']) {
+    assert.equal(validateEvent('tool_use', { tool: 'halaman', action }).ok, true, action);
+  }
+  assert.equal(validateEvent('tool_use', { tool: 'halaman', action: 'extracted' }).ok, false);
+});
+
+test('extract_export is export-shaped but NOT export: it cannot be read as one', () => {
+  assert.equal(validateEvent('extract_export', VALID_PROPS.extract_export).ok, true);
+  // pages_scope uses the same two values as export's, so the rail can join them.
+  assert.equal(validateEvent('extract_export', { ...VALID_PROPS.extract_export, pages_scope: 'all' }).ok, true);
+  assert.equal(validateEvent('extract_export', { ...VALID_PROPS.extract_export, pages_scope: 'half' }).ok, false);
+  // duration obeys the 10 ms-step law like every other duration.
+  assert.equal(validateEvent('extract_export', { ...VALID_PROPS.extract_export, duration: 455 }).ok, false);
+  // `export` itself is untouched: still exactly its old props, still all required.
+  assert.deepEqual(Object.keys(SCHEMA.export).sort(),
+    ['duration', 'fallback', 'format', 'pages_scope', 'size', 'surgery_used']);
+});
+
+
+
