@@ -16,6 +16,13 @@
  *   ocr         async ({ page, viewport, pageNumber }) -> OCR lines; the SHELL supplies it
  *   signal      an AbortSignal: checked between pages and between stages; aborting
  *               rejects with an AbortError and destroys the pdf.js document
+ *   onPage      (page, pageNumber) after every page: the shell hands the Page to the
+ *               streaming writer and DROPS it; model.pages then stays empty (this is
+ *               what keeps a 700-page document out of memory; see docx/stream.js)
+ *   onOpen      (pdf) once the document is open, before page 1: the shell checks numPages
+ *               against its policy here and may throw; a returned { maxPages } narrows the run
+ *   imageCache  a Map-shaped cache for encoded images (get/set/has). Default: an
+ *               unbounded Map (the node gate); the stream passes a byte-capped one
  *   options     passed through to every module on ctx.options
  *   modules     replace any stage (tests, lane experiments):
  *               { images: { extractImages, imageAnchors }, color: { analyzeColor },
@@ -57,7 +64,7 @@ function stackAnchors(...lists) {
   return all.map((e) => e.a);
 }
 
-export async function pdfToDocModel({ pdfjs, fflate, data, onProgress, maxPages, ocr, signal, options, modules }) {
+export async function pdfToDocModel({ pdfjs, fflate, data, onProgress, onPage, onOpen, maxPages, ocr, signal, options, modules, imageCache }) {
   const mods = {
     images: (modules && modules.images) || imagesMod,
     color: (modules && modules.color) || colorMod,
@@ -67,17 +74,21 @@ export async function pdfToDocModel({ pdfjs, fflate, data, onProgress, maxPages,
   checkAbort(signal);
   const pdf = await pdfjs.getDocument({ data: new Uint8Array(data), disableFontFace: true, isEvalSupported: false, verbosity: 0, fontExtraProperties: true }).promise;
   try {
-    const shared = { fflate, imageCache: new Map() };
+    const shared = { fflate, imageCache: imageCache || new Map() };
     const pages = [];
+    const emit = async (pg, i) => { if (onPage) await onPage(pg, i); else pages.push(pg); };
     const stats = {
       pages: pdf.numPages,
       pageKinds: { text: 0, 'searchable-scan': 0, 'ocr-scan': 0, scan: 0, empty: 0 },
       ocrMs: 0, imageMasksSkipped: 0, imagesFailed: 0, anchored: 0, droppedBackground: 0, errors: [], lines: 0, columnBands: 0, tables: 0, shapes: 0,
     };
-    const limit = maxPages ? Math.min(maxPages, pdf.numPages) : pdf.numPages;
+    const opened = onOpen ? await onOpen(pdf) : null;
+    const cap = Math.min(maxPages || Infinity, (opened && opened.maxPages) || Infinity);
+    const limit = Math.min(cap, pdf.numPages);
     for (let i = 1; i <= limit; i += 1) {
       checkAbort(signal);
       const page = await pdf.getPage(i);
+      let built;
       try {
         const ctx = await extract.readPage({ pdfjs, page, pageNumber: i, shared, options });
         const { images, stats: istats } = await mods.images.extractImages(ctx);
@@ -105,13 +116,14 @@ export async function pdfToDocModel({ pdfjs, fflate, data, onProgress, maxPages,
         stats.columnBands += laid.stats.columnBands;
         stats.tables += laid.stats.tables || 0;
         stats.shapes += shapes.length;
-        pages.push({ widthPt: ctx.widthPt, heightPt: ctx.heightPt, segments: laid.segments, anchors: stackAnchors(shapes, imgs.anchors), kind: ctx.kind });
+        built = { widthPt: ctx.widthPt, heightPt: ctx.heightPt, segments: laid.segments, anchors: stackAnchors(shapes, imgs.anchors), kind: ctx.kind };
       } catch (e) {
         if (e && e.name === 'AbortError') throw e;
         stats.errors.push(`p${i}: ${e && e.message}`);
-        pages.push({ widthPt: A4.widthPt, heightPt: A4.heightPt, segments: [{ cols: 1, space: 0, marginPt: { top: 36, right: 36, bottom: 18, left: 36 }, blocks: [] }], anchors: [], kind: 'error' });
+        built = { widthPt: A4.widthPt, heightPt: A4.heightPt, segments: [{ cols: 1, space: 0, marginPt: { top: 36, right: 36, bottom: 18, left: 36 }, blocks: [] }], anchors: [], kind: 'error' };
       }
       page.cleanup();
+      await emit(built, i); // outside the try: a sink failure is the caller's, not a page error
       if (onProgress) onProgress(i, limit);
     }
     return { model: { pages }, stats };

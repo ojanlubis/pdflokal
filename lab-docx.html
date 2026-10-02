@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>lab, PDF ke Word (konverter di worker)</title>
+<style>
+  :root { --ink: #1c1917; --paper: #fafaf9; --line: #d6d3d1; --red: #dc2626; --ok: #166534; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.5 system-ui, sans-serif; background: var(--paper); color: var(--ink); }
+  header { padding: 10px 16px; border-bottom: 1px solid var(--line); }
+  header strong { color: var(--red); }
+  main { padding: 16px; display: grid; gap: 12px; max-width: 760px; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  button { font: inherit; padding: 8px 14px; min-height: 40px; border: 1px solid var(--line); border-radius: 8px; background: #fff; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  progress { width: 220px; }
+  pre { margin: 0; padding: 10px; background: #fff; border: 1px solid var(--line); border-radius: 8px; font-size: 12px; white-space: pre-wrap; word-break: break-word; max-height: 40vh; overflow: auto; }
+  #status.ok { color: var(--ok); }
+  #status.err { color: var(--red); }
+</style>
+</head>
+<body>
+<header><strong>lab</strong> PDF ke Word, konverter di worker. Halaman uji, tidak diindeks, tidak dipakai produk.</header>
+<main>
+  <div class="row">
+    <input type="file" id="file" accept="application/pdf">
+    <label>halaman maks <input type="number" id="maxpages" min="0" value="0" style="width:5em"></label>
+    <label>jalur <select id="mode"><option value="auto">auto</option><option value="worker">worker</option><option value="main">main</option></select></label>
+    <label><input type="checkbox" id="useocr"> OCR untuk pindaian</label>
+  </div>
+  <div class="row">
+    <button id="go" disabled>Ubah ke .docx</button>
+    <button id="cancel" disabled>Batal</button>
+    <progress id="bar" value="0" max="1"></progress>
+    <span id="status">menunggu berkas</span>
+  </div>
+  <div class="row"><a id="save" hidden download="hasil.docx">simpan hasil</a></div>
+  <pre id="log"></pre>
+</main>
+<script type="module" src="/js/lab-docx.js"></script>
+</body>
+</html>
