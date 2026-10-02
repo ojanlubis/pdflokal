@@ -67,6 +67,7 @@ export default {
       one: "{count} file skipped, it's empty or damaged",
       other: "{count} files skipped, they're empty or damaged",
     },
+    mergeBlocked: "The open PDF can't be combined with other files",
     merged: {
       one: 'Merged, now {count} page',
       other: 'Merged, now {count} pages',

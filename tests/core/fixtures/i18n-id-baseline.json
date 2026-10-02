@@ -211,6 +211,12 @@
       "js/v2/app.js"
     ]
   },
+  "toast.mergeBlocked": {
+    "text": "PDF yang terbuka ini nggak bisa digabung dengan file lain",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
   "toast.merged": {
     "text": "Dijepit jadi satu, sekarang {count} halaman",
     "src": [

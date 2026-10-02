@@ -71,6 +71,7 @@ export default {
     openFailedAll: 'Nggak ada file yang bisa dibuka, mungkin kosong atau rusak',
     openFailed: 'Gagal membuka file',
     skipped: '{count} file dilewati, kosong atau rusak',
+    mergeBlocked: 'PDF yang terbuka ini nggak bisa digabung dengan file lain',
     merged: 'Dijepit jadi satu, sekarang {count} halaman',
     addMoreFiles: 'Tambah file lainnya lewat menu File di kiri atas',
   },
