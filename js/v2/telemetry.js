@@ -363,7 +363,9 @@ export function feedback(rating, note, sample, shot) {
  * The feature vote's free-text idea (js/v2/feature-vote.js, founder ruling
  * 2026-10-02). Same endpoint, same table and same free field as the thumbs note
  * above; `kind: 'feature_request'` is all that tells api/feedback.js it is not a
- * rating, and it carries the ids the person voted for. Small, so it goes by
+ * rating, and it carries the ids the person voted for, the visitor id (null when storage failed) and the page
+ * language. It is filed in its OWN table, `feature_requests`, never in `feedback`.
+ * Small, so it goes by
  * beacon like a note with no images. Never carries document text: the only text
  * is what the person typed into the card.
  * @param {string[]} features ids from js/core/features.js, at most three
@@ -376,6 +378,7 @@ export function featureRequest(features, text) {
     if (!vote.ok || !note) return;
     const body = JSON.stringify({
       session_id: sessionId, app_version: appVersion, kind: 'feature_request', features: vote.ids, note,
+      visitor_id: visitorId, lang: document.documentElement.lang === 'en' ? 'en' : 'id',
     });
     if (typeof navigator?.sendBeacon === 'function'
       && navigator.sendBeacon(FEEDBACK_ENDPOINT, new Blob([body], { type: 'application/json' }))) return;

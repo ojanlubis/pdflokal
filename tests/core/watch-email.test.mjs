@@ -12,12 +12,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import handler from '../../api/cron/watch.js';
 import { jakartaDay } from '../../api/_watch.js';
-import { NOT_FEATURE_REQUEST_SQL, IS_FEATURE_REQUEST_SQL } from '../../js/core/features.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const int = (v) => ({ type: 'integer', value: String(v) });
 const text = (v) => ({ type: 'text', value: v });
-const ok = (rows) => ({ ok: true, status: 200, json: async () => ({ results: [
+const ok = (rows, err) => ({ ok: true, status: 200, json: async () => ({ results: err ? [
+  { type: 'error', error: { message: err, code: 'SQLITE_ERROR' } }] : [
   { type: 'ok', response: { type: 'execute', result: { cols: [], rows, affected_row_count: rows.length ? 0 : 1 } } },
   { type: 'ok', response: { type: 'close' } }] }) });
 
@@ -57,8 +57,11 @@ function stubRail(rail = {}) {
     if (/hard_fails/.test(sql)) return ok([[int(r.a6)]]);
     if (/note is not null/.test(sql)) return ok(r.notes.map(([ts, rating, note]) => [text(ts), text(rating), text(note)]));
     if (/rating = 'down'/.test(sql)) return ok([[int(r.a5[0]), int(r.a5[1])]]);
-    // The feature vote's ideas, counted on their own (js/core/features.js).
-    if (sql.includes(IS_FEATURE_REQUEST_SQL)) return ok([[int(r.featureRequests ?? 0)]]);
+    // The feature vote's ideas live in their own table, counted on their own.
+    if (/from feature_requests/.test(sql)) {
+      if (r.noFeatureTable) return ok(null, 'no such table: feature_requests');
+      return ok([[int(r.featureRequests ?? 0)]]);
+    }
     throw new Error(`unstubbed SQL: ${sql.slice(0, 60)}`);
   };
   return { mail, rows, sqls, restore: () => { globalThis.fetch = real; } };
@@ -140,7 +143,7 @@ test('the rail cannot be read: that is the alarm, and it emails', async () => {
   assert.equal(row.findings.email, 'ok');
 });
 
-test('FEATURE VOTE IDEAS: counted on their own, never emailed, and kept out of A4 and A5', async () => {
+test('FEATURE VOTE IDEAS: counted from their own table, never emailed, and A4/A5 never read that table', async () => {
   // 40 ideas in a day and nothing else wrong: no email, but the row says how many.
   const { mail, row, sqls } = await runWatch({ featureRequests: 40 });
   assert.equal(row.findings.feature_requests, 40, 'counted separately, in the row');
@@ -148,14 +151,18 @@ test('FEATURE VOTE IDEAS: counted on their own, never emailed, and kept out of A
   assert.deepEqual(row.findings.fired, []);
   assert.equal(row.findings.email, 'skipped: quiet');
   assert.equal(mail.length, 0, 'one email per idea would be the failure this guards');
-  // The reads that DECIDE A4 and A5 must carry the exclusion. The stub cannot run
-  // SQL, so the semantics are pinned against a real SQLite in feature-vote.test.mjs;
-  // here we pin that the filter is on the statements that matter (vacuity guard:
-  // both reads must exist).
   const a4 = sqls.filter((q) => /note is not null/.test(q));
   const a5 = sqls.filter((q) => /rating = 'down'/.test(q));
-  assert.equal(a4.length, 1);
-  assert.equal(a5.length, 1);
-  assert.ok(a4[0].includes(NOT_FEATURE_REQUEST_SQL), 'A4 must exclude feature ideas');
-  assert.ok(a5[0].includes(NOT_FEATURE_REQUEST_SQL), 'A5 must exclude feature ideas');
+  assert.equal(a4.length, 1, 'vacuity guard: the A4 read ran');
+  assert.equal(a5.length, 1, 'vacuity guard: the A5 read ran');
+  for (const q of [...a4, ...a5]) assert.doesNotMatch(q, /feature_requests/, 'thumbs reads never touch the ideas table');
+  assert.equal(sqls.filter((q) => /from feature_requests/.test(q)).length, 1);
+});
+
+test('FEATURE VOTE IDEAS: before the migration is applied the watch records null, it does NOT cry "rail unreadable"', async () => {
+  const { mail, row, res } = await runWatch({ noFeatureTable: true });
+  assert.equal(res.code, 200, 'a missing ideas table is not a dark rail');
+  assert.equal(row.findings.feature_requests, null);
+  assert.equal(row.findings.email, 'skipped: quiet');
+  assert.equal(mail.length, 0);
 });

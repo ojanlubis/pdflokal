@@ -22,7 +22,6 @@
  */
 import { cronAuthorized } from './_cron.js';
 import { tursoQuery, tursoWrite, arg } from './_turso.js';
-import { NOT_FEATURE_REQUEST_SQL, IS_FEATURE_REQUEST_SQL } from '../js/core/features.js';
 
 const MARKER = '00000000-0000-4000-8000-00000000c0de'; // seat spec: excluded from every read
 const MAX_WINDOW_H = 24 * 14;
@@ -108,14 +107,16 @@ export async function digest(since, now = new Date()) {
      select w.*, f.first_seen from w left join f using (stage, reason) order by w.n desc`,
     [since, until, MARKER]);
 
-  // Feature-vote ideas ride the same table as `[fitur:...]`-prefixed 'up' rows
-  // (js/core/features.js). They are not thumbs: left out of the list and counted.
   const feedback = await rows(fb(),
-    `select ts, rating, note from feedback where ${NOT_FEATURE_REQUEST_SQL} and ts >= ? and ts < ? order by ts desc`,
+    `select ts, rating, note from feedback where ts >= ? and ts < ? order by ts desc`,
     [since, until]);
-  const [featureRequests] = await rows(fb(),
-    `select count(*) as n from feedback where ${IS_FEATURE_REQUEST_SQL} and ts >= ? and ts < ?`,
-    [since, until]);
+  // Feature-vote ideas have their own table (scripts/turso-feedback-migration.sql):
+  // counted, never listed. A missing table (migration not applied yet) is null, not a failure.
+  let featureRequests = null;
+  try {
+    const [r] = await rows(fb(), `select count(*) as n from feature_requests where ts >= ? and ts < ?`, [since, until]);
+    featureRequests = num(r?.n);
+  } catch { /* table not there yet */ }
 
   return {
     now: until,
@@ -131,7 +132,7 @@ export async function digest(since, now = new Date()) {
     arrivals: arrivals.map((a) => ({ ...a, n: num(a.n) })),
     failures: failures.map((f) => ({ ...f, n: num(f.n), sessions: num(f.sessions) })),
     feedback,
-    feature_requests: num(featureRequests?.n) ?? 0,
+    feature_requests: featureRequests,
   };
 }
 

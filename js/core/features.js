@@ -85,22 +85,3 @@ export function shouldOfferVote({ downloads, state, supportShownThisSession }) {
   if (supportShownThisSession) return false;
   return Number.isInteger(downloads) && downloads >= MIN_DOWNLOADS;
 }
-
-// ---- the free-text idea, as it is stored -----------------------------------
-// The idea goes into the SAME `feedback` table as the thumbs (api/feedback.js),
-// whose `rating` column is a NOT NULL up|down check and which has no `kind`
-// column. A migration on a live table is the founder's to run, and a deploy that
-// writes a column before it exists loses every row (the feedback loop is rare
-// enough that a dead one reads as a product nobody complains about), so the kind
-// rides the note itself: `[fitur:pdf-word,watermark] the text`. This prefix is
-// the SINGLE SOURCE OF TRUTH for it: api/feedback.js writes it, and the daily
-// watch (api/_watch.js, api/cron/watch.js, api/routine.js) uses
-// NOT_FEATURE_REQUEST_SQL to leave these rows out of the thumbs counts and the
-// "new feedback" email.
-export const REQUEST_NOTE_PREFIX = '[fitur:';
-export const NOT_FEATURE_REQUEST_SQL = `coalesce(substr(note, 1, ${REQUEST_NOTE_PREFIX.length}), '') <> '${REQUEST_NOTE_PREFIX}'`;
-export const IS_FEATURE_REQUEST_SQL = `coalesce(substr(note, 1, ${REQUEST_NOTE_PREFIX.length}), '') = '${REQUEST_NOTE_PREFIX}'`;
-
-export function requestNote(ids, text) {
-  return `${REQUEST_NOTE_PREFIX}${ids.join(',')}] ${text}`;
-}

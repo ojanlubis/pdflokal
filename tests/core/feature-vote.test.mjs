@@ -23,7 +23,6 @@ import { fileURLToPath } from 'node:url';
 
 import {
   FEATURES, FEATURE_IDS, GROUPS, MAX_VOTES, MIN_DOWNLOADS, cleanVote, shouldOfferVote,
-  REQUEST_NOTE_PREFIX, NOT_FEATURE_REQUEST_SQL, IS_FEATURE_REQUEST_SQL, requestNote,
 } from '../../js/core/features.js';
 import { validateEvent } from '../../js/core/telemetry-schema.js';
 import tHandler, { __setQueryForTests as setTQuery } from '../../api/t.js';
@@ -202,6 +201,7 @@ test('api/t.js: a valid vote is written with its ids and the visitor; bad ones a
 });
 
 // ---- the free-text idea (api/feedback.js) ---------------------------------------
+// It is filed in its OWN table, feature_requests, and writes ZERO rows to `feedback`.
 
 async function postFeedback(body) {
   const calls = [];
@@ -210,37 +210,46 @@ async function postFeedback(body) {
   try { await fbHandler(mkReq({ session_id: SESSION, app_version: 'abc1234', ...body }), res); } finally { setFbQuery(null); }
   return { calls, res };
 }
-// insert into feedback (ts, session_id, app_version, rating, note, sample_before, sample_after, screenshot)
-const COL = { rating: 3, note: 4, before: 5, after: 6, shot: 7 };
+// insert into feature_requests (ts, session_id, visitor_id, app_version, lang, features, note)
+const FR = { ts: 0, session: 1, visitor: 2, version: 3, lang: 4, features: 5, note: 6 };
+const intoTable = (call) => /insert into (\w+)/i.exec(call.text)[1];
 
-test('feedback kind feature_request: stored as an up-rated, tagged note with the voted ids', async () => {
-  const { calls, res } = await postFeedback({ kind: 'feature_request', features: ['pdf-word', 'crop'], note: '  tolong tambah OCR  ' });
+test('feedback kind feature_request: filed in feature_requests with ids, visitor, lang, and writes ZERO rows to feedback', async () => {
+  const { calls, res } = await postFeedback({
+    kind: 'feature_request', features: ['pdf-word', 'crop'], note: '  tolong tambah OCR  ', visitor_id: VISITOR, lang: 'en',
+  });
   assert.equal(res.code, 204);
-  assert.equal(calls.length, 1);
-  assert.match(calls[0].text, /insert into feedback\b/i);
+  assert.equal(calls.length, 1, 'exactly one statement');
+  assert.equal(intoTable(calls[0]), 'feature_requests');
+  assert.equal(calls.filter((c) => intoTable(c) === 'feedback').length, 0, 'ZERO rows to the thumbs table');
   const p = calls[0].params;
-  assert.equal(p[COL.rating], 'up', 'the rating column is an up|down check, so a request is stored as up');
-  assert.equal(p[COL.note], '[fitur:pdf-word,crop] tolong tambah OCR');
-  assert.equal(p[COL.note], requestNote(['pdf-word', 'crop'], 'tolong tambah OCR'));
-  assert.ok(p[COL.note].startsWith(REQUEST_NOTE_PREFIX));
-  assert.equal(p[COL.before], null);
-  assert.equal(p[COL.shot], null);
+  assert.equal(p[FR.session], SESSION);
+  assert.equal(p[FR.visitor], VISITOR);
+  assert.equal(p[FR.version], 'abc1234');
+  assert.equal(p[FR.lang], 'en');
+  assert.deepEqual(JSON.parse(p[FR.features]), ['pdf-word', 'crop']);
+  assert.equal(p[FR.note], 'tolong tambah OCR', 'trimmed, and untagged: no prefix trick any more');
 });
 
-test('feedback kind feature_request: never carries images, even if a crafted body sends them', async () => {
+test('feedback kind feature_request: never carries images; a bad visitor_id or lang is NULL, not a dropped idea', async () => {
   const png = `data:image/png;base64,${'A'.repeat(40)}`;
   const jpg = `data:image/jpeg;base64,${'A'.repeat(40)}`;
-  const { calls } = await postFeedback({ kind: 'feature_request', features: [], note: 'x', sample_before: png, sample_after: png, screenshot: jpg });
+  const { calls } = await postFeedback({
+    kind: 'feature_request', features: [], note: 'x', visitor_id: 'not-a-uuid', lang: 'fr',
+    sample_before: png, sample_after: png, screenshot: jpg,
+  });
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].params[COL.before], null);
-  assert.equal(calls[0].params[COL.after], null);
-  assert.equal(calls[0].params[COL.shot], null);
+  assert.equal(calls[0].params.length, 7, 'seven columns, none of them an image');
+  assert.equal(calls[0].params[FR.visitor], null);
+  assert.equal(calls[0].params[FR.lang], null);
+  assert.ok(!JSON.stringify(calls[0].params).includes('base64'));
 });
 
 test('feedback kind feature_request: a text-only idea files with no ids; the text is capped at 500', async () => {
   const { calls } = await postFeedback({ kind: 'feature_request', note: 'z'.repeat(900) });
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].params[COL.note], `[fitur:] ${'z'.repeat(500)}`);
+  assert.equal(calls[0].params[FR.note], 'z'.repeat(500));
+  assert.equal(calls[0].params[FR.features], '[]');
 });
 
 test('feedback kind feature_request: no text, a bad id, more than 3, a duplicate: dropped whole, never repaired', async () => {
@@ -258,32 +267,38 @@ test('feedback kind feature_request: no text, a bad id, more than 3, a duplicate
   }
 });
 
-test('a normal thumbs note is untouched by all of this (rating still required, no tag)', async () => {
+test('a normal thumbs note is untouched (rating still required, still the feedback table, no feature_requests write)', async () => {
   const none = await postFeedback({ note: 'tanpa rating' });
   assert.equal(none.calls.length, 0, 'still needs a rating');
   const down = await postFeedback({ rating: 'down', note: 'hurufnya tebal' });
   assert.equal(down.calls.length, 1);
-  assert.equal(down.calls[0].params[COL.rating], 'down');
-  assert.equal(down.calls[0].params[COL.note], 'hurufnya tebal');
+  assert.equal(intoTable(down.calls[0]), 'feedback');
+  assert.equal(down.calls[0].params[3], 'down');
+  assert.equal(down.calls[0].params[4], 'hurufnya tebal');
   // `kind` is only a request when it says so exactly: a lookalike is just a thumbs note.
   const odd = await postFeedback({ kind: 'feature_requestt', rating: 'up', note: 'hi' });
-  assert.equal(odd.calls[0].params[COL.note], 'hi');
+  assert.equal(intoTable(odd.calls[0]), 'feedback');
 });
 
-// ---- the watch: ideas are not thumbs ---------------------------------------------
-
-sqliteTest('NOT/IS_FEATURE_REQUEST_SQL separate ideas from thumbs notes on a real SQLite (nulls included)', () => {
+sqliteTest('the migration: idempotent, and the REAL insert from api/feedback.js lands in feature_requests with feedback left empty', async () => {
   const db = new sqlite.DatabaseSync(':memory:');
-  db.exec('create table feedback (id integer primary key, rating text, note text)');
-  const ins = db.prepare('insert into feedback (rating, note) values (?, ?)');
-  ins.run('down', 'hurufnya tebal');
-  ins.run('up', null);
-  ins.run('up', '[fitur:pdf-word] tolong tambah OCR');
-  ins.run('up', '[fitur:] cuma teks');
-  ins.run('up', 'fitur: bukan tag');
-  const notes = (where) => db.prepare(`select note from feedback where ${where} order by id`).all().map((r) => r.note);
-  assert.deepEqual(notes(NOT_FEATURE_REQUEST_SQL), ['hurufnya tebal', null, 'fitur: bukan tag'], 'a null note is NOT a feature request');
-  assert.deepEqual(notes(IS_FEATURE_REQUEST_SQL), ['[fitur:pdf-word] tolong tambah OCR', '[fitur:] cuma teks']);
+  const migration = read('scripts/turso-feedback-migration.sql');
+  db.exec(migration);
+  db.exec(migration); // CREATE ... IF NOT EXISTS: running it twice is a no-op, not an error
+  const { calls } = await postFeedback({ kind: 'feature_request', features: ['pdf-word', 'crop'], note: 'tolong tambah OCR', visitor_id: VISITOR, lang: 'id' });
+  assert.equal(calls.length, 1);
+  db.prepare(calls[0].text).run(...calls[0].params); // the very statement the endpoint sends
+  assert.equal(db.prepare('select count(*) n from feature_requests').get().n, 1);
+  assert.equal(db.prepare('select count(*) n from feedback').get().n, 0, 'the thumbs table is untouched');
+  const row = db.prepare('select * from feature_requests').get();
+  assert.equal(row.note, 'tolong tambah OCR');
+  assert.deepEqual(JSON.parse(row.features), ['pdf-word', 'crop']);
+  // The table's own checks are real (vacuity guard): a 4-id array and an empty note are refused.
+  const bad = (features, note) => () => db.prepare(
+    'insert into feature_requests (session_id, app_version, features, note) values (?,?,?,?)').run(SESSION, 'abc1234', features, note);
+  assert.throws(bad('["a","b","c","d"]', 'x'));
+  assert.throws(bad('[]', ''));
+  assert.throws(bad('{}', 'x'));
   db.close();
 });
 

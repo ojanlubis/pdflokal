@@ -191,7 +191,8 @@ export function defineFeatureVoteSuite({ door }) {
 
       await expect.poll(async () => (await beacons(page)).filter((b) => b.url.endsWith('/api/feedback')).length).toBe(1);
       const fb = (await beacons(page)).find((b) => b.url.endsWith('/api/feedback')).json;
-      expect(fb).toMatchObject({ kind: 'feature_request', features: ['pdf-word', 'lock'], note: 'tolong ada OCR bahasa Jawa' });
+      expect(fb).toMatchObject({ kind: 'feature_request', features: ['pdf-word', 'lock'], note: 'tolong ada OCR bahasa Jawa', lang: 'id' });
+      expect(fb.visitor_id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
       expect(fb.rating).toBeUndefined();
       expect(feedback).toHaveLength(0); // it went by beacon, not by a second path
       expect(await ls(page, 'pdflokal_vote_done')).toBe('voted');

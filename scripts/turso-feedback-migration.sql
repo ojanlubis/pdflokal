@@ -78,6 +78,42 @@ insert into sqlite_sequence (name, seq)
 create index if not exists feedback_ts_idx on feedback (ts desc);
 create index if not exists feedback_rating_idx on feedback (rating);
 
+-- ---- feature_requests (2026-10-02) ---------------------------------------
+-- The feature vote's free-text idea (js/v2/feature-vote.js, api/feedback.js
+-- kind 'feature_request'). ADDITIVE AND IDEMPOTENT: a new table, nothing above is
+-- altered, `feedback` and its views are untouched, so a thumbs count can never
+-- include an idea. Same database as `feedback` on purpose: it is the same kind of
+-- object (a user-typed note), with the same read-restriction story.
+-- ⚠️ MUST BE APPLIED BEFORE THE CODE THAT WRITES IT SHIPS. Until it exists the
+-- endpoint's insert fails (logged, content-blind) and the idea is lost; the watch
+-- reads this table forgivingly and records null until it is there.
+create table if not exists feature_requests (
+  id integer primary key autoincrement,
+  ts text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  session_id text not null,
+  -- Nullable: a browser that could not keep a visitor id (private mode) sends none.
+  visitor_id text,
+  app_version text not null,
+  -- The page language the idea was written on ('id' or 'en'); null if not sent.
+  lang text,
+  -- JSON array of feature ids from js/core/features.js, at most 3, e.g. ["pdf-word","crop"].
+  features text not null default '[]',
+  note text not null,
+
+  constraint feature_requests_session_id_shape_chk check (
+    session_id glob '[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]'
+  ),
+  constraint feature_requests_ts_shape_chk check (
+    ts glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]*Z'
+  ),
+  constraint feature_requests_lang_chk check (lang is null or lang in ('id', 'en')),
+  constraint feature_requests_features_chk check (
+    json_valid(features) and json_type(features) = 'array' and json_array_length(features) <= 3
+  ),
+  constraint feature_requests_note_len_chk check (length(note) between 1 and 500)
+);
+create index if not exists feature_requests_ts_idx on feature_requests (ts desc);
+
 -- ---- read side ----------------------------------------------------------
 -- Daily thumbs split + how many carried a note. Read the NOTES themselves
 -- straight from the table — they are the actual signal; this is the rate.

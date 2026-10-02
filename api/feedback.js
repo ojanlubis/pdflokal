@@ -36,7 +36,7 @@
 export const config = { runtime: 'nodejs', api: { bodyParser: false } };
 
 import { tursoInsert } from './_turso.js';
-import { cleanVote, requestNote, IDEA_MAX } from '../js/core/features.js';
+import { cleanVote, IDEA_MAX } from '../js/core/features.js';
 
 // ⚠️ TEST SEAM — same one api/t.js carries. Tests assert on the SQL and its
 // plain values (ours) and return { rowCount } or throw.
@@ -162,14 +162,15 @@ export default async function handler(req, res) {
     const sessionId = body?.session_id;
     const appVersion = body?.app_version;
 
-    // THE FEATURE VOTE'S FREE-TEXT IDEA (2026-10-02, js/core/features.js). Same
-    // table, same free field, same path as a thumbs note: this is not a second
-    // sink. `kind` is the only new input. It has no rating of its own, and the
-    // table's `rating` column is an up|down check, so it is stored as 'up' with
-    // the kind carried in the note (features.js says why, and the watch reads it
-    // back out). Never a sample or a screenshot: neither belongs to this path.
+    // THE FEATURE VOTE'S FREE-TEXT IDEA (2026-10-02, js/core/features.js) goes to
+    // its OWN table, `feature_requests` (scripts/turso-feedback-migration.sql), in
+    // the same database and through the same free-text rules as a note. It NEVER
+    // touches `feedback`: that table's `rating` means a thumb, and an idea is not
+    // one (every thumbs count, A5's ratio and the v_feedback views would
+    // silently include it). The two paths share the envelope checks below and
+    // nothing else.
     const isRequest = body?.kind === 'feature_request';
-    const rating = isRequest ? 'up' : body?.rating;
+    const rating = isRequest ? 'up' : body?.rating; // 'up' only satisfies the envelope check; never stored
 
     // session_id must be a real UUID, app_version the expected shape, rating
     // exactly 'up'|'down' — any failing means we can't trust the payload, so
@@ -188,27 +189,9 @@ export default async function handler(req, res) {
     // user typed into the feedback box), and never rendered back anywhere.
     let note = null;
     if (typeof body?.note === 'string') {
-      const t = body.note.trim().slice(0, isRequest ? IDEA_MAX : NOTE_MAX);
+      const t = body.note.trim().slice(0, NOTE_MAX);
       if (t) note = t;
     }
-
-    if (isRequest) {
-      // An idea is its text. No text, or voted ids that are not on the list (or
-      // more than three), is not an idea we can file: dropped whole, never
-      // repaired, the same rule the rail's feature_vote follows.
-      const vote = cleanVote(body?.features ?? []);
-      if (!note || !vote.ok) {
-        res.status(204).end();
-        return;
-      }
-      note = requestNote(vote.ids, note);
-    }
-
-    // Increment D: the opt-in before/after crop pair. validateSample() drops
-    // the WHOLE sample (never a partial one) on anything off — the rating+
-    // note above are already extracted and land regardless.
-    const sample = isRequest ? null : validateSample(body);
-    const shot = isRequest ? null : validateShot(body);
 
     // THE CLIENT'S OWN ANSWER WINS — mirroring api/t.js's 2026-07-29 reversal,
     // which this file missed until the 2026-08-09 audit (finding 4). The same
@@ -224,6 +207,46 @@ export default async function handler(req, res) {
     // EXPLICIT ts (2026-09-16), in the rail's one format (ISO, UTC, ms, Z),
     // rather than the database's own clock default.
     const ts = new Date().toISOString();
+
+    if (isRequest) {
+      // An idea is its text. No text, or voted ids that are not on the list (or
+      // more than three, or repeated), is not an idea we can file: dropped whole,
+      // never repaired, the same rule the rail's feature_vote follows. The text
+      // is capped at IDEA_MAX; images are never read on this path.
+      const idea = typeof body?.note === 'string' ? body.note.trim().slice(0, IDEA_MAX) : '';
+      const vote = cleanVote(body?.features ?? []);
+      if (!idea || !vote.ok) {
+        res.status(204).end();
+        return;
+      }
+      // visitor_id and lang ride along, both optional: an invalid value is NULL,
+      // never a dropped idea (same stance as api/t.js's visitor_id).
+      const visitor = typeof body?.visitor_id === 'string' && UUID_RE.test(body.visitor_id) ? body.visitor_id.toLowerCase() : null;
+      const lang = body?.lang === 'id' || body?.lang === 'en' ? body.lang : null;
+      const out = await tursoInsert({
+        url: process.env.TURSO_FEEDBACK_URL,
+        token: process.env.TURSO_FEEDBACK_TOKEN,
+        sql: `insert into feature_requests (ts, session_id, visitor_id, app_version, lang, features, note)
+              values (?,?,?,?,?,?,?)`,
+        values: [ts, String(sessionId).toLowerCase(), visitor, storedVersion, lang, JSON.stringify(vote.ids), idea],
+        expected: 1,
+        override: queryOverride,
+      });
+      // Content-blind, like the thumbs path: counts and a short token, never the idea.
+      if (out.error) {
+        console.error(`[feedback] feature_request insert FAILED error=${out.error} rows_dropped=1`);
+      } else if (!out.dark && out.written !== 1) {
+        console.error(`[feedback] feature_request insert SHORT written=${out.written ?? 'unknown'} rows_expected=1`);
+      }
+      res.status(204).end();
+      return;
+    }
+
+    // Increment D: the opt-in before/after crop pair. validateSample() drops
+    // the WHOLE sample (never a partial one) on anything off — the rating+
+    // note above are already extracted and land regardless.
+    const sample = validateSample(body);
+    const shot = validateShot(body);
 
     // ⭐ THIS BRANCH USED TO BE BLIND, and it was blind for three weeks after
     // api/t.js stopped being (2026-07-28): `await fetch(...)` with the result
