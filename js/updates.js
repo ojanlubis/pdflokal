@@ -33,14 +33,14 @@ export const UPDATES = [
     date: '2026-10-02',
     text: 'Sekarang kamu bisa hapus tulisan asli PDF: nyalain Hapus, terus tap barisnya.',
     en: "You can now delete the PDF's own text: turn on Delete, then tap the line.",
-    approved: false, // awaiting Fauzan
+    approved: true, // Fauzan, 2026-10-02
   },
   {
     id: '2026-10-02-gabung-cek-awal',
     date: '2026-10-02',
     text: 'Gabung PDF sekarang ngasih tahu dari awal kalau ada file yang nggak bisa digabung.',
     en: "Merge now tells you right away when a file can't be merged.",
-    approved: false, // awaiting Fauzan
+    approved: true, // Fauzan, 2026-10-02
   },
   {
     id: '2026-10-02-unduh-coba-ulang',
