@@ -15,6 +15,10 @@
  * dependency: Turso documents its SQL-over-HTTP protocol, so the path is plain
  * `fetch` (api/_turso.js), and the zero-dependency law holds again.
  *
+ * EVERYTHING IT DISCARDS IS COUNTED (2026-10-02, api/_rejects.js): per Jakarta
+ * day, by reason, never by content. A drop is still a 204 and still silent to
+ * the client; it is no longer silent to us. The counting changes no verdict.
+ *
  * Never stores IP or UA raw (spec §2) — neither is read from the request at
  * all; the client already sends a coarse, typed `device` prop where relevant.
  */
@@ -29,6 +33,7 @@ export const config = { runtime: 'nodejs', api: { bodyParser: false } };
 
 import { validateEvent } from '../js/core/telemetry-schema.js';
 import { tursoInsert, placeholders } from './_turso.js';
+import { createTally, flushRejects } from './_rejects.js';
 
 // ⚠️ TEST SEAM, and the ONLY reason anything but `handler` is exported here.
 // tests/core/*.mjs swap in a recorder so the delivery tests assert on the SQL
@@ -43,9 +48,10 @@ const MAX_BODY_BYTES = 32 * 1024;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const APP_VERSION_RE = /^[0-9a-f]{7,40}$|^dev$/;
 
-// Reads the request body as text, capping at maxBytes. Returns null (never
-// throws) if the stream errors OR the cap is exceeded — both are treated as
-// "can't use this request", which the handler turns into a fast 204.
+// Reads the request body as text, capping at maxBytes. Never throws: resolves
+// { text } or { fail } — 'too_big' (the cap was exceeded) or 'unreadable' (the
+// stream errored). Both are "can't use this request", which the handler turns
+// into a fast 204; the two are told apart only so the rejection counter can.
 function readBody(req, maxBytes) {
   return new Promise((resolve) => {
     let size = 0;
@@ -57,8 +63,8 @@ function readBody(req, maxBytes) {
       if (size > maxBytes) { over = true; return; }
       chunks.push(chunk);
     });
-    req.on('end', () => resolve(over ? null : Buffer.concat(chunks).toString('utf8')));
-    req.on('error', () => resolve(null));
+    req.on('end', () => resolve(over ? { fail: 'too_big' } : { text: Buffer.concat(chunks).toString('utf8') }));
+    req.on('error', () => resolve({ fail: 'unreadable' }));
   });
 }
 
@@ -68,15 +74,31 @@ export default async function handler(req, res) {
     return;
   }
 
+  // Every discard below adds to `tally`; the one awaited flush happens before
+  // the 204, on every path, and cannot throw (api/_rejects.js).
+  const tally = createTally();
   try {
-    const raw = await readBody(req, MAX_BODY_BYTES);
-    if (raw === null) { res.status(204).end(); return; } // over budget or unreadable — drop
+    await ingest(req, tally);
+  } catch {
+    // Absolutely never surface a 5xx for a telemetry drop.
+  }
+  await flushRejects(tally, { url: process.env.TURSO_EVENTS_URL, token: process.env.TURSO_EVENTS_TOKEN, override: queryOverride });
+  res.status(204).end();
+}
+
+// Everything the handler used to do between the method check and the 204.
+// Returning is "done, 204"; the caller owns the response.
+async function ingest(req, tally) {
+  { // (block kept from the old try{} so the diff against it stays reviewable)
+    const body = await readBody(req, MAX_BODY_BYTES);
+    if (body.fail) { tally.add(body.fail === 'too_big' ? 'body_too_big' : 'body_unreadable'); return; } // over budget or unreadable — drop
+    const raw = body.text;
 
     let envelope;
     try {
       envelope = JSON.parse(raw);
     } catch {
-      res.status(204).end(); // malformed envelope — drop, never error to the client
+      tally.add('bad_json'); // malformed envelope — drop, never error to the client
       return;
     }
 
@@ -93,7 +115,11 @@ export default async function handler(req, res) {
       || typeof appVersion !== 'string' || !APP_VERSION_RE.test(appVersion)
       || !events || events.length === 0
     ) {
-      res.status(204).end();
+      // Same three-way test as above, in the same order, only to name the first
+      // fault. The verdict is the `if` above; this changes nothing about it.
+      tally.add(typeof sessionId !== 'string' || !UUID_RE.test(sessionId) ? 'bad_session_id'
+        : typeof appVersion !== 'string' || !APP_VERSION_RE.test(appVersion) ? 'bad_app_version'
+        : 'no_events');
       return;
     }
 
@@ -145,13 +171,14 @@ export default async function handler(req, res) {
     // value collapses to 0 (= "now"), which degrades to the old behaviour for
     // that single event rather than writing a garbage row or dropping it.
     const capped = events.slice(0, MAX_EVENTS);
+    if (events.length > capped.length) tally.add('events_over_cap', { n: events.length - capped.length });
     const received = Date.now();
     const MAX_EVENT_AGE_MS = 6 * 60 * 60 * 1000;
     const rows = [];
     for (const e of capped) {
-      if (!e || typeof e.event !== 'string') continue; // malformed single event — drop it, not the batch
-      const { ok, clean } = validateEvent(e.event, e.props);
-      if (!ok) continue; // off-schema single event — silently dropped, never 400s the batch
+      if (!e || typeof e.event !== 'string') { tally.add('event_malformed'); continue; } // malformed single event — drop it, not the batch
+      const { ok, clean, reason, prop } = validateEvent(e.event, e.props);
+      if (!ok) { tally.add(reason, { event: e.event, prop }); continue; } // off-schema single event — dropped (and counted), never 400s the batch
       const rawDt = Number(e.dt); // NOT `raw` — that is the request body above
       const dt = Number.isFinite(rawDt) ? Math.max(0, Math.min(MAX_EVENT_AGE_MS, Math.round(rawDt))) : 0;
       const ts = new Date(received - dt).toISOString();
@@ -168,7 +195,7 @@ export default async function handler(req, res) {
       });
     }
 
-    if (rows.length === 0) { res.status(204).end(); return; }
+    if (rows.length === 0) return;
 
     // ⚠️ THE DARK BRANCH. No TURSO_EVENTS_URL/TOKEN means every event is
     // dropped and NOTHING here goes red — by design ("rail dark, never broken"),
@@ -208,10 +235,5 @@ export default async function handler(req, res) {
     } else if (!out.dark && out.written !== rows.length) {
       console.error(`[telemetry] insert SHORT written=${out.written ?? 'unknown'} rows_expected=${rows.length}`);
     }
-
-    res.status(204).end();
-  } catch {
-    // Absolutely never surface a 5xx for a telemetry drop.
-    res.status(204).end();
   }
 }

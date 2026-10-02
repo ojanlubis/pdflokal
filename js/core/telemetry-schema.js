@@ -959,28 +959,40 @@ export const OPTIONAL_PROPS = {
   block_edit: new Set(['decline_reason']),
 };
 
-// Pure, no I/O. {ok:true, clean} | {ok:false}. Strict on every axis the spec
-// calls out: unknown event, unknown prop, missing required prop, enum value
-// outside the list, and wrong type all fail the WHOLE event (never a partial
-// pass) — a bad call site should be loud, not silently half-recorded.
+// Pure, no I/O. {ok:true, clean} | {ok:false, reason, prop?}. Strict on every
+// axis the spec calls out: unknown event, unknown prop, missing required prop,
+// enum value outside the list, and wrong type all fail the WHOLE event (never a
+// partial pass) — a bad call site should be loud, not silently half-recorded.
+//
+// `reason` (added 2026-10-02, ADDITIVE: every caller reads only .ok/.clean, and
+// no verdict changed) says WHICH axis failed, so api/t.js can COUNT what it
+// discards instead of only what it keeps (TODO "telemetry rejection counter").
+// Closed set, REJECT_REASONS below. unknown_prop and missing_prop are almost
+// always version skew (a cached client older or newer than the schema);
+// bad_value and unknown_event are almost always our own bug.
+// `prop` is set only for missing_prop and bad_value, and it is then a key OF
+// THE SCHEMA (declared by us), never a name the caller sent: the sender
+// controls an unknown prop's name, so that one is deliberately not reported.
+export const REJECT_REASONS = Object.freeze(['unknown_event', 'unknown_prop', 'missing_prop', 'bad_value']);
+
 export function validateEvent(name, props) {
   const shape = SCHEMA[name];
-  if (!shape) return { ok: false };
+  if (!shape) return { ok: false, reason: 'unknown_event' };
 
   const src = props && typeof props === 'object' && !Array.isArray(props) ? props : {};
   const declaredKeys = Object.keys(shape);
 
   for (const key of Object.keys(src)) {
-    if (!(key in shape)) return { ok: false }; // unknown prop
+    if (!(key in shape)) return { ok: false, reason: 'unknown_prop' }; // unknown prop
   }
 
   const clean = {};
   for (const key of declaredKeys) {
     if (!(key in src)) {
       if (OPTIONAL_PROPS[name]?.has(key)) continue; // optional and absent: fine
-      return { ok: false }; // missing a required prop
+      return { ok: false, reason: 'missing_prop', prop: key }; // missing a required prop
     }
-    if (!validateProp(shape[key], src[key])) return { ok: false }; // wrong type / bad enum
+    if (!validateProp(shape[key], src[key])) return { ok: false, reason: 'bad_value', prop: key }; // wrong type / bad enum
     clean[key] = src[key];
   }
   return { ok: true, clean };
