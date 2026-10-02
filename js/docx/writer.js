@@ -226,7 +226,11 @@ export function createDocxStream(deps) {
     onChunk(chunk, !!final);
   });
   const put = (name, bytes, level) => {
-    const f = level === 0 ? new fflate.ZipPassThrough(name) : new fflate.ZipDeflate(name, { level });
+    // Level 0 is still ZipDeflate (stored blocks inside a deflate stream), NOT ZipPassThrough: a streamed entry
+    // has its sizes in a trailing data descriptor, and LibreOffice cannot read a STORED entry that way ("source
+    // file could not be loaded", MEASURED on 83 of 104 corpus files with pictures). Word reads both; a
+    // deflate-method entry works in both. Cost: 5 bytes per 64 KB block.
+    const f = new fflate.ZipDeflate(name, { level });
     f.mtime = ZIP_MTIME;
     zip.add(f);
     f.push(bytes, true);

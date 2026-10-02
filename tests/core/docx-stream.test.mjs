@@ -60,6 +60,39 @@ test('stream: the .docx it emits has the same entries, byte for byte and in the 
   assert.equal(s.writer.outBytes, s.out.length, 'the writer counts exactly the bytes it handed over');
 });
 
+// LibreOffice cannot read a STORED entry whose sizes live in a trailing data descriptor ("source file could
+// not be loaded"); Word can. A stream cannot know an entry's size up front, so every entry must be a DEFLATE
+// entry (level 0 = stored blocks inside deflate is fine). Found by the gate: 83 of 104 corpus files with pictures
+// failed to render when media were written with fflate's ZipPassThrough. Nothing in node loads the file in an
+// office suite, so the property is checked on the bytes: walk the local file headers.
+test('stream: no entry is STORED with a data descriptor (LibreOffice refuses those); pictures included', async () => {
+  const s = await stream(await picturesPdf(3), { limits: { spoolBytes: 0 } }); // spoolBytes 0: media written as they appear
+  const dv = new DataView(s.out.buffer, s.out.byteOffset, s.out.byteLength);
+  let at = 0;
+  let seen = 0;
+  const bad = [];
+  // walk the central directory (end-of-central-directory record is the last 22 bytes: no comment is written)
+  const eocd = s.out.length - 22;
+  assert.equal(dv.getUint32(eocd, true), 0x06054b50);
+  const entries = dv.getUint16(eocd + 10, true);
+  at = dv.getUint32(eocd + 16, true);
+  for (let i = 0; i < entries; i += 1) {
+    assert.equal(dv.getUint32(at, true), 0x02014b50);
+    const flag = dv.getUint16(at + 8, true);
+    const method = dv.getUint16(at + 10, true);
+    const nameLen = dv.getUint16(at + 28, true);
+    const extraLen = dv.getUint16(at + 30, true);
+    const commentLen = dv.getUint16(at + 32, true);
+    const name = Buffer.from(s.out.subarray(at + 46, at + 46 + nameLen)).toString();
+    if (method === 0 && (flag & 8)) bad.push(name);
+    seen += 1;
+    at += 46 + nameLen + extraLen + commentLen;
+  }
+  assert.equal(seen, entries);
+  assert.ok(Object.keys(s.files).some((k) => k.startsWith('word/media/')), 'the document has pictures, or this proves nothing');
+  assert.deepEqual(bad, []);
+});
+
 test('stream: the zip is handed over in pieces and only the last one is final', async () => {
   const s = await stream(await picturesPdf(2));
   assert.ok(s.chunks.length > 3, `pieces: ${s.chunks.length}`);
