@@ -514,19 +514,18 @@ export function createDownloadSheet(deps) {
 
   // ---- export_sheet_close (2026-10-02) ------------------------------------------
   // THE ONE PLACE A CLOSE IS SEEN: the dialog's own `close` event, which fires
-  // for every way out (our close() calls, Esc, and app.js's popstate close for the
-  // Android back). Wiring the event to each close() call instead would miss
+  // for every way out (our close() calls, Esc, and app.js's popstate close). Wiring the event to each close() call instead would miss
   // exactly the ones that do not go through this file. Esc is told apart by
   // `cancel`, which precedes `close` for the Esc key only. Anything that marked
-  // nothing is 'other' — see the schema note on why that is mostly BACK.
+  // nothing is 'other' (the schema note says what that does and does not mean).
   //
   // ⚠️ `built` AND `waited_ms` ARE READ WHEN THE PERSON ACTED, not when the event
   // lands. A dialog's `close` event is a queued task, not synchronous with
   // close(): measured here, a build released right after the close finished
   // BEFORE the event ran, so reading state in the listener reported built:true
   // for a sheet that was closed with nothing ready. markClose() snapshots at the
-  // moment of the tap/keypress; only a close nothing here marked (BACK) has to
-  // be read late, which is the best that path allows.
+  // moment of the tap/keypress; only a close nothing here marked (app.js's popstate
+  // close, at least) has to be read late, which is the best that path allows.
   function markClose(how) {
     closeHow = how;
     closeSnap = { built: ctaHasBytes(), waited: openedAt === null ? 0 : performance.now() - openedAt };
