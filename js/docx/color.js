@@ -870,7 +870,7 @@ function contrastGuard(ctx, resolved, fillAt, stats, pictures) {
 //   ctx.options.rasterize({ ctx, box, why }) -> { bytes, ext } | null     (tests, other hosts)
 //   else raster.js in a browser (canvas + pdf.js's own renderer)           else nothing: counted, not faked.
 const MAX_REGIONS = 4;
-const MAX_RASTER_BYTES = 24 * 1024 * 1024; // per document
+const MAX_RASTER_BYTES = 12 * 1024 * 1024; // per document
 async function rasterRegions(ctx, regions, stats) {
   const out = [];
   const W = ctx.widthPt; const H = ctx.heightPt;

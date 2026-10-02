@@ -6,7 +6,7 @@
  *
  * pdf.js's OWN renderer draws the region, so a soft mask, a tiling pattern or a 60,000-vertex trace
  * comes out exactly as the PDF viewer shows it. The TEXT is left out: every show-text operator of the
- * list the renderer draws from is swapped for a no-op (`dependency` with no ids) for the duration of the render (see renderLists),
+ * list the renderer draws from (and so is every picture images.js anchors itself, see LEAVE_OUT) is swapped for a no-op (`dependency` with no ids) for the duration of the render (see renderLists),
  * so the words stay live Word text on top instead of appearing twice. The background is transparent
  * (the region sits at its paint position in the stack, other art shows through).
  *
@@ -36,7 +36,11 @@ async function toPngBytes(canvas) {
   return blob ? new Uint8Array(await blob.arrayBuffer()) : null;
 }
 
-const SHOW_OPS = (OPS) => new Set([OPS.showText, OPS.showSpacedText, OPS.nextLineShowText, OPS.nextLineSetSpacingShowText]);
+// Left out of the picture: the text (it stays live Word text) and every picture images.js already anchors as its own
+// picture (the same three ops it reads), or each photo would sit in the .docx twice (MEASURED on n029: 918 KB PNG, photos
+// included). Stencil masks (paintImageMaskXObject) stay in: images.js skips them, so this picture is the only place they survive.
+const LEAVE_OUT = (OPS) => new Set([OPS.showText, OPS.showSpacedText, OPS.nextLineShowText, OPS.nextLineSetSpacingShowText,
+  OPS.paintImageXObject, OPS.paintInlineImageXObject, OPS.paintImageXObjectRepeat]);
 
 // MEASURED 2026-10-02 (pdf.js 3.11.174, Chromium): page.getOperatorList() and page.render() do NOT share an
 // operator list (the first carries the OPLIST intent flag, so its cache key differs): blanking the text ops of
@@ -83,7 +87,7 @@ export async function rasterizeRegion({ ctx, box }) {
   const viewport = page.getViewport({ scale, rotation: base.rotation, offsetX: -box[0] * scale, offsetY: -box[1] * scale });
   const lists = await renderLists(page, pdfjs, ops);
   if (!lists.length) return null; // cannot take the text out: a picture with the words baked in would print them twice
-  const text = SHOW_OPS(pdfjs.OPS);
+  const text = LEAVE_OUT(pdfjs.OPS);
   const saved = [];
   for (const l of lists) {
     for (let i = 0; i < l.fnArray.length; i += 1) {

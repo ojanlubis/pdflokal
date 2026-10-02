@@ -7,7 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { validateModel } from '../../js/docx/model.js';
-import { loadLibs, makePdf, convertBytes, packageIsClean, paragraphsOf } from './docx-helpers.mjs';
+import { loadLibs, makePdf, convertBytes, packageIsClean, paragraphsOf, docText } from './docx-helpers.mjs';
 
 loadLibs();
 
@@ -220,8 +220,9 @@ test('colour: a region too complex to draw becomes a picture through ctx.options
   const imgs = r.model.pages[0].anchors.filter((a) => a.kind === 'img');
   assert.equal(imgs.length, 1);
   assert.ok(imgs[0].wPt > 400 && imgs[0].hPt > 150, 'the picture covers the lost region');
+  assert.ok(docText(r.documentXml).some((t) => t.includes('di atas gambar')), 'the words stay live text');
   await clean(r);
-  const none = await convertBytes(bytes, { options: { rasterize: async () => null } });
+  const none = await convertBytes(bytes); // node: no canvas, no hook
   assert.equal(none.model.pages[0].anchors.filter((a) => a.kind === 'img').length, 0);
   assert.equal(shapesOf(none).length, 0, 'the big path is not drawn as a shape');
 });
