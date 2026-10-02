@@ -20,7 +20,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { DatabaseSync } from 'node:sqlite';
+// node:sqlite exists from Node 22.5; CI runs Node 20. A static import kills the whole
+// file there, so load it lazily and skip only the two real-SQLite tests without it.
+const { DatabaseSync } = await import('node:sqlite').catch(() => ({}));
+const NO_SQLITE = DatabaseSync ? false : 'node:sqlite is not available on this Node (CI runs 20)';
 
 import handler, { __setQueryForTests } from '../../api/t.js';
 import { createTally, upsertSql, ALL_REASONS, REQUEST_REASONS, EVENT_REASONS } from '../../api/_rejects.js';
@@ -258,7 +261,7 @@ function freshDb() {
   return db;
 }
 
-test('SQL: the migration applies, and the upsert ADDS across requests instead of inserting a row per drop', () => {
+test('SQL: the migration applies, and the upsert ADDS across requests instead of inserting a row per drop', { skip: NO_SQLITE }, () => {
   const db = freshDb();
   const up = (cells) => db.prepare(upsertSql(cells.length)).run(...cells.flatMap((c) => [c.day, c.reason, c.event, c.prop, c.n]));
   up([{ day: '2026-10-02', reason: 'missing_prop', event: 'failure', prop: 'class', n: 2 }, { day: '2026-10-02', reason: 'bad_json', event: '', prop: '', n: 1 }]);
@@ -272,7 +275,7 @@ test('SQL: the migration applies, and the upsert ADDS across requests instead of
   ]);
 });
 
-test('SQL: the table refuses what the content law forbids it to hold', () => {
+test('SQL: the table refuses what the content law forbids it to hold', { skip: NO_SQLITE }, () => {
   const db = freshDb();
   const ins = (...v) => db.prepare(upsertSql(1)).run(...v);
   assert.throws(() => ins('yesterday', 'bad_json', '', '', 1), /CHECK/i, 'a day that is not a date');
