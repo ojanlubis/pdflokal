@@ -62,6 +62,15 @@ test.describe('unduh sheet — mobile', () => {
 
   test('compress is HONEST: a tiny text PDF reports "sudah optimal", never grows', async ({ page }) => {
     await openSheet(page);
+    // The size the user would get WITHOUT compressing: the real "Asli" download.
+    // (This test used to assert against `window.__dsSizes`, a global nothing in
+    // the product has ever set — `if (sizes)` was always false, so "never
+    // bigger" was never checked. Audit 2026-08-17, item 5. The bytes are the
+    // oracle now, not a debug hook.)
+    const original = await downloadBytes(page, () => page.tap('#ds-cta'));
+    await expect(page.locator('#dl-sheet')).toBeHidden();
+    await page.tap('#btn-download');
+    await expect(page.locator('#dl-sheet')).toBeVisible();
     await page.tap('#ds-size [data-v="kompres"]');
     // The result lands: either savings or the honesty message.
     await expect(page.locator('#ds-size [data-v="kompres"]')).toContainText(/hemat|optimal/, { timeout: 20000 });
@@ -78,8 +87,7 @@ test.describe('unduh sheet — mobile', () => {
     });
 
     // Never bigger than the original build.
-    const sizes = await page.evaluate(() => window.__dsSizes || null);
-    if (sizes) expect(sizes.out).toBeLessThanOrEqual(sizes.base);
+    expect(buf.length).toBeLessThanOrEqual(original.buf.length);
   });
 
   test('gambar: all pages → one ZIP', async ({ page }) => {
