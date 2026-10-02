@@ -402,9 +402,20 @@ export const SCHEMA = {
   // GA4's editor_action/split, and GA4 is ad-blocked wholesale for a large share
   // of Indonesian users. It is NOT a document edit, so it stays out of app.js's
   // COMMIT_ACTIONS (the bug-report prompt must not fire on it).
+  //
+  // 'original_delete' / 'original_miss' (hapus only, 2026-10-02) are the PDF's OWN
+  // text under Hapus. Founder ruling: a tap on printed text with Hapus armed
+  // deletes that line. They are NOT 'delete': that action has always meant "an
+  // object the person added was removed", and keeping the two apart is what lets
+  // the rail say how much Hapus use is on the document's own words versus the
+  // person's own additions. 'original_delete' is an OUTCOME (a line was removed,
+  // or a replacement's text taken off it); 'original_miss' is the tap that found
+  // nothing printed to delete (paper, an image, a drawing, a scan nobody
+  // recognised): the count of what people reach for that Hapus still cannot
+  // remove. Additive: a cached client never sends either.
   tool_use: {
     tool: ['select', 'teks', 'tipex', 'ganti', 'ttd', 'hapus', 'halaman', 'gabung'],
-    action: ['select', 'whiteout', 'text', 'text_inline', 'signature', 'paraf', 'delete', 'pages_open', 'merge', 'arm', 'sig_modal_open', 'extract'],
+    action: ['select', 'whiteout', 'text', 'text_inline', 'signature', 'paraf', 'delete', 'pages_open', 'merge', 'arm', 'sig_modal_open', 'extract', 'original_delete', 'original_miss'],
   },
   // THE OTHER HALF OF THE SAME BLIND SPOT (2026-09-10). `export` fires when a
   // file is actually produced, and `failure`/stage:export fires when the build
