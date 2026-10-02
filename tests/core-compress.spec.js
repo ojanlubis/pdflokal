@@ -158,4 +158,89 @@ test.describe('core compress adapter', () => {
     // One call per page, done counting up 1..3, total constant at 3.
     expect(r.calls).toEqual([[1, 3], [2, 3], [3, 3]]);
   });
+  // COMPRESS x /Rotate (audit 2026-08-17, item 7). compress.js rebuilds every
+  // page as an upright JPEG on a page that "carries NO /Rotate — the pixels are
+  // already upright". That is only true if the rasteriser really did honour the
+  // source's /Rotate, and no test ever gave compress a rotated page: a regression
+  // that rendered at rotation 0 would hand back sideways pages, with the right
+  // page count and a smaller file, and every assertion above would stay green.
+  //
+  // The oracle is what PDF.js SHOWS of the source, not a formula of ours: we
+  // render the rotated source and the compressed output side by side and require
+  // the same displayed size and the same corner carrying ink. The marker sits at
+  // the MediaBox top-left and /Rotate moves it (PDF 32000 §7.7.3.3, clockwise:
+  // 90 -> top-right, 180 -> bottom-right, 270 -> bottom-left), so a page that
+  // came back unrotated, or rotated twice, puts the marker in the wrong corner.
+  for (const [rot, corner] of [[90, 'TR'], [180, 'BR'], [270, 'BL']]) {
+    test(`a source page with /Rotate ${rot} comes out upright: same displayed size, marker in the ${corner} corner`, async ({ page }) => {
+      await page.goto('/alat-gambar.html');
+      await page.waitForFunction(() => !!window.pdfjsLib && !!window.PDFLib);
+
+      const r = await page.evaluate(`(async () => {
+        ${renderPage}
+        const cmp = await import('/js/core/compress.js');
+        const { PDFLib } = window;
+
+        // A 600x800 MediaBox (NOT square, so a missed rotation shows as a size
+        // change) with a noise block in the middle, so the JPEG rebuild really
+        // wins, and a black 60x60 marker at the MediaBox top-left.
+        const doc = await PDFLib.PDFDocument.create();
+        const c = document.createElement('canvas');
+        c.width = 1200; c.height = 1200;
+        const ctx = c.getContext('2d');
+        const id = ctx.createImageData(1200, 1200);
+        for (let j = 0; j < id.data.length; j += 4) {
+          id.data[j] = Math.random() * 256; id.data[j + 1] = Math.random() * 256; id.data[j + 2] = Math.random() * 256; id.data[j + 3] = 255;
+        }
+        ctx.putImageData(id, 0, 0);
+        const img = await doc.embedPng(c.toDataURL('image/png'));
+        const p = doc.addPage([600, 800]);
+        p.drawImage(img, { x: 150, y: 250, width: 300, height: 300 });
+        p.drawRectangle({ x: 0, y: 740, width: 60, height: 60, color: PDFLib.rgb(0, 0, 0) });
+        p.setRotation(PDFLib.degrees(${rot}));
+        const srcBytes = await doc.save();
+
+        const res = await cmp.compressPdfBytes(srcBytes);
+        const outRot = (await PDFLib.PDFDocument.load(res.bytes)).getPages()[0].getRotation().angle;
+
+        const corners = (s) => {
+          const W = s.vpWidth; const H = s.vpHeight;
+          return {
+            TL: s.regionMinLuma(5, 5, 45, 45),
+            TR: s.regionMinLuma(W - 45, 5, W - 5, 45),
+            BL: s.regionMinLuma(5, H - 45, 45, H - 5),
+            BR: s.regionMinLuma(W - 45, H - 45, W - 5, H - 5),
+          };
+        };
+        const src = await renderPage(srcBytes, 1, 1);
+        const out = await renderPage(res.bytes, 1, 1);
+        return {
+          unchanged: res.unchanged, outRot,
+          srcW: src.vpWidth, srcH: src.vpHeight, outW: out.vpWidth, outH: out.vpHeight,
+          srcCorners: corners(src), outCorners: corners(out),
+        };
+      })()`);
+
+      // Precondition: the source really displays rotated, and compress took the
+      // rebuild path (an unchanged return would hand back the input and prove
+      // nothing about the rasteriser).
+      expect(r.unchanged).toBe(false);
+      expect({ w: r.srcW, h: r.srcH }).toEqual(rot === 180 ? { w: 600, h: 800 } : { w: 800, h: 600 });
+
+      // The output is upright on its own terms: no /Rotate to double-apply, and
+      // the displayed size is the source's displayed size.
+      expect(r.outRot).toBe(0);
+      expect(Math.abs(r.outW - r.srcW)).toBeLessThanOrEqual(1);
+      expect(Math.abs(r.outH - r.srcH)).toBeLessThanOrEqual(1);
+
+      // The marker is dark in exactly the expected corner of the SOURCE render
+      // (so the check is not vacuous) and in the same corner of the output.
+      for (const [label, corners] of [['source', r.srcCorners], ['compressed', r.outCorners]]) {
+        for (const k of ['TL', 'TR', 'BL', 'BR']) {
+          if (k === corner) expect(corners[k], `${label} ${k} should hold the marker`).toBeLessThan(60);
+          else expect(corners[k], `${label} ${k} should be paper`).toBeGreaterThan(235);
+        }
+      }
+    });
+  }
 });
