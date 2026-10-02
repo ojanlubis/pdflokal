@@ -8,6 +8,54 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
+  <!-- LANGUAGE. Which language `/` opens in, and which choice sticks. FIRST in <head>
+       on purpose: before gtag and the Mixpanel recorder, so a visit that is about to
+       leave `/` is not counted as a visit to it (both check window.__pdlLeaving).
+       Two jobs, one script:
+       1. A click on any language link (.ld-lang-opt with an hreflang) writes
+          pdflokal_lang = that link's language. Without it an English-browser user who
+          picks "Bahasa Indonesia" on /en would be bounced straight back.
+       2. ONLY on the exact path `/`: a stored choice wins ('en' goes to /en, 'id'
+          stays); with none, a browser whose first language is English goes to /en and
+          anything else stays. `location.replace`, so Back does not return to `/`; the
+          query string and hash travel with it. It never moves /en, a tool page or any
+          other URL, and never an Indonesian browser off `/en`.
+       NEVER FOR A CRAWLER: Googlebot renders as en-US, and a bot sent to /en would
+       never index `/`. So a user agent that says bot, crawler, Lighthouse or headless
+       stays put. navigator.webdriver is deliberately NOT tested: it is true under
+       Playwright, and the specs have to exercise the redirect (they set a real UA).
+       Storage can throw (private modes); every access is in try/catch.
+       ONE URL, ONE LANGUAGE still holds: content never switches on a URL, this only
+       chooses between two URLs (js/lib/i18n.js).
+       ⚠️ Byte-identical in index.html, privasi.html and dukung.html (the redirect is
+       inert off `/`, the click part is the point there) —
+       tests/core/lang-boot-parity.test.mjs fails if they drift. index.html's head is
+       copied into /en and the 12 tool pages by the generators. -->
+  <script>
+  (function () {
+    var KEY = 'pdflokal_lang';
+    document.addEventListener('click', function (e) {
+      try {
+        var a = e.target && e.target.closest && e.target.closest('a.ld-lang-opt[hreflang]');
+        var l = a && a.getAttribute('hreflang');
+        if (l === 'id' || l === 'en') localStorage.setItem(KEY, l);
+      } catch (x) {}
+    });
+    if (location.pathname !== '/') return;
+    if (/bot|crawl|spider|slurp|lighthouse|headless|google-inspectiontool|chrome-lighthouse/i.test(navigator.userAgent || '')) return;
+    var saved = null;
+    try { saved = localStorage.getItem(KEY); } catch (x) {}
+    var first = (navigator.languages && navigator.languages[0]) || navigator.language || '';
+    if (saved === 'en' || (saved !== 'id' && /^en/i.test(first))) {
+      window.__pdlLeaving = true;
+      // Nothing of the Indonesian page may show while /en loads; undone if the move never lands.
+      document.documentElement.style.visibility = 'hidden';
+      setTimeout(function () { document.documentElement.style.visibility = ''; }, 4000);
+      location.replace('/en' + location.search + location.hash);
+    }
+  })();
+  </script>
+
   <!-- SEO Meta Tags (carried over at the swap, Jul 3 2026 — the ranking title stays) -->
   <title>Kompres PDF 1MB Online Gratis - Perkecil di Bawah 1MB | PDFLokal</title>
   <meta name="description" content="Kompres PDF sampai di bawah 1MB, langsung di browser. Gratis, tanpa akun, tanpa upload. Kualitas terbaik yang masih muat.">
@@ -106,7 +154,9 @@
     window.dataLayer = window.dataLayer || [];
     function gtag(){dataLayer.push(arguments);}
     gtag('js', new Date());
-    if (location.hostname === 'pdflokal.id' || location.hostname === 'www.pdflokal.id') {
+    // window.__pdlLeaving: the language script above is moving `/` to /en; count the
+    // visit on /en, not on the page it never showed.
+    if (!window.__pdlLeaving && (location.hostname === 'pdflokal.id' || location.hostname === 'www.pdflokal.id')) {
       gtag('config', 'AW-17538923405');
       gtag('config', 'G-7J8JF8XZ1Q');
     }
@@ -191,6 +241,7 @@
     // so the Playwright gate cannot spend the free tier's 10k replays. The seam
     // is how tests/core-adjacent specs observe the recorder without a prod host.
     var live = location.hostname === 'pdflokal.id' || location.hostname === 'www.pdflokal.id';
+    if (window.__pdlLeaving) return; // the language script is moving `/` to /en: record there, not here
     if (!live && window.__PDFLOKAL_MP_FORCE !== true) return;
     // PIN THE BUNDLE URL TO https, AND IT IS NOT COSMETIC. The official snippet
     // below builds its src PROTOCOL-RELATIVE ("//cdn.mxpnl.com/..."), which

@@ -31,7 +31,11 @@
  *
  * ONE URL, ONE LANGUAGE. <html lang="en"> is what js/lib/i18n.js reads. The
  * hreflang set is the SAME three links as `/` (reciprocal by being identical);
- * canonical is self. No redirect anywhere.
+ * canonical is self. No SERVER redirect, and /en never moves anyone. The one
+ * thing that moves a visitor is the inline script first in index.html's head (and
+ * so first in this page's head, where it is inert): on the exact path `/` an
+ * English browser or a stored choice goes to /en. It chooses between two URLs, it
+ * never changes what one says. Copied verbatim like the rest of the head.
  *
  * URL FORM: `/en`, no trailing slash. vercel.json has trailingSlash:false, so
  * `/en/` answers 308 -> `/en` (measured on prod: /privasi/ and /images/ both

@@ -17,6 +17,8 @@
  * anything inside a [lang="id"] element in the body (the "Bahasa Indonesia"
  * link; not <html lang="id">, which would exempt every word on `/`).
  *
+ * The language link and the browser-language redirect are tests/lang-redirect.spec.js.
+ *
  * Set EN_SHOT_DIR to also drop a screenshot of /en there (the seat looks).
  */
 import { test, expect } from '@playwright/test';
@@ -216,14 +218,12 @@ test.describe('/en', () => {
     await expect(page.locator('#ld-burger-menu a[href="/en/support"]')).toHaveText('Support');
   });
 
-  test('7. an English browser on `/` is NOT redirected', async ({ browser }) => {
-    const ctx = await browser.newContext({ locale: 'en-US' });
-    const page = await ctx.newPage();
+  test('7. an Indonesian browser on `/` stays on `/` (English browsers are sent to /en: tests/lang-redirect.spec.js)', async ({ page }) => {
+    // playwright.config.js pins the browser language to id-ID.
     await page.goto('/');
     await page.waitForTimeout(800);
     expect(new URL(page.url()).pathname).toBe('/');
     await expect(page.locator('html')).toHaveAttribute('lang', 'id');
-    await ctx.close();
   });
 
   test('8. "Back to home" on /en goes to /en, not to the Indonesian page', async ({ page }) => {

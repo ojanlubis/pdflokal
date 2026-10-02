@@ -29,6 +29,13 @@ import { getLocale } from './lib/i18n.js';
 
 export const UPDATES = [
   {
+    id: '2026-10-02-bahasa-browser',
+    date: '2026-10-02',
+    text: 'PDFLokal sekarang otomatis terbuka dalam bahasa browser-mu.',
+    en: 'PDFLokal now opens in your browser language.',
+    approved: false, // awaiting Fauzan
+  },
+  {
     id: '2026-10-01-edit-paragraf',
     date: '2026-10-01',
     text: 'Sekarang kamu bisa edit satu paragraf sekaligus.',
