@@ -976,14 +976,16 @@ export const OPTIONAL_PROPS = {
 export const REJECT_REASONS = Object.freeze(['unknown_event', 'unknown_prop', 'missing_prop', 'bad_value']);
 
 export function validateEvent(name, props) {
-  const shape = SCHEMA[name];
+  // Own keys only: SCHEMA is a plain object, and 'constructor' or '__proto__' would
+  // otherwise resolve through Object.prototype and validate (tests/core/telemetry-proto-keys).
+  const shape = Object.hasOwn(SCHEMA, name) ? SCHEMA[name] : null;
   if (!shape) return { ok: false, reason: 'unknown_event' };
 
   const src = props && typeof props === 'object' && !Array.isArray(props) ? props : {};
   const declaredKeys = Object.keys(shape);
 
   for (const key of Object.keys(src)) {
-    if (!(key in shape)) return { ok: false, reason: 'unknown_prop' }; // unknown prop
+    if (!Object.hasOwn(shape, key)) return { ok: false, reason: 'unknown_prop' }; // unknown prop
   }
 
   const clean = {};
