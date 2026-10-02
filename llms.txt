@@ -1,27 +1,32 @@
 # PDFLokal
 
-> Alat PDF gratis buatan Indonesia yang jalan langsung di browser: edit, tanda tangan, gabung, pisah, dan kompres PDF tanpa mengupload file ke server.
+> Free PDF tools that run entirely in the browser: edit, sign, merge, split, and compress PDFs without uploading the file to any server. Made in Indonesia.
 
-File PDF dan gambar diolah di perangkat pengguna, tidak pernah diupload. Gratis, tanpa akun, tanpa watermark. Bahasa antarmukanya Indonesia. Bisa dipasang sebagai aplikasi (PWA), dan setelah sekali dipakai, tetap bisa membuka, mengedit, dan mengunduh PDF tanpa internet.
+PDF and image files are processed on the user's own device and are never uploaded. Free, no account, no watermark. After one visit the site also installs as an app (PWA) and can open, edit, and download PDFs offline.
 
-In English: free PDF tools in Indonesian that run entirely in the browser. Files are never uploaded.
+The tool pages at the root are written in Indonesian. The main page is also available in English at /en, and a browser whose first language is English is sent there from /. The editor is the same in both languages.
 
-## Alat
+## Tools
 
-- [Edit PDF](https://www.pdflokal.id/edit-pdf): tambah teks, tutup tulisan, dan ubah tulisan yang sudah tercetak di PDF (beta), termasuk di hasil scan lewat OCR di browser
-- [Tanda Tangan PDF](https://www.pdflokal.id/tanda-tangan-pdf): gambar tanda tangan pakai jari, atau pakai foto tanda tangan
-- [Gabung PDF](https://www.pdflokal.id/gabung-pdf): satukan beberapa file PDF jadi satu
-- [Pisah PDF](https://www.pdflokal.id/pisah-pdf): ambil halaman tertentu jadi file baru
-- [Hapus Halaman PDF](https://www.pdflokal.id/hapus-halaman-pdf): hapus, urutkan ulang, atau putar halaman
-- [Kompres PDF](https://www.pdflokal.id/kompres-pdf): perkecil ukuran PDF, dengan target [100 KB](https://www.pdflokal.id/kompres-pdf-100kb), [200 KB](https://www.pdflokal.id/kompres-pdf-200kb), [500 KB](https://www.pdflokal.id/kompres-pdf-500kb), dan [1 MB](https://www.pdflokal.id/kompres-pdf-1mb)
-- [JPG ke PDF](https://www.pdflokal.id/jpg-ke-pdf): ubah foto atau hasil scan jadi satu PDF
-- [PDF ke JPG](https://www.pdflokal.id/pdf-ke-jpg): ubah halaman PDF jadi gambar JPG atau PNG
+- [Edit PDF](https://www.pdflokal.id/edit-pdf): add text, cover existing text, and change text already printed in a PDF (beta), including scans through OCR that runs in the browser
+- [Tanda Tangan PDF](https://www.pdflokal.id/tanda-tangan-pdf): sign a PDF by drawing with a finger or by using a photo of a signature
+- [Gabung PDF](https://www.pdflokal.id/gabung-pdf): merge several PDFs into one
+- [Pisah PDF](https://www.pdflokal.id/pisah-pdf): take chosen pages out into a new file
+- [Hapus Halaman PDF](https://www.pdflokal.id/hapus-halaman-pdf): delete, reorder, or rotate pages
+- [Kompres PDF](https://www.pdflokal.id/kompres-pdf): reduce PDF size, with target sizes of [100 KB](https://www.pdflokal.id/kompres-pdf-100kb), [200 KB](https://www.pdflokal.id/kompres-pdf-200kb), [500 KB](https://www.pdflokal.id/kompres-pdf-500kb), and [1 MB](https://www.pdflokal.id/kompres-pdf-1mb)
+- [JPG ke PDF](https://www.pdflokal.id/jpg-ke-pdf): turn photos or scans into one PDF
+- [PDF ke JPG](https://www.pdflokal.id/pdf-ke-jpg): turn PDF pages into JPG or PNG images
 
-## Privasi
+## English
 
-- [Kebijakan Privasi](https://www.pdflokal.id/privasi): apa yang tetap di perangkat, dan apa yang terkirim (analytics, perekaman sesi, laporan error, masukan)
+- [PDFLokal in English](https://www.pdflokal.id/en): the same editor as the main page, in English
+
+## Privacy
+
+- [Kebijakan Privasi](https://www.pdflokal.id/privasi): what stays on the device and what is sent (analytics, session recording, error reports, feedback); in Indonesian
 
 ## Optional
 
-- [Dukung PDFLokal](https://www.pdflokal.id/dukung): dibuat oleh Fauzan Ahladzikri (Ojan)
-- [Kode sumber](https://github.com/ojanlubis/pdflokal)
+- [Dukung PDFLokal](https://www.pdflokal.id/dukung): about the maker, Fauzan Ahladzikri (Ojan), and how to support the project, in Indonesian
+- [Support PDFLokal](https://www.pdflokal.id/en/support): the same page in English
+- [Source code](https://github.com/ojanlubis/pdflokal)

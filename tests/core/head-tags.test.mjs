@@ -183,10 +183,41 @@ test('3b. every pdflokal.id link in llms.txt resolves to a page in the repo', ()
   const txt = read('llms.txt');
   const paths = [...txt.matchAll(/\]\(https:\/\/www\.pdflokal\.id(\/[^)\s]*)\)/g)].map((m) => m[1]);
   assert.ok(paths.length >= 10, `only ${paths.length} pdflokal.id links found in llms.txt: the instrument is blind`);
+  // cleanUrls: /x -> x.html, and a directory serves its index.html (/en -> en/index.html).
   const missing = paths.filter((p) => {
-    const file = p === '/' ? 'index.html' : `${p.slice(1).replace(/\.html$/, '')}.html`;
-    return !fs.existsSync(path.join(ROOT, file));
+    const bare = p.slice(1).replace(/\.html$/, '');
+    const files = p === '/' ? ['index.html'] : [`${bare}.html`, `${bare}/index.html`];
+    return !files.some((f) => fs.existsSync(path.join(ROOT, f)));
   });
   assert.deepEqual(missing, [], `llms.txt links to pages that do not exist: ${missing.join(', ')}`);
+  // The English pages exist now (2026-10-02); the file must not forget to point at them.
+  for (const p of ['/en', '/en/support']) {
+    assert.ok(paths.includes(p), `llms.txt does not link ${p}`);
+  }
+  // Every link must be a pdflokal.id page or the repo: a stray third-party URL is a claim nobody checked.
+  const hosts = [...txt.matchAll(/\]\((https?:\/\/[^/)\s]+)/g)].map((m) => m[1]);
+  const foreign = hosts.filter((h) => h !== 'https://www.pdflokal.id' && h !== 'https://github.com');
+  assert.deepEqual(foreign, [], `llms.txt links to hosts other than pdflokal.id and github.com: ${foreign.join(', ')}`);
+  assert.ok(!txt.includes('\u2014'), 'llms.txt contains an em dash');
   assert.ok(/^# PDFLokal\n\n> \S/.test(txt), 'llms.txt lost its llmstxt.org head: "# PDFLokal", blank line, "> summary"');
+});
+
+// Served as text/plain by Vercel's static handler (.txt). That holds only while
+// vercel.json leaves /llms.txt alone: no rewrite or redirect that captures it, and no
+// header rule that overrides its Content-Type. robots.txt's Allow: / must also stay
+// open, or a crawler is told not to read the file.
+test('3c. vercel.json and robots.txt leave /llms.txt alone', () => {
+  const cfg = JSON.parse(read('vercel.json'));
+  for (const kind of ['rewrites', 'redirects']) {
+    for (const r of cfg[kind] || []) {
+      assert.ok(!r.source.includes('llms'), `vercel.json ${kind} captures ${r.source}`);
+    }
+  }
+  for (const h of cfg.headers || []) {
+    const overrides = h.headers.some((x) => x.key.toLowerCase() === 'content-type');
+    const matches = h.source === '/(.*)' || h.source.includes('llms') || h.source.includes('.txt');
+    assert.ok(!(overrides && matches), `vercel.json sets Content-Type on ${h.source}, which covers /llms.txt`);
+  }
+  assert.ok(/^Allow: \/$/m.test(read('robots.txt')), 'robots.txt no longer allows /');
+  assert.ok(!/^Disallow:.*llms/m.test(read('robots.txt')), 'robots.txt disallows llms.txt');
 });
