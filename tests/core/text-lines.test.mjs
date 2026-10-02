@@ -8,7 +8,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { groupRunsIntoLines, resolveTap, draftFontSize } from '../../js/core/text-lines.js';
+import { groupRunsIntoLines, resolveTap, draftFontSize, runsNotOwned } from '../../js/core/text-lines.js';
 
 // Build one synthetic run. Horizontal by default (ux=1, uy=0); pass
 // { ux, uy } for other directions. Display fields mirror the pdf geometry
@@ -411,4 +411,22 @@ test('smartReplace builds its draft size through draftFontSize, never a whole-po
   const app = readFileSync(new URL('../../js/v2/app.js', import.meta.url), 'utf8');
   assert.match(app, /fontSize: draftFontSize\(line\.size\)/);
   assert.doesNotMatch(app, /Math\.round\(line\.size\)/);
+});
+
+// A line Hapus deleted (or Edit owns) must not be in the index a paragraph edit
+// reads. The cover's replaceTargets are the run.pdf geometries it was born with.
+test('runsNotOwned drops exactly the runs a cover targets, by geometry', () => {
+  const a = run('alpha beta', 72, 740, 200, 11);
+  const b = run('gamma delta', 72, 725, 210, 11);
+  const c = run('epsilon', 72, 710, 90, 11);
+  const runs = [a, b, c];
+  assert.deepEqual(runsNotOwned(runs, [b.pdf]), [a, c]);
+  assert.deepEqual(runsNotOwned(runs, [a.pdf, c.pdf]), [b]);
+  // a copy of the geometry (history/JSON round trip) still matches
+  assert.deepEqual(runsNotOwned(runs, [JSON.parse(JSON.stringify(b.pdf))]), [a, c]);
+  // nothing owned: the same runs, untouched
+  assert.equal(runsNotOwned(runs, []), runs);
+  assert.equal(runsNotOwned(runs, undefined), runs);
+  // a target elsewhere (different baseline) owns nothing
+  assert.deepEqual(runsNotOwned(runs, [{ ...b.pdf, y0: 600 }]), runs);
 });

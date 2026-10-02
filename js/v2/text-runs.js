@@ -17,7 +17,7 @@
 
 import { getSource } from '../core/model.js';
 import { ensurePdfJs } from '../core/vendor.js';
-import { groupRunsIntoLines, resolveTap } from '../core/text-lines.js';
+import { groupRunsIntoLines, resolveTap, runsNotOwned } from '../core/text-lines.js';
 import { pageHasVisibleText } from '../core/text-visibility.js';
 
 // Finger-sized minimum hit box (page-space px at zoom 1). Small print is a
@@ -191,6 +191,16 @@ export function createTextRunIndex({ getDoc }) {
         }));
       }
       return lineCache.get(pageId);
+    },
+
+    // Lines as the page SHOWS them: the same grouping, over the runs no committed
+    // edit or deletion owns (`targets`: the replaceTargets of the page's covers).
+    // Not cached and not paint-sorted: only a paragraph edit asks, once per tap,
+    // and only when the page has an edit at all. See core/text-lines.js
+    // runsNotOwned for why the cached index cannot answer this.
+    async getLinesWithout(pageId, targets) {
+      const runs = runsNotOwned(await this.getRuns(pageId), targets);
+      return groupRunsIntoLines(runs);
     },
 
     // The tap → line resolver. Delegates to core/text-lines.js's resolveTap:
