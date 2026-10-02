@@ -260,7 +260,7 @@ async function childMain(id) {
   const t0 = Date.now();
   try {
     if (ENGINE === 'ours') {
-      const { convertPdfToDocx } = await import(path.join(ROOT, 'js/core/pdf-to-docx.js'));
+      const { convertPdfToDocx } = await import(path.join(ROOT, 'js/docx/convert.js'));
       const r = await convertPdfToDocx({ pdfjs, fflate, data, maxPages: MAXPAGES });
       fs.writeFileSync(docxPath, r.docx);
       row.stats = r.stats;

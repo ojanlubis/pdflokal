@@ -93,7 +93,7 @@ const cdp = await ctx.newCDPSession(page);
 
 // in-page runner: fetch pdf, convert, return stats + docx base64
 const runner = async ({ url, maxPages, useOcr }) => {
-  const { convertPdfToDocx } = await import('/js/core/pdf-to-docx.js');
+  const { convertPdfToDocx } = await import('/js/docx/convert.js');
   const buf = new Uint8Array(await (await fetch(url)).arrayBuffer());
   let ocr = null;
   if (useOcr) {
