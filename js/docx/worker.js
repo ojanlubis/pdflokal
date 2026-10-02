@@ -41,6 +41,10 @@ let ocrSeq = 0;
 
 async function init() {
   try {
+    // The converter draws pictures and OCR renders on OffscreenCanvas. An engine without it (iOS Safari before
+    // 16.4, some WebViews) gets the init-error path, so the client falls back to the main thread instead of
+    // starting a run that cannot encode a picture.
+    if (typeof OffscreenCanvas === 'undefined' || typeof OffscreenCanvas.prototype.convertToBlob !== 'function') throw new Error('OffscreenCanvas.convertToBlob is not available');
     importScripts('/js/vendor/pdf.min.js', '/js/vendor/fflate.min.js');
     // pdf.js's own worker, started HERE and handed over as a port. Letting pdf.js start it from
     // workerSrc reads window.location, which a worker does not have: it then silently falls back

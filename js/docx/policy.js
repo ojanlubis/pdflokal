@@ -31,8 +31,9 @@
  * the whole-model path 1,004 MB, see docx-shell-bench in the shell lane's report) and that the zip leaves
  * the worker as it is made. Do not read the table as "streaming halves memory": it does not.
  * MEASURED, the same Mac with the renderer process duty-cycled SIGSTOP/SIGCONT (scripts/docx-shell-bench.mjs --throttle 4;
- * a spin loop calibrates at 4.7x main thread and 5.5x worker, but real runs land between 1.5x and 9x of the unthrottled time,
- * because the stop/run cycle interacts with I/O waits: treat it as a noisy instrument, not a 4x ruler). Worker path, ms per page
+ * a spin loop calibrates at 4.7x main thread and 5.5x worker, but real runs land between 1.5x and 9x of the unthrottled time
+ * (the cause is NOT established; INFERRED: the stop/run cycle interacts with I/O waits and with the browser process, which is not
+ * stopped. Treat it as a noisy instrument, not a 4x ruler, and read the 1.5x to 2x rows below as under-throttled). Worker path, ms per page
  * unthrottled -> throttled: text n077 5 -> 33, n010 13 -> 109, pictures n098 17 -> 32, n011 22 -> 40, n065 12 -> 110.
  * n010 (766 pp) takes 10 s unthrottled and 84 s throttled; peak memory does not move with the throttle (549 vs 586 MB). So 400
  * text pages on a slow phone is on the order of 40 s, not minutes, and the page cap is a time guard more than a memory one.
