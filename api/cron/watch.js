@@ -73,6 +73,18 @@ export async function measure(now = new Date()) {
      select count(*) from s where hard_fails > 0 and exports = 0 and work > 0`,
     [ago(now, DAY_MS), MARKER]);
 
+  // What api/t.js discarded in the last 7 Jakarta days, by reason (api/_rejects.js).
+  // TOLERANT ON PURPOSE: the table comes from a migration that may not have run
+  // yet, and an unreadable counter must never be reported as an unreadable RAIL
+  // (that is the fail-loud email). null = could not read; {} = read, nothing dropped.
+  let rejects = null;
+  try {
+    const rr = await one(ev,
+      `select reason, sum(n) from telemetry_rejects where day >= ? group by reason`,
+      [jakartaDay(new Date(now.getTime() - 7 * DAY_MS))]);
+    rejects = Object.fromEntries(rr.map(([reason, n]) => [reason, Number(n)]));
+  } catch { rejects = null; }
+
   const fb = feedback();
   const notes = await one(fb,
     `select ts, rating, note from feedback where note is not null and ts > ? order by ts desc`,
@@ -90,6 +102,7 @@ export async function measure(now = new Date()) {
     a4: notes.length,
     a5: { total: Number(a5total), down: Number(a5down) },
     a6: Number(a6),
+    rejects,
     notes,
   };
 }
