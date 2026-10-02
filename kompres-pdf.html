@@ -1861,9 +1861,9 @@
     .sc-performer img.sc-face { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; border: 1px solid var(--line); display: block; }
     .sc-hat {
       /* At 44px the brim has to overlap the crown or it reads as floating. */
-      position: absolute; top: 2px; left: 50%;
+      position: absolute; top: -3px; left: 50%;
       transform: translateX(-50%) rotate(-12deg);
-      font-size: 20px; line-height: 1; pointer-events: none;
+      width: 26px; height: auto; pointer-events: none;
     }
     .sc-performer b { display: block; font-size: 13px; color: var(--ink); line-height: 1.25; margin-top: 6px; }
     .sc-performer span { display: block; font-size: 11.5px; color: var(--muted); }
@@ -1957,9 +1957,9 @@
       font-size: 18px; line-height: 32px; cursor: pointer;
     }
     .mk-id { display: flex; align-items: center; gap: var(--sp-12); padding-right: 36px; }
-    .mk-kepala { position: relative; flex: none; padding-top: 8px; }
+    .mk-kepala { position: relative; flex: none; padding-top: 17px; } /* room for the hat INSIDE the card: its body scrolls (overflow:auto), so a hat above this box is cut off */
     .mk-face { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid var(--line); display: block; }
-    .mk-topi { position: absolute; top: -6px; left: 50%; transform: translateX(-50%) rotate(-12deg); font-size: 1.25rem; line-height: 1; pointer-events: none; }
+    .mk-topi { position: absolute; top: 0; left: 50%; transform: translateX(-50%) rotate(-12deg); width: 26px; height: auto; pointer-events: none; } /* the engraved cut-out, images/topi.svg (his pick "S", 2026-10-03) */
     .mk-name { font-weight: 700; font-size: var(--fs-0); line-height: 1.2; }
     .mk-real { font-size: var(--fs-n1); color: var(--muted); }
     .mk-label { margin: var(--sp-16) 0 var(--sp-8); font-size: var(--fs-n1); color: var(--muted); }
@@ -2248,7 +2248,7 @@
         <button type="button" class="mk-close" aria-label="Tutup">×</button>
         <div class="mk-id">
           <div class="mk-kepala">
-            <span class="mk-topi" aria-hidden="true">🎩</span>
+            <img class="mk-topi" src="/images/topi.svg" alt="" aria-hidden="true" width="26" height="23">
             <img src="/images/ojan.jpg" alt="Foto Fauzan Ahladzikri (Ojan)" class="mk-face" width="48" height="48" loading="lazy">
           </div>
           <div>
@@ -2636,7 +2636,7 @@
       <p>Scan pakai e-wallet atau m-banking kamu.</p>
       <div class="sc-performer">
         <div class="sc-kepala">
-          <span class="sc-hat" aria-hidden="true">🎩</span>
+          <img class="sc-hat" src="/images/topi.svg" alt="" aria-hidden="true" width="26" height="23">
           <img src="/images/ojan.jpg" alt="Foto Ojan" class="sc-face" width="44" height="44" loading="lazy">
         </div>
         <b>Ojan</b>
