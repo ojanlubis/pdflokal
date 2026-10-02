@@ -323,6 +323,15 @@ export default {
     big: 'Kabarin kalo ada bug yaa, di sini',
   },
 
+  // The feature vote card (js/v2/feature-vote.js). Its static copy (title, hint,
+  // option labels, the idea box) is markup in index.html; these are the lines the
+  // script writes. DRAFT: the founder approves every string.
+  featureVote: {
+    picked: '{n} dari {max} dipilih',
+    thanks: 'Makasih!',
+    thanksTop: 'Makasih! Yang paling banyak diminta:',
+  },
+
   // Page placeholder before a page is rendered (js/render/page-view.js)
   render: { loading: 'memuat…' },
 

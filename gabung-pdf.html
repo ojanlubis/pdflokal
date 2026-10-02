@@ -221,7 +221,8 @@
           touches. Blocking the node is what stops it, and the
           selector is by TYPE rather than by id (`#file-input`, `#sig-file`) so a
           file input added later is covered the day it is added.
-        - `#toast`, `#fb-form` and `#edit-feedback` are BLOCKED, not merely masked.
+        - `#toast`, `#fb-form`, `#fv-form` and `#edit-feedback` are BLOCKED, not merely masked.
+          (`#fv-form` is the feature vote card, whose free-text idea is a user-authored note.)
           The toast is the other place a real filename is ever painted; the other
           two are user-authored notes and consent-gated document crops. Blocking
           means they survive somebody later flipping a mask flag off.
@@ -285,7 +286,7 @@
       record_mask_all_text: true,
       record_mask_all_inputs: true,
       record_canvas: false,
-      record_block_selector: 'img, video, canvas, input[type="file"], #toast, #fb-form, #edit-feedback',
+      record_block_selector: 'img, video, canvas, input[type="file"], #toast, #fb-form, #fv-form, #edit-feedback',
       // THE ALLOWLIST. Masking stays deny-by-default above; these are the only
       // nodes carved out of it, and each one's WHOLE SUBTREE is static markup
       // shipped identically to every visitor. See the head comment for why a
@@ -654,6 +655,77 @@
     .fb-body:not([hidden]), .fb-done:not([hidden]) {
       display: flex; flex-direction: column; gap: var(--sp-12);
     }
+
+    /* ---- the feature vote card (js/v2/feature-vote.js, js/core/features.js) ----
+     * Same object as #fb-form: a dialog + .sheet child, because the global
+     * `dialog` rule IS the overlay. EDITOR / console mode (specs/design-system.md):
+     * nothing above --fs-0, hairlines and ground, no shadow. RED IS TOUCHABLE ONLY,
+     * so a CHOSEN option is marked by ink, weight and a tick, never by colour: the
+     * tick is what keeps "chosen" from being colour alone.
+     * The labels are the checkboxes' own text; the ids (value="") are the data. */
+    .fv-sheet { max-width: 440px; max-height: calc(100dvh - 32px); overflow: hidden; }
+    /* ⚠️ `:not([hidden])`, same trap as .fb-body: a bare display:flex beats [hidden]. */
+    .fv-body:not([hidden]), .fv-done:not([hidden]) {
+      display: flex; flex-direction: column; gap: var(--sp-12); min-height: 0;
+    }
+    .fv-head { display: flex; align-items: flex-start; gap: var(--sp-8); }
+    .fv-head > div { flex: 1; }
+    .fv-title { font-size: 15.5px; line-height: 1.3; }
+    .fv-title:focus, .fv-done-head:focus { outline: none; }
+    .fv-hint { margin: 2px 0 0; font-size: 12.8px; color: var(--muted); }
+    .fv-x { flex: none; width: 36px; height: 36px; padding: 0; display: grid; place-items: center; }
+    .fv-x svg { width: 14px; height: 14px; }
+    /* The 4px pad (undone by the margin) is room for the 3px focus ring: an overflow container clips it. */
+    .fv-scroll { overflow-y: auto; min-height: 0; display: flex; flex-direction: column; gap: var(--sp-16); padding: 4px; margin: -4px; }
+    .fv-list { display: flex; flex-direction: column; gap: var(--sp-12); }
+    .fv-group { border: 0; margin: 0; padding: 0; min-width: 0; }
+    .fv-group legend {
+      padding: 0; margin-bottom: var(--sp-8);
+      font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
+      color: var(--muted); font-weight: 600;
+    }
+    .fv-chips { display: flex; flex-wrap: wrap; gap: var(--sp-8); }
+    .fv-chip { position: relative; display: inline-flex; cursor: pointer; }
+    /* The real checkbox stays in the layout and in the tab order, only unseen:
+       display:none would take it out of both. */
+    .fv-chip input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: inherit; }
+    .fv-chip span {
+      display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px;
+      border: 1px solid var(--line); border-radius: var(--r-control);
+      background: var(--bg); color: var(--muted); font-size: 13px; line-height: 1.25;
+    }
+    .fv-chip input:checked + span { color: var(--ink); font-weight: 600; border-color: var(--ink); }
+    .fv-chip input:checked + span::before { content: "\2713\00a0"; }
+    .fv-chip input:disabled { cursor: not-allowed; }
+    .fv-chip input:disabled:not(:checked) + span { opacity: .45; }
+    .fv-chip input:focus-visible + span { outline: 3px solid var(--accent); outline-offset: 2px; }
+    @media (hover: hover) {
+      .fv-chip input:not(:disabled):not(:checked) + span:hover { background: var(--dzfill); }
+    }
+    .fv-idea-label { display: block; margin-bottom: var(--sp-8); font-size: 13px; color: var(--ink); }
+    #fv-idea {
+      width: 100%; resize: vertical; min-height: 56px;
+      padding: var(--sp-8) var(--sp-12);
+      border: 1px solid var(--line); border-radius: var(--r-control);
+      background: var(--bg); color: var(--ink);
+      font: inherit; font-size: 13px; line-height: 1.5;
+    }
+    #fv-idea:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    .fv-row { display: flex; align-items: center; gap: var(--sp-8); justify-content: flex-end; }
+    .fv-count { flex: 1; margin: 0; font-size: 12.8px; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .fv-row button {
+      min-height: 40px; padding: var(--sp-8) var(--sp-16);
+      border-radius: var(--r-control); border: 1px solid var(--line);
+      background: var(--bg); color: var(--ink); font: inherit; font-size: 13px; cursor: pointer;
+    }
+    #fv-send { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
+    #fv-send:disabled { opacity: .45; cursor: not-allowed; }
+    @media (hover: hover) {
+      #fv-send:not(:disabled):hover { background: var(--accent-down); border-color: var(--accent-down); }
+    }
+    .fv-done-head { font-size: 15.5px; line-height: 1.3; }
+    .fv-top { margin: 0; padding-left: var(--sp-24); font-size: 13px; line-height: 1.7; color: var(--ink); }
+    .fv-top[hidden] { display: none; }
 
     .hc-sheet { max-width: 340px; }
     .hc-sheet p { font-size: 13px; color: var(--muted); margin: -6px 0 2px; }
@@ -2221,6 +2293,7 @@
         <nav class="ld-nav" aria-label="Navigasi utama">
           <a href="https://github.com/ojanlubis/pdflokal" rel="noopener">Github</a>
           <a href="/privasi">Privasi</a>
+          <a href="#usulkan-fitur" data-feature-vote-open>Usulkan fitur</a>
           <a href="/dukung">Dukung</a>
         </nav>
 
@@ -2268,6 +2341,7 @@
            of flow and does not disturb the header's flex layout. -->
       <div class="ld-burger-menu" id="ld-burger-menu" hidden>
         <a href="https://github.com/ojanlubis/pdflokal" rel="noopener">Github</a>
+        <a href="#usulkan-fitur" data-feature-vote-open>Usulkan fitur</a>
         <a href="/dukung">Dukung</a>
         <div class="ld-burger-lang">
           <span class="ld-burger-lang-label">Bahasa</span>
@@ -2644,6 +2718,72 @@
       </div>
       <div class="fb-done" hidden>
         <h2>terimakasih udah bantu pdflokal improve terus</h2>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- The feature vote (founder ruling 2026-10-02: users vote on the planned
+       features, at most 3, and may write an idea; we build everything, the
+       RELEASE order follows the vote). js/v2/feature-vote.js owns it; the list of
+       ids is js/core/features.js and tests/core/feature-vote.test.mjs pins that the
+       checkboxes below and that list are the same set. A feature's LABEL is its
+       checkbox text, the ID is value="": reword a label freely, never an id.
+       Offered once after the second download, and always from the "Usulkan fitur"
+       nav / drawer link. DRAFT COPY: the founder approves every string here.
+       #fv-form is BLOCKED in session replay (the idea is a user-typed note). -->
+  <dialog id="fv-form" aria-labelledby="fv-title">
+    <div class="sheet fv-sheet">
+      <div class="fv-body">
+        <div class="fv-head">
+          <div>
+            <h2 id="fv-title" class="fv-title" tabindex="-1">Fitur apa yang paling kamu butuh?</h2>
+            <p class="fv-hint">Pilih maksimal 3</p>
+          </div>
+          <button type="button" class="btn-ghost fv-x" data-fv-close aria-label="Tutup"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+        </div>
+        <div class="fv-scroll">
+          <div class="fv-list">
+            <fieldset class="fv-group">
+              <legend>Konversi</legend>
+              <div class="fv-chips">
+                <label class="fv-chip"><input type="checkbox" name="feature" value="pdf-word"><span>PDF ke Word</span></label>
+                <label class="fv-chip"><input type="checkbox" name="feature" value="pdf-excel"><span>PDF ke Excel</span></label>
+                <label class="fv-chip"><input type="checkbox" name="feature" value="pdf-ppt"><span>PDF ke PowerPoint</span></label>
+                <label class="fv-chip"><input type="checkbox" name="feature" value="word-pdf"><span>Word ke PDF</span></label>
+              </div>
+            </fieldset>
+            <fieldset class="fv-group">
+              <legend>Alat</legend>
+              <div class="fv-chips">
+                <label class="fv-chip"><input type="checkbox" name="feature" value="form-fill"><span>Isi formulir PDF</span></label>
+                <label class="fv-chip"><input type="checkbox" name="feature" value="camera-scan"><span>Scan pakai kamera HP</span></label>
+                <label class="fv-chip"><input type="checkbox" name="feature" value="canvas-image"><span>Tempel gambar di halaman</span></label>
+                <label class="fv-chip"><input type="checkbox" name="feature" value="redact"><span>Sensor permanen</span></label>
+                <label class="fv-chip"><input type="checkbox" name="feature" value="watermark"><span>Watermark</span></label>
+                <label class="fv-chip"><input type="checkbox" name="feature" value="page-numbers"><span>Nomor halaman</span></label>
+                <label class="fv-chip"><input type="checkbox" name="feature" value="lock"><span>Kunci PDF dengan password</span></label>
+                <label class="fv-chip"><input type="checkbox" name="feature" value="batch"><span>Banyak file sekaligus</span></label>
+                <label class="fv-chip"><input type="checkbox" name="feature" value="crop"><span>Potong halaman</span></label>
+                <label class="fv-chip"><input type="checkbox" name="feature" value="grayscale"><span>Hitam putih</span></label>
+              </div>
+            </fieldset>
+          </div>
+          <div>
+            <label class="fv-idea-label" for="fv-idea">Belum ada di sini? Tulis aja</label>
+            <textarea id="fv-idea" rows="2"></textarea>
+          </div>
+        </div>
+        <div class="fv-row">
+          <p class="fv-count" id="fv-count" aria-live="polite"></p>
+          <button type="button" id="fv-send" disabled>Kirim</button>
+        </div>
+      </div>
+      <div class="fv-done" role="status" hidden>
+        <h2 class="fv-done-head" tabindex="-1"></h2>
+        <ol class="fv-top" hidden></ol>
+        <div class="fv-row">
+          <button type="button" data-fv-close>Tutup</button>
+        </div>
       </div>
     </div>
   </dialog>

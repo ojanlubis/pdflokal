@@ -30,7 +30,14 @@ test.describe('growth loop — mobile', () => {
   // to share/tip, exactly as it does for a voted user or once the drive ends.
   // (Remove this hook when PLAYSTORE_CAMPAIGN is retired.)
   test.beforeEach(async ({ page }) => {
-    await page.addInitScript(() => localStorage.setItem('pdflokal-ps-voted', '1'));
+    await page.addInitScript(() => {
+      localStorage.setItem('pdflokal-ps-voted', '1');
+      // Same idea for the feature vote (2026-10-02): after a browser's second
+      // download it takes the moment from the share/tip card, and these tests
+      // download several times. Marked answered, the moment falls through to
+      // share/tip. The vote's own gating is tests/feature-vote.spec.js.
+      localStorage.setItem('pdflokal_vote_done', 'dismissed');
+    });
   });
 
   test('download celebrates (BERES stamp) and then invites — once per day', async ({ page }) => {

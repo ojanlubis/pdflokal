@@ -30,6 +30,7 @@
 import { validateEvent } from '../core/telemetry-schema.js';
 import { validateSample } from '../core/feedback-sample.js';
 import { validateShot } from '../core/feedback-shot.js';
+import { cleanVote, IDEA_MAX } from '../core/features.js';
 
 const ENDPOINT = '/api/t';
 const FLUSH_AT = 10;
@@ -353,6 +354,34 @@ export function feedback(rating, note, sample, shot) {
     if (validShot) delete payload.screenshot;
     const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
     navigator.sendBeacon(FEEDBACK_ENDPOINT, blob);
+  } catch {
+    // Feedback can NEVER throw into app code — same law as tel().
+  }
+}
+
+/**
+ * The feature vote's free-text idea (js/v2/feature-vote.js, founder ruling
+ * 2026-10-02). Same endpoint, same table and same free field as the thumbs note
+ * above; `kind: 'feature_request'` is all that tells api/feedback.js it is not a
+ * rating, and it carries the ids the person voted for. Small, so it goes by
+ * beacon like a note with no images. Never carries document text: the only text
+ * is what the person typed into the card.
+ * @param {string[]} features ids from js/core/features.js, at most three
+ * @param {string} text the idea, required (an idea is its text)
+ */
+export function featureRequest(features, text) {
+  try {
+    const vote = cleanVote(features);
+    const note = typeof text === 'string' ? text.trim().slice(0, IDEA_MAX) : '';
+    if (!vote.ok || !note) return;
+    const body = JSON.stringify({
+      session_id: sessionId, app_version: appVersion, kind: 'feature_request', features: vote.ids, note,
+    });
+    if (typeof navigator?.sendBeacon === 'function'
+      && navigator.sendBeacon(FEEDBACK_ENDPOINT, new Blob([body], { type: 'application/json' }))) return;
+    if (typeof fetch === 'function') {
+      fetch(FEEDBACK_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true }).catch(() => {});
+    }
   } catch {
     // Feedback can NEVER throw into app code — same law as tel().
   }

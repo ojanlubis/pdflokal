@@ -1087,5 +1087,23 @@
     "src": [
       "js/v2/maker-card.js"
     ]
+  },
+  "featureVote.picked": {
+    "text": "{n} dari {max} dipilih",
+    "src": [
+      "js/v2/feature-vote.js"
+    ]
+  },
+  "featureVote.thanks": {
+    "text": "Makasih!",
+    "src": [
+      "js/v2/feature-vote.js"
+    ]
+  },
+  "featureVote.thanksTop": {
+    "text": "Makasih! Yang paling banyak diminta:",
+    "src": [
+      "js/v2/feature-vote.js"
+    ]
   }
 }

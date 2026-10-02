@@ -14,6 +14,7 @@
  */
 
 import { createPlaystoreVote } from './playstore-vote.js';
+import { createFeatureVote } from './feature-vote.js';
 import { track } from '../lib/analytics.js';
 import { t as tr } from '../lib/i18n.js';
 
@@ -119,6 +120,11 @@ export function createCelebration(deps) {
   // The temporary Play Store vote — owns its own gating; celebrate.js only asks
   // it to try, and skips the share/tip card when it takes the moment.
   const vote = createPlaystoreVote({ toast: deps.toast });
+  // The feature vote (founder ruling 2026-10-02). Owns its own gating and its own
+  // count of saved files; celebrate.js tells it whether the share/tip card has
+  // already spoken this session, and when it takes the moment, withholds the
+  // share/tip card from the rest of the session. One invitation per session.
+  const featureVote = createFeatureVote();
 
   // TETAP JALAN: connection dies, PDFLokal doesn't (no server in the loop).
   // The moat made visible — once per session, only while a page is open.
@@ -206,6 +212,14 @@ export function createCelebration(deps) {
       // we stop here; if it declines (already voted / dismissed today), the
       // share/tip card runs as usual — so voters still get the normal invite.
       if (PLAYSTORE_CAMPAIGN && vote.maybeShow()) return;
+      // Counted on EVERY download, offered or not: "the second" is across visits.
+      const downloads = featureVote.countDownload();
+      // Due ahead of the share/tip card (it is a one-time ask, the card is a daily
+      // one that will be back tomorrow), but never after it in the same session.
+      if (featureVote.maybeShow({ downloads, supportShownThisSession: shownThisSession })) {
+        shownThisSession = true; // and the share/tip card stands down for this session
+        return;
+      }
       // The share/tip invite, once per CALENDAR DAY (founder call, Jul 3) — a gentle
       // reminder that free has a sponsor, never a toll booth per file. (Install lives
       // on the homepage now, off this moment — see install-prompt.js.) shownThisSession

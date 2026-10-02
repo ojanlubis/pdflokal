@@ -318,6 +318,12 @@ export default {
     big: 'Please let me know about any bugs, here',
   },
 
+  featureVote: {
+    picked: '{n} of {max} picked',
+    thanks: 'Thanks!',
+    thanksTop: 'Thanks! Most requested so far:',
+  },
+
   render: { loading: 'loading…' },
 
   maker: {
