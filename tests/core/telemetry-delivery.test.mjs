@@ -176,6 +176,14 @@ test('DELIVERY (0a): zoom_tap survives api/t.js, and a raw (unbucketed) level is
   assert.equal(calls.length, 0, 'an unbucketed zoom level reached the database');
 });
 
+test('DELIVERY (merge guard): merge_blocked survives api/t.js, and an off-enum reason or a raw page count is dropped', async () => {
+  await deliversIntact([{ event: 'merge_blocked', props: { reason: 'open_unrebuildable', pages: '6-20' } }]);
+  for (const props of [{ reason: 'corrupt', pages: '2-5' }, { reason: 'open_unrebuildable', pages: 7 }]) {
+    const { calls } = await run({ ...VALID, events: [{ event: 'merge_blocked', props }] });
+    assert.equal(calls.length, 0, 'an off-schema merge_blocked reached the database');
+  }
+});
+
 // ---------------------------------------------------------------------------
 // visitor_id (2026-09-10). Additive and DELIBERATELY not part of the
 // envelope-trust check that session_id/app_version sit behind — an invalid

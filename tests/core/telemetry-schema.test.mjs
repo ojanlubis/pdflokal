@@ -82,6 +82,7 @@ const VALID_PROPS = {
   extract_export: { duration: 450, pages: '2-5', pages_scope: 'some' },
   export_sheet_close: { how: 'x', built: false, waited_ms: 1200 },
   zoom_tap: { dir: 'out', level: '200-249', device: 'desktop' },
+  merge_blocked: { reason: 'open_unrebuildable', pages: '2-5' },
 };
 
 test('every SCHEMA event has a VALID_PROPS fixture (test coverage stays complete as events are added)', () => {

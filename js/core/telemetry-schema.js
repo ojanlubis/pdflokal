@@ -498,6 +498,21 @@ export const SCHEMA = {
     device: DEVICE,
   },
 
+  // THE MERGE GUARD'S "THE OPEN DOCUMENT IS THE PROBLEM" BRANCH (2026-10-02).
+  // js/v2/app.js declines to add any file to a document pdf-lib cannot rebuild
+  // (a merge always rebuilds, so adding would only move the failure to Unduh).
+  // The NEW file in that moment would have opened fine, so reporting it as
+  // failure{import, corrupt, blocked:true} would widen what that triple means
+  // (a file that could not be opened) and inflate the import-corrupt count with
+  // files that were never at fault. A separate event keeps both numbers honest.
+  // `reason` is a closed enum with one value today; more guard branches would add
+  // values (additions are the safe direction). `pages` is the OPEN document's
+  // size, bucketed, as every pages prop here: it says how much work was in play.
+  merge_blocked: {
+    reason: ['open_unrebuildable'],
+    pages: PAGES_BUCKET,
+  },
+
   // ---- ladder (Rung A–D) — schema-complete now, call sites land on the ladder branch ----
 
   // flavor mirrors spec §2's FLAVOR list exactly (never the font's own name).
