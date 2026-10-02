@@ -151,3 +151,33 @@ create table if not exists routine_runs (
   findings text not null default '{}' check (json_valid(findings)),
   note text
 );
+
+-- telemetry_rejects — what api/t.js DISCARDS, counted by cause (2026-10-02;
+-- api/_rejects.js has the why, the units and the content law). One row per
+-- (Jakarta day, reason, event, prop) with `n` bumped by upsert, so the table
+-- grows with the number of distinct CAUSES and never with traffic.
+-- ⚠️ CONTENT-BLIND: reason is from a closed list in code; event and prop are
+-- a SCHEMA-declared name or '' (never a sender-supplied string); '' and not NULL
+-- because SQLite treats NULLs in a primary key as distinct, which would turn the
+-- upsert into one insert per drop. The length checks are a backstop, not the law.
+-- ⚠️ DEPLOY ORDER: apply this BEFORE (or with) the api/t.js that writes it. Until
+-- it exists every dropped batch logs `[telemetry] reject-count FAILED
+-- error=sql_SQLITE_ERROR` and counts nothing; the endpoint itself is unaffected.
+-- Run: turso db shell <events-db> < scripts/turso-events-migration.sql  (idempotent)
+create table if not exists telemetry_rejects (
+  day text not null,
+  reason text not null,
+  event text not null default '',
+  prop text not null default '',
+  n integer not null default 0,
+  primary key (day, reason, event, prop),
+  constraint telemetry_rejects_day_shape_chk check (day glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  constraint telemetry_rejects_n_chk check (n >= 0),
+  constraint telemetry_rejects_len_chk check (length(reason) <= 32 and length(event) <= 48 and length(prop) <= 48)
+) without rowid;
+
+-- Read it: skew-shaped (unknown_prop, missing_prop: a cached client older or
+-- newer than the schema) vs bug-shaped (bad_value, unknown_event) is the
+-- strict-vs-tolerant question. Request-level reasons count REQUESTS, event-level
+-- ones count EVENTS (api/_rejects.js, UNITS):
+--   select day, reason, event, prop, n from telemetry_rejects order by day desc, n desc;

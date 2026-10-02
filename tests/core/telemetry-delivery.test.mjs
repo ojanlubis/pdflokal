@@ -94,6 +94,11 @@ async function run(payload, { queryImpl } = {}) {
   const calls = [];
   const logged = [];
   __setQueryForTests(async (text, params) => {
+    // The rejection counter (api/_rejects.js) rides the same seam. It is NOT a
+    // delivery: `calls` stays "the events inserts", exactly what every assertion
+    // below was written about. tests/core/telemetry-rejects.test.mjs owns the
+    // counter and reads this same seam by SQL target.
+    if (/telemetry_rejects/.test(String(text))) return { rowCount: params.length / 5 };
     calls.push({ text: String(text), params, body: paramsToRows(params) });
     if (queryImpl) return queryImpl();
     return { rowCount: params.length / COLS.length };
