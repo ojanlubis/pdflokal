@@ -2,7 +2,7 @@
 /*
  * Side-by-side page PNG: original page N | the .docx as LibreOffice renders it.
  *   node scripts/docx-spike-shot.mjs --out DIR --id n001 [--page 1] [--dpi 80]
- * Needs DIR/docx/ID.docx (from docx-spike.mjs), soffice and poppler. Writes DIR/shots/ID-pN.png.
+ * Needs DIR/docx/ID.docx (from docx-gate.mjs, its --out DIR), soffice and poppler. Writes DIR/shots/ID-pN.png.
  */
 import fs from 'node:fs';
 import path from 'node:path';
