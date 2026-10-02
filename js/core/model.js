@@ -2,7 +2,7 @@
  * PDFLokal — core/model.js  (HEADLESS domain model — no DOM, no vendor libs)
  * ============================================================================
  * The ONE source of truth for a document. This layer must run in Node with no
- * browser (that's the litmus test — see docs/foundation-plan.md).
+ * browser (that's the litmus test; the plan was docs/foundation-plan.md, deleted, see `git log -- docs/foundation-plan.md`).
  *
  * The two rules that kill the old spaghetti:
  *   1. A Page OWNS its annotations (page.annotations[]). There is NO parallel
