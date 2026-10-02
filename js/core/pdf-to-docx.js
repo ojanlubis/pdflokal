@@ -192,6 +192,24 @@ function downscale(p, maxW) {
   return { w: nw, h: nh, ch: p.ch, px: out };
 }
 
+// In a real browser pdf.js hands images over as an ImageBitmap (decoded off the
+// main thread), not as a pixel buffer. Draw it at the size it is placed (150 dpi
+// cap) and let the canvas encoder do the work: JPEG when it is opaque (a photo or
+// a scan: ~10x smaller than PNG), PNG when it carries transparency.
+async function encodeBitmap(bitmap, maxW) {
+  const scale = Math.min(1, maxW / bitmap.width);
+  const w = Math.max(1, Math.round(bitmap.width * scale));
+  const h = Math.max(1, Math.round(bitmap.height * scale));
+  const canvas = new globalThis.OffscreenCanvas(w, h);
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(bitmap, 0, 0, w, h);
+  const px = ctx.getImageData(0, 0, w, h).data;
+  let alpha = false;
+  for (let i = 3; i < px.length; i += 4) if (px[i] < 250) { alpha = true; break; }
+  const blob = await canvas.convertToBlob(alpha ? { type: 'image/png' } : { type: 'image/jpeg', quality: 0.85 });
+  return { bytes: new Uint8Array(await blob.arrayBuffer()), ext: alpha ? 'png' : 'jpeg' };
+}
+
 async function extractImages(pdfjs, page, ops, vp, state) {
   const { OPS } = pdfjs;
   const found = [];
@@ -217,8 +235,8 @@ async function extractImages(pdfjs, page, ops, vp, state) {
       if (box.x1 - box.x0 < 4 || box.y1 - box.y0 < 4) { stats.failed += 0; continue; }
       const id = fn === OPS.paintInlineImageXObject ? null : args[0];
       const key = id && `${id}`;
-      let bytes = key && state.imageCache.get(key);
-      if (!bytes) {
+      let enc = key && state.imageCache.get(key);
+      if (!enc) {
         try {
           let img;
           if (fn === OPS.paintInlineImageXObject) img = args[0];
@@ -228,15 +246,19 @@ async function extractImages(pdfjs, page, ops, vp, state) {
             pool.get(id, (o) => { done = true; resolve(o); });
             setTimeout(() => { if (!done) reject(new Error('image not resolved')); }, 4000);
           });
-          const px = img && expandToPixels(img);
-          if (!px) throw new Error('unreadable image');
           const maxW = Math.max(16, Math.ceil(((box.x1 - box.x0) * 150) / 72));
-          const d = downscale(px, maxW);
-          bytes = encodePng(state.fflate, d.w, d.h, d.ch, d.px);
-          if (key) state.imageCache.set(key, bytes);
+          if (img && img.bitmap && typeof globalThis.OffscreenCanvas !== 'undefined') {
+            enc = await encodeBitmap(img.bitmap, maxW);
+          } else {
+            const px = img && expandToPixels(img);
+            if (!px) throw new Error('unreadable image');
+            const d = downscale(px, maxW);
+            enc = { bytes: encodePng(state.fflate, d.w, d.h, d.ch, d.px), ext: 'png' };
+          }
+          if (key) state.imageCache.set(key, enc);
         } catch { stats.failed += 1; continue; }
       }
-      found.push({ kind: 'img', bytes, ext: 'png', box });
+      found.push({ kind: 'img', bytes: enc.bytes, ext: enc.ext, box });
     }
   }
   return { images: found, stats };
@@ -355,7 +377,7 @@ function buildPageBlocks(lines, images, vp, kind) {
   let dropped = 0;
   for (const it of imgItems) {
     const area = (it.x1 - it.x0) * (it.y1 - it.y0);
-    if (kind === 'searchable-scan' && area > W * H * 0.8) { dropped += 1; continue; }
+    if ((kind === 'searchable-scan' || kind === 'ocr-scan') && area > W * H * 0.8) { dropped += 1; continue; }
     // clip to the page: art that spills far off the page is cropped, not shipped whole
     const vx0 = Math.max(0, it.x0); const vy0 = Math.max(0, it.y0);
     const vx1 = Math.min(W, it.x1); const vy1 = Math.min(H, it.y1);
@@ -628,11 +650,29 @@ function finishPara(para, z, marginL, colRight) {
 }
 
 // -------------------------------------------------------------- driver -----
-export async function pdfToDocModel({ pdfjs, fflate, data, onProgress, maxPages }) {
+// OCR lines (core/ocr-lines.js shape: str, x, y, w, h, size in page-space px,
+// top-left origin) as pseudo text runs, so a scan goes through the SAME layout
+// pipeline as a text page. y0 is the negated display baseline: the clustering
+// only needs a consistent perpendicular axis.
+function runsFromOcr(ocrLines) {
+  return ocrLines.map((l) => {
+    const base = l.y + l.h * 0.8;
+    return {
+      str: l.str, x: l.x, y: l.y, w: l.w, h: l.h, size: l.size, fontName: 'ocr', fontFamily: '', dir: 'ltr',
+      org: { x: l.x, y: base },
+      pdf: { x0: l.x, y0: -base, ux: 1, uy: 0, len: l.w, size: l.size },
+      style: { family: 'Arial', bold: false, italic: false },
+    };
+  });
+}
+
+// `ocr` (optional): async ({ page, viewport, pageNumber }) => ocr lines. The
+// SHELL supplies it (canvas + Tesseract live in the browser, not in this module).
+export async function pdfToDocModel({ pdfjs, fflate, data, onProgress, maxPages, ocr }) {
   const pdf = await pdfjs.getDocument({ data: new Uint8Array(data), disableFontFace: true, isEvalSupported: false, verbosity: 0, fontExtraProperties: true }).promise;
   const state = { fflate, imageCache: new Map() };
   const pages = [];
-  const stats = { pages: pdf.numPages, pageKinds: { text: 0, 'searchable-scan': 0, scan: 0, empty: 0 }, imageMasksSkipped: 0, imagesFailed: 0, anchored: 0, droppedBackground: 0, errors: [], lines: 0, columnBands: 0 };
+  const stats = { pages: pdf.numPages, pageKinds: { text: 0, 'searchable-scan': 0, 'ocr-scan': 0, scan: 0, empty: 0 }, ocrMs: 0, imageMasksSkipped: 0, imagesFailed: 0, anchored: 0, droppedBackground: 0, errors: [], lines: 0, columnBands: 0 };
   const limit = maxPages ? Math.min(maxPages, pdf.numPages) : pdf.numPages;
   for (let i = 1; i <= limit; i += 1) {
     const page = await pdf.getPage(i);
@@ -649,12 +689,18 @@ export async function pdfToDocModel({ pdfjs, fflate, data, onProgress, maxPages 
       const hasTextItems = tc.items.some((it) => it.str && it.str.trim());
       let kind = 'empty';
       if (hasTextItems) kind = (await pageHasVisibleText(page, pdfjs)) ? 'text' : 'searchable-scan';
-      const { runs } = hasTextItems ? await extractRuns(pdfjs, page, tc, fontInfo) : { runs: [] };
-      const lines = groupRunsIntoLines(runs);
-      stats.lines += lines.length;
+      let { runs } = hasTextItems ? await extractRuns(pdfjs, page, tc, fontInfo) : { runs: [] };
       const { images, stats: istats } = await extractImages(pdfjs, page, ops, vp, state);
       if (!hasTextItems && images.length) kind = 'scan';
-      stats.pageKinds[kind] += 1;
+      if (kind === 'scan' && ocr) {
+        const t0 = Date.now();
+        const found = await ocr({ page, viewport: vp, pageNumber: i });
+        stats.ocrMs += Date.now() - t0;
+        if (found && found.length) { runs = runsFromOcr(found); kind = 'ocr-scan'; }
+      }
+      const lines = groupRunsIntoLines(runs);
+      stats.lines += lines.length;
+      stats.pageKinds[kind] = (stats.pageKinds[kind] || 0) + 1;
       stats.imageMasksSkipped += istats.masks;
       stats.imagesFailed += istats.failed;
       const built = buildPageBlocks(lines, images, vp, kind);
@@ -673,7 +719,7 @@ export async function pdfToDocModel({ pdfjs, fflate, data, onProgress, maxPages 
   return { model: { pages }, stats };
 }
 
-export async function convertPdfToDocx({ pdfjs, fflate, data, onProgress, maxPages }) {
-  const { model, stats } = await pdfToDocModel({ pdfjs, fflate, data, onProgress, maxPages });
+export async function convertPdfToDocx({ pdfjs, fflate, data, onProgress, maxPages, ocr }) {
+  const { model, stats } = await pdfToDocModel({ pdfjs, fflate, data, onProgress, maxPages, ocr });
   return { docx: buildDocx(model, { fflate }), stats, model };
 }

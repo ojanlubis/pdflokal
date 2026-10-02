@@ -513,5 +513,6 @@ async function main() {
   console.log(`wrote ${path.join(OUT, csvName)} (${out.length} rows, ${out.filter((o) => o.ok).length} ok)`);
 }
 
+export { tokens, recall, parseDocx };
 if (ONE) childMain(ONE).catch((e) => { console.error(e); process.exit(2); });
-else main().then(() => process.exit(0));
+else if (path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main().then(() => process.exit(0));
