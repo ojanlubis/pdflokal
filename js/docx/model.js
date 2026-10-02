@@ -28,8 +28,15 @@
  *               align?, indentLeft?, spaceBefore?,
  *               anchor?: {x,y} (page pt: absolute, behind the text; use in Page.anchors),
  *               crop?: {l,t,r,b} (fractions 0..1 of the source), z? }
- *   Table   = { kind:'tbl', colsPt: number[], rows: Cell[][], border?: boolean, spaceBefore? }
- *   Cell    = { blocks: Para[], span?: number (gridSpan), fill?: hex (cell shading) }
+ *   Table   = { kind:'tbl', colsPt: number[], rows: Cell[][], border?: boolean, spaceBefore?,
+ *               indentLeft? (pt), rowsH?: number[] (pt, one per row, written "at least"),
+ *               src?: 'ruled'|'rules-h'|'text' (how tables.js found it; informational, never written) }
+ *   Cell    = { blocks: Para[], span?: number (gridSpan), fill?: hex (cell shading),
+ *               vmerge?: 'restart'|'continue' (a vertically merged cell: 'continue' keeps its grid
+ *               slot, with no blocks, in every row below the 'restart'),
+ *               borders?: { top?, left?, bottom?, right?: { sz: eighths of a pt, c: hex } } (absent
+ *               side = no border),
+ *               mar?: { t, l, b, r } (pt, cell margins), vAlign?: 'top'|'center'|'bottom' }
  *   Anchor  = any object with a `kind` the writer has an anchor writer for ('img'
  *             built in; docx/color.js registers 'shape'). They ride in the page's
  *             first paragraph, cost the text flow nothing, and stack in array order.
@@ -129,11 +136,20 @@ export function validateModel(doc) {
     else if (b.kind === 'img') checkImg(b, path);
     else if (b.kind === 'tbl') {
       if (!Array.isArray(b.colsPt) || !b.colsPt.length || !b.colsPt.every((c) => num(c) && c > 0)) at(path, 'table colsPt must be positive numbers');
+      if (b.rowsH !== undefined && !(Array.isArray(b.rowsH) && b.rowsH.length === (b.rows || []).length && b.rowsH.every((h) => num(h) && h >= 0))) at(path, 'table rowsH must be one finite height per row');
       (b.rows || []).forEach((row, ri) => {
         const span = row.reduce((a, c) => a + (c.span > 1 ? c.span : 1), 0);
         if (b.colsPt && span !== b.colsPt.length) at(`${path}.rows[${ri}]`, `row spans ${span} columns, grid has ${b.colsPt.length}`);
         row.forEach((c, ci) => {
-          if (c.fill !== undefined && !HEX.test(String(c.fill))) at(`${path}.rows[${ri}][${ci}]`, `bad fill ${c.fill}`);
+          const CP = `${path}.rows[${ri}][${ci}]`;
+          if (c.fill !== undefined && !HEX.test(String(c.fill))) at(CP, `bad fill ${c.fill}`);
+          if (c.vmerge !== undefined && c.vmerge !== 'restart' && c.vmerge !== 'continue') at(CP, `bad vmerge ${c.vmerge}`);
+          if (c.vAlign !== undefined && !['top', 'center', 'bottom'].includes(c.vAlign)) at(CP, `bad vAlign ${c.vAlign}`);
+          for (const [side, bd] of Object.entries(c.borders || {})) {
+            if (!['top', 'left', 'bottom', 'right'].includes(side)) at(CP, `bad border side ${side}`);
+            else if (!(bd && num(bd.sz) && bd.sz > 0 && HEX.test(String(bd.c)))) at(CP, `bad border ${side}`);
+          }
+          for (const [side, v] of Object.entries(c.mar || {})) if (!['t', 'l', 'b', 'r'].includes(side) || !num(v) || v < 0) at(CP, `bad cell margin ${side}=${v}`);
           (c.blocks || []).forEach((p, pi) => checkPara(p, `${path}.rows[${ri}][${ci}].blocks[${pi}]`));
         });
       });
