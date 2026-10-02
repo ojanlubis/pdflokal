@@ -258,6 +258,19 @@ test('tool_use gains gabung/merge as the first-party merge signal', () => {
   assert.equal(validateEvent('tool_use', { tool: 'gabung', action: 'text' }).ok, true); // action enum is per-event, not paired
 });
 
+test("tool_use accepts hapus/original_delete and original_miss", () => {
+  // Hapus on the PDF's own text (2026-10-02). Distinct from 'delete', which has always meant
+  // "an object the person added was removed".
+  for (const action of ['original_delete', 'original_miss']) {
+    assert.equal(validateEvent('tool_use', { tool: 'hapus', action }).ok, true, action);
+  }
+  assert.equal(validateEvent('tool_use', { tool: 'hapus', action: 'original_deleted' }).ok, false);
+  // Skew: every value an old client sends must keep validating.
+  for (const action of ['arm', 'delete']) {
+    assert.equal(validateEvent('tool_use', { tool: 'hapus', action }).ok, true, action);
+  }
+});
+
 test('export choices: format/size/pages_scope validate and are required', () => {
   for (const format of ['pdf', 'png', 'jpg']) {
     assert.equal(validateEvent('export', { ...VALID_PROPS.export, format }).ok, true);
