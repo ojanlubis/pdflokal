@@ -869,4 +869,4 @@ async function selfTest() {
 export { tokens, recall };
 if (CONVERT_ONE) convertChild(CONVERT_ONE).catch((e) => { console.error(e); process.exit(2); });
 else if (REF_ONE) refChild(REF_ONE).catch((e) => { console.error(e); process.exit(2); });
-else if (path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main().catch((e) => { console.error(e); process.exit(2); });
+else if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main().catch((e) => { console.error(e); process.exit(2); });
