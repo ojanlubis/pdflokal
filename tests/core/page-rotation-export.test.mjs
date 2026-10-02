@@ -43,6 +43,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { PNG } from 'pngjs';
 
 import * as model from '../../js/core/model.js';
 import * as ops from '../../js/core/operations.js';
@@ -373,3 +374,141 @@ test('CONTROL: an annotation on a page with NO inherited /Rotate is unmoved', as
     );
   }
 });
+
+// ---------------------------------------------------------------------------
+// SIGNATURES AND TEXT on a page with an inherited /Rotate (audit 2026-08-17,
+// item 4). The whiteout cases above read back a rectangle; a signature goes
+// out through drawImage and text through drawText, two other writers that take
+// the same frame. Neither was ever read back on a rotated page, and text
+// position on a rotated page was not read back anywhere.
+//
+// SAME ORACLE as the whiteout cases: nothing here re-derives
+// transformAnnotationCoords. We read the matrices the exported content stream
+// actually carries, push the image's unit square / the text origin through
+// them, map the result to the DISPLAY frame with toDisplayRect (derived from
+// PDF /Rotate semantics, above), and require it to equal what the user placed.
+
+const near = (a, b, eps = 1e-6) => Math.abs(a - b) <= eps;
+const pointToDisplay = (rot, [x, y], wU, hU) => {
+  const r = toDisplayRect(rot, { x, y, w: 0, h: 0 }, wU, hU);
+  return [r.x, r.y];
+};
+
+function tinyPngDataUrl() {
+  const png = new PNG({ width: 8, height: 4 });
+  png.data.fill(160);
+  return `data:image/png;base64,${PNG.sync.write(png).toString('base64')}`;
+}
+
+// The last image placed, as a PDF-space bounding box. A content stream applies
+// `cm` as CTM' = M x CTM, so a point meets the LAST matrix first.
+function lastDrawnImageBox(stream) {
+  const lines = stream.split(/\r?\n/).map((l) => l.trim());
+  let at = -1;
+  for (let i = lines.length - 1; i >= 0; i -= 1) if (/^\/\S+ Do$/.test(lines[i])) { at = i; break; }
+  assert.notEqual(at, -1, 'no image Do found in the exported content stream: the signature was never drawn');
+  let start = at;
+  while (start >= 0 && lines[start] !== 'q') start -= 1;
+  const mats = [];
+  for (let i = start + 1; i < at; i += 1) {
+    const m = /^(-?[\d.eE+-]+) (-?[\d.eE+-]+) (-?[\d.eE+-]+) (-?[\d.eE+-]+) (-?[\d.eE+-]+) (-?[\d.eE+-]+) cm$/.exec(lines[i]);
+    if (m) mats.push(m.slice(1).map(Number));
+  }
+  assert.ok(mats.length > 0, 'the image had no cm matrices in its q scope');
+  const map = ([x, y]) => {
+    let p = [x, y];
+    for (let i = mats.length - 1; i >= 0; i -= 1) {
+      const [a, b, c, d, e, f] = mats[i];
+      p = [a * p[0] + c * p[1] + e, b * p[0] + d * p[1] + f];
+    }
+    return p;
+  };
+  const xs = []; const ys = [];
+  for (const corner of [[0, 0], [1, 0], [0, 1], [1, 1]]) { const [x, y] = map(corner); xs.push(x); ys.push(y); }
+  const x = Math.min(...xs); const y = Math.min(...ys);
+  return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y };
+}
+
+// The last text-matrix: origin (e,f) and the two basis vectors, in PDF space.
+function lastTextMatrix(stream) {
+  const all = [...stream.matchAll(/(-?[\d.eE+-]+) (-?[\d.eE+-]+) (-?[\d.eE+-]+) (-?[\d.eE+-]+) (-?[\d.eE+-]+) (-?[\d.eE+-]+) Tm/g)];
+  assert.ok(all.length > 0, 'no Tm in the exported content stream: the text was never drawn');
+  const [a, b, c, d, e, f] = all[all.length - 1].slice(1).map(Number);
+  return { a, b, c, d, e, f };
+}
+
+for (const { label, pageIdx } of [
+  { label: 'a page with an inherited /Rotate 90', pageIdx: 0 },
+  { label: 'CONTROL: an ordinary page', pageIdx: 1 },
+]) {
+  test(`buildPdfBytes: a SIGNATURE on ${label} lands where the user put it, at every user rotation`, async () => {
+    const PDFLib = loadUmd('js/vendor/pdf-lib.min.js');
+    const fontkit = loadUmd('js/vendor/fontkit.umd.min.js');
+    const { readPageContents } = await import('../../js/core/redact.js');
+    const image = tinyPngDataUrl();
+
+    for (const user of [0, 90, 180, 270]) {
+      const { doc, pages } = await buildDoc(PDFLib, { pageIndexes: [pageIdx], userRotations: [user] });
+      ops.addAnnotation(doc, pages[0].id, model.createAnnotation('signature', {
+        x: VIEW_RECT.x, y: VIEW_RECT.y, width: VIEW_RECT.w, height: VIEW_RECT.h, image,
+      }));
+      const [outPage] = await exportedPages(PDFLib, fontkit, doc);
+      const { width: wU, height: hU } = outPage.getSize();
+      const box = lastDrawnImageBox(readPageContents(outPage, PDFLib));
+      const shown = toDisplayRect(outPage.getRotation().angle, box, wU, hU);
+      for (const k of ['x', 'y', 'w', 'h']) {
+        assert.ok(
+          near(shown[k], VIEW_RECT[k]),
+          `${label}, user rotation ${user}: the signature was placed ${VIEW_RECT.w}x${VIEW_RECT.h} at `
+          + `(${VIEW_RECT.x},${VIEW_RECT.y}) and the file shows ${shown.w}x${shown.h} at (${shown.x},${shown.y}).`,
+        );
+      }
+    }
+  });
+
+  test(`buildPdfBytes: TEXT on ${label} lands at the user's baseline, upright and reading left to right`, async () => {
+    const PDFLib = loadUmd('js/vendor/pdf-lib.min.js');
+    const fontkit = loadUmd('js/vendor/fontkit.umd.min.js');
+    const { readPageContents } = await import('../../js/core/redact.js');
+    const size = 12;
+    const at = { x: 30, y: 70 };
+
+    for (const user of [0, 90, 180, 270]) {
+      const { doc, pages } = await buildDoc(PDFLib, { pageIndexes: [pageIdx], userRotations: [user] });
+      ops.addAnnotation(doc, pages[0].id, model.createAnnotation('text', {
+        x: at.x, y: at.y, width: 100, height: 20,
+        text: 'HALO', fontFamily: 'Helvetica', fontSize: size, color: '#000000',
+      }));
+      const [outPage] = await exportedPages(PDFLib, fontkit, doc);
+      const { width: wU, height: hU } = outPage.getSize();
+      const rot = outPage.getRotation().angle;
+      const tm = lastTextMatrix(readPageContents(outPage, PDFLib));
+
+      // Where the first baseline starts, as the reader sees it. core/export.js
+      // anchors it 0.9em below the box top (TEXT_BASELINE_RATIO); that number is
+      // what the user's box top means, restated here rather than imported so a
+      // drift in either place goes red.
+      const origin = pointToDisplay(rot, [tm.e, tm.f], wU, hU);
+      assert.ok(
+        near(origin[0], at.x, 1e-3) && near(origin[1], at.y + size * 0.9, 1e-3),
+        `${label}, user rotation ${user}: the text baseline starts at (${origin[0].toFixed(2)},${origin[1].toFixed(2)}) `
+        + `on screen, expected (${at.x},${at.y + size * 0.9}).`,
+      );
+
+      // Orientation: the text's own x axis must run RIGHT on screen and its y
+      // axis UP (negative y on a top-left display). A baseline in the right
+      // place but turned 90 or 180 degrees is the failure a position-only
+      // check cannot see.
+      const xEnd = pointToDisplay(rot, [tm.e + tm.a * 10, tm.f + tm.b * 10], wU, hU);
+      const yEnd = pointToDisplay(rot, [tm.e + tm.c * 10, tm.f + tm.d * 10], wU, hU);
+      assert.ok(
+        near(xEnd[0] - origin[0], 10, 1e-3) && near(xEnd[1] - origin[1], 0, 1e-3),
+        `${label}, user rotation ${user}: the text does not read left to right on screen (x axis -> ${(xEnd[0] - origin[0]).toFixed(2)},${(xEnd[1] - origin[1]).toFixed(2)}).`,
+      );
+      assert.ok(
+        near(yEnd[0] - origin[0], 0, 1e-3) && near(yEnd[1] - origin[1], -10, 1e-3),
+        `${label}, user rotation ${user}: the text is not upright on screen (y axis -> ${(yEnd[0] - origin[0]).toFixed(2)},${(yEnd[1] - origin[1]).toFixed(2)}).`,
+      );
+    }
+  });
+}
