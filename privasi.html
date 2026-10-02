@@ -108,88 +108,80 @@
   <script defer src="/_vercel/insights/script.js"></script>
 
   <style>
+    /* READING, not cards (rewritten 2026-10-02, his "dirapihin dipersimpel biar
+       mudah kebaca"). Sections separate by a hairline and space, never by a
+       box: eight identical bordered cards was the page's sameness, and the
+       red left-bar callout spent the touchable colour on decoration (red =
+       touchable, specs/design-system.md §4). Prose caps at the 62ch measure;
+       only the storage tables run the full column. */
     .privacy-page {
-      max-width: 800px;
+      max-width: 46rem;
       margin: 0 auto;
+      padding-bottom: var(--sp-64);
     }
 
-    .privacy-intro {
-      font-size: 1.0625rem;
-      line-height: 1.7;
+    .privacy-page p,
+    .privacy-page ul {
+      max-width: 62ch;
       color: var(--muted);
-      margin-bottom: var(--sp-48);
+      line-height: 1.65;
     }
 
-    .privacy-section {
-      background: var(--surface);
-      padding: var(--sp-32);
-      border-radius: var(--r-panel);
-      box-shadow: none;
-      /* ⚠️ THE LINE REPLACES THE SHADOW — legacy-bridge.css used to add this
-         for exactly this class (its own note: "the cards lost their shadow
-         above, so they need the line that replaces it, otherwise a --surface
-         card on a --bg page has no edge at all in light mode, where both are
-         white"). Ported directly rather than left to a shared rule, since
-         .privacy-section is the only class here that needs it. */
-      border: 1px solid var(--line);
-      margin-bottom: var(--sp-32);
+    .privacy-page p + p,
+    .privacy-page p + ul,
+    .privacy-page ul + p {
+      margin-top: var(--sp-16);
     }
 
-    .privacy-section h2 {
-      margin-bottom: var(--sp-24);
-      font-size: 1.25rem;
-      display: flex;
-      align-items: center;
-      gap: var(--sp-8);
-    }
-
-    .privacy-list {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-    }
-
-    /* ⚠️ NOT display:flex, AND THE REASON IS THE MARKUP. These items read
-       `<li><strong>Term</strong>, description</li>` — ONE sentence. Under flex
-       the <strong> becomes its own flex item and the text node becomes a
-       second one, so the comma started a separate column: the term sat in a
-       ~229px box and its own comma floated at the far edge of it, and the one
-       term long enough to wrap ("Tidak Ada Penyimpanan") tore a hole through
-       the paragraph. Pre-existing, inherited from style.css, and invisible in
-       the sibling list below because those items have no <strong> — a single
-       text node is a single flex item and looks fine. Hanging indent keeps the
-       ✓ marker without ever splitting the sentence. */
-    .privacy-list li {
-      position: relative;
-      padding: var(--sp-8) 0 var(--sp-8) var(--sp-24);
-      color: var(--muted);
-      line-height: 1.6;
-    }
-
-    .privacy-list li::before {
-      /* ⚠️ NOT GREEN — legacy-bridge.css's own ruling: red is the only
-         touchable colour this system has, so a second accent meaning "good"
-         is not reintroduced here. These are punctuation, --ink, not status. */
-      content: "✓";
-      position: absolute;
-      left: 0;
-      top: var(--sp-8);
+    .privacy-page strong {
       color: var(--ink);
+    }
+
+    .privacy-lead {
+      font-size: var(--fs-1);
+      margin-top: var(--sp-24);
+    }
+
+    .privacy-lead strong {
       font-weight: 600;
     }
 
-    .privacy-highlight {
-      background: var(--dzbg);
+    /* The one falsifiable test a stranger can run. A raised surface, no
+       coloured bar: --dzfill is the landing's "reads as a surface" grey and
+       has a dark value that stays visible. */
+    .privacy-proof {
+      margin-top: var(--sp-32);
       padding: var(--sp-24);
-      border-radius: var(--r-button);
-      border-left: 4px solid var(--accent);
-      margin: var(--sp-24) 0;
+      background: var(--dzfill);
+      border-radius: var(--r-panel);
     }
 
-    .privacy-highlight p {
+    .privacy-proof p {
       margin: 0;
+    }
+
+    .privacy-section {
+      margin-top: var(--sp-48);
+      padding-top: var(--sp-32);
+      border-top: 1px solid var(--line);
+    }
+
+    .privacy-section h2 {
+      font-size: var(--fs-2);
+      line-height: 1.3;
+      margin-bottom: var(--sp-16);
+    }
+
+    .privacy-section ul {
+      padding-left: var(--sp-24);
+    }
+
+    .privacy-section li {
+      padding: var(--sp-4) 0;
+    }
+
+    .privacy-section li::marker {
       color: var(--muted);
-      line-height: 1.6;
     }
 
     .storage-table {
@@ -198,26 +190,33 @@
       margin-top: var(--sp-16);
     }
 
+    .storage-table + p {
+      margin-top: var(--sp-32);
+    }
+
     .storage-table th,
     .storage-table td {
-      padding: var(--sp-8) var(--sp-16);
+      padding: var(--sp-8) var(--sp-16) var(--sp-8) 0;
       text-align: left;
+      vertical-align: top;
       border-bottom: 1px solid var(--line);
     }
 
     .storage-table th {
       font-weight: 600;
       color: var(--ink);
-      font-size: 0.875rem;
+      font-size: var(--fs-n1);
     }
 
     .storage-table td {
       color: var(--muted);
       font-size: 0.875rem;
+      line-height: 1.5;
     }
 
-    .storage-table code {
-      background: var(--dzbg);
+    .storage-table code,
+    .privacy-page p code {
+      background: var(--dzfill);
       padding: 2px 6px;
       border-radius: 4px;
       font-size: 0.8125rem;
@@ -226,14 +225,18 @@
       overflow-wrap: anywhere;
     }
 
-    @media (max-width: 480px) {
-      .privacy-section {
-        padding: var(--sp-24);
+    /* Wide enough for whole keys: breaking them mid-word is only for phones. */
+    @media (min-width: 640px) {
+      .storage-table code {
+        white-space: nowrap;
+        overflow-wrap: normal;
       }
+    }
 
+    @media (max-width: 480px) {
       .storage-table th,
       .storage-table td {
-        padding: var(--sp-4) var(--sp-8);
+        padding: var(--sp-4) var(--sp-8) var(--sp-4) 0;
         font-size: 0.8125rem;
       }
     }
@@ -243,8 +246,7 @@
       display: flex;
       align-items: center;
       gap: var(--sp-16);
-      max-width: 34rem;
-      margin: var(--sp-48) auto 0;
+      margin-top: var(--sp-48);
       padding-top: var(--sp-24);
       border-top: 1px solid var(--line);
     }
@@ -268,6 +270,11 @@
       font-size: var(--fs-n1);
       color: var(--muted);
       margin-top: var(--sp-8);
+    }
+
+    .privacy-updated {
+      margin-top: var(--sp-24);
+      font-size: var(--fs-n1);
     }
   </style>
 </head>
@@ -348,213 +355,123 @@
 
   <!-- Main Content -->
   <main class="pg-wrap">
+    <!-- REWRITTEN 2026-10-02 on his ask "dirapihin dipersimpel biar mudah
+         kebaca" and his cut list, approved in session the same day: the
+         promise first, then each place data goes, then what only leaves when
+         the person sends it. Cut: "Prinsip Utama" + "Data yang TIDAK Saya
+         Kumpulkan" (merged into the lead), the whole "Keamanan" section
+         (repeats, plus an unprovable "selalu diupdate"), the masking
+         mechanism paragraph, the Mixpanel-only reassurances, the back button.
+         ⚠️ EVERY DISCLOSURE SURVIVED: each service, both recorders and the
+         Sentry rate, the visitor_id exception, the one typed character in
+         Sentry errors, both consent-gated sends, both storage tables. Cutting
+         one of those makes the lead sentence false. -->
     <div class="privacy-page">
       <h1>Kebijakan Privasi</h1>
-
-      <p class="privacy-intro">
-        PDFLokal dibangun dengan satu prinsip utama: <strong>privasi kamu adalah prioritas</strong>.
-        Semua proses edit PDF dan gambar berjalan 100% di browser kamu. Tidak ada file yang diupload ke server manapun.
+      <p class="privacy-lead">
+        <strong>File PDF dan gambarmu diolah di browsermu sendiri, dan nggak pernah dikirim ke server mana pun.</strong>
+        Yang tercatat adalah cara PDFLokal dipakai, bukan isi dokumenmu. Pengecualiannya sedikit, dan semuanya ada di bawah.
       </p>
 
-      <!-- Prinsip Utama -->
-      <div class="privacy-section">
-        <h2>Prinsip Utama Saya</h2>
-        <ul class="privacy-list">
-          <li><strong>100% Client-Side Processing</strong>, Semua proses berjalan di browser kamu, bukan di server saya</li>
-          <li><strong>Tidak Ada Upload</strong>, File PDF dan gambar yang kamu olah tidak pernah diupload. Yang bisa ikut terkirim cuma gambar yang kamu sendiri pilih untuk dikirim bersama masukan, dan kamu lihat dulu sebelum terkirim</li>
-          <li><strong>Tidak Ada Penyimpanan</strong>, Saya tidak menyimpan file kamu di manapun, setelah tab ditutup file hilang</li>
-          <li><strong>Open Source</strong>, Kode sumber terbuka, siapa saja bisa verifikasi klaim privasi saya</li>
-        </ul>
-
-        <div class="privacy-highlight">
-          <p>
-            <strong>Cara mudah membuktikan:</strong> Olah satu file seperti biasa. Lalu matikan internet,
-            buka lagi PDFLokal, dan buka, edit, lalu unduh file lain. Tetap jalan, karena filenya diolah
-            di perangkatmu sendiri.
-          </p>
-        </div>
-      </div>
-
-      <!-- Data yang Tidak Dikumpulkan -->
-      <div class="privacy-section">
-        <h2>Data yang TIDAK Saya Kumpulkan</h2>
-        <ul class="privacy-list">
-          <li>File PDF atau gambar yang kamu olah</li>
-          <li>Isi dokumen dan tanda tanganmu, kecuali yang kamu kirim sendiri lewat masukan, atau satu karakter yang kadang ikut di laporan error (lihat Perekaman Sesi)</li>
-          <li>Informasi pribadi (nama, email, dll)</li>
-          <li>Lokasi GPS. Google Analytics dan Vercel memang menebak negara atau kotamu dari alamat internet</li>
-        </ul>
-        <p style="color: var(--muted); line-height: 1.6; margin-top: var(--sp-16);">
-          Yang memang tercatat adalah cara PDFLokal dipakai: alat apa yang dibuka, berapa lama
-          prosesnya, dan rekaman layar dengan tulisanmu ditutup. Siapa yang menerima apa, ada di
-          bagian-bagian berikut.
+      <div class="privacy-proof">
+        <p>
+          <strong>Buktikan sendiri:</strong> olah satu file seperti biasa. Lalu matikan internet,
+          buka lagi PDFLokal, dan buka, edit, lalu unduh file lain. Tetap jalan, karena filenya
+          diolah di perangkatmu sendiri.
         </p>
       </div>
 
-      <!-- Analytics -->
-      <div class="privacy-section">
-        <h2>Tentang Analytics</h2>
-        <p style="color: var(--muted); line-height: 1.6; margin-bottom: var(--sp-16);">
-          Untuk menghitung kunjungan dan melihat alat mana yang dipakai, saya memasang layanan
-          pihak ketiga ini:
+      <section class="privacy-section">
+        <h2>Yang dikirim ke server saya sendiri</h2>
+        <p>
+          Data teknis kecil tentang cara fitur dipakai, supaya saya tahu alat mana yang berguna dan
+          mana yang perlu diperbaiki: alat yang kamu pakai, berapa lama prosesnya, apakah font di
+          dokumen dikenali, jenis perangkat, dan jumlah halaman dalam rentang (1, 2-5, 6-20, 21+).
         </p>
-        <ul class="privacy-list">
+        <p>
+          <strong>Nggak pernah ikut:</strong> isi dokumen, teks yang kamu tulis, nama file, gambar,
+          atau nama font asli. Nggak pakai cookie.
+        </p>
+        <p>
+          Tiap sesi dapat ID acak sendiri. Satu ID lagi, <code>pdflokal_visitor_id</code>, tersimpan
+          di browsermu supaya saya bisa bedain pengunjung baru dan yang balik lagi. Cuma angka acak,
+          dan berhenti di server saya: Mixpanel, Google Analytics, dan Sentry nggak pernah menerimanya.
+        </p>
+      </section>
+
+      <section class="privacy-section">
+        <h2>Yang dikirim ke layanan lain</h2>
+        <p>Untuk menghitung kunjungan dan melihat alat mana yang dipakai:</p>
+        <ul>
           <li>Vercel Web Analytics, tanpa cookie</li>
-          <li>Google Analytics dan Google Ads. Keduanya memasang cookie, daftarnya ada di tabel di bawah</li>
+          <li>Google Analytics dan Google Ads, yang memasang cookie (daftarnya di tabel bawah)</li>
           <li>Mixpanel, yang juga merekam sesi (lihat Perekaman Sesi)</li>
         </ul>
-        <p style="color: var(--muted); line-height: 1.6; margin-top: var(--sp-16);">
-          Yang mereka terima: halaman yang kamu buka, alat yang kamu pakai (misalnya Teks, TTD,
-          Gabung), jenis file (PDF atau gambar), jumlah halaman, dan ID sesi acak. Nama file dan isi
-          dokumen nggak pernah ikut.
+        <p>
+          Mereka menerima halaman yang kamu buka, alat yang kamu pakai, jenis file (PDF atau gambar),
+          jumlah halaman, dan ID sesi acak. Nama file dan isi dokumen nggak ikut. Google Analytics dan
+          Vercel menebak negara atau kotamu dari alamat internet, bukan dari GPS.
         </p>
-      </div>
-
-      <!-- Telemetri Produk -->
-      <div class="privacy-section">
-        <h2>Telemetri Produk</h2>
-        <p style="color: var(--muted); line-height: 1.6; margin-bottom: var(--sp-16);">
-          Selain analytics kunjungan di atas, PDFLokal juga mengirim data teknis kecil ke server saya
-          sendiri (bukan pihak ketiga) tentang bagaimana fitur-fitur dipakai, supaya saya tahu alat
-          mana yang berguna dan mana yang perlu diperbaiki. Datanya sengaja dibuat sesempit mungkin:
-        </p>
-        <ul class="privacy-list">
-          <li>Alat mana yang kamu pakai (Teks, Tip-Ex, Tanda Tangan, dll) dan berapa lama sebuah proses berjalan</li>
-          <li>Apakah sebuah font di dokumen berhasil dikenali atau tidak</li>
-          <li>Jenis perangkat secara umum (HP / tablet / desktop) dan jumlah halaman dalam rentang (1, 2-5, 6-20, 21+)</li>
-        </ul>
-        <div class="privacy-highlight">
-          <p>
-            <strong>Yang TIDAK pernah ikut di telemetri ini:</strong> isi dokumen, teks yang kamu tulis atau edit,
-            nama file, gambar, atau nama font asli. Prinsip "<em>filenya tidak pernah diunggah</em>"
-            tetap 100% berlaku, telemetri ini cuma menghitung APA yang sebuah fitur lakukan, bukan
-            APA isi dokumenmu.
-          </p>
-        </div>
-        <p style="color: var(--muted); line-height: 1.6;">
-          Telemetri ini nggak pakai cookie. Tiap sesi (dari kamu buka PDFLokal sampai kamu tutup tabnya) dapat ID
-          acak sendiri yang nggak nyambung ke sesi lain. <strong>Satu pengecualian, dan saya sebut
-          terus terang</strong>: ada satu ID lagi yang tersimpan di browsermu
-          (<code>pdflokal_visitor_id</code>, ada di tabel di bawah) dan ikut terkirim
-          ke sini, supaya saya tahu bedanya pengunjung baru dan yang sudah pernah datang. Cuma
-          angka acak: bukan nama, bukan email, nggak nyambung ke apa pun di luar sini. Dan dia
-          berhenti di server saya, Mixpanel, GA4, dan Sentry nggak pernah menerimanya.
-        </p>
-        <p style="color: var(--muted); line-height: 1.6; margin-top: var(--sp-16);">
-          Khusus fitur Edit (masih beta): kalau kamu kasih rating 👎, saya akan tanya dulu, <em>"Boleh
-          saya minta dua potongan ini?"</em>, sebelum apa pun terkirim. Ini nggak otomatis sama sekali:
-          cuma jalan kalau kamu sendiri yang tap "Kirim". Yang saya minta juga cuma satu baris teks yang
-          barusan kamu edit, dipotong jadi dua gambar kecil (sebelum dan sesudah diedit), dan kamu
-          LIHAT SENDIRI dulu kedua potongan itu di layar, persis apa adanya, sebelum ada tombol "Kirim"
-          buat ngirimnya. Kalau kamu pilih "Nggak usah" (atau nggak pilih apa-apa), potongan itu nggak
-          pernah keluar dari perangkatmu, rating dan catatanmu (kalau ada) tetap terkirim seperti biasa,
-          cuma tanpa gambar. Prinsip "filenya tidak pernah diunggah" tetap 100% berlaku di sini juga:
-          yang mungkin terkirim cuma potongan satu baris yang KAMU pilih untuk dikirim, bukan halaman,
-          bukan dokumen, dan tentu bukan file kamu.
-        </p>
-        <p style="color: var(--muted); line-height: 1.6; margin-top: var(--sp-16);">
-          Di form masukan kamu boleh paste screenshot. Nggak ada tombol upload, nggak ada yang
-          otomatis, dan gambarnya muncul dulu biar kamu lihat sebelum dikirim. Terus terang: kalau
-          screenshot itu nampilin isi dokumenmu, isi itu ikut terkirim, karena kamu yang milih
-          gambarnya. File PDF-mu sendiri tetap nggak pernah saya kirim ke mana-mana.
-        </p>
-      </div>
+      </section>
 
       <!-- Perekaman Sesi — SESSION REPLAY, BOTH RECORDERS.
-           ⚠️ IT NAMES SENTRY FIRST ON PURPOSE. Sentry's replayIntegration has run
-           in production since 1bb779b (2026-05-29), at 10% since fd5d39c
-           (2026-06-02), and this page had never mentioned it. Disclosing the NEW
-           recorder while staying quiet about the older one would be worse than
-           saying nothing, so the section covers both or it does not ship.
-           ⚠️ EVERY NEGATIVE HERE IS SCOPED TO WHAT THE RECORDING CARRIES, and each
-           one was read off a decompressed payload, not off a config file:
-           tests/mixpanel-replay-privacy.spec.js and tests/sentry-replay-privacy.spec.js.
-           ⚠️ THE MASKING PARAGRAPH WAS REWRITTEN 2026-09-10 (later) AND MUST TRACK
-           index.html's record_unmask_text_selector. It used to say pdflokal's own
-           labels were asterisked too; after Fauzan watched the first real replays
-           that stopped being true, and a privacy page describing a config that no
-           longer exists is worse than one that says nothing. The shape it describes
-           is the shape that shipped: mask everything, then unmask ONLY static chrome
-           that is identical for every visitor. Change that allowlist and this
-           paragraph changes in the same commit.
-           The three Mixpanel-only claims (no cookie, no cross-visit id, no location)
-           are in their own paragraph BECAUSE THEY DO NOT TRANSFER: `ip:false` and
-           `disable_persistence` are Mixpanel keys, and Sentry's replay keeps a
-           sticky session of its own. Do not merge that paragraph upward.
-           ⚖ NO END DATE, BY HIS RULING 2026-10-01 (seat decisions.md): the
-           Mixpanel recorder was a one-month study ending 2026-10-10, and he ruled
-           it keeps running. The page says it is running and that it will be
-           updated if that changes. tests/core/replay-disclosure.test.mjs holds
-           this section and index.html's record_* keys together in BOTH
-           directions: recorder on means Mixpanel is named here with no end date,
-           recorder off means Mixpanel is not named here at all. -->
-      <div class="privacy-section">
-        <h2>Perekaman Sesi (Session Replay)</h2>
-        <p style="color: var(--muted); line-height: 1.6; margin-bottom: var(--sp-16);">
-          Ada dua layanan yang merekam cara orang memakai PDFLokal:
-        </p>
-        <ul class="privacy-list">
-          <li><strong>Sentry</strong>, sudah jalan sejak akhir Mei 2026. Tugas utamanya menangkap error, tapi dia juga merekam sesi: sekarang 1 dari 10 kunjungan, plus setiap kunjungan yang ada error-nya</li>
-          <li><strong>Mixpanel</strong>, semua sesi, dan masih jalan. Saya pakai untuk melihat di langkah mana orang kesulitan waktu mengedit. Kalau perekamannya saya hentikan, halaman ini saya update</li>
+           ⚠️ IT NAMES SENTRY FIRST ON PURPOSE: Sentry's replay has run since
+           2026-05-29 (10% since 2026-06-02) and this page once said nothing
+           about it. The section covers both recorders or it does not ship.
+           ⚠️ EVERY NEGATIVE HERE WAS READ OFF A DECOMPRESSED PAYLOAD:
+           tests/mixpanel-replay-privacy.spec.js, tests/sentry-replay-privacy.spec.js.
+           The masking sentence tracks index.html's record_unmask_text_selector
+           (mask everything, unmask only chrome identical for every visitor);
+           change that allowlist and this sentence changes in the same commit.
+           ⚖ NO END DATE, his ruling 2026-10-01. tests/core/replay-disclosure.test.mjs
+           holds this section and the record_* keys together: the <li> items
+           must START with "Sentry" / "Mixpanel", and the section ends at the
+           next class="privacy-section". -->
+      <section class="privacy-section">
+        <h2>Perekaman Sesi</h2>
+        <p>Dua layanan pihak ketiga merekam cara orang memakai PDFLokal:</p>
+        <ul>
+          <li><strong>Sentry</strong>, sejak akhir Mei 2026. Tugas utamanya menangkap error, dan dia merekam 1 dari 10 kunjungan, plus setiap kunjungan yang ada error-nya</li>
+          <li><strong>Mixpanel</strong>, semua sesi, supaya saya lihat di langkah mana orang kesulitan. Kalau perekamannya saya hentikan, halaman ini saya update</li>
         </ul>
-        <p style="color: var(--muted); line-height: 1.6; margin-top: var(--sp-16);">
-          Yang terekam cuma gerakan di layar: di mana kamu tap, ke mana kamu scroll, tombol mana
-          yang kamu buka, dan berapa lama kamu berhenti di satu langkah.
+        <p>
+          Yang terekam cuma gerakan di layar: di mana kamu tap, ke mana kamu scroll, tombol yang kamu
+          buka, dan berapa lama kamu berhenti. Saya buka sendiri data yang dikirim kedua layanan itu
+          untuk memastikan yang ini nggak ikut:
         </p>
-        <p style="color: var(--muted); line-height: 1.6; margin-top: var(--sp-16); margin-bottom: 0;">
-          <strong>Yang TIDAK terekam.</strong> Saya buka sendiri paket data yang dikirim kedua
-          layanan itu untuk memastikannya:
-        </p>
-        <ul class="privacy-list">
-          <li><strong>Isi dokumenmu.</strong> Di rekaman, halaman PDF-mu cuma muncul sebagai kotak kosong. Gambarnya tidak pernah ikut terkirim</li>
-          <li><strong>Teks yang kamu ketik.</strong> Ditutup jadi tanda bintang sebelum rekamannya dikirim, termasuk waktu kamu mengganti tulisan yang sudah ada di dokumen</li>
-          <li><strong>Nama file kamu</strong></li>
+        <ul>
+          <li><strong>Isi dokumenmu.</strong> Halaman PDF-mu cuma muncul sebagai kotak kosong</li>
+          <li><strong>Teks yang kamu ketik</strong>, termasuk waktu mengganti tulisan di dokumen. Jadi tanda bintang; yang tetap kelihatan cuma tulisan PDFLokal sendiri, seperti nama tombol</li>
+          <li><strong>Nama filemu</strong></li>
         </ul>
-        <p style="color: var(--muted); line-height: 1.6; margin-top: var(--sp-16);">
-          Cara nutupnya: semua tulisan saya tutup dulu tanpa kecuali, baru saya buka lagi khusus
-          buat tulisan PDFLokal sendiri, nama tombol, judul menu, teks yang isinya sama persis buat
-          semua orang. Jadi di rekaman kelihatan kamu lagi buka menu apa, tapi apa pun yang datang
-          dari kamu tetap jadi tanda bintang.
+        <p>
+          Laporan error Sentry berisi pesan error dan langkah sebelumnya. Kadang pesan itu menyebut
+          satu karakter yang kamu ketik, misalnya huruf yang nggak bisa disimpan ke PDF. Perekaman
+          cuma jalan di halaman alat, bukan di halaman ini.
         </p>
-        <p style="color: var(--muted); line-height: 1.6; margin-top: var(--sp-16);">
-          Khusus Mixpanel: nggak ada cookie baru, nggak ada ID yang mengikuti kamu antar kunjungan,
-          dan lokasimu nggak ikut dicatat. ID pengunjung yang saya ceritakan di Telemetri Produk itu
-          punya server saya sendiri, nggak pernah sampai ke Mixpanel maupun Sentry.
-        </p>
-        <p style="color: var(--muted); line-height: 1.6; margin-top: var(--sp-16);">
-          Khusus Sentry: selain rekaman, dia mengirim laporan error, isinya pesan error dan langkah
-          sebelum error itu terjadi. Kadang pesan itu menyebut satu karakter dari teks yang kamu
-          ketik, misalnya huruf yang nggak bisa disimpan ke PDF.
-        </p>
-        <div class="privacy-highlight">
-          <p>
-            Dua-duanya pihak ketiga, bukan server saya sendiri seperti telemetri di atas.
-            Perekaman cuma jalan di halaman alat, bukan di halaman ini, dan file PDF-mu sendiri
-            tetap tidak pernah saya kirim ke mana pun.
-          </p>
-        </div>
-      </div>
+      </section>
 
-      <!-- Local Storage
-           ⚠️ pdflokal_visitor_id ADDED 2026-09-10 (seat decisions.md same
-           date, his ruling): the ONE row in this table that leaves the
-           device. Every other key here is a pure local preference, so the
-           old intro paragraph's blanket "tidak pernah dikirim ke server"
-           was true until this key existed and would be false the moment it
-           shipped silently. Rewritten instead of just adding a row. -->
-      <div class="privacy-section">
-        <h2>Yang Tersimpan di Browsermu</h2>
-        <p style="color: var(--muted); line-height: 1.6; margin-bottom: var(--sp-16);">
-          PDFLokal menyimpan beberapa preferensi di browser kamu (Local Storage, dan satu di
-          Session Storage yang hilang waktu tab ditutup). Hampir semuanya cuma buat kamu sendiri,
-          nggak pernah saya lihat dan nggak pernah dikirim ke mana-mana. Satu kunci beda, dan saya
-          tandai jelas di tabelnya.
+      <section class="privacy-section">
+        <h2>Yang terkirim cuma kalau kamu kirim sendiri</h2>
+        <ul>
+          <li><strong>Screenshot di form masukan.</strong> Kamu yang paste, dan kamu lihat dulu sebelum terkirim. Kalau screenshot itu menampilkan isi dokumen, isi itu ikut</li>
+          <li><strong>Dua potongan di Edit (beta).</strong> Kalau kamu kasih 👎, saya tanya dulu boleh minta satu baris yang barusan kamu edit, sebelum dan sesudah, sebagai dua gambar kecil. Kamu lihat keduanya dulu, dan cuma terkirim kalau kamu tap "Kirim"</li>
+        </ul>
+      </section>
+
+      <!-- ⚠️ pdflokal_visitor_id (2026-09-10, his ruling) is the ONE row in
+           the first table that leaves the device, so the intro cannot say
+           "never sent" without its exception.
+           ⚠️ tests/core/privasi-storage-keys.test.mjs scans the code for every
+           key PDFLokal writes and fails if one is missing from #storage-ours,
+           or if a key here has no writer left. Third-party keys were MEASURED
+           on pdflokal.id (2026-10-01, 11 fresh visits), not read off docs. -->
+      <section class="privacy-section">
+        <h2>Yang tersimpan di browsermu</h2>
+        <p>
+          Preferensi kecil, cuma buat kamu (Local Storage, dan satu di Session Storage yang hilang
+          waktu tab ditutup). Nggak pernah dikirim ke mana-mana, kecuali satu baris yang saya tandai.
         </p>
-        <!-- ⚠️ tests/core/privasi-storage-keys.test.mjs scans the code for every
-             key PDFLokal itself writes and fails if one is missing from THIS
-             table, or if a pdflokal key here has no writer left. Third-party
-             keys go in the second table, which was MEASURED on pdflokal.id
-             (2026-10-01, 11 fresh visits), not read off vendor docs. -->
         <table class="storage-table" id="storage-ours">
           <thead>
             <tr>
@@ -619,13 +536,13 @@
               <td><code>pdflokal_visitor_id</code></td>
               <td>ID acak, dibikin sekali di perangkatmu dan dipakai lagi tiap kamu balik.
                 <strong>Satu-satunya baris di tabel ini yang ikut keluar dari browsermu</strong>,
-                ke server saya sendiri, ceritanya ada di Telemetri Produk di atas</td>
+                ke server saya sendiri, lihat bagian "Yang dikirim ke server saya sendiri" di atas</td>
             </tr>
           </tbody>
         </table>
-        <p style="color: var(--muted); line-height: 1.6; margin-top: var(--sp-24);">
-          Layanan pihak ketiga di atas juga menyimpan data di browsermu. Isinya bisa ikut terkirim
-          ke layanannya masing-masing:
+        <p>
+          Layanan pihak ketiga di atas juga menyimpan data di browsermu, dan isinya bisa ikut
+          terkirim ke layanannya masing-masing:
         </p>
         <table class="storage-table" id="storage-pihak-ketiga">
           <thead>
@@ -654,37 +571,22 @@
             </tr>
           </tbody>
         </table>
-      </div>
+      </section>
 
-      <!-- Keamanan -->
-      <div class="privacy-section">
-        <h2>Keamanan</h2>
-        <ul class="privacy-list">
-          <li><strong>HTTPS</strong>, Koneksi terenkripsi untuk semua halaman</li>
-          <li><strong>Security Headers</strong>, CSP, X-Frame-Options, dan perlindungan lainnya</li>
-          <li><strong>No External Data Transmission</strong>, File kamu tidak pernah meninggalkan browser</li>
-          <li><strong>Regular Updates</strong>, Library dan dependensi selalu diupdate</li>
-        </ul>
-      </div>
-
-      <!-- Kontak -->
-      <div class="privacy-section">
+      <section class="privacy-section">
         <h2>Pertanyaan?</h2>
-        <p style="color: var(--muted); line-height: 1.6;">
-          Kalau kamu punya pertanyaan tentang privasi atau keamanan PDFLokal,
+        <p>
+          Kode PDFLokal terbuka, jadi siapa pun bisa cek klaim di halaman ini. Kalau ada pertanyaan,
           <a href="https://forms.gle/KPDWVAuc91pVjuWq6" target="_blank">hubungi saya</a> atau buka issue di
-          <a href="https://github.com/ojanlubis/pdflokal/issues" target="_blank">GitHub repository</a> saya.
+          <a href="https://github.com/ojanlubis/pdflokal/issues" target="_blank">GitHub</a>.
         </p>
-      </div>
+      </section>
 
       <!-- THE SIGNATURE, 2026-08-27. This page makes the one claim the product
-           cannot be wrong about, and until today it made it anonymously.
-           ⚠️ IT SAYS NOTHING ABOUT ACCOUNTABILITY, ON HIS RULING THE SAME DAY.
-           A first draft opened with "Yang janji di atas, dan yang tanggung
-           jawab kalau salah:" and he struck it: "terlalu eksplisit... dengan
-           naro muka sama nama sama kontak gue udah cukup sebenernya."
-           The face, the name and the channels ARE the statement. Writing the
-           reason out loud is the machine explaining its own move. -->
+           cannot be wrong about, and until then it made it anonymously.
+           ⚠️ IT SAYS NOTHING ABOUT ACCOUNTABILITY, ON HIS RULING THE SAME DAY:
+           "terlalu eksplisit... dengan naro muka sama nama sama kontak gue udah
+           cukup sebenernya." The face, the name and the channels ARE the statement. -->
       <div class="privacy-signature">
         <img src="images/ojan.jpg" alt="Foto Fauzan Ahladzikri (Ojan)" width="56" height="56" loading="lazy">
         <div>
@@ -696,16 +598,7 @@
           </p>
         </div>
       </div>
-
-      <!-- Back Button -->
-      <div style="text-align: center; padding: var(--sp-48) 0;">
-        <p style="font-size: 1rem; color: var(--muted); margin-bottom: var(--sp-16);">
-          Terakhir diupdate: 1 Oktober 2026
-        </p>
-        <a href="/" class="pg-btn">
-          Balik ke Tools
-        </a>
-      </div>
+      <p class="privacy-updated">Terakhir diupdate: 2 Oktober 2026</p>
     </div>
   </main>
 
