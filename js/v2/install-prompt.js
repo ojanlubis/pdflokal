@@ -40,16 +40,25 @@ function isIOS() {
     || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); // iPadOS masquerades as Mac
 }
 function isMobile() {
-  return isIOS() || /android/i.test(navigator.userAgent) || navigator.maxTouchPoints > 1;
+  // Not `maxTouchPoints > 1`: a Windows/ChromeOS touchscreen laptop reports 10
+  // touch points and would be told "install on your phone". The PRIMARY pointer
+  // tells them apart: a phone's (or a desktop-mode Android's) is coarse, a
+  // laptop's trackpad/mouse is fine even with a touchscreen attached.
+  return isIOS() || /android/i.test(navigator.userAgent)
+    || !!window.matchMedia?.('(pointer: coarse)').matches;
 }
 function deviceWord() { return isMobile() ? tr('install.device.mobile') : tr('install.device.desktop'); }
 
 
 // Official install guides — the authoritative source for the EXACT, current UI
 // labels (which drift by browser version + OS + locale). We keep a friendly
-// first-guess AND link out to these. Step labels below were verified
-// against the live pages on 2026-07-18; re-check periodically — see the memory note
-// pwa-install-instructions-maintenance. (The link is the always-current backstop.)
+// first-guess AND link out to these. Step labels in the locale files were verified
+// against the live pages on 2026-07-18; re-read 2026-10-02 and found DRIFT (Android
+// Chrome now "More → Install and create shortcut → Install"; iOS Safari now
+// "… → Share → Add to Home Screen → Open as Web App → Add"; Edge's menu path differs
+// from Chrome's) — proposed strings are with the founder, not yet applied. Re-check
+// periodically — see the memory note pwa-install-instructions-maintenance.
+// (The link is the always-current backstop.)
 // The help pages take the page's language (hl=), so /en/ links the English guide.
 function guideUrl(kind) {
   const hl = tr('install.guideLang');
@@ -78,7 +87,8 @@ function detectInstall() {
     if (samsung) {
       return { kind: 'steps', title: tr('install.androidSamsung.title'), steps: tr('install.androidSamsung.steps') };
     }
-    // Official (Chrome Help, 2026-07-18): ⋮ More → "Add to home screen" → "Install".
+    // Official (Chrome Help, 2026-10-02): ⋮ More → "Install and create shortcut" → "Install"
+    // (the locale string still says the 2026-07-18 "Add to Home screen" path: copy is the founder's).
     return { kind: 'steps', title: tr('install.androidChrome.title'), url: guideUrl('android'), steps: tr('install.androidChrome.steps') };
   }
   // Desktop. Official (Chrome Help, 2026-07-18): the address-bar install icon, OR
