@@ -45,6 +45,7 @@ import * as layoutMod from './layout.js';
 import { buildDocx } from './writer.js';
 import { A4 } from './model.js';
 import { defaultKit } from './canvaskit.js';
+import { stackAnchors } from './stack.js';
 
 export { buildDocx };
 
@@ -57,31 +58,6 @@ function abortError(signal) {
   return e;
 }
 const checkAbort = (signal) => { if (signal && signal.aborted) throw abortError(signal); };
-
-// Anchors from different modules interleave by paint order (z = operator index).
-function stackAnchors(...lists) {
-  const all = lists.flat().map((a, k) => ({ a, k }));
-  all.sort((x, y) => (x.a.z ?? Number.MAX_SAFE_INTEGER) - (y.a.z ?? Number.MAX_SAFE_INTEGER) || x.k - y.k);
-  const out = all.map((e) => e.a);
-  markPicturesUnderShapes(out);
-  return out;
-}
-
-// A behind-text picture that a LATER shape overlaps must itself be written as a shape (Img.asShape, writer.js): LibreOffice
-// draws pictures above shapes whatever relativeHeight says (MEASURED 26.2: a grey box over a screenshot, n016, hidden).
-// The test is the boxes: any overlap larger than a hairline.
-function markPicturesUnderShapes(list) {
-  for (let i = 0; i < list.length; i += 1) {
-    const a = list[i];
-    if (a.kind !== 'img' || !a.anchor || a.asShape) continue;
-    const ax1 = a.anchor.x + a.wPt; const ay1 = a.anchor.y + a.hPt;
-    for (let j = i + 1; j < list.length; j += 1) {
-      const b = list[j];
-      if (b.kind === 'img' || !(b.wPt > 0 && b.hPt > 0) || typeof b.x !== 'number') continue;
-      if (Math.min(ax1, b.x + b.wPt) - Math.max(a.anchor.x, b.x) > 0.2 && Math.min(ay1, b.y + b.hPt) - Math.max(a.anchor.y, b.y) > 0.2) { a.asShape = true; break; }
-    }
-  }
-}
 
 export async function pdfToDocModel({ pdfjs, fflate, data, onProgress, onPage, onOpen, maxPages, ocr, signal, options, modules, imageCache }) {
   const mods = {
@@ -142,7 +118,7 @@ export async function pdfToDocModel({ pdfjs, fflate, data, onProgress, onPage, o
         stats.columnBands += laid.stats.columnBands;
         stats.tables += laid.stats.tables || 0;
         stats.shapes += shapes.length;
-        built = { widthPt: ctx.widthPt, heightPt: ctx.heightPt, segments: laid.segments, anchors: stackAnchors(shapes, imgs.anchors), kind: ctx.kind };
+        built = { widthPt: ctx.widthPt, heightPt: ctx.heightPt, segments: laid.segments, anchors: stackAnchors([shapes, imgs.anchors], { claims: ctx.tables, lines: ctx.lines }), kind: ctx.kind };
       } catch (e) {
         if (e && e.name === 'AbortError') throw e;
         stats.errors.push(`p${i}: ${e && e.message}`);

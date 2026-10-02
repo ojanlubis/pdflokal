@@ -177,7 +177,7 @@ function imgXml(b, w, sect) {
     // that is a shape. convert.js sets asShape only on a picture that a LATER shape overlaps. Word draws the two
     // kinds by relativeHeight alone (INFERRED, no Word here), so there it is the same picture either way.
     w.useNamespace('wps', 'http://schemas.microsoft.com/office/word/2010/wordprocessingShape');
-    return `<w:r><w:drawing><wp:anchor distT="0" distB="0" distL="0" distR="0" simplePos="0" relativeHeight="${251658240 + id}" behindDoc="1" locked="0" layoutInCell="1" allowOverlap="1">`
+    return `<w:r><w:drawing><wp:anchor distT="0" distB="0" distL="0" distR="0" simplePos="0" relativeHeight="${251658240 + id}" behindDoc="${b.inFront ? 0 : 1}" locked="0" layoutInCell="1" allowOverlap="1">`
       + '<wp:simplePos x="0" y="0"/>'
       + `<wp:positionH relativeFrom="page"><wp:posOffset>${emu(b.anchor.x)}</wp:posOffset></wp:positionH>`
       + `<wp:positionV relativeFrom="page"><wp:posOffset>${emu(b.anchor.y)}</wp:posOffset></wp:positionV>`
@@ -194,7 +194,7 @@ function imgXml(b, w, sect) {
     // puts a later picture above an earlier one AND on the same scale as colour.js shapes (a bare id here
     // let every shape, at 251658240 + id, cover every picture in Word). MEASURED 2026-10-02 in LibreOffice 26.2:
     // small bare values stack erratically, Word-style values stack as the spec says.
-    return `<w:r><w:drawing><wp:anchor distT="0" distB="0" distL="0" distR="0" simplePos="0" relativeHeight="${251658240 + id}" behindDoc="1" locked="0" layoutInCell="1" allowOverlap="1">`
+    return `<w:r><w:drawing><wp:anchor distT="0" distB="0" distL="0" distR="0" simplePos="0" relativeHeight="${251658240 + id}" behindDoc="${b.inFront ? 0 : 1}" locked="0" layoutInCell="1" allowOverlap="1">`
       + '<wp:simplePos x="0" y="0"/>'
       + `<wp:positionH relativeFrom="page"><wp:posOffset>${emu(b.anchor.x)}</wp:posOffset></wp:positionH>`
       + `<wp:positionV relativeFrom="page"><wp:posOffset>${emu(b.anchor.y)}</wp:posOffset></wp:positionV>`

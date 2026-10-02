@@ -28,7 +28,8 @@
  *               align?, indentLeft?, spaceBefore?,
  *               anchor?: {x,y} (page pt: absolute, behind the text; use in Page.anchors),
  *               crop?: {l,t,r,b} (fractions 0..1 of the source), z?,
- *               asShape? (anchored only: written as a picture-filled shape, set by convert.js when a later shape overlaps it; see writer.js) }
+ *               asShape? (anchored only: written as a picture-filled shape), inFront? (written in front of the text, behindDoc=0)
+ *               asShape and inFront are set by stack.js, not by the lane that makes the picture }
  *   Table   = { kind:'tbl', colsPt: number[], rows: Cell[][], border?: boolean, spaceBefore?,
  *               indentLeft? (pt), rowsH?: number[] (pt, one per row, written "at least"),
  *               src?: 'ruled'|'rules-h'|'text' (how tables.js found it; informational, never written) }
@@ -41,7 +42,7 @@
  *   Anchor  = any object with a `kind` the writer has an anchor writer for ('img'
  *             built in; docx/color.js registers 'shape'). They ride in the page's
  *             first paragraph, cost the text flow nothing, and stack in array order.
- *   Shape   = { kind:'shape', x, y, wPt, hPt (page pt), fill?: hex, stroke?: {c, wPt} }
+ *   Shape   = { kind:'shape', x, y, wPt, hPt (page pt), fill?: hex, stroke?: {c, wPt}, inFront? (stack.js) }
  *             (the contract for vector art / backgrounds; owned by docx/color.js)
  *
  * THE PAGE CONTEXT (`ctx`, one per PDF page, built and threaded by convert.js)

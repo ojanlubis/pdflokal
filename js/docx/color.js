@@ -47,6 +47,7 @@
 import { registerAnchor } from './writer.js';
 import { walkOps } from './ops.js';
 import { canRasterize, rasterizeRegion } from './raster.js';
+import { boxIsCellOutline, ruleIsBorder } from './stack.js';
 
 // ------------------------------------------------------------- small maths ---
 const HEX6 = /^[0-9a-f]{6}$/i;
@@ -841,12 +842,15 @@ export async function analyzeColor(ctx) {
     get() {
       if (cached) return cached;
       const claims = ctx.tables || [];
-      const inTable = (b) => claims.some((t) => b[0] >= t.x0 - 3 && b[1] >= t.y0 - 3 && b[2] <= t.x1 + 3 && b[3] <= t.y1 + 3);
+      const inClaim = (b) => claims.find((t) => b[0] >= t.x0 - 3 && b[1] >= t.y0 - 3 && b[2] <= t.x1 + 3 && b[3] <= t.y1 + 3);
       cached = [];
       for (const it of drawn) {
         const thin = Math.min(it.box[2] - it.box[0], it.box[3] - it.box[1]) <= 2.5;
-        if ((it.rule || (it.stroke && !it.fill) || (it.rect && thin)) && inTable(it.box)) continue;
-        cached.push(toShape(it));
+        if (!((it.rule || (it.stroke && !it.fill) || (it.rect && thin)) && inClaim(it.box))) { cached.push(toShape(it)); continue; }
+        // A rule inside a table is the table's border only when it lies on a grid line, and a stroke-only box only when it
+        // outlines cells. The character boxes and checkboxes of a form (n018: 110 pieces) are neither, and vanished with the table.
+        const claim = inClaim(it.box);
+        if (!(thin || it.rule ? ruleIsBorder(claim, it.box) : boxIsCellOutline(claim, it.box))) cached.push(toShape(it));
       }
       stats.shapes = cached.length;
       for (const pic of pictures) cached.push(pic);
@@ -981,7 +985,7 @@ function shapeXml(s, w) {
   const id = w.nextId();
   const cx = Math.max(1, E(s.wPt));
   const cy = Math.max(1, E(s.hPt));
-  return `<w:r><w:drawing><wp:anchor distT="0" distB="0" distL="0" distR="0" simplePos="0" relativeHeight="${251658240 + id}" behindDoc="1" locked="0" layoutInCell="1" allowOverlap="1">`
+  return `<w:r><w:drawing><wp:anchor distT="0" distB="0" distL="0" distR="0" simplePos="0" relativeHeight="${251658240 + id}" behindDoc="${s.inFront ? 0 : 1}" locked="0" layoutInCell="1" allowOverlap="1">`
     + '<wp:simplePos x="0" y="0"/>'
     + `<wp:positionH relativeFrom="page"><wp:posOffset>${E(s.x)}</wp:posOffset></wp:positionH>`
     + `<wp:positionV relativeFrom="page"><wp:posOffset>${E(s.y)}</wp:posOffset></wp:positionV>`
