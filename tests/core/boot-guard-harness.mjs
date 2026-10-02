@@ -63,7 +63,9 @@ export function runGuard({ online = true, storage = 'ok', randomUUID = true, hea
     : { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)) };
 
   const caches = {
-    keys: async () => ['pdflokal-shell-v2', 'pdflokal-shell-v3'],
+    // A complete generation of sw.js v8 beside two old shells: the heal must
+    // purge the shells and SPARE the generation (the user's offline copy).
+    keys: async () => ['pdflokal-shell-v2', 'pdflokal-gen-v8-kept', 'pdflokal-shell-v3'],
     delete: async (k) => { calls.cachesDeleted.push(k); return true; },
   };
   const navigator = {
