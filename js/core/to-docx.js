@@ -40,14 +40,14 @@ const halfPt = (pt) => Math.max(2, Math.min(1638, Math.round(pt * 2)));
 
 // XML 1.0 forbids most C0 controls and the two non-characters; a PDF text layer
 // carries them routinely (form feeds, NULs). Lone surrogates are dropped too.
-// eslint-disable-next-line no-control-regex -- stripping XML-illegal control characters is the point
-const BAD_XML = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
+const BAD_XML = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g; // eslint-disable-line no-control-regex
 export function xmlText(s) {
   return String(s).replace(BAD_XML, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 const xmlAttr = (s) => xmlText(s).replace(/"/g, '&quot;');
 
 function runXml(run) {
+  if (run.xml) return run.xml;
   let rpr = '';
   if (run.f) rpr += `<w:rFonts w:ascii="${xmlAttr(run.f)}" w:hAnsi="${xmlAttr(run.f)}" w:cs="${xmlAttr(run.f)}" w:eastAsia="${xmlAttr(run.f)}"/>`;
   if (run.b) rpr += '<w:b/><w:bCs/>';
@@ -93,13 +93,15 @@ function pPrXml(p, sect) {
 }
 
 function paraXml(p, sect) {
-  return `<w:p>${pPrXml(p, sect)}${(p.runs || []).map(runXml).join('')}</w:p>`;
+  const brk = p.colBreakAfter ? '<w:r><w:br w:type="column"/></w:r>' : '';
+  return `<w:p>${pPrXml(p, sect)}${(p.runs || []).map(runXml).join('')}${brk}</w:p>`;
 }
 
-function sectXml(page) {
-  const m = page.marginPt;
-  return `<w:sectPr><w:pgSz w:w="${twip(page.widthPt)}" w:h="${twip(page.heightPt)}"/>`
-    + `<w:pgMar w:top="${twip(m.top)}" w:right="${twip(m.right)}" w:bottom="${twip(m.bottom)}" w:left="${twip(m.left)}" w:header="0" w:footer="0" w:gutter="0"/></w:sectPr>`;
+function sectXml(page, seg, type) {
+  const m = seg.marginPt;
+  const cols = seg.cols > 1 ? `<w:cols w:num="${seg.cols}" w:space="${twip(seg.space || 18)}" w:equalWidth="1"/>` : '';
+  return `<w:sectPr>${type ? `<w:type w:val="${type}"/>` : ''}<w:pgSz w:w="${twip(page.widthPt)}" w:h="${twip(page.heightPt)}"/>`
+    + `<w:pgMar w:top="${twip(m.top)}" w:right="${twip(m.right)}" w:bottom="${twip(m.bottom)}" w:left="${twip(m.left)}" w:header="0" w:footer="0" w:gutter="0"/>${cols}</w:sectPr>`;
 }
 
 function tableXml(t) {
@@ -138,46 +140,58 @@ export function buildDocx(doc, deps) {
     const cx = emu(b.wPt);
     const cy = emu(b.hPt);
     const id = docPrId++;
+    const crop = b.crop ? `<a:srcRect l="${Math.round(b.crop.l * 100000)}" t="${Math.round(b.crop.t * 100000)}" r="${Math.round(b.crop.r * 100000)}" b="${Math.round(b.crop.b * 100000)}"/>` : '';
     const graphic = '<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic>'
       + `<pic:nvPicPr><pic:cNvPr id="${id}" name="${m.name}"/><pic:cNvPicPr/></pic:nvPicPr>`
-      + `<pic:blipFill><a:blip r:embed="${m.rid}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>`
+      + `<pic:blipFill><a:blip r:embed="${m.rid}"/>${crop}<a:stretch><a:fillRect/></a:stretch></pic:blipFill>`
       + `<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>`
       + '</pic:pic></a:graphicData></a:graphic>';
-    let drawing;
     if (b.anchor) {
-      // Behind the text, absolute on the page: used for images the text sits on.
-      drawing = `<w:r><w:drawing><wp:anchor distT="0" distB="0" distL="0" distR="0" simplePos="0" relativeHeight="${id}" behindDoc="1" locked="0" layoutInCell="1" allowOverlap="1">`
+      // Absolute on the page, behind the text.
+      return `<w:r><w:drawing><wp:anchor distT="0" distB="0" distL="0" distR="0" simplePos="0" relativeHeight="${id}" behindDoc="1" locked="0" layoutInCell="1" allowOverlap="1">`
         + '<wp:simplePos x="0" y="0"/>'
         + `<wp:positionH relativeFrom="page"><wp:posOffset>${emu(b.anchor.x)}</wp:posOffset></wp:positionH>`
         + `<wp:positionV relativeFrom="page"><wp:posOffset>${emu(b.anchor.y)}</wp:posOffset></wp:positionV>`
         + `<wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:wrapNone/>`
         + `<wp:docPr id="${id}" name="Picture ${id}"/><wp:cNvGraphicFramePr/>${graphic}</wp:anchor></w:drawing></w:r>`;
-      return `<w:p>${pPrXml({ lineExact: 1 }, sect)}${drawing}</w:p>`;
     }
-    drawing = `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/>`
+    const drawing = `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/>`
       + `<wp:docPr id="${id}" name="Picture ${id}"/><wp:cNvGraphicFramePr/>${graphic}</wp:inline></w:drawing></w:r>`;
     return `<w:p>${pPrXml({ align: b.align, indentLeft: b.indentLeft, spaceBefore: b.spaceBefore }, sect)}${drawing}</w:p>`;
   };
 
   let body = '';
-  const pages = doc.pages.length ? doc.pages : [{ widthPt: 595, heightPt: 842, marginPt: { top: 56, right: 56, bottom: 56, left: 56 }, blocks: [] }];
-  for (const page of pages) {
-    const sect = sectXml(page);
-    const blocks = page.blocks.slice();
-    // The section break lives in the LAST paragraph of the page. A page that
-    // ends in a table (or is empty) gets a 1pt carrier paragraph.
-    const last = blocks[blocks.length - 1];
-    if (!last || last.kind === 'tbl') blocks.push({ kind: 'p', runs: [], lineExact: 1 });
-    blocks.forEach((b, k) => {
-      const s = k === blocks.length - 1 ? sect : '';
-      if (b.kind === 'img') body += imgParaXml(b, s);
-      else if (b.kind === 'tbl') body += tableXml(b);
-      else body += paraXml(b, s);
+  const fallbackSeg = { cols: 1, space: 0, marginPt: { top: 56, right: 56, bottom: 56, left: 56 }, blocks: [] };
+  const pages = doc.pages.length ? doc.pages : [{ widthPt: 595, heightPt: 842, segments: [fallbackSeg], anchors: [] }];
+  let lastSect = '';
+  pages.forEach((page, pi) => {
+    const segments = page.segments && page.segments.length ? page.segments : [fallbackSeg];
+    // Absolute (page-anchored) images ride in the page's first paragraph, so
+    // they cost no vertical space.
+    const anchorRuns = (page.anchors || []).map((b) => ({ xml: imgParaXml(b, '') }));
+    segments.forEach((seg, si) => {
+      const type = si === 0 ? (pi > 0 ? 'nextPage' : null) : 'continuous';
+      const sect = sectXml(page, seg, type);
+      lastSect = sect;
+      const blocks = seg.blocks.slice();
+      if (si === 0 && anchorRuns.length) {
+        if (blocks.length && blocks[0].kind === 'p') blocks[0] = { ...blocks[0], runs: anchorRuns.concat(blocks[0].runs || []) };
+        else blocks.unshift({ kind: 'p', runs: anchorRuns, lineExact: 1 });
+      }
+      // The section break lives in the LAST paragraph of the segment. A segment
+      // that ends in a table (or is empty) gets a 1pt carrier paragraph.
+      const last = blocks[blocks.length - 1];
+      if (!last || last.kind === 'tbl') blocks.push({ kind: 'p', runs: [], lineExact: 1 });
+      blocks.forEach((b, k) => {
+        const sp = k === blocks.length - 1 ? sect : '';
+        if (b.kind === 'img') body += imgParaXml(b, sp);
+        else if (b.kind === 'tbl') body += tableXml(b);
+        else body += paraXml(b, sp);
+      });
     });
-  }
-  // The last page's section properties must be the body's own sectPr, not a
+  });
+  // The last section's properties must be the body's own sectPr, not a
   // paragraph's: swap the final paragraph-level one for a body-level one.
-  const lastSect = sectXml(pages[pages.length - 1]);
   const at = body.lastIndexOf(lastSect);
   body = body.slice(0, at) + body.slice(at + lastSect.length);
   body = body.replace(/<w:pPr><\/w:pPr>/g, '');

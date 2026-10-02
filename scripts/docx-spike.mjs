@@ -211,6 +211,7 @@ async function childMain(id) {
   const pj = await pdfjs.getDocument({ data: new Uint8Array(data), disableFontFace: true, isEvalSupported: false, verbosity: 0, fontExtraProperties: true }).promise.catch((e) => { row.pdfOpenError = String(e && e.message); return null; });
   let refText = '';
   const pageItems = [];
+  const pageTokens = [];
   let pdfBold = 0;
   let pdfItalic = 0;
   if (pj) {
@@ -239,12 +240,17 @@ async function childMain(id) {
         }
       }
       refText += ' ';
+      pageTokens.push(tokens(tc.items.map((x) => x.str + (x.hasEOL ? ' ' : '')).join('')));
       pageItems.push(items);
       pg.cleanup();
     }
     await pj.destroy();
   }
   row.refWords = tokens(refText);
+  // body page: first page in 2..6 with >= 150 words (a page of running text, not a cover)
+  const bp = pageTokens.findIndex((t, i) => i >= 1 && i < 6 && t.length >= 150);
+  row.bodyPage = bp >= 0 ? bp + 1 : null;
+  row.bodyHead = bp >= 0 ? pageTokens[bp].slice(0, 6) : null;
   Object.assign(row, layoutLabels(pageItems));
   row.pdfBold = pdfBold;
   row.pdfItalic = pdfItalic;
@@ -298,7 +304,7 @@ async function childMain(id) {
 // ============================================================ ORCHESTRATOR ==
 function runPool(items, jobs, fn) {
   let k = 0;
-  return Promise.all(Array.from({ length: jobs }, async () => { while (k < items.length) { const i = k; k += 1; await fn(items[i], i); } }));
+  return Promise.all(Array.from({ length: jobs }, async (_, slot) => { while (k < items.length) { const i = k; k += 1; await fn(items[i], i, slot); } }));
 }
 function spawnAsync(cmd, args, opts) {
   return new Promise((resolve) => {
@@ -370,14 +376,14 @@ async function main() {
   const renderDir = path.join(OUT, 'render');
   fs.mkdirSync(renderDir, { recursive: true });
   const rows = [];
-  await runPool(ids, render ? Math.max(1, Math.min(JOBS, 4)) : 1, async (id, i) => {
+  await runPool(ids, render ? Math.max(1, Math.min(JOBS, 4)) : 1, async (id, i, slot) => {
     const row = JSON.parse(fs.readFileSync(path.join(OUT, 'raw', `${id}.json`), 'utf8'));
     Object.assign(row, meta.get(id) || {});
     const docx = path.join(OUT, 'docx', `${id}.docx`);
     const pdf = path.join(CORPUS, `${id}.pdf`);
     if (render && row.ok) {
       const t0 = Date.now();
-      const prof = path.join(os.tmpdir(), `lo-profile-${process.pid}-${i % JOBS}`);
+      const prof = path.join(os.tmpdir(), `lo-profile-${process.pid}-${slot}`);
       const r = await spawnAsync(SOFFICE, [`-env:UserInstallation=file://${prof}`, '--headless', '--convert-to', 'pdf', '--outdir', renderDir, docx], { timeout: 300000 });
       row.renderMs = Date.now() - t0;
       const rpdf = path.join(renderDir, `${id}.pdf`);
@@ -401,6 +407,24 @@ async function main() {
           row.visRows = pearson(rowProfile(A.grid, GW, GH), rowProfile(B.grid, GW, GH));
           row.inkRatio = A.total > 0 ? B.total / A.total : null;
         } catch (e) { row.visError = String(e.message).slice(0, 100); }
+        // body page: locate the rendered page that carries the same first words
+        if (row.bodyPage && row.bodyHead) {
+          const pages = rt.split('\f');
+          let q = pages.findIndex((t) => { const tk = tokens(t); for (let i = 0; i + 6 <= tk.length && i < 60; i += 1) { if (row.bodyHead.every((w, j) => tk[i + j] === w)) return true; } return false; });
+          row.bodyFound = q >= 0 ? 1 : 0;
+          q = q >= 0 ? q + 1 : row.bodyPage;
+          row.bodyDocxPage = q;
+          const a2 = path.join(renderDir, `${id}_orig_b`);
+          const b2 = path.join(renderDir, `${id}_docx_b`);
+          spawnSync('pdftoppm', ['-r', '40', '-gray', '-png', '-f', String(row.bodyPage), '-l', String(row.bodyPage), '-singlefile', pdf, a2]);
+          spawnSync('pdftoppm', ['-r', '40', '-gray', '-png', '-f', String(q), '-l', String(q), '-singlefile', rpdf, b2]);
+          try {
+            const A2 = pageInk(`${a2}.png`, 40, 52);
+            const B2 = pageInk(`${b2}.png`, 40, 52);
+            row.visBody = pearson(A2.grid, B2.grid);
+            row.inkBody = A2.total > 0 ? B2.total / A2.total : null;
+          } catch { /* leave empty */ }
+        }
       }
     }
     rows.push(row);
@@ -475,6 +499,11 @@ async function main() {
     o.visGrid = r.visGrid == null ? '' : r.visGrid.toFixed(4);
     o.visRows = r.visRows == null ? '' : r.visRows.toFixed(4);
     o.inkRatio = r.inkRatio == null ? '' : r.inkRatio.toFixed(3);
+    o.bodyPage = r.bodyPage || '';
+    o.bodyFound = r.bodyFound ?? '';
+    o.visBody = r.visBody == null ? '' : r.visBody.toFixed(4);
+    o.inkBody = r.inkBody == null ? '' : r.inkBody.toFixed(3);
+    o.columnBands = st.columnBands ?? '';
     return o;
   });
   const cols = Object.keys(out[0]);

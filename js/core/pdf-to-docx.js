@@ -31,46 +31,36 @@ const NUM_MARKER_RE = /^(\(?\d{1,3}([.)]\d*)*[.)]|\(?[A-Za-z][.)]|\(?[ivxIVX]{1,
 const RTL_RE = new RegExp('[\\u0590-\\u08FF\\uFB1D-\\uFDFF\\uFE70-\\uFEFE]', 'g');
 
 // ---------------------------------------------------------------- fonts ----
-const KNOWN = [
-  [/times|tinos|liberation ?serif|nimbus ?rom/i, 'Times New Roman'],
-  [/arial|helvet|liberation ?sans|arimo|nimbus ?sans/i, 'Arial'],
-  [/calibri|carlito/i, 'Calibri'],
-  [/cambria|caladea/i, 'Cambria'],
-  [/courier|cousine|consolas|monospace/i, 'Courier New'],
-  [/verdana/i, 'Verdana'],
-  [/tahoma/i, 'Tahoma'],
-  [/georgia/i, 'Georgia'],
-  [/garamond/i, 'Garamond'],
-  [/palatino|book ?antiqua/i, 'Palatino Linotype'],
-  [/trebuchet/i, 'Trebuchet MS'],
-  [/segoe/i, 'Segoe UI'],
-  [/comic/i, 'Comic Sans MS'],
-  [/impact/i, 'Impact'],
-  [/tw ?cen/i, 'Tw Cen MT'],
-  [/century|schoolbook/i, 'Century Schoolbook'],
-  [/bookman/i, 'Bookman Old Style'],
-  [/montserrat/i, 'Montserrat'],
-  [/open ?sans/i, 'Open Sans'],
-  [/roboto/i, 'Roboto'],
-  [/lato/i, 'Lato'],
-  [/noto ?sans/i, 'Noto Sans'],
-  [/noto ?serif/i, 'Noto Serif'],
+const ALIAS = [
+  [/^(times new roman|times|tinos|liberation serif|nimbus rom\w*)$/i, 'Times New Roman'],
+  [/^(arial|helvetica|helvetica neue|liberation sans|arimo|nimbus sans\w*)$/i, 'Arial'],
+  [/^(courier|courier new|cousine|liberation mono|nimbus mono\w*)$/i, 'Courier New'],
+  [/^(calibri|carlito)$/i, 'Calibri'],
+  [/^(cambria|caladea)$/i, 'Cambria'],
+  [/^(symbol|symbolmt)$/i, 'Symbol'],
 ];
 
 export function fontInfoOf(fontObj, generic) {
   const raw = String((fontObj && fontObj.name) || '');
-  const name = raw.replace(/^[A-Z]{6}\+/, '').replace(/^.*\+/, '');
-  const spaced = name.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[-_,]/g, ' ');
+  const name = raw.replace(/^.*\+/, '');
   const bold = /bold|black|heavy|semibold|demi/i.test(name) || !!(fontObj && fontObj.bold);
   const italic = /italic|oblique/i.test(name) || !!(fontObj && fontObj.italic);
+  // family = the part before the style suffix ("ArialNarrow-BoldItalic" -> "Arial Narrow")
+  let fam = name.split(/[-,]/)[0]
+    .replace(/(PSMT|PS|MT)$/i, '')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/_/g, ' ')
+    .replace(/\s+(bold|italic|oblique|regular)\b.*$/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
   let family = null;
-  for (const [re, fam] of KNOWN) if (re.test(spaced)) { family = fam; break; }
+  for (const [re, f] of ALIAS) if (re.test(fam)) { family = f; break; }
   if (!family) {
-    const base = spaced.replace(/\b(bold|italic|oblique|regular|roman|normal|mt|ps|psmt|std|pro|lt|black|light|medium|semibold|narrow|condensed)\b/gi, '').replace(/\s+/g, ' ').trim();
     // A generator placeholder ("F1", "g d0 f1", "CIDFont") teaches nothing.
-    const uninformative = !base || /^(f|c|g|tt|font|cidfont|type|d|[a-z]\d*)(\s?\d+)*$/i.test(base) || base.length < 3;
-    if (!uninformative) family = base;
+    const uninformative = !fam || /^(f|c|g|tt|font|cidfont|type|d|[a-z]\d*)(\s?\d+)*$/i.test(fam) || fam.length < 3;
+    if (!uninformative) family = fam;
   }
+  fam = '';
   if (!family) {
     if (fontObj && fontObj.isMonospace) family = 'Courier New';
     else if ((fontObj && fontObj.isSerifFont) || generic === 'serif') family = 'Times New Roman';
@@ -312,140 +302,161 @@ function lineGeom(line) {
   };
 }
 
+// Split the reading-ordered items into SEGMENTS: runs of items in one zone are
+// single-column text; consecutive runs in different zones whose x-ranges are
+// disjoint, similar in width and overlapping in y are ONE multi-column band
+// (Word columns, continuous section). Anything stranger stays single-flow.
+function segmentsOf(ordered, pageW, pageH) {
+  const runs = [];
+  for (const it of ordered) {
+    const last = runs[runs.length - 1];
+    if (last && last.zone === it.zone) last.items.push(it);
+    else runs.push({ zone: it.zone, items: [it] });
+  }
+  for (const r of runs) {
+    r.x0 = Math.min(...r.items.map((i) => i.x0));
+    r.x1 = Math.max(...r.items.map((i) => i.x1));
+    r.y0 = Math.min(...r.items.map((i) => i.y0));
+    r.y1 = Math.max(...r.items.map((i) => i.y1));
+  }
+  const segs = [];
+  let k = 0;
+  while (k < runs.length) {
+    const group = [runs[k]];
+    while (k + group.length < runs.length) {
+      const nxt = runs[k + group.length];
+      const prev = group[group.length - 1];
+      const ov = Math.min(prev.y1, nxt.y1) - Math.max(prev.y0, nxt.y0);
+      const span = Math.min(prev.y1 - prev.y0, nxt.y1 - nxt.y0);
+      const wide = Math.max(nxt.x1 - nxt.x0, prev.x1 - prev.x0);
+      const narrow = Math.min(nxt.x1 - nxt.x0, prev.x1 - prev.x0);
+      const real = (r) => r.items.length >= 6 && r.x1 - r.x0 >= pageW * 0.25 && r.y1 - r.y0 >= pageH * 0.2;
+      if (nxt.x0 >= prev.x1 && nxt.zone !== prev.zone && span > 0 && ov > 0.5 * span && narrow >= 0.7 * wide && group.length < 3
+        && real(prev) && real(nxt) && !group.some((g) => g.zone === nxt.zone)) group.push(nxt);
+      else break;
+    }
+    if (group.length >= 2) segs.push({ cols: group.length, runs: group });
+    else segs.push({ cols: 1, runs: group });
+    k += group.length;
+  }
+  return segs;
+}
+
 function buildPageBlocks(lines, images, vp, kind) {
   const W = vp.width;
   const H = vp.height;
   const geoms = lines.map(lineGeom);
-  // Pad the extent test a little so adjacent lines of one paragraph merge into
-  // one horizontal band rather than being cut per line (their boxes touch).
-  const imgItems = images.map((im) => ({ kind: 'img', im, size: 10, base: im.box.y1, x0: im.box.x0, x1: im.box.x1, y0: im.box.y0, y1: im.box.y1, zone: 0 }));
+  const imgItems = images.map((im) => ({ im, x0: im.box.x0, x1: im.box.x1, y0: im.box.y0, y1: im.box.y1 }));
 
-  // images that sit under text are backgrounds: anchored, not in the flow.
-  const flow = [];
-  const behind = [];
+  // Images are anchored absolutely on the page (behind the text); they cost the
+  // text flow nothing. A searchable scan's full-page picture is dropped: its
+  // words are the content, and the picture would double them.
+  const anchors = [];
+  let dropped = 0;
   for (const it of imgItems) {
     const area = (it.x1 - it.x0) * (it.y1 - it.y0);
-    let under = false;
-    const fullPage = area > W * H * 0.8;
-    for (const g of geoms) {
-      const ix = Math.max(0, Math.min(it.x1, g.x1) - Math.max(it.x0, g.x0));
-      const iy = Math.max(0, Math.min(it.y1, g.y1) - Math.max(it.y0, g.y0));
-      if (ix * iy > 0.5 * (g.x1 - g.x0) * (g.y1 - g.y0)) { under = true; break; }
-    }
-    if (kind === 'searchable-scan' && fullPage) { it.dropped = 'scan-background'; continue; }
-    (under ? behind : flow).push(it);
+    if (kind === 'searchable-scan' && area > W * H * 0.8) { dropped += 1; continue; }
+    // clip to the page: art that spills far off the page is cropped, not shipped whole
+    const vx0 = Math.max(0, it.x0); const vy0 = Math.max(0, it.y0);
+    const vx1 = Math.min(W, it.x1); const vy1 = Math.min(H, it.y1);
+    if (vx1 - vx0 < 2 || vy1 - vy0 < 2) { dropped += 1; continue; }
+    const w = it.x1 - it.x0; const h = it.y1 - it.y0;
+    anchors.push({
+      kind: 'img', anchor: { x: vx0, y: vy0 }, bytes: it.im.bytes, ext: it.im.ext, wPt: vx1 - vx0, hPt: vy1 - vy0,
+      crop: vx0 !== it.x0 || vy0 !== it.y0 || vx1 !== it.x1 || vy1 !== it.y1 ? { l: (vx0 - it.x0) / w, t: (vy0 - it.y0) / h, r: (it.x1 - vx1) / w, b: (it.y1 - vy1) / h } : null,
+    });
   }
 
-  const all = geoms.concat(flow);
   const ordered = [];
-  const zoneRef = { n: 0 };
-  xyCut(all, zoneRef, 0, ordered, 0);
+  xyCut(geoms.slice(), { n: 0 }, 0, ordered, 0);
+  const segs = segmentsOf(ordered, W, H);
 
-  // page margins from the text itself
-  const lefts = geoms.map((g) => g.x0);
-  const rights = geoms.map((g) => g.x1);
-  const marginL = lefts.length ? Math.max(12, Math.min(Math.min(...lefts), W * 0.35)) : 56;
-  const marginR = rights.length ? Math.max(12, Math.min(W - Math.max(...rights), W * 0.35)) : 56;
+  const pageLefts = geoms.map((g) => g.x0);
+  const pageRights = geoms.map((g) => g.x1);
+  const pageMarginL = pageLefts.length ? Math.max(12, Math.min(Math.min(...pageLefts), W * 0.35)) : 56;
+  const pageMarginR = pageRights.length ? Math.max(12, Math.min(W - Math.max(...pageRights), W * 0.35)) : 56;
 
-  // zone geometry
-  const zones = new Map();
-  for (const g of geoms) {
-    if (!zones.has(g.zone)) zones.set(g.zone, { xs: [], rs: [] });
-    zones.get(g.zone).xs.push(g.x0);
-    zones.get(g.zone).rs.push(g.x1);
-  }
-  for (const z of zones.values()) {
-    z.left = percentile(z.xs, 0.05);
-    z.right = percentile(z.rs, 0.9);
-  }
-
-  // rows: consecutive ordered line items in one zone whose baselines coincide
-  const rows = [];
-  for (const it of ordered) {
-    if (it.kind === 'img') { rows.push({ img: it }); continue; }
-    const last = rows[rows.length - 1];
-    if (last && last.cells && last.zone === it.zone && Math.abs(last.base - it.base) <= 0.35 * Math.min(last.size, it.size)) {
-      last.cells.push(it);
-    } else rows.push({ cells: [it], zone: it.zone, base: it.base, size: it.size });
-  }
-  for (const r of rows) {
-    if (r.cells) {
-      r.cells.sort((a, b) => a.x0 - b.x0);
-      r.left = r.cells[0].x0;
-      r.right = Math.max(...r.cells.map((c) => c.x1));
-      r.size = Math.max(...r.cells.map((c) => c.size));
-    }
-  }
-
-  const blocks = [];
-  let cursor = null; // estimated bottom (y, page pt) of the previous block
   const H_OF = (sz) => sz * 1.2;
-  const place = (target, height, cap) => {
+  let cursor = null; // estimated bottom (y, page pt) of the previous block
+  const place = (target, height) => {
     const sb = cursor === null ? 0 : Math.max(0, target - cursor);
-    cursor = (cursor === null ? target : Math.max(cursor, 0) + sb) + height;
-    if (cursor === null || Number.isNaN(cursor)) cursor = target + height;
-    return cap ? Math.min(sb, cap) : sb;
+    cursor = (cursor === null ? target : cursor + sb) + height;
+    return sb;
   };
 
-  let para = null;
-  const flush = () => {
-    if (!para) return;
-    const p = finishPara(para, zones.get(para.zone), marginL, W, marginR);
-    const lineH = p.lineExact || H_OF(p.sizeMax);
-    const nLines = para.rows.length;
-    const target = para.rows[0].base - 0.8 * lineH;
-    p.spaceBefore = place(target, lineH * nLines) || 0;
-    p.spaceBefore = p.spaceBefore ? Math.round(p.spaceBefore * 10) / 10 : 0;
-    blocks.push(p);
-    para = null;
-  };
-
-  for (const r of rows) {
-    if (r.img) {
-      flush();
-      const im = r.img;
-      const w = Math.min(im.x1 - im.x0, W - marginL - marginR);
-      const h = (im.y1 - im.y0) * (w / (im.x1 - im.x0));
-      const sb = place(im.y0, h);
-      blocks.push({ kind: 'img', bytes: im.im.bytes, ext: im.im.ext, wPt: w, hPt: h, indentLeft: Math.max(0, im.x0 - marginL), spaceBefore: sb });
-      continue;
+  const segments = [];
+  let firstTop = null;
+  for (const seg of segs) {
+    const segItems = seg.runs.flatMap((r) => r.items);
+    // Single-column segments share the PAGE margins; only a column band gets its own.
+    const marginL = seg.cols > 1 ? Math.max(12, Math.min(Math.min(...segItems.map((g) => g.x0)), W * 0.4)) : pageMarginL;
+    const marginR = seg.cols > 1 ? Math.max(12, Math.min(W - Math.max(...segItems.map((g) => g.x1)), W * 0.4)) : pageMarginR;
+    const out = { cols: seg.cols, space: 0, marginPt: { top: 0, right: marginR, bottom: 18, left: marginL }, blocks: [] };
+    if (seg.cols > 1) {
+      const gaps = [];
+      for (let k = 1; k < seg.runs.length; k += 1) gaps.push(seg.runs[k].x0 - seg.runs[k - 1].x1);
+      out.space = Math.max(6, Math.min(...gaps));
     }
-    const z = zones.get(r.zone);
-    const rowKind = classifyRow(r, z);
-    if (rowKind.type === 'multi') {
+    const bandTop = cursor;
+    let bandEnd = cursor;
+    seg.runs.forEach((run, ri) => {
+      if (ri > 0) cursor = bandTop;
+      const zone = { left: Math.min(...run.items.map((g) => g.x0)), right: percentile(run.items.map((g) => g.x1), 0.9) };
+      const origin = seg.cols > 1 ? zone.left : marginL;
+      const colRight = seg.cols > 1 ? Math.max(...run.items.map((g) => g.x1)) : W - marginR;
+      // rows: lines in this run whose baselines coincide
+      const rows = [];
+      for (const it of run.items) {
+        const last = rows[rows.length - 1];
+        if (last && Math.abs(last.base - it.base) <= 0.35 * Math.min(last.size, it.size)) last.cells.push(it);
+        else rows.push({ cells: [it], base: it.base, size: it.size });
+      }
+      for (const r of rows) {
+        r.cells.sort((a, b) => a.x0 - b.x0);
+        r.left = r.cells[0].x0;
+        r.right = Math.max(...r.cells.map((c) => c.x1));
+        r.size = Math.max(...r.cells.map((c) => c.size));
+      }
+      const startBlock = out.blocks.length;
+      let para = null;
+      const flush = () => {
+        if (!para) return;
+        const p = finishPara(para, zone, origin, colRight);
+        const lineH = p.lineExact || H_OF(p.sizeMax);
+        const target = para.rows[0].base - 0.8 * lineH;
+        if (firstTop === null) firstTop = Math.max(0, target);
+        p.spaceBefore = Math.round(place(target, lineH * para.rows.length) * 10) / 10;
+        out.blocks.push(p);
+        para = null;
+      };
+      for (const r of rows) {
+        const rk = classifyRow(r, zone);
+        if (rk.type === 'multi') {
+          flush();
+          const p = multiCellPara(r, origin);
+          const lineH = H_OF(p.sizeMax);
+          p.lineExact = lineH;
+          if (firstTop === null) firstTop = Math.max(0, r.base - 0.8 * lineH);
+          p.spaceBefore = Math.round(place(r.base - 0.8 * lineH, lineH) * 10) / 10;
+          out.blocks.push(p);
+          continue;
+        }
+        const item = { row: r, base: r.base, size: r.size, left: r.left, right: r.right, runs: rk.runs, bullet: rk.bullet, marker: rk.marker, markerGap: rk.markerGap, left2: rk.left2 };
+        if (para && joinable(para, item, zone)) para.rows.push(item);
+        else { flush(); para = { rows: [item] }; }
+      }
       flush();
-      const p = multiCellPara(r, marginL);
-      const lineH = H_OF(p.sizeMax);
-      p.lineExact = lineH;
-      p.spaceBefore = place(r.base - 0.8 * lineH, lineH);
-      blocks.push(p);
-      continue;
-    }
-    const item = { row: r, base: r.base, size: r.size, left: r.left, right: r.right, runs: rowKind.runs, bullet: rowKind.bullet, marker: rowKind.marker, markerGap: rowKind.markerGap, left2: rowKind.left2, zone: r.zone };
-    if (para && joinable(para, item, z)) {
-      para.rows.push(item);
-    } else {
-      flush();
-      para = { rows: [item], zone: r.zone };
-    }
+      bandEnd = Math.max(bandEnd === null ? 0 : bandEnd, cursor === null ? 0 : cursor);
+      // a column break closes every column of a band but the last
+      if (seg.cols > 1 && ri < seg.runs.length - 1 && out.blocks.length > startBlock) out.blocks[out.blocks.length - 1].colBreakAfter = true;
+    });
+    if (seg.cols > 1) cursor = bandEnd;
+    segments.push(out);
   }
-  flush();
-
-  const anchors = behind.map((it) => ({ kind: 'img', anchor: { x: it.x0, y: it.y0 }, bytes: it.im.bytes, ext: it.im.ext, wPt: it.x1 - it.x0, hPt: it.y1 - it.y0 }));
-  const dropped = imgItems.filter((it) => it.dropped).length;
-  const firstBase = rows.find((r) => r.cells || r.img);
-  let top = 36;
-  if (blocks.length) {
-    const b0 = blocks[0];
-    const lineH = b0.kind === 'img' ? 0 : (b0.lineExact || 12);
-    const baseline0 = firstBase && firstBase.cells ? firstBase.base : (firstBase && firstBase.img ? firstBase.img.y0 + 0.8 * 0 : 40);
-    top = firstBase && firstBase.img ? firstBase.img.y0 : baseline0 - 0.8 * lineH;
-  }
-  return {
-    blocks: anchors.concat(blocks),
-    marginPt: { top: Math.max(0, Math.min(top, H * 0.5)), right: marginR, bottom: 18, left: marginL },
-    stats: { anchored: anchors.length, droppedBackground: dropped },
-  };
+  if (!segments.length) segments.push({ cols: 1, space: 0, marginPt: { top: 36, right: pageMarginR, bottom: 18, left: pageMarginL }, blocks: [] });
+  segments[0].marginPt.top = Math.max(0, Math.min(firstTop === null ? 36 : firstTop, H * 0.5));
+  for (let k = 1; k < segments.length; k += 1) segments[k].marginPt.top = segments[0].marginPt.top;
+  return { segments, anchors, stats: { anchored: anchors.length, droppedBackground: dropped, columnBands: segments.filter((s) => s.cols > 1).length } };
 }
 
 // A justified line is stretched until the column guard (1.5em) splits it into
@@ -540,7 +551,7 @@ function joinable(para, item, z) {
   return true;
 }
 
-function finishPara(para, z, marginL, pageW, marginR) {
+function finishPara(para, z, marginL, colRight) {
   const rows = para.rows;
   const n = rows.length;
   const first = rows[0];
@@ -602,7 +613,7 @@ function finishPara(para, z, marginL, pageW, marginR) {
   }
   if (n >= 2) {
     const maxRight = Math.max(...rows.map((r) => r.right));
-    p.indentRight = Math.max(0, Math.round((pageW - marginR - maxRight) * 10) / 10);
+    p.indentRight = Math.max(0, Math.round((colRight - maxRight) * 10) / 10);
   }
   // right-to-left paragraph
   const text = runs.map((x) => x.t).join('');
@@ -621,7 +632,7 @@ export async function pdfToDocModel({ pdfjs, fflate, data, onProgress, maxPages 
   const pdf = await pdfjs.getDocument({ data: new Uint8Array(data), disableFontFace: true, isEvalSupported: false, verbosity: 0, fontExtraProperties: true }).promise;
   const state = { fflate, imageCache: new Map() };
   const pages = [];
-  const stats = { pages: pdf.numPages, pageKinds: { text: 0, 'searchable-scan': 0, scan: 0, empty: 0 }, imageMasksSkipped: 0, imagesFailed: 0, anchored: 0, droppedBackground: 0, errors: [], lines: 0 };
+  const stats = { pages: pdf.numPages, pageKinds: { text: 0, 'searchable-scan': 0, scan: 0, empty: 0 }, imageMasksSkipped: 0, imagesFailed: 0, anchored: 0, droppedBackground: 0, errors: [], lines: 0, columnBands: 0 };
   const limit = maxPages ? Math.min(maxPages, pdf.numPages) : pdf.numPages;
   for (let i = 1; i <= limit; i += 1) {
     const page = await pdf.getPage(i);
@@ -649,10 +660,11 @@ export async function pdfToDocModel({ pdfjs, fflate, data, onProgress, maxPages 
       const built = buildPageBlocks(lines, images, vp, kind);
       stats.anchored += built.stats.anchored;
       stats.droppedBackground += built.stats.droppedBackground;
-      pages.push({ widthPt: vp.width, heightPt: vp.height, marginPt: built.marginPt, blocks: built.blocks, kind });
+      stats.columnBands += built.stats.columnBands;
+      pages.push({ widthPt: vp.width, heightPt: vp.height, segments: built.segments, anchors: built.anchors, kind });
     } catch (e) {
       stats.errors.push(`p${i}: ${e && e.message}`);
-      pages.push({ widthPt: 595, heightPt: 842, marginPt: { top: 36, right: 36, bottom: 18, left: 36 }, blocks: [], kind: 'error' });
+      pages.push({ widthPt: 595, heightPt: 842, segments: [{ cols: 1, space: 0, marginPt: { top: 36, right: 36, bottom: 18, left: 36 }, blocks: [] }], anchors: [], kind: 'error' });
     }
     page.cleanup();
     if (onProgress) onProgress(i, limit);
