@@ -45,19 +45,48 @@ test.describe('back button — mobile', () => {
     expect(new URL(page.url()).pathname).toBe('/');
   });
 
-  test('RAPID double-back (coalesced traversal) still closes everything, stays on page', async ({ page }) => {
+  // ---- RAPID back: two traversals before the first popstate lands -----------------
+  // WHY NOT `Promise.all([page.goBack(), page.goBack()])` (what this test used to
+  // do; failed 13/80 on 2026-10-02): Playwright's goBack() is NOT "go back one" —
+  // it reads Page.getNavigationHistory, takes entries[currentIndex - 1] and asks
+  // Chromium to navigate to that ABSOLUTE entry id. Fired together, both calls
+  // read the same currentIndex and name the same target, so ~1 run in 6 delivered
+  // ONE back and the dl-sheet correctly stayed open on its own, still-present
+  // history entry (probe: one popstate, state {v2dlg:'dl-sheet'}, sheet open,
+  // entry intact). Product consistent; the harness simply didn't press back twice.
+  // A phone's back button is relative ("one step from wherever I am"), so the
+  // faithful drivers are page-side: history.back() twice, and history.go(-2),
+  // which is what Chromium's coalescing turns a fast double-tap into — a SINGLE
+  // popstate landing two entries down. That second shape is the one the product's
+  // popstate handler (wireDialogHistory) closes the whole stack for.
+  async function openNestedSheets(page) {
     await openDoc(page);
     await page.tap('#btn-download');
     await page.tap('#ds-pages [data-v="some"]');
     await expect(page.locator('#pm-sheet')).toBeVisible();
+  }
 
-    // Two backs as fast as the harness can fire them — the browser may
-    // coalesce them into a single popstate. Outcome must be the same.
-    await Promise.all([page.goBack(), page.goBack()]).catch(() => {});
+  async function expectEverythingClosedOnGuard(page) {
     await expect(page.locator('#pm-sheet')).toBeHidden();
     await expect(page.locator('#dl-sheet')).toBeHidden();
+    // Landed on the editor's own guard entry — the rest state. Polled: state is
+    // the real signal that the traversal(s) finished, not a sleep.
+    await expect.poll(() => page.evaluate(() => window.history.state?.v2doc === true)).toBe(true);
+    await expect(page.locator('#home-confirm')).toBeHidden(); // not offered: we did not walk past the guard
     expect(new URL(page.url()).pathname).toBe('/');
     await expect(page.locator('.pv-page').first()).toBeVisible();
+  }
+
+  test('RAPID double-back (two back() calls in one task) closes both sheets, stays on page', async ({ page }) => {
+    await openNestedSheets(page);
+    await page.evaluate(() => { window.history.back(); window.history.back(); });
+    await expectEverythingClosedOnGuard(page);
+  });
+
+  test('RAPID double-back COALESCED into one popstate (go(-2)) closes both sheets, stays on page', async ({ page }) => {
+    await openNestedSheets(page);
+    await page.evaluate(() => { window.history.go(-2); });
+    await expectEverythingClosedOnGuard(page);
   });
 
   test('UI close (✕) leaves history clean: back after it does not reopen or exit oddly', async ({ page }) => {
