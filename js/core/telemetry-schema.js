@@ -374,9 +374,17 @@ export const SCHEMA = {
   // Deliberately NOT emitted for the on-off disarm tap or for any internal
   // setTool('select') — there are ~10 of those per edit and they are the
   // editor talking to itself, not a user reaching for anything.
+  //
+  // 'extract' (2026-10-02) is the Ekstrak button in the Halaman sheet: the
+  // split / "pisah PDF" job. It is an INTENT-side action, like 'arm': it fires on
+  // the tap, whether or not a file results (the file itself is `extract_export`
+  // below). Until now the rail saw nothing of split at all — the only trace was
+  // GA4's editor_action/split, and GA4 is ad-blocked wholesale for a large share
+  // of Indonesian users. It is NOT a document edit, so it stays out of app.js's
+  // COMMIT_ACTIONS (the bug-report prompt must not fire on it).
   tool_use: {
     tool: ['select', 'teks', 'tipex', 'ganti', 'ttd', 'hapus', 'halaman', 'gabung'],
-    action: ['select', 'whiteout', 'text', 'text_inline', 'signature', 'paraf', 'delete', 'pages_open', 'merge', 'arm', 'sig_modal_open'],
+    action: ['select', 'whiteout', 'text', 'text_inline', 'signature', 'paraf', 'delete', 'pages_open', 'merge', 'arm', 'sig_modal_open', 'extract'],
   },
   // THE OTHER HALF OF THE SAME BLIND SPOT (2026-09-10). `export` fires when a
   // file is actually produced, and `failure`/stage:export fires when the build
@@ -407,6 +415,23 @@ export const SCHEMA = {
     // enums come straight from download-sheet.js's own state.
     format: EXPORT_FORMAT,
     size: EXPORT_SIZE,
+    pages_scope: PAGES_SCOPE,
+  },
+
+  // THE FILE EKSTRAK PRODUCES (2026-10-02). Export-shaped, and DELIBERATELY NOT an
+  // `export` event: `export` is the Unduh sheet's, it is counted by
+  // api/routine.js (sessions that exported) and api/cron/watch.js (export volume),
+  // and its pairing with `export_intent` is how abandonment is read. Ekstrak has
+  // no sheet and no intent step, so folding it into `export` would raise every one
+  // of those numbers and break that pairing without any code that reads `export`
+  // having changed. A new name leaves all of it alone.
+  //   duration:    tap to bytes-in-hand, same clock as export.duration
+  //   pages:       how many pages were taken out (bucketed, never a count)
+  //   pages_scope: 'all' when the selection was the whole document (an Ekstrak
+  //                that is really a plain copy), else 'some'
+  extract_export: {
+    duration: 'duration',
+    pages: PAGES_BUCKET,
     pages_scope: PAGES_SCOPE,
   },
 
