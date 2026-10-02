@@ -324,6 +324,9 @@ async function replay(ctx) {
         cx = x; cy = y; sx = x; sy = y;
       }
     }
+    // a moveTo straight after a moveTo (pdf-lib and others emit `0 0 m x y m`) replaces it; a trailing lone moveTo paints nothing
+    for (let q = cmds.length - 1; q > 0; q -= 1) if (cmds[q][0] === 'M' && cmds[q - 1][0] === 'M') cmds.splice(q - 1, 1);
+    while (cmds.length && cmds[cmds.length - 1][0] === 'M') cmds.pop();
     return cmds.length ? { cmds, box: pathBox(cmds) } : null;
   };
 
