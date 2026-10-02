@@ -83,7 +83,7 @@ function startServer() {
     if (req.headers['if-none-match'] === etag) { res.writeHead(304, headers); res.end(); return; }
     res.writeHead(200, headers); res.end(buf);
   });
-  return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve({
+  return new Promise((resolve) => server.listen(0, () => resolve({
     state, base: `http://localhost:${server.address().port}`, close: () => new Promise((r) => server.close(r)),
   })));
 }
