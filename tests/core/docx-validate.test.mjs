@@ -65,7 +65,7 @@ const CASES = [
   ['a cell with no paragraph (the schema allows it: EG_BlockLevelElts is a choice that can match nothing)', edit(D, '<w:tc><w:tcPr><w:tcW w:w="3000" w:type="dxa"/></w:tcPr>', '<w:tc><w:tcPr><w:tcW w:w="3000" w:type="dxa"/></w:tcPr></w:tc><w:tc><w:tcPr><w:tcW w:w="3000" w:type="dxa"/></w:tcPr>'), true, false],
   ['a table with no tblGrid', edit(D, '<w:tblGrid><w:gridCol w:w="3000"/><w:gridCol w:w="3000"/></w:tblGrid>', ''), true, true],
   ['a row wider than the grid (gridSpan 3 of 2)', edit(D, '<w:gridSpan w:val="2"/>', '<w:gridSpan w:val="3"/>'), true, false],
-  ['a row narrower than the grid', edit(D, '<w:tc><w:tcPr><w:tcW w:w="3000" w:type="dxa"/><w:gridSpan w:val="2"/></w:tcPr>', '<w:tc><w:tcPr><w:tcW w:w="3000" w:type="dxa"/></w:tcPr>'), true, false],
+  ['a row narrower than the grid', edit(D, '<w:tc><w:tcPr><w:tcW w:w="6000" w:type="dxa"/><w:gridSpan w:val="2"/></w:tcPr>', '<w:tc><w:tcPr><w:tcW w:w="6000" w:type="dxa"/></w:tcPr>'), true, false],
   ['wp:docPr id reused', edit(D, '<wp:docPr id="2" name="Picture 2"/>', '<wp:docPr id="1" name="Picture 2"/>'), true, false],
   ['wp:extent of zero', edit(D, '<wp:extent cx="508000" cy="508000"/>', '<wp:extent cx="0" cy="508000"/>'), true, false],
   ['a paragraph after the body sectPr', edit(D, '</w:sectPr></w:body>', '</w:sectPr><w:p/></w:body>'), true, true],
