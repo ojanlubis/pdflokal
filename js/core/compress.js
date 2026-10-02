@@ -36,7 +36,7 @@
  *   browser globals — this module has zero vendor imports, no ueState, and no
  *   knowledge of the DOM model. Rasterization inherently needs a canvas; that
  *   is the one platform dependency, and it prefers OffscreenCanvas so a future
- *   Web Worker (see docs/future-architecture.md) can run this off the main
+ *   Web Worker (docs/future-architecture.md, deleted; `git log -- docs/future-architecture.md`) can run this off the main
  *   thread unchanged.
  */
 
