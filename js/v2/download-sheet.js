@@ -141,6 +141,11 @@ export function createDownloadSheet(deps) {
     building: false, compressing: false, exporting: false,
     seq: 0,            // invalidates in-flight builds when selection changes
   };
+  // export_sheet_close bookkeeping. `openedAt` is also the "an open is on the
+  // books" flag: null means the close handler has nothing to report.
+  let openedAt = null;
+  let closeHow = null;   // set together with closeSnap by markClose()
+  let closeSnap = null;  // { built, waited } as of the moment the person closed it
 
   // ---- real bytes (built lazily, cached per sheet-open + page selection) ------
   function selectedPages() {
@@ -212,6 +217,16 @@ export function createDownloadSheet(deps) {
     const bytes = doc.sources[0].bytes;
     if (!bytes?.length) return null;
     return { bytes, pageNumbers: pages.map((p) => p.sourcePageNum + 1) };
+  }
+
+  // Did the big button have something to hand over RIGHT NOW? The same bytes
+  // doExport would reach for, so "built:false" means a tap at this instant would
+  // have waited. PDF: the selected size's bytes (Kompres is a SECOND build, so a
+  // sheet closed while it still runs is not built). Image: the built PDF, or the
+  // locked-PDF fallback that the image path is allowed to use instead. Pure read.
+  function ctaHasBytes() {
+    if (state.format === 'pdf') return !!(state.size === 'kompres' ? state.compressed : state.base);
+    return !!(state.base || imageFallbackSource());
   }
 
   async function buildBase() {
@@ -494,8 +509,38 @@ export function createDownloadSheet(deps) {
   });
 
   el('#ds-cta').addEventListener('click', doExport);
-  el('#ds-close').addEventListener('click', () => modal.close());
-  modal.addEventListener('click', (e) => { if (e.target === modal) modal.close(); });
+  el('#ds-close').addEventListener('click', () => { markClose('x'); modal.close(); });
+  modal.addEventListener('click', (e) => { if (e.target === modal) { markClose('backdrop'); modal.close(); } });
+
+  // ---- export_sheet_close (2026-10-02) ------------------------------------------
+  // THE ONE PLACE A CLOSE IS SEEN: the dialog's own `close` event, which fires
+  // for every way out (our close() calls, Esc, and app.js's popstate close for the
+  // Android back). Wiring the event to each close() call instead would miss
+  // exactly the ones that do not go through this file. Esc is told apart by
+  // `cancel`, which precedes `close` for the Esc key only. Anything that marked
+  // nothing is 'other' — see the schema note on why that is mostly BACK.
+  //
+  // ⚠️ `built` AND `waited_ms` ARE READ WHEN THE PERSON ACTED, not when the event
+  // lands. A dialog's `close` event is a queued task, not synchronous with
+  // close(): measured here, a build released right after the close finished
+  // BEFORE the event ran, so reading state in the listener reported built:true
+  // for a sheet that was closed with nothing ready. markClose() snapshots at the
+  // moment of the tap/keypress; only a close nothing here marked (BACK) has to
+  // be read late, which is the best that path allows.
+  function markClose(how) {
+    closeHow = how;
+    closeSnap = { built: ctaHasBytes(), waited: openedAt === null ? 0 : performance.now() - openedAt };
+  }
+  modal.addEventListener('cancel', () => markClose('escape'));
+  modal.addEventListener('close', () => {
+    if (openedAt === null) return; // not a close of an open we recorded
+    const how = closeHow || 'other';
+    const snap = closeSnap || { built: ctaHasBytes(), waited: performance.now() - openedAt };
+    openedAt = null;
+    closeHow = null;
+    closeSnap = null;
+    tel('export_sheet_close', { how, built: snap.built, waited_ms: durationBucket(snap.waited) });
+  });
 
   async function doExport() {
     if (state.exporting) return;
@@ -626,6 +671,7 @@ export function createDownloadSheet(deps) {
         size: state.size,
         pages_scope: state.picked ? 'some' : 'all',
       });
+      markClose('export'); // read by the `close` listener above
       modal.close();
     } catch (err) {
       console.error(err);
@@ -697,6 +743,9 @@ export function createDownloadSheet(deps) {
         pages: pagesBucket(deps.getDoc().pages.length),
         device: deps.deviceClass(),
       });
+      openedAt = performance.now();
+      closeHow = null;
+      closeSnap = null;
       modal.showModal();
       buildBase(); // truth on the button + pre-warmed bytes for the 90% path
       // buildBase's tail re-runs buildCompressed when size is already 'kompres'.

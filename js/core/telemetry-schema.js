@@ -434,6 +434,30 @@ export const SCHEMA = {
     pages: PAGES_BUCKET,
     pages_scope: PAGES_SCOPE,
   },
+  // THE SHEET CLOSED (2026-10-02) — the other end of `export_intent`. Opened and
+  // left was 566 of 1779 editing sessions (see export_intent) and the rail could
+  // not say whether the person gave up waiting or closed it by accident.
+  //   how:       what closed it. 'x' the close button · 'backdrop' a tap outside
+  //              · 'escape' the Esc key · 'export' it closed itself after a
+  //              download. 'other' is whatever the sheet cannot see, which is
+  //              overwhelmingly the Android hardware/gesture BACK (app.js's
+  //              wireDialogHistory closes the dialog from popstate); it is not
+  //              broken out because the sheet has no witness for it.
+  //   built:     did the big button have bytes to hand over at that instant? The
+  //              PDF path means the selected size's bytes (compressed when Kompres
+  //              is chosen), the image path means the built PDF or the locked-PDF
+  //              fallback. false + a short waited_ms is "closed before the build
+  //              could finish"; true + a short waited_ms is "looked and left".
+  //   waited_ms: how long the sheet was open, via durationBucket (10 ms steps,
+  //              capped at 10 minutes).
+  // Fires for EVERY close including 'export', so export_intent and
+  // export_sheet_close counts should match; a gap is a sheet that never closed
+  // (tab killed with it open).
+  export_sheet_close: {
+    how: ['x', 'backdrop', 'escape', 'export', 'other'],
+    built: 'bool',
+    waited_ms: 'duration',
+  },
 
   // ---- ladder (Rung A–D) — schema-complete now, call sites land on the ladder branch ----
 

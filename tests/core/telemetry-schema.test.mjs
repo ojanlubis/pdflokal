@@ -80,6 +80,7 @@ const VALID_PROPS = {
   failure_cause: { stage: 'export', name: 'TypeError', hint: 'undefined-prop' },
   // 2026-10-02, the three gaps (split/Ekstrak, the sheet's close, the +/- buttons).
   extract_export: { duration: 450, pages: '2-5', pages_scope: 'some' },
+  export_sheet_close: { how: 'x', built: false, waited_ms: 1200 },
 };
 
 test('every SCHEMA event has a VALID_PROPS fixture (test coverage stays complete as events are added)', () => {
@@ -456,5 +457,17 @@ test('extract_export is export-shaped but NOT export: it cannot be read as one',
     ['duration', 'fallback', 'format', 'pages_scope', 'size', 'surgery_used']);
 });
 
+test('export_sheet_close: every `how` validates, an unknown one does not, built is a bool', () => {
+  for (const how of ['x', 'backdrop', 'escape', 'export', 'other']) {
+    assert.equal(validateEvent('export_sheet_close', { ...VALID_PROPS.export_sheet_close, how }).ok, true, how);
+  }
+  assert.equal(validateEvent('export_sheet_close', { ...VALID_PROPS.export_sheet_close, how: 'back' }).ok, false);
+  assert.equal(validateEvent('export_sheet_close', { ...VALID_PROPS.export_sheet_close, built: 'yes' }).ok, false);
+  // waited_ms goes through durationBucket, which clamps: a sheet left open for an hour is still valid.
+  const clamped = { ...VALID_PROPS.export_sheet_close, waited_ms: durationBucket(3_600_000) };
+  assert.equal(clamped.waited_ms, 600000);
+  assert.equal(validateEvent('export_sheet_close', clamped).ok, true);
+  assert.equal(validateEvent('export_sheet_close', { ...VALID_PROPS.export_sheet_close, waited_ms: 1234 }).ok, false);
+});
 
 

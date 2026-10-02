@@ -158,6 +158,15 @@ test('DELIVERY (R4): tool_use halaman/extract and extract_export survive api/t.j
   ]);
 });
 
+test('DELIVERY (R5): export_sheet_close survives api/t.js, and an off-enum `how` is dropped, never stored', async () => {
+  await deliversIntact([{ event: 'export_sheet_close', props: { how: 'escape', built: true, waited_ms: 3200 } }]);
+  const { calls } = await run({
+    ...VALID,
+    events: [{ event: 'export_sheet_close', props: { how: 'back-button', built: true, waited_ms: 100 } }],
+  });
+  assert.equal(calls.length, 0, 'an off-schema export_sheet_close reached the database');
+});
+
 // ---------------------------------------------------------------------------
 // visitor_id (2026-09-10). Additive and DELIBERATELY not part of the
 // envelope-trust check that session_id/app_version sit behind — an invalid
