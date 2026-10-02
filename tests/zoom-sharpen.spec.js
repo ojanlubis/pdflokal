@@ -18,8 +18,8 @@
  *      renderSeq supersede FIRES: `sharpenIntent` stops a second rasterize
  *      being issued for a page that already has one in flight, so the overlap
  *      is prevented up front and the supersede is a backstop. Measured under
- *      20x CPU throttling: issued 10, applied 10, superseded 0. See the note
- *      at the assertion, and ../TODO.md for what would prove it;
+ *      20x CPU throttling: issued 10, applied 10, superseded 0. The guard is
+ *      proven in tests/core/render-seq.test.mjs; see the note at the assertion;
  *   5. once settled, AT MOST ONE page is above the baseline. This is the memory
  *      guarantee tests/mobile/bigdoc-stress.spec.js measures, restated as an
  *      invariant this file can sample. Note "settled": a focus handoff at high
