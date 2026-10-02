@@ -22,7 +22,8 @@ export async function openDoc(page, fixture = UNDANGAN) {
     window.__beacons = [];
     navigator.sendBeacon = (url, blob) => {
       Promise.resolve(blob && blob.text ? blob.text() : blob)
-        .then((txt) => { try { window.__beacons.push(JSON.parse(txt)); } catch { /* ignored */ } });
+        .then((txt) => { try { window.__beacons.push(JSON.parse(txt)); } catch { /* ignored */ } })
+        .catch(() => { /* an unreadable beacon body is not a test signal */ });
       return true;
     };
   });
