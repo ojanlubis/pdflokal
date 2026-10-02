@@ -83,6 +83,8 @@ const VALID_PROPS = {
   export_sheet_close: { how: 'x', built: false, waited_ms: 1200 },
   zoom_tap: { dir: 'out', level: '200-249', device: 'desktop' },
   merge_blocked: { reason: 'open_unrebuildable', pages: '2-5' },
+  // 2026-10-02, the feature vote (js/core/features.js): ids only, never labels.
+  feature_vote: { features: ['pdf-word', 'watermark'], has_text: true },
 };
 
 test('every SCHEMA event has a VALID_PROPS fixture (test coverage stays complete as events are added)', () => {
@@ -328,7 +330,15 @@ test('NO string-typed prop exists anywhere in SCHEMA (spec §2 law)', () => {
     for (const [prop, descriptor] of Object.entries(shape)) {
       const isEnum = Array.isArray(descriptor);
       const isTyped = descriptor === 'bool' || descriptor === 'int' || descriptor === 'duration';
-      assert.ok(isEnum || isTyped, `${event}.${prop} has a free-string type descriptor — forbidden`);
+      // A SET of enum members ({ set, max }, 2026-10-02): still no free string,
+      // because every member must be one of `set`. Held to the enum's own bar.
+      const isSet = Boolean(descriptor) && typeof descriptor === 'object' && Array.isArray(descriptor.set);
+      assert.ok(isEnum || isTyped || isSet, `${event}.${prop} has a free-string type descriptor — forbidden`);
+      if (isSet) {
+        assert.ok(descriptor.set.length > 0, `${event}.${prop} set must not be empty`);
+        assert.ok(Number.isInteger(descriptor.max) && descriptor.max > 0, `${event}.${prop} set needs a positive integer max`);
+        for (const v of descriptor.set) assert.equal(typeof v, 'string', `${event}.${prop} set members must be strings`);
+      }
       if (isEnum) {
         assert.ok(descriptor.length > 0, `${event}.${prop} enum must not be empty`);
         for (const v of descriptor) assert.equal(typeof v, 'string', `${event}.${prop} enum values must be strings`);

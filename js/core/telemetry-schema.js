@@ -16,6 +16,11 @@
  *                       already bucketed/counted upstream, never a raw
  *                       unbounded magnitude. (No v1 event uses this yet; kept
  *                       for schema completeness per spec §2's type list.)
+ *   - { set, max }   → a SET of enum members: an array of at most `max` DISTINCT
+ *                       strings, each one of `set`. Added 2026-10-02 for the
+ *                       feature vote (a person picks up to 3 of 14 ids). Still
+ *                       no free string: every member is an enum value, so the
+ *                       boundary law holds.
  *   - 'duration'     → finite integer ms, 0 <= v <= 600000, a multiple of 10.
  *                       Callers should always produce this via
  *                       durationBucket() below rather than hand-rolling a
@@ -34,6 +39,8 @@
  * verbatim existing constant, since the match step itself has no named
  * reason in the code today, only a matched:boolean.
  */
+
+import { FEATURE_IDS, MAX_VOTES } from './features.js';
 
 // ---- shared enum/bucket vocab (reused by more than one event) -----------------
 const PAGES_BUCKET = ['1', '2-5', '6-20', '21+'];
@@ -906,6 +913,18 @@ export const SCHEMA = {
     blocked: 'bool',
   },
   // spec-edit-fidelity-instrumentation.md Increment C: the visual oracle —
+  // THE FEATURE VOTE (2026-10-02, founder ruling: users vote on planned
+  // features, release order follows the vote). `features` are ids from the ONE
+  // list in core/features.js (never labels, so rewording a checkbox changes no
+  // stored data), at most MAX_VOTES, distinct. `has_text` says only THAT the
+  // person also wrote an idea; the idea itself goes through api/feedback.js,
+  // never this rail. api/votes.js counts these rows, one vote per feature per
+  // visitor (the latest vote of each visitor wins), so a re-send is harmless.
+  feature_vote: {
+    features: { set: FEATURE_IDS, max: MAX_VOTES },
+    has_text: 'bool',
+  },
+
   // core/visual-oracle.js's compareRegions() on the edited line's own region,
   // pristine (the rebake's PREVIOUS raster) vs stamped (the raster it just
   // produced). A separate event from commit_paint (not new fields riding on
@@ -936,6 +955,12 @@ export const SCHEMA = {
 
 function validateProp(descriptor, value) {
   if (Array.isArray(descriptor)) return typeof value === 'string' && descriptor.includes(value);
+  if (descriptor && typeof descriptor === 'object' && Array.isArray(descriptor.set)) {
+    return Array.isArray(value)
+      && value.length <= descriptor.max
+      && new Set(value).size === value.length
+      && value.every((v) => typeof v === 'string' && descriptor.set.includes(v));
+  }
   if (descriptor === 'bool') return typeof value === 'boolean';
   if (descriptor === 'int') return Number.isInteger(value) && value >= 0;
   if (descriptor === 'duration') {
