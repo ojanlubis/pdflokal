@@ -96,12 +96,20 @@ export function createSignatureModal({ modal, onReady, toast }) {
     // SignaturePad constructor adds its own set to the SAME canvas — without
     // off(), N modal opens = N pads all drawing every stroke N× thick.
     pad?.off();
+    pad = null;
+    delete canvas.dataset.ready;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     canvas.width = canvas.offsetWidth * dpr;
     canvas.height = canvas.offsetHeight * dpr;
     canvas.getContext('2d').scale(dpr, dpr);
     const SignaturePad = await ensureSignaturePad();
     pad = new SignaturePad(canvas, { minWidth: 1, maxWidth: 2.4 });
+    // THE SIGNAL, not a courtesy: until this line the canvas takes NO ink (the
+    // pad's pointer listeners do not exist yet), and on the first open of a page
+    // the library is a network fetch. A stroke drawn before this point is lost
+    // without a trace, then Pakai answers "draw first" and the sheet stays up.
+    // tests/signature-save.spec.js waits on it instead of racing the fetch.
+    canvas.dataset.ready = 'true';
   }
   // "Ulangi" is also how a restored signature is discarded — without dropping
   // `restored` the confirm handler would hand back the stored bytes the user

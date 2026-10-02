@@ -32,6 +32,12 @@ async function openDoc(page) {
 async function openSigSheet(page) {
   await page.click('[data-tool="signature"]');
   await expect(page.locator('#sig-modal')).toBeVisible();
+  // The dialog is visible BEFORE it can take ink: SignaturePad is fetched on the
+  // first open of a page, and strokes drawn ahead of it are dropped. Pakai then
+  // says "draw first" and #sig-modal stays up, intercepting the later page click
+  // (the CI flake of 2026-10-02, reproduced by delaying the vendor script).
+  // data-ready is set by signature-modal.js once the pad is attached.
+  await expect(page.locator('#sig-canvas')).toHaveAttribute('data-ready', 'true');
 }
 
 async function drawStroke(page) {
@@ -116,5 +122,34 @@ test.describe('signature save — opt-in, one key, unchecking deletes', () => {
     expect(anno.image).toBe(saved);
     // Unchecking + Pakai is the delete control.
     expect(await readKey(page)).toBeNull();
+  });
+});
+
+// The pad is a lazy vendor fetch on the first open of a page. This is the slow
+// case made deterministic: the sheet is up and the canvas is NOT ready, and
+// ready arrives only once the pad can take ink. Without the data-ready signal
+// this is the CI flake (sheet visible, stroke lost, "draw first", sheet stays).
+// Service workers are blocked because sw.js answers the script itself and
+// page.route() never sees a worker-served request.
+test.describe('signature pad readiness under a slow vendor fetch', () => {
+  test.use({ serviceWorkers: 'block' });
+
+  test('canvas is not ready while SignaturePad loads, and ink drawn once ready is kept', async ({ page }) => {
+    await page.route('**/signature_pad.umd.min.js', async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      await route.continue();
+    });
+    await page.goto('/');
+    await page.setInputFiles('#file-input', FIXTURE);
+    await expectFirstPage(page);
+    await page.click('[data-tool="signature"]');
+    await expect(page.locator('#sig-modal')).toBeVisible();
+    // Visible, yet inert: the 600ms fetch is still in flight.
+    await expect(page.locator('#sig-canvas')).not.toHaveAttribute('data-ready', 'true');
+    await expect(page.locator('#sig-canvas')).toHaveAttribute('data-ready', 'true');
+    await drawStroke(page);
+    await page.click('#sig-use');
+    await expect(page.locator('#sig-modal')).toBeHidden();
+    await placeAndRead(page);
   });
 });
