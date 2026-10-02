@@ -181,18 +181,71 @@ registerBlock('p', (b, w, sect) => paraXml(b, sect), { carriesSect: true });
 registerBlock('img', imgXml, { carriesSect: true });
 registerAnchor('img', imgXml);
 
-export function buildDocx(doc, deps) {
-  const { fflate } = deps;
-  const media = []; // { name, bytes, rid }
-  const mediaByBytes = new Map();
+// ------------------------------------------------------- the streaming writer ----
+// ONE writer for both entry points. buildDocx(doc) feeds a whole model through it
+// and joins the chunks; createDocxStream() is what the browser shell uses so the
+// document model never has to exist as a whole:
+//
+//   const s = createDocxStream({ fflate, onChunk(bytes, final) {...}, title? });
+//   for each page: s.addPage(page)   // serialised NOW; the Page object can be dropped
+//   s.finish();                      // writes the rest; the last onChunk has final = true
+//
+// WHAT IS HELD while streaming, and why (MEASURED numbers are in the shell lane's
+// report; the shapes here are what makes them true):
+//   - media: each distinct picture is written to the zip as soon as it is first
+//     seen and then forgotten (dedup is a WeakMap on the byte array's identity, so
+//     it does not keep the bytes alive). Until `spoolBytes` of media have piled up
+//     they are held back instead, so a small document gets the canonical layout
+//     ([Content_Types].xml first, media last). A big one spills early and carries
+//     its media first: OPC does not require an order, only streamers like it.
+//   - document.xml: held as UTF-8 per page and deflated at the end, because its
+//     root element must declare every namespace a LATER page may turn out to need
+//     (w.useNamespace is lazy, see model.js). The last page is kept as a string
+//     until finish(): the body-level <w:sectPr> replaces its final paragraph's.
+//     Measured on the corpus this is ~20-50 KB of XML per page.
+//   - nothing else. In particular `w.doc.pages` is EMPTY in a stream (buildDocx
+//     passes the whole model, so a registered part must not rely on it): a part
+//     keeps what it needs in `w.ext` while the pages go by.
+const ZIP_MTIME = Date.UTC(1980, 0, 2); // fixed, so equal input gives equal bytes
+
+export function createDocxStream(deps) {
+  const { fflate, onChunk } = deps;
+  const spoolBytes = deps.spoolBytes === undefined ? 16 * 1024 * 1024 : deps.spoolBytes;
+  const enc = fflate.strToU8;
+  const media = []; // { name, rid } (no bytes: the zip owns them)
+  const mediaByBytes = new WeakMap();
   const rels = []; // { id, type, target } beyond styles/numbering/media
   let docPrId = 1;
   const extraNs = new Map();
+  const doc = deps.doc || { title: deps.title, pages: [] };
+  const stats = { pages: 0, mediaCount: 0, mediaBytes: 0, docXmlBytes: 0, spilled: false, outBytes: 0 };
+
+  const zip = new fflate.Zip((err, chunk, final) => {
+    if (err) throw err;
+    stats.outBytes += chunk.length;
+    onChunk(chunk, !!final);
+  });
+  const put = (name, bytes, level) => {
+    const f = level === 0 ? new fflate.ZipPassThrough(name) : new fflate.ZipDeflate(name, { level });
+    f.mtime = ZIP_MTIME;
+    zip.add(f);
+    f.push(bytes, true);
+  };
+
+  let pendingMedia = []; // [name, bytes] held back until spill
+  let pendingBytes = 0;
+  const spill = () => {
+    stats.spilled = true;
+    for (const [name, bytes] of pendingMedia) put(`word/media/${name}`, bytes, 0);
+    pendingMedia = [];
+    pendingBytes = 0;
+  };
 
   const w = {
     fflate,
     doc,
     ext: {},
+    streaming: true,
     esc: xmlText,
     attr: xmlAttr,
     twip,
@@ -208,9 +261,17 @@ export function buildDocx(doc, deps) {
       if (!m) {
         const n = media.length + 1;
         const ext = MEDIA_EXT[extIn] || (extraMediaTypes.has(extIn) ? extIn : 'png');
-        m = { name: `image${n}.${ext}`, bytes, rid: `rIdImg${n}` };
+        m = { name: `image${n}.${ext}`, rid: `rIdImg${n}` };
         media.push(m);
         mediaByBytes.set(bytes, m);
+        stats.mediaCount += 1;
+        stats.mediaBytes += bytes.length;
+        if (stats.spilled) put(`word/media/${m.name}`, bytes, 0);
+        else {
+          pendingMedia.push([m.name, bytes]);
+          pendingBytes += bytes.length;
+          if (pendingBytes > spoolBytes) spill();
+        }
       }
       return m;
     },
@@ -227,11 +288,15 @@ export function buildDocx(doc, deps) {
     return bw.fn(b, w, sect);
   };
 
-  let body = '';
   const fallbackSeg = { cols: 1, space: 0, marginPt: { top: 56, right: 56, bottom: 56, left: 56 }, blocks: [] };
-  const pages = doc.pages.length ? doc.pages : [{ widthPt: 595, heightPt: 842, segments: [fallbackSeg], anchors: [] }];
-  let lastSect = '';
-  pages.forEach((page, pi) => {
+  const fallbackPage = { widthPt: 595, heightPt: 842, segments: [fallbackSeg], anchors: [] };
+  const docParts = []; // UTF-8 of every page but the pending one
+  let pending = null; // { xml, lastSect } of the page most recently added
+  let pageIndex = 0;
+
+  function pageXml(page, pi) {
+    let body = '';
+    let lastSect = '';
     const segments = page.segments && page.segments.length ? page.segments : [fallbackSeg];
     // Absolute (page-anchored) objects ride in the page's first paragraph, so
     // they cost no vertical space.
@@ -259,80 +324,125 @@ export function buildDocx(doc, deps) {
         body += blockXml(b, k === blocks.length - 1 ? sect : '');
       });
     });
-  });
-  // The last section's properties must be the body's own sectPr, not a
-  // paragraph's: swap the final paragraph-level one for a body-level one.
-  const at = body.lastIndexOf(lastSect);
-  body = body.slice(0, at) + body.slice(at + lastSect.length);
-  body = body.replace(/<w:pPr><\/w:pPr>/g, '');
-  const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document ${NS}${[...extraNs].map(([p, u]) => ` xmlns:${p}="${u}"`).join('')}><w:body>${body}${lastSect}</w:body></w:document>`;
-
-  const stylesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles ${NS}>`
-    + '<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:eastAsia="Arial" w:cs="Arial"/><w:sz w:val="22"/><w:szCs w:val="22"/><w:lang w:val="id-ID"/></w:rPr></w:rPrDefault>'
-    + '<w:pPrDefault><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>'
-    + '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style>'
-    + `${extraStyles.join('')}</w:styles>`;
-
-  // abstractNum elements must all precede the num elements (schema order).
-  const numberingXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:numbering ${NS}>`
-    + '<w:abstractNum w:abstractNumId="0"><w:multiLevelType w:val="singleLevel"/><w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="bullet"/><w:lvlText w:val="&#8226;"/><w:lvlJc w:val="left"/>'
-    + '<w:pPr><w:ind w:left="360" w:hanging="360"/></w:pPr><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/></w:rPr></w:lvl></w:abstractNum>'
-    + `${extraNumbering.map((n) => n.abstractNum).join('')}`
-    + '<w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num>'
-    + `${extraNumbering.map((n) => n.num).join('')}</w:numbering>`;
-
-  // Extra parts last: they may read state the body pass left in w.ext.
-  const parts = [];
-  for (const p of extraParts) {
-    const content = p.build(w);
-    if (content === null || content === undefined) continue;
-    const entry = { path: p.path, contentType: p.contentType, content, rel: p.rel };
-    if (p.rel) entry.rid = p.rel.root ? `rIdP${parts.length + 3}` : w.addRel(p.rel.type, p.path.replace(/^word\//, ''));
-    parts.push(entry);
+    return { xml: body, lastSect };
   }
 
-  const types = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
-    + '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
-    + '<Default Extension="xml" ContentType="application/xml"/>'
-    + '<Default Extension="png" ContentType="image/png"/><Default Extension="jpeg" ContentType="image/jpeg"/>'
-    + [...extraMediaTypes].map(([e, t]) => `<Default Extension="${e}" ContentType="${t}"/>`).join('')
-    + '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
-    + '<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>'
-    + '<Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/>'
-    + '<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>'
-    + parts.map((p) => `<Override PartName="/${p.path}" ContentType="${p.contentType}"/>`).join('')
-    + '</Types>';
-
-  const rootRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
-    + '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>'
-    + '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>'
-    + parts.filter((p) => p.rel && p.rel.root).map((p) => `<Relationship Id="${p.rid}" Type="${p.rel.type}" Target="${p.path}"/>`).join('')
-    + '</Relationships>';
-
-  const docRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
-    + '<Relationship Id="rIdSt" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'
-    + '<Relationship Id="rIdNum" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>'
-    + media.map((m) => `<Relationship Id="${m.rid}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${m.name}"/>`).join('')
-    + rels.map((r) => `<Relationship Id="${r.id}" Type="${r.type}" Target="${r.target}"/>`).join('')
-    + '</Relationships>';
-
-  const core = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" '
-    + 'xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">'
-    + `<dc:title>${xmlText(doc.title || '')}</dc:title><dc:creator>PDFLokal</dc:creator></cp:coreProperties>`;
-
-  const enc = fflate.strToU8;
-  // [Content_Types].xml first, as Word expects. Media are already compressed
-  // (PNG/JPEG): store them (level 0) and deflate the XML.
-  const files = {
-    '[Content_Types].xml': [enc(types), { level: 6 }],
-    '_rels/.rels': [enc(rootRels), { level: 6 }],
-    'word/document.xml': [enc(documentXml), { level: 6 }],
-    'word/_rels/document.xml.rels': [enc(docRels), { level: 6 }],
-    'word/styles.xml': [enc(stylesXml), { level: 6 }],
-    'word/numbering.xml': [enc(numberingXml), { level: 6 }],
-    'docProps/core.xml': [enc(core), { level: 6 }],
+  const EMPTY_PPR = /<w:pPr><\/w:pPr>/g;
+  const flushPending = () => {
+    if (!pending) return;
+    const bytes = enc(pending.xml.replace(EMPTY_PPR, ''));
+    stats.docXmlBytes += bytes.length;
+    docParts.push(bytes);
+    pending = null;
   };
-  for (const p of parts) files[p.path] = [typeof p.content === 'string' ? enc(p.content) : p.content, { level: 6 }];
-  for (const m of media) files[`word/media/${m.name}`] = [m.bytes, { level: 0 }];
-  return fflate.zipSync(files);
+
+  return {
+    stats,
+    addPage(page) {
+      const made = pageXml(page, pageIndex);
+      pageIndex += 1;
+      stats.pages = pageIndex;
+      flushPending();
+      pending = made;
+    },
+    finish() {
+      if (!pageIndex) this.addPage(fallbackPage);
+      // The last section's properties must be the body's own sectPr, not a
+      // paragraph's: swap the final paragraph-level one for a body-level one.
+      const { xml, lastSect } = pending;
+      const at = xml.lastIndexOf(lastSect);
+      pending.xml = xml.slice(0, at) + xml.slice(at + lastSect.length);
+      flushPending();
+      const head = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document ${NS}${[...extraNs].map(([p, u]) => ` xmlns:${p}="${u}"`).join('')}><w:body>`;
+      const tail = `${lastSect}</w:body></w:document>`;
+
+      const stylesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles ${NS}>`
+        + '<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:eastAsia="Arial" w:cs="Arial"/><w:sz w:val="22"/><w:szCs w:val="22"/><w:lang w:val="id-ID"/></w:rPr></w:rPrDefault>'
+        + '<w:pPrDefault><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>'
+        + '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style>'
+        + `${extraStyles.join('')}</w:styles>`;
+
+      // abstractNum elements must all precede the num elements (schema order).
+      const numberingXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:numbering ${NS}>`
+        + '<w:abstractNum w:abstractNumId="0"><w:multiLevelType w:val="singleLevel"/><w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="bullet"/><w:lvlText w:val="&#8226;"/><w:lvlJc w:val="left"/>'
+        + '<w:pPr><w:ind w:left="360" w:hanging="360"/></w:pPr><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/></w:rPr></w:lvl></w:abstractNum>'
+        + `${extraNumbering.map((n) => n.abstractNum).join('')}`
+        + '<w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num>'
+        + `${extraNumbering.map((n) => n.num).join('')}</w:numbering>`;
+
+      // Extra parts last: they may read state the body pass left in w.ext.
+      const parts = [];
+      for (const p of extraParts) {
+        const content = p.build(w);
+        if (content === null || content === undefined) continue;
+        const entry = { path: p.path, contentType: p.contentType, content, rel: p.rel };
+        if (p.rel) entry.rid = p.rel.root ? `rIdP${parts.length + 3}` : w.addRel(p.rel.type, p.path.replace(/^word\//, ''));
+        parts.push(entry);
+      }
+
+      const types = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        + '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+        + '<Default Extension="xml" ContentType="application/xml"/>'
+        + '<Default Extension="png" ContentType="image/png"/><Default Extension="jpeg" ContentType="image/jpeg"/>'
+        + [...extraMediaTypes].map(([e, t]) => `<Default Extension="${e}" ContentType="${t}"/>`).join('')
+        + '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+        + '<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>'
+        + '<Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/>'
+        + '<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>'
+        + parts.map((p) => `<Override PartName="/${p.path}" ContentType="${p.contentType}"/>`).join('')
+        + '</Types>';
+
+      const rootRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        + '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>'
+        + '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>'
+        + parts.filter((p) => p.rel && p.rel.root).map((p) => `<Relationship Id="${p.rid}" Type="${p.rel.type}" Target="${p.path}"/>`).join('')
+        + '</Relationships>';
+
+      const docRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        + '<Relationship Id="rIdSt" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'
+        + '<Relationship Id="rIdNum" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>'
+        + media.map((m) => `<Relationship Id="${m.rid}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${m.name}"/>`).join('')
+        + rels.map((r) => `<Relationship Id="${r.id}" Type="${r.type}" Target="${r.target}"/>`).join('')
+        + '</Relationships>';
+
+      const core = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" '
+        + 'xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">'
+        + `<dc:title>${xmlText(doc.title || '')}</dc:title><dc:creator>PDFLokal</dc:creator></cp:coreProperties>`;
+
+      // [Content_Types].xml first, as Word expects (unless media already spilled
+      // out ahead of it, see the header). XML is deflated; media are already
+      // compressed (PNG/JPEG) and were stored (level 0).
+      put('[Content_Types].xml', enc(types), 6);
+      put('_rels/.rels', enc(rootRels), 6);
+      const dx = new fflate.ZipDeflate('word/document.xml', { level: 6 });
+      dx.mtime = ZIP_MTIME;
+      zip.add(dx);
+      dx.push(enc(head), false);
+      stats.docXmlBytes += head.length + tail.length;
+      for (const piece of docParts) dx.push(piece, false);
+      docParts.length = 0;
+      dx.push(enc(tail), true);
+      put('word/_rels/document.xml.rels', enc(docRels), 6);
+      put('word/styles.xml', enc(stylesXml), 6);
+      put('word/numbering.xml', enc(numberingXml), 6);
+      put('docProps/core.xml', enc(core), 6);
+      for (const p of parts) put(p.path, typeof p.content === 'string' ? enc(p.content) : p.content, 6);
+      for (const [name, bytes] of pendingMedia) put(`word/media/${name}`, bytes, 0);
+      pendingMedia = [];
+      zip.end();
+    },
+  };
+}
+
+export function buildDocx(doc, deps) {
+  const chunks = [];
+  const s = createDocxStream({ fflate: deps.fflate, doc, spoolBytes: Infinity, onChunk: (c) => { chunks.push(c); } });
+  for (const page of doc.pages) s.addPage(page);
+  s.finish();
+  let total = 0;
+  for (const c of chunks) total += c.length;
+  const out = new Uint8Array(total);
+  let at = 0;
+  for (const c of chunks) { out.set(c, at); at += c.length; }
+  return out;
 }
