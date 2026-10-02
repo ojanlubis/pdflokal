@@ -147,6 +147,18 @@ const MEDIA_EXT = { png: 'png', jpeg: 'jpeg', jpg: 'jpeg' };
 // ------------------------------------------------------ the built-in 'img' ----
 // Anchored (b.anchor): a <w:r> absolute on the page, behind the text. Block-level:
 // a <w:p> with an inline picture.
+// A crop (fractions of the SOURCE removed on each side) as the fill rectangle of a picture-filled shape: the whole picture
+// is stretched over a rectangle that reaches past the shape by the cropped part, and the shape clips it. LibreOffice
+// ignores a:srcRect in a shape's picture fill but honours a negative fillRect (MEASURED 26.2); Word reads it as the
+// picture fill's offsets.
+function fillRectOf(crop) {
+  if (!crop) return '<a:fillRect/>';
+  const vw = 1 - crop.l - crop.r; const vh = 1 - crop.t - crop.b;
+  if (!(vw > 0.001 && vh > 0.001)) return '<a:fillRect/>';
+  const f = (v, d) => Math.round(-(v / d) * 100000);
+  return `<a:fillRect l="${f(crop.l, vw)}" t="${f(crop.t, vh)}" r="${f(crop.r, vw)}" b="${f(crop.b, vh)}"/>`;
+}
+
 function imgXml(b, w, sect) {
   const m = w.addMedia(b.bytes, b.ext);
   const cx = emu(b.wPt);
@@ -158,6 +170,24 @@ function imgXml(b, w, sect) {
     + `<pic:blipFill><a:blip r:embed="${m.rid}"/>${crop}<a:stretch><a:fillRect/></a:stretch></pic:blipFill>`
     + `<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>`
     + '</pic:pic></a:graphicData></a:graphic>';
+  if (b.anchor && b.asShape) {
+    // The same picture as a picture-FILLED SHAPE. LibreOffice (MEASURED 2026-10-02, 26.2) draws every behind-text
+    // picture above every behind-text shape whatever their relativeHeight, so a callout box drawn after a screenshot
+    // vanished behind it (n016); shapes stack among themselves exactly as relativeHeight says, and so does a picture
+    // that is a shape. convert.js sets asShape only on a picture that a LATER shape overlaps. Word draws the two
+    // kinds by relativeHeight alone (INFERRED, no Word here), so there it is the same picture either way.
+    w.useNamespace('wps', 'http://schemas.microsoft.com/office/word/2010/wordprocessingShape');
+    return `<w:r><w:drawing><wp:anchor distT="0" distB="0" distL="0" distR="0" simplePos="0" relativeHeight="${251658240 + id}" behindDoc="1" locked="0" layoutInCell="1" allowOverlap="1">`
+      + '<wp:simplePos x="0" y="0"/>'
+      + `<wp:positionH relativeFrom="page"><wp:posOffset>${emu(b.anchor.x)}</wp:posOffset></wp:positionH>`
+      + `<wp:positionV relativeFrom="page"><wp:posOffset>${emu(b.anchor.y)}</wp:posOffset></wp:positionV>`
+      + `<wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:wrapNone/>`
+      + `<wp:docPr id="${id}" name="Picture ${id}"/><wp:cNvGraphicFramePr/>`
+      + '<a:graphic><a:graphicData uri="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"><wps:wsp><wps:cNvSpPr/>'
+      + `<wps:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom>`
+      + `<a:blipFill><a:blip r:embed="${m.rid}"/><a:stretch>${fillRectOf(b.crop)}</a:stretch></a:blipFill><a:ln><a:noFill/></a:ln></wps:spPr>`
+      + '<wps:bodyPr/></wps:wsp></a:graphicData></a:graphic></wp:anchor></w:drawing></w:r>';
+  }
   if (b.anchor) {
     // Absolute on the page, behind the text.
     // Stacking: ids rise in document order and anchors are written in paint (z) order, so 251658240 + id

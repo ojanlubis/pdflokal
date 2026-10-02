@@ -219,7 +219,7 @@ export function parseDocxXml(xml, mediaFiles) {
     bold,
     italic,
     drawings: (xml.match(/<w:drawing>/g) || []).length,
-    shapes: (xml.match(/<wps:wsp[ >]/g) || []).length,
+    shapes: (xml.match(/<wps:wsp[ >]/g) || []).length - (xml.match(/<wps:wsp>(?:(?!<\/wps:wsp>)[\s\S])*?<a:blipFill>/g) || []).length, // a picture written as a picture-filled shape (writer.js asShape) is a picture
     mediaFiles,
     tables: (xml.match(/<w:tbl>/g) || []).length,
     sections: (xml.match(/<w:sectPr[ >]/g) || []).length,

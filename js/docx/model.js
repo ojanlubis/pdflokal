@@ -27,7 +27,8 @@
  *   Img     = { kind:'img', bytes: Uint8Array, ext:'png'|'jpeg', wPt, hPt,
  *               align?, indentLeft?, spaceBefore?,
  *               anchor?: {x,y} (page pt: absolute, behind the text; use in Page.anchors),
- *               crop?: {l,t,r,b} (fractions 0..1 of the source), z? }
+ *               crop?: {l,t,r,b} (fractions 0..1 of the source), z?,
+ *               asShape? (anchored only: written as a picture-filled shape, set by convert.js when a later shape overlaps it; see writer.js) }
  *   Table   = { kind:'tbl', colsPt: number[], rows: Cell[][], border?: boolean, spaceBefore?,
  *               indentLeft? (pt), rowsH?: number[] (pt, one per row, written "at least"),
  *               src?: 'ruled'|'rules-h'|'text' (how tables.js found it; informational, never written) }
