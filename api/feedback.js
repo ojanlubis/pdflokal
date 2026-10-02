@@ -36,6 +36,7 @@
 export const config = { runtime: 'nodejs', api: { bodyParser: false } };
 
 import { tursoInsert } from './_turso.js';
+import { cleanVote, requestNote, IDEA_MAX } from '../js/core/features.js';
 
 // ⚠️ TEST SEAM — same one api/t.js carries. Tests assert on the SQL and its
 // plain values (ours) and return { rowCount } or throw.
@@ -160,7 +161,15 @@ export default async function handler(req, res) {
 
     const sessionId = body?.session_id;
     const appVersion = body?.app_version;
-    const rating = body?.rating;
+
+    // THE FEATURE VOTE'S FREE-TEXT IDEA (2026-10-02, js/core/features.js). Same
+    // table, same free field, same path as a thumbs note: this is not a second
+    // sink. `kind` is the only new input. It has no rating of its own, and the
+    // table's `rating` column is an up|down check, so it is stored as 'up' with
+    // the kind carried in the note (features.js says why, and the watch reads it
+    // back out). Never a sample or a screenshot: neither belongs to this path.
+    const isRequest = body?.kind === 'feature_request';
+    const rating = isRequest ? 'up' : body?.rating;
 
     // session_id must be a real UUID, app_version the expected shape, rating
     // exactly 'up'|'down' — any failing means we can't trust the payload, so
@@ -179,15 +188,27 @@ export default async function handler(req, res) {
     // user typed into the feedback box), and never rendered back anywhere.
     let note = null;
     if (typeof body?.note === 'string') {
-      const t = body.note.trim().slice(0, NOTE_MAX);
+      const t = body.note.trim().slice(0, isRequest ? IDEA_MAX : NOTE_MAX);
       if (t) note = t;
+    }
+
+    if (isRequest) {
+      // An idea is its text. No text, or voted ids that are not on the list (or
+      // more than three), is not an idea we can file: dropped whole, never
+      // repaired, the same rule the rail's feature_vote follows.
+      const vote = cleanVote(body?.features ?? []);
+      if (!note || !vote.ok) {
+        res.status(204).end();
+        return;
+      }
+      note = requestNote(vote.ids, note);
     }
 
     // Increment D: the opt-in before/after crop pair. validateSample() drops
     // the WHOLE sample (never a partial one) on anything off — the rating+
     // note above are already extracted and land regardless.
-    const sample = validateSample(body);
-    const shot = validateShot(body);
+    const sample = isRequest ? null : validateSample(body);
+    const shot = isRequest ? null : validateShot(body);
 
     // THE CLIENT'S OWN ANSWER WINS — mirroring api/t.js's 2026-07-29 reversal,
     // which this file missed until the 2026-08-09 audit (finding 4). The same

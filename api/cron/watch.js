@@ -22,6 +22,7 @@
  */
 import { cronAuthorized } from '../_cron.js';
 import { tursoQuery, tursoWrite, arg } from '../_turso.js';
+import { NOT_FEATURE_REQUEST_SQL, IS_FEATURE_REQUEST_SQL } from '../../js/core/features.js';
 import { BASELINE_DAYS, floorFromDays, evaluateAlarms, emailDecision, composeEmail, jakartaDay, jakartaMidnight } from '../_watch.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -85,13 +86,22 @@ export async function measure(now = new Date()) {
     rejects = Object.fromEntries(rr.map(([reason, n]) => [reason, Number(n)]));
   } catch { rejects = null; }
 
+  // THE FEATURE VOTE'S IDEAS ARE NOT THUMBS (2026-10-02). They share the
+  // `feedback` table and are stored as rating 'up' with a `[fitur:...]` note
+  // prefix (js/core/features.js), so every read of what people SAID ABOUT THE
+  // PRODUCT leaves them out: otherwise A4 would email him once per request and
+  // A5's thumbs-up denominator would fill with votes nobody gave. They are
+  // counted on their own below, as a number in the row, and never emailed.
   const fb = feedback();
   const notes = await one(fb,
-    `select ts, rating, note from feedback where note is not null and ts > ? order by ts desc`,
+    `select ts, rating, note from feedback where note is not null and ${NOT_FEATURE_REQUEST_SQL} and ts > ? order by ts desc`,
     [ago(now, DAY_MS)]);
   const [[a5total, a5down]] = await one(fb,
-    `select count(*), coalesce(sum(rating = 'down'),0) from feedback where ts > ?`,
+    `select count(*), coalesce(sum(rating = 'down'),0) from feedback where ${NOT_FEATURE_REQUEST_SQL} and ts > ?`,
     [ago(now, 7 * DAY_MS)]);
+  const [[featureRequests]] = await one(fb,
+    `select count(*) from feedback where ${IS_FEATURE_REQUEST_SQL} and ts > ?`,
+    [ago(now, DAY_MS)]);
 
   return {
     floor,
@@ -103,6 +113,7 @@ export async function measure(now = new Date()) {
     a5: { total: Number(a5total), down: Number(a5down) },
     a6: Number(a6),
     rejects,
+    feature_requests: Number(featureRequests),
     notes,
   };
 }
