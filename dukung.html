@@ -24,6 +24,14 @@
 
   <title>Dukung PDFLokal - Bantu Saya Tetap Gratis</title>
   <meta name="description" content="PDFLokal dibuat sendirian oleh Ojan (Fauzan Ahladzikri). Gratis, tanpa iklan. Kalau kepakai, boleh traktir kopi lewat QRIS.">
+  <link rel="canonical" href="https://www.pdflokal.id/dukung">
+  <!-- hreflang: this page and its English twin (/en/support, generated from this
+       file by scripts/gen-en-support.js), reciprocal by being the same three links
+       on both. x-default is the English twin, as on `/` and `/en`. -->
+  <link rel="alternate" hreflang="id" href="https://www.pdflokal.id/dukung">
+  <link rel="alternate" hreflang="en" href="https://www.pdflokal.id/en/support">
+  <link rel="alternate" hreflang="x-default" href="https://www.pdflokal.id/en/support">
+  <meta property="og:locale" content="id_ID">
 
   <!-- Fonts (self-hosted in css/page-base.css via @font-face) -->
 
@@ -435,6 +443,14 @@
       .qr-card { max-width: 288px; }
       .qr-image { max-width: 208px; }
     }
+
+    /* ---- LANGUAGE LINK (the control is real now; chrome.css still draws the
+       old placeholder, which privasi.html uses). index.html's own rules, local
+       here so privasi's placeholder is untouched: the current language is
+       weight, not colour (red means touchable), and the other is a link. ---- */
+    .ld-lang-opt.is-active { color: var(--ink); cursor: default; }
+    a.ld-lang-opt { text-decoration: none; }
+    .ld-burger-lang-opts a.ld-lang-opt { font-size: var(--fs-n1); }
   </style>
 </head>
 <body>
@@ -475,9 +491,11 @@
       <!-- Mobile only — desktop hides this in favour of .ld-nav's Privasi link. -->
       <a href="/privasi" class="ld-hd-privasi-mobile">Privasi</a>
 
-      <!-- Language control — PLACEHOLDER. Desktop only; mobile's equivalent
-           lives inside the burger drawer. Indonesia selected, English
-           disabled ("segera") and inert on purpose. -->
+      <!-- Language control. Desktop only; mobile's equivalent lives inside the
+           burger drawer. Same markup as index.html's: the current language is
+           weight, the other is a real link to this page's twin (/en/support).
+           scripts/gen-en-support.js swaps which option is the link on the
+           English page. -->
       <details class="ld-lang">
         <summary class="ld-lang-btn" aria-label="Pilih bahasa">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
@@ -485,8 +503,8 @@
           <svg class="ld-lang-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
         </summary>
         <div class="ld-lang-menu">
-          <button type="button" class="ld-lang-opt is-active">Indonesia</button>
-          <button type="button" class="ld-lang-opt" disabled aria-disabled="true">English <span class="ld-lang-soon">segera</span></button>
+          <span class="ld-lang-opt is-active" aria-current="true" lang="id">Indonesia</span>
+          <a class="ld-lang-opt" href="/en/support" hreflang="en" lang="en">English</a>
         </div>
       </details>
     </div>
@@ -505,8 +523,8 @@
       <div class="ld-burger-lang">
         <span class="ld-burger-lang-label">Bahasa</span>
         <div class="ld-burger-lang-opts">
-          <span class="ld-lang-opt is-active">Indonesia</span>
-          <span class="ld-lang-opt" aria-disabled="true">English <span class="ld-lang-soon">segera</span></span>
+          <span class="ld-lang-opt is-active" aria-current="true" lang="id">Indonesia</span>
+          <a class="ld-lang-opt" href="/en/support" hreflang="en" lang="en">English</a>
         </div>
       </div>
     </div>
@@ -541,7 +559,7 @@
             <div class="performer-id">
               <div class="performer-kepala">
                 <span class="performer-topi" aria-hidden="true">🎩</span>
-                <img src="images/ojan.jpg" alt="Foto Fauzan Ahladzikri (Ojan)" class="performer-face" width="72" height="72">
+                <img src="/images/ojan.jpg" alt="Foto Fauzan Ahladzikri (Ojan)" class="performer-face" width="72" height="72">
               </div>
               <div>
                 <div class="performer-name">Ojan</div>
@@ -562,8 +580,8 @@
           <h2>Traktir Kopi</h2>
 
           <div class="qr-card">
-            <img src="images/qris-mark.svg" alt="QRIS" class="qris-logo" width="88" height="33">
-            <img src="images/qris.png" alt="QRIS - Scan untuk traktir kopi" class="qr-image" width="645" height="649">
+            <img src="/images/qris-mark.svg" alt="QRIS" class="qris-logo" width="88" height="33">
+            <img src="/images/qris.png" alt="QRIS - Scan untuk traktir kopi" class="qr-image" width="645" height="649">
             <p class="qr-caption">Scan pakai aplikasi e-wallet atau mobile banking kamu</p>
             <!-- His ask, 2026-09-06: a phone can screenshot, "tp boleh juga
                  tambahin 'download QR'". A download attribute on the real
@@ -1238,7 +1256,7 @@
   </script>
 
   <!-- Theme management -->
-  <script type="module" src="js/theme.js"></script>
+  <script type="module" src="/js/theme.js"></script>
   <script type="module" src="/js/chrome-nav.js"></script>
 
 </body>

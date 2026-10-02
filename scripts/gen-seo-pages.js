@@ -43,6 +43,7 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname } from 'node:path';
 import { renderEnPage, EN_PATH, EN_FILE } from './gen-en-page.js';
+import { renderEnSupport, SUPPORT_EN_PATH, SUPPORT_EN_FILE, SUPPORT_ID_PATH } from './gen-en-support.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -442,14 +443,29 @@ for (const page of data.pages) {
   if (!CHECK) console.log(`  ✓ ${EN_FILE}  (${Object.keys(map).length} strings from i18n/markup.en.json)`);
 }
 
+// ---- the English support page (/en/support) ---------------------------------
+// Generated from dukung.html + i18n/markup.en.support.json (scripts/gen-en-support.js).
+// ORDER MATTERS for the work log inside it: `npm run riwayat` rewrites the log in
+// dukung.html, then `npm run seo` carries it here. Run the other way round and
+// --check goes red, which is the point.
+{
+  const map = JSON.parse(readFileSync(join(ROOT, 'i18n/markup.en.support.json'), 'utf8'));
+  const dukung = readFileSync(join(ROOT, 'dukung.html'), 'utf8');
+  emit(SUPPORT_EN_FILE, renderEnSupport(dukung, map, { origin }));
+  if (!CHECK) console.log(`  ✓ ${SUPPORT_EN_FILE}  (${Object.keys(map).length} strings from i18n/markup.en.support.json)`);
+}
+
 // ---- sitemap ---------------------------------------------------------------
 // alat-gambar.html and lab.html are absent on purpose: both are noindex.
 const urls = [
   { loc: `${origin}/`, priority: '1.0', changefreq: 'weekly' },
   { loc: `${origin}${EN_PATH}`, priority: '0.8', changefreq: 'monthly' },
   ...data.pages.map((p) => ({ loc: `${origin}/${p.slug}`, priority: '0.9', changefreq: 'monthly' })),
-  { loc: `${origin}/privasi.html`, priority: '0.3', changefreq: 'yearly' },
-  { loc: `${origin}/dukung.html`, priority: '0.3', changefreq: 'yearly' },
+  { loc: `${origin}/privasi`, priority: '0.3', changefreq: 'yearly' },
+  // Clean URLs only: `/dukung.html` answers 308 -> `/dukung` (vercel.json cleanUrls), and a
+  // sitemap entry that redirects is a defect. /en/support is its English twin.
+  { loc: `${origin}${SUPPORT_ID_PATH}`, priority: '0.3', changefreq: 'yearly' },
+  { loc: `${origin}${SUPPORT_EN_PATH}`, priority: '0.3', changefreq: 'yearly' },
 ];
 
 const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
