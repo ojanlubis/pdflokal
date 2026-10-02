@@ -72,15 +72,17 @@ export async function pdfToDocModel({ pdfjs, fflate, data, onProgress, onPage, o
     layout: (modules && modules.layout) || layoutMod,
   };
   checkAbort(signal);
-  const pdf = await pdfjs.getDocument({ data: new Uint8Array(data), disableFontFace: true, isEvalSupported: false, verbosity: 0, fontExtraProperties: true }).promise;
+  // A canvas kit (options.canvasKit, see canvaskit.js) brings its own pdf.js canvas factory: in node pdf.js has none.
+  const kitFactory = options && options.canvasKit && options.canvasKit.canvasFactory;
+  const pdf = await pdfjs.getDocument({ data: new Uint8Array(data), disableFontFace: true, isEvalSupported: false, verbosity: 0, fontExtraProperties: true, ...(kitFactory ? { canvasFactory: kitFactory } : {}) }).promise;
   try {
-    const shared = { fflate, imageCache: imageCache || new Map() };
+    const shared = { fflate, imageCache: imageCache || new Map(), pdf }; // pdf: the document handle images.js needs to paint through pdf.js
     const pages = [];
     const emit = async (pg, i) => { if (onPage) await onPage(pg, i); else pages.push(pg); };
     const stats = {
       pages: pdf.numPages,
       pageKinds: { text: 0, 'searchable-scan': 0, 'ocr-scan': 0, scan: 0, empty: 0 },
-      ocrMs: 0, imageMasksSkipped: 0, imagesFailed: 0, anchored: 0, droppedBackground: 0, errors: [], lines: 0, columnBands: 0, tables: 0, shapes: 0,
+      ocrMs: 0, imageMasksSkipped: 0, imagesFailed: 0, imagesPlain: 0, imagesPainted: 0, imagesPaintFailed: 0, imageMaskSources: 0, anchored: 0, droppedBackground: 0, errors: [], lines: 0, columnBands: 0, tables: 0, shapes: 0,
     };
     const opened = onOpen ? await onOpen(pdf) : null;
     const cap = Math.min(maxPages || Infinity, (opened && opened.maxPages) || Infinity);
@@ -111,6 +113,10 @@ export async function pdfToDocModel({ pdfjs, fflate, data, onProgress, onPage, o
         stats.pageKinds[ctx.kind] = (stats.pageKinds[ctx.kind] || 0) + 1;
         stats.imageMasksSkipped += istats.masks;
         stats.imagesFailed += istats.failed;
+        stats.imagesPlain += istats.plain || 0;
+        stats.imagesPainted += istats.painted || 0;
+        stats.imagesPaintFailed += istats.paintedFailed || 0;
+        stats.imageMaskSources += istats.maskSources || 0;
         stats.anchored += imgs.anchors.length;
         stats.droppedBackground += imgs.dropped;
         stats.columnBands += laid.stats.columnBands;

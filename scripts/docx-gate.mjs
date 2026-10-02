@@ -321,13 +321,16 @@ async function convertChild(id) {
   if (ENGINE === 'ours') {
     // Library loading is not conversion time: it is outside the clock (as in the spike's timings).
     globalThis.pdfjsWorker = loadUmd('js/vendor/pdf.worker.min.js');
-    pre = { pdfjs: loadUmd('js/vendor/pdf.min.js'), fflate: loadUmd('js/vendor/fflate.min.js'), ...(await import(path.join(ROOT, 'js/docx/convert.js'))) };
+    // images are painted through pdf.js onto a canvas; node has none, so the gate lends the engine one (a measuring tool,
+    // not a runtime dependency: scripts/lib/node-canvas-kit.mjs). DOCX_NO_CANVAS=1 measures the canvas-free path.
+    const canvasKit = process.env.DOCX_NO_CANVAS ? null : await (await import('./lib/node-canvas-kit.mjs')).nodeCanvasKit();
+    pre = { pdfjs: loadUmd('js/vendor/pdf.min.js'), fflate: loadUmd('js/vendor/fflate.min.js'), canvasKit, ...(await import(path.join(ROOT, 'js/docx/convert.js'))) };
   }
   const t0 = Date.now();
   try {
     if (ENGINE === 'ours') {
-      const { pdfjs, fflate, convertPdfToDocx } = pre;
-      const r = await convertPdfToDocx({ pdfjs, fflate, data, maxPages: MAXPAGES });
+      const { pdfjs, fflate, convertPdfToDocx, canvasKit } = pre;
+      const r = await convertPdfToDocx({ pdfjs, fflate, data, maxPages: MAXPAGES, options: canvasKit ? { canvasKit } : {} });
       fs.writeFileSync(docxPath, r.docx);
       row.stats = r.stats;
     } else {
@@ -770,7 +773,8 @@ async function main() {
   fs.writeFileSync(path.join(OUT, csvName), `${csv}\n`);
   const byId = Object.fromEntries(derived.map((o) => [o.id, o]));
   const lost = derived.filter((o) => !o.ok && /^child /.test(o.error || '')).length;
-  const env = { node: process.version, platform: `${process.platform}-${process.arch}`, ncpu: os.cpus().length, jobs: JOBS, maxpages: MAXPAGES >= 1e9 ? 'all' : MAXPAGES, soffice: render ? String(spawnSync(SOFFICE, ['--version'], { encoding: 'utf8' }).stdout || '').trim().slice(0, 60) : null, xmllint: rows.some((r) => r.xmllint), xsd: !!SCHEMA };
+  const env = { node: process.version, platform: `${process.platform}-${process.arch}`, ncpu: os.cpus().length, jobs: JOBS, maxpages: MAXPAGES >= 1e9 ? 'all' : MAXPAGES, soffice: render ? String(spawnSync(SOFFICE, ['--version'], { encoding: 'utf8' }).stdout || '').trim().slice(0, 60) : null, xmllint: rows.some((r) => r.xmllint), xsd: !!SCHEMA, canvas: ENGINE === 'ours' ? await (await import('./lib/node-canvas-kit.mjs')).canvasLabel() : null };
+  console.log(`canvas for images: ${env.canvas}`);
   console.log(`wrote ${path.join(OUT, csvName)} (${derived.length} rows, ${derived.filter((o) => o.ok).length} ok)`);
 
   // ---- 4. baseline
@@ -791,8 +795,10 @@ async function main() {
   const base = loadBaseline(baseFile);
   if (base.meta && base.meta.maxpages !== undefined && String(base.meta.maxpages) !== String(env.maxpages)) console.log(`\nWARNING: baseline was made with maxpages=${base.meta.maxpages}, this run is ${env.maxpages}: quality numbers are not comparable`);
   if (base.meta && base.meta.platform && base.meta.platform !== env.platform) console.log(`\nWARNING: baseline machine ${base.meta.platform}, this one ${env.platform}: times and RSS are not comparable`);
+  const baseCanvas = String((base.meta && base.meta.canvas) || 'none');
+  if (env.canvas && baseCanvas.startsWith('none') !== env.canvas.startsWith('none')) console.log(`\nWARNING: baseline canvas: ${baseCanvas}; this run: ${env.canvas}: picture and visual numbers are not like for like`);
   const cmp = compareRuns(byId, base.rows, { perf: !argv.includes('--no-perf'), render, schema: !!SCHEMA, pages: pagesRan });
-  const md = renderCompare(cmp, path.relative(ROOT, baseFile) || baseFile);
+  const md = renderCompare(cmp, path.relative(ROOT, baseFile) || baseFile).replace(/\n\n/, `\n\ncanvas for images: ${env.canvas} (baseline: ${baseCanvas})\n\n`);
   fs.writeFileSync(path.join(OUT, 'compare.md'), `${md}\n`);
   fs.writeFileSync(path.join(OUT, 'results.json'), JSON.stringify({ env, summary: summarize(derived), compare: cmp, rows: byId }));
   console.log(`\n${md}`);
