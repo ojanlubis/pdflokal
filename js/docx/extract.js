@@ -66,6 +66,30 @@ export function fontInfoOf(fontObj, generic) {
   return { family, bold, italic };
 }
 
+// ---------------------------------------------------------------- spaces ----
+// Many generators (PowerPoint, some Word exports) write a word space as a SEPARATE text item
+// (" ") and position the words by matrix, so the gap between two words can be well under the
+// 0.18em the line assembler needs to guess a space ("Memperolehpalingsedikit"). runsFromTextContent
+// drops whitespace-only items; this keeps what they mean by folding each one into the item
+// before it on the same baseline as a trailing space. Geometry (width) is untouched. MEASURED
+// effect: see the lane notes in the commit; the glued-token share of n065 was 7%.
+export function foldSpaceItems(items) {
+  const out = [];
+  for (const it of items) {
+    if (it.str && it.width && !it.str.trim() && out.length) {
+      const prev = out[out.length - 1];
+      if (prev.str && prev.str.trim() && !/\s$/.test(prev.str) && prev.fontName !== undefined) {
+        const size = Math.hypot(it.transform[2], it.transform[3]) || 10;
+        const dy = Math.abs(it.transform[5] - prev.transform[5]);
+        const dx = it.transform[4] - (prev.transform[4] + prev.width);
+        if (dy <= 0.3 * size && dx >= -0.5 * size && dx <= size) { out[out.length - 1] = { ...prev, str: `${prev.str} ` }; continue; }
+      }
+    }
+    out.push(it);
+  }
+  return out;
+}
+
 // ---------------------------------------------------------------- page -----
 export async function readPage({ pdfjs, page, pageNumber, shared, options }) {
   const vp = page.getViewport({ scale: 1 });
@@ -82,7 +106,7 @@ export async function readPage({ pdfjs, page, pageNumber, shared, options }) {
   if (hasTextItems) kind = (await pageHasVisibleText(page, pdfjs)) ? 'text' : 'searchable-scan';
   const runs = hasTextItems
     ? runsFromTextContent({
-      pdfjs, tc, vp,
+      pdfjs, tc: { ...tc, items: foldSpaceItems(tc.items) }, vp,
       extra: (item) => ({ dir: item.dir, style: fontInfo.get(item.fontName) || { family: 'Arial', bold: false, italic: false } }),
     })
     : [];
@@ -156,6 +180,8 @@ export function styledRuns(line, colorOf) {
     prev = r;
     prevA1 = a0 + r.pdf.len;
   }
+  // a folded word space at the end of a line is not part of the line
+  if (out.length) out[out.length - 1].t = out[out.length - 1].t.replace(/\s+$/, '');
   return out;
 }
 
