@@ -161,6 +161,7 @@ function recall(ref, got) {
 // ------------------------------------------------------------ docx parse ---
 const fflateLib = () => (fflateLib.v ||= loadUmd('js/vendor/fflate.min.js'));
 const decode = (s) => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
+const countNonEmpty = (xml) => (xml.match(/<w:p[ >][\s\S]*?<\/w:p>/g) || []).filter((p) => /<w:t(?: [^>]*)?>[^<]*[\p{L}\p{N}]/u.test(p)).length;
 export function parseDocxXml(xml, mediaFiles) {
   const paras = xml.match(/<w:p[ >][\s\S]*?<\/w:p>/g) || [];
   let text = '';
@@ -182,9 +183,25 @@ export function parseDocxXml(xml, mediaFiles) {
     if (tokens(pt).length) nonEmpty += 1;
     text += `${pt} `;
   }
+  // Paragraphs OUTSIDE tables: every table cell is a w:p, so a calendar grid of one-word cells reads as "one
+  // paragraph per line" to the prose flag below. Tables are not nested in our output (the writer never nests);
+  // a nested table would only count its inner paragraphs as table-owned, which is the safe direction.
+  let bodyParas = 0;
+  {
+    let depth = 0;
+    let at = 0;
+    for (const m of xml.matchAll(/<w:tbl>|<\/w:tbl>/g)) {
+      if (depth === 0) bodyParas += countNonEmpty(xml.slice(at, m.index));
+      depth += m[0] === '<w:tbl>' ? 1 : -1;
+      if (depth < 0) depth = 0;
+      at = m.index + m[0].length;
+    }
+    if (depth === 0) bodyParas += countNonEmpty(xml.slice(at));
+  }
   return {
     words: tokens(text),
     paras: nonEmpty,
+    bodyParas,
     bold,
     italic,
     drawings: (xml.match(/<w:drawing>/g) || []).length,
@@ -533,7 +550,7 @@ export function renderCompare(cmp, label) {
 // ============================================================ BASELINE I/O ===
 // Ids and numbers only: no words from the PDFs, no notes, no filenames.
 const BASE_COLS = ['ok', 'class', 'columns', 'tables', 'pages', 'pagesConverted', 'recallBag', 'recallLcs', 'recallBagPoppler', 'recallLcsPoppler', 'recallRendered',
-  'visGrid', 'visCoarse', 'visRows', 'visBody', 'visBodyCoarse', 'inkRatio', 'inkBody', 'pageRatio', 'refWords', 'docxWords', 'docxParas', 'linePerParaFlag',
+  'visGrid', 'visCoarse', 'visRows', 'visBody', 'visBodyCoarse', 'inkRatio', 'inkBody', 'pageRatio', 'refWords', 'docxWords', 'docxParas', 'docxBodyParas', 'linePerParaFlag',
   'pdfBold', 'docxBold', 'pdfItalic', 'docxItalic', 'pdfImages', 'docxDrawings', 'docxShapes', 'docxMedia', 'docxTables', 'columnBands', 'ms', 'msPerPage', 'rssMB',
   'docxBytes', 'xmlOk', 'pkgOk', 'renderOk'];
 
@@ -630,7 +647,7 @@ async function main() {
         const insp = inspectDocx(docx, path.join(os.tmpdir(), `docx-gate-xml-${LANE}-${process.pid}-${slot}`));
         const d = insp.parsed;
         row.docxBytes = fs.statSync(docx).size;
-        Object.assign(row, { docxWords: d.words, docxParas: d.paras, docxBold: d.bold, docxItalic: d.italic, docxDrawings: d.drawings, docxShapes: d.shapes, docxMedia: d.mediaFiles, docxTables: d.tables, docxSections: d.sections });
+        Object.assign(row, { docxWords: d.words, docxParas: d.paras, docxBodyParas: d.bodyParas, docxBold: d.bold, docxItalic: d.italic, docxDrawings: d.drawings, docxShapes: d.shapes, docxMedia: d.mediaFiles, docxTables: d.tables, docxSections: d.sections });
         row.xmlOk = insp.xmlProblems.length ? 0 : 1;
         row.pkgOk = insp.pkgProblems.length ? 0 : 1;
         row.xmlNote = insp.xmlProblems.concat(insp.pkgProblems).slice(0, 2).join(' | ').replace(/[\t\n,]/g, ' ').slice(0, 200);
@@ -782,7 +799,10 @@ function deriveRow(r, render) {
   o.wordsPerPara = r.docxParas ? Math.round((o.docxWords / r.docxParas) * 10) / 10 : null;
   o.pdfWordsPerLine = r.pdfLayoutLines ? Math.round((o.refWords / r.pdfLayoutLines) * 10) / 10 : null;
   // line-per-paragraph regression: nearly one paragraph per visual line on a prose document
-  o.linePerParaFlag = r.docxParas && r.pdfLayoutLines >= 20 && r.docxParas / r.pdfLayoutLines > 0.8 && o.refWords / r.pdfLayoutLines >= 8 ? 1 : 0;
+  // (body paragraphs only: a table cell is a w:p by construction, never a prose line)
+  o.docxBodyParas = r.docxBodyParas ?? null;
+  const prose = r.docxBodyParas ?? r.docxParas;
+  o.linePerParaFlag = prose && r.pdfLayoutLines >= 20 && prose / r.pdfLayoutLines > 0.8 && o.refWords / r.pdfLayoutLines >= 8 ? 1 : 0;
   o.pdfBold = r.pdfBold ?? null;
   o.docxBold = r.docxBold ?? null;
   o.pdfItalic = r.pdfItalic ?? null;
