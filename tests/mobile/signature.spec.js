@@ -75,18 +75,25 @@ test.describe('signature — mobile', () => {
     expect(await page.evaluate(() => window.v2.getDoc().pages[1].annotations.length)).toBe(0);
   });
 
-  test('paraf mode places small (80px) with subtype', async ({ page }) => {
+  // Founder ruling 2026-10-02: the "use as initials, smaller" box had no use and
+  // is gone. The property: the modal offers no such control, a placed signature
+  // is always the document-scale 150px with no subtype, and the bar says
+  // "Tanda tangan terpilih". Red without the removal: #sig-paraf exists, and
+  // ticking it (the old path) placed 80px.
+  test('no initials checkbox; placed signature is 150px, no subtype', async ({ page }) => {
     await openDoc(page);
     await page.tap('[data-tool="signature"]');
+    await expect(page.locator('#sig-modal')).toBeVisible();
+    await expect(page.locator('#sig-paraf')).toHaveCount(0);
+    await expect(page.locator('#sig-modal')).not.toContainText('paraf');
     await drawStroke(page);
-    await page.tap('#sig-paraf');
     await page.tap('#sig-use');
     await page.tap('.pv-page >> nth=0', { position: { x: 120, y: 300 } });
 
     const anno = await page.evaluate(() => window.v2.getDoc().pages[0].annotations[0]);
-    expect(anno.subtype).toBe('paraf');
-    expect(anno.width).toBe(80);
-    await expect(page.locator('#sig-bar-label')).toHaveText('Paraf terpilih');
+    expect(anno.subtype).toBeUndefined();
+    expect(anno.width).toBe(150);
+    await expect(page.locator('#sig-bar-label')).toHaveText('Tanda tangan terpilih');
   });
 
   test('upload tab: image file flows through bg-removal to placement', async ({ page }) => {

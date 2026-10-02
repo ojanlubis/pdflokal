@@ -25,9 +25,8 @@ export default {
   page: { short: 'Hal {n}' },
   loading: { count: '{n} dari {total} file' },
 
-  // Signature / paraf bar above the page
+  // Signature bar above the page
   sigBar: {
-    initialsSelected: 'Paraf terpilih',
     signatureSelected: 'Tanda tangan terpilih',
     armed: 'Pilih tempat untuk menempatkan',
   },
@@ -43,7 +42,6 @@ export default {
     armText: 'Pilih tempat untuk menulis',
     armWhiteout: 'Seret di halaman untuk menutup teks',
     armSignature: 'Pilih tempat untuk menempatkan tanda tangan',
-    armInitials: 'Pilih tempat untuk menempatkan paraf',
     armEdit: 'Edit teks asli, fitur beta. Tap tulisan yang mau kamu ubah',
     armEditShort: 'Tap tulisan yang mau diubah',
     missedText: 'Nggak kena tulisan, tap tepat di teksnya ya',

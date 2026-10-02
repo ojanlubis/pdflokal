@@ -1,14 +1,14 @@
 /*
- * PDFLokal — v2/signature-modal.js  (TTD: draw / upload / paraf)
+ * PDFLokal — v2/signature-modal.js  (TTD: draw / upload)
  * ============================================================================
- * Produces ONE thing: { dataUrl, width, height, subtype } handed to the app
+ * Produces ONE thing: { dataUrl, width, height } handed to the app
  * for tap-to-place. Two sources:
  *   - Gambar: SignaturePad canvas, auto-trimmed to ink bounds (an untrimmed
  *     460×180 pad placed at 150px wide looks comically small — trim first).
  *   - Upload: an image file; white background stripped to transparency by
  *     default (photos of wet-ink signatures — the dominant real-world case).
- * Paraf is the same signature type with subtype 'paraf' and a smaller default
- * placement width — zero extra branches downstream (render/export/undo).
+ * (There was once a "use as initials, smaller" checkbox; the founder ruled it
+ * useless on 2026-10-02 and it is gone, with the subtype it set.)
  */
 
 import { ensureSignaturePad } from '../core/vendor.js';
@@ -56,8 +56,8 @@ export function createSignatureModal({ modal, onReady, toast }) {
   // 2026-08-22): open() threw `Cannot set properties of null (setting
   // 'checked')` twice in production, two days AFTER the 2026-08-17 tandatangan
   // ship, one event each, and it does NOT reproduce — all 21 shipped pages were
-  // scanned in a real browser and every one has #sig-save, #sig-paraf and
-  // #sig-removebg correctly inside #sig-modal.
+  // scanned in a real browser and every one has #sig-save, the since-removed
+  // initials box and #sig-removebg correctly inside #sig-modal.
   // The explanation that fits the shape is DEPLOY SKEW: a browser holding
   // index.html cached from before the ship, then fetching the new app.js. New
   // code, old markup. STATED AS THE BEST FIT, NOT AS PROVEN — the reproduction
@@ -66,7 +66,6 @@ export function createSignatureModal({ modal, onReady, toast }) {
   // The fix is correct under EVERY candidate cause, which is why it ships
   // without the root cause being settled: a modal must not die because optional
   // chrome is absent. Missing box = feature not offered, not a dead dialog.
-  const parafCheck = modal.querySelector('#sig-paraf');
   const removeBgCheck = modal.querySelector('#sig-removebg');
   const saveCheck = modal.querySelector('#sig-save');
   const tabs = modal.querySelectorAll('.sig-tab');
@@ -277,7 +276,6 @@ export function createSignatureModal({ modal, onReady, toast }) {
       dataUrl: art.dataUrl,
       width: art.width,
       height: art.height,
-      subtype: parafCheck?.checked ? 'paraf' : null,
     });
   });
   modal.querySelector('#sig-cancel').addEventListener('click', () => modal.close());
