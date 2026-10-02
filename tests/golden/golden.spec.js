@@ -55,6 +55,9 @@ async function reportAndAssert(scenarioName, results) {
       if (issue.diffPixels !== undefined) {
         console.log(`    diff: ${issue.diffPixels}/${issue.total} px (${(issue.ratio * 100).toFixed(3)}%)`);
       }
+      if (issue.ink) {
+        console.log(`    ink:  ${issue.ink.changedBlocks}/${issue.ink.inkBlocks} ink blocks changed${issue.ink.fail ? ' (over tolerance)' : ''}`);
+      }
       if (issue.actualPath) console.log(`    saved actual: ${issue.actualPath}`);
       if (issue.diffPath) console.log(`    saved diff:   ${issue.diffPath}`);
     }

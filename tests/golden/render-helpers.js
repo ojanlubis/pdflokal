@@ -16,6 +16,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import pixelmatch from 'pixelmatch';
 import { PNG } from 'pngjs';
+import { compareInk } from './ink-compare.js';
 
 // WHY pixel-diff tolerance instead of exact hash: PDF.js text rendering is
 // stable per platform but differs across platforms (macOS vs Linux font
@@ -23,6 +24,12 @@ import { PNG } from 'pngjs';
 // against actuals rendered on the CI Linux runner — guaranteed false
 // positives. Pixelmatch with a small tolerance absorbs the AA drift while
 // still failing if an annotation shifts position or a glyph swaps.
+//
+// ⚠ This ratio is a share of PAGE AREA, not of INK. On a 595x842 page 0.5% is
+// ~2,400 pixels, more than the entire ink of the baseline pages (1,070-1,340),
+// so on its own it passes a page with every word missing (audit 2026-08-17,
+// item 1). It stays as the coarse "the page moved" check; the content check is
+// compareInk() in ink-compare.js, which is relative to ink.
 const ALLOWED_DIFF_RATIO = 0.005; // 0.5% of pixels may legitimately differ
 const PIXELMATCH_THRESHOLD = 0.1; // per-pixel YIQ tolerance; 0.1 = default
 
@@ -69,13 +76,14 @@ export function sha256(buf) {
   return crypto.createHash('sha256').update(buf).digest('hex');
 }
 
-// Compare two PNG buffers. Returns { diffPixels, total, ratio, diffPng? }.
+// Compare two PNG buffers. Returns { diffPixels, total, ratio, ink, diffPng? }.
+// `ink` is compareInk()'s verdict (blocks of drawn content that changed).
 // Different dimensions short-circuit to a 100% mismatch.
 function comparePngBuffers(baselineBuf, actualBuf) {
   const baseline = PNG.sync.read(baselineBuf);
   const actual = PNG.sync.read(actualBuf);
   if (baseline.width !== actual.width || baseline.height !== actual.height) {
-    return { diffPixels: Infinity, total: 0, ratio: 1, dimsDiffer: true };
+    return { diffPixels: Infinity, total: 0, ratio: 1, dimsDiffer: true, ink: { fail: true, changedBlocks: Infinity, inkBlocks: 0, ratio: 1 } };
   }
   const { width, height } = baseline;
   const total = width * height;
@@ -92,6 +100,7 @@ function comparePngBuffers(baselineBuf, actualBuf) {
     diffPixels,
     total,
     ratio: diffPixels / total,
+    ink: compareInk(baseline, actual),
     diffPng: PNG.sync.write(diff),
   };
 }
@@ -130,8 +139,8 @@ export async function assertGoldenMatch(scenarioName, pdfBytes, page, baselinesD
       continue;
     }
 
-    const { diffPixels, total, ratio, diffPng, dimsDiffer } = comparePngBuffers(baseline, pngs[i]);
-    if (ratio > ALLOWED_DIFF_RATIO) {
+    const { diffPixels, total, ratio, diffPng, dimsDiffer, ink } = comparePngBuffers(baseline, pngs[i]);
+    if (ratio > ALLOWED_DIFF_RATIO || ink.fail) {
       const diffPath = path.join(actualDir, `${scenarioName}-page-${pageNum}-diff.png`);
       await fs.writeFile(actualPath, pngs[i]);
       if (diffPng) await fs.writeFile(diffPath, diffPng);
@@ -141,6 +150,7 @@ export async function assertGoldenMatch(scenarioName, pdfBytes, page, baselinesD
         diffPixels,
         total,
         ratio,
+        ink,
         dimsDiffer: !!dimsDiffer,
         actualPath,
         diffPath: diffPng ? diffPath : undefined,
