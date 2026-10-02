@@ -16,6 +16,7 @@ import { addSource, addPages } from './operations.js';
 import { ensurePdfJs } from './vendor.js';
 import { editSignature } from './page-surgery.js';
 import { pageHasVisibleText } from './text-visibility.js';
+import { failureReason } from './failure-reason.js';
 
 // bytes → append a Source + its Pages (metadata only) to `doc`. Returns the pages.
 // SINGLE SOURCE OF TRUTH for "this PDF is password/permissions protected".
@@ -48,6 +49,40 @@ async function detectEncrypted(pdf) {
     return !!info?.EncryptFilterName;
   } catch {
     return false;
+  }
+}
+
+// CAN pdf-lib REBUILD THIS FILE? The error it throws, or null.
+//
+// WHY: PDF.js reads a file through its xref table and never looks at objects
+// the table does not reach; pdf-lib reads it top to bottom and throws on the
+// first malformed object, referenced or not. So a file with one damaged
+// orphan object (an old revision, a truncated stray write) opens and renders
+// perfectly here and then cannot be re-parsed to rebuild it. Reproduced
+// 2026-10-02 with tests/fixtures/nasty/orphan-rusak.pdf (PDF.js: 2 pages, pdf-lib:
+// "Failed to parse invalid PDF object"). Rail: 5 sessions on 2026-08-20,
+// 09-18 and 10-01 hit `export/corrupt` (hint `parse`), every one of them a merge.
+// A merge ALWAYS rebuilds (core/export.js passThroughSource only hands back a
+// single, untouched source), so for a merge this is the moment to find out,
+// not Unduh after the work is done.
+//
+// Returns the ORIGINAL error so the caller classifies it with failureReason /
+// failureCause exactly as the export path would: one vocabulary, nothing new
+// on the rail, and the message stays on the device. LOAD only, on purpose:
+// the rail's `hint: parse` is a load-time failure; copyPages/save failures are
+// a different class with their own witness (v2/bake-failure.js).
+//
+// An ENCRYPTED file also fails pdf-lib's load, but that is the protected-PDF
+// path (flagged on the Source, warned at import, honest at export), not a
+// parse failure. It answers null here so it is never declined as "corrupt".
+//
+// Never throws. PDFLib is injected (this file has no vendor imports).
+export async function pdfLibLoadError(PDFLib, bytes) {
+  try {
+    await PDFLib.PDFDocument.load(bytes);
+    return null;
+  } catch (err) {
+    return failureReason(err) === 'encrypted' ? null : err;
   }
 }
 

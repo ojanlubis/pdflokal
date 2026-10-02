@@ -24,7 +24,7 @@ import {
   moveAnnotation, normalizePageWidths,
 } from '../core/operations.js';
 import { createHistory, record, undo, redo, canUndo, canRedo } from '../core/history.js';
-import { importPdf, importImage, createPageRasterizer, probeTextLayer } from '../core/import.js';
+import { importPdf, importImage, createPageRasterizer, probeTextLayer, pdfLibLoadError } from '../core/import.js';
 import {
   pagesBucket, durationBucket, ratioBucket, inkRatioBucket, intentValue,
   unsupportedCharClass, ocrLinesBucket, zoomBucket,
@@ -2970,6 +2970,41 @@ document.addEventListener('keydown', (e) => {
 // toast was retired when the processing overlay landed — see showProcessing.)
 const SIZE_BLOCK = 100 * 1024 * 1024;
 
+// ---- the merge guard: a document that cannot be rebuilt must not be merged ----
+//
+// Two parsers read every file: PDF.js to show it, pdf-lib to write it back. They
+// do not agree on every file (core/import.js pdfLibLoadError has the why). A
+// single untouched file never meets pdf-lib (core/export.js passThroughSource
+// hands its bytes back), so a lone file is NEVER checked here; it keeps opening,
+// editing-for-view and downloading as before. A MERGE always rebuilds, so the
+// moment a second file would join, every PDF involved is proven loadable by
+// pdf-lib first, and a file that is not is declined through the same path as
+// any unreadable file (skipped, counted on the rail as import/corrupt). Nothing
+// is rasterised or repaired: the user's document is never changed behind their
+// back, and they learn which file to leave out while it still costs nothing.
+// Rail before this: `export/corrupt`, 5 sessions, every one a merge, no file.
+const rebuildVerdicts = new Map(); // sourceId -> Promise<Error|null>
+
+// pdf-lib's load error for `bytes`, or null. If pdf-lib itself cannot be
+// fetched (offline) we do not know, and not knowing never blocks an import.
+async function rebuildLoadError(bytes) {
+  let PDFLib;
+  try { ({ PDFLib } = await ensurePdfLib()); } catch { return null; }
+  return pdfLibLoadError(PDFLib, bytes);
+}
+
+// The first already-open PDF source pdf-lib cannot rebuild, as its error, or null.
+// Verdicts are cached per source so a later merge does not parse it again.
+async function firstUnrebuildableSource() {
+  for (const source of doc.sources) {
+    if (!doc.pages.some((p) => p.sourceId === source.id && !p.isFromImage)) continue; // an image's bytes are not parsed
+    if (!rebuildVerdicts.has(source.id)) rebuildVerdicts.set(source.id, rebuildLoadError(source.bytes));
+    const err = await rebuildVerdicts.get(source.id);
+    if (err) return err;
+  }
+  return null;
+}
+
 let loadingFiles = false; // re-entry guard: double-taps and rapid picks interleave imports
 
 async function loadFiles(files) {
@@ -3002,6 +3037,20 @@ async function loadFilesInner(files) {
   // here but sat hidden BEHIND this overlay (z-order), and the overlay itself
   // — plus its "diproses di HP-mu" note — is the honest heads-up now.
   showProcessing(usable.length);
+  // A merge rebuilds the document, so every PDF in it must be one pdf-lib can
+  // parse (see the merge guard above). Already-open sources first: if one of
+  // THEM cannot be rebuilt, adding anything makes the export impossible, and
+  // blaming the new file would be wrong. Say which side it is, and stop.
+  const rebuilds = doc.sources.length > 0 || usable.length > 1;
+  if (doc.sources.length > 0) {
+    const err = await firstUnrebuildableSource();
+    if (err) {
+      toast(tr('toast.mergeBlocked'));
+      tel('failure', { stage: 'import', reason: failureReason(err), class: 'none', blocked: true });
+      tel('failure_cause', { stage: 'import', ...failureCause(err) });
+      return;
+    }
+  }
   // Per-file resilience: one empty/corrupt/unreadable file must NOT crash the whole
   // load. Before this guard, a 0-byte PDF (Sentry JAVASCRIPT-H) and a file that went
   // unreadable after the picker handed its reference (JAVASCRIPT-G) both bubbled to
@@ -3024,7 +3073,13 @@ async function loadFilesInner(files) {
       // file carries the arrival intent.)
       const docIntent = intentValue(pendingIntent);
       if (isPdf(f)) {
+        // Same catch as any unreadable file: skipped, rail import/corrupt, blocked:true.
+        if (rebuilds) {
+          const loadErr = await rebuildLoadError(bytes);
+          if (loadErr) throw loadErr;
+        }
         const importedPages = await importPdf(doc, { name: f.name, bytes });
+        if (rebuilds) rebuildVerdicts.set(doc.sources.at(-1).id, Promise.resolve(null)); // just proven
         // A protected PDF opens and renders perfectly (PDF.js decrypts) but can
         // NEVER be written back — pdf-lib has no decryption. Say so HERE, at
         // import, rather than letting them edit a 444-page document and meet
@@ -3392,6 +3447,7 @@ async function resetDoc() {
   // clearing them would leak faces forever across repeated Buka Baru, and
   // document.fonts.check() for a stale name would still (wrongly) report true.
   pdfLibDocCache.clear();
+  rebuildVerdicts.clear();
   docFontCache.clear();
   for (const face of addedFontFaces) document.fonts.delete(face);
   addedFontFaces.clear();
