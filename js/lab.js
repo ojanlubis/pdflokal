@@ -12,6 +12,7 @@
 import { createDoc, createAnnotation } from './core/model.js';
 import { addAnnotation } from './core/operations.js';
 import { createHistory } from './core/history.js';
+import { rasterFitsShape } from './core/raster-key.js';
 import { importPdf, createPageRasterizer } from './core/import.js';
 import { createPageSlot } from './render/page-view.js';
 import { createViewportStream } from './render/viewport.js';
@@ -28,7 +29,7 @@ let zoom = 1;
 let doc = createDoc();
 let slots = [];
 let rasterizer = null;
-const history = createHistory();
+const history = createHistory(undefined, { carryRaster: rasterFitsShape });
 
 function applyZoom() { stage.style.transform = `scale(${zoom})`; stream.refresh(0); }
 document.getElementById('z-in').onclick = () => { zoom = Math.min(zoom + 0.2, 3); applyZoom(); };
