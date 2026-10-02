@@ -37,6 +37,10 @@ const TAP_SLOP = 12; // px of finger movement beyond which a press is not a tap
 //   onEditText: (annotationId) => void — click/tap on an already-selected text
 //   onGantiSteer: ({pageId, x, y} | null) => void — live line-highlight while
 //               a Ganti Teks press/drag/hover is in flight; null clears it
+//   onDeleteTap:  (annotationId, pageId) => void — Hapus armed, tapped an object of ours
+//   onDeleteOriginal: ({pageId, x, y}) => void — Hapus armed, a TAP (release in
+//               place) that hit no annotation of ours: the PDF's own content,
+//               which the app resolves to a printed line and deletes
 // }
 export function createInteraction(ctx) {
   const { stage } = ctx;
@@ -229,6 +233,17 @@ export function createInteraction(ctx) {
       const anno = page.annotations.find((a) => a.id === annoEl.dataset.annoId);
       if (anno) {
         if (tool === 'delete') {
+          // A cover that CARRIES SURGERY INTENT (a deleted or edited printed line)
+          // is the PDF's own text, not an object the person added: a tap on it
+          // goes the way a tap on the printed line itself goes. Before the page
+          // is baked (and always when the bake declined) that cover is a real DOM
+          // element, and a double-tap on Hapus would otherwise land its second
+          // tap here and take the first one back, with the screen and the model
+          // then disagreeing about whether the line is gone.
+          if (anno.type === 'whiteout' && anno.replaceTargets?.length) {
+            tapCandidate = { pointerId: e.pointerId, annoId: null, annoEl: null, x: e.clientX, y: e.clientY, pageView, pageId, deleteOriginal: true };
+            return;
+          }
           e.preventDefault();
           ctx.onDeleteTap?.(anno.id, page.id);
           return;
@@ -262,6 +277,22 @@ export function createInteraction(ctx) {
         tapCandidate = { pointerId: e.pointerId, annoId: anno.id, annoEl, x: e.clientX, y: e.clientY };
         return;
       }
+    }
+
+    // 3b) HAPUS ARMED, NOTHING OF OURS UNDER THE FINGER. The press was aimed at
+    //    the PDF's own content (or blank paper). Before 2026-10-02 this fell
+    //    through to step 4 and did nothing at all: `tool === 'delete'` was only
+    //    ever checked inside the annotation-hit branch above, so delete-mode
+    //    stayed lit in silence, which the rail read as 17% (phone) / 24% (desktop)
+    //    of Hapus sessions completing. Founder ruling: deleting printed text is
+    //    "naturally what they want", so the tap goes to the app, which resolves it
+    //    to a line. RELEASE-commit on every pointer type, camera-first like step 4
+    //    and Ganti: a drag is the camera and must not delete anything. No
+    //    preventDefault and no capture, so a scroll can still take the gesture
+    //    (pointercancel clears the candidate).
+    if (tool === 'delete') {
+      tapCandidate = { pointerId: e.pointerId, annoId: null, annoEl: null, x: e.clientX, y: e.clientY, pageView, pageId, deleteOriginal: true };
+      return;
     }
 
     // 4) Empty page, Pilih tool: same release-commit rule — a tap deselects,
@@ -370,6 +401,11 @@ export function createInteraction(ctx) {
       const isTap = e.type === 'pointerup' &&
         Math.hypot(e.clientX - tc.x, e.clientY - tc.y) < TAP_SLOP;
       if (!isTap) return;
+      if (tc.deleteOriginal) {
+        const p = toPage(e, tc.pageView);
+        ctx.onDeleteOriginal?.({ pageId: tc.pageId, x: p.x, y: p.y });
+        return;
+      }
       if (tc.annoId) {
         const doc = ctx.getDoc();
         const found = findAnno(doc, tc.annoId);
