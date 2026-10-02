@@ -501,9 +501,24 @@ export function createDownloadSheet(deps) {
     if (state.exporting) return;
     state.exporting = true;
     render();
-    const seq = state.seq;
     const t0 = performance.now(); // spec-telemetry.md §3 export.duration — tap to bytes-in-hand
     try {
+      // A BUILD THAT DIED OF A DROPPED SCRIPT IS NOT A VERDICT. buildBase ran
+      // when the sheet opened and kept its error (see its catch); every tap on
+      // Unduh after that re-threw the SAME stored error, so a vendor script
+      // that failed to arrive once (core/vendor.js, flagged `vendorLoadFailed`)
+      // killed the sheet until the user closed and reopened it. Measured on the
+      // rail: five sessions, 2026-09-18 → 09-30; two of them, the failures
+      // stopped the moment the sheet was reopened (bf32bd80, e7306cc1). The tap
+      // now means what it says — try the build again. Only for that flag: any
+      // other error is the file's own verdict and a rebuild would only repeat
+      // it, and toast it twice.
+      if (!state.base && !state.building && state.buildError?.vendorLoadFailed) {
+        await buildBase();
+      }
+      // After the rebuild above: buildBase advances state.seq, and the check
+      // below must compare against the build this tap is actually waiting for.
+      const seq = state.seq;
       // Belt-and-braces: if Compress is selected but its bytes are missing and
       // nothing is computing them (any invalidation path), start it here.
       if (state.format === 'pdf' && state.size === 'kompres' && !state.compressed && !state.compressing) {
