@@ -167,6 +167,15 @@ test('DELIVERY (R5): export_sheet_close survives api/t.js, and an off-enum `how`
   assert.equal(calls.length, 0, 'an off-schema export_sheet_close reached the database');
 });
 
+test('DELIVERY (0a): zoom_tap survives api/t.js, and a raw (unbucketed) level is dropped', async () => {
+  await deliversIntact([{ event: 'zoom_tap', props: { dir: 'out', level: '200-249', device: 'desktop' } }]);
+  const { calls } = await run({
+    ...VALID,
+    events: [{ event: 'zoom_tap', props: { dir: 'in', level: '2.38', device: 'desktop' } }],
+  });
+  assert.equal(calls.length, 0, 'an unbucketed zoom level reached the database');
+});
+
 // ---------------------------------------------------------------------------
 // visitor_id (2026-09-10). Additive and DELIBERATELY not part of the
 // envelope-trust check that session_id/app_version sit behind — an invalid
