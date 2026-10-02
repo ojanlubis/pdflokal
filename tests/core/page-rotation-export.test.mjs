@@ -11,11 +11,20 @@
  * only found out after they had the file.
  *
  * WHY NO EXISTING TEST CAUGHT IT, and this is the part worth remembering:
- * every fixture in tests/fixtures/nasty/ has baseRotation 0 — including
- * `halaman-miring.pdf`, whose name promises otherwise (its content is drawn
- * askew; the file carries no /Rotate at all). At baseRotation 0 the buggy
- * formula and the correct one are the SAME NUMBER. The whole corpus agreed
- * with both implementations, so no amount of it could tell them apart.
+ * no export test ran a source with an inherited /Rotate. Nearly every fixture
+ * in tests/fixtures/nasty/ has baseRotation 0, and at baseRotation 0 the buggy
+ * formula and the correct one are the SAME NUMBER, so that corpus agreed with
+ * both implementations and could not tell them apart.
+ *
+ * CORRECTION (audit 2026-08-17, item 6). This comment used to say
+ * `halaman-miring.pdf` "carries no /Rotate at all (checked — zero matches)".
+ * That was false. It carries /Rotate 90 (pdf-lib getRotation() reads 90;
+ * tests/ganti-teks.spec.js already titles its use "rotated page (/Rotate 90)").
+ * The "zero matches" came from grepping the raw bytes: the page dictionary is
+ * inside a compressed object stream, where the literal text /Rotate does not
+ * appear. The gap that mattered is unchanged — halaman-miring is only opened
+ * by the live text-run spec, never exported, so it never exercised the export
+ * writers — but "no fixture has /Rotate" is not the reason.
  * [[fixture-must-distinguish]] — hence `putar-90.pdf`
  * (scripts/gen-fixture-putar.mjs), which self-verifies that it really carries
  * /Rotate 90 and that its MediaBox is not square.
