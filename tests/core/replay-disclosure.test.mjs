@@ -58,7 +58,7 @@ export function sentryReplayOn(sentryInit) {
 // The Perekaman Sesi section's raw HTML: from its heading to the next section.
 export function replaySection(privasiHtml) {
   const html = stripComments(privasiHtml);
-  const start = html.search(/<h2>\s*Perekaman Sesi/);
+  const start = html.search(/<h2>\s*Perekaman sesi/i);
   if (start < 0) return null;
   const rest = html.slice(start);
   const end = rest.indexOf('class="privacy-section"');
@@ -106,14 +106,24 @@ test('the instrument sees both recorders and the section (known positive)', () =
   assert.ok(section && toText(section).length > 200, 'Perekaman Sesi section not found or empty');
 });
 
+// Mutate inside the Perekaman sesi section only. Since 2026-10-02 the
+// "Yang dikirim ke layanan lain" list ALSO has an item starting with
+// "Mixpanel", earlier on the page, so an unscoped replace mutated that one and
+// left the section under test untouched.
+function inReplay(html, re, to) {
+  const at = html.search(/<h2>\s*Perekaman sesi/i);
+  assert.ok(at >= 0, 'Perekaman sesi heading not found');
+  return html.slice(0, at) + html.slice(at).replace(re, to);
+}
+
 test('privasi.html names exactly the recorders that ship, with no end date', () => {
   assert.deepEqual(disclosureProblems(real()), []);
 });
 
 test('red on revert: the old 10 Oktober end date comes back', () => {
   const r = real();
-  const privasiHtml = r.privasiHtml.replace(
-    /<li><strong>Mixpanel<\/strong>[\s\S]*?<\/li>/,
+  const privasiHtml = inReplay(r.privasiHtml,
+    /<li>(?:<strong>)?Mixpanel\b[\s\S]*?<\/li>/,
     '<li><strong>Mixpanel</strong>, semua sesi, sampai <strong>10 Oktober 2026</strong>.</li>',
   );
   assert.notEqual(privasiHtml, r.privasiHtml, 'mutation did not apply');
@@ -122,7 +132,7 @@ test('red on revert: the old 10 Oktober end date comes back', () => {
 
 test('red on revert: the page stops naming Mixpanel while it records', () => {
   const r = real();
-  const privasiHtml = r.privasiHtml.replace(/<li><strong>Mixpanel<\/strong>[\s\S]*?<\/li>/, '');
+  const privasiHtml = inReplay(r.privasiHtml, /<li>(?:<strong>)?Mixpanel\b[\s\S]*?<\/li>/, '');
   assert.notEqual(privasiHtml, r.privasiHtml, 'mutation did not apply');
   assert.match(disclosureProblems({ ...r, privasiHtml }).join('\n'), /does not list it/);
 });
@@ -142,7 +152,7 @@ test('prose about a key is not the key: a commented-out recorder counts as off',
 
 test('red on revert: Sentry replay keeps running but drops off the page', () => {
   const r = real();
-  const privasiHtml = r.privasiHtml.replace(/<li><strong>Sentry<\/strong>[\s\S]*?<\/li>/, '');
+  const privasiHtml = inReplay(r.privasiHtml, /<li>(?:<strong>)?Sentry\b[\s\S]*?<\/li>/, '');
   assert.notEqual(privasiHtml, r.privasiHtml, 'mutation did not apply');
   assert.match(disclosureProblems({ ...r, privasiHtml }).join('\n'), /Sentry records sessions/);
 });

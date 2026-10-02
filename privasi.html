@@ -369,52 +369,51 @@
     <div class="privacy-page">
       <h1>Kebijakan Privasi</h1>
       <p class="privacy-lead">
-        <strong>File PDF dan gambarmu diolah di browsermu sendiri, dan nggak pernah dikirim ke server mana pun.</strong>
-        Yang tercatat adalah cara PDFLokal dipakai, bukan isi dokumenmu. Pengecualiannya sedikit, dan semuanya ada di bawah.
+        <strong>File PDF dan gambarmu diolah di browsermu sendiri dan nggak pernah dikirim ke server mana pun.</strong>
+        Yang saya catat adalah cara PDFLokal dipakai, bukan isi dokumenmu. Pengecualiannya ada di bawah.
       </p>
 
       <div class="privacy-proof">
         <p>
-          <strong>Buktikan sendiri:</strong> olah satu file seperti biasa. Lalu matikan internet,
-          buka lagi PDFLokal, dan buka, edit, lalu unduh file lain. Tetap jalan, karena filenya
-          diolah di perangkatmu sendiri.
+          Coba sendiri: olah satu file seperti biasa, lalu matikan internet. Buka lagi PDFLokal,
+          lalu buka, edit, dan unduh file lain. Semuanya tetap jalan.
         </p>
       </div>
 
       <section class="privacy-section">
         <h2>Yang dikirim ke server saya sendiri</h2>
         <p>
-          Data teknis kecil tentang cara fitur dipakai, supaya saya tahu alat mana yang berguna dan
-          mana yang perlu diperbaiki: alat yang kamu pakai, berapa lama prosesnya, apakah font di
-          dokumen dikenali, jenis perangkat, dan jumlah halaman dalam rentang (1, 2-5, 6-20, 21+).
+          Data teknis tentang cara fitur dipakai, untuk tahu alat mana yang perlu diperbaiki: alat
+          yang kamu pakai, berapa lama prosesnya, apakah font di dokumen dikenali, jenis perangkat,
+          dan jumlah halaman dalam rentang (1, 2-5, 6-20, 21+).
         </p>
         <p>
-          <strong>Nggak pernah ikut:</strong> isi dokumen, teks yang kamu tulis, nama file, gambar,
-          atau nama font asli. Nggak pakai cookie.
+          Isi dokumen, teks yang kamu tulis, nama file, gambar, dan nama font asli nggak pernah ikut.
+          Nggak pakai cookie.
         </p>
         <p>
-          Tiap sesi dapat ID acak sendiri. Satu ID lagi, <code>pdflokal_visitor_id</code>, tersimpan
-          di browsermu supaya saya bisa bedain pengunjung baru dan yang balik lagi. Cuma angka acak,
-          dan berhenti di server saya: Mixpanel, Google Analytics, dan Sentry nggak pernah menerimanya.
+          Tiap sesi dapat ID acak sendiri. Satu ID lagi, <code>pdflokal_visitor_id</code>, disimpan di
+          browsermu untuk membedakan pengunjung baru dan yang kembali. Isinya angka acak. ID ini cuma
+          sampai ke server saya: Mixpanel, Google Analytics, dan Sentry nggak pernah menerimanya.
         </p>
       </section>
 
       <section class="privacy-section">
         <h2>Yang dikirim ke layanan lain</h2>
-        <p>Untuk menghitung kunjungan dan melihat alat mana yang dipakai:</p>
+        <p>Untuk menghitung kunjungan dan alat yang dipakai, saya pakai:</p>
         <ul>
           <li>Vercel Web Analytics, tanpa cookie</li>
-          <li>Google Analytics dan Google Ads, yang memasang cookie (daftarnya di tabel bawah)</li>
-          <li>Mixpanel, yang juga merekam sesi (lihat Perekaman Sesi)</li>
+          <li>Google Analytics dan Google Ads, dengan cookie (daftarnya di tabel bawah)</li>
+          <li>Mixpanel, yang juga merekam sesi</li>
         </ul>
         <p>
           Mereka menerima halaman yang kamu buka, alat yang kamu pakai, jenis file (PDF atau gambar),
           jumlah halaman, dan ID sesi acak. Nama file dan isi dokumen nggak ikut. Google Analytics dan
-          Vercel menebak negara atau kotamu dari alamat internet, bukan dari GPS.
+          Vercel memperkirakan negara atau kotamu dari alamat internet.
         </p>
       </section>
 
-      <!-- Perekaman Sesi — SESSION REPLAY, BOTH RECORDERS.
+      <!-- Perekaman sesi — SESSION REPLAY, BOTH RECORDERS.
            ⚠️ IT NAMES SENTRY FIRST ON PURPOSE: Sentry's replay has run since
            2026-05-29 (10% since 2026-06-02) and this page once said nothing
            about it. The section covers both recorders or it does not ship.
@@ -428,34 +427,33 @@
            must START with "Sentry" / "Mixpanel", and the section ends at the
            next class="privacy-section". -->
       <section class="privacy-section">
-        <h2>Perekaman Sesi</h2>
-        <p>Dua layanan pihak ketiga merekam cara orang memakai PDFLokal:</p>
+        <h2>Perekaman sesi</h2>
+        <p>Dua layanan merekam layar waktu PDFLokal dipakai:</p>
         <ul>
-          <li><strong>Sentry</strong>, sejak akhir Mei 2026. Tugas utamanya menangkap error, dan dia merekam 1 dari 10 kunjungan, plus setiap kunjungan yang ada error-nya</li>
-          <li><strong>Mixpanel</strong>, semua sesi, supaya saya lihat di langkah mana orang kesulitan. Kalau perekamannya saya hentikan, halaman ini saya update</li>
+          <li>Sentry, sejak akhir Mei 2026: 1 dari 10 kunjungan, plus setiap kunjungan yang ada error-nya. Tugas utamanya menangkap error</li>
+          <li>Mixpanel: semua sesi, untuk melihat di langkah mana orang kesulitan. Kalau perekamannya saya hentikan, halaman ini saya update</li>
         </ul>
         <p>
-          Yang terekam cuma gerakan di layar: di mana kamu tap, ke mana kamu scroll, tombol yang kamu
-          buka, dan berapa lama kamu berhenti. Saya buka sendiri data yang dikirim kedua layanan itu
-          untuk memastikan yang ini nggak ikut:
+          Yang terekam: di mana kamu tap, ke mana kamu scroll, tombol yang kamu buka, dan berapa lama
+          kamu berhenti. Saya sudah membuka data yang dikirim kedua layanan itu, dan ini yang nggak ikut:
         </p>
         <ul>
-          <li><strong>Isi dokumenmu.</strong> Halaman PDF-mu cuma muncul sebagai kotak kosong</li>
-          <li><strong>Teks yang kamu ketik</strong>, termasuk waktu mengganti tulisan di dokumen. Jadi tanda bintang; yang tetap kelihatan cuma tulisan PDFLokal sendiri, seperti nama tombol</li>
-          <li><strong>Nama filemu</strong></li>
+          <li>Isi dokumenmu. Halaman PDF muncul sebagai kotak kosong</li>
+          <li>Teks yang kamu ketik, termasuk saat mengganti tulisan di dokumen. Semuanya jadi tanda bintang, kecuali tulisan PDFLokal sendiri seperti nama tombol</li>
+          <li>Nama filemu</li>
         </ul>
         <p>
-          Laporan error Sentry berisi pesan error dan langkah sebelumnya. Kadang pesan itu menyebut
-          satu karakter yang kamu ketik, misalnya huruf yang nggak bisa disimpan ke PDF. Perekaman
-          cuma jalan di halaman alat, bukan di halaman ini.
+          Laporan error Sentry berisi pesan error dan langkah sebelumnya. Kadang pesan itu memuat satu
+          karakter yang kamu ketik, misalnya huruf yang nggak bisa disimpan ke PDF.
         </p>
+        <p>Perekaman cuma jalan di halaman alat.</p>
       </section>
 
       <section class="privacy-section">
-        <h2>Yang terkirim cuma kalau kamu kirim sendiri</h2>
+        <h2>Yang kamu kirim sendiri</h2>
         <ul>
-          <li><strong>Screenshot di form masukan.</strong> Kamu yang paste, dan kamu lihat dulu sebelum terkirim. Kalau screenshot itu menampilkan isi dokumen, isi itu ikut</li>
-          <li><strong>Dua potongan di Edit (beta).</strong> Kalau kamu kasih 👎, saya tanya dulu boleh minta satu baris yang barusan kamu edit, sebelum dan sesudah, sebagai dua gambar kecil. Kamu lihat keduanya dulu, dan cuma terkirim kalau kamu tap "Kirim"</li>
+          <li>Screenshot di form masukan. Kamu yang paste, dan kamu lihat dulu sebelum terkirim. Kalau screenshot itu menampilkan isi dokumen, isi itu ikut terkirim</li>
+          <li>Potongan di Edit (beta). Kalau kamu kasih 👎, saya minta izin untuk satu baris yang barusan kamu edit, sebelum dan sesudah, sebagai dua gambar kecil. Kamu lihat keduanya dulu, dan baru terkirim kalau kamu tap Kirim</li>
         </ul>
       </section>
 
@@ -469,8 +467,8 @@
       <section class="privacy-section">
         <h2>Yang tersimpan di browsermu</h2>
         <p>
-          Preferensi kecil, cuma buat kamu (Local Storage, dan satu di Session Storage yang hilang
-          waktu tab ditutup). Nggak pernah dikirim ke mana-mana, kecuali satu baris yang saya tandai.
+          Preferensi kecil untuk kamu sendiri, di Local Storage (satu di Session Storage, hilang saat
+          tab ditutup). Semuanya tetap di browsermu, kecuali satu baris yang saya tandai.
         </p>
         <table class="storage-table" id="storage-ours">
           <thead>
@@ -541,8 +539,8 @@
           </tbody>
         </table>
         <p>
-          Layanan pihak ketiga di atas juga menyimpan data di browsermu, dan isinya bisa ikut
-          terkirim ke layanannya masing-masing:
+          Layanan di atas juga menyimpan data di browsermu, dan isinya bisa terkirim ke layanannya
+          masing-masing:
         </p>
         <table class="storage-table" id="storage-pihak-ketiga">
           <thead>
@@ -576,9 +574,8 @@
       <section class="privacy-section">
         <h2>Pertanyaan?</h2>
         <p>
-          Kode PDFLokal terbuka, jadi siapa pun bisa cek klaim di halaman ini. Kalau ada pertanyaan,
-          <a href="https://forms.gle/KPDWVAuc91pVjuWq6" target="_blank">hubungi saya</a> atau buka issue di
-          <a href="https://github.com/ojanlubis/pdflokal/issues" target="_blank">GitHub</a>.
+          Kode PDFLokal terbuka di <a href="https://github.com/ojanlubis/pdflokal" target="_blank" rel="noopener">GitHub</a>,
+          dan kamu bisa buka issue di sana. Atau <a href="https://forms.gle/KPDWVAuc91pVjuWq6" target="_blank">hubungi saya</a> langsung.
         </p>
       </section>
 
