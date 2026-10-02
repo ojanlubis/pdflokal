@@ -2538,6 +2538,7 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
   syncFormatBar();
 
   let committed = false; // guard: blur fires after Enter-commit too
+  let escaped = false;   // Escape = back out; an empty commit without it = delete the line
   let releaseKeyboardWatch = () => {};
   const commit = () => {
     if (committed) return;
@@ -2795,6 +2796,27 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
       track('editor_action', { action: 'text' });
       tel('tool_use', { tool: 'teks', action: 'text' });
       touchedEdit = !!d.replaceCoverId;
+    } else if ((draft?.replaceCoverId || draft?.ocrCoverId) && !escaped) {
+      // EMPTY FRESH COMMIT = DELETE THE LINE (founder ruling 2026-10-02, with
+      // Hapus: "itu naturally yang mereka mau"). Clearing a line's words and
+      // committing used to be the BACKOUT: onCancel took the cover back and the
+      // original stayed, so a person who deleted the text watched it not be
+      // deleted. Now the cover stays and no replacement is written: a pure
+      // deletion, the same pair Hapus makes (cover with replaceTargets, no text
+      // over it). For a paragraph draft it is the whole paragraph, which is what
+      // clearing the whole paragraph means. ONE undo step, already recorded when
+      // the cover was placed (`recorded: true`).
+      // BACKING OUT IS UNCHANGED: Escape sets `escaped` (the keydown handler
+      // below), which skips this branch and lands in the cancel one after it.
+      // A scan draft has nothing to cut, so nothing to re-bake; its cover is the
+      // deletion, and it needs the paper the editor's own appearance pass may
+      // not have painted yet (that pass stands down once the editor is gone).
+      const cov = findAnnotation(doc, draft.replaceCoverId || draft.ocrCoverId)?.annotation;
+      if (cov?.ocrBox && !cov.paperImage) void paintScanPaper(cov, pageId, cov.ocrBox);
+      touchedEdit = !!draft.replaceCoverId;
+      gantiOutcome = 'delete';
+      gantiCoverId = draft.replaceCoverId ?? null;
+      gantiDocFont = false;
     } else if (draft?.onCancel) {
       // Ganti Teks backed out with nothing typed — take the cover back too.
       draft.onCancel();
@@ -2941,12 +2963,20 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
     // prefill (draft.text). Restoring '' on a re-edit would read as a
     // deliberate empty commit — which now DELETES the edit (the
     // `draft.reEdit` empty branch below) — the opposite of backing out.
-    // A fresh Ganti draft keeps '' on purpose: its empty commit is the
-    // cancel that takes the cover back.
+    // A fresh Ganti draft keeps '' but SAYS it is backing out (`escaped`): its
+    // empty commit used to be the cancel that takes the cover back, and now an
+    // empty commit deletes the line (commit()'s fresh-draft branch), so the two
+    // can no longer share one signal. The flag, not a restored prefill, because a
+    // paragraph's editor reads its text back as laid-out rows and a rewritten
+    // textContent is not guaranteed to read back as the same words.
     // ocrReEdit sits beside reEdit here for the same reason it does in
     // commit(): a rung S2 re-edit is a re-edit, and Escape must back out of
     // one rather than empty-commit it into a deletion.
-    if (e.key === 'Escape') { ed.textContent = anno?.text ?? ((draft?.reEdit || draft?.ocrReEdit) ? draft.text : '') ?? ''; ed.blur(); }
+    if (e.key === 'Escape') {
+      escaped = true;
+      ed.textContent = anno?.text ?? ((draft?.reEdit || draft?.ocrReEdit) ? draft.text : '') ?? '';
+      ed.blur();
+    }
     e.stopPropagation(); // don't trigger app shortcuts while typing
   });
   ed.addEventListener('pointerdown', (e) => e.stopPropagation());
