@@ -186,14 +186,34 @@ export function createPageManager(deps) {
     // the bar states what the sheet can do before anything is touched, rather
     // than hiding every action behind a selection the user has to discover.
     bulkBar.classList.add('show');
-    bulkBar.querySelector('.pm-count').textContent = tr('pm.selected', { count: n });
+    // Only touch the live region when the text changes: re-writing identical
+    // text can make a screen reader repeat "0 dipilih" on every render.
+    const count = bulkBar.querySelector('.pm-count');
+    const label = tr('pm.selected', { count: n });
+    if (count.textContent !== label) count.textContent = label;
     const empty = n === 0;
-    bulkBar.querySelector('[data-act="rotate"]').disabled = empty;
-    bulkBar.querySelector('[data-act="extract"]').disabled = empty;
+    // aria-disabled, NOT the disabled attribute: a native-disabled button leaves
+    // the tab order and a screen reader's walk, so a keyboard user would never
+    // meet Putar/Ekstrak/Hapus at zero selection (the very gap this bar closes),
+    // and focus is dropped to <body> if the focused action disables itself.
+    // The click handler below ignores aria-disabled buttons.
+    setUnavailable(bulkBar.querySelector('[data-act="rotate"]'), empty);
+    setUnavailable(bulkBar.querySelector('[data-act="extract"]'), empty);
     // Deleting every page is blocked (an empty doc is a dead end, not a state).
-    bulkBar.querySelector('[data-act="delete"]').disabled = empty || n >= deps.getDoc().pages.length;
+    setUnavailable(bulkBar.querySelector('[data-act="delete"]'), empty || n >= deps.getDoc().pages.length);
     // Batal has nothing to cancel at zero — keep it out of the tab order too.
-    bulkBar.querySelector('[data-act="clear"]').hidden = empty;
+    // If it holds focus as it goes, hand focus to the first tile rather than
+    // letting the dialog fall back to <body>.
+    const clear = bulkBar.querySelector('[data-act="clear"]');
+    if (empty && !clear.hidden && document.activeElement === clear) {
+      grid.querySelector('.pm-tile:not(.pm-add)')?.focus();
+    }
+    clear.hidden = empty;
+  }
+
+  function setUnavailable(btn, off) {
+    if (off) btn.setAttribute('aria-disabled', 'true');
+    else btn.removeAttribute('aria-disabled');
   }
 
   // ---- FLIP reorder: grab a REAL page and move it -----------------------------------
@@ -438,8 +458,10 @@ export function createPageManager(deps) {
 
   // ---- bulk actions ---------------------------------------------------------------
   bulkBar.addEventListener('click', (e) => {
-    const act = e.target.closest('[data-act]')?.dataset.act;
-    if (!act || selected.size === 0) return;
+    const btn = e.target.closest('[data-act]');
+    const act = btn?.dataset.act;
+    // aria-disabled buttons still receive click/Enter/Space: they must do nothing.
+    if (!act || selected.size === 0 || btn.getAttribute('aria-disabled') === 'true') return;
     const doc = deps.getDoc();
     const pages = doc.pages.filter((p) => selected.has(p.id));
 

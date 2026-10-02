@@ -1649,7 +1649,16 @@
       border: 1px solid var(--line); background: var(--bg); font-size: 13px;
     }
     .pm-bulk button.danger { color: #d33131; border-color: rgba(211,49,49,.35); }
-    .pm-bulk button:disabled { opacity: .35; }
+    /* Unavailable, not absent: the three verbs stay on screen at zero selection
+       and say so with aria-disabled (NOT the disabled attribute, which would pull
+       them out of the tab order and out of a screen reader's walk). Muted ink, the hairline and a
+       step down in opacity (muted alone read as enabled), never red: red means touchable (specs/design-system.md §4), and
+       this is the one state where Hapus Halaman is not. Mirrors .ld-lang-opt:disabled.
+       Source order matters: this must follow .danger to beat its colour. */
+    .pm-bulk button[aria-disabled="true"],
+    .pm-bulk button.danger[aria-disabled="true"] {
+      color: var(--muted); border-color: var(--line); opacity: .6; cursor: not-allowed;
+    }
     .pm-bulk .btn-ghost { border: none; background: none; }
 
     /* ---- signature modal extras ---- */
@@ -1767,7 +1776,7 @@
         #file-menu button:hover { background: var(--bg); }
         .ds-seg button:hover:not(.on) { border-color: rgba(220,38,38,.4); }
         .pm-tile:hover:not(.pm-placeholder) { border-color: rgba(220,38,38,.45); }
-        .pm-bulk button:hover, .pm-pickbar button:hover { border-color: var(--accent); color: var(--accent); }
+        .pm-bulk button:hover:not([aria-disabled="true"]), .pm-pickbar button:hover { border-color: var(--accent); color: var(--accent); }
       }
       #v2-stage { padding-bottom: 40px; }
       .pv-anno { cursor: grab; }
@@ -2696,10 +2705,10 @@
       </div>
       <div id="pm-grid" class="pm-grid"></div>
       <div id="pm-bulk" class="pm-bulk">
-        <span class="pm-count"></span>
-        <button data-act="rotate">Putar</button>
-        <button data-act="extract">Ekstrak</button>
-        <button data-act="delete" class="danger">Hapus Halaman</button>
+        <span class="pm-count" id="pm-count" aria-live="polite"></span>
+        <button data-act="rotate" aria-describedby="pm-count">Putar</button>
+        <button data-act="extract" aria-describedby="pm-count">Ekstrak</button>
+        <button data-act="delete" class="danger" aria-describedby="pm-count">Hapus Halaman</button>
         <button data-act="clear" class="btn-ghost">Batal</button>
       </div>
       <div id="pm-pickbar" class="pm-pickbar">
