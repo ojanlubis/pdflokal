@@ -11,12 +11,15 @@
  * while the exported file is 90. Screen and file disagree, and the user finds
  * out only after they have the file.
  *
- * WHY NO EXISTING FIXTURE COVERED IT. `halaman-miring.pdf` sounds like the
- * right one and is not: its content is drawn askew, and the file carries no
- * /Rotate at all (checked — zero matches). EVERY fixture in this directory has
+ * WHY NO EXISTING FIXTURE COVERED IT. Every export test ran sources with
  * baseRotation 0, which is precisely the case where the buggy formula and the
  * correct one agree. A corpus that agrees with both implementations cannot
  * distinguish them, however large it is — see [[fixture-must-distinguish]].
+ * (CORRECTION, audit 2026-08-17: this comment used to claim
+ * `halaman-miring.pdf` "carries no /Rotate at all (checked — zero matches)".
+ * False: it carries /Rotate 90, inside a compressed object stream, which a
+ * grep of the raw bytes cannot see. It was simply never EXPORTED by a test.
+ * Read rotation with pdf-lib's getRotation(), not by grepping bytes.)
  *
  * THE PAGE IS DELIBERATELY NOT SQUARE (595 × 842 MediaBox, so 842 × 595 as
  * displayed). A square page would make the rotated and unrotated dimensions
