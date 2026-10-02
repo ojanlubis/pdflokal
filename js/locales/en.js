@@ -311,6 +311,10 @@ export default {
 
   render: { loading: 'loading…' },
 
+  maker: {
+    months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+  },
+
   theme: {
     toLight: 'Switch to light mode',
     toDark: 'Switch to dark mode',

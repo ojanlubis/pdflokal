@@ -36,9 +36,9 @@
  * URL FORM: `/en/support`, no trailing slash, no .html (vercel.json has
  * cleanUrls + trailingSlash:false). Change SUPPORT_EN_PATH here, nowhere else.
  */
-import { mapMarkup, EN_PATH } from './gen-en-page.js';
+import { mapMarkup, EN_PATH, SUPPORT_EN } from './gen-en-page.js';
 
-export const SUPPORT_EN_PATH = '/en/support';
+export const SUPPORT_EN_PATH = SUPPORT_EN; // defined once, in gen-en-page.js, which links to it
 export const SUPPORT_EN_FILE = 'en/support.html';
 export const SUPPORT_ID_PATH = '/dukung';
 

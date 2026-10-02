@@ -23,9 +23,11 @@ to pdflokal.id.
   sanctioned. The only server code in the repo is `api/` — see `api/`, each file's header says what
   it is. `sentry-tunnel.js` is the one endpoint that forwards data to a third party (DSN-allowlisted).
 - **All UI text in Indonesian**, informal "kamu". English tech terms (tap, scroll, install) are fine
-  inside step-by-step instructions. **No em-dashes in user-visible text** — use `, `. `/en` is the one
-  English page (generated, never hand-edit `en/index.html`; its strings live in
-  `i18n/markup.en.json` + `js/locales/en.js`).
+  inside step-by-step instructions. **No em-dashes in user-visible text** — use `, `. `/en` is `/` in
+  English and `/en/support` is `/dukung` in English: the same product, only the language differs
+  (founder, 2026-10-02). Both are generated, never hand-edit `en/index.html` or `en/support.html`;
+  strings live in `i18n/markup.en.json`, `i18n/markup.en.support.json` + `js/locales/en.js`. After
+  `npm run riwayat` (the work log in `dukung.html`) run `npm run seo` to carry it to `/en/support`.
 - Never add an external API call carrying user data. Privacy is the product.
 - Target files up to 50 MB comfortably. Test Chrome, Firefox, Safari, Edge, phone and desktop.
 

@@ -3,9 +3,11 @@
  * ============================================================================
  * tests/core/en-page.test.mjs proves the generator and the files. This proves
  * what a browser shows: no Indonesian visible anywhere, English from the JS
- * layer too (a toast, the Download sheet), nothing that 404s, the language link
- * on both pages, and that the removed pieces (QRIS, /dukung, the maker card, the
- * Template row) are really gone and nothing that used them throws.
+ * layer too (a toast, the Download sheet, the maker card's dates and lines),
+ * nothing that 404s, the language link on both pages, and that /en carries
+ * everything `/` does (the founder's ruling 2026-10-02: the same product, only
+ * the language differs): the Template row, the maker card, the QRIS button and
+ * QR, all in English, every support link going to /en/support.
  *
  * ⚠️ THE STOPLIST IS ONLY WORTH ITS HITS: it is first pointed at `/`, which is
  * Indonesian by construction, and must find plenty. A detector that finds
@@ -25,7 +27,9 @@ import { expectFirstPage } from './helpers/render.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SAMPLE = path.join(__dirname, 'fixtures', 'sample-2pages.pdf');
 
-const STOP = /\b(dan|yang|untuk|atau|dengan|dari|ini|itu|kamu|nggak|aja|udah|saya|ke|di|jadi|mau|bisa|biar|Unduh|halaman|ketuk|Tarik|Pilih|Seret|Buka|Hapus|Kirim|Gratis|Cepat|Tutup|Batal|Pakai|Kembali|Ukuran|Simpan|Ulangi|Urungkan)\b/i;
+// The second line is the vocabulary of the blocks `/en` used to cut and now carries
+// (Template row, maker card, QRIS card): the sweep must reach them too.
+const STOP = /\b(dan|yang|untuk|atau|dengan|dari|ini|itu|kamu|nggak|aja|udah|saya|ke|di|jadi|mau|bisa|biar|Unduh|halaman|ketuk|Tarik|Pilih|Seret|Buka|Hapus|Kirim|Gratis|Cepat|Tutup|Batal|Pakai|Kembali|Ukuran|Simpan|Ulangi|Urungkan|Dukung|Traktir|kopi|Lihat|selengkapnya|terakhir|Foto|Kwitansi|Gaji|Surat|Jalan|Agu|Okt|Des|Mei)\b/i;
 const EXEMPT_TEXT = new Set(['Dibuat di Indonesia']);
 
 // Every visible-or-hidden text node (dialogs, the folded tool grid, the FAQ
@@ -72,26 +76,71 @@ test.describe('/en', () => {
     page.on('pageerror', (e) => errors.push(e.message));
     await page.goto('/en');
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
-    await expect(page.locator('h1')).toHaveText('For sorting out PDFs.');
+    await expect(page.locator('h1')).toHaveText('For all your PDF Needs');
     expect(await indonesianHits(page)).toEqual([]);
     expect(await page.locator('.ld-foot').innerText()).toContain('Dibuat di Indonesia');
     expect(errors).toEqual([]);
     if (process.env.EN_SHOT_DIR) await page.screenshot({ path: path.join(process.env.EN_SHOT_DIR, 'en-desktop.png'), fullPage: true });
   });
 
-  test('2. the pieces /en drops are really gone, and the app boots without them', async ({ page }) => {
+  test('2. /en carries what `/` carries: Template row, QRIS button and QR, maker card, all in English', async ({ page }) => {
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
     await page.goto('/en');
-    for (const sel of ['#maker-card', '.tl-band', '#sc-donate', '.sc-qr', 'a[href^="/dukung"]', 'img[src*="qris"]']) {
-      expect(await page.locator(sel).count(), sel).toBe(0);
+    for (const sel of ['#maker-card', '#tl-band', '#sc-donate', '.sc-qr', 'img[src*="qris"]']) {
+      expect(await page.locator(sel).count(), sel).toBeGreaterThan(0);
     }
+    // The Template row, translated.
+    await expect(page.locator('#tl-band .tl-head b')).toHaveText('Template');
+    expect(await page.locator('#tl-band .tl-doc span').allTextContents()).toEqual(['Payslip', 'Invoice', 'Receipt', 'Delivery note', 'Work order']);
+    // The support card carries its donate button and QR, in English.
+    await expect(page.locator('#sc-donate')).toContainText('Buy me a coffee');
+    await expect(page.locator('.sc-qr p')).toHaveText('Scan with your e-wallet or mobile banking app.');
+    // Support links all point at the English support page; none at /dukung.
+    expect(await page.locator('a[href^="/dukung"]').count()).toBe(0);
+    expect(await page.locator('a[href^="/en/support"]').count()).toBeGreaterThanOrEqual(5);
     // Opening a document runs the whole boot path (celebrate.js wires #sc-donate).
     await page.setInputFiles('#file-input', SAMPLE);
     await expectFirstPage(page);
     // /privasi is the one link kept, and it stays Indonesian.
     await expect(page.locator('.ld-nav a[href="/privasi"]')).toHaveText('Privacy');
     expect(errors).toEqual([]);
+  });
+
+  test('2b. the maker card shows in English, with English dates, and "See more" opens the English work log', async ({ page }) => {
+    await page.goto('/en');
+    const card = page.locator('#maker-card');
+    await expect(card).toBeVisible({ timeout: 6000 });
+    await expect(card.locator('.mk-label')).toHaveText('Latest updates');
+    await expect(card.locator('.mk-real')).toHaveText('Fauzan Ahladzikri');
+    const times = await card.locator('.mk-list time').allTextContents();
+    expect(times.length).toBe(3);
+    for (const t of times) expect(t).toMatch(/^\d{1,2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)$/);
+    const lines = await card.locator('.mk-list span').allTextContents();
+    expect(lines.join(' ')).not.toMatch(STOP);
+    expect(lines[0]).toBe('You can now edit a whole paragraph at once.');
+    expect(await card.innerText()).not.toMatch(STOP);
+    // CONTROL: the same card on `/` is the Indonesian line, so the test can tell them apart.
+    await page.goto('/');
+    await expect(page.locator('#maker-card .mk-list span').first()).toHaveText('Sekarang kamu bisa edit satu paragraf sekaligus.', { timeout: 6000 });
+    // "See more" goes to the ENGLISH support page and opens its log.
+    await page.goto('/en');
+    await expect(card).toBeVisible({ timeout: 6000 });
+    await card.locator('.mk-more').click();
+    await expect(page).toHaveURL(/\/en\/support#development$/);
+    await expect(page.locator('#rw-drawer')).toBeVisible();
+  });
+
+  test('2c. the QRIS reveal on the support card works on /en, in English', async ({ page }) => {
+    await page.goto('/en');
+    await page.evaluate(() => document.getElementById('support-card').classList.add('show'));
+    await page.click('#sc-donate');
+    await expect(page.locator('#support-card')).toHaveClass(/qr-open/);
+    const qr = page.locator('.sc-qr');
+    await expect(qr).toBeVisible();
+    await expect(qr.locator('img[src="/images/qris.png"]')).toHaveAttribute('alt', 'QRIS to buy me a coffee');
+    await expect(qr.locator('.sc-performer b')).toHaveText('Ojan');
+    expect(await page.locator('#support-card').innerText()).not.toMatch(STOP);
   });
 
   test('3. strings that come from JS are English too: a toast, the Download sheet', async ({ page }) => {
@@ -164,6 +213,7 @@ test.describe('/en', () => {
     await page.click('#ld-burger');
     await expect(page.locator('#ld-burger-menu a[href="/"]')).toHaveText('Bahasa Indonesia');
     expect(await page.locator('#ld-burger-menu a[href^="/dukung"]').count()).toBe(0);
+    await expect(page.locator('#ld-burger-menu a[href="/en/support"]')).toHaveText('Support');
   });
 
   test('7. an English browser on `/` is NOT redirected', async ({ browser }) => {

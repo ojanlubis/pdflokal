@@ -20,10 +20,14 @@
  * Both name the string. Neither is a warning, because a warning is a file
  * nobody opens.
  *
- * WHAT /en REMOVES (the founder's hand, or an Indonesian product): the QRIS
- * support button and QR, every /dukung link, the Template row, the maker card.
- * The block cuts below throw when their anchor is gone, and the page is checked
- * for any surviving /dukung.
+ * WHAT /en CARRIES: EVERYTHING. The founder's ruling, 2026-10-02: "anggaplah itu
+ * cuma perbedaan bahasa tapi semua tetap sama" — `/en` is the SAME product as `/`
+ * in English, so the Template row, the maker card, the QRIS button and its QR all
+ * stay and are translated like any other string. The one rewrite is a link: every
+ * `/dukung` points at its English twin `/en/support` (scripts/gen-en-support.js),
+ * `/dukung#development` included, and the generator throws if a `/dukung` href
+ * would reach the page. (Until 2026-10-02 these blocks were cut from /en and the
+ * generator threw if /dukung survived; that was the opposite ruling.)
  *
  * ONE URL, ONE LANGUAGE. <html lang="en"> is what js/lib/i18n.js reads. The
  * hreflang set is the SAME three links as `/` (reciprocal by being identical);
@@ -119,7 +123,7 @@ const LD = /(<script type="application\/ld\+json">)([\s\S]*?)(<\/script>)/g;
 
 // Every string of index.html that needs an English line: markup + JSON-LD copy.
 export function sourceStrings(template) {
-  const html = stripIndonesianOnly(template);
+  const html = relinkSupport(template);
   const keys = new Set();
   mapMarkup(html, (k) => { keys.add(k); });
   for (const m of html.matchAll(LD)) {
@@ -128,11 +132,6 @@ export function sourceStrings(template) {
   return keys;
 }
 
-// Cut a block, shouting if its anchor is gone.
-function cut(html, re, label) {
-  if (html.search(re) < 0) throw new Error(`gen-en-page: cannot remove ${label} from /en: anchor not found in index.html. The template changed; fix the pattern here, do not ship /en with it.`);
-  return html.replace(re, '');
-}
 function sub(html, re, replacement, label) {
   if (html.search(re) < 0) throw new Error(`gen-en-page: anchor not found in index.html: ${label}. The template changed; fix the pattern here, do not ship /en with the Indonesian ${label}.`);
   return html.replace(re, () => replacement);
@@ -143,23 +142,22 @@ export const banner = `<!-- GENERATED FILE, DO NOT EDIT BY HAND.
      Regenerate with: npm run seo
      Hand edits are destroyed on the next run, and "npm run seo:check" fails CI. -->\n`;
 
-// What /en does not carry: the founder's hand, or an Indonesian product. Shared
-// by the renderer and by sourceStrings(), so a string that only lives in a
-// removed block is never demanded of the map.
-export function stripIndonesianOnly(template) {
-  let html = template;
-  html = cut(html, /[ \t]*<section class="tl-band" id="tl-band">[\s\S]*?<\/section>\n?/, 'the Template row');
-  html = cut(html, /[ \t]*<aside id="maker-card"[\s\S]*?<\/aside>\n?/, 'the maker card');
-  html = cut(html, /[ \t]*<button id="sc-donate">[\s\S]*?<\/button>\n?/, 'the QRIS donate button');
-  html = cut(html, /[ \t]*<div class="sc-qr">[\s\S]*?<span>Fauzan Ahladzikri<\/span>\s*<\/div>\s*<\/div>\n?/, 'the QR block');
-  html = cut(html, /[ \t]*<a href="\/dukung">[^<]*<\/a>\n?/g, 'the /dukung links');
-  if (/\/dukung/.test(mapMarkupNoComments(html))) throw new Error('gen-en-page: a /dukung link survived on /en. It is Indonesian-only (money rail, his hand).');
+// /dukung has an English twin. Every link to it on /en goes there, the work-log
+// anchor included (`/dukung#development` -> `/en/support#development`). Shared by
+// the renderer and by sourceStrings(). Shouts if there is nothing to rewrite (the
+// template lost its support links: fix the pattern, do not ship /en unlinked) and
+// if any /dukung href is still live afterwards.
+export const SUPPORT_EN = '/en/support';
+export function relinkSupport(template) {
+  const html = template.replace(/href="\/dukung(?=["#?])/g, `href="${SUPPORT_EN}`);
+  if (html === template) throw new Error('gen-en-page: no /dukung link found in index.html to point at /en/support. The template changed; fix the pattern here, do not ship /en without its support links.');
+  if (/href="\/dukung/.test(mapMarkupNoComments(html))) throw new Error('gen-en-page: a /dukung href reached /en. Every support link on /en must be /en/support.');
   return html;
 }
 
 export function renderEnPage(template, map, { origin }) {
   const url = `${origin}${EN_PATH}`;
-  let html = stripIndonesianOnly(template);
+  let html = relinkSupport(template);
 
   // ---- the English -------------------------------------------------------------
   const used = new Set();
