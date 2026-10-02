@@ -3046,8 +3046,11 @@ async function loadFilesInner(files) {
     const err = await firstUnrebuildableSource();
     if (err) {
       toast(tr('toast.mergeBlocked'));
-      tel('failure', { stage: 'import', reason: failureReason(err), class: 'none', blocked: true });
-      tel('failure_cause', { stage: 'import', ...failureCause(err) });
+      // NOT failure/import/corrupt: that triple means "THIS file could not be
+      // opened", and the new file here would have opened fine. The open document
+      // is the one that cannot be rebuilt, so it gets its own event (schema:
+      // merge_blocked) and the import/corrupt count stays about new files only.
+      tel('merge_blocked', { reason: 'open_unrebuildable', pages: pagesBucket(doc.pages.length) });
       return;
     }
   }

@@ -15,7 +15,9 @@
  * passes through untouched, as before); the moment a second file would join, each
  * PDF is proven loadable by pdf-lib, and one that is not is declined through the
  * ordinary unreadable-file path: skipped, import/corrupt, blocked:true. Nothing
- * is rasterised or repaired.
+ * is rasterised or repaired. When it is the file ALREADY OPEN that cannot be
+ * rebuilt, the new file is innocent: that branch reports merge_blocked
+ * {open_unrebuildable}, never import/corrupt (EXCLUDE 4: the triple keeps its meaning).
  *
  * WHAT DISTINGUISHES: against the old code tests 2-4 fail — the bad file joins
  * the document (or the good one joins the bad one) and no import failure row
@@ -54,6 +56,16 @@ const importFailures = async (page) => {
     .flatMap((b) => b.body.events || [])
     .filter((e) => e.event === 'failure' && e.props.stage === 'import'));
 };
+const mergeBlocked = async (page) => {
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  return page.evaluate(() => (window.__rail || [])
+    .filter((b) => b.url.includes('/api/t'))
+    .flatMap((b) => b.body.events || [])
+    .filter((e) => e.event === 'merge_blocked'));
+};
 const pageCount = (page) => page.evaluate(() => window.v2.getDoc().pages.length);
 
 test.describe('merge guard: a document pdf-lib cannot rebuild', () => {
@@ -88,6 +100,9 @@ test.describe('merge guard: a document pdf-lib cannot rebuild', () => {
     const fails = await expect.poll(async () => (await importFailures(page)).length).toBeGreaterThan(0)
       .then(() => importFailures(page));
     expect(fails[0].props).toMatchObject({ stage: 'import', reason: 'corrupt', blocked: true });
+    // The NEW file is the unrebuildable one: that is the import/corrupt meaning, and
+    // the open-document event must not fire alongside it.
+    expect(await mergeBlocked(page)).toEqual([]);
   });
 
   test('picking it together with a good file skips only the bad one', async ({ page }) => {
@@ -99,6 +114,7 @@ test.describe('merge guard: a document pdf-lib cannot rebuild', () => {
     const names = await page.evaluate(() => window.v2.getDoc().sources.map((s) => s.name));
     expect(names).toEqual(['surat-word.pdf']);
     await expect.poll(async () => (await importFailures(page)).length).toBeGreaterThan(0);
+    expect(await mergeBlocked(page)).toEqual([]);
   });
 
   test('when the file ALREADY OPEN is the unrebuildable one, adding anything is declined and says so', async ({ page }) => {
@@ -110,8 +126,12 @@ test.describe('merge guard: a document pdf-lib cannot rebuild', () => {
     await page.setInputFiles('#file-input', GOOD2);
     await expect(page.locator('#toast')).toContainText('nggak bisa digabung');
     expect(await pageCount(page)).toBe(2); // nothing was added
-    await expect.poll(async () => (await importFailures(page)).length).toBeGreaterThan(0);
-    expect((await importFailures(page))[0].props).toMatchObject({ reason: 'corrupt', blocked: true });
+    // The rail says WHICH side was at fault: a merge_blocked for the open document,
+    // and NOT failure/import/corrupt, because GOOD2 would have opened fine and
+    // counting it there would widen what that triple means.
+    await expect.poll(async () => (await mergeBlocked(page)).length).toBe(1);
+    expect((await mergeBlocked(page))[0].props).toEqual({ reason: 'open_unrebuildable', pages: '2-5' });
+    expect(await importFailures(page)).toEqual([]);
   });
 
   test('control: two ordinary files still merge, and a protected file is not mistaken for a corrupt one', async ({ page }) => {
