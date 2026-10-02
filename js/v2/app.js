@@ -1700,13 +1700,25 @@ async function smartReplace(pageId, x, y) {
   // list). Anything it cannot prove declines, named on the rail, to exactly
   // the per-line edit below — never a guess.
   if (line.blockId !== null && line.blockId !== undefined) {
-    const pageLines = await textRuns.getLines(pageId);
-    const block = blockOfLine(pageLines, line);
+    // The index reads the PRISTINE file, so a line Hapus deleted (or Edit already
+    // owns) is still in it and would be prefilled back into the paragraph, and
+    // committing would write it into the file again. Detect the paragraph over
+    // the lines the page still shows: a hole at either end leaves a shorter
+    // paragraph, a hole in the middle breaks it and the tap falls to the line
+    // edit below.
+    const ownedTargets = page ? pageEdits(page).flatMap((e) => e.targets) : [];
+    let pageLines = await textRuns.getLines(pageId);
+    let blockLine = line;
+    if (ownedTargets.length) {
+      pageLines = await textRuns.getLinesWithout(pageId, ownedTargets);
+      blockLine = resolveTap(pageLines, x, y, MIN_HIT);
+    }
+    const block = blockLine ? blockOfLine(pageLines, blockLine) : null;
     if (block) {
       const verdict = planBlockEdit(block, pageLines, { rotation: page ? totalPageRotation(page) : 0 });
       if (verdict.ok) {
         tel('block_edit', { outcome: 'open', block_lines: block.lines.length });
-        openBlockReplace(pageId, line, verdict.plan);
+        openBlockReplace(pageId, blockLine, verdict.plan);
         return;
       }
       tel('block_edit', { outcome: 'decline', decline_reason: verdict.reason, block_lines: block.lines.length });

@@ -478,6 +478,22 @@ function distanceToBox(x, y, bx, by, bw, bh) {
   return Math.hypot(x - cx, y - cy);
 }
 
+// The runs of a page that NO committed edit or deletion owns. A cover carrying
+// replaceTargets (a Ganti edit, a Hapus delete, a paragraph edit) says "the
+// printed text at these pdf-space spots is gone or replaced"; the pdf.js index
+// reads the PRISTINE source and still holds those runs, so anything that asks
+// "what text is on this page" (Rung D's paragraph prefill) must ask without
+// them, or it hands back words the page no longer shows. `targets` are
+// run.pdf-shaped geometries (core/redact.js's frame); a run is owned when one
+// matches on position, direction, length and size. Pure: the same run objects
+// come back, so callers can still map them to the cached index.
+const OWNED_TOL = 0.01;
+export function runsNotOwned(runs, targets) {
+  if (!targets || targets.length === 0) return runs;
+  const same = (a, b) => ['x0', 'y0', 'ux', 'uy', 'len', 'size'].every((k) => Math.abs(a[k] - b[k]) <= OWNED_TOL);
+  return runs.filter((r) => !targets.some((t) => same(r.pdf, t)));
+}
+
 // The font size a Ganti Teks draft starts with, from the replaced line's own
 // size. The editor accepts 6..120; the size is KEPT FRACTIONAL on purpose: the
 // twin (overlay and export) paints at exactly this size, and rounding 7.395 to
