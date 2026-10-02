@@ -146,10 +146,37 @@ export function fontEmbedsAtSave(parsed) {
     // them still dereferences OS/2 inside fontkit, so they must not throw.
     void parsed.capHeight; void parsed.xHeight;
     void parsed.post.isFixedPitch; void parsed.head.macStyle.italic;
-    return nums.every((n) => Number.isFinite(n));
+    if (!nums.every((n) => Number.isFinite(n))) return false;
+    return glyphsReadableAtSave(parsed);
   } catch {
     return false;
   }
+}
+
+// THE OTHER HALF OF save(): the widths. Without `{subset:true}` pdf-lib's
+// CustomFontEmbedder writes the /W array for EVERY code point in the font's
+// cmap (allGlyphsInFontSortedById -> computeWidths), reading each glyph's
+// advanceWidth. fontkit answers that from the glyph's own outline header, so a
+// subset whose glyf/loca runs past the end of its bytes (a truncated or damaged
+// FontFile2 stream) parses, passes every descriptor field above, embeds, and
+// then throws `RangeError: Trying to access beyond buffer length` from inside
+// save(). The first real one, 2026-10-01 (Sentry JAVASCRIPT-17, tag
+// stage:commit-bake): the bake swallowed it, and export would have died on it.
+// This walks exactly the glyphs pdf-lib will walk, now, while a throw can still
+// decline the rung. Memoised per parsed font: callers ask on every keystroke.
+const glyphsReadable = new WeakMap();
+function glyphsReadableAtSave(parsed) {
+  if (glyphsReadable.has(parsed)) return glyphsReadable.get(parsed);
+  let ok = true;
+  try {
+    for (const cp of parsed.characterSet) {
+      if (!Number.isFinite(parsed.glyphForCodePoint(cp).advanceWidth)) { ok = false; break; }
+    }
+  } catch {
+    ok = false;
+  }
+  glyphsReadable.set(parsed, ok);
+  return ok;
 }
 
 // ---- rung 1: doc-subset -------------------------------------------------------
