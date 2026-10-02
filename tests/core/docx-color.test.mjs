@@ -199,3 +199,29 @@ test('colour: nothing in the page, nothing in the colour output (no shapes, no c
   assert.doesNotMatch(r.documentXml, /w:color w:val|wps:/);
   await clean(r);
 });
+
+// A filled path too complex to draw (a zigzag of 3000 vertices that does not simplify away) is the raster hook's work:
+// the region becomes a picture at its paint position, with the text left to Word; no hook, no picture, counted.
+async function complexPdf() {
+  return makePdf((pages, { fonts, rgb }) => {
+    const pts = [];
+    for (let k = 0; k < 3000; k += 1) pts.push([60 + (k / 3000) * 450, 300 + (k % 2 ? 160 : 0)]);
+    pages[0].drawSvgPath(`M ${pts[0][0]} ${pts[0][1]} ${pts.slice(1).map((p) => `L ${p[0]} ${p[1]}`).join(' ')} Z`, { x: 0, y: 842, color: rgb(0.1, 0.4, 0.2) });
+    pages[0].drawText('di atas gambar', { x: 80, y: 400, size: 14, font: fonts.reg });
+  });
+}
+
+test('colour: a region too complex to draw becomes a picture through ctx.options.rasterize, anchored in paint order; with no hook it is counted and not faked', async () => {
+  const bytes = await complexPdf();
+  const calls = [];
+  const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+  const r = await convertBytes(bytes, { options: { rasterize: async (a) => { calls.push(a.why); return { bytes: png, ext: 'png' }; } } });
+  assert.deepEqual(calls, ['complex']);
+  const imgs = r.model.pages[0].anchors.filter((a) => a.kind === 'img');
+  assert.equal(imgs.length, 1);
+  assert.ok(imgs[0].wPt > 400 && imgs[0].hPt > 150, 'the picture covers the lost region');
+  await clean(r);
+  const none = await convertBytes(bytes, { options: { rasterize: async () => null } });
+  assert.equal(none.model.pages[0].anchors.filter((a) => a.kind === 'img').length, 0);
+  assert.equal(shapesOf(none).length, 0, 'the big path is not drawn as a shape');
+});

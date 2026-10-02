@@ -46,6 +46,7 @@
 
 import { registerAnchor } from './writer.js';
 import { walkOps } from './ops.js';
+import { canRasterize, rasterizeRegion } from './raster.js';
 
 // ------------------------------------------------------------- small maths ---
 const HEX6 = /^[0-9a-f]{6}$/i;
@@ -162,6 +163,42 @@ function pointInCmds(cmds, px, py) { // even-odd over the flattened outline
   return inside;
 }
 
+// Runs of straight segments lose every vertex within `tol` pt of the line between the run's kept ends
+// (Douglas-Peucker, iterative: a map outline has 60,000 of them). Curves, closes and moves are kept as they are.
+function simplify(cmds, tol = 0.25) {
+  const out = [];
+  let k = 0;
+  while (k < cmds.length) {
+    if (cmds[k][0] !== 'L') { out.push(cmds[k]); k += 1; continue; }
+    // the run of L's, with the point that precedes it
+    const prev = out[out.length - 1];
+    const px = prev && prev[0] !== 'Z' ? prev[prev.length - 2] : null;
+    const py = prev && prev[0] !== 'Z' ? prev[prev.length - 1] : null;
+    let e = k;
+    while (e < cmds.length && cmds[e][0] === 'L') e += 1;
+    const pts = px === null ? [] : [[px, py]];
+    for (let q = k; q < e; q += 1) pts.push([cmds[q][1], cmds[q][2]]);
+    const keep = new Uint8Array(pts.length);
+    keep[0] = 1; keep[pts.length - 1] = 1;
+    const stack = [[0, pts.length - 1]];
+    while (stack.length) {
+      const [a, b] = stack.pop();
+      if (b - a < 2) continue;
+      const dx = pts[b][0] - pts[a][0]; const dy = pts[b][1] - pts[a][1];
+      const L = Math.hypot(dx, dy);
+      let far = -1; let fd = tol;
+      for (let q = a + 1; q < b; q += 1) {
+        const d = L < 1e-9 ? Math.hypot(pts[q][0] - pts[a][0], pts[q][1] - pts[a][1]) : Math.abs((pts[q][0] - pts[a][0]) * dy - (pts[q][1] - pts[a][1]) * dx) / L;
+        if (d > fd) { fd = d; far = q; }
+      }
+      if (far >= 0) { keep[far] = 1; stack.push([a, far], [far, b]); }
+    }
+    for (let q = px === null ? 0 : 1; q < pts.length; q += 1) if (keep[q]) out.push(['L', pts[q][0], pts[q][1]]);
+    k = e;
+  }
+  return out;
+}
+
 // ------------------------------------------------------------ gradients -----
 const hexIn = (s) => String(s).replace('#', '').toUpperCase();
 function colourAt(stops, t) {
@@ -240,6 +277,7 @@ async function replay(ctx) {
   const stats = { fills: 0, strokes: 0, gradients: 0, smaskSkipped: 0, tilingSkipped: 0, patternMissing: 0 };
   const items = [];
   const events = [];
+  const lost = []; // what we could not draw natively: { z, box (page pt), why }  (the raster hook's work list)
   // gradient objects are resolved asynchronously by name
   const names = new Set();
   const nOps = ops.fnArray.length;
@@ -371,11 +409,13 @@ async function replay(ctx) {
     if (close) path.cmds.push(['Z']);
     if (st.smaskGroup) return; // the inside of a mask DEFINITION is never painted
     const mask = st.maskOn ? st.mask : st.grpMask;
-    if ((st.maskOn || st.grpMask) && !(mask && mask.ir)) { stats.smaskSkipped += 1; return; }
+    const lose = (why) => { if (doFill && !empty(st.clip)) { const b = inter(st.clip, path.box); if (!empty(b)) lost.push({ z: ev.i, box: b, why }); } };
+    if ((st.maskOn || st.grpMask) && !(mask && mask.ir)) { stats.smaskSkipped += 1; lose('mask'); return; }
     let fillSpec = null;
     let strokeSpec = null;
     if (doFill) fillSpec = solidOf(st.fill, st.fillPat);
-    if (mask && fillSpec && fillSpec.grad) { stats.smaskSkipped += 1; return; } // a gradient under a gradient mask
+    if (mask && fillSpec && fillSpec.grad) { stats.smaskSkipped += 1; lose('mask'); return; } // a gradient under a gradient mask
+    if (doFill && st.fillPat === 'tiling') lose('pattern');
     if (doStroke && !mask && st.strokePat !== 'tiling' && !(st.strokePat && st.strokePat.shade)) strokeSpec = st.stroke ? { c: st.stroke } : null;
     if (!fillSpec && !strokeSpec) return;
     const rect = rectOf(path.cmds);
@@ -463,8 +503,8 @@ async function replay(ctx) {
       case OPS.shadingFill: {
         const ir = shadings.get(args[0]);
         if (st.smaskGroup) { if (ir && ir[0] === 'RadialAxial' && !defMask) defMask = { ir, M: toPage(ev.ctm) }; break; }
-        if (st.maskOn || st.grpMask) { stats.smaskSkipped += 1; break; }
-        if (!ir || ir[0] !== 'RadialAxial' || empty(st.clip)) { stats.patternMissing += 1; break; }
+        if (st.maskOn || st.grpMask) { stats.smaskSkipped += 1; if (!empty(st.clip)) lost.push({ z: ev.i, box: st.clip.slice(), why: 'mask' }); break; }
+        if (!ir || ir[0] !== 'RadialAxial' || empty(st.clip)) { stats.patternMissing += 1; if (!empty(st.clip)) lost.push({ z: ev.i, box: st.clip.slice(), why: 'shading' }); break; }
         const cmds = st.clipPath || rectCmds(st.clip);
         items.push({ z: ev.i, cmds, box: pathBox(cmds), rect: st.clipPath ? null : st.clip.slice(), eo: false, fill: { grad: ir, M: toPage(ev.ctm), a: st.fa }, stroke: null, clip: st.clip.slice() });
         stats.fills += 1; stats.gradients += 1;
@@ -489,7 +529,7 @@ async function replay(ctx) {
       default: break;
     }
   }
-  return { items, events, stats };
+  return { items, events, stats, lost };
 }
 
 // --------------------------------------------------- text colour matching ---
@@ -537,33 +577,62 @@ function matchText(ctx, events, stats) {
     hits.sort((a, b) => a.s - b.s);
     if (!hits.length) { stats.textUnmatched += 1; out.push([r]); continue; }
     stats.textMatched += 1;
-    // consecutive shows of one colour make one segment
-    const segs = [];
-    for (const h of hits) {
-      const c = h.e.color === undefined ? null : h.e.color;
-      if (h.e.color === undefined) r.colorUnresolved = true;
+    // Paint order along the run: at every stretch the LATEST show covering it wins (a drop shadow or a fake
+    // bold draws the same word twice; alternating the two colours would scramble the word). Gaps (spaces
+    // are not shows we track) take the colour before them; equal neighbours merge.
+    const xs = [...new Set([0, len, ...hits.flatMap((h) => [h.s, h.end])])].sort((p, q) => p - q);
+    let segs = [];
+    for (let k = 0; k + 1 < xs.length; k += 1) {
+      const lo = xs[k]; const hi = xs[k + 1];
+      if (hi - lo < 1e-6) continue;
+      const mid = (lo + hi) / 2;
+      let top = null;
+      for (const h of hits) if (h.s <= mid && mid <= h.end && (!top || h.e.z > top.e.z)) top = h;
+      const gap = !top;
+      const c = gap ? (segs.length ? segs[segs.length - 1].c : undefined) : (top.e.color === undefined ? null : top.e.color);
+      if (top && top.e.color === undefined) r.colorUnresolved = true;
       const last = segs[segs.length - 1];
-      if (last && last.c === c) { last.end = Math.max(last.end, h.end); last.z = Math.max(last.z, h.e.z); }
-      else segs.push({ c, s: last ? Math.max(h.s, last.end) : 0, end: h.end, z: h.e.z });
+      if (last && (last.c === c || c === undefined)) { last.end = hi; if (top) last.z = Math.max(last.z, top.e.z); }
+      else segs.push({ c: c === undefined ? null : c, s: lo, end: hi, z: top ? top.e.z : 0 });
     }
-    segs[segs.length - 1].end = len;
+    // a sliver is an artefact of rounding, not a colour change: it joins the longer neighbour
+    while (segs.length > 1) {
+      const k = segs.findIndex((g) => g.end - g.s < Math.min(0.3 * size, 0.2 * len));
+      if (k < 0) break;
+      const nb = k === 0 ? 1 : (k === segs.length - 1 ? k - 1 : (segs[k - 1].end - segs[k - 1].s >= segs[k + 1].end - segs[k + 1].s ? k - 1 : k + 1));
+      const into = segs[nb];
+      into.s = Math.min(into.s, segs[k].s); into.end = Math.max(into.end, segs[k].end); into.z = Math.max(into.z, segs[k].z);
+      segs.splice(k, 1);
+      for (let q = segs.length - 1; q > 0; q -= 1) if (segs[q].c === segs[q - 1].c) { segs[q - 1].end = segs[q].end; segs[q - 1].z = Math.max(segs[q - 1].z, segs[q].z); segs.splice(q, 1); }
+    }
+    segs[0].s = 0; segs[segs.length - 1].end = len;
     const paint = (target, sg) => { target.color = sg.c && sg.c !== '000000' ? sg.c : null; target.colorZ = sg.z; resolved.add(target); };
     if (segs.length === 1 || !horizontalPage || Math.abs(uy) > 1e-3 || ux < 0) {
-      paint(r, segs.reduce((a, b) => (b.end - b.s > a.end - a.s ? b : a))); // cannot split: the colour that covers most of it
+      paint(r, segs.reduce((x, y) => (y.end - y.s > x.end - x.s ? y : x))); // cannot split: the colour that covers most of it
       out.push([r]);
       continue;
     }
-    // split the run where the colour changes, on a space when one is near
+    // split the run where the colour changes; a cut lands ON whitespace (within a few characters) or not at all:
+    // a colour that changes inside a word never splits the word
     const L = r.str.length;
     const cuts = [0];
+    const kept = [segs[0]];
     for (let k = 1; k < segs.length; k += 1) {
-      let c = Math.round((segs[k].s / len) * L);
-      for (let d = 0; d <= 4; d += 1) {
-        if (c - d > 0 && /\s/.test(r.str[c - d - 1] || '')) { c -= d; break; }
-        if (c + d < L && /\s/.test(r.str[c + d - 1] || '')) { c += d; break; }
+      const c0 = Math.round((segs[k].s / len) * L);
+      let c = -1;
+      for (let d = 0; d <= 4 && c < 0; d += 1) {
+        if (c0 - d > 0 && /\s/.test(r.str[c0 - d - 1] || '')) c = c0 - d;
+        else if (c0 + d < L && c0 + d > 0 && /\s/.test(r.str[c0 + d - 1] || '')) c = c0 + d;
       }
-      cuts.push(Math.max(cuts[cuts.length - 1], Math.min(L, c)));
+      if (c <= cuts[cuts.length - 1] || c >= L) { // no word boundary here: the stretch belongs to the part before it, unless it is the longer
+        const prev = kept[kept.length - 1];
+        if (segs[k].end - segs[k].s > prev.end - prev.s) kept[kept.length - 1] = { ...segs[k], s: prev.s };
+        else prev.end = segs[k].end;
+        continue;
+      }
+      cuts.push(c); kept.push(segs[k]);
     }
+    segs = kept;
     cuts.push(L);
     const parts = [];
     for (let k = 0; k < segs.length; k += 1) {
@@ -585,10 +654,12 @@ function matchText(ctx, events, stats) {
 
 // ------------------------------------------------------------- the pages ----
 const MAX_SHAPES = 400; // per page: a map or a chart with thousands of marks must not stall Word
+const MAX_SHAPE_CMDS = 2500; // vertices in one shape, after simplification
+const MAX_PAGE_CMDS = 20000; // vertices on one page, after simplification
 
 export async function analyzeColor(ctx) {
   const stats = { shapes: 0, fills: 0, strokes: 0, gradients: 0, smaskSkipped: 0, tilingSkipped: 0, patternMissing: 0,
-    textMatched: 0, textUnmatched: 0, runsSplit: 0, highlights: 0, guardDropped: 0, guardWhitened: 0, capped: 0, whiteDropped: 0, tiny: 0 };
+    textMatched: 0, textUnmatched: 0, runsSplit: 0, highlights: 0, guardDropped: 0, guardWhitened: 0, capped: 0, complexDropped: 0, rasterised: 0, whiteDropped: 0, tiny: 0 };
   let rep;
   try { rep = await replay(ctx); } catch (e) { stats.error = String(e && e.message); return { fillAt: () => null, anchors: [], background: null, stats }; }
   Object.assign(stats, { fills: rep.stats.fills, strokes: rep.stats.strokes, gradients: rep.stats.gradients, smaskSkipped: rep.stats.smaskSkipped, tilingSkipped: rep.stats.tilingSkipped, patternMissing: rep.stats.patternMissing });
@@ -620,6 +691,9 @@ export async function analyzeColor(ctx) {
     }
   }
   const items = rep.items.filter((it) => (it.fill || it.stroke) && it.box[2] >= 0 && it.box[3] >= 0 && it.box[0] <= W && it.box[1] <= H);
+  const lostRegions = rep.lost.filter((l) => l.box[2] > 0 && l.box[3] > 0 && l.box[0] < W && l.box[1] < H);
+  // a path with tens of thousands of vertices (a map) is the same shape with a few hundred: Word must open it
+  for (const it of items) if (!it.rect && it.cmds.length > 40) it.cmds = simplify(it.cmds);
 
   // -- classify: drop noise, normalise lines into rects
   const drawables = [];
@@ -684,24 +758,39 @@ export async function analyzeColor(ctx) {
     return inside;
   };
   const shapes = [];
+  const highlighted = new Set();
   for (const it of keep) {
     const hits = hlFor(it);
-    if (hits) { for (const r of hits) r.bg = it.fill.c; stats.highlights += 1; continue; }
+    if (hits) { for (const r of hits) r.bg = it.fill.c; stats.highlights += 1; highlighted.add(it); continue; }
     shapes.push(it);
   }
 
-  // -- cap: keep the page's biggest marks
-  let drawn = shapes;
+  // -- budgets. Word opens what it can lay out: a shape with thousands of vertices is not drawn (it is a map or
+  //    a trace, and becomes a picture where a rasterizer exists), and the page as a whole gets a vertex budget.
+  //    Counted, never faked: a bounding box in its place would paint a block over the page.
+  const weight = (it) => (it.fill ? area(it.box) : (it.stroke.w * Math.hypot(it.box[2] - it.box[0], it.box[3] - it.box[1])));
+  let drawn = [];
+  for (const it of shapes) {
+    if (it.cmds.length > MAX_SHAPE_CMDS) { stats.complexDropped += 1; if (it.fill) lostRegions.push({ z: it.z, box: inter(it.box, pageBox), why: 'complex' }); } else drawn.push(it);
+  }
   if (drawn.length > MAX_SHAPES) {
-    const weight = (it) => (it.fill ? area(it.box) : (it.stroke.w * Math.hypot(it.box[2] - it.box[0], it.box[3] - it.box[1])));
     drawn = drawn.slice().sort((a, b) => weight(b) - weight(a)).slice(0, MAX_SHAPES).sort((a, b) => a.z - b.z);
-    stats.capped = shapes.length - MAX_SHAPES;
+    stats.capped = shapes.length - drawn.length - stats.complexDropped;
+  }
+  let cmdTotal = drawn.reduce((a, it) => a + it.cmds.length, 0);
+  if (cmdTotal > MAX_PAGE_CMDS) {
+    const byWeight = drawn.slice().sort((a, b) => weight(a) - weight(b)); // smallest first: they go first
+    const gone = new Set();
+    for (const it of byWeight) { if (cmdTotal <= MAX_PAGE_CMDS) break; if (it.cmds.length > 12) { gone.add(it); cmdTotal -= it.cmds.length; stats.complexDropped += 1; } }
+    drawn = drawn.filter((it) => !gone.has(it));
   }
 
   // -- fillAt: the solid colour behind a page rectangle (composited over what is beneath)
+  // Only paint that REACHES the page counts: a fill we did not draw (capped, too complex, masked) must not
+  // vouch for light text sitting on it. Highlights count: they travel with the words as run shading.
   const solids = [];
-  for (const it of keep) if (it.fill && !it.stroke) solids.push(it);
-  for (const it of shapes) if (it.fill && it.stroke && !solids.includes(it)) solids.push(it);
+  for (const it of drawn) if (it.fill) solids.push(it);
+  for (const it of keep) if (it.fill && !it.stroke && highlighted.has(it)) solids.push(it);
   solids.sort((a, b) => a.z - b.z);
   const fillAt = (x0, y0, x1, y1) => {
     const q = [x0, y0, x1, y1];
@@ -724,8 +813,11 @@ export async function analyzeColor(ctx) {
   let background = null;
   for (const it of solids) if (area(it.box) >= 0.9 * W * H && !isWhite(it.fill.c) && (it.fill.a ?? 1) >= 0.9) background = it.fill.c;
 
+  // -- what we could not draw natively, as pictures where a rasterizer exists (browser: raster.js; tests: ctx.options.rasterize)
+  const pictures = await rasterRegions(ctx, lostRegions, stats);
+
   // -- the rule: colour and background travel together
-  contrastGuard(ctx, resolved, fillAt, stats);
+  contrastGuard(ctx, resolved, fillAt, stats, pictures);
 
   const info = { fillAt, background, stats };
   let cached = null;
@@ -742,6 +834,8 @@ export async function analyzeColor(ctx) {
         cached.push(toShape(it));
       }
       stats.shapes = cached.length;
+      for (const pic of pictures) cached.push(pic);
+      cached.sort((a, b) => a.z - b.z);
       return cached;
     },
   });
@@ -750,8 +844,8 @@ export async function analyzeColor(ctx) {
 
 // Light text needs a backdrop we drew (or a picture); text we could not colour, over a dark
 // backdrop we drew, becomes white. Both directions of "travel together".
-function contrastGuard(ctx, resolved, fillAt, stats) {
-  const imgs = (ctx.images || []).filter((im) => {
+function contrastGuard(ctx, resolved, fillAt, stats, pictures) {
+  const imgs = [...pictures.map((p) => ({ z: p.z, box: { x0: p.anchor.x, y0: p.anchor.y, x1: p.anchor.x + p.wPt, y1: p.anchor.y + p.hPt } })), ...(ctx.images || [])].filter((im) => {
     const a = (im.box.x1 - im.box.x0) * (im.box.y1 - im.box.y0);
     return !((ctx.kind === 'searchable-scan' || ctx.kind === 'ocr-scan') && a > ctx.widthPt * ctx.heightPt * 0.8);
   });
@@ -769,6 +863,40 @@ function contrastGuard(ctx, resolved, fillAt, stats) {
     }
   }
 }
+
+// ---------------------------------------------------------- the raster hook ---
+// The regions we could not draw natively (a soft-masked fill, a tiling pattern, a vertex-heavy trace) become
+// pictures of the page there, with the TEXT left out (it stays live Word text). Who rasterizes:
+//   ctx.options.rasterize({ ctx, box, why }) -> { bytes, ext } | null     (tests, other hosts)
+//   else raster.js in a browser (canvas + pdf.js's own renderer)           else nothing: counted, not faked.
+const MAX_REGIONS = 4;
+const MAX_RASTER_BYTES = 24 * 1024 * 1024; // per document
+async function rasterRegions(ctx, regions, stats) {
+  const out = [];
+  const W = ctx.widthPt; const H = ctx.heightPt;
+  const hook = ctx.options && typeof ctx.options.rasterize === 'function' ? ctx.options.rasterize : defaultRasterizer();
+  if (!hook || !regions.length) return out;
+  const shared = ctx.shared || {};
+  const wanted = regions
+    .map((r) => ({ ...r, box: inter(r.box, [0, 0, W, H]) }))
+    .filter((r) => !empty(r.box) && area(r.box) >= 0.01 * W * H)
+    .sort((a, b) => area(b.box) - area(a.box));
+  const picked = [];
+  for (const r of wanted) if (!picked.some((q) => within(r.box, q.box, 2))) picked.push(r);
+  for (const r of picked.slice(0, MAX_REGIONS)) {
+    if ((shared.rasterBytes || 0) > MAX_RASTER_BYTES) break;
+    let pic = null;
+    try { pic = await hook({ ctx, box: r.box.slice(), why: r.why }); } catch { pic = null; }
+    if (!pic || !pic.bytes || !pic.bytes.length) continue;
+    shared.rasterBytes = (shared.rasterBytes || 0) + pic.bytes.length;
+    const b = r.box;
+    out.push({ kind: 'img', anchor: { x: b[0], y: b[1] }, bytes: pic.bytes, ext: pic.ext || 'png', wPt: b[2] - b[0], hPt: b[3] - b[1], z: r.z, crop: null });
+    stats.rasterised += 1;
+  }
+  return out;
+}
+
+const defaultRasterizer = () => (canRasterize() ? rasterizeRegion : null);
 
 // ----------------------------------------------------------- the model ------
 function toShape(it) {
