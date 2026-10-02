@@ -41,8 +41,10 @@ const SW = fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8');
 // v5, v6 and v7 joined on 2026-10-02. v7 carried Sentry JAVASCRIPT-18 (a fresh
 // app.js beside a pre-#165 import.js, reproduced in tests/sw-generation.spec.js
 // as the PER-FILE fallback); v5 and v6 were live for the three heal+repeat pairs
-// on the rail (2026-09-29, 09-30, 10-01). All three were per-file caches, which
-// is mixed by construction. v4 never shipped (see sw.js's header).
+// on the rail (2026-09-29, 09-30, 10-01) — the WORKER's part in those pairs is
+// INFERRED, not measured: the heal reload they died on is uncontrolled, and no
+// candidate reproduced 'repeat' in Chromium or WebKit. Named here because all
+// three were per-file caches, which is mixed by construction. v4 never shipped.
 const POISONED = [
   'pdflokal-shell-v1', 'pdflokal-shell-v2', 'pdflokal-shell-v3',
   'pdflokal-shell-v5', 'pdflokal-shell-v6', 'pdflokal-shell-v7',
