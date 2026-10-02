@@ -90,6 +90,8 @@ const INTENT = ['gabung', 'split', 'halaman', 'kompres', 'ttd', 'paraf', 'teks',
 const EXPORT_FORMAT = ['pdf', 'png', 'jpg'];
 const EXPORT_SIZE = ['asli', 'kompres', 'sedang', 'kecil'];
 const PAGES_SCOPE = ['all', 'some'];
+// zoomBucket()'s five-plus-one outputs, percent of 1:1. Keep in lockstep with it.
+const ZOOM_BUCKET = ['<60', '60-99', '100-149', '150-199', '200-249', '250+'];
 
 // WHICH KIND of character a standard font refused (failure.class, 2026-08-09).
 // core/text-encode.js's own header already names the two populations that
@@ -120,6 +122,24 @@ export function pagesBucket(n) {
   if (v <= 5) return '2-5';
   if (v <= 20) return '6-20';
   return '21+';
+}
+
+// zoom (a multiplier, 0.3..3 as the +/- buttons clamp it) → a percent bucket.
+// Cuts are placed against the MEASURED opening zooms of 913eb38 (desktop fit-
+// width: 2.38 at 1512px, 1.59 at 1040px; touch path: ~1.0 tablet, ~0.65 phone),
+// so each of those openings lands in its OWN bucket and "left it where it
+// opened" is distinguishable from "moved one bucket". Rounded to a whole percent
+// before comparing: the buttons step by 0.25 from an arbitrary opening value, so
+// a raw float compared against 0.6 or 2.5 would split across a cut by rounding
+// dust. A non-number collapses to the smallest bucket, like pagesBucket().
+export function zoomBucket(z) {
+  const pct = Math.round(Number(z) * 100);
+  if (!Number.isFinite(pct) || pct < 60) return '<60';
+  if (pct < 100) return '60-99';
+  if (pct < 150) return '100-149';
+  if (pct < 200) return '150-199';
+  if (pct < 250) return '200-249';
+  return '250+';
 }
 
 // raw intent (a real INTENT key, null, or user-controlled ?buat= garbage) → a
@@ -457,6 +477,22 @@ export const SCHEMA = {
     how: ['x', 'backdrop', 'escape', 'export', 'other'],
     built: 'bool',
     waited_ms: 'duration',
+  },
+  // THE +/- BUTTONS (2026-10-02), so the fit-width opening of 913eb38 can be
+  // judged: it was ruled on one screenshot and nothing measures whether people
+  // then fight it. `dir` is the button; `level` is the zoom BEFORE the press —
+  // the view the person was looking at when they decided it was wrong, which is
+  // the question (pressing − from 2.38 says "too big", pressing + from 1.0 says
+  // "too small"). `device` is here for export_intent's reason: the fit-width
+  // default is desktop only, so desktop and touch must be separable. Buttons
+  // only: pinch and ctrl+wheel are streams of dozens of events per gesture, a
+  // different sampling problem, and not what that commit's question was about.
+  // Fires even at the clamp (pressing + at 300%): wanting more than the ceiling
+  // is a signal too.
+  zoom_tap: {
+    dir: ['in', 'out'],
+    level: ZOOM_BUCKET,
+    device: DEVICE,
   },
 
   // ---- ladder (Rung A–D) — schema-complete now, call sites land on the ladder branch ----

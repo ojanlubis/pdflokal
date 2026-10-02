@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 
 import {
   SCHEMA, validateEvent, pagesBucket, durationBucket, intentValue, ratioBucket, inkRatioBucket,
-  ocrLinesBucket,
+  ocrLinesBucket, zoomBucket,
 } from '../../js/core/telemetry-schema.js';
 
 // A minimal, schema-valid props object for each event — used to prove every
@@ -81,6 +81,7 @@ const VALID_PROPS = {
   // 2026-10-02, the three gaps (split/Ekstrak, the sheet's close, the +/- buttons).
   extract_export: { duration: 450, pages: '2-5', pages_scope: 'some' },
   export_sheet_close: { how: 'x', built: false, waited_ms: 1200 },
+  zoom_tap: { dir: 'out', level: '200-249', device: 'desktop' },
 };
 
 test('every SCHEMA event has a VALID_PROPS fixture (test coverage stays complete as events are added)', () => {
@@ -470,4 +471,32 @@ test('export_sheet_close: every `how` validates, an unknown one does not, built 
   assert.equal(validateEvent('export_sheet_close', { ...VALID_PROPS.export_sheet_close, waited_ms: 1234 }).ok, false);
 });
 
+test('zoomBucket: the measured openings of 913eb38 each land in their own bucket', () => {
+  assert.equal(zoomBucket(2.38), '200-249'); // desktop 1512px
+  assert.equal(zoomBucket(1.59), '150-199'); // desktop 1040px
+  assert.equal(zoomBucket(1.0), '100-149');  // tablet / small desktop
+  assert.equal(zoomBucket(0.65), '60-99');   // phone
+  // The cuts, from both sides, including the clamps the buttons enforce (0.3 .. 3).
+  assert.equal(zoomBucket(0.3), '<60');
+  assert.equal(zoomBucket(0.59), '<60');
+  assert.equal(zoomBucket(0.6), '60-99');
+  assert.equal(zoomBucket(0.99), '60-99');
+  assert.equal(zoomBucket(1.49), '100-149');
+  assert.equal(zoomBucket(1.5), '150-199');
+  assert.equal(zoomBucket(2.0), '200-249');
+  assert.equal(zoomBucket(2.49), '200-249');
+  assert.equal(zoomBucket(2.5), '250+');
+  assert.equal(zoomBucket(3), '250+');
+  // The buttons step by 0.25 from an arbitrary opening, so float dust must not split a cut.
+  assert.equal(zoomBucket(0.1 + 0.2 + 0.3), '60-99'); // 0.6000000000000001-ish
+  for (const junk of [NaN, undefined, null, 'abc', Infinity]) {
+    assert.equal(validateEvent('zoom_tap', { dir: 'in', level: zoomBucket(junk), device: 'phone' }).ok, true, String(junk));
+  }
+});
 
+test('zoom_tap: dir and device are closed enums, level must be a bucket', () => {
+  assert.equal(validateEvent('zoom_tap', VALID_PROPS.zoom_tap).ok, true);
+  assert.equal(validateEvent('zoom_tap', { ...VALID_PROPS.zoom_tap, dir: 'up' }).ok, false);
+  assert.equal(validateEvent('zoom_tap', { ...VALID_PROPS.zoom_tap, level: 2.38 }).ok, false); // a raw number is never speakable
+  assert.equal(validateEvent('zoom_tap', { ...VALID_PROPS.zoom_tap, device: 'watch' }).ok, false);
+});

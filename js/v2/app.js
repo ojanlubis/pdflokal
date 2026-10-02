@@ -27,7 +27,7 @@ import { createHistory, record, undo, redo, canUndo, canRedo } from '../core/his
 import { importPdf, importImage, createPageRasterizer, probeTextLayer } from '../core/import.js';
 import {
   pagesBucket, durationBucket, ratioBucket, inkRatioBucket, intentValue,
-  unsupportedCharClass, ocrLinesBucket,
+  unsupportedCharClass, ocrLinesBucket, zoomBucket,
 } from '../core/telemetry-schema.js';
 import { compareRegions } from '../core/visual-oracle.js';
 import { createOcrIndex, ocrEngineLoaded } from './ocr-runs.js';
@@ -335,8 +335,17 @@ function openingZoom(pageWidth) {
   // user could have reached by hand.
   return Math.max(0.3, Math.min(fit, desktop ? 3 : 1));
 }
-on('z-in', 'click', () => { zoom = Math.min(zoom + 0.25, 3); applyZoom(); });
-on('z-out', 'click', () => { zoom = Math.max(zoom - 0.25, 0.3); applyZoom(); });
+// zoom_tap reports the zoom BEFORE the press (core/telemetry-schema.js says why).
+// Emitted ahead of the change so `zoom` is still the view being rejected; the
+// tel() call is try/catch-armoured, so it can never stop the zoom from happening.
+on('z-in', 'click', () => {
+  tel('zoom_tap', { dir: 'in', level: zoomBucket(zoom), device: deviceClass() });
+  zoom = Math.min(zoom + 0.25, 3); applyZoom();
+});
+on('z-out', 'click', () => {
+  tel('zoom_tap', { dir: 'out', level: zoomBucket(zoom), device: deviceClass() });
+  zoom = Math.max(zoom - 0.25, 0.3); applyZoom();
+});
 
 // ---- contact bookmark: tap the tab, the panel slides up; tap again or tap
 // outside to close. Same toggle + outside-pointerdown-close idiom as the

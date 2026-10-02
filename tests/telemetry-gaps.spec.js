@@ -205,3 +205,39 @@ test.describe('R5 export_sheet_close', () => {
     expect(closes[0].props).toMatchObject({ how: 'x', built: false });
   });
 });
+
+test.describe('0a zoom buttons', () => {
+  const zoomNow = (page) => page.evaluate(() => Number(/scale\(([\d.]+)\)/.exec(document.getElementById('v2-stage').style.transform)[1]));
+
+  test('each press reports its direction and the zoom BEFORE the press, and the zoom still happens', async ({ page }) => {
+    await openDoc(page);
+    const z0 = await zoomNow(page);
+
+    await page.click('#z-out');
+    const z1 = await zoomNow(page);
+    await page.click('#z-in');
+    const z2 = await zoomNow(page);
+    expect(z1, 'telemetry stopped the zoom').toBeLessThan(z0);
+    expect(z2).toBeGreaterThan(z1);
+
+    const taps = named(await railEvents(page), 'zoom_tap').map((e) => e.props);
+    expect(taps).toHaveLength(2);
+    const bucket = (z) => {
+      const p = Math.round(z * 100);
+      return p < 60 ? '<60' : p < 100 ? '60-99' : p < 150 ? '100-149' : p < 200 ? '150-199' : p < 250 ? '200-249' : '250+';
+    };
+    // Independent re-statement of the cuts: the event must carry the zoom the
+    // user was looking at when they pressed, not the one they got.
+    expect(taps[0]).toEqual({ dir: 'out', level: bucket(z0), device: 'desktop' });
+    expect(taps[1]).toEqual({ dir: 'in', level: bucket(z1), device: 'desktop' });
+  });
+
+  test('pressing + at the 300% ceiling still reports (wanting more than the ceiling is a signal)', async ({ page }) => {
+    await openDoc(page);
+    for (let i = 0; i < 12; i += 1) await page.click('#z-in');
+    expect(await zoomNow(page)).toBe(3);
+    const taps = named(await railEvents(page), 'zoom_tap').map((e) => e.props);
+    expect(taps).toHaveLength(12);
+    expect(taps.at(-1)).toEqual({ dir: 'in', level: '250+', device: 'desktop' });
+  });
+});
