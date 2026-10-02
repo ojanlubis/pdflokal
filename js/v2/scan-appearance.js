@@ -124,3 +124,13 @@ export async function scanAppearance(r, line) {
     return { paperImage: image, lettering };
   } finally { clearTimeout(timer); }
 }
+
+// Paper only, no lettering. For a DELETION there is no replacement text to
+// match, and matchLettering is the expensive half (up to 1.2 s of font loading
+// and mask scoring). Same plane, same tile, so the patch is the one an edit on
+// that line would have painted.
+export function scanPaper(r, line) {
+  if (!r || ![line.x, line.y, line.w, line.h].every(Number.isFinite) || line.w <= 0 || line.h <= 0) return {};
+  const plane = paperModel(r, line);
+  return plane ? { paperImage: paperImage(plane) } : {};
+}

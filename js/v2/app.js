@@ -31,7 +31,7 @@ import {
 } from '../core/telemetry-schema.js';
 import { compareRegions } from '../core/visual-oracle.js';
 import { createOcrIndex, ocrEngineLoaded } from './ocr-runs.js';
-import { scanAppearance } from './scan-appearance.js';
+import { scanAppearance, scanPaper } from './scan-appearance.js';
 import { validateSample } from '../core/feedback-sample.js';
 import { createPageSlot, syncOverlay, textFontCss, applyTextFont, measureTextAnnoWidth } from '../render/page-view.js';
 import { createViewportStream } from '../render/viewport.js';
@@ -72,7 +72,7 @@ import { readPageContents, extractFontMetrics } from '../core/redact.js';
 // 'pages_open' opens a sheet. None of those is a commit, and counting them would
 // fire the prompt at someone who has not yet done anything they could find a bug
 // in. `ganti_commit` is its own event, not a tool_use, so it is named separately.
-const COMMIT_ACTIONS = new Set(['whiteout', 'text', 'text_inline', 'signature', 'paraf', 'delete', 'merge']);
+const COMMIT_ACTIONS = new Set(['whiteout', 'text', 'text_inline', 'signature', 'paraf', 'delete', 'original_delete', 'merge']);
 const bugPrompt = createBugReportPrompt();
 
 // Every existing `tel(...)` call site keeps working untouched — this is the one
@@ -2174,6 +2174,163 @@ async function matchReplaceColors(cover, draft, pageId, line) {
   } catch { /* best-effort; white cover + default ink stand */ }
 }
 
+// ---- Hapus on the PDF's OWN text (founder ruling 2026-10-02) ---------------------
+// "itu naturally yang mereka mau, let's facilitate it": with Hapus armed, a tap
+// on a printed line DELETES it. A toast explaining Tip-Ex was rejected.
+//
+// THE PRIMITIVE ALREADY EXISTED: a whiteout cover carrying replaceTargets +
+// replaceBox with NO partner text annotation. core/page-surgery.js cuts the
+// original show-ops for any such cover (runSurgery's candidates filter does not
+// look for a replacement), planNativeInserts only stamps when a text annotation
+// points back, and buildEditedPageBytes documents `insert: null` as "a pure
+// deletion". So this is Ganti Teks minus the editor, and export, live bake,
+// undo and re-edit all come with it. The screen and the file agree for the
+// same reason a Ganti edit's do: one pipeline builds both.
+//
+// THE UNIT IS THE LINE, NOT THE PARAGRAPH (Ganti opens a whole paragraph when
+// core/block-edit.js can prove it). Rung D exists because retyped text has to
+// REFLOW; a deletion has nothing to reflow, Hapus's grammar everywhere is one
+// object per tap, and one tap wiping a fifteen-line paragraph is the bigger
+// surprise on a phone, even with undo. A whole paragraph still goes through
+// Edit: clear it and commit (see commit()'s empty-draft branch).
+//
+// WHERE SURGERY DECLINES (a run it cannot match), the cover stays as a visible
+// Tip-Ex rectangle and ships as one: the words are hidden, not removed. That is
+// what Ganti already does under the same condition, and `surgery` on the rail
+// says how often it happens. Undo is how a declined delete is taken back: a tap
+// on that cover with Hapus armed is treated as a tap on the printed line under
+// it (interaction.js), never as a request to delete the cover.
+
+// A throwaway draft for matchReplaceColors, which wants one to hand its ink
+// colour to. Nothing here has an editor, so ink is unused; editorEl:null makes
+// the OCR guard inside it (`editingEl !== draft.editorEl`) pass when no editor
+// is open, which is always the case here (arming Hapus blurred any editor).
+const noDraft = () => ({ editorEl: null, appearanceLocked: false });
+
+function missOriginal() {
+  // Nothing printed under the finger: blank paper, an image, a drawing, or a scan
+  // that was never recognised. Silent on screen (a toast was ruled out), counted
+  // on the rail so "what do people tap that we cannot delete" is answerable.
+  tel('tool_use', { tool: 'hapus', action: 'original_miss' });
+}
+
+// After the model changed: paint now, then bake the page so the file's truth
+// (the cut ops) replaces the cover. Same order as commit(): sync first, bake
+// second, sync again once the bake resolves so suppression matches reality.
+// `coverId` is passed only for a NEW cover, so its `surgery` outcome is read
+// (a re-delete of a replacement's text was already reported when it was made).
+function bakeAfterEditChange(pageId, coverId) {
+  syncPage(pageId);
+  rebakePage(pageId).then(() => {
+    syncPage(pageId);
+    const oc = coverId && getPage(doc, pageId)?.editOutcomes?.find((o) => o.coverId === coverId);
+    if (oc) tel('surgery', oc.surgery);
+  }).catch((err) => console.warn('rebakePage gagal:', err));
+}
+
+// Born-digital: one cover over the tapped line's own runs, nothing written back.
+async function deleteOriginalLine(pageId, line) {
+  record(history, doc);
+  const cover = addAnnotation(doc, pageId, createAnnotation('whiteout', {
+    x: line.x, y: line.y, width: line.w, height: line.h,
+    // One target per constituent run, exactly as smartReplace builds them (see the
+    // long WHY there: a blended target silently cuts only the dominant run).
+    replaceTargets: line.runs.map((r) => r.pdf),
+    replaceBox: { x: line.x, y: line.y, w: line.w, h: line.h },
+  }));
+  tel('tool_use', { tool: 'hapus', action: 'original_delete' });
+  syncPage(pageId);
+  // Colour first, bake after: if the bake declines, the cover that stays must
+  // already match the paper rather than flash white on a coloured page.
+  await matchReplaceColors(cover, noDraft(), pageId, line);
+  bakeAfterEditChange(pageId, cover.id);
+}
+
+// Paint a scan cover in the paper sampled around its box (no lettering: a
+// deletion has no text to match). Best effort, like matchScanAppearance: if the
+// raster cannot be read the white patch stands.
+async function paintScanPaper(cover, pageId, box) {
+  try {
+    const result = scanPaper(await withPageRasterCtx(pageId), box);
+    if (findAnnotation(doc, cover.id)?.annotation !== cover) return; // undone meanwhile
+    if (result.paperImage) {
+      updateAnnotation(doc, cover.id, { paperImage: result.paperImage });
+      const el = stage.querySelector(`[data-anno-id="${cover.id}"]`);
+      if (el) { el.style.backgroundImage = `url("${result.paperImage}")`; el.style.backgroundSize = '100% 100%'; }
+    } else {
+      await matchReplaceColors(cover, noDraft(), pageId, box);
+    }
+  } catch { /* the white patch stands */ }
+}
+
+// Recognised scan (Rung S2's index, only present after the person recognised the
+// page through Edit): the same cover Ganti would place, with no text over it. A
+// scan has no show-ops to cut, so this is a Tip-Ex patch sized to the line and
+// painted in the sampled paper, and it exports as exactly that. NEVER carries
+// replaceTargets/replaceBox (see the S2 header above: those fields point the
+// cutter at the page's real text).
+async function deleteOcrLine(pageId, line) {
+  record(history, doc);
+  const box = { x: line.x, y: line.y, w: line.w, h: line.h };
+  const cover = addAnnotation(doc, pageId, createAnnotation('whiteout', {
+    x: box.x, y: box.y, width: box.w, height: box.h, ocrBox: box,
+  }));
+  tel('tool_use', { tool: 'hapus', action: 'original_delete' });
+  syncPage(pageId);
+  await paintScanPaper(cover, pageId, box);
+}
+
+// The tapped spot is inside a line that an edit already owns. With a
+// replacement painted there, the replacement is what the person sees and taps:
+// remove it and keep the cover, so the line stays deleted (the same shape as an
+// emptied Ganti commit). With none, the line is already gone: nothing to do.
+function deleteEditedReplacement(pageId, edit) {
+  // Already deleted: the finger is on a printed line that is gone. Not a MISS
+  // (the rail's 'original_miss' is "nothing printed here"), and a double-tap
+  // makes this the common second tap, so it is silent and changes nothing.
+  if (!edit.replacement) return;
+  record(history, doc);
+  removeAnnotation(doc, edit.replacement.id);
+  tel('tool_use', { tool: 'hapus', action: 'original_delete' });
+  bakeAfterEditChange(pageId, null);
+}
+
+async function deleteOriginalAt(pageId, x, y) {
+  if (!getPage(doc, pageId)) return;
+  if (ocrIndex.hasLines(pageId)) {
+    const ocrLine = ocrIndex.hitTest(pageId, x, y);
+    if (ocrLine) await deleteOcrLine(pageId, ocrLine); else missOriginal();
+    return;
+  }
+  const line = await textRuns.hitTest(pageId, x, y);
+  // Re-read AFTER the await: an undo or a second tap may have landed meanwhile,
+  // and everything below must see the model as it is NOW. From here to the
+  // addAnnotation inside deleteOriginalLine nothing yields, so two quick taps on
+  // one line cannot both create a cover (the second sees the first as owner).
+  const page = getPage(doc, pageId);
+  if (!page) return;
+  if (!line) {
+    // Not over any printed line, but a replacement longer than the words it
+    // replaced paints past its birth box (field report 2026-08-26): that overflow
+    // is visible, so it is tappable.
+    const hit = hitTestEditedLine(page, x, y);
+    if (hit?.replacement) deleteEditedReplacement(pageId, hit); else missOriginal();
+    return;
+  }
+  // Pristine-first, NOT hitTestEditedLine-first: that function inflates every
+  // edit's box toward a finger-sized target, and a deleted line has no ink to
+  // show where its box ends, so it would swallow taps meant for the line beside it.
+  // Ownership is geometric: an edit owns the line whose centre is in its birth box.
+  const cx = line.x + line.w / 2;
+  const cy = line.y + line.h / 2;
+  const owner = pageEdits(page).find(({ cover }) => {
+    const b = cover.replaceBox;
+    return cx >= b.x && cx <= b.x + b.w && cy >= b.y && cy <= b.y + b.h;
+  });
+  if (owner) { deleteEditedReplacement(pageId, owner); return; }
+  await deleteOriginalLine(pageId, line);
+}
+
 // ---- interaction wiring ------------------------------------------------------------
 const interaction = createInteraction({
   stage,
@@ -2192,6 +2349,7 @@ const interaction = createInteraction({
     refreshChrome();
   },
   onDeleteTap: (annoId, pageId) => {
+    const gone = findAnnotation(doc, annoId)?.annotation;
     record(history, doc);
     removeAnnotation(doc, annoId);
     // ⚠️ THE ARMED PATH'S OWN OUTCOME. `arm` is emitted only when Hapus is pressed
@@ -2202,9 +2360,19 @@ const interaction = createInteraction({
     // armed-and-gave-up. Same event deleteSelected sends: the meaning ("a Hapus
     // delete happened") is unchanged, only the missing call site.
     tel('tool_use', { tool: 'hapus', action: 'delete' });
-    syncPage(pageId);
+    // The replacement text of an edit that is baked into the page raster (or is
+    // being: the overlay shows it until the bake lands) is only on screen because
+    // of that raster. Removing the annotation without a re-bake leaves the old
+    // raster up, and then the screen says the text is deleted while the model
+    // (and so the file) says nothing of the kind, or the reverse.
+    if (gone?.replaceCoverId) bakeAfterEditChange(pageId, null); else syncPage(pageId);
     setTool('select'); // one delete per arming; undo covers mistakes
   },
+  // Hapus armed, a tap landed on none of OUR objects: the PDF's own printed text.
+  // Stays armed (founder, 2026-10-02): taking several lines out is the normal
+  // use, and Hapus itself toggles off. NOT the own-object path above, which
+  // disarms after one delete.
+  onDeleteOriginal: ({ pageId, x, y }) => { void deleteOriginalAt(pageId, x, y); },
   onPlace: (t, { pageId, x, y }) => {
     // ONLY the two tools that open an editor, and the restriction is evidence,
     // not tidiness. onPlace fires AFTER the tap has landed, so the zoom cannot
@@ -2889,11 +3057,14 @@ on('btn-all-pages', 'click', () => {
 function deleteSelected() {
   const id = doc.selection.annotationId;
   if (!id) return;
-  const pageId = findAnnotation(doc, id)?.page.id ?? null;
+  const found = findAnnotation(doc, id);
+  const pageId = found?.page.id ?? null;
   record(history, doc);
   removeAnnotation(doc, id);
   tel('tool_use', { tool: 'hapus', action: 'delete' }); // spec-telemetry.md §6.2
-  if (pageId) syncPage(pageId);
+  // Same reason as onDeleteTap: a replacement's text is part of the baked page.
+  if (pageId && found.annotation.replaceCoverId) bakeAfterEditChange(pageId, null);
+  else if (pageId) syncPage(pageId);
 }
 
 // spec-live-surgery.md §5/§8.3 (increment 3): undo/redo can bring a page's
