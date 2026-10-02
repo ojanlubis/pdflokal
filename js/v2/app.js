@@ -2194,6 +2194,14 @@ const interaction = createInteraction({
   onDeleteTap: (annoId, pageId) => {
     record(history, doc);
     removeAnnotation(doc, annoId);
+    // ⚠️ THE ARMED PATH'S OWN OUTCOME. `arm` is emitted only when Hapus is pressed
+    // with nothing selected (btn-delete-anno), and that is exactly the path that
+    // lands HERE; `delete` was emitted only from deleteSelected(), the other
+    // path. So arm and delete never co-occurred for one gesture, and every
+    // person who armed Hapus and deleted their own object read on the rail as
+    // armed-and-gave-up. Same event deleteSelected sends: the meaning ("a Hapus
+    // delete happened") is unchanged, only the missing call site.
+    tel('tool_use', { tool: 'hapus', action: 'delete' });
     syncPage(pageId);
     setTool('select'); // one delete per arming; undo covers mistakes
   },
