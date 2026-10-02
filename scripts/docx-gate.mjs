@@ -11,7 +11,9 @@
  *   node scripts/docx-gate.mjs --baseline X.csv        compare against a spike results.csv (same column names)
  *   node scripts/docx-gate.mjs --self-test             prove the instruments and the exit code can go red
  *
- *   options: --maxpages N|all (40)  --jobs N (4)  --out DIR  --lane NAME (LibreOffice profiles
+ *   --pages [N]                  also render a deterministic sample of N files (default 12) with Apple Pages (osascript, serial,
+ *                                steals focus) and score recall: recallPages / pagesRatio / pagesFail. See scripts/lib/pages-render.mjs.
+ *   options: --no-schema (skip the XSD validation)  --maxpages N|all (40)  --jobs N (4)  --out DIR  --lane NAME (LibreOffice profiles
  *            /tmp/lo-NAME-PID-SLOT, so parallel lanes never share one)  --cache DIR  --resume
  *            (reuse an earlier convert in --out instead of reconverting)  --no-perf (time and memory
  *            are reported, not gated)  --engine pdf2docx (the reference engine, see PDF2DOCX_PY)
@@ -32,6 +34,11 @@
  *   ms / rssMB                   conversion wall time and PEAK RESIDENT SET of the converting process
  *                                alone (its own child process, so metric gathering cannot inflate it);
  *                                at --maxpages 40, NOT the 766-page worst case the spike reported
+ *   strictOk / xsdOk             scripts/lib/docx-validate.mjs: the Word-strict structure rules (element order in
+ *                                pPr/rPr/tblPr/tcPr/sectPr, a cell ends with a paragraph, grid widths, unique drawing
+ *                                ids, package and image-byte integrity) and EVERY XML part against the ECMA-376
+ *                                transitional, OPC and MS-ODRAWXML (wps) schemas through xmllint. Hard failures.
+ *                                --no-schema skips the XSD half (reported as n/a, never as green).
  *   xmlOk / pkgOk                every XML part well-formed (xmllint AND scripts/lib/docx-xml.mjs;
  *                                xmllint prints namespace errors but exits 0, so ANY stderr counts),
  *                                and the package's content types / rels / ids resolve
@@ -45,6 +52,9 @@ import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { PNG } from 'pngjs';
 import { xmlProblems, packageProblems } from './lib/docx-xml.mjs';
+import { validateDocx, structureProblems, xsdProblems, xmllintAvailable } from './lib/docx-validate.mjs';
+import { ensureSchemas } from './lib/ooxml-schemas.mjs';
+import { pagesAvailable, renderWithPages, quitPages } from './lib/pages-render.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CORPUS = process.env.CORPUS || (fs.existsSync(path.join(ROOT, 'tests/fixtures/wild/web')) ? path.join(ROOT, 'tests/fixtures/wild/web') : '/Users/ojanlubis/machine/fkd/pdflokal/app/tests/fixtures/wild/web');
@@ -80,6 +90,10 @@ export const HEADLINE = [
   { id: 'failures', label: 'files that failed to convert', get: (s) => s.failures, better: 'lower', abs: 0 },
   { id: 'xmlBad', label: 'files with malformed XML', get: (s) => s.xmlBad, better: 'lower', abs: 0 },
   { id: 'pkgBad', label: 'files with a broken package', get: (s) => s.pkgBad, better: 'lower', abs: 0 },
+  { id: 'strictBad', label: 'files failing the Word-strict structure checks', get: (s) => s.strictBad, better: 'lower', abs: 0 },
+  { id: 'xsdBad', label: 'files failing ECMA-376 / OPC / wps schema validation', get: (s) => s.xsdBad, better: 'lower', abs: 0, needs: 'schema' },
+  { id: 'pagesFail', label: 'sampled files Apple Pages could not open or export', get: (s) => s.pagesFail, better: 'lower', abs: 0, needs: 'pages' },
+  { id: 'recallPages.mean', label: 'recall after Apple Pages render (sample), mean', get: (s) => s.mean.recallPages, better: 'higher', abs: 0.01, needs: 'pages' },
   { id: 'renderFail', label: 'files LibreOffice could not render', get: (s) => s.renderFail, better: 'lower', abs: 0, needs: 'render' },
   { id: 'severe', label: 'files whose word recall fell > 0.05 or that now fail', get: (s) => s.severe, better: 'lower', abs: 0 },
   { id: 'recallBag.mean', label: 'recall (bag vs pdf.js), mean', get: (s) => s.mean.recallBag, better: 'higher', abs: 0.002 },
@@ -217,12 +231,15 @@ function xmllintProblems(files, scratch) {
 }
 
 // Everything the gate knows about a written .docx without rendering it.
+let SCHEMA = null; // set by main() (null = --no-schema)
 export function inspectDocx(file, scratch) {
-  const files = fflateLib().unzipSync(new Uint8Array(fs.readFileSync(file)));
+  const bytes = new Uint8Array(fs.readFileSync(file));
+  const files = fflateLib().unzipSync(bytes);
   const parsed = parseDocxXml(fflateLib().strFromU8(files['word/document.xml']), Object.keys(files).filter((k) => k.startsWith('word/media/')).length);
   const jsXml = Object.keys(files).filter((n) => /\.(xml|rels)$/.test(n)).flatMap((n) => xmlProblems(files[n]).map((m) => `${n}: ${m}`));
   const lint = xmllintProblems(files, scratch);
-  return { parsed, xmlProblems: jsXml.concat(lint || []), xmllint: lint !== null, pkgProblems: packageProblems(files) };
+  const v = validateDocx(bytes, { fflate: fflateLib(), schema: SCHEMA, scratch: `${scratch}-xsd` });
+  return { parsed, xmlProblems: jsXml.concat(lint || []), xmllint: lint !== null, pkgProblems: packageProblems(files), strictProblems: v.problems, xsdProblems: v.xsdProblems, xsdRan: v.xsd === 'ran', notes: v.notes };
 }
 
 // ------------------------------------------------- pdf-side layout labels --
@@ -447,7 +464,7 @@ const pctl = (a, p) => { if (!a.length) return null; const s = a.slice().sort((x
 // rows: derived rows (numbers or null). Aggregates over exactly the rows given.
 export function summarize(rows) {
   const col = (k) => rows.map((r) => r[k]).filter(isNum);
-  const stat = (fn) => Object.fromEntries(['recallBag', 'recallLcs', 'recallBagPoppler', 'recallLcsPoppler', 'recallRendered', 'visGrid', 'visBody', 'visRows', 'pageRatio', 'msPerPage', 'ms', 'rssMB', 'docxParas'].map((k) => [k, fn(col(k))]));
+  const stat = (fn) => Object.fromEntries(['recallBag', 'recallLcs', 'recallBagPoppler', 'recallLcsPoppler', 'recallRendered', 'recallPages', 'visGrid', 'visBody', 'visRows', 'pageRatio', 'msPerPage', 'ms', 'rssMB', 'docxParas'].map((k) => [k, fn(col(k))]));
   const pageDev = rows.map((r) => (isNum(r.pageRatio) ? Math.abs(r.pageRatio - 1) : null)).filter(isNum);
   const sum = (k) => rows.reduce((a, r) => a + (isNum(r[k]) ? r[k] : 0), 0);
   const ratio = (a, b) => (sum(b) > 0 ? sum(a) / sum(b) : null);
@@ -456,6 +473,9 @@ export function summarize(rows) {
     failures: rows.filter((r) => !r.ok).length,
     xmlBad: rows.filter((r) => r.ok && r.xmlOk === 0).length,
     pkgBad: rows.filter((r) => r.ok && r.pkgOk === 0).length,
+    strictBad: rows.filter((r) => r.ok && r.strictOk === 0).length,
+    xsdBad: rows.filter((r) => r.ok && r.xsdOk === 0).length,
+    pagesFail: rows.filter((r) => r.ok && r.pagesOk === 0).length,
     renderFail: rows.filter((r) => r.ok && r.renderOk === 0).length,
     severe: 0,
     mean: { ...stat(mean), pageDev: mean(pageDev) },
@@ -476,7 +496,7 @@ export function summarize(rows) {
 
 // ============================================================== COMPARE ======
 // cur / base: { id: derivedRow }. Compared on the ids both have. Returns the verdict and the evidence.
-export function compareRuns(cur, base, { perf = true, render = true } = {}) {
+export function compareRuns(cur, base, { perf = true, render = true, schema = true, pages = true } = {}) {
   const ids = Object.keys(cur).filter((id) => base[id]).sort();
   const curRows = ids.map((id) => cur[id]);
   const baseRows = ids.map((id) => base[id]);
@@ -504,6 +524,8 @@ export function compareRuns(cur, base, { perf = true, render = true } = {}) {
     const cv = h.get(sc);
     const row = { id: h.id, label: h.label, base: bv, cur: cv, better: h.better, tol: h.rel !== undefined ? (isNum(bv) ? Math.abs(bv) * h.rel : null) : h.abs, perf: !!h.perf };
     if (h.needs === 'render' && !render) return { ...row, status: 'n/a (no render)' };
+    if (h.needs === 'pages' && !pages) return { ...row, status: 'n/a (no --pages)' };
+    if (h.needs === 'schema' && !schema) return { ...row, status: 'n/a (--no-schema)' };
     if (!isNum(bv) || !isNum(cv)) return { ...row, status: 'n/a' };
     const delta = cv - bv;
     const bad = h.better === 'higher' ? bv - cv > row.tol + 1e-12 : cv - bv > row.tol + 1e-12;
@@ -535,7 +557,7 @@ export function renderCompare(cmp, label) {
 const BASE_COLS = ['ok', 'class', 'columns', 'tables', 'pages', 'pagesConverted', 'recallBag', 'recallLcs', 'recallBagPoppler', 'recallLcsPoppler', 'recallRendered',
   'visGrid', 'visCoarse', 'visRows', 'visBody', 'visBodyCoarse', 'inkRatio', 'inkBody', 'pageRatio', 'refWords', 'docxWords', 'docxParas', 'linePerParaFlag',
   'pdfBold', 'docxBold', 'pdfItalic', 'docxItalic', 'pdfImages', 'docxDrawings', 'docxShapes', 'docxMedia', 'docxTables', 'columnBands', 'ms', 'msPerPage', 'rssMB',
-  'docxBytes', 'xmlOk', 'pkgOk', 'renderOk'];
+  'docxBytes', 'xmlOk', 'pkgOk', 'strictOk', 'xsdOk', 'renderOk', 'pagesOk', 'recallPages'];
 
 function parseCsv(text) {
   const [head, ...lines] = text.trim().split('\n');
@@ -574,6 +596,13 @@ async function main() {
   if (!fs.existsSync(CORPUS)) problems.push(`corpus not found: ${CORPUS} (set CORPUS=)`);
   if (render && !fs.existsSync(SOFFICE)) problems.push(`LibreOffice not found: ${SOFFICE} (set SOFFICE=, or --no-render)`);
   if (spawnSync('pdftotext', ['-v']).error) problems.push('poppler (pdftotext, pdftoppm, pdfimages, pdfinfo) not on PATH');
+  const noSchema = argv.includes('--no-schema');
+  if (!noSchema) {
+    if (!xmllintAvailable()) problems.push('xmllint (libxml2) not on PATH: the schema validation cannot run (install it, or pass --no-schema and accept an n/a, not a green)');
+    else {
+      try { SCHEMA = await ensureSchemas({ log: (m) => console.log(m) }); } catch (e) { problems.push(`OOXML schemas unavailable: ${String(e.message).split('\n')[0]} (run node scripts/lib/ooxml-schemas.mjs, or pass --no-schema)`); }
+    }
+  }
   if (problems.length) { console.error(problems.join('\n')); process.exit(2); }
 
   fs.mkdirSync(path.join(OUT, 'raw'), { recursive: true });
@@ -586,7 +615,7 @@ async function main() {
   if (!ids.length) { console.error('no files selected'); process.exit(2); }
   const subset = ids.length < allIds.length;
   const resume = argv.includes('--resume');
-  console.log(`engine=${ENGINE} files=${ids.length}${subset ? ` of ${allIds.length}` : ''} maxpages=${MAXPAGES >= 1e9 ? 'all' : MAXPAGES} jobs=${JOBS} render=${render} out=${OUT}`);
+  console.log(`engine=${ENGINE} files=${ids.length}${subset ? ` of ${allIds.length}` : ''} maxpages=${MAXPAGES >= 1e9 ? 'all' : MAXPAGES} jobs=${JOBS} render=${render} schema=${SCHEMA ? 'ECMA-376 transitional + OPC + wps' : 'OFF'} out=${OUT}`);
 
   // ---- 1. convert (own process each; timing and RSS are the converter's alone)
   const self = fileURLToPath(import.meta.url);
@@ -635,6 +664,11 @@ async function main() {
         row.pkgOk = insp.pkgProblems.length ? 0 : 1;
         row.xmlNote = insp.xmlProblems.concat(insp.pkgProblems).slice(0, 2).join(' | ').replace(/[\t\n,]/g, ' ').slice(0, 200);
         row.xmllint = insp.xmllint;
+        row.strictOk = insp.strictProblems.length ? 0 : 1;
+        row.xsdOk = insp.xsdRan ? (insp.xsdProblems.length ? 0 : 1) : null;
+        row.strictNotes = insp.notes.length;
+        row.strictNote = insp.strictProblems.slice(0, 2).join(' | ').replace(/[\t\n,]/g, ' ').slice(0, 240);
+        row.xsdNote = insp.xsdProblems.slice(0, 2).join(' | ').replace(/[\t\n,]/g, ' ').slice(0, 300);
       } catch (e) { row.ok = false; row.error = `unreadable docx: ${String(e.message).slice(0, 150)}`; }
     }
     if (render && row.ok) {
@@ -696,6 +730,38 @@ async function main() {
   for (const p of profiles) if (p.startsWith('/tmp/lo-')) fs.rmSync(p, { recursive: true, force: true });
   rows.sort((x, y) => x.id.localeCompare(y.id));
 
+  // ---- 2b. Apple Pages (opt-in): a second consumer on a deterministic sample, serial
+  const pagesArg = arg('pages', null);
+  let pagesRan = false;
+  if (pagesArg) {
+    if (!pagesAvailable()) console.error('--pages: Apple Pages is not available on this machine; skipped (reported n/a, not green)');
+    else {
+      pagesRan = true;
+      const want = Math.max(1, Number(pagesArg === true ? 12 : pagesArg) || 12);
+      const okRows = rows.filter((r) => r.ok);
+      const step = Math.max(1, Math.ceil(okRows.length / want));
+      const sample = okRows.filter((_, i) => i % step === 0).slice(0, want);
+      const pdir = path.join(OUT, 'pages');
+      fs.mkdirSync(pdir, { recursive: true });
+      console.log(`rendering ${sample.length} files with Apple Pages (serial, ~10-30 s each)...`);
+      for (const row of sample) {
+        const out = path.join(pdir, `${row.id}.pdf`);
+        const res = renderWithPages(path.join(OUT, 'docx', `${row.id}.docx`), out, { timeout: 120000 });
+        row.pagesOk = res.ok ? 1 : 0;
+        row.pagesMs = res.ms;
+        if (!res.ok) row.pagesError = res.error;
+        else {
+          row.pagesPages = Number((String(spawnSync('pdfinfo', [out], { encoding: 'utf8' }).stdout || '').match(/Pages:\s+(\d+)/) || [])[1]) || null;
+          row.pagesWords = tokens(spawnSync('pdftotext', ['-enc', 'UTF-8', out, '-'], { encoding: 'utf8', maxBuffer: 1 << 28 }).stdout || '');
+        }
+        process.stdout.write(res.ok ? '.' : 'x');
+        if (res.stuck) { console.log(`\nPages is stuck behind a dialog in a session it did not launch: the rest of the sample is skipped (pagesOk stays n/a), not retried`); break; }
+      }
+      quitPages();
+      console.log('\nPages done');
+    }
+  }
+
   // ---- 3. derive
   const derived = rows.map((r) => deriveRow(r, render));
   const cols = Object.keys(derived[0]);
@@ -704,7 +770,7 @@ async function main() {
   fs.writeFileSync(path.join(OUT, csvName), `${csv}\n`);
   const byId = Object.fromEntries(derived.map((o) => [o.id, o]));
   const lost = derived.filter((o) => !o.ok && /^child /.test(o.error || '')).length;
-  const env = { node: process.version, platform: `${process.platform}-${process.arch}`, ncpu: os.cpus().length, jobs: JOBS, maxpages: MAXPAGES >= 1e9 ? 'all' : MAXPAGES, soffice: render ? String(spawnSync(SOFFICE, ['--version'], { encoding: 'utf8' }).stdout || '').trim().slice(0, 60) : null, xmllint: rows.some((r) => r.xmllint) };
+  const env = { node: process.version, platform: `${process.platform}-${process.arch}`, ncpu: os.cpus().length, jobs: JOBS, maxpages: MAXPAGES >= 1e9 ? 'all' : MAXPAGES, soffice: render ? String(spawnSync(SOFFICE, ['--version'], { encoding: 'utf8' }).stdout || '').trim().slice(0, 60) : null, xmllint: rows.some((r) => r.xmllint), xsd: !!SCHEMA };
   console.log(`wrote ${path.join(OUT, csvName)} (${derived.length} rows, ${derived.filter((o) => o.ok).length} ok)`);
 
   // ---- 4. baseline
@@ -725,7 +791,7 @@ async function main() {
   const base = loadBaseline(baseFile);
   if (base.meta && base.meta.maxpages !== undefined && String(base.meta.maxpages) !== String(env.maxpages)) console.log(`\nWARNING: baseline was made with maxpages=${base.meta.maxpages}, this run is ${env.maxpages}: quality numbers are not comparable`);
   if (base.meta && base.meta.platform && base.meta.platform !== env.platform) console.log(`\nWARNING: baseline machine ${base.meta.platform}, this one ${env.platform}: times and RSS are not comparable`);
-  const cmp = compareRuns(byId, base.rows, { perf: !argv.includes('--no-perf'), render });
+  const cmp = compareRuns(byId, base.rows, { perf: !argv.includes('--no-perf'), render, schema: !!SCHEMA, pages: pagesRan });
   const md = renderCompare(cmp, path.relative(ROOT, baseFile) || baseFile);
   fs.writeFileSync(path.join(OUT, 'compare.md'), `${md}\n`);
   fs.writeFileSync(path.join(OUT, 'results.json'), JSON.stringify({ env, summary: summarize(derived), compare: cmp, rows: byId }));
@@ -798,6 +864,16 @@ function deriveRow(r, render) {
   o.imagesFailed = st.imagesFailed ?? null;
   o.xmlOk = r.xmlOk ?? null;
   o.pkgOk = r.pkgOk ?? null;
+  o.strictOk = r.strictOk ?? null;
+  o.xsdOk = r.xsdOk ?? null;
+  o.strictNotes = r.strictNotes ?? null;
+  o.strictNote = r.strictNote || '';
+  o.xsdNote = r.xsdNote || '';
+  o.pagesOk = r.pagesOk ?? null;
+  o.pagesMs = r.pagesMs ?? null;
+  o.pagesError = (r.pagesError || '').replace(/[\t\n,]/g, ' ');
+  o.pagesRatio = r.pagesPages && r.pagesConverted ? Number((r.pagesPages / r.pagesConverted).toFixed(2)) : null;
+  o.recallPages = r.pagesWords && o.refWords ? r4(recall(r.refWords, r.pagesWords).bag) : null;
   o.xmlNote = r.xmlNote || '';
   o.renderOk = r.renderOk ? 1 : (render && r.ok ? 0 : null);
   o.renderMs = r.renderMs ?? null;
@@ -839,6 +915,40 @@ async function selfTest() {
     expect((xmllintProblems({ 'x.xml': new TextEncoder().encode('<w:p/>') }, scratch) || []).length > 0, 'xmllint witness flags a namespace error although it exits 0');
     expect((xmllintProblems({ 'x.xml': new TextEncoder().encode('<a xmlns:w="u"><w:p/></a>') }, scratch) || ['x']).length === 0, 'xmllint witness passes a good document');
   }
+  // strict + schema instruments: a known-good package passes, and each class of break goes red in the layer that owns it
+  {
+    const { buildFixtureDocx } = await import('./lib/docx-validate.mjs');
+    const fx = fflateLib();
+    const good = fx.unzipSync(await buildFixtureDocx(fx));
+    const enc = (t) => fx.strToU8(t);
+    const doc = fx.strFromU8(good['word/document.xml']);
+    const broken = (from, to) => { const f = { ...good }; if (!doc.includes(from)) throw new Error(`self-test fixture changed: ${from}`); f['word/document.xml'] = enc(doc.replace(from, to)); return f; };
+    const rprSwapped = broken('<w:rPr><w:b/><w:bCs/><w:color w:val="C00000"/>', '<w:rPr><w:color w:val="C00000"/><w:b/><w:bCs/>');
+    const pprSwapped = broken('<w:spacing w:before="120" w:after="0" w:line="240" w:lineRule="auto"/><w:jc w:val="center"/>', '<w:jc w:val="center"/><w:spacing w:before="120" w:after="0" w:line="240" w:lineRule="auto"/>');
+    const cellEndsInTable = broken('Gabungan</w:t></w:r></w:p></w:tc>', 'Gabungan</w:t></w:r></w:p><w:tbl><w:tblPr/><w:tblGrid><w:gridCol w:w="100"/></w:tblGrid><w:tr><w:tc><w:p/></w:tc></w:tr></w:tbl></w:tc>');
+    const gridWrong = broken('<w:gridSpan w:val="2"/>', '<w:gridSpan w:val="3"/>');
+    expect(structureProblems(good).problems.length === 0, 'strict: a known-good package passes');
+    expect(structureProblems(rprSwapped).problems.length > 0, 'strict: goes red on a mis-ordered w:rPr (the schema cannot see this one)');
+    expect(structureProblems(pprSwapped).problems.length > 0, 'strict: goes red on a mis-ordered w:pPr');
+    expect(structureProblems(cellEndsInTable).problems.length > 0, 'strict: goes red on a cell that ends with a table');
+    expect(structureProblems(gridWrong).problems.length > 0, 'strict: goes red on a row wider than its grid');
+    const noMedia = { ...good }; delete noMedia['word/media/image1.png'];
+    expect(structureProblems(noMedia).problems.length > 0, 'strict: goes red on a relationship whose target is gone');
+    let schema = null;
+    if (!xmllintAvailable()) console.log('skip schema checks: xmllint not installed');
+    else {
+      try { schema = await ensureSchemas(); } catch (e) { console.log(`skip schema checks: ${String(e.message).split('\n')[0]}`); }
+    }
+    if (!schema && (process.env.DOCX_REQUIRE_XSD || process.env.CI)) { fails.push('schema checks required (CI / DOCX_REQUIRE_XSD) but unavailable'); console.log('FAIL schema checks required but unavailable'); }
+    if (schema) {
+      const scratch = path.join(os.tmpdir(), `docx-gate-xsd-self-${process.pid}`);
+      expect(xsdProblems(good, schema, scratch).length === 0, 'schema: a known-good package validates');
+      expect(xsdProblems(pprSwapped, schema, scratch).length > 0, 'schema: goes red on a mis-ordered w:pPr');
+      expect(xsdProblems(broken('<w:body>', '<w:body><w:bogus/>'), schema, scratch).length > 0, 'schema: goes red on a stray element in w:body');
+      expect(xsdProblems(broken('<wps:bodyPr/>', ''), schema, scratch).length > 0, 'schema: goes red inside the Microsoft wps shape (the schema is wired, not just present)');
+      expect(xsdProblems(rprSwapped, schema, scratch).length === 0, 'schema: does NOT see a swapped w:rPr (documents why the strict layer exists)');
+    }
+  }
   // compare: identical passes; each doctored variant goes red
   const base = { n1: { id: 'n1', ok: 1, recallBag: 0.99, recallLcs: 0.95, recallBagPoppler: 0.99, recallLcsPoppler: 0.95, recallRendered: 0.99, visGrid: 0.8, visBody: 0.7, pageRatio: 1, docxBold: 10, pdfBold: 10, docxItalic: 5, pdfItalic: 5, docxDrawings: 4, docxShapes: 0, docxTables: 2, xmlOk: 1, pkgOk: 1, renderOk: 1, msPerPage: 20, rssMB: 300, linePerParaFlag: 0 },
     n2: { id: 'n2', ok: 1, recallBag: 1, recallLcs: 1, recallBagPoppler: 1, recallLcsPoppler: 1, recallRendered: 1, visGrid: 0.9, visBody: 0.9, pageRatio: 1, docxBold: 0, pdfBold: 0, docxItalic: 0, pdfItalic: 0, docxDrawings: 0, docxShapes: 0, docxTables: 0, xmlOk: 1, pkgOk: 1, renderOk: 1, msPerPage: 20, rssMB: 300, linePerParaFlag: 0 } };
@@ -847,6 +957,9 @@ async function selfTest() {
   const cases = [
     ['a file stops converting', (c) => { c.n1.ok = 0; }],
     ['malformed XML appears', (c) => { c.n1.xmlOk = 0; }],
+    ['a file fails the strict checks', (c) => { c.n1.strictOk = 0; }],
+    ['a file fails schema validation', (c) => { c.n2.xsdOk = 0; }],
+    ['Apple Pages cannot open a sampled file', (c) => { c.n1.pagesOk = 0; }],
     ['a package breaks', (c) => { c.n2.pkgOk = 0; }],
     ['word recall collapses on one file', (c) => { c.n1.recallBag = 0.5; }],
     ['recall drifts down on every file', (c) => { c.n1.recallLcs = 0.9; c.n2.recallLcs = 0.95; }],
@@ -858,6 +971,8 @@ async function selfTest() {
     ['memory doubles', (c) => { c.n1.rssMB = 700; }],
   ];
   for (const [what, mutate] of cases) { const c = clone(); mutate(c); expect(!compareRuns(c, base).pass, `compare goes red when ${what}`); }
+  const xsdRed = clone(); xsdRed.n1.xsdOk = 0;
+  expect(compareRuns(xsdRed, base, { schema: false }).pass, 'compare: --no-schema reports the schema metric as n/a, not red');
   const slowOk = clone(); slowOk.n1.msPerPage = 60; slowOk.n2.msPerPage = 60;
   expect(compareRuns(slowOk, base, { perf: false }).pass, 'compare: --no-perf reports a slowdown without failing');
   const better = clone(); better.n1.docxTables = 9; better.n1.recallLcs = 0.99;
