@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 /*
  * The wild-corpus sweep: 154 real documents through import -> render -> export.
- *   node scripts/wild-sweep.mjs
+ *   node scripts/wild-sweep.mjs                  # forces the REBUILD path (default)
+ *   node scripts/wild-sweep.mjs --passthrough    # the old no-op path: untouched docs come back as their own bytes
+ *   SWEEP_WILD=/abs/path/to/corpus  SWEEP_ORIGIN=http://localhost:5067  (a lane's own port + a read-only corpus)
  *
  * Starts its own static server if one is not already up, and ALWAYS kills what
  * it started (see ensureServer/stopServer).
@@ -32,9 +34,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const WILD = path.join(ROOT, 'tests/fixtures/wild');
+const WILD = process.env.SWEEP_WILD || path.join(ROOT, 'tests/fixtures/wild');
 const NASTY = path.join(ROOT, 'tests/fixtures/nasty');
 const ORIGIN = process.env.SWEEP_ORIGIN || 'http://localhost:5050';
+const PORT = new URL(ORIGIN).port || '5050';
+// Forcing the rebuild is the DEFAULT because the passthrough path makes the
+// fidelity oracle compare a file with itself (see the note at the export stage).
+const PASSTHROUGH = process.argv.includes('--passthrough');
 
 /*
  * ⚠️ THIS SCRIPT OWNS ITS SERVER AND MUST KILL IT.
@@ -58,7 +64,7 @@ async function ensureServer() {
   // the real server orphaned, which is exactly what happened on the first
   // attempt at this cleanup: the sweep finished, reported success, and left
   // two processes holding port 5050.
-  server = spawn('npx', ['serve', '-l', '5050', '.'], { cwd: ROOT, stdio: 'ignore', detached: true });
+  server = spawn('npx', ['serve', '-l', PORT, '.'], { cwd: ROOT, stdio: 'ignore', detached: true });
   for (let i = 0; i < 40; i++) {
     await new Promise((r) => setTimeout(r, 500));
     if (await reachable()) return;
@@ -81,16 +87,23 @@ const BATCH = Number(process.env.SWEEP_BATCH || 12);
 
 const rows = fs.readFileSync(path.join(WILD, 'MANIFEST.tsv'), 'utf8').trim().split('\n');
 const head = rows[0].split('\t');
+// Two manifest layouts exist: wild/ (id, shape, ..., file) and wild/web/ (id,
+// url, category, ... with the file named <id>.pdf).
 const [iId, iShape, iFile] = ['id', 'shape', 'file'].map((k) => head.indexOf(k));
+const iCategory = head.indexOf('category');
 const CORPUS = rows.slice(1).map((r) => {
   const c = r.split('\t');
-  return { id: c[iId], shape: c[iShape], file: path.join(WILD, c[iFile]) };
+  return {
+    id: c[iId],
+    shape: iShape >= 0 ? c[iShape] : c[iCategory],
+    file: path.join(WILD, iFile >= 0 ? c[iFile] : `${c[iId]}.pdf`),
+  };
 }).filter((e) => e.id && fs.existsSync(e.file));
 
 // `corrupt` is the CONTROL path: it deliberately paints over the exported page
 // before re-importing it. An oracle that has never disagreed with anything is
 // decoration, so the comparison must be shown to go red on demand.
-const IN_PAGE = async ({ src, corrupt }) => {
+const IN_PAGE = async ({ src, corrupt, passthrough }) => {
   const dec = (s) => {
     const bin = atob(s);
     const u = new Uint8Array(bin.length);
@@ -99,7 +112,8 @@ const IN_PAGE = async ({ src, corrupt }) => {
   };
   const { createDoc } = await import('/js/core/model.js');
   const { importPdf, createPageRasterizer } = await import('/js/core/import.js');
-  const { buildPdfBytes } = await import('/js/core/export.js');
+  const { buildPdfBytes, passThroughSource } = await import('/js/core/export.js');
+  const { createSource } = await import('/js/core/model.js');
   const { failureReason } = await import('/js/core/failure-reason.js');
   const { compareRegions } = await import('/js/core/visual-oracle.js');
   const { ensurePdfLib } = await import('/js/core/vendor.js');
@@ -143,17 +157,28 @@ const IN_PAGE = async ({ src, corrupt }) => {
     const imgBefore = await toImageData(before.dataUrl, before.width, before.height);
 
     stage = 'export';
-    // ⚠️ READ THIS BEFORE TREATING A GREEN SWEEP AS REFACTOR EVIDENCE
-    // (2026-09-09). This sweep imports each document and exports it UNTOUCHED
-    // — which is now precisely the shape core/export.js hands straight back as
-    // the original bytes (passThroughSource, so an e-meterai survives a
-    // download). So for the no-op run the fidelity oracle below compares the
-    // file with ITSELF and cannot see the rebuild path at all. The `corrupt`
-    // mode still goes red (it damages the output after export), so the oracle
-    // is not broken — but "the wild corpus exports faithfully" no longer says
-    // anything about copyPages/save. To sweep the REBUILD path, make each doc
-    // ineligible first (an annotation, a rotation, or one page deselected).
+    // ⚠️ THE REBUILD PATH IS FORCED HERE, and that is the point of this stage.
+    // core/export.js passThroughSource hands an untouched single-source doc
+    // straight back as its ORIGINAL BYTES (so an e-meterai survives a
+    // download). Since 2026-09-09 that made this sweep half blind: for a no-op
+    // run the fidelity oracle compared the file with ITSELF, and
+    // copyPages/save were never exercised on a wild document. To sweep the real
+    // save path we make the doc ineligible without changing one pixel of it:
+    // a second, unused Source (passThroughSource requires exactly ONE). Pages,
+    // annotations and rotation are untouched, so what is compared is still
+    // "does a rebuild of this document look like the document", through the
+    // very copyPages + save a subset/merge/rotate export takes.
+    // `--passthrough` keeps the old no-op behaviour for comparison.
+    if (!passthrough) {
+      doc.sources.push(createSource({ name: 'unused.pdf', bytes: new Uint8Array([37, 80, 68, 70]), numPages: 1 }));
+      // A forcing step that cannot be seen to fire is decoration (assertion
+      // forces the check): prove the doc is no longer pass-through eligible.
+      if (passThroughSource(doc)) return { ok: false, stage: 'export', reason: 'harness-rebuild-not-forced' };
+    }
+    const srcBytes = doc.sources[0].bytes;
     let out = await buildPdfBytes(doc, { PDFLib, fontkit });
+    const rebuilt = !(out && out.length === srcBytes.length && out.every((b, i) => b === srcBytes[i]));
+    if (!passthrough && !rebuilt) return { ok: false, stage: 'export', reason: 'harness-output-is-source-bytes' };
     if (!out || !out.length) return { ok: false, stage: 'export', reason: 'empty-output' };
 
     if (corrupt) {
@@ -180,8 +205,8 @@ const IN_PAGE = async ({ src, corrupt }) => {
     // that would have caught the 2026-07-27 searchable-scan corruption on a
     // REAL file, instead of only on a fixture we wrote ourselves.
     const cmp = compareRegions(imgBefore, after.img);
-    if (!cmp) return { ok: true, pages: pagesIn, cmp: null }; // blank page: no ink to compare, not a failure
-    return { ok: true, pages: pagesIn, cmp: { ink: cmp.inkRatio, weight: cmp.weightRatio, height: cmp.heightRatio } };
+    if (!cmp) return { ok: true, rebuilt, pages: pagesIn, cmp: null }; // blank page: no ink to compare, not a failure
+    return { ok: true, rebuilt, pages: pagesIn, cmp: { ink: cmp.inkRatio, weight: cmp.weightRatio, height: cmp.heightRatio } };
   } catch (err) {
     return { ok: false, stage, reason: failureReason(err) };
   }
@@ -199,11 +224,11 @@ const b64 = (f) => fs.readFileSync(f).toString('base64');
 
 async function run(file, opts = {}) {
   try {
-    return await page.evaluate(IN_PAGE, { src: b64(file), corrupt: opts.corrupt });
+    return await page.evaluate(IN_PAGE, { src: b64(file), corrupt: opts.corrupt, passthrough: opts.passthrough ?? PASSTHROUGH });
   } catch {
     await fresh();
     try {
-      return await page.evaluate(IN_PAGE, { src: b64(file), corrupt: opts.corrupt });
+      return await page.evaluate(IN_PAGE, { src: b64(file), corrupt: opts.corrupt, passthrough: opts.passthrough ?? PASSTHROUGH });
     } catch {
       await fresh();
       // Twice, alone, on a brand-new browser. That is a document that kills a
@@ -221,7 +246,25 @@ console.log('CONTROLS');
 const good = await run(path.join(NASTY, 'surat-word.pdf'));
 console.log(`  surat-word.pdf  ok=${good.ok} ${good.stage || ''} ${good.reason || ''}`);
 if (!good.ok) throw new Error('a known-good document failed: the harness rejects everything');
-for (const n of ['terpotong.pdf', 'terkunci.pdf']) {
+// THE FORCING MUST BE SEEN TO DIFFER FROM THE BYPASS. The same known-good file,
+// both ways: pass-through hands back its own bytes (rebuilt=false), the forced
+// run must come back as a genuinely different file (rebuilt=true). If the two
+// agree, this sweep is blind to copyPages/save again and says so before it
+// touches the corpus.
+{
+  const bypass = await run(path.join(NASTY, 'surat-word.pdf'), { passthrough: true });
+  const forced = await run(path.join(NASTY, 'surat-word.pdf'), { passthrough: false });
+  console.log(`  rebuild control: passthrough rebuilt=${bypass.rebuilt}, forced rebuilt=${forced.rebuilt}`);
+  if (bypass.rebuilt !== false) throw new Error('the pass-through control did not hand back the original bytes: the rebuilt flag cannot be trusted');
+  if (forced.rebuilt !== true) throw new Error('the forced run did not rebuild the document: the sweep is blind to copyPages/save');
+}
+// terkunci.pdf is encrypted: pdf-lib cannot load it, so a REBUILD must fail it.
+// Under --passthrough the untouched file is handed back as its own bytes and
+// legitimately "succeeds" (export.js passThroughSource, SIDE BENEFIT), so the
+// control is only known-broken on the rebuild path. The pre-2026-10-02 script
+// asserted it broken unconditionally and would have died at this line.
+const KNOWN_BROKEN = PASSTHROUGH ? ['terpotong.pdf'] : ['terpotong.pdf', 'terkunci.pdf'];
+for (const n of KNOWN_BROKEN) {
   const v = await run(path.join(NASTY, n));
   console.log(`  ${n.padEnd(15)} ok=${v.ok} ${v.stage} ${v.reason}`);
   if (v.ok) throw new Error(`${n} is known-broken and came back OK: the harness detects nothing`);
@@ -278,13 +321,15 @@ for (const r of results) {
   byShape[r.shape].n += 1;
   if (!r.ok) byShape[r.shape].fail += 1;
 }
-console.log(`\n===== ${results.length} documents, ${fails.length} failures =====`);
+const rebuiltN = results.filter((r) => r.rebuilt).length;
+console.log(`\n===== ${results.length} documents, ${fails.length} failures, ${rebuiltN} went through copyPages/save (${PASSTHROUGH ? 'PASSTHROUGH mode' : 'forced rebuild'}) =====`);
 for (const [k, v] of Object.entries(byShape)) console.log(`  ${k.padEnd(18)} ${String(v.n).padStart(3)} files, ${v.fail} failed`);
 const grouped = {};
 for (const f of fails) (grouped[`${f.stage}/${f.reason}`] ||= []).push(f.id);
 console.log('');
 for (const [k, ids] of Object.entries(grouped)) console.log(`  ${k.padEnd(26)} ${String(ids.length).padStart(3)}  ${ids.join(' ')}`);
 
+fs.mkdirSync(path.join(ROOT, 'test-results'), { recursive: true });
 fs.writeFileSync(path.join(ROOT, 'test-results/wild-sweep.json'),
   JSON.stringify({ byShape, failures: fails.map((f) => ({ id: f.id, shape: f.shape, stage: f.stage, reason: f.reason })) }, null, 1));
 
