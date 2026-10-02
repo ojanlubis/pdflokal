@@ -687,7 +687,7 @@ export function finishPara(para, z, marginL, colRight) {
     }
     for (const x of r.runs) {
       const last = runs[runs.length - 1];
-      if (last && last.b === x.b && last.i === x.i && last.f === x.f && last.sz === x.sz) last.t += x.t;
+      if (last && last.b === x.b && last.i === x.i && last.f === x.f && last.sz === x.sz && (last.c || null) === (x.c || null) && (last.bg || null) === (x.bg || null)) last.t += x.t;
       else runs.push({ ...x });
     }
   });

@@ -165,8 +165,14 @@ export function styledRuns(line, colorOf) {
     const last = out[out.length - 1];
     const sz = Math.round(r.pdf.size * 2) / 2;
     const c = colour(r);
-    if (last && last.b === s.bold && last.i === s.italic && last.f === s.family && last.sz === sz && (last.c || null) === c) last.t += text;
-    else out.push(c ? { t: text, b: s.bold, i: s.italic, f: s.family, sz, c } : { t: text, b: s.bold, i: s.italic, f: s.family, sz });
+    const bg = r.bg || null;
+    if (last && last.b === s.bold && last.i === s.italic && last.f === s.family && last.sz === sz && (last.c || null) === c && (last.bg || null) === bg) last.t += text;
+    else {
+      const o = { t: text, b: s.bold, i: s.italic, f: s.family, sz };
+      if (c) o.c = c;
+      if (bg) o.bg = bg;
+      out.push(o);
+    }
   };
   for (const r of line.runs) {
     const a0 = r.pdf.x0 * r.pdf.ux + r.pdf.y0 * r.pdf.uy;
