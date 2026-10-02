@@ -93,13 +93,17 @@ test.describe('privasi.html — Local Storage table, ratified rows', () => {
     // this one ("ID pengunjung yang saya ceritakan di Telemetri Produk…"), which
     // is copy the consolidation deliberately added. A locator that a legitimate
     // sentence can break is the wrong locator.
+    // 2026-10-02: the section was renamed "Yang dikirim ke server saya
+    // sendiri" in the /privasi simplification, and GA4 is spelled out as
+    // "Google Analytics". Same claim, same section, new address.
     const telemetrySection = page
       .locator('.privacy-section')
-      .filter({ has: page.getByRole('heading', { name: 'Telemetri Produk' }) });
+      .filter({ has: page.getByRole('heading', { name: 'Yang dikirim ke server saya sendiri' }) });
+    await expect(telemetrySection).toHaveCount(1);
     await expect(telemetrySection.getByText('pdflokal_visitor_id')).toHaveCount(1);
     const telemetryText = await telemetrySection.innerText();
     expect(telemetryText).toMatch(/Mixpanel/);
-    expect(telemetryText).toMatch(/GA4/);
+    expect(telemetryText).toMatch(/Google Analytics/);
     expect(telemetryText).toMatch(/Sentry/);
   });
 });
