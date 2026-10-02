@@ -102,64 +102,67 @@ function rectOf(cmds) {
 
 const rectCmds = (b) => [['M', b[0], b[1]], ['L', b[2], b[1]], ['L', b[2], b[3]], ['L', b[0], b[3]], ['Z']];
 
-// Curves -> short polylines (only used where a path must be clipped).
-function flatten(cmds, n = 8) {
-  const out = [];
+// Curves -> short polylines, as FLAT subpaths [x0,y0,x1,y1,...] (one number array per M..., not an array per point:
+// MEASURED 2026-10-02 on n057, the pair-per-vertex form allocated 2.8 GB in clip/flatten/simplify alone and put the
+// converter's peak RSS 300 MB over the baseline). Only used where a path must be clipped or point-tested.
+function polysOf(cmds, n = 8) {
+  const subs = [];
+  let cur = null;
   let cx = 0; let cy = 0; let sx = 0; let sy = 0;
   for (const c of cmds) {
-    if (c[0] === 'M') { out.push(['M', c[1], c[2]]); cx = sx = c[1]; cy = sy = c[2]; }
-    else if (c[0] === 'L') { out.push(['L', c[1], c[2]]); cx = c[1]; cy = c[2]; }
+    if (c[0] === 'M') { cur = [c[1], c[2]]; subs.push(cur); cx = sx = c[1]; cy = sy = c[2]; }
+    else if (c[0] === 'L') { if (cur) cur.push(c[1], c[2]); cx = c[1]; cy = c[2]; }
     else if (c[0] === 'C') {
       for (let k = 1; k <= n; k += 1) {
         const t = k / n; const u = 1 - t;
-        out.push(['L',
-          u * u * u * cx + 3 * u * u * t * c[1] + 3 * u * t * t * c[3] + t * t * t * c[5],
-          u * u * u * cy + 3 * u * u * t * c[2] + 3 * u * t * t * c[4] + t * t * t * c[6]]);
+        const x = u * u * u * cx + 3 * u * u * t * c[1] + 3 * u * t * t * c[3] + t * t * t * c[5];
+        const y = u * u * u * cy + 3 * u * u * t * c[2] + 3 * u * t * t * c[4] + t * t * t * c[6];
+        if (cur) cur.push(x, y);
       }
       cx = c[5]; cy = c[6];
-    } else { out.push(['Z']); cx = sx; cy = sy; }
+    } else { cx = sx; cy = sy; }
   }
-  return out;
+  return subs;
 }
 
 // Sutherland-Hodgman against an axis-aligned box, per closed subpath. -> cmds ([] = nothing left).
 function clipPolys(cmds, box) {
-  const subs = [];
-  let cur = null;
-  for (const c of flatten(cmds)) {
-    if (c[0] === 'M') { cur = [[c[1], c[2]]]; subs.push(cur); }
-    else if (c[0] === 'L' && cur) cur.push([c[1], c[2]]);
-  }
-  const edges = [
-    (p) => p[0] - box[0], (p) => box[2] - p[0], (p) => p[1] - box[1], (p) => box[3] - p[1],
-  ];
   const out = [];
-  for (let poly of subs) {
-    for (const d of edges) {
+  const emit = (poly) => { for (let i = 0; i < poly.length; i += 2) out.push([i ? 'L' : 'M', poly[i], poly[i + 1]]); out.push(['Z']); };
+  for (let poly of polysOf(cmds)) {
+    let inside = true;
+    for (let i = 0; i < poly.length && inside; i += 2) if (poly[i] < box[0] || poly[i] > box[2] || poly[i + 1] < box[1] || poly[i + 1] > box[3]) inside = false;
+    if (inside) { if (poly.length >= 6) emit(poly); continue; }
+    for (let e = 0; e < 4; e += 1) {
       const next = [];
-      for (let i = 0; i < poly.length; i += 1) {
-        const a = poly[i]; const b = poly[(i + 1) % poly.length];
-        const da = d(a); const db = d(b);
-        if (da >= 0) next.push(a);
-        if ((da >= 0) !== (db >= 0)) { const t = da / (da - db); next.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]); }
+      const len = poly.length;
+      const dist = (x, y) => (e === 0 ? x - box[0] : e === 1 ? box[2] - x : e === 2 ? y - box[1] : box[3] - y);
+      for (let i = 0; i < len; i += 2) {
+        const ax = poly[i]; const ay = poly[i + 1];
+        const j = i + 2 < len ? i + 2 : 0;
+        const bx = poly[j]; const by = poly[j + 1];
+        const da = dist(ax, ay); const db = dist(bx, by);
+        if (da >= 0) next.push(ax, ay);
+        if ((da >= 0) !== (db >= 0)) { const t = da / (da - db); next.push(ax + (bx - ax) * t, ay + (by - ay) * t); }
       }
       poly = next;
       if (!poly.length) break;
     }
-    if (poly.length >= 3) { poly.forEach((p, i) => out.push([i ? 'L' : 'M', p[0], p[1]])); out.push(['Z']); }
+    if (poly.length >= 6) emit(poly);
   }
   return out;
 }
 
 function pointInCmds(cmds, px, py) { // even-odd over the flattened outline
   let inside = false;
-  let first = null; let prev = null;
-  const edge = (a, b) => { if ((a[1] > py) !== (b[1] > py) && px < ((b[0] - a[0]) * (py - a[1])) / (b[1] - a[1]) + a[0]) inside = !inside; };
-  for (const c of flatten(cmds, 4)) {
-    if (c[0] === 'M') { if (prev && first) edge(prev, first); first = prev = [c[1], c[2]]; }
-    else if (c[0] === 'L') { const p = [c[1], c[2]]; edge(prev, p); prev = p; }
+  for (const poly of polysOf(cmds, 4)) {
+    const len = poly.length;
+    for (let i = 0; i < len; i += 2) {
+      const j = i + 2 < len ? i + 2 : 0;
+      const ax = poly[i]; const ay = poly[i + 1]; const bx = poly[j]; const by = poly[j + 1];
+      if ((ay > py) !== (by > py) && px < ((bx - ax) * (py - ay)) / (by - ay) + ax) inside = !inside;
+    }
   }
-  if (prev && first) edge(prev, first);
   return inside;
 }
 
@@ -172,28 +175,30 @@ function simplify(cmds, tol = 0.25) {
     if (cmds[k][0] !== 'L') { out.push(cmds[k]); k += 1; continue; }
     // the run of L's, with the point that precedes it
     const prev = out[out.length - 1];
-    const px = prev && prev[0] !== 'Z' ? prev[prev.length - 2] : null;
-    const py = prev && prev[0] !== 'Z' ? prev[prev.length - 1] : null;
+    const hasPrev = !!prev && prev[0] !== 'Z';
     let e = k;
     while (e < cmds.length && cmds[e][0] === 'L') e += 1;
-    const pts = px === null ? [] : [[px, py]];
-    for (let q = k; q < e; q += 1) pts.push([cmds[q][1], cmds[q][2]]);
-    const keep = new Uint8Array(pts.length);
-    keep[0] = 1; keep[pts.length - 1] = 1;
-    const stack = [[0, pts.length - 1]];
+    const m = e - k + (hasPrev ? 1 : 0);
+    const pts = new Float64Array(m * 2);
+    let w = 0;
+    if (hasPrev) { pts[0] = prev[prev.length - 2]; pts[1] = prev[prev.length - 1]; w = 2; }
+    for (let q = k; q < e; q += 1) { pts[w] = cmds[q][1]; pts[w + 1] = cmds[q][2]; w += 2; }
+    const keep = new Uint8Array(m);
+    keep[0] = 1; keep[m - 1] = 1;
+    const stack = [0, m - 1];
     while (stack.length) {
-      const [a, b] = stack.pop();
+      const b = stack.pop(); const a = stack.pop();
       if (b - a < 2) continue;
-      const dx = pts[b][0] - pts[a][0]; const dy = pts[b][1] - pts[a][1];
+      const dx = pts[2 * b] - pts[2 * a]; const dy = pts[2 * b + 1] - pts[2 * a + 1];
       const L = Math.hypot(dx, dy);
       let far = -1; let fd = tol;
       for (let q = a + 1; q < b; q += 1) {
-        const d = L < 1e-9 ? Math.hypot(pts[q][0] - pts[a][0], pts[q][1] - pts[a][1]) : Math.abs((pts[q][0] - pts[a][0]) * dy - (pts[q][1] - pts[a][1]) * dx) / L;
+        const d = L < 1e-9 ? Math.hypot(pts[2 * q] - pts[2 * a], pts[2 * q + 1] - pts[2 * a + 1]) : Math.abs((pts[2 * q] - pts[2 * a]) * dy - (pts[2 * q + 1] - pts[2 * a + 1]) * dx) / L;
         if (d > fd) { fd = d; far = q; }
       }
-      if (far >= 0) { keep[far] = 1; stack.push([a, far], [far, b]); }
+      if (far >= 0) { keep[far] = 1; stack.push(a, far, far, b); }
     }
-    for (let q = px === null ? 0 : 1; q < pts.length; q += 1) if (keep[q]) out.push(['L', pts[q][0], pts[q][1]]);
+    for (let q = hasPrev ? 1 : 0; q < m; q += 1) if (keep[q]) out.push(['L', pts[2 * q], pts[2 * q + 1]]);
     k = e;
   }
   return out;
@@ -274,7 +279,7 @@ async function replay(ctx) {
   const { pdfjs, ops, vp } = ctx;
   const { OPS } = pdfjs;
   const mul = (a, b) => pdfjs.Util.transform(a, b);
-  const stats = { fills: 0, strokes: 0, gradients: 0, smaskSkipped: 0, tilingSkipped: 0, patternMissing: 0 };
+  const stats = { fills: 0, strokes: 0, gradients: 0, smaskSkipped: 0, tilingSkipped: 0, patternMissing: 0, complexDropped: 0 };
   const items = [];
   const events = [];
   const lost = []; // what we could not draw natively: { z, box (page pt), why }  (the raster hook's work list)
@@ -365,7 +370,9 @@ async function replay(ctx) {
     // a moveTo straight after a moveTo (pdf-lib and others emit `0 0 m x y m`) replaces it; a trailing lone moveTo paints nothing
     for (let q = cmds.length - 1; q > 0; q -= 1) if (cmds[q][0] === 'M' && cmds[q - 1][0] === 'M') cmds.splice(q - 1, 1);
     while (cmds.length && cmds[cmds.length - 1][0] === 'M') cmds.pop();
-    return cmds.length ? { cmds, box: pathBox(cmds) } : null;
+    // a trace with tens of thousands of vertices (a map) is the same shape with a few hundred: simplify BEFORE anything clips it
+    const out = cmds.length > 40 ? simplify(cmds) : cmds;
+    return out.length ? { cmds: out, box: pathBox(out) } : null;
   };
 
   const applyClip = () => {
@@ -419,6 +426,11 @@ async function replay(ctx) {
     if (doStroke && !mask && st.strokePat !== 'tiling' && !(st.strokePat && st.strokePat.shade)) strokeSpec = st.stroke ? { c: st.stroke } : null;
     if (!fillSpec && !strokeSpec) return;
     const rect = rectOf(path.cmds);
+    if (!rect && path.cmds.length > MAX_SHAPE_CMDS) { // too complex to draw: never clipped (that is the cost), it is the raster hook's work
+      stats.complexDropped += 1;
+      lose('complex');
+      return;
+    }
     const P = toPage(ev.ctm);
     let g;
     if (fillSpec) g = visibleGeometry(path.cmds, path.box, rect);
@@ -654,15 +666,15 @@ function matchText(ctx, events, stats) {
 
 // ------------------------------------------------------------- the pages ----
 const MAX_SHAPES = 400; // per page: a map or a chart with thousands of marks must not stall Word
-const MAX_SHAPE_CMDS = 2500; // vertices in one shape, after simplification
-const MAX_PAGE_CMDS = 20000; // vertices on one page, after simplification
+const MAX_SHAPE_CMDS = 400; // vertices in one shape, after simplification
+const MAX_PAGE_CMDS = 2500; // vertices on one page, after simplification
 
 export async function analyzeColor(ctx) {
   const stats = { shapes: 0, fills: 0, strokes: 0, gradients: 0, smaskSkipped: 0, tilingSkipped: 0, patternMissing: 0,
     textMatched: 0, textUnmatched: 0, runsSplit: 0, highlights: 0, guardDropped: 0, guardWhitened: 0, capped: 0, complexDropped: 0, rasterised: 0, whiteDropped: 0, tiny: 0 };
   let rep;
   try { rep = await replay(ctx); } catch (e) { stats.error = String(e && e.message); return { fillAt: () => null, anchors: [], background: null, stats }; }
-  Object.assign(stats, { fills: rep.stats.fills, strokes: rep.stats.strokes, gradients: rep.stats.gradients, smaskSkipped: rep.stats.smaskSkipped, tilingSkipped: rep.stats.tilingSkipped, patternMissing: rep.stats.patternMissing });
+  Object.assign(stats, { complexDropped: rep.stats.complexDropped, fills: rep.stats.fills, strokes: rep.stats.strokes, gradients: rep.stats.gradients, smaskSkipped: rep.stats.smaskSkipped, tilingSkipped: rep.stats.tilingSkipped, patternMissing: rep.stats.patternMissing });
   const W = ctx.widthPt; const H = ctx.heightPt;
   const pageBox = [0, 0, W, H];
 
@@ -781,7 +793,7 @@ export async function analyzeColor(ctx) {
   if (cmdTotal > MAX_PAGE_CMDS) {
     const byWeight = drawn.slice().sort((a, b) => weight(a) - weight(b)); // smallest first: they go first
     const gone = new Set();
-    for (const it of byWeight) { if (cmdTotal <= MAX_PAGE_CMDS) break; if (it.cmds.length > 12) { gone.add(it); cmdTotal -= it.cmds.length; stats.complexDropped += 1; } }
+    for (const it of byWeight) { if (cmdTotal <= MAX_PAGE_CMDS) break; if (it.cmds.length > 12) { gone.add(it); cmdTotal -= it.cmds.length; stats.complexDropped += 1; if (it.fill) lostRegions.push({ z: it.z, box: inter(it.box, pageBox), why: 'complex' }); } }
     drawn = drawn.filter((it) => !gone.has(it));
   }
 
@@ -799,7 +811,10 @@ export async function analyzeColor(ctx) {
     let colour = null;
     let coloured = false;
     for (const it of solids) {
-      const ia = area(inter(it.box, q));
+      const b = it.box; // the overlap by hand: this runs once per text run x shape, and an array per pair was the page's garbage
+      const ox = Math.min(b[2], x1) - Math.max(b[0], x0);
+      const oy = Math.min(b[3], y1) - Math.max(b[1], y0);
+      const ia = ox > 0 && oy > 0 ? ox * oy : 0;
       if (!(qa > 0 ? ia >= 0.8 * qa : ia > 0)) continue;
       if (!it.rect && !pointInCmds(it.cmds, cx, cy)) continue;
       const a = it.fill.a ?? 1;
