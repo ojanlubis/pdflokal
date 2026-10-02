@@ -24,6 +24,7 @@ import {
   moveAnnotation, normalizePageWidths,
 } from '../core/operations.js';
 import { createHistory, record, undo, redo, canUndo, canRedo } from '../core/history.js';
+import { rasterFitsShape, rasterIsCurrent } from '../core/raster-key.js';
 import { importPdf, importImage, createPageRasterizer, probeTextLayer, pdfLibLoadError } from '../core/import.js';
 import {
   pagesBucket, durationBucket, ratioBucket, inkRatioBucket, intentValue,
@@ -122,7 +123,7 @@ function deviceClass() {
 
 // ---- state (ONE doc, ONE history — everything else is DOM or derived) -------
 let doc = createDoc(); // replaced wholesale by "Buka Baru" (File menu)
-const history = createHistory();
+const history = createHistory(undefined, { carryRaster: rasterFitsShape });
 let slots = [];
 let rasterizer = null;
 let zoom = 1;
@@ -1159,7 +1160,22 @@ async function captureFeedbackSample(prevRaster, newRaster, box) {
 function syncEditedRasters(prevPages) {
   const prevSig = new Map(prevPages.map((p) => [p.id, editSignature(p)]));
   for (const page of doc.pages) {
-    if (editSignature(page) !== (prevSig.get(page.id) ?? '')) {
+    // history.js no longer snapshots rasters: restore() carries the LIVE raster
+    // when it still fits the page's shape, which may be stale in content (core/
+    // raster-key.js). So the test is no longer only "signature moved vs the
+    // pre-op page" but also "does the raster it now holds show THIS page's
+    // edits" — the second catches a bake that was still in flight at undo time,
+    // where both pages share a signature but the picture predates it. A page
+    // with NO raster (rotated, resized, or restored from a delete) is skipped:
+    // the viewport stream renders it, and the rasterizer's edited-doc cache is
+    // keyed by signature, so that render is already the right bake; a rebake
+    // here would invalidate the build the stream just started and bake twice.
+    const sigMoved = editSignature(page) !== (prevSig.get(page.id) ?? '');
+    if (!page.raster) {
+      if (!editSignature(page)) page.editApplied = null; // same as rebakePage: no edits left
+      continue;
+    }
+    if (sigMoved || !rasterIsCurrent(page.raster, page)) {
       rebakePage(page.id).catch((err) => console.warn('rebakePage (undo/redo) gagal:', err));
     }
   }

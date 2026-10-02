@@ -15,6 +15,7 @@ import { createSource, createPage, getSource } from './model.js';
 import { addSource, addPages } from './operations.js';
 import { ensurePdfJs } from './vendor.js';
 import { editSignature } from './page-surgery.js';
+import { rasterKey } from './raster-key.js';
 import { pageHasVisibleText } from './text-visibility.js';
 import { failureReason } from './failure-reason.js';
 
@@ -507,9 +508,13 @@ export function createPageRasterizer(doc, opts = {}) {
       // (return the current raster so a caller's attach() shows it, not stale).
       const seq = (renderSeq.get(page.id) || 0) + 1;
       renderSeq.set(page.id, seq);
+      // Provenance for undo/redo (core/history.js): which picture this is,
+      // read when the render is ISSUED. History carries a live raster across a
+      // restore only if this still equals the restored page's key.
+      const key = rasterKey(page);
       const canvas = await renderToCanvas(page, scale);
       if (renderSeq.get(page.id) !== seq) return page.raster;
-      page.raster = { dataUrl: canvas.toDataURL('image/png'), width: canvas.width, height: canvas.height, scale };
+      page.raster = { dataUrl: canvas.toDataURL('image/png'), width: canvas.width, height: canvas.height, scale, key };
       return page.raster;
     },
     // Small render for page-manager tiles. Does NOT touch page.raster (the main

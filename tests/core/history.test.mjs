@@ -11,8 +11,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createDoc, createSource, createPage, createAnnotation, _resetIds } from '../../js/core/model.js';
-import { addSource, addPages, removePage, reorderPage, rotatePage, addAnnotation, updateAnnotation, removeAnnotation, selectAnnotation } from '../../js/core/operations.js';
+import { addSource, addPages, removePage, reorderPage, rotatePage, addAnnotation, updateAnnotation, removeAnnotation, moveAnnotation, resizeAnnotation, selectAnnotation } from '../../js/core/operations.js';
 import { createHistory, record, undo, redo, canUndo, canRedo } from '../../js/core/history.js';
+import { rasterKey, rasterFitsShape, rasterIsCurrent } from '../../js/core/raster-key.js';
 
 function docWithTwoPages() {
   _resetIds();
@@ -140,4 +141,145 @@ test('undo() / redo() on empty stacks are safe no-ops', () => {
   assert.equal(redo(h, doc), false);
   assert.equal(canUndo(h), false);
   assert.equal(canRedo(h), false);
+});
+
+// ============================================================================
+// Rasters are NOT history (2026-10-02). Snapshots used to carry page.raster by
+// reference, pinning every raster a page had at record time. Measured: 5 pages
+// x 40 edits x 1.3 MiB rasters retained 266 MiB; with the fix, ~0.
+// ============================================================================
+const fakeRaster = (page, n = 0) => ({ dataUrl: 'data:image/png;base64,' + 'A'.repeat(64) + n, width: 10, height: 10, scale: 2, key: rasterKey(page) });
+
+// Every object reachable from the history stacks, so a snapshot cannot hide a
+// raster behind a new field name. Strings are values; objects are identity.
+function reachable(root) {
+  const seen = new Set();
+  const walk = (v) => {
+    if (!v || typeof v !== 'object' || seen.has(v)) return;
+    seen.add(v);
+    for (const k of Object.keys(v)) walk(v[k]);
+  };
+  walk(root);
+  return seen;
+}
+
+test('history keeps NO page raster alive, however many rasters replace each other between edits', () => {
+  const doc = docWithTwoPages();
+  const h = createHistory(50, { carryRaster: rasterFitsShape });
+  const live = new Set();
+  for (let i = 0; i < 30; i++) {
+    record(h, doc);
+    addAnnotation(doc, doc.pages[0].id, createAnnotation('text', { x: i, y: i, text: 'e' + i }));
+    for (const p of doc.pages) { p.raster = fakeRaster(p, i); live.add(p.raster); } // zoom-sharpen / re-render swaps it
+  }
+  const held = [...reachable([h.undoStack, h.redoStack])].filter((o) => o.dataUrl !== undefined || live.has(o));
+  assert.equal(held.length, 0, 'no raster object is reachable from the undo/redo stacks');
+  for (const snap of h.undoStack) for (const p of snap.pages) assert.equal('raster' in p, false, 'snapshot page has no raster field');
+});
+
+test('undo/redo restores every tool\'s state exactly (rasters excluded)', () => {
+  const sig = 'data:image/png;base64,SIG';
+  const steps = {
+    'add text': (d, [p1]) => addAnnotation(d, p1.id, createAnnotation('text', { x: 5, y: 6, text: 'halo', fontSize: 14 })),
+    'add signature': (d, [p1]) => addAnnotation(d, p1.id, createAnnotation('signature', { x: 0, y: 0, width: 150, height: 60, image: sig })),
+    'add whiteout (Tip-Ex)': (d, [p1]) => addAnnotation(d, p1.id, createAnnotation('whiteout', { x: 1, y: 2, width: 40, height: 10 })),
+    'ganti pair': (d, [p1]) => {
+      const c = addAnnotation(d, p1.id, createAnnotation('whiteout', { x: 1, y: 2, width: 40, height: 10, replaceTargets: [{ x0: 1, y0: 2, ux: 1, uy: 0, size: 12, len: 40 }], replaceBox: { x: 1, y: 2, w: 40, h: 10 } }));
+      addAnnotation(d, p1.id, createAnnotation('text', { x: 1, y: 2, text: 'baru', replaceCoverId: c.id }));
+    },
+    'move': (d, [p1]) => moveAnnotation(d, p1.annotations[0].id, 7, 9),
+    'resize': (d, [p1]) => resizeAnnotation(d, p1.annotations[0].id, { width: 99, height: 33 }),
+    'style (format bar)': (d, [p1]) => updateAnnotation(d, p1.annotations[0].id, { bold: true, color: '#f00', fontSize: 22 }),
+    'delete annotation (Hapus)': (d, [p1]) => removeAnnotation(d, p1.annotations[0].id),
+    'rotate page': (d, [p1]) => rotatePage(d, p1.id, 90),
+    'reorder page': (d, [p1]) => reorderPage(d, p1.id, 1),
+    'delete page': (d, [p1]) => removePage(d, p1.id),
+  };
+  const state = (d) => JSON.parse(JSON.stringify({ pages: d.pages.map(({ raster, ...p }) => p), selection: d.selection }));
+  for (const [name, step] of Object.entries(steps)) {
+    const doc = docWithTwoPages();
+    const [p1] = doc.pages;
+    addAnnotation(doc, p1.id, createAnnotation('text', { x: 3, y: 3, text: 'seed' }));
+    for (const p of doc.pages) p.raster = fakeRaster(p);
+    const h = createHistory(50, { carryRaster: rasterFitsShape });
+    const before = state(doc);
+    record(h, doc);
+    step(doc, doc.pages);
+    const after = state(doc);
+    assert.notDeepEqual(after, before, `${name}: the step changed something`);
+    assert.equal(undo(h, doc), true);
+    assert.deepEqual(state(doc), before, `${name}: undo restores the pre-state`);
+    assert.equal(redo(h, doc), true);
+    assert.deepEqual(state(doc), after, `${name}: redo restores the post-state`);
+  }
+});
+
+test('restore carries a live raster that still fits the page, and only that', () => {
+  const doc = docWithTwoPages();
+  const [p1, p2] = doc.pages;
+  p1.raster = fakeRaster(p1); p2.raster = fakeRaster(p2);
+  const r1 = p1.raster, r2 = p2.raster;
+  const h = createHistory(50, { carryRaster: rasterFitsShape });
+
+  // annotation edit: the page PICTURE is unchanged (annotations are DOM overlay) -> no re-render on undo
+  record(h, doc);
+  addAnnotation(doc, p1.id, createAnnotation('text', { x: 1, y: 1, text: 'a' }));
+  undo(h, doc);
+  assert.equal(doc.pages[0].raster, r1, 'unchanged picture keeps its live raster (no re-render)');
+  assert.equal(doc.pages[1].raster, r2);
+
+  // rotation: the raster is pre-rotated, so the restored page must NOT inherit the live one
+  record(h, doc);
+  rotatePage(doc, doc.pages[0].id, 90);
+  doc.pages[0].raster = fakeRaster(doc.pages[0], 'rot'); // the render layer re-rendered it rotated
+  undo(h, doc);
+  assert.equal(doc.pages[0].rotation, 0);
+  assert.equal(doc.pages[0].raster, null, 'a raster of the other orientation is dropped, render layer re-derives');
+  assert.equal(doc.pages[1].raster, r2, 'the untouched page keeps its raster');
+});
+
+test('restore never resurrects a raster for a deleted page, and never carries without a cacheKey', () => {
+  const doc = docWithTwoPages();
+  const [p1] = doc.pages;
+  p1.raster = fakeRaster(p1);
+  const h = createHistory(50, { carryRaster: rasterFitsShape });
+  record(h, doc);
+  removePage(doc, p1.id);
+  undo(h, doc);
+  assert.equal(doc.pages[0].id, p1.id);
+  assert.equal(doc.pages[0].raster, null, 'a restored deleted page has no raster until re-rendered');
+
+  const bare = docWithTwoPages();
+  bare.pages[0].raster = fakeRaster(bare.pages[0]);
+  const h2 = createHistory(); // no carryRaster configured: always safe, never carries
+  record(h2, bare);
+  addAnnotation(bare, bare.pages[0].id, createAnnotation('text', { x: 1, y: 1, text: 'a' }));
+  undo(h2, bare);
+  assert.equal(bare.pages[0].raster, null);
+});
+
+test('a stale raster (edits moved on) may stand in for the no-seam swap, but is identifiable as stale', () => {
+  // Same shape, other edits: carried so the page never blanks (spec-live-surgery §7),
+  // and rasterIsCurrent says false so the app re-bakes it. This is also the in-flight
+  // case: the live page already has the new edit while its raster predates it.
+  const doc = docWithTwoPages();
+  const [p1] = doc.pages;
+  p1.raster = fakeRaster(p1); // stamped for the no-edit picture
+  const stale = p1.raster;
+  const h = createHistory(50, { carryRaster: rasterFitsShape });
+  const c = addAnnotation(doc, p1.id, createAnnotation('whiteout', { x: 1, y: 2, width: 40, height: 10, replaceTargets: [{ x0: 1, y0: 2, ux: 1, uy: 0, size: 12, len: 40 }], replaceBox: { x: 1, y: 2, w: 40, h: 10 } }));
+  addAnnotation(doc, p1.id, createAnnotation('text', { x: 1, y: 2, text: 'baru', replaceCoverId: c.id }));
+  record(h, doc);                     // snapshot WITH the edit
+  addAnnotation(doc, p1.id, createAnnotation('text', { x: 9, y: 9, text: 'nudge' }));
+  undo(h, doc);
+  assert.equal(doc.pages[0].raster, stale, 'carried (no blank frame)');
+  assert.equal(rasterIsCurrent(doc.pages[0].raster, doc.pages[0]), false, 'but flagged stale, so the app re-bakes');
+});
+
+test('rasterIsCurrent: a raster rendered for exactly this page is current', () => {
+  const doc = docWithTwoPages();
+  const p = doc.pages[0];
+  p.raster = fakeRaster(p);
+  assert.equal(rasterIsCurrent(p.raster, p), true);
+  assert.equal(rasterIsCurrent({ dataUrl: 'x', scale: 2 }, p), false, 'a raster with no provenance is never trusted');
 });
