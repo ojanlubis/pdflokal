@@ -3948,8 +3948,23 @@ window.addEventListener('unhandledrejection', (e) => reportRuntimeFailure(e?.rea
 // Enhancement only — makes the app installable + offline. Silent-fail on purpose:
 // a registration error must NEVER surface to the user or block the editor. Shared
 // by index.html AND the generated SEO pages (all register the same root-scoped SW).
+//
+// ⚠️ KEEP THIS THE LAST STATEMENT IN THE FILE. The 'pdflokal:booted' message is
+// sw.js's ONLY proof that this page's module set linked and ran: it is what makes
+// the set of files this load fetched a COMPLETE generation, the only kind sw.js
+// will ever serve offline (sw.js, GENERATIONS). Reaching this line means every
+// static import resolved and the whole top level above evaluated. Moved earlier,
+// it would vouch for a set that can still die below it.
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
+    // No block comment in this catch: several tests strip block comments with a
+    // lazy regex, and the accept string for images earlier in this file opens
+    // one as far as that regex can tell, so a closer here swallows the file.
+    try {
+      navigator.serviceWorker.controller?.postMessage({ type: 'pdflokal:booted' });
+    } catch {
+      // enhancement only
+    }
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   });
 }
