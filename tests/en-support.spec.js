@@ -16,37 +16,13 @@
  * "Bahasa Indonesia" link).
  */
 import { test, expect } from '@playwright/test';
+import { indonesianHits as findIndonesian } from './helpers/indonesian.js';
 
 const STOP = /\b(dan|yang|untuk|atau|dengan|dari|ini|itu|kamu|nggak|aja|udah|saya|ke|di|jadi|mau|bisa|biar|Unduh|halaman|ketuk|Tarik|Pilih|Seret|Buka|Hapus|Kirim|Gratis|Cepat|Tutup|Batal|Pakai|Kembali|Bantu|Traktir|Kopi|Dukung|Kasih|Makasih|Balik|Tanya|Jawab)\b/i;
 const EXEMPT_TEXT = ['Dibuat di Indonesia', '© 2026 PT Fauzan Karya Digital'];
 
-// textContent semantics (the log drawer is a closed <dialog>, still copy), minus
-// script/style, the declared-Indonesian link and the log's commit subjects.
-async function indonesianHits(page) {
-  return page.evaluate(({ stop, exempt }) => {
-    const re = new RegExp(stop.source, stop.flags);
-    const hits = [];
-    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
-      const el = n.parentElement;
-      if (!el || el.closest('script, style, body [lang="id"], .rw-log li > span')) continue;
-      const text = n.textContent.replace(/\s+/g, ' ').trim();
-      if (!text || exempt.includes(text)) continue;
-      if (re.test(text)) hits.push(`text: ${text}`);
-    }
-    for (const el of document.querySelectorAll('[aria-label],[title],[placeholder],[alt]')) {
-      if (el.closest('body [lang="id"]')) continue;
-      for (const a of ['aria-label', 'title', 'placeholder', 'alt']) {
-        const v = el.getAttribute(a);
-        if (v && re.test(v)) hits.push(`${a}: ${v}`);
-      }
-    }
-    const desc = document.querySelector('meta[name="description"]')?.getAttribute('content');
-    if (desc && re.test(desc)) hits.push(`description: ${desc}`);
-    if (re.test(document.title)) hits.push(`title: ${document.title}`);
-    return hits;
-  }, { stop: { source: STOP.source, flags: STOP.flags }, exempt: EXEMPT_TEXT });
-}
+// The log drawer is a closed <dialog>, still copy; its commit subjects are exempt.
+const indonesianHits = (page) => findIndonesian(page, { stop: STOP, exempt: EXEMPT_TEXT, skip: '.rw-log li > span' });
 
 test.describe('/en/support', () => {
   test('0. the detector is not blind: /dukung is full of Indonesian', async ({ page }) => {

@@ -22,49 +22,23 @@
  * Set EN_SHOT_DIR to also drop a screenshot of /en there (the seat looks).
  */
 import { test, expect } from '@playwright/test';
+import { indonesianHits as findIndonesian } from './helpers/indonesian.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { expectFirstPage } from './helpers/render.js';
+import { UPDATES } from '../js/updates.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SAMPLE = path.join(__dirname, 'fixtures', 'sample-2pages.pdf');
+// The card's top line is the newest approved entry; read it, so approving a new one moves the pin with it.
+const NEWEST = UPDATES.find((u) => u.approved);
 
 // The second line is the vocabulary of the blocks `/en` used to cut and now carries
 // (Template row, maker card, QRIS card): the sweep must reach them too.
 const STOP = /\b(dan|yang|untuk|atau|dengan|dari|ini|itu|kamu|nggak|aja|udah|saya|ke|di|jadi|mau|bisa|biar|Unduh|halaman|ketuk|Tarik|Pilih|Seret|Buka|Hapus|Kirim|Gratis|Cepat|Tutup|Batal|Pakai|Kembali|Ukuran|Simpan|Ulangi|Urungkan|Dukung|Traktir|kopi|Lihat|selengkapnya|terakhir|Foto|Kwitansi|Gaji|Surat|Jalan|Agu|Okt|Des|Mei)\b/i;
 const EXEMPT_TEXT = new Set(['Dibuat di Indonesia']);
 
-// Every visible-or-hidden text node (dialogs, the folded tool grid, the FAQ
-// answers) and every accessible-name attribute, minus script/style and the
-// declared-Indonesian language link. textContent semantics, not innerText:
-// innerText skips whatever is hidden, and a hidden dialog is still copy.
-async function indonesianHits(page) {
-  return page.evaluate(({ stop, exempt }) => {
-    const re = new RegExp(stop.source, stop.flags);
-    const hits = [];
-    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
-      const el = n.parentElement;
-      if (!el || el.closest('script, style, body [lang="id"]')) continue;
-      const text = n.textContent.replace(/\s+/g, ' ').trim();
-      if (!text || exempt.includes(text)) continue;
-      if (re.test(text)) hits.push(`text: ${text}`);
-    }
-    for (const el of document.querySelectorAll('[aria-label],[title],[placeholder],[alt]')) {
-      if (el.closest('body [lang="id"]')) continue;
-      for (const a of ['aria-label', 'title', 'placeholder', 'alt']) {
-        const v = el.getAttribute(a);
-        if (v && re.test(v)) hits.push(`${a}: ${v}`);
-      }
-    }
-    for (const sel of ['meta[name="description"]', 'meta[property="og:title"]', 'meta[property="og:description"]']) {
-      const v = document.querySelector(sel)?.getAttribute('content');
-      if (v && re.test(v)) hits.push(`${sel}: ${v}`);
-    }
-    if (re.test(document.title)) hits.push(`title: ${document.title}`);
-    return hits;
-  }, { stop: { source: STOP.source, flags: STOP.flags }, exempt: [...EXEMPT_TEXT] });
-}
+const indonesianHits = (page) => findIndonesian(page, { stop: STOP, exempt: [...EXEMPT_TEXT] });
 
 test.describe('/en', () => {
   test('0. the detector is not blind: `/` is full of Indonesian', async ({ page }) => {
@@ -120,11 +94,11 @@ test.describe('/en', () => {
     for (const t of times) expect(t).toMatch(/^\d{1,2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)$/);
     const lines = await card.locator('.mk-list span').allTextContents();
     expect(lines.join(' ')).not.toMatch(STOP);
-    expect(lines[0]).toBe('You can now edit a whole paragraph at once.');
+    expect(lines[0]).toBe(NEWEST.en);
     expect(await card.innerText()).not.toMatch(STOP);
     // CONTROL: the same card on `/` is the Indonesian line, so the test can tell them apart.
     await page.goto('/');
-    await expect(page.locator('#maker-card .mk-list span').first()).toHaveText('Sekarang kamu bisa edit satu paragraf sekaligus.', { timeout: 6000 });
+    await expect(page.locator('#maker-card .mk-list span').first()).toHaveText(NEWEST.text, { timeout: 6000 });
     // "See more" goes to the ENGLISH support page and opens its log.
     await page.goto('/en');
     await expect(card).toBeVisible({ timeout: 6000 });
