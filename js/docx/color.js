@@ -666,8 +666,8 @@ function matchText(ctx, events, stats) {
 
 // ------------------------------------------------------------- the pages ----
 const MAX_SHAPES = 400; // per page: a map or a chart with thousands of marks must not stall Word
-const MAX_SHAPE_CMDS = 400; // vertices in one shape, after simplification
-const MAX_PAGE_CMDS = 2500; // vertices on one page, after simplification
+const MAX_SHAPE_CMDS = 1200; // vertices in one shape, after simplification
+const MAX_PAGE_CMDS = 8000; // vertices on one page, after simplification
 
 export async function analyzeColor(ctx) {
   const stats = { shapes: 0, fills: 0, strokes: 0, gradients: 0, smaskSkipped: 0, tilingSkipped: 0, patternMissing: 0,
