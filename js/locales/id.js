@@ -311,6 +311,11 @@ export default {
   // Page placeholder before a page is rendered (js/render/page-view.js)
   render: { loading: 'memuat…' },
 
+  // Month abbreviations on the maker card's "Latest updates" list (js/v2/maker-card.js)
+  maker: {
+    months: ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'],
+  },
+
   // Dark-mode toggle's aria-label and tooltip (js/theme.js)
   theme: {
     toLight: 'Ganti ke mode terang',

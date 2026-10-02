@@ -188,9 +188,9 @@ export function createCelebration(deps) {
     } catch { /* user cancelled the share sheet; keep the card, no nagging */ }
   });
 
-  // /en ships without the donate button and the QR (the money rail is Indonesian-
-  // only), so the element may legitimately be absent. Optional chaining, not a guard
-  // on the language: the markup is the single source of what the page offers.
+  // The donate button is on every language's page (/en carries it too, translated:
+  // the founder's ruling 2026-10-02). Optional chaining anyway, so a page whose
+  // markup omits the button does not break the share card.
   card.querySelector('#sc-donate')?.addEventListener('click', () => {
     // Reveal the QR INLINE, never leave the editor (founder-locked).
     card.classList.add('qr-open');

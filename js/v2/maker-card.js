@@ -8,7 +8,8 @@
  *   1. THE MAKER CARD — Ojan's face and name (inherited from /dukung, the
  *      performer), his last three approved updates (js/updates.js), one way
  *      to support him, and "Lihat selengkapnya" to the full work log (the
- *      /dukung drawer, opened by #development). Homepage only, on a visitor's first open, and again
+ *      /dukung drawer, opened by #development; on /en the same links read
+ *      /en/support, rewritten by scripts/gen-en-page.js). Homepage only, on a visitor's first open, and again
  *      only when an approved update exists they have not seen.
  *      A CORNER CARD, NOT A CENTRED DIALOG: the dropzone and Buka File stay
  *      usable. Blocking someone who came to fix a PDF, before they have tried
@@ -23,8 +24,8 @@
  *      between File and the tools. His ruling: it is the FIRST thing to go
  *      when the header gets tight.
  */
-import { shownUpdates } from '../updates.js';
-import { numberLocale } from '../lib/i18n.js';
+import { shownUpdates, updateText } from '../updates.js';
+import { t, numberLocale } from '../lib/i18n.js';
 
 export const SEEN_KEY = 'pdflokal_maker_seen';
 const SHOW_DELAY_MS = 900; // let the landing paint and be read first
@@ -34,11 +35,11 @@ export function shouldShowCard(entries, seenId) {
   return entries.length > 0 && entries[0].id !== seenId;
 }
 
-// "23 Sep" — short, and the same in both languages this page ships.
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+// "23 Sep" / "1 Aug" — short, in the page's language (`/` says Agu, Okt, Des and
+// Mei; /en says Aug, Oct, Dec and May: the months live in the dictionaries).
 export function shortDate(iso) {
   const [, m, d] = String(iso).split('-').map(Number);
-  return m >= 1 && m <= 12 && d ? `${d} ${MONTHS[m - 1]}` : '';
+  return m >= 1 && m <= 12 && d ? `${d} ${t('maker.months')[m - 1]}` : '';
 }
 
 function readSeen() {
@@ -59,7 +60,7 @@ export function initMakerCard({ entries = shownUpdates(), delay = SHOW_DELAY_MS 
     time.dateTime = u.date;
     time.textContent = shortDate(u.date);
     const p = document.createElement('span');
-    p.textContent = u.text;
+    p.textContent = updateText(u);
     li.append(time, p);
     return li;
   }));

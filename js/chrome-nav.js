@@ -8,9 +8,10 @@
  * own tiny module rather than duplicated once per page (CLAUDE.md: "one
  * rule, one home"). No imports, same style as js/theme.js.
  *
- * The language control (.ld-lang) needs no JS: it's a native <details>, and
- * it is a placeholder that must not persist or change anything — see
- * css/chrome.css and specs/design-system.md for why.
+ * The language control (.ld-lang) needs no JS: it's a native <details> holding
+ * plain links. On dukung.html it is real (Bahasa Indonesia / English, the twin at
+ * /en/support); on privasi.html it is still the "segera" placeholder (that page
+ * has no English twin) — see css/chrome.css and specs/design-system.md.
  */
 const burgerBtn = document.getElementById('ld-burger');
 const burgerMenu = document.getElementById('ld-burger-menu');

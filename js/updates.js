@@ -16,57 +16,88 @@
  * seen" memory stores, so a NEW id is what brings the card back to someone
  * who closed it. `date` is YYYY-MM-DD (WIB). `text` is one or two short lines.
  * Newest at the top.
+ *
+ * ENGLISH: every entry carries `en`, the same line for /en (the founder's ruling
+ * 2026-10-02: /en is the same product, so the card is too). It is a field and not
+ * a dictionary key on purpose: entries are append-only data that a hook asks a
+ * session to add, and a key per entry would orphan in the dictionaries the day
+ * the entry scrolls off the card. tests/core/maker-card.test.mjs fails an entry
+ * without one. Plain, short, no em-dash; the tool names the English UI shows
+ * (Edit, Download, Sign).
  */
+import { getLocale } from './lib/i18n.js';
+
 export const UPDATES = [
+  {
+    id: '2026-10-02-bahasa-browser',
+    date: '2026-10-02',
+    text: 'PDFLokal sekarang otomatis terbuka dalam bahasa browser-mu.',
+    en: 'PDFLokal now opens in your browser language.',
+    approved: true, // Fauzan, 2026-10-02: approved as is
+  },
   {
     id: '2026-10-01-edit-paragraf',
     date: '2026-10-01',
     text: 'Sekarang kamu bisa edit satu paragraf sekaligus.',
+    en: 'You can now edit a whole paragraph at once.',
     approved: true,
   },
   {
     id: '2026-10-01-english',
     date: '2026-10-01',
     text: 'PDFLokal sekarang ada versi bahasa Inggris.',
+    en: 'PDFLokal now has an English version.',
     approved: true,
   },
   {
     id: '2026-10-01-edit-sama-persis',
     date: '2026-10-01',
     text: 'Teks yang kamu edit sekarang tampil persis sama dengan hasil unduhannya.',
+    en: 'The text you edit now looks exactly like it does in the downloaded file.',
     approved: true,
   },
   {
     id: '2026-10-01-edit-isian',
     date: '2026-10-01',
     text: 'Tools Edit sekarang bisa mendeteksi formulir dan list, supaya editnya lebih pas',
+    en: 'The Edit tool now detects forms and lists, so edits fit better.',
     approved: true,
   },
   {
     id: '2026-10-01-ukuran-bebas',
     date: '2026-10-01',
     text: 'Ukuran huruf Teks sekarang bisa kamu ketik sendiri, sekecil 1.',
+    en: 'You can now type your own Text font size, as small as 1.',
     approved: true,
   },
   {
     id: '2026-09-23-teks-titik',
     date: '2026-09-23',
     text: 'Teks hasil Edit nggak lagi jadi titik-titik saat file diunduh.',
+    en: 'Edited text no longer turns into dots when the file is downloaded.',
     approved: true,
   },
   {
     id: '2026-09-22-scan-nyatu',
     date: '2026-09-22',
     text: 'Edit di dokumen hasil scan sekarang ikut warna kertas dan bentuk hurufnya.',
+    en: 'Edits on scanned documents now match the paper color and the lettering.',
     approved: true,
   },
   {
     id: '2026-09-21-unduh-hp',
     date: '2026-09-21',
     text: 'Tombol Unduh yang kadang nggak bisa ditekan di HP udah beres.',
+    en: 'The Download button that sometimes could not be tapped on phones is fixed.',
     approved: true,
   },
 ];
+
+// The entry's line in the page's language: English on /en when it has one, else
+// the Indonesian (never blank).
+export function updateText(u, locale = getLocale()) {
+  return locale === 'en' && u.en ? u.en : u.text;
+}
 
 // What the card shows: approved only, newest first, at most `max`.
 export function shownUpdates(list = UPDATES, max = 3) {

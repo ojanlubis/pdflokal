@@ -23,6 +23,11 @@ export default defineConfig({
 
   use: {
     baseURL: BASE_URL,
+    // The browser's language is Indonesian. Playwright's default is en-US, and
+    // `/` now sends an English browser to /en (the inline script in index.html's
+    // head), so without this every spec that loads `/` would be testing /en. The
+    // redirect itself is tested in tests/lang-redirect.spec.js, which sets its own.
+    locale: 'id-ID',
     trace: 'retain-on-failure',
     video: 'retain-on-failure',
     screenshot: 'only-on-failure',

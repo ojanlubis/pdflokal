@@ -1,19 +1,22 @@
 /*
- * THE ENGLISH EDITOR (/en) SAYS ONLY WHAT IT SHOULD, IN ONE LANGUAGE, ONCE.
+ * THE ENGLISH EDITOR (/en) IS `/` IN ENGLISH: ALL OF IT, IN ONE LANGUAGE, ONCE.
  * ============================================================================
  * `en/index.html` is generated from index.html + i18n/markup.en.json by
  * scripts/gen-en-page.js. Four properties, each stated as the failure it
- * prevents:
+ * prevents (founder's ruling 2026-10-02: /en is the SAME product, only the
+ * language differs, so nothing is cut from it):
  *
  *   1. THE GENERATOR SHOUTS. A source string that left index.html, a string
- *      that has no English, and a removal anchor that vanished all throw. A
- *      silent no-op here ships Indonesian on /en, or ships the QRIS button the
- *      founder keeps off it, and nothing else in the gate would notice.
+ *      that has no English, and a template that lost its /dukung links (or
+ *      leaks one) all throw. A silent no-op here ships Indonesian on /en, or
+ *      sends English readers to the Indonesian support page.
  *   2. HREFLANG BELONGS TO `/` AND `/en` ONLY. index.html is the template of
  *      the 12 tool pages, so a copied set would declare `/` and `/en` as THEIR
  *      alternates (the FAQPage defect class). Each page's set is checked.
- *   3. /en REMOVES WHAT IT PROMISED TO: QRIS, /dukung, the Template row, the
- *      maker card. And it is self-canonical, lang="en", og:locale en_US.
+ *   3. /en CARRIES EVERYTHING `/` DOES: the Template row, the maker card, the
+ *      QRIS button and QR, in English, with every support link pointing at
+ *      /en/support and no /dukung href anywhere. The H1 is the founder's exact
+ *      words. And it is self-canonical, lang="en", og:locale en_US.
  *   4. THE MAP CARRIES NO INDONESIAN and no em-dash (house rule).
  *
  * ⚠️ NON-VACUOUS: the hreflang reader is first pointed at `/`, which really has
@@ -64,17 +67,13 @@ test('1d. a map entry for text that does not exist throws', () => {
   assert.throws(() => render(TEMPLATE, { ...MAP, 'Kalimat yang tidak ada': 'A sentence that is not there' }), /no longer contains/);
 });
 
-test('1e. every removal anchor shouts when its block is gone', () => {
-  const cuts = {
-    'the Template row': /<section class="tl-band"[\s\S]*?<\/section>/,
-    'the maker card': /<aside id="maker-card"[\s\S]*?<\/aside>/,
-    'the QRIS donate button': /<button id="sc-donate">[\s\S]*?<\/button>/,
-  };
-  for (const [label, re] of Object.entries(cuts)) {
-    const without = TEMPLATE.replace(re, '');
-    assert.notEqual(without, TEMPLATE, `${label}: fixture edit did not land`);
-    assert.throws(() => render(without), (e) => e.message.includes(label), `removing ${label} from the template did not throw`);
-  }
+test('1e. the support links: none in the template throws; a /dukung href that would survive throws', () => {
+  const none = TEMPLATE.replace(/href="\/dukung(#development)?"/g, 'href="/x"');
+  assert.notEqual(none, TEMPLATE, 'fixture edit did not land');
+  assert.throws(() => render(none), /no \/dukung link found/);
+  const leak = TEMPLATE.replace('<a href="/privasi">Privasi</a>', '<a href="/privasi">Privasi</a><a href="/dukung/extra">x</a>');
+  assert.notEqual(leak, TEMPLATE);
+  assert.throws(() => render(leak), /\/dukung href reached \/en/);
 });
 
 test('1f. a template without the hreflang trio throws instead of shipping /en unpaired', () => {
@@ -124,14 +123,41 @@ test('3a. /en is lang="en", self-canonical, og:locale en_US', () => {
   assert.match(html, /^<!-- GENERATED FILE, DO NOT EDIT BY HAND\./, 'the generated-file banner is gone');
 });
 
-test('3b. /en carries none of what it was told to drop', () => {
-  const html = read(EN_FILE);
-  const links = visibleLinks(html);
-  assert.deepEqual(links.filter((h) => h.startsWith('/dukung')), [], '/dukung is Indonesian-only');
-  for (const gone of ['id="maker-card"', 'class="tl-band"', 'id="sc-donate"', 'class="sc-qr"', 'qris.png', 'template.pdflokal.id', 'segera']) {
-    assert.ok(!markupOnly(html).includes(gone), `/en still carries ${gone}`);
+test('3b. /en carries everything `/` does: Template row, maker card, QRIS button and QR, in English', () => {
+  const html = markupOnly(read(EN_FILE));
+  for (const present of ['id="maker-card"', 'id="tl-band"', 'id="sc-donate"', 'class="sc-qr"', '/images/qris.png', 'template.pdflokal.id/slip-gaji']) {
+    assert.ok(html.includes(present), `/en lost ${present}: it must carry what \`/\` carries`);
   }
-  assert.ok(html.includes('Dibuat di Indonesia'), 'the brand pun stays');
+  // Same blocks, same count, as the Indonesian page: nothing was cut.
+  const ids = markupOnly(TEMPLATE);
+  for (const re of [/class="tl-doc"/g, /id="maker-card"/g, /id="sc-donate"/g, /class="sc-qr"/g, /class="mk-list"/g]) {
+    assert.equal((html.match(re) || []).length, (ids.match(re) || []).length, `${re} count differs between / and /en`);
+  }
+  assert.match(html, /<b>Template<\/b>/);
+  assert.deepEqual([...html.matchAll(/<a class="tl-doc"[^>]*>\s*<svg[\s\S]*?<\/svg>\s*<span>([^<]*)<\/span>/g)].map((m) => m[1]),
+    ['Payslip', 'Invoice', 'Receipt', 'Delivery note', 'Work order']);
+  assert.match(html, /<button id="sc-donate">[\s\S]*?Buy me a coffee\s*<\/button>/);
+  assert.match(html, /aria-label="From Ojan"/);
+  assert.match(html, /<p class="mk-label">Latest updates<\/p>/);
+  assert.ok(!html.includes('segera'), 'the retired "segera" placeholder is back');
+  assert.ok(read(EN_FILE).includes('Dibuat di Indonesia'), 'the brand pun stays');
+});
+
+test('3b2. every support link on /en is /en/support (the work-log anchor included), and none is /dukung', () => {
+  const links = visibleLinks(read(EN_FILE));
+  assert.deepEqual(links.filter((h) => h.startsWith('/dukung')), [], '/dukung must not be linked from /en');
+  assert.deepEqual([...new Set(links.filter((h) => h.startsWith('/en/support')))].sort(), ['/en/support', '/en/support#development']);
+  // desktop nav + drawer + maker card (support, more) + footer
+  assert.ok(links.filter((h) => h === '/en/support').length >= 4, 'header, drawer, maker card and footer each link to /en/support');
+  assert.equal(links.filter((h) => h === '/en/support#development').length, 1, 'the maker card\'s "See more" must open the English work log');
+  // CONTROL: the Indonesian page links /dukung where /en links /en/support (the reader sees links at all).
+  const idLinks = visibleLinks(TEMPLATE);
+  assert.ok(idLinks.filter((h) => h === '/dukung').length >= 4 && idLinks.includes('/dukung#development'));
+});
+
+test('3b3. the English H1 is the founder\'s words, verbatim', () => {
+  assert.match(read(EN_FILE), /<h1>For all your PDF Needs<\/h1>/);
+  assert.equal((markupOnly(read(EN_FILE)).match(/<h1[\s>]/g) || []).length, 1);
 });
 
 test('3c. the privacy links stay on /privasi (the page is not translated)', () => {
@@ -174,7 +200,7 @@ test('3g. /en is exactly what the generator emits (the drift check, in-process)'
 // ---- 4. the map ---------------------------------------------------------------
 
 test('4. the English carries no em-dash and no Indonesian stoplist word', () => {
-  const STOP = /\b(dan|yang|untuk|atau|dari|dengan|ini|itu|kamu|nggak|aja|udah|saya|Unduh|halaman|Halaman|ketuk|Tarik|Pilih|Seret|Buka|Hapus|Kirim|Gratis|Cepat|Bahasa|Ukuran|Tutup|Batal|Pakai)\b/;
+  const STOP = /\b(dan|yang|untuk|atau|dari|dengan|ini|itu|kamu|nggak|aja|udah|saya|Unduh|halaman|Halaman|ketuk|Tarik|Pilih|Seret|Buka|Hapus|Kirim|Gratis|Cepat|Bahasa|Ukuran|Tutup|Batal|Pakai|Dukung|Traktir|kopi|Lihat|selengkapnya|terakhir|Foto|Kwitansi|Gaji|Surat|Jalan|Scan pakai)\b/i;
   // The brand pun, the company name and the language's own name are the exemptions.
   const EXEMPT = new Set(['Dibuat di Indonesia', '© 2026 PT Fauzan Karya Digital', 'Bahasa Indonesia']);
   const bad = [];

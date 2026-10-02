@@ -10,6 +10,10 @@
  * read `?lang=`, a path prefix and localStorage; those would let one URL show
  * two languages, which breaks the canonical tag and makes the URL lie
  * (docs: reference/seo-i18n-plan-2026-10-01.md §4). Do not add them back.
+ * The one thing that DOES look at the browser's language is the inline script in
+ * index.html's <head>, and it only chooses between two URLs (`/` -> `/en` for an
+ * English browser or a stored choice): it never changes what a URL says, so
+ * one URL, one language still holds.
  *
  * - t(key, vars) is SYNCHRONOUS and reads the locale on every call (no state).
  * - `id` is the source language and the fallback for a missing key in any other

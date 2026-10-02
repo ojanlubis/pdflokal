@@ -151,9 +151,11 @@
   .ld-hd-privasi-mobile:hover { color: var(--ink); }
 }
 
-/* Language control — PLACEHOLDER, desktop only (mobile's equivalent lives in
-   the burger drawer). Chooses nothing, changes nothing — see .ld-lang-opt's
-   disabled state below. Built to visibly NOT function rather than to
+/* Language control, desktop only (mobile's equivalent lives in the burger
+   drawer). On dukung.html it is REAL since 2026-10-02 (plain links to the twin
+   page; dukung.html keeps its own link rules). On privasi.html it is still the
+   PLACEHOLDER this block draws: chooses nothing, changes nothing — see
+   .ld-lang-opt's disabled state below. Built to visibly NOT function rather than to
    quietly do nothing; see specs/design-system.md and index.html's own
    comment on .ld-lang for the why. */
 .ld-lang { position: relative; display: none; }

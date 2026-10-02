@@ -212,3 +212,26 @@ test('10. a successful /en navigation with a query string refreshes /en, and lea
   assert.equal(await text(worker.store.get(key('/en'))), 'english of today', 'the /en shell stayed at install-day bytes');
   assert.equal(await text(worker.store.get(key('/'))), 'indonesian from install day', 'an /en navigation overwrote the Indonesian shell');
 });
+
+// ---- the English support page (/en/support), v7 -------------------------------
+
+test('11. install precaches /en/support too, and a bad one aborts neither the install nor /en', async () => {
+  const ok = loadWorker(async () => basic('x'));
+  await install(ok);
+  assert.equal(await text(ok.store.get(key('/en/support'))), 'precached /en/support', 'the English support page is not precached');
+  const bad = loadWorker(async () => basic('x'), { failAdd: ['/en/support'] });
+  await assert.doesNotReject(() => install(bad));
+  assert.equal(await text(bad.store.get(key('/'))), 'precached /', 'a bad /en/support took the root shell down with it');
+  assert.equal(await text(bad.store.get(key('/en'))), 'precached /en', 'a bad /en/support took /en down with it');
+});
+
+test('12. offline, /en/support is served from its own entry; with none it falls back to /en, never to /', async () => {
+  const worker = loadWorker(async () => { throw new TypeError('Failed to fetch'); }, { online: false });
+  worker.seed('/', 'indonesian shell');
+  worker.seed('/en', 'english shell');
+  worker.seed('/en/support', 'english support page');
+  assert.equal(await text(await dispatch(worker, navigate('/en/support'))), 'english support page');
+  worker.store.delete(key('/en/support'));
+  worker.seed('/en', 'english shell');
+  assert.equal(await text(await dispatch(worker, navigate('/en/support'))), 'english shell');
+});

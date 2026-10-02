@@ -4,6 +4,54 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+  <!-- LANGUAGE. Which language `/` opens in, and which choice sticks. FIRST in <head>
+       on purpose: before gtag and the Mixpanel recorder, so a visit that is about to
+       leave `/` is not counted as a visit to it (both check window.__pdlLeaving).
+       Two jobs, one script:
+       1. A click on any language link (.ld-lang-opt with an hreflang) writes
+          pdflokal_lang = that link's language. Without it an English-browser user who
+          picks "Bahasa Indonesia" on /en would be bounced straight back.
+       2. ONLY on the exact path `/`: a stored choice wins ('en' goes to /en, 'id'
+          stays); with none, a browser whose first language is English goes to /en and
+          anything else stays. `location.replace`, so Back does not return to `/`; the
+          query string and hash travel with it. It never moves /en, a tool page or any
+          other URL, and never an Indonesian browser off `/en`.
+       NEVER FOR A CRAWLER: Googlebot renders as en-US, and a bot sent to /en would
+       never index `/`. So a user agent that says bot, crawler, Lighthouse or headless
+       stays put. navigator.webdriver is deliberately NOT tested: it is true under
+       Playwright, and the specs have to exercise the redirect (they set a real UA).
+       Storage can throw (private modes); every access is in try/catch.
+       ONE URL, ONE LANGUAGE still holds: content never switches on a URL, this only
+       chooses between two URLs (js/lib/i18n.js).
+       ⚠️ Byte-identical in index.html, privasi.html and dukung.html (the redirect is
+       inert off `/`, the click part is the point there) —
+       tests/core/lang-boot-parity.test.mjs fails if they drift. index.html's head is
+       copied into /en and the 12 tool pages by the generators. -->
+  <script>
+  (function () {
+    var KEY = 'pdflokal_lang';
+    document.addEventListener('click', function (e) {
+      try {
+        var a = e.target && e.target.closest && e.target.closest('a.ld-lang-opt[hreflang]');
+        var l = a && a.getAttribute('hreflang');
+        if (l === 'id' || l === 'en') localStorage.setItem(KEY, l);
+      } catch (x) {}
+    });
+    if (location.pathname !== '/') return;
+    if (/bot|crawl|spider|slurp|lighthouse|headless|google-inspectiontool|chrome-lighthouse/i.test(navigator.userAgent || '')) return;
+    var saved = null;
+    try { saved = localStorage.getItem(KEY); } catch (x) {}
+    var first = (navigator.languages && navigator.languages[0]) || navigator.language || '';
+    if (saved === 'en' || (saved !== 'id' && /^en/i.test(first))) {
+      window.__pdlLeaving = true;
+      // Nothing of the Indonesian page may show while /en loads; undone if the move never lands.
+      document.documentElement.style.visibility = 'hidden';
+      setTimeout(function () { document.documentElement.style.visibility = ''; }, 4000);
+      location.replace('/en' + location.search + location.hash);
+    }
+  })();
+  </script>
+
   <!-- Google tag (gtag.js) -->
   <!-- WHY G-7J8JF8XZ1Q: the old ID G-7J8JF8XZ1Q entered a state Google would not serve
        (gtag/js?id=... -> HTTP 404), so GA4 never initialised and analytics were ~97% dead
@@ -24,6 +72,14 @@
 
   <title>Dukung PDFLokal - Bantu Saya Tetap Gratis</title>
   <meta name="description" content="PDFLokal dibuat sendirian oleh Ojan (Fauzan Ahladzikri). Gratis, tanpa iklan. Kalau kepakai, boleh traktir kopi lewat QRIS.">
+  <link rel="canonical" href="https://www.pdflokal.id/dukung">
+  <!-- hreflang: this page and its English twin (/en/support, generated from this
+       file by scripts/gen-en-support.js), reciprocal by being the same three links
+       on both. x-default is the English twin, as on `/` and `/en`. -->
+  <link rel="alternate" hreflang="id" href="https://www.pdflokal.id/dukung">
+  <link rel="alternate" hreflang="en" href="https://www.pdflokal.id/en/support">
+  <link rel="alternate" hreflang="x-default" href="https://www.pdflokal.id/en/support">
+  <meta property="og:locale" content="id_ID">
 
   <!-- Fonts (self-hosted in css/page-base.css via @font-face) -->
 
@@ -435,6 +491,14 @@
       .qr-card { max-width: 288px; }
       .qr-image { max-width: 208px; }
     }
+
+    /* ---- LANGUAGE LINK (the control is real now; chrome.css still draws the
+       old placeholder, which privasi.html uses). index.html's own rules, local
+       here so privasi's placeholder is untouched: the current language is
+       weight, not colour (red means touchable), and the other is a link. ---- */
+    .ld-lang-opt.is-active { color: var(--ink); cursor: default; }
+    a.ld-lang-opt { text-decoration: none; }
+    .ld-burger-lang-opts a.ld-lang-opt { font-size: var(--fs-n1); }
   </style>
 </head>
 <body>
@@ -475,9 +539,11 @@
       <!-- Mobile only — desktop hides this in favour of .ld-nav's Privasi link. -->
       <a href="/privasi" class="ld-hd-privasi-mobile">Privasi</a>
 
-      <!-- Language control — PLACEHOLDER. Desktop only; mobile's equivalent
-           lives inside the burger drawer. Indonesia selected, English
-           disabled ("segera") and inert on purpose. -->
+      <!-- Language control. Desktop only; mobile's equivalent lives inside the
+           burger drawer. Same markup as index.html's: the current language is
+           weight, the other is a real link to this page's twin (/en/support).
+           scripts/gen-en-support.js swaps which option is the link on the
+           English page. -->
       <details class="ld-lang">
         <summary class="ld-lang-btn" aria-label="Pilih bahasa">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
@@ -485,8 +551,8 @@
           <svg class="ld-lang-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
         </summary>
         <div class="ld-lang-menu">
-          <button type="button" class="ld-lang-opt is-active">Indonesia</button>
-          <button type="button" class="ld-lang-opt" disabled aria-disabled="true">English <span class="ld-lang-soon">segera</span></button>
+          <span class="ld-lang-opt is-active" aria-current="true" lang="id">Indonesia</span>
+          <a class="ld-lang-opt" href="/en/support" hreflang="en" lang="en">English</a>
         </div>
       </details>
     </div>
@@ -505,8 +571,8 @@
       <div class="ld-burger-lang">
         <span class="ld-burger-lang-label">Bahasa</span>
         <div class="ld-burger-lang-opts">
-          <span class="ld-lang-opt is-active">Indonesia</span>
-          <span class="ld-lang-opt" aria-disabled="true">English <span class="ld-lang-soon">segera</span></span>
+          <span class="ld-lang-opt is-active" aria-current="true" lang="id">Indonesia</span>
+          <a class="ld-lang-opt" href="/en/support" hreflang="en" lang="en">English</a>
         </div>
       </div>
     </div>
@@ -541,7 +607,7 @@
             <div class="performer-id">
               <div class="performer-kepala">
                 <span class="performer-topi" aria-hidden="true">🎩</span>
-                <img src="images/ojan.jpg" alt="Foto Fauzan Ahladzikri (Ojan)" class="performer-face" width="72" height="72">
+                <img src="/images/ojan.jpg" alt="Foto Fauzan Ahladzikri (Ojan)" class="performer-face" width="72" height="72">
               </div>
               <div>
                 <div class="performer-name">Ojan</div>
@@ -562,8 +628,8 @@
           <h2>Traktir Kopi</h2>
 
           <div class="qr-card">
-            <img src="images/qris-mark.svg" alt="QRIS" class="qris-logo" width="88" height="33">
-            <img src="images/qris.png" alt="QRIS - Scan untuk traktir kopi" class="qr-image" width="645" height="649">
+            <img src="/images/qris-mark.svg" alt="QRIS" class="qris-logo" width="88" height="33">
+            <img src="/images/qris.png" alt="QRIS - Scan untuk traktir kopi" class="qr-image" width="645" height="649">
             <p class="qr-caption">Scan pakai aplikasi e-wallet atau mobile banking kamu</p>
             <!-- His ask, 2026-09-06: a phone can screenshot, "tp boleh juga
                  tambahin 'download QR'". A download attribute on the real
@@ -1238,7 +1304,7 @@
   </script>
 
   <!-- Theme management -->
-  <script type="module" src="js/theme.js"></script>
+  <script type="module" src="/js/theme.js"></script>
   <script type="module" src="/js/chrome-nav.js"></script>
 
 </body>

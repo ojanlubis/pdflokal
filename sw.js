@@ -51,11 +51,18 @@
 // not know /en would serve it the Indonesian `/` shell as the offline fallback,
 // and a v5 cache holds no /en entry to evict. The bump makes every returning
 // device reinstall, which is when /en is precached (see PRECACHE_LANG below).
-const CACHE = 'pdflokal-shell-v6';
+//
+// Bumped v6 -> v7 on 2026-10-02 for the English support page (/en/support). Same
+// reason as v6: a worker that did not know the page has no entry to evict and
+// never precached it; the bump makes returning devices reinstall, which is when
+// /en/support is precached (PRECACHE_LANG below). Offline, a navigation to it
+// that has no entry falls back to /en (homeFor), never to the Indonesian `/`.
+const CACHE = 'pdflokal-shell-v7';
 // The two language homes. Each is the last-resort shell for its own subtree: an
 // offline navigation under /en must land on /en, never on the Indonesian `/`.
 const HOME = '/';
 const HOME_EN = '/en';
+const SUPPORT_EN = '/en/support';
 const homeFor = (pathname) => (pathname === HOME_EN || pathname.startsWith(HOME_EN + '/') ? HOME_EN : HOME);
 const PRECACHE = [
   '/',
@@ -69,11 +76,12 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE)
       .then((c) => c.addAll(PRECACHE)
-        // PRECACHE_LANG: the English shell is added on its own, and a failure to
-        // fetch it is swallowed. addAll is all-or-nothing, so putting /en in
-        // PRECACHE would let a bad /en response abort the install of the whole
-        // worker and take the Indonesian offline shell with it.
-        .then(() => c.add(HOME_EN).catch(() => {})))
+        // PRECACHE_LANG: the English shell and its support page are added on
+        // their own, and a failure to fetch either is swallowed. addAll is
+        // all-or-nothing, so putting /en in PRECACHE would let a bad /en response
+        // abort the install of the whole worker and take the Indonesian offline
+        // shell with it.
+        .then(() => Promise.all([HOME_EN, SUPPORT_EN].map((u) => c.add(u).catch(() => {})))))
       .then(() => self.skipWaiting()),
   );
 });
