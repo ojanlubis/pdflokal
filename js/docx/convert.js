@@ -44,6 +44,7 @@ import * as tablesMod from './tables.js';
 import * as layoutMod from './layout.js';
 import { buildDocx } from './writer.js';
 import { A4 } from './model.js';
+import { defaultKit } from './canvaskit.js';
 
 export { buildDocx };
 
@@ -73,7 +74,8 @@ export async function pdfToDocModel({ pdfjs, fflate, data, onProgress, onPage, o
   };
   checkAbort(signal);
   // A canvas kit (options.canvasKit, see canvaskit.js) brings its own pdf.js canvas factory: in node pdf.js has none.
-  const kitFactory = options && options.canvasKit && options.canvasKit.canvasFactory;
+  const kit = defaultKit(options); // the browser's own in a page or a worker, the injected one in node, or none
+  const kitFactory = kit && kit.canvasFactory;
   const pdf = await pdfjs.getDocument({ data: new Uint8Array(data), disableFontFace: true, isEvalSupported: false, verbosity: 0, fontExtraProperties: true, ...(kitFactory ? { canvasFactory: kitFactory } : {}) }).promise;
   try {
     const shared = { fflate, imageCache: imageCache || new Map(), pdf }; // pdf: the document handle images.js needs to paint through pdf.js

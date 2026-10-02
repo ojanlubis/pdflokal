@@ -38,9 +38,10 @@ async function toPngBytes(canvas) {
 
 // Left out of the picture: the text (it stays live Word text) and every picture images.js already anchors as its own
 // picture (the same three ops it reads), or each photo would sit in the .docx twice (MEASURED on n029: 918 KB PNG, photos
-// included). Stencil masks (paintImageMaskXObject) stay in: images.js skips them, so this picture is the only place they survive.
+// included). Stencil masks (paintImageMask*) are left out too: since the images lane merged, images.js paints them as pictures itself (MEASURED at integration: n010, 144 stencils, -11 KB).
 const LEAVE_OUT = (OPS) => new Set([OPS.showText, OPS.showSpacedText, OPS.nextLineShowText, OPS.nextLineSetSpacingShowText,
-  OPS.paintImageXObject, OPS.paintInlineImageXObject, OPS.paintImageXObjectRepeat]);
+  OPS.paintImageXObject, OPS.paintInlineImageXObject, OPS.paintImageXObjectRepeat,
+  OPS.paintImageMaskXObject, OPS.paintImageMaskXObjectRepeat, OPS.paintImageMaskXObjectGroup]);
 
 // MEASURED 2026-10-02 (pdf.js 3.11.174, Chromium): page.getOperatorList() and page.render() do NOT share an
 // operator list (the first carries the OPLIST intent flag, so its cache key differs): blanking the text ops of

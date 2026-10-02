@@ -52,15 +52,20 @@ export function makePdfjsCanvasFactory(create) {
 export function browserKit() {
   const g = globalThis;
   if (typeof g.OffscreenCanvas !== 'undefined') {
+    const create = (w, h) => {
+      const canvas = new g.OffscreenCanvas(w, h);
+      return { canvas, context: canvas.getContext('2d', { willReadFrequently: true }) };
+    };
     return {
-      create(w, h) {
-        const canvas = new g.OffscreenCanvas(w, h);
-        return { canvas, context: canvas.getContext('2d', { willReadFrequently: true }) };
-      },
+      create,
       async encode(canvas, type, quality) {
         const blob = await canvas.convertToBlob({ type: `image/${type}`, quality });
         return new Uint8Array(await blob.arrayBuffer());
       },
+      // In a Web Worker there is no document: pdf.js's own canvas factory reaches for document.createElement the first
+      // time a render needs a scratch canvas (a soft mask, a pattern, a big image) and the render fails. Hand it ours.
+      // (A page with a document keeps pdf.js's own: it is the path every other tool in the product takes.)
+      ...(typeof g.document === 'undefined' ? { canvasFactory: makePdfjsCanvasFactory(create) } : {}),
     };
   }
   if (typeof g.document !== 'undefined' && g.document.createElement) {

@@ -19,6 +19,7 @@ import { spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { makePdf } from './core/docx-helpers.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SAMPLE = '/tests/fixtures/sample-2pages.pdf';
@@ -84,6 +85,29 @@ test.describe('PDF to Word shell: worker, cancel, caps', () => {
     expect(r.inspect.media).toBeGreaterThan(0);
     expect(r.inspect.entries.some((n) => /^word\/media\/image\d+\.jpeg$/.test(n))).toBe(true);
     expect(r.stats.imagesFailed).toBe(0);
+  });
+
+  // MEASURED 2026-10-02 at integration: in a worker pdf.js's own canvas factory reaches for `document`, so a picture that
+  // needs pdf.js to PAINT it with a scratch canvas (a stencil mask, a soft-mask group) failed to paint
+  // (imagesPaintFailed) and fell back to the raw picture: soft-mask source images came out as black boxes again.
+  // canvaskit.js now hands pdf.js a factory that makes OffscreenCanvases.
+  test('a stencil-masked picture is painted in the worker too (pdf.js needs a scratch canvas), not dropped', async ({ page }) => {
+    const pdf = await makePdf(async (pages, { doc, PDFLib }) => {
+      const ctx = doc.context;
+      const bits = new Uint8Array([0xF0, 0xF0, 0xF0, 0xF0, 0x0F, 0x0F, 0x0F, 0x0F]); // 8x8, one bit a pixel
+      const ref = ctx.register(ctx.stream(bits, { Type: 'XObject', Subtype: 'Image', Width: 8, Height: 8, ImageMask: true, BitsPerComponent: 1 }));
+      pages[0].node.setXObject(PDFLib.PDFName.of('Msk'), ref);
+      pages[0].pushOperators(PDFLib.pushGraphicsState(), PDFLib.setFillingRgbColor(0.8, 0.1, 0.1), PDFLib.concatTransformationMatrix(120, 0, 0, 120, 60, 500), PDFLib.drawObject('Msk'), PDFLib.popGraphicsState());
+    });
+    await openLab(page);
+    const r = await page.evaluate(async (bytes) => {
+      const out = await window.labDocx.convert(new Uint8Array(bytes).buffer, { mode: 'worker' });
+      return { mode: out.mode, stats: out.stats };
+    }, Array.from(pdf));
+    expect(r.mode).toBe('worker');
+    expect(r.stats.imagesPaintFailed).toBe(0);
+    expect(r.stats.imagesPainted).toBe(1);
+    expect(r.stats.imageMasksSkipped).toBe(0);
   });
 
   test('the page stays alive while a 120-page document converts in the worker', async ({ page }) => {
