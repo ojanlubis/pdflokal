@@ -604,7 +604,10 @@ export const SCHEMA = {
     hit: 'bool',
   },
   ganti_commit: {
-    outcome: ['commit', 'cancel', 'noop'],
+    // 'delete' (2026-10-02): the line's text was cleared and committed, which now
+    // removes the line (it used to cancel, i.e. 'cancel'). Additive: an old client
+    // never sends it, and an old row's meaning is untouched.
+    outcome: ['commit', 'cancel', 'noop', 'delete'],
     font_path: ['doc-font', 'twin'],
   },
   // matched/reason describe ONLY the Rung B match/cut step (text-walk.js's
