@@ -210,3 +210,25 @@ test('14. failureCause names the 0-byte import (app.js throws new Error(\'empty 
   assert.equal(failureCause(new Error('File is 0 bytes')).hint, 'empty');
   assert.equal(failureCause(new Error('zero-byte upload')).hint, 'empty');
 });
+
+test('15. a vendor script that never arrived is filed under fetch, not under the file name it quotes', () => {
+  // Rail 2026-09-18..30: five export sessions, two with no edits at all, read as Error/glyph and
+  // Error/none. core/vendor.js's loader throws `Gagal memuat /js/vendor/fontkit.umd.min.js`; the
+  // word "fontkit" fell into the `glyph` rule, and `pdf-lib.min.js` matched nothing. The loader now
+  // flags the error and failureCause reads the flag first. Pins both halves: the signature the
+  // rail recorded (so the old reading is reproducible), and the new one.
+  const fontkit = new Error('Gagal memuat /js/vendor/fontkit.umd.min.js');
+  const pdfLib = new Error('Gagal memuat /js/vendor/pdf-lib.min.js');
+  assert.deepEqual(failureCause(fontkit), { name: 'Error', hint: 'glyph' }, 'unflagged: the old, misleading reading');
+  assert.deepEqual(failureCause(pdfLib), { name: 'Error', hint: 'none' }, 'unflagged: the old, blind reading');
+  fontkit.vendorLoadFailed = true;
+  pdfLib.vendorLoadFailed = true;
+  assert.deepEqual(failureCause(fontkit), { name: 'Error', hint: 'fetch' });
+  assert.deepEqual(failureCause(pdfLib), { name: 'Error', hint: 'fetch' });
+  // The flag does not touch the reason bucket: that enum is the product's, and a new member is a seat call.
+  assert.equal(failureReason(fontkit), 'unknown');
+  // Only `=== true` counts: a truthy string on some foreign error must not borrow the verdict.
+  const foreign = new Error('Failed to parse PDF document');
+  foreign.vendorLoadFailed = 'yes';
+  assert.equal(failureCause(foreign).hint, 'parse');
+});

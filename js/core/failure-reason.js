@@ -153,6 +153,13 @@ export function failureCause(err) {
   if (err !== null && err !== undefined) name = CAUSE_NAMES.has(rawName) ? rawName : 'other';
   const msg = typeof err?.message === 'string' ? err.message : '';
   let hint = 'none';
+  // A vendor <script> that never arrived (core/vendor.js flags the error). Asked
+  // BEFORE any message rule: its text names the file — "…fontkit.umd.min.js" —
+  // which the `glyph` rule reads as a font fault, so five 2026-09-18..30 export
+  // failures were filed under glyph/none when the cause was the network. A
+  // flag, not a pattern: this module has no imports, and matching our own
+  // Indonesian wording here would couple it to a string.
+  if (err?.vendorLoadFailed === true) return { name, hint: 'fetch' };
   for (const [label, re] of HINTS) {
     if (re.test(msg)) { hint = label; break; }
   }

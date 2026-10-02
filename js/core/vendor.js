@@ -36,22 +36,57 @@
 
 const inflight = new Map(); // src -> Promise
 
-function loadScript(src) {
-  if (inflight.has(src)) return inflight.get(src);
-
-  const p = new Promise((resolve, reject) => {
+// ONE ATTEMPT = one <script> element. A failed element is removed so a retry
+// does not leave a dead tag behind for every blip.
+function loadScriptOnce(src) {
+  return new Promise((resolve, reject) => {
     const el = document.createElement('script');
     el.src = src;
     el.async = false; // preserve execution order if two land together
     el.onload = () => resolve();
     el.onerror = () => {
-      // Drop the cached rejection so a later attempt can retry (flaky network
-      // on a phone is the normal case here, not the exception).
-      inflight.delete(src);
+      el.remove();
       reject(new Error(`Gagal memuat ${src}`));
     };
     document.head.appendChild(el);
   });
+}
+
+// WHY MORE THAN ONE ATTEMPT (rail 2026-09-18 → 09-30, five sessions): these
+// libs load at the moment of intent, and on export that moment is the first
+// time a photo-only or text-only document needs pdf-lib/fontkit at all
+// (~1.2 MB, fetched on whatever network the phone has right then). One dropped
+// request aborted the whole build, reported as export/unknown, and the user
+// retyped Unduh against a stored error until they closed and reopened the
+// sheet. A blip is not a verdict: try again once, shortly, before saying so.
+//
+// The thrown error is marked `vendorLoadFailed`. core/failure-reason.js reads
+// the flag (it has no imports, by design) to file this under cause `fetch`
+// instead of letting the message's own words — "fontkit" — read as a font
+// fault; download-sheet.js reads it to know a rebuild is worth trying.
+export const LOAD_ATTEMPTS = 2;
+export const LOAD_RETRY_MS = 800;
+
+function loadScript(src) {
+  if (inflight.has(src)) return inflight.get(src);
+
+  const p = (async () => {
+    let lastErr;
+    for (let attempt = 0; attempt < LOAD_ATTEMPTS; attempt += 1) {
+      if (attempt > 0) await new Promise((r) => setTimeout(r, LOAD_RETRY_MS));
+      try {
+        await loadScriptOnce(src);
+        return;
+      } catch (err) {
+        lastErr = err;
+      }
+    }
+    // Drop the cached rejection so a later attempt can retry (flaky network
+    // on a phone is the normal case here, not the exception).
+    inflight.delete(src);
+    lastErr.vendorLoadFailed = true;
+    throw lastErr;
+  })();
 
   inflight.set(src, p);
   return p;
