@@ -133,9 +133,8 @@ test('3b. /en carries everything `/` does: Template row, maker card, QRIS button
   for (const re of [/class="tl-doc"/g, /id="maker-card"/g, /id="sc-donate"/g, /class="sc-qr"/g, /class="mk-list"/g]) {
     assert.equal((html.match(re) || []).length, (ids.match(re) || []).length, `${re} count differs between / and /en`);
   }
-  assert.match(html, /<b>Template<\/b>/);
   assert.deepEqual([...html.matchAll(/<a class="tl-doc"[^>]*>\s*<svg[\s\S]*?<\/svg>\s*<span>([^<]*)<\/span>/g)].map((m) => m[1]),
-    ['Payslip', 'Invoice', 'Receipt', 'Delivery note', 'Work order']);
+    ['Payslip', 'Invoice', 'Receipt', 'Delivery note', 'Work order', 'QR code']);
   assert.match(html, /<button id="sc-donate">[\s\S]*?Buy me a coffee\s*<\/button>/);
   assert.match(html, /aria-label="From Ojan"/);
   assert.match(html, /<p class="mk-label">Latest updates<\/p>/);

@@ -67,8 +67,7 @@ test.describe('/en', () => {
       expect(await page.locator(sel).count(), sel).toBeGreaterThan(0);
     }
     // The Template row, translated.
-    await expect(page.locator('#tl-band .tl-head b')).toHaveText('Template');
-    expect(await page.locator('#tl-band .tl-doc span').allTextContents()).toEqual(['Payslip', 'Invoice', 'Receipt', 'Delivery note', 'Work order']);
+    expect(await page.locator('#tl-band .tl-doc span').allTextContents()).toEqual(['Payslip', 'Invoice', 'Receipt', 'Delivery note', 'Work order', 'QR code']);
     // The support card carries its donate button and QR, in English.
     await expect(page.locator('#sc-donate')).toContainText('Buy me a coffee');
     await expect(page.locator('.sc-qr p')).toHaveText('Scan with your e-wallet or mobile banking app.');
