@@ -95,6 +95,9 @@ import { extractFontProgram, lookupFontObject } from '../core/doc-fonts.js';
 import { textCoveredBy, nativeCandidate } from '../core/stamp.js';
 import { faceLadder, faceStyle } from '../core/line-font.js';
 import { loadFaceFont, startLineFont, refusalNote } from './line-font-live.js';
+import {
+  toastDurationMs, firstTimeForDoc, alreadyShownForDoc, armEditNoticeKey, lineOutgrew,
+} from './edit-expectations.js';
 import { planBlockEdit, blockOfLine, blockAnnotation, blockExtent, logicalTextOf } from '../core/block-edit.js';
 import { totalPageRotation } from '../core/page-rotation.js';
 import { styleBlockEditor, placeBlockEditor, readEditorLines } from './block-editor.js';
@@ -200,7 +203,9 @@ function toast(msg) {
   toastEl.textContent = msg;
   toastEl.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2600);
+  // Scales with length (edit-expectations.js): a sentence of a dozen words is
+  // not readable in 2.6 s. Short text keeps the old 2.6 s.
+  toastTimer = setTimeout(() => toastEl.classList.remove('show'), toastDurationMs(msg));
 }
 
 // Pull a toast down early. Needed when a dialog opens on top of one: a toast
@@ -858,7 +863,15 @@ for (const btn of document.querySelectorAll('#toolbar .tool[data-tool]')) {
     // never see "beta". The arm-toast announces it on every device, once per
     // arming, right as the user starts. Verb shifted ganti→edit to match the
     // renamed button (taste: the verb matches the interaction model everywhere).
-    if (t === 'ganti') toast(tr('toast.armEdit'));
+    if (t === 'ganti') {
+      // A locked or signed file gets its own sentence INSTEAD of the beta line,
+      // once per document (edit-expectations.js armEditNoticeKey). Literal keys
+      // here so tests/core/i18n.test.mjs can see every one being read.
+      const notice = armEditNoticeKey(doc);
+      if (notice === 'armEditLocked') toast(tr('toast.armEditLocked'));
+      else if (notice === 'armEditSigned') toast(tr('toast.armEditSigned'));
+      else toast(tr('toast.armEdit'));
+    }
   });
 }
 
@@ -1601,6 +1614,7 @@ function reEditLine(pageId, cover, replacement) {
   track('editor_action', { action: 'ganti_teks_reedit' });
   const draft = {
     text: replacement?.text ?? '',
+    originalWidth: box.w, // see smartReplace's draft
     fontSize: replacement?.fontSize ?? Math.min(120, Math.max(6, Math.round(box.h))),
     fontFamily: replacement?.fontFamily,
     bold: !!replacement?.bold,
@@ -1688,7 +1702,11 @@ async function smartReplace(pageId, x, y) {
       track('ganti_no_text_layer');
       showScanOffer(pageId);
     } else {
-      toast(tr('toast.missedText'));
+      // The page has text but none under the finger: say what it IS, not just
+      // that it missed (a picture of words cannot be edited, only covered). The
+      // OCR-scan miss above keeps missedText: there the lines are guesses and
+      // "tap right on it" is the useful advice.
+      toast(tr('toast.notText'));
     }
     return;
   }
@@ -1760,6 +1778,9 @@ async function smartReplace(pageId, x, y) {
   track('editor_action', { action: 'ganti_teks' });
   const draft = {
     text: line.str,
+    // The original line's width: the editor never wraps a single line, so the
+    // first time typing outgrows this the person is told (openTextEditor).
+    originalWidth: line.w,
     fontSize: draftFontSize(line.size),
     fontFamily: mapRunFont(line.fontFamily, line.fontName),
     recorded: true,
@@ -3011,6 +3032,21 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
 
   overlay.appendChild(ed);
   ed.focus();
+  // SINGLE-LINE EDIT ONLY (a paragraph reflows, so it has no such limit): the
+  // first time per document the typed text is wider than the original line,
+  // say the line cannot wrap. The once-per-document check runs BEFORE the one
+  // offsetWidth read, so after the message it costs nothing per keystroke.
+  // offsetWidth is page-space layout px (pre-zoom), the same frame as
+  // originalWidth, which comes from line.w.
+  if (draft && !blockPlan && draft.originalWidth > 0) {
+    const onWider = () => {
+      if (alreadyShownForDoc(doc, 'lineNoWrap')) { ed.removeEventListener('input', onWider); return; }
+      if (!lineOutgrew(ed.offsetWidth, draft.originalWidth)) return;
+      if (firstTimeForDoc(doc, 'lineNoWrap')) toast(tr('toast.lineNoWrap'));
+      ed.removeEventListener('input', onWider);
+    };
+    ed.addEventListener('input', onWider);
+  }
   if (blockPlan) {
     // First baseline onto the paragraph's first baseline — now, once the
     // editor has a layout, and again on every face change (prepareDocFont /

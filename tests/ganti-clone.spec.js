@@ -38,7 +38,7 @@ import { expectFirstPage } from './helpers/render.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE = path.join(__dirname, 'fixtures', 'nasty', 'nota-subset.pdf');
-const SUBSTITUTE_TOAST = 'Huruf ini memakai font pengganti yang mirip';
+const SUBSTITUTE_TOAST = 'Font aslinya nggak bisa dipakai, diganti yang mirip.';
 
 async function openDoc(page) {
   await page.goto('/');

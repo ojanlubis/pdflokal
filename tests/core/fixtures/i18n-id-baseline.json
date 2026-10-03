@@ -78,6 +78,36 @@
       "js/v2/app.js"
     ]
   },
+  "toast.notText": {
+    "text": "Nggak ada teks di situ. Kalau gambar, pakai Tip-Ex.",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
+  "toast.lineNoWrap": {
+    "text": "Baris ini nggak bisa turun, jadi melebar ke samping.",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
+  "toast.armEditLocked": {
+    "text": "PDF ini dikunci, hasil edit nggak bisa diunduh.",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
+  "toast.armEditSigned": {
+    "text": "Ada meterai/TTD digital. Kalau diedit, jadi nggak sah.",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
+  "toast.charRefused": {
+    "text": "\"{ch}\" nggak bisa ditulis, font-nya nggak punya.",
+    "src": [
+      "js/v2/line-font-live.js"
+    ]
+  },
   "toast.noReadableText": {
     "text": "Nggak ada tulisan yang kebaca",
     "src": [
@@ -116,7 +146,7 @@
     ]
   },
   "toast.fontSubstituteChar": {
-    "text": "Huruf ini memakai font pengganti yang mirip",
+    "text": "Font aslinya nggak bisa dipakai, diganti yang mirip.",
     "src": [
       "js/v2/app.js"
     ]
@@ -249,6 +279,12 @@
   },
   "sheet.signedNote": {
     "text": "Dokumen ini punya meterai atau tanda tangan digital. Kalau disimpan dari sini, segelnya rusak dan dokumen bisa gagal diverifikasi. File aslimu nggak berubah.",
+    "src": [
+      "js/v2/download-sheet.js"
+    ]
+  },
+  "sheet.coveredNote": {
+    "text": "Yang ditutup masih ada di file. Buat isi rahasia, unduh sebagai Gambar.",
     "src": [
       "js/v2/download-sheet.js"
     ]

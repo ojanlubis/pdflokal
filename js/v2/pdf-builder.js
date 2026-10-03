@@ -14,15 +14,17 @@ export async function buildPdfArtifact(doc, deps = {}) {
   const buildPdf = deps.buildPdf || buildPdfBytes;
   const { PDFLib, fontkit } = await loadPdfLib();
   let fontFallback = false;
+  let covered = 0; // Tip-Ex rectangles painted into the file (core/export.js onCoverDrawn)
   const bytes = await buildPdf(doc, {
     PDFLib,
     fontkit,
     onFontFallback: () => { fontFallback = true; },
+    onCoverDrawn: () => { covered += 1; },
     // The glyph fallback (core/export.js drawTextAsImage): a character the
     // PDF font cannot paint is embedded as an image painted by the browser,
     // instead of aborting the whole export. Injected HERE, the one browser
     // edge every UI route goes through, so no route can forget it.
     rasterizeText: rasterizeTextAnno,
   });
-  return { bytes, fontFallback };
+  return { bytes, fontFallback, covered };
 }
