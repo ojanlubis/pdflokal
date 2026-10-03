@@ -1444,10 +1444,10 @@
     .tl-doc:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     .tl-doc svg { width: 20px; height: 20px; color: var(--accent); }
     .tl-doc span { font-size: var(--fs-n1); font-weight: 700; letter-spacing: -.01em; line-height: 1.2; }
-    /* Start, not centre: centred, the row sat 106px in from the column edge its
-       own label and the tool cards below both start on — two left edges one row
-       apart. The cards keep their smaller size, which is what sets them apart. */
-    @media (min-width: 720px) { .tl-row { grid-auto-columns: 132px; } }
+    /* From 720px the row fills the column: both edges line up with the dropzone
+       and the tool cards (his ask 2026-10-03, once the sixth card left a ragged
+       right edge). Below it the row stays a fixed-width swipe strip. */
+    @media (min-width: 720px) { .tl-row { grid-auto-columns: 1fr; overflow-x: visible; padding-bottom: 0; } }
     .ld-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-12); margin-top: var(--sp-16); }
     .ld-grid.more, #ld-more { margin-top: var(--sp-12); }
     #ld-more[hidden] { display: none; }
