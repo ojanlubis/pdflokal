@@ -354,9 +354,22 @@
        module beside fresh siblings) kills js/v2/app.js at MODULE TOP LEVEL. There is
        then no editor, no toolbar, and NO TELEMETRY — the rail is blind to this by
        construction, because js/v2/telemetry.js is part of the dead graph. Sentry
-       JAVASCRIPT-V/J/Y/Z, 9 events, 2026-08-18 to 08-30. sw.js is network-first for
-       /js/, but its offline fallback is PER-FILE, so a flaky connection can still
-       hand one module a stale cached copy while its siblings arrive fresh.
+       JAVASCRIPT-V/J/Y/Z, 9 events, 2026-08-18 to 08-30. Until sw.js v8 its offline
+       fallback was PER-FILE, so a flaky connection could hand one module a stale
+       cached copy while its siblings arrived fresh (JAVASCRIPT-18, 2026-10-02,
+       reproduced in tests/sw-generation.spec.js). v8 serves a page's modules from
+       ONE source, so what is left for this guard is skew the worker cannot see:
+       the transition load still served by an older worker, or bytes mixed
+       somewhere between the server and the browser.
+
+       WHAT THE HEAL DOES, MEASURED in Chromium and WebKit: unregister every
+       worker, then reload. The reloaded document is NOT controlled by the old
+       worker and revalidates every module against the server. It empties every
+       cache EXCEPT the worker's complete generations (`pdflokal-gen-*`): a
+       generation is only written by a load that booted, so it cannot be the
+       skew, and it is the user's only offline copy. Until 2026-10-02 this purged
+       those too, and a heal on a flaky link then left the user with no worker,
+       no cache and a dead page.
 
        WHY THE MATCH IS NARROW, and what was chosen: healing on EVERY error would
        reload users through unrelated bugs, and a reload loop is strictly worse than
@@ -440,7 +453,8 @@
       try {
         if (window.caches) {
           jobs.push(caches.keys().then(function (ks) {
-            return Promise.all(ks.map(function (k) { return caches.delete(k); }));
+            return Promise.all(ks.filter(function (k) { return k.indexOf('pdflokal-gen-') !== 0; })
+              .map(function (k) { return caches.delete(k); }));
           }));
         }
       } catch (err) { /* nothing to purge is not a failure */ }

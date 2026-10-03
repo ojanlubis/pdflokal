@@ -20,110 +20,49 @@
  * tests/core/sw-cache-generation.test.mjs proves eviction; this file proves
  * the handler's BEHAVIOUR, by loading sw.js against a stub of the worker
  * global and dispatching fetch events at it. The stub is deliberately thin —
- * a Map of URL → Response — so that a change to what the handler stores or
- * serves shows up here as a changed body, not as a passing ritual.
+ * named Maps of URL → Response, shared with sw-generations.test.mjs through
+ * sw-harness.mjs — so that a change to what the handler stores or serves shows
+ * up here as a changed body, not as a passing ritual. Since sw.js v8 an online
+ * navigation writes into its own GENERATION, so these read that generation.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
-import vm from 'node:vm';
-import { fileURLToPath } from 'node:url';
+import {
+  CACHE, basic, key, text, loadWorker, dispatch, install, navigate, moduleReq, flaky,
+} from './sw-harness.mjs';
 
-const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const SW_SRC = fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8');
-const ORIGIN = 'https://www.pdflokal.id';
-
-// A 200 same-origin response the handler will agree to cache. Node's Response
-// reports type 'default'; the worker's `cacheable()` asks for 'basic', which
-// is what a same-origin fetch reports in a browser.
-function basic(body) {
-  const res = new Response(body, { status: 200 });
-  Object.defineProperty(res, 'type', { value: 'basic' });
-  return res;
-}
-const key = (req) => new URL(typeof req === 'string' ? req : req.url, ORIGIN).href;
-const text = async (res) => (res ? res.text() : null);
-
-// Load sw.js into a fresh worker-shaped global. `fetchImpl` is the network.
-function loadWorker(fetchImpl, { online = true, failAdd = [] } = {}) {
-  const listeners = {};
-  const store = new Map();
-  const cache = {
-    put: async (req, res) => { store.set(key(req), res); },
-    match: async (req) => store.get(key(req)),
-    addAll: async (urls) => { for (const u of urls) store.set(key(u), basic(`precached ${u}`)); },
-    // add() rejects for the URLs in `failAdd`: a /en that 404s or redirects at install.
-    add: async (u) => {
-      if (failAdd.includes(u)) throw new TypeError('bad response');
-      store.set(key(u), basic(`precached ${u}`));
-    },
-  };
-  const caches = {
-    open: async () => cache,
-    match: (req) => cache.match(req),
-    keys: async () => [],
-    delete: async () => true,
-  };
-  const self = {
-    addEventListener: (type, fn) => { listeners[type] = fn; },
-    location: new URL(ORIGIN + '/sw.js'),
-    navigator: { onLine: online },
-    clients: { claim: async () => {} },
-    skipWaiting: async () => {},
-  };
-  const ctx = vm.createContext({ self, caches, fetch: fetchImpl, Response, URL, console, setTimeout, navigator: self.navigator });
-  vm.runInContext(SW_SRC, ctx, { filename: 'sw.js' });
-  assert.equal(typeof listeners.fetch, 'function', 'sw.js registered no fetch listener — the harness is not seeing the handler');
-  return { listeners, store, seed: (url, body) => store.set(key(url), basic(body)) };
-}
-
-// Dispatch one fetch event and return what respondWith() was handed. The
-// handler's cache writes are fire-and-forget promise chains, so the result is
-// awaited and then the microtask queue drained before anything is asserted.
-async function dispatch(worker, request) {
-  let responded = null;
-  worker.listeners.fetch({ request, respondWith: (p) => { responded = p; }, waitUntil: () => {} });
-  const res = responded ? await responded : null;
-  await new Promise((r) => setImmediate(r));
-  await new Promise((r) => setImmediate(r));
-  return res;
-}
-const navigate = (url) => ({ url: ORIGIN + url, method: 'GET', mode: 'navigate' });
-const moduleReq = (url) => ({ url: ORIGIN + url, method: 'GET', mode: 'cors' });
-
-// A network that fails the first `failures` calls, then serves `body`.
-function flaky(failures, body) {
-  let calls = 0;
-  const impl = async () => {
-    calls += 1;
-    if (calls <= failures) throw new TypeError('Failed to fetch');
-    return basic(body);
-  };
-  impl.calls = () => calls;
-  return impl;
+// Since sw.js v8 a navigation writes into a GENERATION of its own, not into the
+// shared shell cache: the bytes a page loaded live together. These read the
+// one generation a navigation created.
+async function navOnline(worker, url, id = 'tab') {
+  worker.open(id, url);
+  const res = await dispatch(worker, navigate(url), { resultingClientId: id });
+  const gens = worker.gens();
+  assert.equal(gens.length, 1, `expected the navigation to open exactly one generation, found ${gens.length}`);
+  return { res, gen: gens[0] };
 }
 
 test('1. a successful navigation with a query string refreshes the last-resort "/" shell too', async () => {
   const worker = loadWorker(async () => basic('shell of today'));
   worker.seed('/', 'shell from install day');
 
-  const res = await dispatch(worker, navigate('/?utm_source=pwa'));
+  const { res, gen } = await navOnline(worker, '/?utm_source=pwa');
   assert.equal(await text(res), 'shell of today', 'the online navigation did not get the network response');
 
-  assert.equal(await text(worker.store.get(key('/'))), 'shell of today',
+  assert.equal(await worker.read('/', gen), 'shell of today',
     'the "/" entry still holds install-day bytes after a successful navigation to "/?utm_source=pwa". '
     + 'A PWA user never navigates to bare "/", so this entry is only ever refreshed by the fix under test — '
     + 'and it is the fallback every failed launch is served (Sentry JAVASCRIPT-10/13).');
-  assert.equal(await text(worker.store.get(key('/?utm_source=pwa'))), 'shell of today',
+  assert.equal(await worker.read('/?utm_source=pwa', gen), 'shell of today',
     'the navigation\'s own key was not stored — the refresh must be IN ADDITION to the existing write');
 });
 
 test('2. CONTROL: a navigation to a different page does not overwrite the "/" shell', async () => {
   const worker = loadWorker(async () => basic('kompres page'));
   worker.seed('/', 'landing');
-  await dispatch(worker, navigate('/kompres-pdf'));
-  assert.equal(await text(worker.store.get(key('/'))), 'landing',
+  const { gen } = await navOnline(worker, '/kompres-pdf');
+  assert.equal(await worker.read('/kompres-pdf', gen), 'kompres page', 'the navigation did not store its own page');
+  assert.equal(await worker.read('/', gen), null,
     'a navigation to /kompres-pdf replaced the "/" shell — the refresh is for the ROOT path only, or every '
     + 'failed launch would land on whichever tool page was visited last');
 });
@@ -133,26 +72,34 @@ test('3. a module fetch that fails ONCE and then succeeds is served fresh, never
   const worker = loadWorker(net);
   worker.seed('/js/v2/telemetry.js', '/* stale: no feedback export */');
 
-  const res = await dispatch(worker, moduleReq('/js/v2/telemetry.js'));
+  const res = await dispatch(worker, moduleReq('/js/v2/telemetry.js'), { clientId: 'tab' });
   assert.equal(net.calls(), 2, `the handler tried the network ${net.calls()} time(s) — one transient failure must be retried before the cache is consulted`);
   assert.equal(await text(res), 'export function feedback() {}',
     'one transient network failure handed the page a STALE module beside fresh siblings — the skew that killed '
     + 'js/v2/edit-feedback.js at import (Sentry JAVASCRIPT-Q)');
 });
 
-test('4. CONTROL: a module fetch that keeps failing still falls back to the cache — offline must keep working', async () => {
+// Test 4 used to pin the PER-FILE offline fallback ("a module that keeps
+// failing still gets the cached copy"). That fallback is what produced Sentry
+// JAVASCRIPT-18, and sw.js v8 removed it on purpose: offline modules now come
+// whole from one complete generation. tests/core/sw-generations.test.mjs pins
+// both halves — the refusal, and offline still opening.
+test('4. a module fetch that keeps failing is NOT answered with a cached copy chosen file by file', async () => {
   const net = flaky(Infinity, 'never');
   const worker = loadWorker(net, { online: false });
   worker.seed('/js/v2/telemetry.js', 'cached copy');
-  const res = await dispatch(worker, moduleReq('/js/v2/telemetry.js'));
-  assert.equal(await text(res), 'cached copy', 'the offline fallback is gone — a retry must never replace it');
+  const res = await dispatch(worker, moduleReq('/js/v2/telemetry.js'), { clientId: 'tab' });
+  assert.notEqual(await text(res).catch(() => null), 'cached copy',
+    'a module request from a page the worker cannot place in a generation was answered with a cached copy — '
+    + 'the per-file fallback is back, and with it the cross-deploy skew (Sentry JAVASCRIPT-18)');
+  assert.equal(res.type, 'error');
 });
 
 test('5. a navigation that fails ONCE and then succeeds gets today\'s shell, not the cached one', async () => {
   const net = flaky(1, 'shell of today');
   const worker = loadWorker(net);
   worker.seed('/', 'shell from install day');
-  const res = await dispatch(worker, navigate('/?utm_source=pwa'));
+  const { res } = await navOnline(worker, '/?utm_source=pwa');
   assert.equal(await text(res), 'shell of today',
     'a single failed navigation request served the install-day shell to a user whose modules were about to '
     + 'arrive fresh — the cold-launch skew (Sentry JAVASCRIPT-10/13)');
@@ -160,8 +107,8 @@ test('5. a navigation that fails ONCE and then succeeds gets today\'s shell, not
 
 test('6. VACUITY GUARD: the harness can see a real failure — a body the handler never wrote reads back null', async () => {
   const worker = loadWorker(async () => basic('x'));
-  assert.equal(await text(worker.store.get(key('/never'))), null);
-  const res = await dispatch(worker, navigate('/?buat=kompres'));
+  assert.equal(await worker.read('/never'), null);
+  const { res } = await navOnline(worker, '/?buat=kompres');
   assert.equal(await text(res), 'x');
 });
 
@@ -170,23 +117,17 @@ test('6. VACUITY GUARD: the harness can see a real failure — a body the handle
 // navigation to /en/anything is served the Indonesian `/`, and the English
 // editor is silently Indonesian the moment the network goes.
 
-async function install(worker) {
-  let done = null;
-  worker.listeners.install({ waitUntil: (p) => { done = p; } });
-  await done;
-}
-
 test('7. install precaches /en beside /', async () => {
   const worker = loadWorker(async () => basic('x'));
   await install(worker);
-  assert.equal(await text(worker.store.get(key('/en'))), 'precached /en', 'the English shell is not precached');
-  assert.equal(await text(worker.store.get(key('/'))), 'precached /', 'the Indonesian shell is not precached');
+  assert.equal(await worker.read('/en'), 'precached /en', 'the English shell is not precached');
+  assert.equal(await worker.read('/'), 'precached /', 'the Indonesian shell is not precached');
 });
 
 test('8. a /en that cannot be precached does not abort the install (the Indonesian shell must survive it)', async () => {
   const worker = loadWorker(async () => basic('x'), { failAdd: ['/en'] });
   await assert.doesNotReject(() => install(worker));
-  assert.equal(await text(worker.store.get(key('/'))), 'precached /', 'a bad /en took the root shell down with it');
+  assert.equal(await worker.read('/'), 'precached /', 'a bad /en took the root shell down with it');
 });
 
 test('9. an offline navigation under /en lands on /en, never on the Indonesian /', async () => {
@@ -208,9 +149,10 @@ test('10. a successful /en navigation with a query string refreshes /en, and lea
   const worker = loadWorker(async () => basic('english of today'));
   worker.seed('/', 'indonesian from install day');
   worker.seed('/en', 'english from install day');
-  await dispatch(worker, navigate('/en?utm_source=pwa'));
-  assert.equal(await text(worker.store.get(key('/en'))), 'english of today', 'the /en shell stayed at install-day bytes');
-  assert.equal(await text(worker.store.get(key('/'))), 'indonesian from install day', 'an /en navigation overwrote the Indonesian shell');
+  const { gen } = await navOnline(worker, '/en?utm_source=pwa');
+  assert.equal(await worker.read('/en', gen), 'english of today', 'the /en shell was not written with this load');
+  assert.equal(await worker.read('/', gen), null, 'an /en navigation wrote the Indonesian shell');
+  assert.equal(await worker.read('/'), 'indonesian from install day', 'an /en navigation overwrote the Indonesian shell');
 });
 
 // ---- the English support page (/en/support), v7 -------------------------------
@@ -218,11 +160,11 @@ test('10. a successful /en navigation with a query string refreshes /en, and lea
 test('11. install precaches /en/support too, and a bad one aborts neither the install nor /en', async () => {
   const ok = loadWorker(async () => basic('x'));
   await install(ok);
-  assert.equal(await text(ok.store.get(key('/en/support'))), 'precached /en/support', 'the English support page is not precached');
+  assert.equal(await ok.read('/en/support'), 'precached /en/support', 'the English support page is not precached');
   const bad = loadWorker(async () => basic('x'), { failAdd: ['/en/support'] });
   await assert.doesNotReject(() => install(bad));
-  assert.equal(await text(bad.store.get(key('/'))), 'precached /', 'a bad /en/support took the root shell down with it');
-  assert.equal(await text(bad.store.get(key('/en'))), 'precached /en', 'a bad /en/support took /en down with it');
+  assert.equal(await bad.read('/'), 'precached /', 'a bad /en/support took the root shell down with it');
+  assert.equal(await bad.read('/en'), 'precached /en', 'a bad /en/support took /en down with it');
 });
 
 test('12. offline, /en/support is served from its own entry; with none it falls back to /en, never to /', async () => {
@@ -231,7 +173,7 @@ test('12. offline, /en/support is served from its own entry; with none it falls 
   worker.seed('/en', 'english shell');
   worker.seed('/en/support', 'english support page');
   assert.equal(await text(await dispatch(worker, navigate('/en/support'))), 'english support page');
-  worker.store.delete(key('/en/support'));
+  worker.named.get(CACHE).delete(key('/en/support'));
   worker.seed('/en', 'english shell');
   assert.equal(await text(await dispatch(worker, navigate('/en/support'))), 'english shell');
 });

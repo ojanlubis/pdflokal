@@ -37,7 +37,18 @@ const SW = fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8');
 // Generations that were live while a documented cross-deploy skew incident was
 // killing the module graph. A device still holding one of these has the broken
 // set on it; only a different CACHE name purges it.
-const POISONED = ['pdflokal-shell-v1', 'pdflokal-shell-v2', 'pdflokal-shell-v3'];
+//
+// v5, v6 and v7 joined on 2026-10-02. v7 carried Sentry JAVASCRIPT-18 (a fresh
+// app.js beside a pre-#165 import.js, reproduced in tests/sw-generation.spec.js
+// as the PER-FILE fallback); v5 and v6 were live for the three heal+repeat pairs
+// on the rail (2026-09-29, 09-30, 10-01) — the WORKER's part in those pairs is
+// INFERRED, not measured: the heal reload they died on is uncontrolled, and no
+// candidate reproduced 'repeat' in Chromium or WebKit. Named here because all
+// three were per-file caches, which is mixed by construction. v4 never shipped.
+const POISONED = [
+  'pdflokal-shell-v1', 'pdflokal-shell-v2', 'pdflokal-shell-v3',
+  'pdflokal-shell-v5', 'pdflokal-shell-v6', 'pdflokal-shell-v7',
+];
 
 function cacheName() {
   const m = /^const CACHE = '([^']+)';$/m.exec(SW);
@@ -56,9 +67,15 @@ test('1. the cache name is not one of the generations a skew incident shipped on
   );
 });
 
+// Since v8 the worker owns more than one cache: CACHE plus its generations
+// (`pdflokal-gen-v8-*`), so "not CACHE" became "not ours". The behaviour —
+// a foreign name is deleted, our generations survive — is driven for real in
+// tests/core/sw-generations.test.mjs (test 8); this pins the shape.
 test('2. the activate handler still purges every non-matching cache — the bump only works because of this', () => {
+  assert.match(SW, /const ours = \(k\) => k === CACHE \|\| k\.startsWith\(GEN_PREFIX\)/,
+    'sw.js no longer defines which caches it owns as CACHE plus its own generation prefix');
   assert.match(
-    SW, /caches\.keys\(\)[\s\S]{0,200}k !== CACHE[\s\S]{0,80}caches\.delete\(k\)/,
+    SW, /caches\.keys\(\)[\s\S]{0,200}!ours\(k\)[\s\S]{0,80}caches\.delete\(k\)/,
     'sw.js no longer deletes the caches whose key differs from CACHE on activate. Without that, '
     + 'bumping the name adds a cache instead of replacing one, and the stale entries survive '
     + 'forever — which makes test 1 above a ritual.',
