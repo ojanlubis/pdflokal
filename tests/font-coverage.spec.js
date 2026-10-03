@@ -53,7 +53,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const NASTY = (name) => path.join(__dirname, 'fixtures', 'nasty', name);
 const LOREM_FULL = NASTY('lorem-full.pdf');
 const LOREM_SUBSET = NASTY('lorem-subset.pdf');
-const SUBSTITUTE_TOAST = 'Huruf ini memakai font pengganti yang mirip';
+const SUBSTITUTE_TOAST = 'Font aslinya nggak bisa dipakai, diganti yang mirip.';
 
 async function openDoc(page, fixture) {
   await page.goto('/');

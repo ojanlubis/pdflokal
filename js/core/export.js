@@ -671,6 +671,13 @@ export async function buildPdfBytes(doc, deps = {}) {
       for (const anno of orderedForPaint(annotations)) {
         if (skipCovers.has(anno.id)) continue; // surgery succeeded — true background shows through
         if (skipDraw.has(anno.id)) continue; // Rung C wrote this one natively — don't double-paint
+        // WITNESS: a whiteout that reaches here is PAINTED OVER the page, so
+        // whatever it hides is still in the file (the cut either never applied
+        // or this is a plain Tip-Ex). The Unduh sheet's "covered" note counts
+        // these; counting what is drawn cannot drift from what the file holds.
+        if (anno.type === 'whiteout') {
+          try { deps.onCoverDrawn?.(anno); } catch { /* reporting must never break the export */ }
+        }
         const draw = ANNOTATION_DRAWERS[anno.type];
         if (!draw) {
           console.warn('[core/export] Unknown annotation type, skipping:', anno.type);

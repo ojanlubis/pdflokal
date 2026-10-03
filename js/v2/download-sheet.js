@@ -23,6 +23,7 @@ import { durationBucket, pagesBucket } from '../core/telemetry-schema.js';
 import { showStamp } from './celebrate.js';
 import { buildPdfArtifact } from './pdf-builder.js';
 import { passThroughSource } from '../core/export.js';
+import { coveredNoteShows } from './edit-expectations.js';
 
 // WHAT TO SAY WHEN IT FAILS, AND WHEN NOT TO SAY "TRY AGAIN".
 // Founder ruling via PM, 2026-07-29: advice that cannot work is worse than no
@@ -128,6 +129,22 @@ export function createDownloadSheet(deps) {
     const cta = el('#ds-cta');
     if (cta) cta.insertAdjacentElement('beforebegin', p);
     else modal.appendChild(p);
+    return p;
+  }
+
+  // THE COVERED NOTE'S ELEMENT (key sheet.coveredNote), mounted lazily for the
+  // same reason signedNoteEl is: index.html is the body template of every
+  // generated page and a module must not require a shell of its own age. Sits
+  // right after the seal note, so when both apply they read in that order.
+  function coveredNoteEl() {
+    let p = el('#ds-covered');
+    if (p) return p;
+    p = document.createElement('p');
+    p.className = 'ds-note';
+    p.id = 'ds-covered';
+    p.hidden = true;
+    const anchor = signedNoteEl();
+    anchor.insertAdjacentElement('afterend', p);
     return p;
   }
 
@@ -243,9 +260,9 @@ export function createDownloadSheet(deps) {
       // callback. Collected on a local so a superseded build can never flag
       // the current one; surfaced at the CTA (doExport), the moment the user
       // actually takes the bytes, not here (the build may still be discarded).
-      const { bytes, fontFallback } = await buildPdfArtifact(subset);
+      const { bytes, fontFallback, covered } = await buildPdfArtifact(subset);
       if (seq !== state.seq) return; // selection changed mid-build
-      state.base = { bytes, size: bytes.length, fontFallback };
+      state.base = { bytes, size: bytes.length, fontFallback, covered };
     } catch (err) {
       console.error(err);
       // ⚠️ KEEP THE ERROR. This is where an export ACTUALLY fails — the build,
@@ -436,6 +453,17 @@ export function createDownloadSheet(deps) {
     // keeps this a string the copy ruling can replace without re-reading HTML.
     if (anySigned) noteEl.textContent = tr('sheet.signedNote');
     noteEl.hidden = !anySigned || sealSurvivesThisDownload();
+
+    // The covered note (key sheet.coveredNote): what a Tip-Ex hides is still in
+    // a PDF. Known only once the build has run (state.base.covered counts the
+    // rectangles the export really painted), so it appears when the size does.
+    // Format Gambar hides it; Compress hides it too, because that rasterises.
+    const coveredEl = coveredNoteEl();
+    coveredEl.textContent = tr('sheet.coveredNote');
+    coveredEl.hidden = !coveredNoteShows({
+      format: state.format, size: state.size, covered: state.base?.covered,
+      compressedUnchanged: !!state.compressed?.unchanged,
+    });
 
     segSync('#ds-pages', state.picked ? 'some' : 'all');
     el('#ds-all-sub').textContent = tr('sheet.pagesAll', { count: nAll });

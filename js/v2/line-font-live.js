@@ -22,11 +22,12 @@
 import { acceptLineInput, decideLineFont, faceCssFamily, faceStyle, storedDecision } from '../core/line-font.js';
 import { CLONE_FONT_URLS, isSfntFontProgram } from '../core/clone-fonts.js';
 import { applyTextFont } from '../render/page-view.js';
+import { t as tr } from '../lib/i18n.js';
 
-// TODO(copy): placeholder until Fauzan writes the note (EXCLUDE 2 — client
-// copy is his). One home, so his wording lands in exactly one place.
+// The words are the i18n key toast.charRefused (his copy, approved 2026-10-03).
+// Kept as a function: app.js hands it to onRefuse and tests read it from here.
 export function refusalNote(ch) {
-  return `Huruf "${ch}" belum bisa ditulis di PDF ini.`;
+  return tr('toast.charRefused', { ch });
 }
 
 // ---- bundled faces, loaded from the bytes the stamp embeds ---------------------

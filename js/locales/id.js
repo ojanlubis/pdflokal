@@ -45,13 +45,20 @@ export default {
     armEdit: 'Edit teks asli, fitur beta. Tap tulisan yang mau kamu ubah',
     armEditShort: 'Tap tulisan yang mau diubah',
     missedText: 'Nggak kena tulisan, tap tepat di teksnya ya',
+    // The Edit tool's limits, said at the moment the person hits them. His
+    // wording, approved 2026-10-03.
+    notText: 'Nggak ada teks di situ. Kalau gambar, pakai Tip-Ex.',
+    lineNoWrap: 'Baris ini nggak bisa turun, jadi melebar ke samping.',
+    armEditLocked: 'PDF ini dikunci, hasil edit nggak bisa diunduh.',
+    armEditSigned: 'Ada meterai/TTD digital. Kalau diedit, jadi nggak sah.',
+    charRefused: '"{ch}" nggak bisa ditulis, font-nya nggak punya.',
     noReadableText: 'Nggak ada tulisan yang kebaca',
     scanFailed: 'Gagal scan, coba lagi ya',
     scanNotEditable: 'Halaman ini hasil scan/foto, teksnya belum bisa diedit',
     pickObject: 'Pilih objek yang mau dihapus',
     preparing: 'Sebentar, lagi disiapkan',
     fontSubstituteResult: 'Sebagian teks memakai font pengganti yang mirip di file hasil',
-    fontSubstituteChar: 'Huruf ini memakai font pengganti yang mirip',
+    fontSubstituteChar: 'Font aslinya nggak bisa dipakai, diganti yang mirip.',
     // Rung D, the whole-paragraph edit: said once at commit, when the grown paragraph
     // now overlaps the text below it. His wording (2026-10-01). There is no page-bottom
     // refusal: a paragraph may leave the page, and the editor shows it leaving.
@@ -84,6 +91,9 @@ export default {
       unknown: 'Waduh, gagal membuat file',
     },
     signedNote: 'Dokumen ini punya meterai atau tanda tangan digital. Kalau disimpan dari sini, segelnya rusak dan dokumen bisa gagal diverifikasi. File aslimu nggak berubah.',
+    // Shown beside signedNote when a Tip-Ex (or an Edit/Hapus whose cut fell back
+    // to a cover) is painted over text that stays in the PDF. PDF format only.
+    coveredNote: 'Yang ditutup masih ada di file. Buat isi rahasia, unduh sebagai Gambar.',
     auto: 'Otomatis',
     compressFailed: 'Kompres gagal, saya pakai ukuran asli ya',
     meta: '{name}.pdf · {count} hal',
