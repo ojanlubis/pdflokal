@@ -3042,6 +3042,10 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
     const onWider = () => {
       if (alreadyShownForDoc(doc, 'lineNoWrap')) { ed.removeEventListener('input', onWider); return; }
       if (!lineOutgrew(ed.offsetWidth, draft.originalWidth)) return;
+      // Never over another message: the refused-character note fires on the same
+      // keystroke and would be replaced before anyone read it. Wait for a quiet
+      // moment instead; the line is still too wide on the next keystroke.
+      if (toastEl.classList.contains('show')) return;
       if (firstTimeForDoc(doc, 'lineNoWrap')) toast(tr('toast.lineNoWrap'));
       ed.removeEventListener('input', onWider);
     };

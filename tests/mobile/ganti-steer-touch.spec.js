@@ -122,7 +122,7 @@ test.describe('ganti steer — press/drag/release on real touch', () => {
 
     await touchDrag(page, a.x, a.y, margin.x, margin.y);
 
-    await expect(page.locator('#toast')).toContainText('kena tulisan');
+    await expect(page.locator('#toast')).toContainText('Nggak ada teks di situ');
     await expect(page.locator('.v2-text-edit')).toHaveCount(0);
     expect(await page.evaluate(() => window.v2.getDoc().pages[0].annotations.length)).toBe(0);
   });
