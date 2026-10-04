@@ -34,7 +34,7 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "AGPL-3.0-only",
   "type": "module",
   "bugs": {
     "url": "https://github.com/ojanlubis/pdflokal/issues"
