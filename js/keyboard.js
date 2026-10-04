@@ -132,10 +132,7 @@ function handleEscapeKey(isTyping) {
   // to showHome() and wiped the user's in-progress edits. Documented in
   // memory/ux-audit-2026-05-30.md (finding C1).
   // Order: open modal -> open dropdown -> finally exit editor as a last resort.
-  if (hasOpenModal()) {
-    closeAllModals();
-    return;
-  }
+  if (hasOpenModal()) { closeAllModals(); return; }
   if (closeOpenEditorDropdown()) return;
 
   if (state.currentTool) showHome();

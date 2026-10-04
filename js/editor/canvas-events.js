@@ -129,9 +129,8 @@ export function ueSetupCanvasEvents() {
   // making the undo snapshot mutate along with live state.
   let preChangeState = null;
 
-  // Double-tap detection state
-  let touchLastTap = 0;
-  let touchLastCoords = null;
+  // The previous touch-end: a second one soon after and close by is a double tap.
+  const prevTouch = { at: 0, point: null };
 
   // Pinch-to-zoom state
   let pinchStartDist = 0;
@@ -199,21 +198,14 @@ export function ueSetupCanvasEvents() {
       ueState.selectedPage = info.pageIndex;
       ueHighlightThumbnail(info.pageIndex);
     }
-
-    // Double-tap detection
-    const now = Date.now();
-    if (now - touchLastTap < DOUBLE_TAP_DELAY && touchLastCoords) {
-      const distance = Math.sqrt(
-        Math.pow(info.x - touchLastCoords.x, 2) +
-        Math.pow(info.y - touchLastCoords.y, 2)
-      );
-      if (distance < DOUBLE_TAP_DISTANCE) {
-        handleDoubleClick(info);
-        return;
-      }
-    }
-    touchLastTap = now;
-    touchLastCoords = { x: info.x, y: info.y };
+    // A second touch soon after the first, and close to it, is a double tap.
+    const at = Date.now();
+    const isDoubleTap = prevTouch.point !== null
+      && at - prevTouch.at < DOUBLE_TAP_DELAY
+      && Math.hypot(info.x - prevTouch.point.x, info.y - prevTouch.point.y) < DOUBLE_TAP_DISTANCE;
+    if (isDoubleTap) { handleDoubleClick(info); return; }
+    prevTouch.at = at;
+    prevTouch.point = { x: info.x, y: info.y };
     handleDown(info);
   }, { passive: false });
 
