@@ -1,0 +1,22 @@
+# What pdflokal.id serves is the app, not the repo. Without this file Vercel published
+# every tracked file: CLAUDE.md, decisions.md, docs/, tests/, CI config (all 200 on
+# 2026-10-04). Keep LICENSE served (AGPL notice). package.json stays: functions need it.
+/CLAUDE.md
+/decisions.md
+/CONTRIBUTING.md
+/CODE_OF_CONDUCT.md
+/README.md
+/docs
+/scripts
+/seo
+/i18n
+/.github
+/eslint.config.js
+/playwright.config.js
+/skills-lock.json
+/sonar-project.properties
+# tests/ is hidden except the one sample the lab pages fetch (js/lab.js, js/lab-edit.js)
+/tests/*
+!/tests/fixtures
+/tests/fixtures/*
+!/tests/fixtures/sample-2pages.pdf
