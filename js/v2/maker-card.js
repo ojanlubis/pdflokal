@@ -26,13 +26,25 @@
  */
 import { shownUpdates, updateText } from '../updates.js';
 import { t, numberLocale } from '../lib/i18n.js';
+import { FEATURE_IDS, untoldShipped } from '../core/features.js';
+import { votedIds, toldIds, rememberTold } from './vote-memory.js';
 
 export const SEEN_KEY = 'pdflokal_maker_seen';
 const SHOW_DELAY_MS = 900; // let the landing paint and be read first
 
-// Pure: show when there is something approved and its newest id is unseen.
-export function shouldShowCard(entries, seenId) {
-  return entries.length > 0 && entries[0].id !== seenId;
+// Pure: show when there is something approved and its newest id is unseen, or
+// when there is a feature this person voted for that has shipped and they have
+// not been told (`notices`, from untoldShipped(): the feature vote's promise,
+// "nanti saya kabari di sini", is kept HERE, in Ojan's card, never in a new one).
+export function shouldShowCard(entries, seenId, notices = []) {
+  return notices.length > 0 || (entries.length > 0 && entries[0].id !== seenId);
+}
+
+// The one line naming a shipped feature the person voted for. The label is the
+// vote card's own (featureVote.labels is in FEATURES order).
+export function noticeText(id) {
+  const labels = t('featureVote.labels');
+  return t('featureVote.shipped', { feature: labels[FEATURE_IDS.indexOf(id)] ?? id });
 }
 
 // "23 Sep" / "1 Aug" — short, in the page's language (`/` says Agu, Okt, Des and
@@ -49,9 +61,11 @@ function writeSeen(id) {
   try { localStorage.setItem(SEEN_KEY, id); } catch { /* private mode: it just shows again */ }
 }
 
-export function initMakerCard({ entries = shownUpdates(), delay = SHOW_DELAY_MS } = {}) {
+export function initMakerCard({
+  entries = shownUpdates(), delay = SHOW_DELAY_MS, notices = untoldShipped(votedIds(), toldIds()),
+} = {}) {
   const card = document.getElementById('maker-card');
-  if (!card || !shouldShowCard(entries, readSeen())) return;
+  if (!card || !shouldShowCard(entries, readSeen(), notices)) return;
 
   const list = card.querySelector('.mk-list');
   list.replaceChildren(...entries.map((u) => {
@@ -64,15 +78,30 @@ export function initMakerCard({ entries = shownUpdates(), delay = SHOW_DELAY_MS 
     li.append(time, p);
     return li;
   }));
+  // A card with nothing to list says only what it came to say.
+  const label = card.querySelector('.mk-label');
+  if (entries.length === 0) { list.hidden = true; if (label) label.hidden = true; }
+  if (notices.length > 0) {
+    // ABOVE the updates: it is the reason this card is up, and the only line
+    // addressed to this person. textContent, never innerHTML.
+    const box = document.createElement('div');
+    box.className = 'mk-notice';
+    box.replaceChildren(...notices.map((id) => {
+      const p = document.createElement('p');
+      p.textContent = noticeText(id);
+      return p;
+    }));
+    (label ?? list).before(box);
+  }
 
   const dismiss = () => {
-    writeSeen(entries[0].id);
+    if (entries.length > 0) writeSeen(entries[0].id);
     card.hidden = true;
   };
   card.querySelector('.mk-close').addEventListener('click', dismiss);
   // The support link navigates on its own; marking seen first means the card
   // does not greet them again when they come back from /dukung.
-  for (const a of card.querySelectorAll('.mk-support, .mk-more')) a.addEventListener('click', () => writeSeen(entries[0].id));
+  for (const a of card.querySelectorAll('.mk-support, .mk-more')) a.addEventListener('click', () => { if (entries.length > 0) writeSeen(entries[0].id); });
 
   // Homepage only. Opening a document leaves the landing; the card goes with
   // it, without marking seen — they never answered it.
@@ -80,7 +109,18 @@ export function initMakerCard({ entries = shownUpdates(), delay = SHOW_DELAY_MS 
   new MutationObserver(() => { if (!onLanding()) card.hidden = true; })
     .observe(document.body, { attributes: true, attributeFilter: ['class'] });
 
-  setTimeout(() => { if (onLanding()) card.hidden = false; }, delay);
+  // THE CARD WAITS while a dialog is open (the feature vote is one: the bottom-right
+  // corner is this card's and nothing else may share the screen with it, his
+  // ruling 2026-10-06). It comes up the moment that dialog closes. A shipped
+  // feature is marked told when it is SHOWN, so it is said once.
+  const reveal = () => {
+    if (!onLanding()) return;
+    const open = document.querySelector('dialog[open]');
+    if (open) { open.addEventListener('close', () => setTimeout(reveal, delay), { once: true }); return; }
+    card.hidden = false;
+    if (notices.length > 0) rememberTold(notices);
+  };
+  setTimeout(reveal, delay);
 }
 
 // ---- the count ----------------------------------------------------------------
