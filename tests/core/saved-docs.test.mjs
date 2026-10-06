@@ -28,7 +28,7 @@ import {
 } from '../../js/core/operations.js';
 import {
   SAVED_VERSION, AUTOSAVE_KEEP, serializeDoc, deserializeDoc, SavedDocError,
-  autosaveEvictions, reopenCandidate, createAutosaveScheduler, needsSafariNote, storageFailureKind, blobOf,
+  autosaveEvictions, reopenCandidate, createAutosaveScheduler, needsSafariNote, storageFailureKind, blobOf, visibleEntries,
 } from '../../js/core/saved-docs.js';
 
 const bytes = (...n) => new Uint8Array(n);
@@ -312,6 +312,36 @@ test('reopen candidate: the latest autosave; null when none, or when it is open 
   assert.equal(reopenCandidate(entries, new Set(['a2'])), null, 'the latest is open elsewhere: skip the dialog, do not fall back to an older one');
   assert.equal(reopenCandidate([entry('m1', 'manual', 1)], new Set()), null);
   assert.equal(reopenCandidate([], new Set()), null);
+});
+
+// ---- "Nanti aja" is remembered (seat call 2026-10-06) -------------------------------------------------
+
+test('a declined autosave is not offered again until it is NEWER than the decline', () => {
+  const declined = { ...entry('a2', 'auto', 9), declinedAt: 9 };
+  assert.equal(reopenCandidate([entry('a1', 'auto', 1), declined], new Set()), null, 'declined at its own last change: do not nag');
+  const changedSince = { ...declined, updatedAt: 12 };
+  assert.equal(reopenCandidate([changedSince], new Set()).id, 'a2', 'the same slot changed after the decline: ask again');
+  const differentDoc = entry('a3', 'auto', 20);
+  assert.equal(reopenCandidate([declined, differentDoc], new Set()).id, 'a3', 'a newer autosave of ANOTHER doc: ask again');
+  assert.equal(reopenCandidate([{ ...entry('a4', 'auto', 5), declinedAt: 9 }], new Set()), null, 'a decline later than the entry still holds');
+});
+
+// ---- the list shows a document once ----------------------------------------------------------------------
+
+test('visibleEntries: an autosave linked to a manual entry is hidden; unlinked ones stay; order is kept', () => {
+  const m1 = { ...entry('m1', 'manual', 50), slotId: 'a1' };            // saved from slot a1
+  const m2 = entry('m2', 'manual', 40);                                  // opened later, linked from the autosave side
+  const a1 = entry('a1', 'auto', 60);
+  const a2 = { ...entry('a2', 'auto', 55), manualId: 'm2' };
+  const a3 = entry('a3', 'auto', 30);                                    // a different document
+  const out = visibleEntries([a1, a2, a3, m1, m2]);
+  assert.deepEqual(out.map((e) => e.id), ['a3', 'm1', 'm2']);
+});
+
+test('visibleEntries: a link to a manual entry that no longer exists hides nothing', () => {
+  const a = { ...entry('a1', 'auto', 1), manualId: 'm-deleted' };
+  const m = { ...entry('m1', 'manual', 2), slotId: 'a-gone' };
+  assert.deepEqual(visibleEntries([a, m]).map((e) => e.id), ['a1', 'm1']);
 });
 
 // ---- the debounced scheduler ---------------------------------------------------------------------------
