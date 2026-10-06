@@ -49,7 +49,10 @@ function writeSeen(id) {
   try { localStorage.setItem(SEEN_KEY, id); } catch { /* private mode: it just shows again */ }
 }
 
-export function initMakerCard({ entries = shownUpdates(), delay = SHOW_DELAY_MS } = {}) {
+// `ready`: a promise the card waits on before it may appear. app.js passes the reopen ask
+// (specs/spec-simpan-editan.md): the bottom-right corner is the card's, but the card never
+// shows while the dialog is open. The default resolves at once, so nothing else changes.
+export function initMakerCard({ entries = shownUpdates(), delay = SHOW_DELAY_MS, ready = Promise.resolve() } = {}) {
   const card = document.getElementById('maker-card');
   if (!card || !shouldShowCard(entries, readSeen())) return;
 
@@ -80,7 +83,7 @@ export function initMakerCard({ entries = shownUpdates(), delay = SHOW_DELAY_MS 
   new MutationObserver(() => { if (!onLanding()) card.hidden = true; })
     .observe(document.body, { attributes: true, attributeFilter: ['class'] });
 
-  setTimeout(() => { if (onLanding()) card.hidden = false; }, delay);
+  setTimeout(() => { ready.then(() => { if (onLanding()) card.hidden = false; }); }, delay);
 }
 
 // ---- the count ----------------------------------------------------------------

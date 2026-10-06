@@ -64,6 +64,11 @@ import { initFeedbackForm } from './feedback-form.js';
 import { createCelebration } from './celebrate.js';
 import { initInstallPrompt, isStandalone } from './install-prompt.js';
 import { initMakerCard, initVisitorCount } from './maker-card.js';
+import { createSavedStore } from './saved-store.js';
+import { createPresence } from './doc-presence.js';
+import { createSavedSession } from './saved-session.js';
+import { createSavedUi } from './saved-docs-ui.js';
+import { needsSafariNote } from '../core/saved-docs.js';
 import { applyIntentCopy } from './intent-copy.js';
 import { ensurePdfLib } from '../core/vendor.js';
 import { readPageContents, extractFontMetrics } from '../core/redact.js';
@@ -128,7 +133,14 @@ function deviceClass() {
 
 // ---- state (ONE doc, ONE history — everything else is DOM or derived) -------
 let doc = createDoc(); // replaced wholesale by "Buka Baru" (File menu)
-const history = createHistory(undefined, { carryRaster: rasterFitsShape, onDirtyChange: setLeaveGuard });
+// "Simpan editan" (js/v2/saved-session.js), assigned further down. Declared HERE because the
+// history below calls it on every change, and `let` keeps that call safe before it exists.
+let savedSession = null;
+const history = createHistory(undefined, {
+  carryRaster: rasterFitsShape,
+  onDirtyChange: setLeaveGuard,
+  onChange: () => savedSession?.touch(), // the autosave: debounced, reads the doc when it fires
+});
 let slots = [];
 let rasterizer = null;
 let zoom = 1;
@@ -286,7 +298,12 @@ function download(blob, filename) {
 }
 const celebration = createCelebration({ toast });
 initInstallPrompt(); // homepage "install to home screen" chip + adaptive card (off the download moment)
-initMakerCard();    // homepage: Ojan + his last approved updates (js/updates.js)
+// The Ojan card waits for the reopen dialog to be decided or closed: the two never show together
+// (specs/spec-simpan-editan.md). `reopenSettled` is settled further down, where the dialog lives;
+// the try/finally there guarantees it settles even if that setup throws.
+let settleReopen = () => {};
+const reopenSettled = new Promise((resolve) => { settleReopen = resolve; });
+initMakerCard({ ready: reopenSettled }); // homepage: Ojan + his last approved updates (js/updates.js)
 initVisitorCount(); // header count, homepage + editor (api/visitors.js)
 // The general feedback channel: a footer link, never prompted. Separate from
 // edit-feedback.js on purpose — that module owns the consent-gated image path
@@ -3400,6 +3417,27 @@ async function firstUnrebuildableSource() {
   return null;
 }
 
+// The landing yields to the editor and the stage is built from `doc`. Shared by a file
+// load (loadFilesInner) and a restored saved document (adoptRestoredDoc).
+function showEditor({ openingZoomFor }) {
+  if (!rasterizer) rasterizer = createPageRasterizer(doc, { editedPageProvider });
+  emptyEl.style.display = 'none';
+  // Capture BEFORE clearing: this is the real "editor becomes active" transition,
+  // and it must fire exactly once. `firstLoad` (pagesBefore === 0) is NOT the same
+  // signal — Buka Baru (resetDoc) also produces pagesBefore === 0 on the very next
+  // loadFilesInner call, but is-empty was already removed and never re-added, so
+  // gating on firstLoad here would push a second, orphaned back-button guard entry
+  // every time someone starts over. See wireDialogHistory below for the other half.
+  const wasEmpty = document.body.classList.contains('is-empty');
+  document.body.classList.remove('is-empty'); // landing yields, editor chrome returns
+  if (wasEmpty) pushEditorHistoryState();
+
+  if (openingZoomFor) {
+    zoom = openingZoom(doc.pages[0].width);
+  }
+  rebuildStage(); // applies zoom + sizer at the end
+}
+
 let loadingFiles = false; // re-entry guard: double-taps and rapid picks interleave imports
 
 async function loadFiles(files) {
@@ -3601,22 +3639,8 @@ async function loadFilesInner(files) {
   // away immediately.
   normalizePageWidths(doc);
 
-  if (!rasterizer) rasterizer = createPageRasterizer(doc, { editedPageProvider });
-  emptyEl.style.display = 'none';
-  // Capture BEFORE clearing: this is the real "editor becomes active" transition,
-  // and it must fire exactly once. `firstLoad` (pagesBefore === 0) is NOT the same
-  // signal — Buka Baru (resetDoc) also produces pagesBefore === 0 on the very next
-  // loadFilesInner call, but is-empty was already removed and never re-added, so
-  // gating on firstLoad here would push a second, orphaned back-button guard entry
-  // every time someone starts over. See wireDialogHistory below for the other half.
-  const wasEmpty = document.body.classList.contains('is-empty');
-  document.body.classList.remove('is-empty'); // landing yields, editor chrome returns
-  if (wasEmpty) pushEditorHistoryState();
-
-  if (firstLoad) {
-    zoom = openingZoom(doc.pages[0].width);
-  }
-  rebuildStage(); // applies zoom + sizer at the end
+  showEditor({ openingZoomFor: firstLoad });
+  if (firstLoad) savedSession?.begin(); // a new document: its autosave slot, and the lock that says it is ours
   // A non-first load that actually grew the doc IS a merge (gabung). Fire at
   // COMPLETION so it counts real merges from EVERY entry point — the [+] tile,
   // the File menu, dropping more files onto an open doc — not sheet-opens. GA4's
@@ -3826,9 +3850,103 @@ on('fm-pages', 'click', () => {
   openPagesSheet(); // the SAME opener the toolbar button uses — never a second one
 });
 
+// ---- Simpan editan: manual save, autosave, the saved list, the reopen ask -----------------------
+// BUILT, NOT RELEASED (specs/spec-simpan-editan.md: held for a user vote). The pure rules are
+// core/saved-docs.js, the I/O is saved-store.js, tab ownership is doc-presence.js, the
+// who-writes-what is saved-session.js, the two dialogs are saved-docs-ui.js. This is the glue.
+//
+// Restore puts a saved document on screen the way UNDO leaves a page whose raster no longer
+// fits: every page has `raster: null`, so the viewport stream renders it through
+// editedPageProvider, which RE-BAKES Ganti/OCR edits from the pristine source bytes plus the
+// annotations (core/page-surgery.js). Nothing here bakes anything itself.
+async function adoptRestoredDoc({ doc: restored, name }) {
+  showProcessing(1);
+  try {
+    if (doc.pages.length > 0) await resetDoc(); // caches, rasterizer and fonts of the OLD doc
+    resetEditFeedback();
+    // IN PLACE: closures hold `doc` by name, and resetDoc may just have replaced it.
+    doc.sources = restored.sources;
+    doc.pages = restored.pages;
+    doc.selection = restored.selection;
+    baseName = name || 'dokumen';
+    // A reopened document starts with a clean undo stack and counts as NOT dirty, so the
+    // leave guard stays down until the first new edit (spec).
+    history.undoStack.length = 0;
+    history.redoStack.length = 0;
+    markClean(history);
+    showEditor({ openingZoomFor: true });
+  } finally {
+    hideProcessing();
+  }
+}
+
+const savedStore = createSavedStore();
+const savedPresence = createPresence();
+const savedSafari = needsSafariNote(globalThis.navigator?.userAgent);
+savedSession = createSavedSession({
+  store: savedStore,
+  presence: savedPresence,
+  getDoc: () => doc,
+  getName: () => baseName,
+  // An open inline editor means a Ganti cover may exist before its replacement does:
+  // saving then would restore a deleted line. The autosave waits for the editor to close.
+  isBusy: () => !!editingEl,
+  adopt: adoptRestoredDoc,
+  toast,
+  msg: (key) => ({
+    quota: tr('saved.failQuota'), blocked: tr('saved.failBlocked'),
+    other: tr('saved.failOther'), openFail: tr('saved.openFail'),
+  })[key],
+  tel,
+});
+const savedUi = createSavedUi({
+  store: savedStore,
+  presence: savedPresence,
+  session: savedSession,
+  tel,
+  isLanding: () => document.body.classList.contains('is-empty'),
+  // The reopen ask is for the plain homepage. A page that already knows what the visitor came
+  // to do (?buat=, an SEO tool page's data-intent) is not interrupted.
+  isIntentPage: () => !!(document.body.dataset.intent || new URLSearchParams(window.location.search).get('buat')),
+});
+
+for (const [id, label, tip] of [
+  ['fm-save', tr('saved.menuSave'), tr('saved.menuSaveTip')],
+  ['fm-saved', tr('saved.menuList'), tr('saved.menuListTip')],
+]) {
+  const btn = document.getElementById(id);
+  if (!btn) continue; // a stale shell without the item: it costs the item, not the editor
+  const lab = btn.querySelector('.fm-label');
+  if (lab) lab.textContent = label;
+  btn.title = tip;
+}
+on('fm-save', 'click', async () => {
+  toggleFileMenu(false);
+  const res = await savedSession.saveManual(); // tells the user itself when it fails
+  if (res.ok) toast(res.update ? tr('saved.updated') : savedSafari ? tr('saved.savedSafari') : tr('saved.saved'));
+});
+on('fm-saved', 'click', () => {
+  toggleFileMenu(false);
+  savedUi.openList();
+});
+
+// The last change must not be lost to the debounce when the tab goes away.
+window.addEventListener('pagehide', () => savedSession.flush());
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') savedSession.flush(); });
+
+// The reopen ask, then the Ojan card (which waits on `reopenSettled`, set up near the top).
+try {
+  savedUi.maybeAskReopen().then(settleReopen, settleReopen);
+} catch {
+  settleReopen();
+}
+
 // Start over: a FRESH doc + history. The signature stays (it's the user's,
 // not the document's). Cancelling the picker leaves everything untouched.
 async function resetDoc() {
+  // The document going away is autosaved FIRST (a flush reads it synchronously), then its
+  // slot and locks are released. Never throws: Buka Baru must not depend on storage.
+  await savedSession?.end();
   doc = createDoc();
   history.undoStack.length = 0;
   history.redoStack.length = 0;
@@ -3908,6 +4026,7 @@ on('hc-cancel', 'click', () => {
   document.getElementById('home-confirm').close();
 });
 on('hc-go', 'click', () => {
+  savedSession?.flush(); // leaving: the debounce must not swallow the last change
   // The user was just asked (this dialog); the browser's own prompt would be a second ask.
   setLeaveGuard(false);
   // The wordmark's own href is this page's home ('/' or '/en'), so /en does not
@@ -3936,7 +4055,7 @@ function pushEditorHistoryState() {
 (function wireDialogHistory() {
   // NOTE: window.history everywhere — plain `history` is SHADOWED in this
   // module by the undo history (const history = createHistory()).
-  const dialogs = ['pm-sheet', 'sig-modal', 'dl-sheet', 'home-confirm'].map((id) => document.getElementById(id));
+  const dialogs = ['pm-sheet', 'sig-modal', 'dl-sheet', 'home-confirm', 'saved-list'].map((id) => document.getElementById(id)).filter(Boolean);
   const stack = []; // open dialogs in STACKING order (array order lies for nesting)
   let expectPop = false;
 
@@ -3944,6 +4063,10 @@ function pushEditorHistoryState() {
     const nativeShow = dlg.showModal.bind(dlg);
     dlg.showModal = () => {
       if (dlg.open) return; // double-tap/double-Ctrl+S: showModal throws on open dialogs
+      // The saved list also opens from the homepage's reopen ask, where no editor guard entry sits
+      // beneath it: a history entry pushed there would be left behind when a restored document
+      // pushes its own. On the homepage it opens as a plain dialog.
+      if (dlg.id === 'saved-list' && document.body.classList.contains('is-empty')) { nativeShow(); return; }
       nativeShow();
       window.history.pushState({ v2dlg: dlg.id }, '');
       stack.push(dlg);
@@ -4004,6 +4127,9 @@ window.v2 = {
   history,
   pageManager, // tests: force a grid re-render mid-drag (Sentry fee8a76e repro)
   getRasterizer: () => rasterizer, // tests: drive the real live-surgery raster path (tests/live-raster.spec.js)
+  // tests/saved-*.spec.js: the saved-docs pieces, so a spec can seed autosave slots and wait on the
+  // store without driving the UI six times.
+  saved: { session: savedSession, store: savedStore, presence: savedPresence, ui: savedUi },
   celebration, // tests: drive the post-download routing (install nudge vs share card)
   // tests/zoom-sharpen.spec.js. `superseded` is the honest one: it counts ONLY
   // renders that core/import.js's renderSeq guard threw away because a later
