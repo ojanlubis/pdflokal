@@ -112,3 +112,27 @@ sqliteTest('digest: the one-pass totals equal the three queries they replaced, o
   assert.equal(d.alive.last_event, '2026-09-24T06:00:00.000Z');
   db.close();
 });
+
+// ---- ?last=1: the routine's first call (brief §1.1) reads routine_runs only ----
+import routineHandler from '../../api/routine.js';
+
+test('GET /api/routine?last=1: answers last_run + watch from routine_runs and never touches events', async () => {
+  process.env.ROUTINE_KEY = 'k'; process.env.TURSO_EVENTS_URL = 'libsql://ev.turso.io'; process.env.TURSO_EVENTS_TOKEN = 't';
+  const r = recordFetch();
+  const res = { code: null, body: null, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; }, end() { return this; } };
+  try {
+    await routineHandler({ method: 'GET', url: '/api/routine?last=1', headers: { authorization: 'Bearer k' } }, res);
+  } finally { r.restore(); }
+  assert.equal(res.code, 200);
+  assert.deepEqual(Object.keys(res.body).sort(), ['last_run', 'now', 'watch']);
+  assert.ok(r.sent.length >= 1, 'it did read (vacuity guard)');
+  for (const { sql } of r.sent) assert.match(sql, /from routine_runs/, `only routine_runs: ${sql}`);
+  assert.ok(r.sent.every(({ sql }) => !/from events/.test(sql)), 'no events scan: the digest costs ~1M rows, this must cost a few dozen');
+});
+
+test('GET /api/routine?last=1 is still behind the key', async () => {
+  process.env.ROUTINE_KEY = 'k';
+  const res = { code: null, status(c) { this.code = c; return this; }, end() { return this; } };
+  await routineHandler({ method: 'GET', url: '/api/routine?last=1', headers: {} }, res);
+  assert.equal(res.code, 401);
+});

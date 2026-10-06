@@ -41,18 +41,32 @@ async function rows(db, sql, args = []) {
 const num = (v) => (v == null ? null : Number(v));
 const parse = (s) => { try { return JSON.parse(s); } catch { return null; } };
 
-export async function digest(since, now = new Date()) {
-  const until = now.toISOString();
-  const span = now.getTime() - Date.parse(since);
-  const prevSince = new Date(Date.parse(since) - span).toISOString();
+// The routine's own previous row and the daily watch's last 8: two reads of
+// routine_runs (a few dozen rows). Brief §1.1 needs `last_run.ts` BEFORE it can
+// say which window to ask for, and used to fetch the whole digest (the default
+// 72 h of events, ~1M rows read) just to learn one timestamp. `?last=1` is that
+// timestamp without the digest.
+export async function lastRuns() {
   const E = ev();
-
   const [lastRun] = await rows(E,
     `select id, ts, status, window_hours, findings from routine_runs
      where routine = 'cloud-maintenance' order by id desc limit 1`);
   const watch = await rows(E,
     `select ts, status, findings, note from routine_runs
      where routine = 'vercel-watch' order by id desc limit 8`);
+  return {
+    lastRun: lastRun ? { ...lastRun, findings: parse(lastRun.findings) } : null,
+    watch: watch.map((w) => ({ ...w, findings: parse(w.findings) })),
+  };
+}
+
+export async function digest(since, now = new Date()) {
+  const until = now.toISOString();
+  const span = now.getTime() - Date.parse(since);
+  const prevSince = new Date(Date.parse(since) - span).toISOString();
+  const E = ev();
+
+  const { lastRun, watch } = await lastRuns();
 
   // ONE pass over [prevSince, until) answers the liveness line, this window's
   // totals and the previous window's session count. They were three queries
@@ -118,8 +132,8 @@ export async function digest(since, now = new Date()) {
   return {
     now: until,
     window: { since, hours: Math.round((span / 3600000) * 10) / 10, prev_since: prevSince },
-    last_run: lastRun ? { ...lastRun, findings: parse(lastRun.findings) } : null,
-    watch: watch.map((w) => ({ ...w, findings: parse(w.findings) })),
+    last_run: lastRun,
+    watch,
     alive: { last_event: tot?.last_event ?? null, n_window: num(tot?.n_window) ?? 0, n_prev: num(tot?.n_prev) ?? 0 },
     sessions: { window: num(tot?.sessions), prev: num(tot?.prev_sessions) },
     sessions_by_day: sessionsByDay.map((d) => ({ ...d, sessions: num(d.sessions), events: num(d.events), browsers: num(d.browsers) })),
@@ -150,6 +164,15 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     const url = new URL(req.url, 'http://x');
     const now = new Date();
+    if (url.searchParams.get('last') === '1') {
+      try {
+        const { lastRun, watch } = await lastRuns();
+        res.status(200).json({ now: now.toISOString(), last_run: lastRun, watch });
+      } catch (err) {
+        res.status(503).json({ error: 'rail_unreadable', reason: String(err?.message ?? 'unknown').slice(0, 60) });
+      }
+      return;
+    }
     let since = url.searchParams.get('since');
     // Default window: since the routine's own last run (brief §1.1), capped.
     if (!since || Number.isNaN(Date.parse(since))) since = new Date(now.getTime() - 72 * 3600000).toISOString();
