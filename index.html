@@ -892,6 +892,43 @@
       display: flex; flex-direction: column; align-items: center; gap: 16px;
       transform-origin: top left;
     }
+    /* ---- per-page control strip (js/v2/page-strip.js) ----
+       The stage is one scale(zoom) transform, so every length here is written in
+       --u = 1px / zoom (zoom is published on the stage by app.js): the strip
+       LAYS OUT at size/zoom and RENDERS at the same size at every zoom, while
+       its width stays the page's own layout width. --h is the strip and button
+       size in on-screen px: 36 with a mouse, 44 on a touch screen. */
+    .pv-slot { display: flex; flex-direction: column; flex: 0 0 auto; }
+    .pv-strip {
+      --u: calc(1px / var(--zoom, 1));
+      --h: 36;
+      box-sizing: border-box; width: 100%; flex: 0 0 auto;
+      display: flex; align-items: center; justify-content: space-between;
+      gap: calc(8 * var(--u));
+      height: calc(var(--h) * var(--u)); margin-bottom: calc(2 * var(--u));
+      color: var(--muted);
+      font-size: calc(12 * var(--u)); font-weight: 500; line-height: 1;
+    }
+    .pv-strip-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pv-strip-btns { flex: 0 0 auto; display: flex; align-items: center; gap: 0; }
+    .pv-strip button {
+      width: calc(var(--h) * var(--u)); height: calc(var(--h) * var(--u)); min-height: 0; padding: 0;
+      display: inline-flex; align-items: center; justify-content: center;
+      color: var(--muted); background: transparent; border: 0;
+      border-radius: calc(8 * var(--u)); cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .pv-strip button svg { width: calc(18 * var(--u)); height: calc(18 * var(--u)); pointer-events: none; }
+    .pv-strip button:active:not([aria-disabled="true"]) { background: rgba(26,29,33,.14); color: var(--ink); }
+    .pv-strip button:focus-visible { outline: calc(2 * var(--u)) solid var(--accent); outline-offset: calc(-2 * var(--u)); }
+    /* Unavailable, not absent (aria-disabled, never the disabled attribute): the
+       same muted, dimmed, not-red treatment as the Halaman bulk bar. */
+    .pv-strip button[aria-disabled="true"] { opacity: .35; cursor: not-allowed; }
+    @media (pointer: coarse) { .pv-strip { --h: 44; } }
+    @media (hover: hover) {
+      .pv-strip button:hover:not([aria-disabled="true"]) { background: rgba(26,29,33,.08); color: var(--ink); }
+      .pv-strip button[data-strip-act="delete"]:hover:not([aria-disabled="true"]) { color: #d33131; background: rgba(211,49,49,.09); }
+    }
 
     /* placeholder shimmer (telegraph: "loading", not "broken") */
     .pv-ph { overflow: hidden; }

@@ -42,6 +42,7 @@ import { createFormatBar } from './format-bar.js';
 import { createTextRunIndex, mapRunFont, MIN_HIT } from './text-runs.js';
 import { resolveTap, draftFontSize } from '../core/text-lines.js';
 import { createPageManager } from './page-manager.js';
+import { createPageStrips } from './page-strip.js';
 import { createSignatureModal } from './signature-modal.js';
 import { createDownloadSheet } from './download-sheet.js';
 import { track } from '../lib/analytics.js';
@@ -299,6 +300,10 @@ initFeedbackForm();
 const sizer = document.getElementById('v2-sizer');
 function applyZoom() {
   stage.style.transform = `scale(${zoom})`;
+  // The per-page strip (page-strip.js) divides its lengths by this so it renders
+  // at one size at every zoom. Set BEFORE the offset measurements below: the
+  // strip's layout height depends on it, and the sizer is built from that.
+  stage.style.setProperty('--zoom', String(zoom));
   // offsetWidth/Height are layout (pre-transform) sizes — scale them ourselves.
   sizer.style.width = Math.ceil(stage.offsetWidth * zoom) + 'px';
   sizer.style.height = Math.ceil(stage.offsetHeight * zoom) + 'px';
@@ -391,10 +396,22 @@ function setZoomAnchored(next, midX, midY) {
   // Content point under the midpoint, rescaled to the new zoom.
   const cx = (scrollEl.scrollLeft + mx) * (clamped / zoom);
   const cy = (scrollEl.scrollTop + my) * (clamped / zoom);
+  // The y axis is NOT linear in zoom any more: the per-page strips keep a
+  // constant on-screen height (page-strip.js), so a plain rescale of the content
+  // offset drifts by (strips above the point) x (strip height) x (1 - ratio).
+  // Anchor on the page under the midpoint instead: remember where the point sits
+  // inside that page (page-space px, which DO scale linearly) and put it back.
+  let ref = null;
+  for (const s of slots) { if (s.view.getBoundingClientRect().top <= midY) ref = s.view; else break; }
+  const refOffset = ref ? (midY - ref.getBoundingClientRect().top) / zoom : 0;
   zoom = clamped;
   applyZoom();
   scrollEl.scrollLeft = cx - mx;
-  scrollEl.scrollTop = cy - my;
+  if (ref && ref.isConnected) {
+    scrollEl.scrollTop += ref.getBoundingClientRect().top + refOffset * zoom - midY;
+  } else {
+    scrollEl.scrollTop = cy - my;
+  }
 }
 
 // ---- placement zoom: you cannot aim at what you cannot see ----------------------
@@ -732,7 +749,9 @@ function rebuildStage() {
       activeId: doc.selection.annotationId,
       label: tr('page.short', { n: i + 1 }),
     });
-    stage.appendChild(slot.view);
+    // The page view rides inside a .pv-slot wrapper with its control strip
+    // (page-strip.js); slot.view stays the .pv-page itself for everything else.
+    stage.appendChild(pageStrips.wrap(slot.view, page, i, doc.pages.length));
     return slot;
   });
   interaction.refreshSelection();
@@ -2523,6 +2542,10 @@ const pageManager = createPageManager({
   },
   toast,
 });
+// The per-page control strip above each page in the stage (↑ ↓ putar hapus). It
+// drives the SAME pageManager mutations as the sheet, so there is one behaviour.
+// rebuildStage() above calls it; it is only ever called after module start-up.
+const pageStrips = createPageStrips({ stage, scrollEl, getDoc: () => doc, pageManager });
 // THE ONLY WAY THE KELOLA-HALAMAN SHEET OPENS. Two affordances reach it — the
 // toolbar `Halaman` button and the File menu's `Atur Halaman` (his ruling
 // 2026-08-09: the double is fine because one of them sits inside a closed

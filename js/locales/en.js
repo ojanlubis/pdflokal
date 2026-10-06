@@ -301,6 +301,10 @@ export default {
 
   pm: {
     page: 'Page {n}',
+    moveUp: 'Move up',
+    moveDown: 'Move down',
+    rotate: 'Rotate',
+    delete: 'Delete page',
     use: 'Use ({n})',
     selected: '{count} selected',
     deleted: {

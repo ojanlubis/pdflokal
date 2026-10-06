@@ -22,6 +22,14 @@ import { record } from '../core/history.js';
 import { track } from '../lib/analytics.js';
 import { t as tr } from '../lib/i18n.js';
 
+// SINGLE SOURCE OF TRUTH for "unavailable, not absent": aria-disabled, never the
+// disabled attribute (a native-disabled button leaves the tab order). The bulk
+// bar below and the per-page strip (page-strip.js) both use it.
+export function setUnavailable(btn, off) {
+  if (off) btn.setAttribute('aria-disabled', 'true');
+  else btn.removeAttribute('aria-disabled');
+}
+
 const LONG_PRESS_MS = 280;
 const DRAG_SLOP = 8; // px of movement that cancels a pending long-press
 
@@ -209,11 +217,6 @@ export function createPageManager(deps) {
       grid.querySelector('.pm-tile:not(.pm-add)')?.focus();
     }
     clear.hidden = empty;
-  }
-
-  function setUnavailable(btn, off) {
-    if (off) btn.setAttribute('aria-disabled', 'true');
-    else btn.removeAttribute('aria-disabled');
   }
 
   // ---- FLIP reorder: grab a REAL page and move it -----------------------------------
@@ -424,14 +427,7 @@ export function createPageManager(deps) {
           // Commit: the model index = placeholder's position in the grid.
           const tiles = [...grid.querySelectorAll('.pm-tile:not(.pm-add):not(.pm-drag-ghost)')];
           const toIndex = tiles.indexOf(d.placeholder);
-          const doc = deps.getDoc();
-          const fromIndex = doc.pages.findIndex((p) => p.id === page.id);
-          if (toIndex !== -1 && toIndex !== fromIndex) {
-            record(deps.history, doc);
-            reorderPage(doc, page.id, toIndex);
-            track('editor_action', { action: 'reorder' });
-            deps.onDocChanged();
-          }
+          if (toIndex !== -1) movePage(page.id, toIndex);
           dragActive = false;
           render(); // rebuild clears all inline drag styles + flushes any parked render
         };
@@ -456,6 +452,53 @@ export function createPageManager(deps) {
     tile.addEventListener('pointercancel', end);
   }
 
+  // ---- the three page mutations: SINGLE SOURCE OF TRUTH -----------------------------
+  // The Halaman sheet (bulk bar, drag) AND the per-page strip in the main stage
+  // (page-strip.js) both come through here, so a click on either is the same
+  // act: one undo step, the same core op, the same telemetry name, the same
+  // thumbnail invalidation, the same toast. Each returns false when it did
+  // nothing (and then recorded nothing).
+  function movePage(pageId, toIndex) {
+    const doc = deps.getDoc();
+    const fromIndex = doc.pages.findIndex((p) => p.id === pageId);
+    if (fromIndex === -1 || toIndex === fromIndex || toIndex < 0 || toIndex >= doc.pages.length) return false;
+    record(deps.history, doc);
+    reorderPage(doc, pageId, toIndex);
+    track('editor_action', { action: 'reorder' });
+    deps.onDocChanged();
+    return true;
+  }
+
+  function rotatePages(ids) {
+    const doc = deps.getDoc();
+    const pages = doc.pages.filter((p) => ids.includes(p.id));
+    if (pages.length === 0) return false;
+    record(deps.history, doc);
+    for (const p of pages) {
+      rotatePage(doc, p.id, 90);
+      p.raster = null;             // raster is now the wrong orientation
+      thumbs.delete(p.id);         // thumb too
+    }
+    track('editor_action', { action: 'rotate' });
+    if (sheet.open) render();
+    deps.onDocChanged();
+    return true;
+  }
+
+  function deletePages(ids) {
+    const doc = deps.getDoc();
+    const pages = doc.pages.filter((p) => ids.includes(p.id));
+    // Deleting every page is blocked (an empty doc is a dead end, not a state).
+    if (pages.length === 0 || pages.length >= doc.pages.length) return false;
+    record(deps.history, doc);
+    for (const p of pages) { removePage(doc, p.id); thumbs.delete(p.id); selected.delete(p.id); }
+    track('editor_action', { action: 'delete_page' });
+    if (sheet.open) render();
+    deps.onDocChanged();
+    deps.toast(tr('pm.deleted', { count: pages.length }));
+    return true;
+  }
+
   // ---- bulk actions ---------------------------------------------------------------
   bulkBar.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-act]');
@@ -466,24 +509,9 @@ export function createPageManager(deps) {
     const pages = doc.pages.filter((p) => selected.has(p.id));
 
     if (act === 'rotate') {
-      record(deps.history, doc);
-      for (const p of pages) {
-        rotatePage(doc, p.id, 90);
-        p.raster = null;             // raster is now the wrong orientation
-        thumbs.delete(p.id);         // thumb too
-      }
-      track('editor_action', { action: 'rotate' });
-      render();
-      deps.onDocChanged();
+      rotatePages(pages.map((p) => p.id));
     } else if (act === 'delete') {
-      if (pages.length >= doc.pages.length) return; // guarded in UI as well
-      record(deps.history, doc);
-      for (const p of pages) { removePage(doc, p.id); thumbs.delete(p.id); }
-      selected.clear();
-      track('editor_action', { action: 'delete_page' });
-      render();
-      deps.onDocChanged();
-      deps.toast(tr('pm.deleted', { count: pages.length }));
+      deletePages(pages.map((p) => p.id));
     } else if (act === 'extract') {
       track('editor_action', { action: 'split' }); // old name kept: extract IS split
       deps.onExtract(pages);
@@ -502,6 +530,9 @@ export function createPageManager(deps) {
     openPick,
     close,
     render,
+    movePage,
+    rotatePages,
+    deletePages,
     invalidateThumbs,
     // Test hook only (tests/buka-baru-thumbs.spec.js): the thumb cache is
     // otherwise unobservable, and its leak-on-Buka-Baru regression needs a

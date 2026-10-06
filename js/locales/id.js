@@ -306,6 +306,12 @@ export default {
   // Kelola Halaman sheet (js/v2/page-manager.js)
   pm: {
     page: 'Halaman {n}',
+    // The per-page strip (js/v2/page-strip.js). rotate/delete reuse the bulk bar's
+    // own words ("Putar", "Hapus Halaman"); moveUp/moveDown are new.
+    moveUp: 'Pindah ke atas',
+    moveDown: 'Pindah ke bawah',
+    rotate: 'Putar',
+    delete: 'Hapus Halaman',
     use: 'Pakai ({n})',
     selected: '{count} dipilih',
     deleted: '{count} halaman dihapus. Salah? Tinggal Undo',

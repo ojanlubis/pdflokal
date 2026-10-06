@@ -29,6 +29,18 @@
 import { orderedForPaint, annotationZIndex } from '../core/annotation-order.js';
 import { t as tr } from '../lib/i18n.js';
 
+// SINGLE SOURCE OF TRUTH for a page's displayed size, in page-space px. It
+// swaps for 90/270 — the raster is rendered pre-rotated, so the view (and every
+// annotation coordinate) lives in the ROTATED frame. The per-page strip
+// (v2/page-strip.js) sizes itself from this so it is exactly as wide as the page.
+export function pageDisplaySize(page) {
+  const rotated = (page.rotation || 0) % 180 !== 0;
+  return {
+    width: rotated ? page.height : page.width,
+    height: rotated ? page.width : page.height,
+  };
+}
+
 // Render a full page view (background + annotation overlay).
 // opts.activeId = id of the currently-active annotation → rendered on top.
 // opts.label   = placeholder caption (e.g. "Hal 42").
@@ -37,11 +49,7 @@ export function renderPageView(page, opts = {}) {
   const view = document.createElement('div');
   view.className = 'pv-page';
   view.dataset.pageId = page.id;
-  // Displayed size swaps for 90/270 — the raster is rendered pre-rotated, so
-  // the view (and every annotation coordinate) lives in the ROTATED frame.
-  const rotated = (page.rotation || 0) % 180 !== 0;
-  const w = rotated ? page.height : page.width;
-  const h = rotated ? page.width : page.height;
+  const { width: w, height: h } = pageDisplaySize(page);
   view.style.cssText =
     `position:relative;flex:0 0 auto;width:${w}px;height:${h}px;` +
     'background:#fff;box-shadow:0 2px 12px rgba(63,49,35,.16);border-radius:2px';

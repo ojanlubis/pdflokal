@@ -986,7 +986,32 @@
     "text": "Halaman {n}",
     "src": [
       "js/mobile-ui.js",
-      "js/v2/page-manager.js"
+      "js/v2/page-manager.js",
+      "js/v2/page-strip.js"
+    ]
+  },
+  "pm.moveUp": {
+    "text": "Pindah ke atas",
+    "src": [
+      "js/v2/page-strip.js"
+    ]
+  },
+  "pm.moveDown": {
+    "text": "Pindah ke bawah",
+    "src": [
+      "js/v2/page-strip.js"
+    ]
+  },
+  "pm.rotate": {
+    "text": "Putar",
+    "src": [
+      "js/v2/page-strip.js"
+    ]
+  },
+  "pm.delete": {
+    "text": "Hapus Halaman",
+    "src": [
+      "js/v2/page-strip.js"
     ]
   },
   "pm.use": {
