@@ -107,4 +107,33 @@ test.describe('editor chrome — the merged row', () => {
     await page.click('[data-tool="whiteout"]');
     await expect(page.locator('[data-tool="whiteout"]')).toHaveAttribute('aria-pressed', 'true');
   });
+  test('phone: the header row has top breathing room, and --chrome-h still equals the header', async ({ page }) => {
+    // Unduh and the logo used to sit flush against the top of the screen (y=0).
+    // The padding is part of the chrome's height, so --chrome-h must carry it, or
+    // the format/signature bars (positioned at --chrome-h) land inside the toolbar.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await openEditor(page);
+    const m = await page.evaluate(() => {
+      const r = (s) => document.querySelector(s).getBoundingClientRect();
+      const probe = document.createElement('div');
+      probe.style.cssText = 'position:absolute;height:var(--chrome-h);width:1px;visibility:hidden';
+      document.body.appendChild(probe);
+      const chrome = probe.getBoundingClientRect().height;
+      probe.remove();
+      return { dl: r('#btn-download').top, brand: r('.brand').top, file: r('#btn-file').top,
+               hdrBottom: r('header').bottom, toolbarTop: r('#toolbar').top, chrome };
+    });
+    expect(m.dl, 'Unduh clear of the top edge').toBeGreaterThanOrEqual(10);
+    expect(m.brand).toBeGreaterThanOrEqual(10);
+    expect(m.file).toBeGreaterThanOrEqual(10);
+    expect(Math.round(m.chrome), '--chrome-h is the header height').toBe(Math.round(m.hdrBottom));
+    expect(m.toolbarTop, 'tool row sits below the Unduh row').toBeGreaterThan(m.dl + 30);
+  });
+
+  test('desktop: the merged row is untouched by the phone top padding', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await openEditor(page);
+    const h = await page.evaluate(() => document.querySelector('header').getBoundingClientRect().height);
+    expect(Math.round(h)).toBe(52); // --header-merged-h, as before
+  });
 });

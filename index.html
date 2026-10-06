@@ -529,7 +529,11 @@
          spelled `calc(var(--header-h) + var(--toolbar-h))` at each use site,
          which stopped being true the moment the two could share a row. One
          name, redefined once per breakpoint. */
-      --chrome-h: calc(var(--header-h) + var(--toolbar-h));
+      /* Top breathing room of the header row, phone only (set in the max-width:899px
+         block below; 0 on the merged row). It is part of the chrome's height, so
+         it is part of --chrome-h: the format and signature bars sit at that line. */
+      --hdr-top: 0px;
+      --chrome-h: calc(var(--header-h) + var(--toolbar-h) + var(--hdr-top));
       --header-merged-h: 52px;   /* the single-row height (tools are 36px + padding) */
     }
     /* Self-hosted fonts (preview parity with the PDF export) */
@@ -587,6 +591,13 @@
          row of its own; above it, everything stays on one line. No JS, no
          second element, no duplicated tool buttons to keep in sync. */
       flex-wrap: wrap;
+    }
+    /* Phone: Unduh, the logo and File sat flush against the top edge of the screen.
+       Same 10px as the side gutter, or the notch inset when that is larger (an
+       installed PWA on a notched phone). Desktop is the merged row and is untouched. */
+    @media (max-width: 899px) {
+      :root { --hdr-top: max(10px, env(safe-area-inset-top, 0px)); }
+      header { padding-top: var(--hdr-top); }
     }
     /* Narrow: the toolbar is a row of its own and carries the bottom edge, so
        the header must NOT also draw one — two borders read as a seam. */
