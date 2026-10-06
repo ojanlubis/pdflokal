@@ -25,6 +25,19 @@ export function nextId(prefix) {
 // Test-only: reset the counter so id assertions are deterministic per test.
 export function _resetIds() { _seq = 0; }
 
+// A document restored from the browser's saved copy (core/saved-docs.js) keeps
+// its ids verbatim: annotations reference each other by id (replaceCoverId,
+// ocrCoverId ...) and re-minting would mean rewriting every such field, one
+// forgotten reference away from a Ganti text that points at nothing. The cost
+// of keeping them is this: the counter must move past every id the restored
+// doc already holds, or the next createAnnotation in the session collides.
+export function reserveIds(ids) {
+  for (const id of ids) {
+    const n = Number(String(id).match(/_(\d+)$/)?.[1]);
+    if (Number.isFinite(n) && n > _seq) _seq = n;
+  }
+}
+
 // A source file — the ONLY place raw bytes live. Pages reference it by id.
 // `encrypted` — this source carries a PDF standard-security handler. PDF.js
 // decrypts for VIEWING, so these documents open and render perfectly; pdf-lib

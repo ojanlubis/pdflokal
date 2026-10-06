@@ -336,7 +336,8 @@ test('scheduler: a change that lands WHILE a save runs is saved afterwards, neve
   assert.equal(runs, 1);
   s.touch(); await T.advance(1000);
   assert.equal(runs, 1, 'two saves must never overlap');
-  release(); await T.advance(1000);
+  release(); await T.advance(0); // let the first save finish before time moves on
+  await T.advance(1000);
   assert.equal(runs, 2);
 });
 
