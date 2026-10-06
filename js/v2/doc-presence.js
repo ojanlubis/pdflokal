@@ -26,7 +26,7 @@ const CHANNEL = 'pdflokal-doc-presence';
 
 export function createPresence({
   locks = globalThis.navigator?.locks,
-  makeChannel = (name) => (typeof BroadcastChannel === 'function' ? new BroadcastChannel(name) : null),
+  makeChannel = (name) => (typeof globalThis.BroadcastChannel === 'function' ? new globalThis.BroadcastChannel(name) : null),
   wait = 150, // how long a channel "who has what?" waits for answers
 } = {}) {
   const mine = new Set();

@@ -58,7 +58,7 @@ export class SavedDocError extends Error {
 // A deep, independent copy. structuredClone where it exists; the JSON fallback is
 // safe because a saved state is plain data by construction (that is tested).
 function clonePlain(value) {
-  if (typeof structuredClone === 'function') return structuredClone(value);
+  if (typeof globalThis.structuredClone === 'function') return globalThis.structuredClone(value);
   return JSON.parse(JSON.stringify(value));
 }
 
