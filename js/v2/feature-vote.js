@@ -15,10 +15,12 @@
  *   2. choose   no photo; a real checkbox per option (at most 3), the idea box, "Kirim pilihan"
  *   3. done     his one thanks line (it also promises "dikabari di sini"), the top 3 (names only), the coffee ask, Tutup
  *
- * WHEN IT SHOWS (core/features.js shouldOfferVote, wired by celebrate.js): after
- * EVERY successful whole-document download, until "Nanti aja"; after that at most
- * once a day; never after a vote. Never over another card or dialog (checked at the
- * moment of showing; a skipped moment is simply asked again on the next download).
+ * WHEN IT SHOWS (core/features.js shouldOfferVote, wired by celebrate.js): the
+ * moment a whole-document download completes, and it REPLACES the share/coffee card
+ * for that download (the coffee ask is step 3). After EVERY such download, until
+ * "Nanti aja"; after that at most once a day; never after a vote; not without a
+ * visitor_id. Never over another card or dialog: if one is up, the vote is simply not
+ * offered for that download (and the share card behaves as it always did).
  * A close with no vote from this door, by any route (Escape, the x, a click outside),
  * is the same answer as "Nanti aja": a modal the person had to dismiss and that came
  * straight back on the next download would be a nag. The menu link
@@ -56,16 +58,11 @@ import {
 } from '../core/features.js';
 import { isVoted, nantiDay, rememberNanti, rememberVote } from './vote-memory.js';
 
-// The BERES stamp lands 1.2s after a download and lasts 3s (celebrate.js). A modal
-// opened over it would bury the one moment this product rewards, so the card
-// waits for the stamp to clear.
-export const SHOW_DELAY_MS = 4400;
-const POLL_MS = 500;
-const MAX_WAIT_MS = 25000;
+const SHEET_WAIT_MS = 600;
 
 // Everything that is already on screen and must not share it with the vote: any
 // open dialog (the Unduh sheet, the feedback form...) and the page's cards.
-const OCCUPANTS = 'dialog[open], #support-card.show, #install-card.show, #bug-prompt.show, #vote-card.show';
+const OCCUPANTS = 'dialog[open]:not(#dl-sheet), #support-card.show, #install-card.show, #bug-prompt.show, #vote-card.show';
 
 // Pure: the top three FEATURE IDS from api/votes.js's counts, most first, ties in
 // list order, zero-vote features never shown. [] when there is nothing to rank.
@@ -97,6 +94,7 @@ export function createFeatureVote() {
   const ideaEl = $('#fv-idea');
   const countEl = $('#fv-count');
   const errorEl = $('#fv-error');
+  const inviteTitle = $('#fv-invite-title');
   const inviteText = $('#fv-invite-text');
   const titleEl = $('#fv-title');
   const doneHead = $('#fv-done-head');
@@ -104,16 +102,12 @@ export function createFeatureVote() {
   const topEl = $('.fv-top');
   const coffeeEl = $('.fv-coffee');
   if (!dlg || !steps.invite || !steps.choose || !steps.done || !list || !sendBtn || !ideaEl || !countEl
-    || !errorEl || !inviteText || !titleEl || !doneHead || !topWrap || !topEl || !coffeeEl) return noop;
+    || !errorEl || !inviteTitle || !inviteText || !titleEl || !doneHead || !topWrap || !topEl || !coffeeEl) return noop;
 
   // ---- the words (every string is a featureVote.* key; the call sites are literal) ----
   const setText = (sel, text) => { const el = $(sel); if (el) el.textContent = text; };
-  const lines = tr('featureVote.invite');
-  inviteText.replaceChildren(...(Array.isArray(lines) ? lines : [String(lines)]).map((l) => {
-    const p = document.createElement('p'); // textContent, never innerHTML
-    p.textContent = l;
-    return p;
-  }));
+  inviteTitle.textContent = tr('featureVote.inviteTitle');
+  inviteText.textContent = tr('featureVote.invite');
   setText('.fv-start', tr('featureVote.start'));
   for (const el of dlg.querySelectorAll('[data-fv-later]')) el.textContent = tr('featureVote.later');
   titleEl.textContent = tr('featureVote.title');
@@ -161,7 +155,7 @@ export function createFeatureVote() {
   // One step visible at a time; the dialog is named by the step's own heading.
   function showStep(name) {
     for (const [k, el] of Object.entries(steps)) el.hidden = k !== name;
-    const head = { invite: inviteText, choose: titleEl, done: doneHead }[name];
+    const head = { invite: inviteTitle, choose: titleEl, done: doneHead }[name];
     dlg.setAttribute('aria-labelledby', head.id);
     return head;
   }
@@ -306,42 +300,45 @@ export function createFeatureVote() {
 
   return {
     // Called by celebrate.js on EVERY successful download; `whole` is true only for
-    // the whole document (not a picked subset). Returns true when the card takes
-    // this download's moment, so celebrate.js withholds the share/coffee card from
-    // the rest of the session.
+    // the whole document (not a picked subset). Returns true when the card TAKES this
+    // download's moment, and the share/coffee card then does not show for it (his
+    // ruling 2026-10-06: "begitu selesai download itu muncul, ngereplace share card
+    // dan traktir kopi"). It opens at once, with no wait for the BERES stamp (a
+    // body-level stamp paints under a top-layer dialog, so the dialog wins) and no
+    // wait for other cards: if one is on screen the vote simply is not offered for
+    // this download and the share card behaves as it always did.
     maybeShow({ whole, supportShownThisSession }) {
       // No visitor_id means no ballot can be held (one per visitor_id): do not invite.
       if (telemetry.hasVisitorId?.() === false) return false;
       if (pending || !shouldOfferVote({
         whole, voted: isVoted(), nantiDay: nantiDay(), today: dayKey(), supportShownThisSession,
       })) return false;
+      if (document.querySelector(OCCUPANTS)) return false;
       pending = true;
-      // Never over another dialog or card: wait for it to clear (the bug-report
-      // card appears with the first download of a day and leaves on its own after
-      // 9s), up to MAX_WAIT_MS, then give up WITHOUT answering for the person: the
-      // next download asks again. Re-checked at the moment of showing, because the
-      // answer can change in the seconds this waited.
-      const fire = (waited = 0) => {
-        if (document.querySelector(OCCUPANTS)) {
-          if (waited < MAX_WAIT_MS) setTimeout(() => fire(waited + POLL_MS), POLL_MS);
-          else pending = false;
-          return;
-        }
+      const go = () => {
+        if (!pending) return;
         pending = false;
+        if (document.querySelector(OCCUPANTS)) return; // something took the screen in the meantime
         open('auto');
       };
-      const arm = () => setTimeout(() => fire(), SHOW_DELAY_MS);
-      // A download is exactly when Android hides the tab behind its own sheet; a
-      // dialog opened into a hidden tab is a dialog nobody saw (see
-      // bug-report-prompt.js, which learned this the hard way).
-      if (document.hidden) {
+      // The Unduh sheet is closing in this same breath; opening after its `close`
+      // keeps the sheet's own focus restore from landing on this dialog. A short
+      // cap, so a sheet that never closes cannot hold the vote back.
+      const sheet = document.getElementById('dl-sheet');
+      if (sheet?.open) {
+        sheet.addEventListener('close', go, { once: true });
+        setTimeout(go, SHEET_WAIT_MS);
+      } else if (document.hidden) {
+        // A download is exactly when Android hides the tab behind its own sheet; a
+        // dialog opened into a hidden tab is a dialog nobody saw (see
+        // bug-report-prompt.js, which learned this the hard way).
         const onVisible = () => {
           if (document.hidden) return;
           document.removeEventListener('visibilitychange', onVisible);
-          arm();
+          go();
         };
         document.addEventListener('visibilitychange', onVisible);
-      } else arm();
+      } else go();
       return true;
     },
     open,

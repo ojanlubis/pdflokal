@@ -329,8 +329,10 @@ export default {
   // "fix"). Every other string is a DRAFT: the seat wrote it through the
   // copywriting skill, reference/vote-v2-copy-draft-2026-10-06.md, and he edits.
   featureVote: {
-    // DRAFT-APPROVED-BY-HIM (step 1, his voice; one line per <p>)
-    invite: ['Halo guyss.', 'Mau bikin fitur baru tp bingung fiturnya apa.', 'Bantu voting doong... makasii'],
+    // DRAFT-APPROVED-BY-HIM (step 1, his words verbatim, 2026-10-06 evening: spelling and
+    // lowercase are his; the header he typed "PDF Lokal", the brand is written PDFLokal)
+    inviteTitle: 'Voting Fitur PDFLokal',
+    invite: 'Halo guyss. Mau bikin fitur baru tp bingung apaan. Bantu voting doong. terimakasii',
     start: 'Pilih fitur', // DRAFT
     later: 'Nanti aja', // DRAFT
     title: 'Fitur apa yang kamu butuh?', // DRAFT

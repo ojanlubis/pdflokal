@@ -216,13 +216,13 @@ export function createCelebration(deps) {
       // share/tip card runs as usual — so voters still get the normal invite.
       if (PLAYSTORE_CAMPAIGN && vote.maybeShow()) return;
       // The feature vote follows EVERY whole-document download until "Nanti aja",
-      // then at most once a day, never after a vote (core/features.js). It is due
-      // ahead of the share/tip card, which has its own daily cap and is the vote's
-      // last step anyway (the coffee ask after sending), and never after that card
-      // in the same session. When it takes the moment the card stands down for it.
+      // then at most once a day, never after a vote (core/features.js). When it is
+      // offered it opens AT ONCE and REPLACES the share/tip card for this download
+      // (his ruling 2026-10-06); its last step carries the coffee ask. When it is not
+      // offered (voted, "Nanti aja" today, no visitor_id, a partial download, another
+      // card up) this falls through and the share/tip card runs exactly as before.
       if (featureVote.maybeShow({ whole, supportShownThisSession: shownThisSession })) {
-        shownThisSession = true;
-        return;
+        return; // the share/tip card does not show for THIS download; its daily cap is untouched
       }
       // The share/tip invite, once per CALENDAR DAY (founder call, Jul 3) — a gentle
       // reminder that free has a sponsor, never a toll booth per file. (Install lives

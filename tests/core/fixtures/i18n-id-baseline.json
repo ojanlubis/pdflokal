@@ -1089,11 +1089,7 @@
     ]
   },
   "featureVote.invite": {
-    "text": [
-      "Halo guyss.",
-      "Mau bikin fitur baru tp bingung fiturnya apa.",
-      "Bantu voting doong... makasii"
-    ],
+    "text": "Halo guyss. Mau bikin fitur baru tp bingung apaan. Bantu voting doong. terimakasii",
     "src": [
       "js/v2/feature-vote.js"
     ]
@@ -1184,6 +1180,12 @@
     "src": [
       "js/v2/feature-vote.js",
       "js/v2/maker-card.js"
+    ]
+  },
+  "featureVote.inviteTitle": {
+    "text": "Voting Fitur PDFLokal",
+    "src": [
+      "js/v2/feature-vote.js"
     ]
   }
 }

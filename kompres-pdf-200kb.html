@@ -679,8 +679,7 @@
     /* ⚠️ `:not([hidden])`, same trap as .fb-body: a bare display:flex beats [hidden]. */
     .fv-step:not([hidden]) { display: flex; flex-direction: column; gap: var(--sp-16); min-height: 0; }
     /* step 1: the invitation */
-    .fv-invite-text { display: flex; flex-direction: column; gap: var(--sp-8); }
-    .fv-invite-text:focus { outline: none; }
+    .fv-invite-text { display: flex; flex-direction: column; gap: var(--sp-12); }
     .fv-invite-text p { margin: 0; font-size: var(--fs-1); line-height: 1.4; color: var(--ink); }
     /* His photo, with the engraved top hat (images/topi.svg, images/ojan.jpg) exactly
        as the maker card wears it, only larger. The padding is room for the hat INSIDE
@@ -2742,10 +2741,13 @@
        download until "Nanti aja", then at most daily; never after voting; always from
        the "Usulkan fitur" nav / drawer link. #fv-form is BLOCKED in session replay
        (the idea is a user-typed note). -->
-  <dialog id="fv-form" aria-labelledby="fv-invite-text">
+  <dialog id="fv-form" aria-labelledby="fv-invite-title">
     <div class="sheet fv-sheet">
       <div class="fv-step fv-invite" data-fv-step="invite">
-        <div id="fv-invite-text" class="fv-invite-text" tabindex="-1"></div>
+        <div class="fv-invite-text">
+          <h2 id="fv-invite-title" class="fv-title" tabindex="-1"></h2>
+          <p id="fv-invite-text"></p>
+        </div>
         <div class="fv-kepala">
           <img class="fv-topi" src="/images/topi.svg" alt="" aria-hidden="true" width="26" height="23">
           <img src="/images/ojan.jpg" alt="Foto Fauzan Ahladzikri (Ojan)" class="fv-face" width="96" height="96">

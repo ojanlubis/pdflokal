@@ -322,7 +322,8 @@ export default {
   // for word; all DRAFT until he reads them (the step-1 and after-vote lines follow
   // his casual tone: his Indonesian is the source).
   featureVote: {
-    invite: ['Hey guys.', "I want to build a new feature but I can't decide which one.", 'Help me vote pleaseee... thankss'],
+    inviteTitle: 'Feature vote',
+    invite: "Hey guys. I want to build a new feature but I can't decide what. Help me vote pleaseee. thankss",
     start: 'Pick features',
     later: 'Maybe later',
     title: 'Which features do you need?',
