@@ -29,6 +29,27 @@ import { getLocale } from './lib/i18n.js';
 
 export const UPDATES = [
   {
+    id: '2026-10-06-tinggalkan-tab',
+    date: '2026-10-06',
+    text: 'Browser sekarang ngingetin kamu kalau mau nutup tab sebelum editan diunduh.',
+    en: "Your browser now warns you before closing a tab with edits you haven't downloaded.",
+    approved: true, // Fauzan, 2026-10-06
+  },
+  {
+    id: '2026-10-06-copy-paste',
+    date: '2026-10-06',
+    text: 'Sekarang kamu bisa copy-paste teks, tip-ex, dan tanda tangan pakai Ctrl+C dan Ctrl+V.',
+    en: 'You can now copy and paste text, whiteout and signatures with Ctrl+C and Ctrl+V.',
+    approved: true, // Fauzan, 2026-10-06
+  },
+  {
+    id: '2026-10-06-ctrl-b-i',
+    date: '2026-10-06',
+    text: 'Ctrl+B dan Ctrl+I sekarang bikin teks tebal dan miring.',
+    en: 'Ctrl+B and Ctrl+I now make text bold and italic.',
+    approved: true, // Fauzan, 2026-10-06
+  },
+  {
     id: '2026-10-02-hapus-tulisan-asli',
     date: '2026-10-02',
     text: 'Sekarang kamu bisa hapus tulisan asli PDF: nyalain Hapus, terus tap barisnya.',
