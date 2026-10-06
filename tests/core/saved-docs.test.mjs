@@ -28,7 +28,7 @@ import {
 } from '../../js/core/operations.js';
 import {
   SAVED_VERSION, AUTOSAVE_KEEP, serializeDoc, deserializeDoc, SavedDocError,
-  autosaveEvictions, reopenCandidate, createAutosaveScheduler, needsSafariNote, storageFailureKind,
+  autosaveEvictions, reopenCandidate, createAutosaveScheduler, needsSafariNote, storageFailureKind, blobOf,
 } from '../../js/core/saved-docs.js';
 
 const bytes = (...n) => new Uint8Array(n);
@@ -207,6 +207,22 @@ test('blobs: one per source, the SAME bytes, never a view that drags a whole buf
   const first = blobs.find((b) => b.sourceId === doc.sources[0].id);
   assert.deepEqual([...new Uint8Array(first.bytes)], [10, 11, 12, 13]);
   assert.equal(first.bytes.byteLength, 4, 'a view was stored with its whole backing buffer');
+});
+
+test('haveBytes: sources already stored are left out of the blobs, so an autosave does not re-copy the file', () => {
+  const { doc } = editedDoc();
+  const [a, b] = doc.sources;
+  const { state, blobs } = serializeDoc(doc, { name: 'x', haveBytes: new Set([a.id]) });
+  assert.deepEqual(blobs.map((x) => x.sourceId), [b.id]);
+  assert.equal(state.sources.length, 2, 'the state still names every source');
+  assert.equal(blobOf(a).bytes.byteLength, 4);
+});
+
+test('scheduler: run() starts synchronously inside flush(), so it reads the doc before it is replaced', () => {
+  let started = false;
+  const s = createAutosaveScheduler({ run: () => { started = true; return new Promise(() => {}); }, setTimer: () => 1, clearTimer: () => {} });
+  s.touch(); s.flush();
+  assert.equal(started, true);
 });
 
 // ---- restore: ids and validation -----------------------------------------------------

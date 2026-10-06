@@ -70,8 +70,17 @@ function ownBuffer(bytes) {
   return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
 }
 
+// One source's bytes as a blob record. Exported so the caller can build the rest
+// on demand (the store asked for bytes it does not have: see saved-store.js).
+export function blobOf(source) {
+  return { sourceId: source.id, bytes: ownBuffer(source.bytes) };
+}
+
 // -> { state, blobs: [{ sourceId, bytes: ArrayBuffer }] }. Pure; never touches `doc`.
-export function serializeDoc(doc, { name = '' } = {}) {
+// `haveBytes` (a Set of source ids): sources whose bytes are already stored for
+// this entry. They are left OUT of `blobs`, which is what makes an autosave cheap:
+// copying a 40 MB PDF's bytes to write them a second time is the cost to avoid.
+export function serializeDoc(doc, { name = '', haveBytes = new Set() } = {}) {
   const state = {
     v: SAVED_VERSION,
     name: String(name),
@@ -87,7 +96,7 @@ export function serializeDoc(doc, { name = '' } = {}) {
       return { ...kept, annotations: clonePlain(p.annotations) };
     }),
   };
-  const blobs = doc.sources.map((s) => ({ sourceId: s.id, bytes: ownBuffer(s.bytes) }));
+  const blobs = doc.sources.filter((s) => !haveBytes.has(s.id)).map(blobOf);
   return { state, blobs };
 }
 
@@ -201,8 +210,12 @@ export function createAutosaveScheduler({
   function go() {
     dirty = false;
     running = true;
-    Promise.resolve()
-      .then(run)
+    // run() is CALLED synchronously: its first lines read the live document, and a
+    // flush() that precedes "Buka Baru" must see the doc it is flushing, not the
+    // empty one that replaces it a moment later.
+    let started;
+    try { started = Promise.resolve(run()); } catch (err) { started = Promise.reject(err); }
+    started
       .catch((err) => { try { onError(err); } catch { /* reporting never breaks saving */ } })
       .finally(() => { running = false; if (dirty && timer == null) arm(); });
   }
