@@ -342,3 +342,31 @@ test('dirty: markChanged (an un-undoable mutation) dirties; settle() takes back 
   assert.equal(canUndo(h), true, 'undo behaviour is unchanged by settle');
   settle(createHistory());      // empty stack: no throw, nothing to do
 });
+
+// ---- onChange: the autosave hook (specs/spec-simpan-editan.md) ------------------------
+// "Every recorded change" — record, undo, redo and a non-undoable markChanged — and
+// nothing else. markClean (a download) and settle (a backed-out gesture) change no
+// document state, so they must not wake the autosave.
+test('onChange fires for record/undo/redo/markChanged and not for markClean or settle', () => {
+  const doc = docWithTwoPages();
+  let n = 0;
+  const h = createHistory(undefined, { onChange: () => { n++; } });
+  record(h, doc); assert.equal(n, 1);
+  undo(h, doc); assert.equal(n, 2);
+  redo(h, doc); assert.equal(n, 3);
+  markChanged(h); assert.equal(n, 4);
+  markClean(h); assert.equal(n, 4, 'a download is not a document change');
+  record(h, doc); const before = n;
+  settle(h); assert.equal(n, before, 'settle only rewinds a serial');
+  assert.equal(undo(createHistory(undefined, { onChange: () => { n++; } }), doc), false);
+  assert.equal(n, before, 'an undo with nothing to undo changed nothing');
+});
+
+test('onChange is optional, and a throwing listener cannot break an edit', () => {
+  const doc = docWithTwoPages();
+  const h = createHistory();
+  record(h, doc);
+  const h2 = createHistory(undefined, { onChange: () => { throw new Error('boom'); } });
+  assert.doesNotThrow(() => record(h2, doc));
+  assert.equal(h2.undoStack.length, 1);
+});
