@@ -3007,6 +3007,23 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
   ed.addEventListener('blur', commit);
   ed.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ed.blur(); }
+    // Ctrl/Cmd+B / I = the format bar's buttons, for the WHOLE box. WHY
+    // preventDefault always: the browser's native contenteditable bold styles
+    // only the selection and is read back with textContent on commit, so it was
+    // silently lost. WHY toggle only when !editingIsReplace: a Ganti draft hides
+    // the format bar (founder ruling: editing != redefining), and with no
+    // annotation yet the toggle would rewrite the sticky defaults behind it.
+    // Ctrl/Cmd+U: no underline feature, so swallow the native one.
+    if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+      const mk = e.key.toLowerCase();
+      if (mk === 'b' || mk === 'i' || mk === 'u') {
+        e.preventDefault();
+        if (!editingIsReplace) {
+          if (mk === 'b') formatBar.toggleBold();
+          else if (mk === 'i') formatBar.toggleItalic();
+        }
+      }
+    }
     // Escape = back out. Restore what the editor OPENED with, so commit()'s
     // no-op guards absorb it: the annotation's own text, or a RE-EDIT's
     // prefill (draft.text). Restoring '' on a re-edit would read as a
@@ -3190,6 +3207,11 @@ document.addEventListener('keydown', (e) => {
   if (mod && key === 'z') { e.preventDefault(); e.shiftKey ? doRedo() : doUndo(); }
   else if (mod && key === 'y') { e.preventDefault(); doRedo(); }
   else if (mod && key === 's') { e.preventDefault(); doDownload(); }
+  else if (mod && !e.altKey && (key === 'b' || key === 'i') && selectedTextAnno()) {
+    // Same as the format bar's B / I (preventDefault: Firefox opens bookmarks on Ctrl+B).
+    e.preventDefault();
+    if (key === 'b') formatBar.toggleBold(); else formatBar.toggleItalic();
+  }
   else if ((e.key === 'Delete' || e.key === 'Backspace') && doc.selection.annotationId) {
     e.preventDefault(); deleteSelected();
   } else if (e.key === 'Escape') {

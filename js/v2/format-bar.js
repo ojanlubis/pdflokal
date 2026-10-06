@@ -176,8 +176,13 @@ export function createFormatBar(deps) {
     sizeIn.placeholder = '';
     commitSize();
   });
-  boldBtn.addEventListener('click', () => apply({ bold: !(deps.getTarget() || defaults).bold }));
-  italicBtn.addEventListener('click', () => apply({ italic: !(deps.getTarget() || defaults).italic }));
+  // SINGLE SOURCE OF TRUTH for bold/italic: the buttons AND the Ctrl/Cmd+B/I
+  // shortcuts (app.js) both come through here, so a shortcut can never differ
+  // from the button in scope (whole box), undo step, or aria-pressed state.
+  function toggleBold() { apply({ bold: !(deps.getTarget() || defaults).bold }); }
+  function toggleItalic() { apply({ italic: !(deps.getTarget() || defaults).italic }); }
+  boldBtn.addEventListener('click', toggleBold);
+  italicBtn.addEventListener('click', toggleItalic);
   for (const s of swatches) s.addEventListener('click', () => apply({ color: s.dataset.color }));
   // 'input' fires while dragging inside the OS picker → live preview on the text.
   customColor.addEventListener('input', () => apply({ color: customColor.value }));
@@ -199,5 +204,7 @@ export function createFormatBar(deps) {
       reflect(anno || defaults);
     },
     getDefaults: () => ({ ...defaults }),
+    toggleBold,
+    toggleItalic,
   };
 }
