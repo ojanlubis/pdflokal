@@ -73,31 +73,83 @@ function restore(history, doc, snap) {
 // `carryRaster(raster, page)` (optional) -> boolean: may a live raster stand in
 // for a restored page? Supplied by the app (core/raster-key.js); this module
 // stays ignorant of what a raster shows.
-export function createHistory(limit = DEFAULT_LIMIT, { carryRaster = null } = {}) {
-  return { undoStack: [], redoStack: [], limit, carryRaster };
+// `onDirtyChange(dirty)` (optional): called when "has changes since the last
+// markClean" flips, never otherwise. The app hangs the leave-site guard on it.
+//
+// DIRTY IS AN ID, NOT A FLAG. Every state the doc passes through between
+// record() calls has a serial; `current` is the live one, `cleanId` the one
+// last handed to the user as a file. Each snapshot carries the serial of the
+// state it holds, so undo/redo move `current` back and forth along the same
+// ids and "undo back to exactly the downloaded state" is clean again for free.
+// A flag could not do that: it would stay dirty after the undo.
+export function createHistory(limit = DEFAULT_LIMIT, { carryRaster = null, onDirtyChange = null } = {}) {
+  return {
+    undoStack: [], redoStack: [], limit, carryRaster,
+    current: 0, cleanId: 0, nextId: 1, wasDirty: false, onDirtyChange,
+  };
+}
+
+function syncDirty(history) {
+  const dirty = history.current !== history.cleanId;
+  if (dirty === history.wasDirty) return;
+  history.wasDirty = dirty;
+  if (history.onDirtyChange) history.onDirtyChange(dirty);
 }
 
 // Call BEFORE mutating. Clears redo (no branching timelines).
 export function record(history, doc) {
-  history.undoStack.push(snapshot(doc));
+  history.undoStack.push({ ...snapshot(doc), id: history.current });
   if (history.undoStack.length > history.limit) history.undoStack.shift();
   history.redoStack.length = 0;
+  history.current = history.nextId++;
+  syncDirty(history);
 }
 
 export function undo(history, doc) {
   const snap = history.undoStack.pop();
   if (!snap) return false;
-  history.redoStack.push(snapshot(doc));
+  history.redoStack.push({ ...snapshot(doc), id: history.current });
   restore(history, doc, snap);
+  history.current = snap.id;
+  syncDirty(history);
   return true;
 }
 
 export function redo(history, doc) {
   const snap = history.redoStack.pop();
   if (!snap) return false;
-  history.undoStack.push(snapshot(doc));
+  history.undoStack.push({ ...snapshot(doc), id: history.current });
   restore(history, doc, snap);
+  history.current = snap.id;
+  syncDirty(history);
   return true;
+}
+
+export function isDirty(history) { return history.current !== history.cleanId; }
+
+// The doc as it is NOW is the one the user has in a file (or just opened).
+export function markClean(history) {
+  history.cleanId = history.current;
+  syncDirty(history);
+}
+
+// A mutation that is NOT undoable and so never went through record() (merging
+// another file into the open doc). Gives the live state a serial no file has.
+export function markChanged(history) {
+  history.current = history.nextId++;
+  syncDirty(history);
+}
+
+// A gesture that record()ed and then backed out leaving the doc exactly as it
+// was (Ganti: the cover is placed after record(), removed again on Escape). The
+// undo entry stays — undo behaviour is unchanged — but the state is the one
+// before it, so the serial goes back too. Call ONLY when nothing else changed
+// since that record().
+export function settle(history) {
+  const top = history.undoStack.at(-1);
+  if (!top) return;
+  history.current = top.id;
+  syncDirty(history);
 }
 
 export function canUndo(history) { return history.undoStack.length > 0; }

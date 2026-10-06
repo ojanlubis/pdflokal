@@ -23,7 +23,8 @@ import {
   addAnnotation, removeAnnotation, updateAnnotation, clearSelection, selectAnnotation,
   moveAnnotation, normalizePageWidths, duplicateAnnotation,
 } from '../core/operations.js';
-import { createHistory, record, undo, redo, canUndo, canRedo } from '../core/history.js';
+import { createHistory, record, undo, redo, canUndo, canRedo, markClean, markChanged, settle } from '../core/history.js';
+import { setLeaveGuard } from './leave-guard.js';
 import { rasterFitsShape, rasterIsCurrent } from '../core/raster-key.js';
 import { importPdf, importImage, createPageRasterizer, probeTextLayer, pdfLibLoadError } from '../core/import.js';
 import {
@@ -127,7 +128,7 @@ function deviceClass() {
 
 // ---- state (ONE doc, ONE history — everything else is DOM or derived) -------
 let doc = createDoc(); // replaced wholesale by "Buka Baru" (File menu)
-const history = createHistory(undefined, { carryRaster: rasterFitsShape });
+const history = createHistory(undefined, { carryRaster: rasterFitsShape, onDirtyChange: setLeaveGuard });
 let slots = [];
 let rasterizer = null;
 let zoom = 1;
@@ -1810,7 +1811,7 @@ async function smartReplace(pageId, x, y) {
     replaceCoverId: cover.id,
     // Backing out (Escape / empty commit) must not leave a mute cover over
     // the original words — the cover belongs to the replace, not to itself.
-    onCancel: () => { removeAnnotation(doc, cover.id); syncPage(pageId); },
+    onCancel: () => { removeAnnotation(doc, cover.id); settle(history); syncPage(pageId); },
   };
   openTextEditor({ pageId, x: line.x, y: line.y, anno: null, draft });
   // Disarm NOW, not at commit (founder ruling, Jul 18 phone test): with the
@@ -1844,7 +1845,7 @@ function openBlockReplace(pageId, line, plan) {
     fontFamily: mapRunFont(line.fontFamily, line.fontName),
     recorded: true,
     replaceCoverId: cover.id,
-    onCancel: () => { removeAnnotation(doc, cover.id); syncPage(pageId); },
+    onCancel: () => { removeAnnotation(doc, cover.id); settle(history); syncPage(pageId); },
     block: plan,
   };
   openTextEditor({ pageId, x: plan.disp.x, y: plan.box.y, anno: null, draft });
@@ -1912,7 +1913,7 @@ function ocrReplace(pageId, line) {
     fontFamily: 'Helvetica',
     recorded: true,
     ocrCoverId: cover.id,
-    onCancel: () => { removeAnnotation(doc, cover.id); syncPage(pageId); },
+    onCancel: () => { removeAnnotation(doc, cover.id); settle(history); syncPage(pageId); },
   };
   openTextEditor({ pageId, x: line.x, y: line.y, anno: null, draft });
   setTool('select'); // disarm now, not at commit — same founder ruling as smartReplace
@@ -3622,6 +3623,7 @@ async function loadFilesInner(files) {
   // gabungkan_used fired on page-manager open, which also covers split/reorder/
   // delete; this is the clean, merge-only signal the first-party rail lacked.
   if (!firstLoad && doc.pages.length > pagesBefore) {
+    markChanged(history); // a merge is not undoable, so it never went through record()
     tel('tool_use', { tool: 'gabung', action: 'merge' });
   }
   // Honest close-out: skips take priority over the merge tally — the user needs to
@@ -3830,6 +3832,7 @@ async function resetDoc() {
   doc = createDoc();
   history.undoStack.length = 0;
   history.redoStack.length = 0;
+  markClean(history); // a fresh doc has nothing to lose; takes the leave guard down
   // Page ids are module-global monotonic (core/model.js's _seq) — the old
   // doc's thumbnail cache entries can never be hit again OR evicted, so
   // without this they are pure retained garbage, megabytes per Buka Baru on
@@ -3880,6 +3883,8 @@ const downloadSheet = createDownloadSheet({
   getBaseName: () => baseName,
   pickPages: (preselected) => pageManager.openPick(preselected),
   download,
+  // The whole document is now a file: nothing left to lose on leave.
+  onWholeDocExported: () => markClean(history),
   toast,
   // For export_intent's `device` prop. Injected rather than imported because
   // deviceClass() is app.js-local (it reads the live viewport), and the sheet
@@ -3903,6 +3908,8 @@ on('hc-cancel', 'click', () => {
   document.getElementById('home-confirm').close();
 });
 on('hc-go', 'click', () => {
+  // The user was just asked (this dialog); the browser's own prompt would be a second ask.
+  setLeaveGuard(false);
   // The wordmark's own href is this page's home ('/' or '/en'), so /en does not
   // send an English reader to the Indonesian page.
   window.location.assign(document.querySelector('a.ld-mark')?.getAttribute('href') || '/');

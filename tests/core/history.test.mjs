@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 
 import { createDoc, createSource, createPage, createAnnotation, _resetIds } from '../../js/core/model.js';
 import { addSource, addPages, removePage, reorderPage, rotatePage, addAnnotation, updateAnnotation, removeAnnotation, moveAnnotation, resizeAnnotation, selectAnnotation } from '../../js/core/operations.js';
-import { createHistory, record, undo, redo, canUndo, canRedo } from '../../js/core/history.js';
+import { createHistory, record, undo, redo, canUndo, canRedo, isDirty, markClean, markChanged, settle } from '../../js/core/history.js';
 import { rasterKey, rasterFitsShape, rasterIsCurrent } from '../../js/core/raster-key.js';
 
 function docWithTwoPages() {
@@ -282,4 +282,63 @@ test('rasterIsCurrent: a raster rendered for exactly this page is current', () =
   p.raster = fakeRaster(p);
   assert.equal(rasterIsCurrent(p.raster, p), true);
   assert.equal(rasterIsCurrent({ dataUrl: 'x', scale: 2 }, p), false, 'a raster with no provenance is never trusted');
+});
+
+// ---- dirty = "changed since the last file the user got" (leave-site guard) ----------------
+test('dirty: a fresh history is clean; record() makes it dirty and tells the listener once per flip', () => {
+  const doc = docWithTwoPages();
+  const flips = [];
+  const h = createHistory(50, { onDirtyChange: (d) => flips.push(d) });
+  assert.equal(isDirty(h), false);
+  record(h, doc);
+  record(h, doc);
+  assert.equal(isDirty(h), true);
+  assert.deepEqual(flips, [true], 'one flip, not one call per record');
+  markClean(h);
+  assert.equal(isDirty(h), false);
+  assert.deepEqual(flips, [true, false]);
+});
+
+test('dirty: undo back to exactly the downloaded state is clean; redo past it is dirty again', () => {
+  const doc = docWithTwoPages();
+  const h = createHistory();
+  record(h, doc); addAnnotation(doc, doc.pages[0].id, createAnnotation('text', { x: 1, y: 1, text: 'a' }));
+  markClean(h); // "downloaded" with one annotation
+  assert.equal(isDirty(h), false);
+  record(h, doc); addAnnotation(doc, doc.pages[0].id, createAnnotation('text', { x: 2, y: 2, text: 'b' }));
+  assert.equal(isDirty(h), true);
+  undo(h, doc);
+  assert.equal(isDirty(h), false, 'back on the downloaded state');
+  redo(h, doc);
+  assert.equal(isDirty(h), true);
+  undo(h, doc); undo(h, doc); // past it, to the pre-edit state
+  assert.equal(isDirty(h), true, 'a state that was never downloaded is dirty');
+  redo(h, doc);
+  assert.equal(isDirty(h), false);
+});
+
+test('dirty: a new edit after undoing past the clean state cannot alias it back to clean', () => {
+  const doc = docWithTwoPages();
+  const h = createHistory();
+  record(h, doc); addAnnotation(doc, doc.pages[0].id, createAnnotation('text', { x: 1, y: 1, text: 'a' }));
+  markClean(h);
+  undo(h, doc);                 // pre-edit state, dirty
+  record(h, doc); addAnnotation(doc, doc.pages[0].id, createAnnotation('text', { x: 5, y: 5, text: 'other' }));
+  assert.equal(isDirty(h), true, 'a different edit is not the downloaded one');
+  undo(h, doc);
+  assert.equal(isDirty(h), true, 'and its pre-state is the pre-edit state, still not the downloaded one');
+});
+
+test('dirty: markChanged (an un-undoable mutation) dirties; settle() takes back a recorded-then-cancelled gesture', () => {
+  const doc = docWithTwoPages();
+  const h = createHistory();
+  markChanged(h);
+  assert.equal(isDirty(h), true);
+  markClean(h);
+  record(h, doc);               // gesture starts...
+  assert.equal(isDirty(h), true);
+  settle(h);                    // ...and backs out with the doc untouched
+  assert.equal(isDirty(h), false);
+  assert.equal(canUndo(h), true, 'undo behaviour is unchanged by settle');
+  settle(createHistory());      // empty stack: no throw, nothing to do
 });

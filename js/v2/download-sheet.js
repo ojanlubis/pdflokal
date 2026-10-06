@@ -102,6 +102,7 @@ export function fmtMB(bytes) {
 //   modal, getDoc, getBaseName,
 //   pickPages: () => Promise<pageIds[]|null>   — opens Kelola Halaman in pick mode
 //   download: (blob, filename) => void
+//   onWholeDocExported?: () => void  — a download of ALL pages finished (never a picked subset)
 //   toast: (msg) => void
 // }
 export function createDownloadSheet(deps) {
@@ -661,6 +662,9 @@ export function createDownloadSheet(deps) {
           deps.toast(tr('sheet.toast.zipDone', { count: n }));
         }
       }
+      // The leave-site guard's "downloaded" mark. Only a whole-document export
+      // counts: a picked subset leaves the other pages' edits unsaved.
+      if (!state.picked) deps.onWholeDocExported?.();
       // A font fell back to Helvetica during the base build — the kept file's
       // text does not look like the preview. Tell the user AFTER the download
       // (the file is already right-or-wrong; the message is a heads-up, not a
