@@ -85,23 +85,77 @@ test('the card leaves with the landing when a document opens', async ({ page }) 
   await expect(page.locator('#maker-card')).toBeHidden();
 });
 
-test('homepage count: shown with a number, hidden when the API has none', async ({ page }) => {
+// Homepage: ONE centred line under the dropzone, above the install chip, at every
+// width (his ruling 2026-10-06). It used to sit in the header beside the wordmark
+// at >=1100px only, so a phone never saw it.
+for (const [name, viewport] of [['phone', { width: 390, height: 844 }], ['desktop', { width: 1280, height: 800 }]]) {
+  test(`homepage count (${name}): one centred line under the dropzone, above the install chip`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await mock(page);
+    await page.goto('/');
+    const c = page.locator('.vc-wrap .visitor-count');
+    await expect(c).toBeVisible();
+    await expect(c).toHaveText('184 visitor hari ini');
+    await expect(c.locator('.vc-pulse')).toBeVisible();
+    const box = await c.boundingBox();
+    const dz = await page.locator('#btn-open').boundingBox();
+    const chip = await page.locator('.ip-chip-wrap').boundingBox();
+    expect(box.y, 'below the dropzone').toBeGreaterThanOrEqual(dz.y + dz.height);
+    expect(box.y + box.height, 'above the install chip').toBeLessThanOrEqual(chip.y + 1);
+    // one line: no taller than a 14px text line plus slack
+    expect(box.height).toBeLessThan(26);
+    // centred on the page, not on the dropzone's own left edge
+    expect(Math.abs(box.x + box.width / 2 - viewport.width / 2)).toBeLessThan(8);
+    // and it is no longer in the header
+    await expect(page.locator('.ld-hd .visitor-count')).toHaveCount(0);
+    if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/vc2-home-${viewport.width}.png` });
+  });
+}
+
+test('homepage count: hidden, and takes no room, when the API has none', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mock(page, { visitors: null });
+  await page.goto('/');
+  await page.waitForTimeout(800);
+  await expect(page.locator('.vc-wrap .visitor-count')).toBeHidden();
+  await expect(page.locator('.vc-wrap')).toBeHidden();
+});
+
+test('editor count (phone): hidden, and the header gets no extra row for it', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const toolbarTop = async (visitors) => {
+    const p = await page.context().newPage();
+    await p.setViewportSize({ width: 390, height: 844 });
+    await mock(p, { visitors });
+    await p.goto('/');
+    await p.setInputFiles('#file-input', path.join(__dirname, 'fixtures', 'sample-2pages.pdf'));
+    await expectFirstPage(p);
+    // the API answer arrives well before a document has rendered; wait anyway
+    await p.waitForTimeout(500);
+    const top = (await p.locator('#toolbar').boundingBox()).y;
+    const shown = await p.locator('header > .visitor-count').isVisible();
+    if (visitors && process.env.SHOTS) await p.screenshot({ path: `${process.env.SHOTS}/vc2-editor-390.png` });
+    await p.close();
+    return { top, shown };
+  };
+  const without = await toolbarTop(null);
+  const withCount = await toolbarTop(184);
+  expect(withCount.shown, 'the count is hidden in the editor at phone width').toBe(false);
+  expect(withCount.top, 'tool row top is unchanged by the count').toBe(without.top);
+});
+
+test('editor count (desktop 1280): visible beside File on the header row', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await mock(page);
   await page.goto('/');
-  const c = page.locator('.ld-hd .visitor-count');
+  await page.setInputFiles('#file-input', path.join(__dirname, 'fixtures', 'sample-2pages.pdf'));
+  await expectFirstPage(page);
+  const c = page.locator('header > .visitor-count');
   await expect(c).toBeVisible();
-  await expect(c).toHaveText('184 visitor hari ini');
-  await expect(c.locator('.vc-pulse')).toBeVisible();
-  // never collides with the centred nav
-  expect(overlap(await c.boundingBox(), await page.locator('.ld-nav').boundingBox())).toBe(false);
-
-  const p2 = await page.context().newPage();
-  await p2.setViewportSize({ width: 1280, height: 800 });
-  await mock(p2, { visitors: null });
-  await p2.goto('/');
-  await p2.waitForTimeout(800);
-  await expect(p2.locator('.ld-hd .visitor-count')).toBeHidden();
+  const file = await page.locator('#btn-file').boundingBox();
+  const box = await c.boundingBox();
+  expect(box.x).toBeGreaterThan(file.x + file.width);
+  expect(Math.abs((box.y + box.height / 2) - (file.y + file.height / 2)), 'same row as File').toBeLessThan(12);
 });
 
 test('editor count: between File and the tools when wide, first to go when narrow', async ({ page }) => {

@@ -2057,19 +2057,21 @@
     @media (prefers-reduced-motion: reduce) { .vc-pulse::after { animation: none; opacity: 0; } }
     .visitor-count b { color: var(--ink); font-weight: 600; }
     .visitor-count[hidden] { display: none; }
-    /* Homepage: beside the wordmark, only where the centred nav leaves room.
-       First thing to go (his ruling), so it leaves before the nav does. */
-    /* 24px off the wordmark (his call 2026-09-24: "kurang ketengah", horizontal):
-       at the flex gap's 8px it read as part of the logo. */
-    .ld-hd .visitor-count { display: none; margin-left: var(--sp-16); }
-    @media (min-width: 1100px) { .ld-hd .visitor-count:not([hidden]) { display: inline-flex; } }
+    /* Homepage: one centred line under the dropzone, above the install chip.
+       margin-top matches .ip-chip-wrap's, so the two read as one quiet strip. */
+    .vc-wrap { display: flex; justify-content: center; margin-top: var(--sp-16); }
+    .vc-wrap:has(> .visitor-count[hidden]) { display: none; }
+    .vc-wrap + .ip-chip-wrap { margin-top: var(--sp-16); }
     /* Editor: between File and the tools; measured out when crowded. */
     /* flex-shrink 1000: when the row gets tight the count gives up its room
        before File or a tool label does; maker-card.js hides it the moment its
        text would be clipped. */
     header > .visitor-count { order: 2; padding: 0 var(--sp-8); flex: 0 1000 auto; min-width: 0; overflow: hidden; }
     header > .visitor-count.is-crowded { display: none; }
-    @media (max-width: 899px) { header > .visitor-count { display: none; } }
+    /* Narrow: the editor never gives the count a row of its own. This must beat
+       `.visitor-count:not([hidden])` (0,2,0), which a bare `header > .visitor-count`
+       (0,1,1) did not, so at phone width the count wrapped onto its own row. */
+    @media (max-width: 899px) { header > .visitor-count:not([hidden]) { display: none; } }
   </style>
 </head>
 <body class="is-empty" data-intent="kompres" data-target="200000">
@@ -2181,7 +2183,6 @@
                obvious thing a stranger will try. Same defect the founder found
                on privasi/dukung, one layer upstream and twelve times over. -->
           <a class="ld-mark" href="/" aria-label="PDFLokal, ke beranda">PDF<em>Lokal</em></a>
-          <span class="visitor-count" data-visitor-count hidden title="Jumlah browser yang membuka PDFLokal hari ini"><span class="vc-pulse" aria-hidden="true"></span><span><b class="vc-n"></b> visitor hari ini</span></span>
           <button class="ld-burger" id="ld-burger" type="button" aria-expanded="false" aria-controls="ld-burger-menu" aria-label="Buka menu navigasi">
             <svg class="ld-burger-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
               <line class="ld-burger-l1" x1="3" y1="6" x2="21" y2="6"/>
@@ -2279,6 +2280,12 @@
           <span class="dz-buka">Buka File</span>
           <span class="dz-hint">PDF atau foto, boleh banyak sekaligus</span>
         </button>
+        </div>
+        <!-- The visitor count: one line under the dropzone, above the install chip,
+             centred at every width (his ruling 2026-10-06). js/v2/maker-card.js
+             fills it and unhides it only when /api/visitors answered. -->
+        <div class="vc-wrap">
+          <span class="visitor-count" data-visitor-count hidden title="Jumlah browser yang membuka PDFLokal hari ini"><span class="vc-pulse" aria-hidden="true"></span><span><b class="vc-n"></b> visitor hari ini</span></span>
         </div>
         <!-- Install chip: quiet, below the dropzone. Shown only to RETURNING users
              (js/v2/install-prompt.js); tap opens the adaptive install card. Never
