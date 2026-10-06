@@ -52,6 +52,36 @@ for (const [name, viewport] of [['desktop', { width: 1280, height: 800 }], ['pho
   });
 }
 
+// The close button drew a vertical oval (32 wide, 36 tall: the global
+// `button { min-height: 36px }` beat its height). Equal sides and a round radius.
+test('close button is a true circle (fine pointer)', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await mock(page);
+  await page.goto('/');
+  const x = page.locator('#maker-card .mk-close');
+  await expect(x).toBeVisible();
+  const b = await x.boundingBox();
+  expect(b.width).toBeCloseTo(b.height, 1);
+  expect(await x.evaluate((e) => getComputedStyle(e).borderRadius)).toBe('50%');
+});
+
+test.describe('close button, coarse pointer', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  test('is a true circle with a 44px touch target', async ({ page }) => {
+    await mock(page);
+    await page.goto('/');
+    const x = page.locator('#maker-card .mk-close');
+    await expect(x).toBeVisible();
+    expect(await page.evaluate(() => matchMedia('(pointer: coarse)').matches), 'the context really is coarse').toBe(true);
+    const b = await x.boundingBox();
+    expect(b.width).toBeCloseTo(b.height, 1);
+    expect(b.width).toBeGreaterThanOrEqual(44);
+    // the visible disc stays 32px
+    const disc = await x.evaluate((e) => parseFloat(getComputedStyle(e, '::before').width));
+    expect(disc).toBe(32);
+  });
+});
+
 test('closing it keeps it closed; a NEW approved update brings it back', async ({ page }) => {
   await mock(page);
   await page.goto('/');
