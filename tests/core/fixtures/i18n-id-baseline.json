@@ -296,7 +296,7 @@
     ]
   },
   "sheet.compressFailed": {
-    "text": "Kompres gagal, saya pakai ukuran asli ya",
+    "text": "Kompres gagal, pakai ukuran asli ya",
     "src": [
       "js/v2/download-sheet.js"
     ]
@@ -543,7 +543,7 @@
     ]
   },
   "intent.kompres.dzHint": {
-    "text": "Ukuran hasilnya saya tunjukkan sebelum kamu unduh",
+    "text": "Ukuran hasilnya kelihatan dulu sebelum kamu unduh",
     "src": [
       "js/v2/intent-copy.js"
     ]
@@ -808,7 +808,7 @@
     ]
   },
   "editFeedback.thanks": {
-    "text": "Makasih, masukanmu ngebantu saya 🙏",
+    "text": "Makasi masukannyaa, ngebantu banget 🙏",
     "src": [
       "js/v2/edit-feedback.js"
     ]
@@ -832,13 +832,13 @@
     ]
   },
   "editFeedback.askTitle": {
-    "text": "Boleh saya minta dua potongan ini?",
+    "text": "Boleh minta dua potongan ini?",
     "src": [
       "js/v2/edit-feedback.js"
     ]
   },
   "editFeedback.askSub": {
-    "text": "Sebelum dan sesudahnya, biar saya bisa analisis fiturnya kurang di mana. Nggak ada isi file lain.",
+    "text": "Sebelum dan sesudahnya, biar bisa dicek fiturnya kurang di mana. Nggak ada isi file lain.",
     "src": [
       "js/v2/edit-feedback.js"
     ]
@@ -1040,7 +1040,7 @@
     ]
   },
   "bugPrompt.big": {
-    "text": "Mohon kabarin saya ya kalo ada bug, di sini",
+    "text": "Kabarin kalo ada bug yaa, di sini",
     "src": [
       "js/v2/bug-report-prompt.js"
     ]

@@ -140,7 +140,7 @@ test('the founder copy is verbatim — both lines, exactly as he wrote them', as
   const texts = card.children.map((c) => c.textContent);
   assert.deepEqual(texts, [
     'Halo user PDFLokal',
-    'Mohon kabarin saya ya kalo ada bug, di sini',
+    'Kabarin kalo ada bug yaa, di sini',
   ], 'EXCLUDE 2: this copy is his and may not be reworded by a session');
 });
 

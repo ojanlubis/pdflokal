@@ -370,7 +370,7 @@
       <h1>Kebijakan Privasi</h1>
       <p class="privacy-lead">
         <strong>File PDF dan gambarmu diolah di browsermu sendiri dan nggak pernah dikirim ke server mana pun.</strong>
-        Yang saya catat adalah cara PDFLokal dipakai, bukan isi dokumenmu. Pengecualiannya ada di bawah.
+        Yang dicatat adalah cara PDFLokal dipakai, bukan isi dokumenmu. Pengecualiannya ada di bawah.
       </p>
 
       <div class="privacy-proof">
@@ -381,7 +381,7 @@
       </div>
 
       <section class="privacy-section">
-        <h2>Yang dikirim ke server saya sendiri</h2>
+        <h2>Yang dikirim ke server PDFLokal sendiri</h2>
         <p>
           Data teknis tentang cara fitur dipakai, untuk tahu alat mana yang perlu diperbaiki: alat
           yang kamu pakai, berapa lama prosesnya, apakah font di dokumen dikenali, jenis perangkat,
@@ -394,13 +394,13 @@
         <p>
           Tiap sesi dapat ID acak sendiri. Satu ID lagi, <code>pdflokal_visitor_id</code>, disimpan di
           browsermu untuk membedakan pengunjung baru dan yang kembali. Isinya angka acak. ID ini cuma
-          sampai ke server saya: Mixpanel, Google Analytics, dan Sentry nggak pernah menerimanya.
+          sampai ke server PDFLokal: Mixpanel, Google Analytics, dan Sentry nggak pernah menerimanya.
         </p>
       </section>
 
       <section class="privacy-section">
         <h2>Yang dikirim ke layanan lain</h2>
-        <p>Untuk menghitung kunjungan dan alat yang dipakai, saya pakai:</p>
+        <p>Untuk menghitung kunjungan dan alat yang dipakai, PDFLokal memakai:</p>
         <ul>
           <li>Vercel Web Analytics, tanpa cookie</li>
           <li>Google Analytics dan Google Ads, dengan cookie (daftarnya di tabel bawah)</li>
@@ -431,11 +431,11 @@
         <p>Dua layanan merekam layar waktu PDFLokal dipakai:</p>
         <ul>
           <li>Sentry, sejak akhir Mei 2026: 1 dari 10 kunjungan, plus setiap kunjungan yang ada error-nya. Tugas utamanya menangkap error</li>
-          <li>Mixpanel: semua sesi, untuk melihat di langkah mana orang kesulitan. Kalau perekamannya saya hentikan, halaman ini saya update</li>
+          <li>Mixpanel: semua sesi, untuk melihat di langkah mana orang kesulitan. Kalau perekamannya dihentikan, halaman ini diupdate</li>
         </ul>
         <p>
           Yang terekam: di mana kamu tap, ke mana kamu scroll, tombol yang kamu buka, dan berapa lama
-          kamu berhenti. Saya sudah membuka data yang dikirim kedua layanan itu, dan ini yang nggak ikut:
+          kamu berhenti. Data yang dikirim kedua layanan itu sudah dibuka, dan ini yang nggak ikut:
         </p>
         <ul>
           <li>Isi dokumenmu. Halaman PDF muncul sebagai kotak kosong</li>
@@ -453,7 +453,7 @@
         <h2>Yang kamu kirim sendiri</h2>
         <ul>
           <li>Screenshot di form masukan. Kamu yang paste, dan kamu lihat dulu sebelum terkirim. Kalau screenshot itu menampilkan isi dokumen, isi itu ikut terkirim</li>
-          <li>Potongan di Edit (beta). Kalau kamu kasih 👎, saya minta izin untuk satu baris yang barusan kamu edit, sebelum dan sesudah, sebagai dua gambar kecil. Kamu lihat keduanya dulu, dan baru terkirim kalau kamu tap Kirim</li>
+          <li>Potongan di Edit (beta). Kalau kamu kasih 👎, PDFLokal minta izin untuk satu baris yang barusan kamu edit, sebelum dan sesudah, sebagai dua gambar kecil. Kamu lihat keduanya dulu, dan baru terkirim kalau kamu tap Kirim</li>
         </ul>
       </section>
 
@@ -468,7 +468,7 @@
         <h2>Yang tersimpan di browsermu</h2>
         <p>
           Preferensi kecil untuk kamu sendiri, di Local Storage (satu di Session Storage, hilang saat
-          tab ditutup). Semuanya tetap di browsermu, kecuali satu baris yang saya tandai.
+          tab ditutup). Semuanya tetap di browsermu, kecuali satu baris yang ditandai.
         </p>
         <table class="storage-table" id="storage-ours">
           <thead>
@@ -512,7 +512,7 @@
             </tr>
             <tr>
               <td><code>pdflokal_maker_seen</code></td>
-              <td>Mengingat kabar terbaru dari saya yang sudah kamu lihat</td>
+              <td>Mengingat kabar terbaru yang sudah kamu lihat</td>
             </tr>
             <tr>
               <td><code>pdflokal_bugreport_last</code></td>
@@ -534,7 +534,7 @@
               <td><code>pdflokal_visitor_id</code></td>
               <td>ID acak, dibikin sekali di perangkatmu dan dipakai lagi tiap kamu balik.
                 <strong>Satu-satunya baris di tabel ini yang ikut keluar dari browsermu</strong>,
-                ke server saya sendiri, lihat bagian "Yang dikirim ke server saya sendiri" di atas</td>
+                ke server PDFLokal sendiri, lihat bagian "Yang dikirim ke server PDFLokal sendiri" di atas</td>
             </tr>
           </tbody>
         </table>
@@ -575,7 +575,7 @@
         <h2>Pertanyaan?</h2>
         <p>
           Kode PDFLokal terbuka di <a href="https://github.com/ojanlubis/pdflokal" target="_blank" rel="noopener">GitHub</a>,
-          dan kamu bisa buka issue di sana. Atau <a href="https://forms.gle/KPDWVAuc91pVjuWq6" target="_blank">hubungi saya</a> langsung.
+          dan kamu bisa buka issue di sana. Atau <a href="https://forms.gle/KPDWVAuc91pVjuWq6" target="_blank">hubungi Ojan</a> langsung.
         </p>
       </section>
 
@@ -602,7 +602,7 @@
   <!-- Footer — ported from index.html's .ld-foot; see css/chrome.css. -->
   <div class="pg-wrap">
     <footer class="ld-foot">
-      <a href="/dukung">Dukung Saya</a>
+      <a href="/dukung">Dukung PDFLokal</a>
       <a href="/privasi">Privasi</a>
       <a href="https://github.com/ojanlubis/pdflokal" rel="noopener">GitHub</a>
       <span>Dibuat di Indonesia</span>

@@ -302,7 +302,7 @@
                            // dropzone copy, footer. Static HTML; js only toggles display.
         '#zoom-ctl',       // + / −
         '#contact-tab-btn',// "Ada masukan?" (the dialog it opens, #fb-form, stays BLOCKED)
-        '#bug-prompt',     // the once-a-day "kabarin saya kalo ada bug" card. TWO FIXED
+        '#bug-prompt',     // the once-a-day "kabarin kalo ada bug" card. TWO FIXED
                            // STRINGS, built in js/v2/bug-report-prompt.js and identical for
                            // every visitor — no user text can reach it. Unmasked ON PURPOSE:
                            // masked it is a grey rectangle, and "did anyone notice this?" is
@@ -2157,7 +2157,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="8" rx="1"/></svg>
       Tip-Ex
     </button>
-    <button class="tool" data-tool="ganti" aria-pressed="false" aria-label="Edit teks asli yang sudah tercetak di PDF" title="Edit teks asli di PDF, masih beta, kabari saya kalau ada yang aneh">
+    <button class="tool" data-tool="ganti" aria-pressed="false" aria-label="Edit teks asli yang sudah tercetak di PDF" title="Edit teks asli di PDF, masih beta, kabarin kalo ada yang aneh yaa">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
       Edit<span class="beta-tag">beta</span>
     </button>
@@ -2286,7 +2286,7 @@
                  softening, and the claims it made now live in the FAQ and the
                  privacy promise further down, where content is free. -->
             <h1>Kompres PDF sampai di bawah 500KB</h1>
-            <p class="ld-sub">Target 500KB sudah disetel. Seret file-mu, dan saya cari kualitas terbaik yang masih muat.</p>
+            <p class="ld-sub">Target 500KB sudah disetel. Seret file-mu, dan PDFLokal mencari kualitas terbaik yang masih muat.</p>
           </div>
         <!-- ⭐ THE WORKING COLUMN. Everything inside shares one 920 width — the
              dropzone and the tool cards read as a single column because they
@@ -2450,7 +2450,7 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
           <div>
             <b>Filemu nggak pernah ninggalin perangkatmu.</b>
-            <p>Ijazah, KTP, kontrak. Semua diproses di browser-mu sendiri, bukan di server orang. <a href="/privasi">Baca janji privasi saya</a></p>
+            <p>Ijazah, KTP, kontrak. Semua diproses di browser-mu sendiri, bukan di server orang. <a href="/privasi">Baca janji privasinya</a></p>
           </div>
         </div>
         <div class="ld-copy">
@@ -2465,7 +2465,7 @@
           <p>Batas 500KB muncul di banyak portal kepegawaian, pendaftaran sekolah kedinasan, dan sistem unggah berkas instansi. Angkanya bukan kebetulan: 500KB cukup untuk menyimpan beberapa halaman hasil scan yang masih terbaca, sambil menjaga beban penyimpanan server mereka tetap rendah.</p>
           <p>Yang jarang dijelaskan portal-portal itu: kalau berkasmu kelewat, unggahan gagal, kadang tanpa pesan kesalahan yang jelas, kadang setelah kamu mengisi seluruh formulir.</p>
           <h2>Kalau 500KB tidak tercapai</h2>
-          <p>Saya akan bilang terus terang. Kalau ukuran terkecil yang bisa saya capai adalah 640KB, tombolnya akan mengatakan 640KB, bukan membulatkannya jadi "500KB ✓". Berkas yang kamu kira lolos padahal tidak justru lebih merepotkan daripada berkas yang kamu tahu kebesaran.</p>
+          <p>PDFLokal akan bilang terus terang. Kalau ukuran terkecil yang bisa dicapai adalah 640KB, tombolnya akan mengatakan 640KB, bukan membulatkannya jadi "500KB ✓". Berkas yang kamu kira lolos padahal tidak justru lebih merepotkan daripada berkas yang kamu tahu kebesaran.</p>
           <p>Kalau itu terjadi, langkah yang paling ampuh biasanya bukan mengompres lebih keras, tapi membuang halaman yang tidak diminta. Buka Kelola Halaman, buang halaman kosong dan lampiran yang tidak dipinta, lalu coba lagi.</p>
           <h2>Ijazah dan KTP-mu tidak diunggah</h2>
           <p>Berkas yang kamu kompres untuk pendaftaran hampir selalu dokumen identitas. Situs lain memintamu mengunggahnya ke server mereka lebih dulu, lalu berjanji menghapusnya nanti, janji yang tidak punya cara kamu periksa.</p>
@@ -2482,11 +2482,11 @@
           </details>
           <details>
             <summary>Kalau tidak sampai 500KB gimana?</summary>
-            <p>Saya tampilkan ukuran terkecil yang berhasil dicapai, apa adanya. Saya tidak akan mengaku berkasmu lolos kalau kenyataannya tidak.</p>
+            <p>PDFLokal menampilkan ukuran terkecil yang berhasil dicapai, apa adanya, dan tidak akan mengaku berkasmu lolos kalau kenyataannya tidak.</p>
           </details>
           <details>
             <summary>Tulisannya masih terbaca?</summary>
-            <p>Ya. Saya memilih kualitas tertinggi yang masih muat di bawah 500KB. Perlu diketahui: halaman hasil kompresi menjadi gambar, jadi teksnya tidak bisa lagi diseleksi, untuk berkas hasil scan, ini tidak mengubah apa pun.</p>
+            <p>Ya. PDFLokal memilih kualitas tertinggi yang masih muat di bawah 500KB. Perlu diketahui: halaman hasil kompresi menjadi gambar, jadi teksnya tidak bisa lagi diseleksi, untuk berkas hasil scan, ini tidak mengubah apa pun.</p>
           </details>
           <details>
             <summary>File-ku diupload ke server?</summary>
@@ -2517,7 +2517,7 @@
           </nav>
         </div>
         <footer class="ld-foot">
-          <a href="/dukung">Dukung Saya</a>
+          <a href="/dukung">Dukung PDFLokal</a>
           <a href="/privasi">Privasi</a>
           <!-- "Github", not "GitHub" — the founder ruled the capitalization for
                the navbar (2026-07-29) and the footer said the other thing, so one
@@ -2681,7 +2681,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     </button>
     <div class="sc-head">Selesai, filemu udah jadi!</div>
-    <p class="sc-sub">PDFLokal gratis dan bakal terus gratis. Kalau kepakai, bantu saya sedikit ya:</p>
+    <p class="sc-sub">PDFLokal gratis dan bakal terus gratis. Kalo kepakai, bantuin dikit yaa:</p>
     <div class="sc-actions">
       <button id="sc-share">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></svg>

@@ -302,7 +302,7 @@
                            // dropzone copy, footer. Static HTML; js only toggles display.
         '#zoom-ctl',       // + / −
         '#contact-tab-btn',// "Ada masukan?" (the dialog it opens, #fb-form, stays BLOCKED)
-        '#bug-prompt',     // the once-a-day "kabarin saya kalo ada bug" card. TWO FIXED
+        '#bug-prompt',     // the once-a-day "kabarin kalo ada bug" card. TWO FIXED
                            // STRINGS, built in js/v2/bug-report-prompt.js and identical for
                            // every visitor — no user text can reach it. Unmasked ON PURPOSE:
                            // masked it is a grey rectangle, and "did anyone notice this?" is
@@ -2157,7 +2157,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="8" rx="1"/></svg>
       Tip-Ex
     </button>
-    <button class="tool" data-tool="ganti" aria-pressed="false" aria-label="Edit teks asli yang sudah tercetak di PDF" title="Edit teks asli di PDF, masih beta, kabari saya kalau ada yang aneh">
+    <button class="tool" data-tool="ganti" aria-pressed="false" aria-label="Edit teks asli yang sudah tercetak di PDF" title="Edit teks asli di PDF, masih beta, kabarin kalo ada yang aneh yaa">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
       Edit<span class="beta-tag">beta</span>
     </button>
@@ -2450,7 +2450,7 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
           <div>
             <b>Filemu nggak pernah ninggalin perangkatmu.</b>
-            <p>Ijazah, KTP, kontrak. Semua diproses di browser-mu sendiri, bukan di server orang. <a href="/privasi">Baca janji privasi saya</a></p>
+            <p>Ijazah, KTP, kontrak. Semua diproses di browser-mu sendiri, bukan di server orang. <a href="/privasi">Baca janji privasinya</a></p>
           </div>
         </div>
         <div class="ld-copy">
@@ -2468,16 +2468,16 @@
           <p>Dokumen resmi di Indonesia sering minta paraf di setiap halaman, bukan cuma tanda tangan di halaman terakhir. PDFLokal punya alat paraf tersendiri, ukurannya lebih kecil, dan ada tombol <strong>Semua Halaman</strong> yang menyalin parafmu ke posisi yang sama di seluruh halaman sekaligus.</p>
           <h2>Ini sah nggak?</h2>
           <p>PDFLokal menempelkan gambar tanda tanganmu ke dalam dokumen, sama seperti menandatangani hasil print lalu men-scan-nya, dan diterima di sebagian besar keperluan sehari-hari: surat pernyataan, formulir, kontrak kerja.</p>
-          <p>Yang PDFLokal <strong>tidak</strong> lakukan adalah tanda tangan digital bersertifikat (yang terikat identitas digital resmi). Kalau instansimu memintanya secara khusus, kamu butuh penyedia tersertifikasi. Saya lebih baik jujur soal ini daripada membiarkanmu salah kira.</p>
+          <p>Yang PDFLokal <strong>tidak</strong> lakukan adalah tanda tangan digital bersertifikat (yang terikat identitas digital resmi). Kalau instansimu memintanya secara khusus, kamu butuh penyedia tersertifikasi. Lebih baik jujur soal ini daripada membiarkanmu salah kira.</p>
           <h2>Tanda tangan pakai jari di HP</h2>
           <p>Menggambar tanda tangan dengan jari di layar HP hasilnya sering terlihat kaku dan gemetar. PDFLokal menghaluskan goresanmu dan menyesuaikan ketebalannya dengan kecepatan gerakan, sama seperti pena betulan, yang menipis saat digerakkan cepat.</p>
           <p>Kalau hasilnya tetap kurang mirip, pakai saja tab Upload dan foto tanda tanganmu di atas kertas putih. Buat kebanyakan orang, hasilnya jauh lebih rapi dan lebih menyerupai tanda tangan asli.</p>
           <h2>Soal materai</h2>
           <p>Beberapa dokumen di Indonesia meminta e-meterai. PDFLokal tidak menerbitkan e-meterai, itu diterbitkan lewat kanal resmi Peruri, dan siapa pun yang menawarkannya secara gratis lewat situs biasa patut kamu curigai.</p>
-          <p>Yang perlu kamu tahu: menempelkan gambar meterai lewat Upload itu cuma gambar, bukan meterai yang sah. Untuk dokumen elektronik, yang sah cuma e-meterai dari Peruri. Saya lebih memilih menjelaskan batasannya daripada membiarkanmu mengira sudah beres padahal belum.</p>
-          <h2>Tanda tanganmu tidak saya simpan</h2>
+          <p>Yang perlu kamu tahu: menempelkan gambar meterai lewat Upload itu cuma gambar, bukan meterai yang sah. Untuk dokumen elektronik, yang sah cuma e-meterai dari Peruri. Lebih baik batasannya dijelaskan daripada membiarkanmu mengira sudah beres padahal belum.</p>
+          <h2>Tanda tanganmu tidak disimpan kecuali kamu minta</h2>
           <p>Tanda tangan adalah data yang paling sensitif di dokumenmu, dan situs lain memintamu mengunggahnya. Beberapa bahkan menyimpannya di akunmu "supaya praktis dipakai lagi", artinya, tanda tanganmu duduk di server orang.</p>
-          <p>Di PDFLokal, tanda tanganmu ada di dalam browser selama kamu mengerjakan dokumen, dan lenyap saat kamu menutup tab. Tidak ada akun, jadi tidak ada tempat untuk menyimpannya.</p>
+          <p>Di PDFLokal, tanda tanganmu ada di dalam browser selama kamu mengerjakan dokumen, dan tidak disimpan kecuali kamu mencentang "Simpan tanda tangan". Kalau dicentang, tanda tangan itu tetap di browser ini saja, tidak pernah ke server.</p>
         </div>
         <section class="ld-faq">
           <h2>Sering ditanya</h2>
@@ -2495,7 +2495,7 @@
           </details>
           <details>
             <summary>Tanda tanganku disimpan di server kalian?</summary>
-            <p>Tidak. Tidak ada yang dikirim ke mana pun. Tanda tanganmu ada di browser-mu selama kamu mengerjakan dokumen, dan hilang saat kamu menutup halaman.</p>
+            <p>Tidak. Tidak ada yang dikirim ke mana pun. Tanda tanganmu ada di browser-mu selama kamu mengerjakan dokumen, dan tidak disimpan kecuali kamu mencentang &quot;Simpan tanda tangan&quot;. Kalau dicentang, tetap di browser ini saja.</p>
           </details>
           <details>
             <summary>Harus bikin akun?</summary>
@@ -2534,7 +2534,7 @@
           </nav>
         </div>
         <footer class="ld-foot">
-          <a href="/dukung">Dukung Saya</a>
+          <a href="/dukung">Dukung PDFLokal</a>
           <a href="/privasi">Privasi</a>
           <!-- "Github", not "GitHub" — the founder ruled the capitalization for
                the navbar (2026-07-29) and the footer said the other thing, so one
@@ -2698,7 +2698,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     </button>
     <div class="sc-head">Selesai, filemu udah jadi!</div>
-    <p class="sc-sub">PDFLokal gratis dan bakal terus gratis. Kalau kepakai, bantu saya sedikit ya:</p>
+    <p class="sc-sub">PDFLokal gratis dan bakal terus gratis. Kalo kepakai, bantuin dikit yaa:</p>
     <div class="sc-actions">
       <button id="sc-share">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></svg>

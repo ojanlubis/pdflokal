@@ -302,7 +302,7 @@
                            // dropzone copy, footer. Static HTML; js only toggles display.
         '#zoom-ctl',       // + / −
         '#contact-tab-btn',// "Ada masukan?" (the dialog it opens, #fb-form, stays BLOCKED)
-        '#bug-prompt',     // the once-a-day "kabarin saya kalo ada bug" card. TWO FIXED
+        '#bug-prompt',     // the once-a-day "kabarin kalo ada bug" card. TWO FIXED
                            // STRINGS, built in js/v2/bug-report-prompt.js and identical for
                            // every visitor — no user text can reach it. Unmasked ON PURPOSE:
                            // masked it is a grey rectangle, and "did anyone notice this?" is
@@ -2157,7 +2157,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="8" rx="1"/></svg>
       Tip-Ex
     </button>
-    <button class="tool" data-tool="ganti" aria-pressed="false" aria-label="Edit teks asli yang sudah tercetak di PDF" title="Edit teks asli di PDF, masih beta, kabari saya kalau ada yang aneh">
+    <button class="tool" data-tool="ganti" aria-pressed="false" aria-label="Edit teks asli yang sudah tercetak di PDF" title="Edit teks asli di PDF, masih beta, kabarin kalo ada yang aneh yaa">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
       Edit<span class="beta-tag">beta</span>
     </button>
@@ -2450,11 +2450,11 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
           <div>
             <b>Filemu nggak pernah ninggalin perangkatmu.</b>
-            <p>Ijazah, KTP, kontrak. Semua diproses di browser-mu sendiri, bukan di server orang. <a href="/privasi">Baca janji privasi saya</a></p>
+            <p>Ijazah, KTP, kontrak. Semua diproses di browser-mu sendiri, bukan di server orang. <a href="/privasi">Baca janji privasinya</a></p>
           </div>
         </div>
         <div class="ld-copy">
-          <p>Hampir semua orang yang mencari cara mengompres PDF sebenarnya sedang mengejar satu angka: batas unggah. "Maksimal 500KB." "Tidak lebih dari 1MB." Karena itu PDFLokal tidak cuma mengecilkan file, kamu bisa menyebutkan target ukurannya, dan saya akan mencari kualitas terbaik yang masih muat di bawah batas itu. Semuanya di dalam browser, tanpa file-mu pernah diunggah ke mana pun.</p>
+          <p>Hampir semua orang yang mencari cara mengompres PDF sebenarnya sedang mengejar satu angka: batas unggah. "Maksimal 500KB." "Tidak lebih dari 1MB." Karena itu PDFLokal tidak cuma mengecilkan file, kamu bisa menyebutkan target ukurannya, dan PDFLokal akan mencari kualitas terbaik yang masih muat di bawah batas itu. Semuanya di dalam browser, tanpa file-mu pernah diunggah ke mana pun.</p>
           <h2>Cara mengompres PDF</h2>
           <ol>
           <li>Seret PDF-mu ke kotak di atas.</li>
@@ -2463,13 +2463,13 @@
           </ol>
           <h2>Kenapa selalu soal batas unggah</h2>
           <p>Pendaftaran CPNS, SNBP, SNBT, beasiswa, e-filing pajak, portal kepegawaian. Hampir semuanya menetapkan batas ukuran berkas yang ketat, dan hampir semuanya menolak file-mu tanpa penjelasan kalau kelewat.</p>
-          <p>Alat kompres buatan luar negeri melayani "perkecil filenya". Yang sebenarnya kamu butuhkan adalah "muat dalam batas ini". Itu masalah yang berbeda, dan itu masalah yang saya pedulikan.</p>
+          <p>Alat kompres buatan luar negeri melayani "perkecil filenya". Yang sebenarnya kamu butuhkan adalah "muat dalam batas ini". Itu masalah yang berbeda, dan itu yang jadi perhatian PDFLokal.</p>
           <h2>Apa yang sebenarnya dikecilkan</h2>
           <p>Yang bikin PDF gemuk hampir selalu gambarnya, hasil scan, foto ijazah, tanda tangan yang difoto pakai kamera 48MP. PDFLokal menggambar ulang setiap halaman pada resolusi tertinggi yang masih muat di batas ukuranmu, lalu menyusunnya jadi PDF baru.</p>
           <p>Terus terang soal konsekuensinya: halaman hasil kompresi menjadi gambar, jadi teksnya tidak lagi bisa diseleksi atau dicari. Ini trade-off yang diambil semua alat kompres untuk dokumen hasil scan, dan untuk berkas yang memang berasal dari foto atau scan, tidak ada yang hilang, karena teksnya sejak awal sudah berupa gambar.</p>
           <p>Kalau file-mu isinya teks murni (misalnya hasil ekspor dari Word), kompresi semacam ini justru merugikan, hasilnya bisa lebih besar dari aslinya. PDFLokal mendeteksinya dan mengembalikan file aslimu utuh, bukan memaksakan hasil yang lebih buruk sambil mengaku sudah mengompres.</p>
           <h2>Kualitasnya turun nggak?</h2>
-          <p>Sedikit, dan itu memang tujuannya, file yang lebih kecil berarti data yang lebih sedikit. Yang saya jaga: dokumen tetap terbaca jelas di layar dan tetap rapi saat dicetak. Kalau hasilnya kurang pas, kamu bisa unduh versi aslinya tanpa kompresi.</p>
+          <p>Sedikit, dan itu memang tujuannya, file yang lebih kecil berarti data yang lebih sedikit. Yang dijaga: dokumen tetap terbaca jelas di layar dan tetap rapi saat dicetak. Kalau hasilnya kurang pas, kamu bisa unduh versi aslinya tanpa kompresi.</p>
           <h2>Berapa KB yang realistis</h2>
           <p>Kalau PDF-mu isinya hasil scan atau foto, penyusutannya biasanya besar, file 5MB sering turun ke ratusan KB tanpa membuat tulisannya susah dibaca. Ini kasus yang paling umum, karena berkas persyaratan hampir selalu berupa hasil foto atau scan.</p>
           <p>Kalau PDF-mu isinya teks murni (misalnya dokumen yang diekspor dari Word), file-nya kemungkinan besar sudah kecil, dan kompresi tidak akan banyak mengubahnya. PDFLokal akan mengatakannya terus terang alih-alih pura-pura bekerja lalu memberimu file dengan ukuran yang sama.</p>
@@ -2481,17 +2481,17 @@
           <p>Di PDFLokal tidak ada yang perlu dihapus, karena tidak ada yang pernah dikirim. Buka tab Network di browser-mu kalau kamu paham teknis, kamu tidak akan melihat satu pun unggahan file. Dan kalau kamu tidak paham teknis: matikan internetmu, dan lihat kompresinya tetap jalan.</p>
           <h2>Kompres PDF di HP</h2>
           <p>Kompresi PDF adalah pekerjaan berat: setiap gambar di dalam dokumen harus digambar ulang. Situs lain memindahkan beban itu ke server mereka, yang berarti kamu harus mengunggah dokumen puluhan megabita lewat sinyal seluler, lalu mengunduhnya lagi.</p>
-          <p>PDFLokal mengerjakannya di HP-mu. Di sinyal yang buruk, ini bukan cuma lebih aman, tapi juga jauh lebih cepat: tidak ada yang perlu naik dan turun lewat jaringan. Dan saya menahan diri untuk tidak menggambar terlalu banyak halaman sekaligus, supaya HP kelas menengah tidak kehabisan memori di tengah jalan.</p>
+          <p>PDFLokal mengerjakannya di HP-mu. Di sinyal yang buruk, ini bukan cuma lebih aman, tapi juga jauh lebih cepat: tidak ada yang perlu naik dan turun lewat jaringan. Dan PDFLokal menahan diri untuk tidak menggambar terlalu banyak halaman sekaligus, supaya HP kelas menengah tidak kehabisan memori di tengah jalan.</p>
         </div>
         <section class="ld-faq">
           <h2>Sering ditanya</h2>
           <details>
             <summary>Bisa kompres sampai ukuran tertentu, misalnya 500KB?</summary>
-            <p>Bisa. Pilih target (2MB, 1MB, 500KB, 200KB, atau 100KB) dan PDFLokal akan mencari kualitas tertinggi yang masih muat di bawah batas itu. Kalau ternyata tidak tercapai, saya bilang terus terang berapa ukuran terkecil yang bisa saya dapat, bukan diam-diam memberimu file yang kelewat batas.</p>
+            <p>Bisa. Pilih target (2MB, 1MB, 500KB, 200KB, atau 100KB) dan PDFLokal akan mencari kualitas tertinggi yang masih muat di bawah batas itu. Kalau ternyata tidak tercapai, PDFLokal bilang terus terang berapa ukuran terkecil yang bisa didapat, bukan diam-diam memberimu file yang kelewat batas.</p>
           </details>
           <details>
             <summary>Tulisannya jadi buram nggak?</summary>
-            <p>Tetap terbaca, saya selalu memilih kualitas tertinggi yang masih muat di batas ukuranmu. Tapi jujur: halaman hasil kompresi menjadi gambar, jadi teksnya tidak bisa lagi diseleksi atau dicari. Untuk berkas hasil scan atau foto, ini tidak mengubah apa pun, karena teksnya memang sudah berupa gambar sejak awal.</p>
+            <p>Tetap terbaca, PDFLokal selalu memilih kualitas tertinggi yang masih muat di batas ukuranmu. Tapi jujur: halaman hasil kompresi menjadi gambar, jadi teksnya tidak bisa lagi diseleksi atau dicari. Untuk berkas hasil scan atau foto, ini tidak mengubah apa pun, karena teksnya memang sudah berupa gambar sejak awal.</p>
           </details>
           <details>
             <summary>Kalau file-ku sudah kecil, apa yang terjadi?</summary>
@@ -2499,7 +2499,7 @@
           </details>
           <details>
             <summary>Ada batas ukuran file yang boleh dikompres?</summary>
-            <p>Tidak ada batas dari saya. Batasnya cuma memori perangkatmu sendiri.</p>
+            <p>Tidak ada batas dari PDFLokal. Batasnya cuma memori perangkatmu sendiri.</p>
           </details>
           <details>
             <summary>File-ku diupload ke server?</summary>
@@ -2538,7 +2538,7 @@
           </nav>
         </div>
         <footer class="ld-foot">
-          <a href="/dukung">Dukung Saya</a>
+          <a href="/dukung">Dukung PDFLokal</a>
           <a href="/privasi">Privasi</a>
           <!-- "Github", not "GitHub" — the founder ruled the capitalization for
                the navbar (2026-07-29) and the footer said the other thing, so one
@@ -2702,7 +2702,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     </button>
     <div class="sc-head">Selesai, filemu udah jadi!</div>
-    <p class="sc-sub">PDFLokal gratis dan bakal terus gratis. Kalau kepakai, bantu saya sedikit ya:</p>
+    <p class="sc-sub">PDFLokal gratis dan bakal terus gratis. Kalo kepakai, bantuin dikit yaa:</p>
     <div class="sc-actions">
       <button id="sc-share">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></svg>

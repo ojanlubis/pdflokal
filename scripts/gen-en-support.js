@@ -36,7 +36,7 @@
  * URL FORM: `/en/support`, no trailing slash, no .html (vercel.json has
  * cleanUrls + trailingSlash:false). Change SUPPORT_EN_PATH here, nowhere else.
  */
-import { mapMarkup, EN_PATH, SUPPORT_EN } from './gen-en-page.js';
+import { mapMarkup, pick, EN_PATH, SUPPORT_EN } from './gen-en-page.js';
 
 export const SUPPORT_EN_PATH = SUPPORT_EN; // defined once, in gen-en-page.js, which links to it
 export const SUPPORT_EN_FILE = 'en/support.html';
@@ -113,10 +113,14 @@ export function renderEnSupport(template, map, { origin }) {
   // ---- the English -------------------------------------------------------------
   const used = new Set();
   const missing = [];
-  html = mapMarkup(html, (key) => {
-    if (!Object.hasOwn(map, key)) { missing.push(key); return undefined; }
-    used.add(key);
-    return map[key];
+  // A key may carry a context ("Dukung PDFLokal @ href=\"/dukung\"": the footer
+  // link says "Support Me", the page's own heading says "Support PDFLokal"). The
+  // same mechanism gen-en-page.js uses; see pick() there.
+  html = mapMarkup(html, (key, _kind, ctx) => {
+    const k = pick(map, key, ctx);
+    if (k === null) { missing.push(key); return undefined; }
+    used.add(k);
+    return map[k];
   });
   const orphaned = Object.keys(map).filter((k) => !used.has(k));
   if (orphaned.length) {

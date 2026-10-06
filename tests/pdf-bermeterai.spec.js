@@ -212,7 +212,7 @@ test.describe('tanda-tangan-pdf: what we say about materai', () => {
     await page.goto('/tanda-tangan-pdf');
 
     await expect(page.locator('.ld-copy p', { hasText: 'Yang perlu kamu tahu' })).toHaveText(
-      'Yang perlu kamu tahu: menempelkan gambar meterai lewat Upload itu cuma gambar, bukan meterai yang sah. Untuk dokumen elektronik, yang sah cuma e-meterai dari Peruri. Saya lebih memilih menjelaskan batasannya daripada membiarkanmu mengira sudah beres padahal belum.',
+      'Yang perlu kamu tahu: menempelkan gambar meterai lewat Upload itu cuma gambar, bukan meterai yang sah. Untuk dokumen elektronik, yang sah cuma e-meterai dari Peruri. Lebih baik batasannya dijelaskan daripada membiarkanmu mengira sudah beres padahal belum.',
     );
 
     await expect(page.locator('.ld-faq details p', { hasText: 'tidak menerbitkan e-meterai' })).toHaveText(

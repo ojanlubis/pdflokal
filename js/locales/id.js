@@ -95,7 +95,7 @@ export default {
     // to a cover) is painted over text that stays in the PDF. PDF format only.
     coveredNote: 'Yang ditutup masih ada di file. Buat isi rahasia, unduh sebagai Gambar.',
     auto: 'Otomatis',
-    compressFailed: 'Kompres gagal, saya pakai ukuran asli ya',
+    compressFailed: 'Kompres gagal, pakai ukuran asli ya',
     meta: '{name}.pdf · {count} hal',
     pagesAll: '{count} halaman',
     pagesPicked: '{count} dipilih',
@@ -156,7 +156,7 @@ export default {
     },
     kompres: {
       dzTitle: 'Seret PDF yang mau dikompres',
-      dzHint: 'Ukuran hasilnya saya tunjukkan sebelum kamu unduh',
+      dzHint: 'Ukuran hasilnya kelihatan dulu sebelum kamu unduh',
     },
     ttd: {
       dzTitle: 'Seret PDF yang mau ditandatangani',
@@ -256,12 +256,12 @@ export default {
     ask: 'Gimana hasil editnya?',
     up: 'Bagus',
     down: 'Kurang pas',
-    thanks: 'Makasih, masukanmu ngebantu saya 🙏',
+    thanks: 'Makasi masukannyaa, ngebantu banget 🙏',
     noteQuestion: 'Apa yang kurang pas?',
     notePlaceholder: 'isi feedback biar kita bisa improve',
     noteLabel: 'Ceritakan apa yang kurang pas',
-    askTitle: 'Boleh saya minta dua potongan ini?',
-    askSub: 'Sebelum dan sesudahnya, biar saya bisa analisis fiturnya kurang di mana. Nggak ada isi file lain.',
+    askTitle: 'Boleh minta dua potongan ini?',
+    askSub: 'Sebelum dan sesudahnya, biar bisa dicek fiturnya kurang di mana. Nggak ada isi file lain.',
     cropBefore: 'Asli',
     cropAfter: 'Hasil',
     skip: 'Nggak usah',
@@ -320,7 +320,7 @@ export default {
   // The bug-report card (js/v2/bug-report-prompt.js): the founder's own words
   bugPrompt: {
     small: 'Halo user PDFLokal',
-    big: 'Mohon kabarin saya ya kalo ada bug, di sini',
+    big: 'Kabarin kalo ada bug yaa, di sini',
   },
 
   // Page placeholder before a page is rendered (js/render/page-view.js)
