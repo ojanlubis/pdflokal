@@ -114,6 +114,46 @@ create table if not exists feature_requests (
 );
 create index if not exists feature_requests_ts_idx on feature_requests (ts desc);
 
+-- ---- feature_ballots (2026-10-06) ----------------------------------------
+-- THE FEATURE VOTE'S BALLOT BOX (api/votes.js). ONE ROW PER visitor_id, TOTAL: the
+-- PRIMARY KEY is the one-ballot rule (his ruling 2026-10-06), so a second ballot from
+-- the same visitor is refused by the DATABASE, not by a client that a cleared browser
+-- walks past. The 1 to 3 chosen ids are ONE json-array column of ONE row, so a ballot
+-- is written whole or not at all (a single statement is atomic): a partial ballot
+-- cannot land.
+-- ADDITIVE AND IDEMPOTENT: a new table and one index, nothing above is altered or
+-- dropped. Same database as feature_requests on purpose (the ideas), the one the
+-- rail's read-only watch token cannot read. ONLY AGGREGATES LEAVE IT (GET /api/votes).
+-- ⚠️ MUST BE APPLIED BEFORE THE CODE THAT WRITES IT SHIPS. Until it exists a ballot's
+-- insert fails (logged by code only), the endpoint answers 503 and the card says the
+-- vote did not go through; nothing is lost silently.
+create table if not exists feature_ballots (
+  -- Lowercase UUID: api/votes.js lowercases it, so 'ABC...' and 'abc...' are one voter.
+  visitor_id text primary key,
+  ts text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  -- The page language the ballot was cast on ('id' or 'en'); null if not sent.
+  lang text,
+  -- 1 when the same send also carried a free-text idea (the idea itself is in feature_requests).
+  has_text integer not null default 0,
+  -- JSON array of feature ids from js/core/features.js, at most 3, e.g. ["pdf-word","watermark"].
+  features text not null default '[]',
+
+  constraint feature_ballots_visitor_id_shape_chk check (
+    visitor_id glob '[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]'
+  ),
+  constraint feature_ballots_ts_shape_chk check (
+    ts glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]*Z'
+  ),
+  constraint feature_ballots_lang_chk check (lang is null or lang in ('id', 'en')),
+  constraint feature_ballots_has_text_chk check (has_text in (0, 1)),
+  constraint feature_ballots_features_chk check (
+    json_valid(features) and json_type(features) = 'array' and json_array_length(features) <= 3
+  ),
+  -- A ballot is a choice or an idea, never nothing.
+  constraint feature_ballots_not_empty_chk check (json_array_length(features) > 0 or has_text = 1)
+);
+create index if not exists feature_ballots_ts_idx on feature_ballots (ts desc);
+
 -- ---- read side ----------------------------------------------------------
 -- Daily thumbs split + how many carried a note. Read the NOTES themselves
 -- straight from the table — they are the actual signal; this is the rate.

@@ -36,7 +36,7 @@
 export const config = { runtime: 'nodejs', api: { bodyParser: false } };
 
 import { tursoInsert } from './_turso.js';
-import { cleanVote, IDEA_MAX } from '../js/core/features.js';
+import { cleanVote, cleanIdea } from '../js/core/features.js';
 
 // ⚠️ TEST SEAM — same one api/t.js carries. Tests assert on the SQL and its
 // plain values (ours) and return { rowCount } or throw.
@@ -213,7 +213,7 @@ export default async function handler(req, res) {
       // more than three, or repeated), is not an idea we can file: dropped whole,
       // never repaired, the same rule the rail's feature_vote follows. The text
       // is capped at IDEA_MAX; images are never read on this path.
-      const idea = typeof body?.note === 'string' ? body.note.trim().slice(0, IDEA_MAX) : '';
+      const idea = cleanIdea(body?.note); // tags stripped, trimmed, capped at IDEA_MAX
       const vote = cleanVote(body?.features ?? []);
       if (!idea || !vote.ok) {
         res.status(204).end();

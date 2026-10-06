@@ -32,12 +32,20 @@ header says what it is); none of it ever receives a PDF. The ones that take user
   same database, never in `feedback`. No images are read on that path. The table is created by
   `scripts/turso-feedback-migration.sql` (idempotent) and **must exist before the code that writes
   it ships**; until then the insert fails, logged content-blind, and the idea is lost.
-- **`api/votes.js`** — GET only, no input. The feature vote's result: counts per feature id from the
-  `feature_vote` events on the rail, **one vote per feature per visitor** (the latest vote per
-  `visitor_id`, or `session_id` when there is none, wins; deduped at read time). Aggregates only:
-  no id, no row, no text, and nothing at all under 10 voters. Cached at the CDN for 10 minutes;
-  on any failure it answers `{voters:null,counts:null}`. It reads `events` only, so it cannot reach
-  `feedback` or `feature_requests`.
+- **`api/votes.js`** — the feature vote's ballot box. `POST` takes `{visitor_id, features, has_text,
+  lang}` and writes ONE row to `feature_ballots` in the same database (`pdflokal-feedback`):
+  **one ballot per `visitor_id`, total**, enforced by the table's primary key (the insert is
+  `on conflict do nothing`, so a second ballot writes zero rows and is answered 409). A missing or
+  malformed `visitor_id`, an id not on the list, more than 3, or a ballot with no choice and no idea
+  is a 400 and writes nothing; the 1 to 3 ids are one JSON column of one row, so a ballot lands
+  whole or not at all. The write goes through `_turso.js`, which checks the transport, then every
+  statement's own result (Turso answers HTTP 200 for a refused statement), then the row count: any
+  failure is a 503, never a "recorded". No free text is read (the idea goes to `feature_requests`
+  above, tag-stripped and capped at 500). `GET` returns aggregates only: counts per feature id and
+  the number of voters; no id, no row, no text, and nothing at all under 10 voters. Cached at the CDN
+  for 10 minutes; on any failure it answers `{voters:null,counts:null}`. The `feature_vote` rail
+  event is analytics only; nothing counts it. The table is created by the same idempotent
+  `scripts/turso-feedback-migration.sql` and **must exist before the code that writes it ships**.
 
 Both **fail closed**: if their env vars are absent the endpoint 204s and writes nothing. That
 property is load-bearing and also a trap — it silently swallowed a week of preview telemetry in
