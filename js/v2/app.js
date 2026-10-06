@@ -3184,9 +3184,12 @@ document.addEventListener('keydown', (e) => {
   // Never hijack typing surfaces (the inline editor stops propagation itself).
   if (e.target.matches?.('input, select, textarea, [contenteditable="true"]')) return;
   const mod = e.ctrlKey || e.metaKey;
-  if (mod && e.key === 'z') { e.preventDefault(); e.shiftKey ? doRedo() : doUndo(); }
-  else if (mod && e.key === 'y') { e.preventDefault(); doRedo(); }
-  else if (mod && e.key === 's') { e.preventDefault(); doDownload(); }
+  // WHY lowercased: Shift (or CapsLock) turns e.key into 'Z', so a bare
+  // `e.key === 'z'` never matched Ctrl/Cmd+Shift+Z and redo-by-keyboard never fired.
+  const key = e.key.toLowerCase();
+  if (mod && key === 'z') { e.preventDefault(); e.shiftKey ? doRedo() : doUndo(); }
+  else if (mod && key === 'y') { e.preventDefault(); doRedo(); }
+  else if (mod && key === 's') { e.preventDefault(); doDownload(); }
   else if ((e.key === 'Delete' || e.key === 'Backspace') && doc.selection.annotationId) {
     e.preventDefault(); deleteSelected();
   } else if (e.key === 'Escape') {
@@ -3196,7 +3199,7 @@ document.addEventListener('keydown', (e) => {
     setTool('select');
   } else if (!mod && doc.pages.length > 0) {
     // Tool verbs — same keys as the old editor (muscle memory carries over).
-    const k = e.key.toLowerCase();
+    const k = key;
     if (k === 'v') setTool('select');
     else if (k === 't') setTool('text');
     else if (k === 'w') setTool('whiteout');
