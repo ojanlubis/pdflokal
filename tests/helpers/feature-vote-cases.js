@@ -170,7 +170,7 @@ export function defineFeatureVoteSuite({ door }) {
       await expect(page.locator('#fv-form .fv-top-label')).toHaveText('Paling banyak dipilih:');
       await expect(page.locator('#fv-form .fv-top li')).toHaveText(['PDF ke Word', 'Tambah watermark', 'Simpan editan buat dilanjut nanti']);
       expect(await page.locator('#fv-form .fv-top').innerText()).not.toMatch(/\d/); // names only
-      await expect(page.locator('#fv-form .fv-coffee .sc-sub')).toHaveText('PDFLokal gratis dan bakal terus gratis. Kalau kepakai, bantu saya sedikit ya:');
+      await expect(page.locator('#fv-form .fv-coffee .sc-sub')).toHaveText('PDFLokal gratis dan bakal terus gratis. Kalo kepakai, bantuin dikit yaa:');
       await expect(page.locator('#fv-form .fv-coffee .sc-qr')).toBeHidden();
       await page.locator('#fv-form .fv-coffee button').click(); // "Traktir kopi"
       await expect(page.locator('#fv-form .fv-coffee .sc-qr img[alt="QRIS untuk traktir kopi"]')).toBeVisible();
