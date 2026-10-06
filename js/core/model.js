@@ -50,6 +50,47 @@ export function createAnnotation(type, props = {}) {
   return { id: nextId('anno'), type, ...props };
 }
 
+// ---- copy / paste -----------------------------------------------------------
+// SINGLE SOURCE OF TRUTH for "what of an annotation travels when it is copied".
+// WHY a per-type WHITELIST and not {...anno} minus a blacklist: an annotation
+// can be bound to the document's own original content (a Ganti cover's
+// replaceTargets/replaceBox, an OCR cover's ocrBox/paperImage, a replacement's
+// replaceCoverId/ocrCoverId/docFontFamily/fontDecision, a paragraph `block`).
+// Copying those would stamp a second cut onto the original or point at a cover
+// that is not its own. A whitelist means a binding added tomorrow cannot leak
+// into a paste until someone deliberately lists it here.
+//   - text:      visible text + style. A replacement's text copies as PLAIN text
+//                (it is the words the user sees); a paragraph `block` does not
+//                (its line layout cannot be reproduced as one plain line).
+//   - whiteout:  only a user-drawn one. A cover bound to the original (any of
+//                replaceTargets/replaceBox/ocrBox/paperImage) IS the binding.
+//   - signature: image (an immutable data-URL string, shared by reference as
+//                history snapshots and "Semua Hal." already do) + geometry.
+//   - anything else (watermark/pageNumber are unreachable from v2): not copyable.
+const COPY_FIELDS = {
+  text: ['text', 'x', 'y', 'fontSize', 'fontFamily', 'bold', 'italic', 'color'],
+  whiteout: ['x', 'y', 'width', 'height', 'color'],
+  signature: ['image', 'x', 'y', 'width', 'height'],
+};
+const DOC_BOUND_COVER = ['replaceTargets', 'replaceBox', 'ocrBox', 'paperImage'];
+
+// A NEW annotation (fresh id, no page) from `anno`, or null if it is not
+// copyable. Pure: never mutates `anno`, never adds to a doc (operations.js does).
+export function isCopyable(anno) {
+  if (!anno || !COPY_FIELDS[anno.type]) return false;
+  if (anno.type === 'text') return !anno.block;
+  if (anno.type === 'whiteout') return !DOC_BOUND_COVER.some((k) => anno[k] != null);
+  if (anno.type === 'signature') return !!anno.image;
+  return false;
+}
+
+export function cloneForPaste(anno) {
+  if (!isCopyable(anno)) return null;
+  const props = {};
+  for (const k of COPY_FIELDS[anno.type]) if (anno[k] !== undefined) props[k] = anno[k];
+  return createAnnotation(anno.type, props);
+}
+
 // A page. Immutable identity (id). Owns its annotations. `raster` is filled by
 // the render/import layer in Phase 1 (an image of the page) — null in pure core.
 export function createPage({

@@ -16,12 +16,12 @@
  *   - nothing hover-only; touch targets ≥44px
  */
 
-import { createDoc, createAnnotation, getPage, getSource, findAnnotation } from '../core/model.js';
+import { createDoc, createAnnotation, getPage, getSource, findAnnotation, isCopyable, cloneForPaste } from '../core/model.js';
 import { failureReason, failureCause } from '../core/failure-reason.js';
 import { isStandardFamily, unencodableInStandardFont } from '../core/text-encode.js';
 import {
   addAnnotation, removeAnnotation, updateAnnotation, clearSelection, selectAnnotation,
-  moveAnnotation, normalizePageWidths,
+  moveAnnotation, normalizePageWidths, duplicateAnnotation,
 } from '../core/operations.js';
 import { createHistory, record, undo, redo, canUndo, canRedo } from '../core/history.js';
 import { rasterFitsShape, rasterIsCurrent } from '../core/raster-key.js';
@@ -3182,6 +3182,74 @@ function deleteSelected() {
   else if (pageId) syncPage(pageId);
 }
 
+// ---- copy / cut / paste / duplicate (Canva/Figma-style) -----------------------------
+// The app's OWN clipboard, in memory only: the system clipboard is never read or
+// written (privacy is the product, and signature-modal.js owns image paste from
+// it). `annoClipboard` is a detached snapshot (core/model.js cloneForPaste), so
+// editing the source after Ctrl+C cannot change what Ctrl+V pastes. `pasteCount`
+// steps the paste +10px from the SOURCE position each time, Canva-style.
+let annoClipboard = null;
+let pasteCount = 0;
+
+function selectedFound() {
+  const id = doc.selection.annotationId;
+  return id ? findAnnotation(doc, id) : null;
+}
+
+// True when a copyable annotation is now on the app clipboard.
+function copySelected() {
+  const found = selectedFound();
+  if (!found || !isCopyable(found.annotation)) return false; // doc-bound kinds: see cloneForPaste
+  annoClipboard = cloneForPaste(found.annotation);
+  pasteCount = 0;
+  return true;
+}
+
+// The page a paste lands on: the selected object's page if it is on screen,
+// else the page under the viewport midline (focusedPageId), else the selection's
+// page, else the first page.
+function pasteTargetPageId() {
+  const found = selectedFound();
+  const vp = scrollEl.getBoundingClientRect();
+  const onScreen = (pageId) => {
+    const slot = slots.find((s) => s.page.id === pageId);
+    if (!slot) return false;
+    const r = slot.view.getBoundingClientRect();
+    return r.bottom > vp.top && r.top < vp.bottom;
+  };
+  if (found && onScreen(found.page.id)) return found.page.id;
+  if (focusedPageId && getPage(doc, focusedPageId)) return focusedPageId;
+  if (doc.selection.pageId && getPage(doc, doc.selection.pageId)) return doc.selection.pageId;
+  return doc.pages[0]?.id ?? null;
+}
+
+// ONE undo step: record, add + offset the copy, select it, repaint the pages involved.
+function placeCopy(pageId, src, n) {
+  if (!pageId || !isCopyable(src)) return null;
+  const prev = selectedFound();
+  record(history, doc);
+  const clone = duplicateAnnotation(doc, pageId, src, n);
+  if (!clone) return null;
+  selectAnnotation(doc, clone.id);
+  // The old selection's chrome must go: repaint its page too when it is another one.
+  if (prev && prev.page.id !== pageId) syncPage(prev.page.id);
+  syncPage(pageId);
+  return clone;
+}
+
+function pasteCopy() {
+  if (!annoClipboard) return false;
+  pasteCount += 1;
+  return !!placeCopy(pasteTargetPageId(), annoClipboard, pasteCount);
+}
+
+// Duplicate in place: +10px on the selection's own page, clipboard untouched
+// (Figma's Ctrl+D). The copy is selected, so a second press cascades.
+function duplicateSelected() {
+  const found = selectedFound();
+  return !!(found && placeCopy(found.page.id, found.annotation, 1));
+}
+
 // spec-live-surgery.md §5/§8.3 (increment 3): undo/redo can bring a page's
 // committed edits into or out of existence — capture the PRE-op pages so
 // syncEditedRasters can diff edit-signatures by page.id afterward and
@@ -3207,6 +3275,18 @@ document.addEventListener('keydown', (e) => {
   if (mod && key === 'z') { e.preventDefault(); e.shiftKey ? doRedo() : doUndo(); }
   else if (mod && key === 'y') { e.preventDefault(); doRedo(); }
   else if (mod && key === 's') { e.preventDefault(); doDownload(); }
+  else if (mod && !e.altKey && !e.shiftKey && 'cxvd'.includes(key) && key.length === 1 && !document.querySelector('dialog[open]')) {
+    // WHY the open-dialog guard: preventDefault on Ctrl+V's keydown suppresses the
+    // `paste` event, which the signature sheet needs for image paste. WHY no
+    // preventDefault when there is nothing to do: native behaviour stays intact.
+    // Shift is excluded (Ctrl+Shift+C is the browser's inspector). C/X also stand
+    // down while the user has native text selected somewhere (toast, sheet copy).
+    const textSelected = !!window.getSelection?.()?.toString();
+    if (key === 'c' && !textSelected) { if (copySelected()) e.preventDefault(); }
+    else if (key === 'x' && !textSelected) { if (copySelected()) { e.preventDefault(); deleteSelected(); } }
+    else if (key === 'v') { if (annoClipboard && pasteCopy()) e.preventDefault(); }
+    else if (key === 'd' && selectedFound()) { e.preventDefault(); duplicateSelected(); } // browsers bookmark on Ctrl+D
+  }
   else if (mod && !e.altKey && (key === 'b' || key === 'i') && selectedTextAnno()) {
     // Same as the format bar's B / I (preventDefault: Firefox opens bookmarks on Ctrl+B).
     e.preventDefault();

@@ -10,7 +10,7 @@
  * `mutatePages()` and its six-parallel-map dance simply don't exist here.
  */
 
-import { getPage, findAnnotation, getSource } from './model.js';
+import { getPage, findAnnotation, getSource, cloneForPaste } from './model.js';
 
 const clamp = (n, lo, hi) => Math.min(Math.max(n, lo), hi);
 
@@ -146,6 +146,22 @@ export function addAnnotation(doc, pageId, annotation) {
   if (!pg) return null;
   pg.annotations.push(annotation);
   return annotation;
+}
+
+// Paste/duplicate: a fresh copy of `src` on `pageId`, stepped (+10px x and y)
+// `n` times from the SOURCE's own position. moveAnnotation does the stepping,
+// so the clamp inside the page (in the rotated view frame) is the one every
+// move already uses. Returns the new annotation, or null if `src` is not
+// copyable (core/model.js cloneForPaste) or the page is gone. The caller
+// records history first: one paste = one undo step.
+export const PASTE_OFFSET = 10;
+export function duplicateAnnotation(doc, pageId, src, n = 1) {
+  if (!getPage(doc, pageId)) return null;
+  const clone = cloneForPaste(src);
+  if (!clone) return null;
+  addAnnotation(doc, pageId, clone);
+  moveAnnotation(doc, clone.id, PASTE_OFFSET * n, PASTE_OFFSET * n);
+  return clone;
 }
 
 export function updateAnnotation(doc, annotationId, patch) {
