@@ -336,4 +336,43 @@ export default {
     toLight: 'Ganti ke mode terang',
     toDark: 'Ganti ke mode gelap',
   },
+
+  // "Simpan editan" (js/v2/saved-docs-ui.js, js/v2/saved-session.js, app.js).
+  // DRAFT 2026-10-06: EVERY string in this block is a placeholder. The seat rewrites
+  // it through the copywriting skill and Fauzan approves it before anything ships
+  // (specs/spec-simpan-editan.md: "all user-facing strings are DRAFTS").
+  saved: {
+    menuSave: 'Simpan editan', // DRAFT
+    menuSaveTip: 'Simpan di browser ini supaya bisa dibuka lagi', // DRAFT
+    menuList: 'Editan tersimpan', // DRAFT
+    menuListTip: 'Buka atau hapus editan yang kamu simpan', // DRAFT
+    saved: 'Tersimpan di browser ini', // DRAFT
+    savedSafari: 'Tersimpan di browser ini. Safari menghapusnya kalau 7 hari nggak dibuka.', // DRAFT
+    updated: 'Simpanan diperbarui', // DRAFT
+    failQuota: 'Penyimpanan browser penuh, editan nggak bisa disimpan', // DRAFT
+    failBlocked: 'Browser ini nggak mengizinkan penyimpanan (mode privat?)', // DRAFT
+    failOther: 'Editan nggak bisa disimpan', // DRAFT
+    openFail: 'Editan itu nggak bisa dibuka', // DRAFT
+    askTitle: 'Lanjutkan editan terakhir?', // DRAFT
+    askBody: 'Editanmu tersimpan otomatis di browser ini. Nggak diupload ke mana-mana.', // DRAFT
+    askWhen: '{name}, diedit {when}', // DRAFT
+    askOpen: 'Buka lagi', // DRAFT
+    askLater: 'Nanti aja', // DRAFT
+    askAll: 'Lihat semua', // DRAFT
+    listTitle: 'Editan tersimpan', // DRAFT
+    listClose: 'Tutup', // DRAFT
+    listEmpty: 'Belum ada editan tersimpan.', // DRAFT
+    listManual: 'Yang kamu simpan', // DRAFT
+    listAuto: 'Terakhir dibuka', // DRAFT
+    listPages: '{count} halaman', // DRAFT
+    listOpen: 'Buka', // DRAFT
+    listOpenCopy: 'Buka salinan', // DRAFT
+    listDelete: 'Hapus', // DRAFT
+    listDeleteSure: 'Yakin hapus?', // DRAFT
+    listElsewhere: 'Terbuka di tab lain', // DRAFT
+    listHere: 'Sedang dibuka', // DRAFT
+    listStorage: 'Browser memakai {size} untuk PDFLokal di perangkat ini.', // DRAFT
+    listStorageNote: 'Ini penyimpanan browser-mu sendiri. Nggak ada yang diupload, dan browser boleh membersihkannya kapan saja.', // DRAFT
+    listSafari: 'Safari menghapus data situs yang 7 hari nggak dibuka.', // DRAFT
+  },
 };

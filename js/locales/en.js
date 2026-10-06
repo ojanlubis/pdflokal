@@ -328,4 +328,43 @@ export default {
     toLight: 'Switch to light mode',
     toDark: 'Switch to dark mode',
   },
+
+  // "Simpan editan" (js/v2/saved-docs-ui.js, js/v2/saved-session.js, app.js).
+  // DRAFT 2026-10-06: EVERY string in this block is a placeholder. The seat rewrites
+  // it through the copywriting skill and Fauzan approves it before anything ships
+  // (specs/spec-simpan-editan.md: "all user-facing strings are DRAFTS").
+  saved: {
+    menuSave: 'Save edits', // DRAFT
+    menuSaveTip: 'Save in this browser so you can open it again', // DRAFT
+    menuList: 'Saved edits', // DRAFT
+    menuListTip: 'Open or delete the edits you saved', // DRAFT
+    saved: 'Saved in this browser', // DRAFT
+    savedSafari: 'Saved in this browser. Safari deletes it if you do not visit for 7 days.', // DRAFT
+    updated: 'Saved copy updated', // DRAFT
+    failQuota: 'Browser storage is full, your edits could not be saved', // DRAFT
+    failBlocked: 'This browser does not allow saving (private mode?)', // DRAFT
+    failOther: 'Your edits could not be saved', // DRAFT
+    openFail: 'That saved edit could not be opened', // DRAFT
+    askTitle: 'Continue your last edit?', // DRAFT
+    askBody: 'Your edits were saved automatically in this browser. Nothing is uploaded.', // DRAFT
+    askWhen: '{name}, edited {when}', // DRAFT
+    askOpen: 'Reopen', // DRAFT
+    askLater: 'Not now', // DRAFT
+    askAll: 'See all', // DRAFT
+    listTitle: 'Saved edits', // DRAFT
+    listClose: 'Close', // DRAFT
+    listEmpty: 'No saved edits yet.', // DRAFT
+    listManual: 'Saved by you', // DRAFT
+    listAuto: 'Recently opened', // DRAFT
+    listPages: { one: '{count} page', other: '{count} pages' }, // DRAFT
+    listOpen: 'Open', // DRAFT
+    listOpenCopy: 'Open a copy', // DRAFT
+    listDelete: 'Delete', // DRAFT
+    listDeleteSure: 'Really delete?', // DRAFT
+    listElsewhere: 'Open in another tab', // DRAFT
+    listHere: 'Open now', // DRAFT
+    listStorage: 'Your browser uses {size} for PDFLokal on this device.', // DRAFT
+    listStorageNote: 'This is your own browser storage. Nothing is uploaded, and the browser may clear it at any time.', // DRAFT
+    listSafari: 'Safari deletes site data after 7 days without a visit.', // DRAFT
+  },
 };
