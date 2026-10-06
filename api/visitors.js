@@ -19,8 +19,12 @@
  *
  * PRIVACY: only an aggregate leaves this function. No id, no row, no input.
  *
- * COST: cached at the CDN for 10 minutes, so Turso sees a handful of reads an
- * hour no matter the traffic. On any failure it answers {visitors:null} with
+ * COST: cached at the CDN for an hour, so Turso sees about one read an hour per
+ * edge region no matter the traffic. Turso bills ROWS READ, not queries: on
+ * 2026-10-06 this one query had read 203M rows in 6 days (89% of the free
+ * month) because the planner picked the partial `events_visitor_id_idx` and
+ * walked EVERY row that has a visitor_id (~276k per call). INDEXED BY pins
+ * the `ts` index, so a call reads only today's rows. Do not remove it. On any failure it answers {visitors:null} with
  * a short cache, and the page shows nothing — a missing count is honest, a
  * wrong one is not.
  */
@@ -43,7 +47,7 @@ export async function countVisitors({ now = Date.now(), url, token } = {}) {
   const since = startOfDayWIB(now);
   const r = await tursoScalar({
     url, token,
-    sql: 'select count(distinct visitor_id) from events where ts >= ? and visitor_id is not null',
+    sql: 'select count(distinct visitor_id) from events indexed by events_ts_idx where ts >= ? and visitor_id is not null',
     args: [{ type: 'text', value: since }],
   });
   const n = r.ok ? Number(r.value) : NaN;
@@ -62,6 +66,6 @@ export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   res.setHeader('Cache-Control', visitors === null
     ? 'public, s-maxage=60'
-    : 'public, max-age=300, s-maxage=600, stale-while-revalidate=3600');
+    : 'public, max-age=600, s-maxage=3600, stale-while-revalidate=3600');
   res.status(200).end(JSON.stringify({ visitors }));
 }

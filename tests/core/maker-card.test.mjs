@@ -103,6 +103,13 @@ test('countVisitors: a real count comes back as a number', async () => {
   assert.equal(sent.requests[0].stmt.args[0].value, '2026-09-22T17:00:00.000Z', 'window starts at midnight WIB today');
 });
 
+test('countVisitors: pins the ts index (the visitor_id index read every row, 2026-10-06)', async () => {
+  let sent;
+  await withFetch(async (url, init) => { sent = JSON.parse(init.body); return turso(row(184))(); }, () => countVisitors(cfg));
+  assert.match(sent.requests[0].stmt.sql, /\bindexed by events_ts_idx\b/i,
+    'without it SQLite walks events_visitor_id_idx end to end: ~276k rows read per call on the free quota');
+});
+
 test('startOfDayWIB: the Jakarta calendar day, not the UTC one', () => {
   // 17:00Z is 00:00 WIB — the boundary itself belongs to the new day.
   assert.equal(startOfDayWIB(Date.parse('2026-09-24T17:00:00Z')), '2026-09-24T17:00:00.000Z');
