@@ -364,6 +364,45 @@ test.describe('a reopened document and the leave guard', () => {
   });
 });
 
+test.describe('opening a saved document over a dirty one', () => {
+  test('the guard that was up for the old document comes down for the reopened one', async ({ page }) => {
+    const seen = [];
+    page.on('dialog', (d) => { seen.push(d.type()); d.accept(); });
+    await openAndEdit(page);
+    await menuSave(page);
+    await expect.poll(async () => (await storeList(page)).filter((e) => e.kind === 'manual').length).toBe(1);
+    // A second, edited, undownloaded document replaces it (Buka Baru).
+    await page.click('#btn-file');
+    await page.click('#fm-new');
+    await page.setInputFiles('#file-input', FIXTURE);
+    await expectFirstPage(page);
+    await addText(page, 'Dokumen kedua');
+    const armed = () => page.evaluate(() => window.v2.history.current !== window.v2.history.cleanId);
+    expect(await armed(), 'precondition: the second document is dirty, so the guard is up').toBe(true);
+
+    await page.click('#btn-file');
+    await page.click('#fm-saved');
+    const manual = page.locator('#saved-list .sv-row', { has: page.locator('.sv-open') }).filter({ hasText: 'Yang kamu simpan' });
+    await page.locator('#saved-list .sv-group', { hasText: 'Yang kamu simpan' }).waitFor();
+    await page.locator('#saved-list .sv-list').first().locator('.sv-open').click();
+    await expect(page.locator('#saved-list')).not.toBeVisible();
+    void manual;
+
+    expect(await armed()).toBe(false);
+    expect(await page.evaluate(() => window.v2.history.undoStack.length)).toBe(0);
+    // The document that was replaced was not lost: its autosave holds it.
+    await expect.poll(async () => (await storeList(page)).filter((e) => e.kind === 'auto').length, { timeout: 8000 }).toBeGreaterThan(0);
+    const texts = await page.evaluate(() => window.v2.saved.store.list().then((es) => Promise.all(es.filter((e) => e.kind === 'auto')
+      .map((e) => window.v2.saved.store.load(e.id).then((l) => JSON.stringify(l.state))))));
+    expect(texts.some((t) => t.includes('Dokumen kedua'))).toBe(true);
+
+    seen.length = 0;
+    await page.mouse.click(5, 5);
+    await page.reload();
+    expect(seen).toEqual([]);
+  });
+});
+
 test.describe('the Ojan card waits for the reopen dialog', () => {
   const approved = (src) => src.replaceAll('approved: false', 'approved: true');
   async function mock(page) {
