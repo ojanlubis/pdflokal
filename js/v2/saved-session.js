@@ -58,7 +58,6 @@ export function createSavedSession({
   let disabled = false;       // storage blocked: autosave is off for this session
   let autoFailureToasted = false;
   let persistAsked = false;
-  let inFlight = Promise.resolve();
 
   const scheduler = createAutosaveScheduler({
     run: () => runAutosave(),
@@ -86,12 +85,11 @@ export function createSavedSession({
   }
 
   // The open document is going away ("Buka Baru", or another entry replacing it):
-  // save what is pending NOW (run() reads the live doc synchronously, before the
-  // caller replaces it), wait for the write, release the locks. Never throws.
+  // save what is pending NOW and wait for the write (the caller replaces the
+  // document only after this resolves), then release the locks. Never throws.
   async function end() {
     try {
-      scheduler.flush();
-      await inFlight;
+      await scheduler.drain(); // a change that landed behind a save in flight is saved too
     } catch { /* a failed last save is reported by its own path */ }
     scheduler.cancel();
     releaseSlot();
@@ -145,7 +143,6 @@ export function createSavedSession({
       await mine.ready;
       await commit(job, await protectedIds());
     })();
-    inFlight = work.catch(() => {});
     return work;
   }
 

@@ -357,6 +357,37 @@ test('scheduler: a change that lands WHILE a save runs is saved afterwards, neve
   assert.equal(runs, 2);
 });
 
+test('scheduler: drain() saves a change that is pending BEHIND a save in flight (Buka Baru during an autosave must not lose it)', async () => {
+  const T = fakeTimers(); let runs = 0; let release; const order = [];
+  const s = createAutosaveScheduler({
+    run: () => { runs++; order.push(`start${runs}`); return runs === 1 ? new Promise((r) => { release = () => { order.push('end1'); r(); }; }) : Promise.resolve(); },
+    setTimer: T.setTimer, clearTimer: T.clearTimer,
+  });
+  s.touch(); await T.advance(1000);       // save 1 starts and hangs
+  s.touch();                              // a newer change lands while it runs
+  const drained = s.drain();
+  await T.advance(0);
+  assert.equal(runs, 1, 'the second save waits for the first');
+  release();
+  await drained;
+  assert.equal(runs, 2, 'drain saved the newer change too');
+  assert.deepEqual(order, ['start1', 'end1', 'start2']);
+  assert.equal(s.pending, false);
+});
+
+test('scheduler: drain() with nothing pending returns at once, and gives up on a draft that never closes', async () => {
+  const T = fakeTimers(); let runs = 0; let open = true;
+  const s = createAutosaveScheduler({ run: async () => { runs++; }, canRun: () => !open, setTimer: T.setTimer, clearTimer: T.clearTimer });
+  await s.drain();
+  assert.equal(runs, 0);
+  s.touch();
+  await s.drain(); // an editor draft is open: do not save a half-made edit, do not hang either
+  assert.equal(runs, 0);
+  open = false;
+  await s.drain();
+  assert.equal(runs, 1);
+});
+
 test('scheduler: canRun false (an editor draft is open) postpones, and saves once it is closed', async () => {
   const T = fakeTimers(); let runs = 0; let open = true;
   const s = createAutosaveScheduler({ run: async () => { runs++; }, canRun: () => !open, setTimer: T.setTimer, clearTimer: T.clearTimer });

@@ -185,7 +185,9 @@ export function reopenCandidate(entries, heldElsewhere) {
 //   - `canRun()` false (the app says an editor draft is open: a Ganti cover that
 //     exists before its replacement does) postpones, polling every `delay`,
 //     rather than saving a half-made edit;
-//   - flush() saves now if anything is pending (pagehide); cancel() forgets;
+//   - flush() saves now if anything is pending and nothing is running (pagehide: synchronous,
+//     best effort); drain() also waits out a save in flight and saves what landed behind it;
+//     cancel() forgets;
 //   - run() throwing is reported to onError and never stops later saves.
 export function createAutosaveScheduler({
   run, canRun = () => true, delay = AUTOSAVE_DELAY_MS, onError = () => {},
@@ -194,6 +196,7 @@ export function createAutosaveScheduler({
   let timer = null;
   let dirty = false;
   let running = false;
+  let current = Promise.resolve(); // the save in flight; settles AFTER `running` is cleared
 
   const arm = () => {
     if (timer != null) clearTimer(timer);
@@ -215,7 +218,7 @@ export function createAutosaveScheduler({
     // empty one that replaces it a moment later.
     let started;
     try { started = Promise.resolve(run()); } catch (err) { started = Promise.reject(err); }
-    started
+    current = started
       .catch((err) => { try { onError(err); } catch { /* reporting never breaks saving */ } })
       .finally(() => { running = false; if (dirty && timer == null) arm(); });
   }
@@ -226,6 +229,21 @@ export function createAutosaveScheduler({
       if (!dirty || running || !canRun()) return;
       if (timer != null) { clearTimer(timer); timer = null; }
       go();
+    },
+    // Everything pending is saved, INCLUDING a change that landed behind a save in flight
+    // (flush() skips those: one run at a time). The caller is about to replace the document
+    // ("Buka Baru", opening another entry), so it waits. Returns without saving while an editor
+    // draft is open (canRun false), because a half-made edit is not worth saving and a draft that
+    // never closes must not hang the caller. At most a few rounds: a document that changes
+    // faster than it can be saved is not drained forever.
+    async drain() {
+      for (let round = 0; round < 4; round++) {
+        if (running) await current;
+        if (!dirty || !canRun()) return;
+        if (timer != null) { clearTimer(timer); timer = null; }
+        go();
+        await current;
+      }
     },
     cancel() { dirty = false; if (timer != null) { clearTimer(timer); timer = null; } },
     get pending() { return dirty; },
