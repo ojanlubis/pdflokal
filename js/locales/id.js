@@ -323,13 +323,39 @@ export default {
     big: 'Kabarin kalo ada bug yaa, di sini',
   },
 
-  // The feature vote card (js/v2/feature-vote.js). Its static copy (title, hint,
-  // option labels, the idea box) is markup in index.html; these are the lines the
-  // script writes. DRAFT: the founder approves every string.
+  // The feature vote card (js/v2/feature-vote.js, v2 2026-10-06). Every word on it
+  // is here; the markup in index.html is a skeleton. Strings marked
+  // DRAFT-APPROVED-BY-HIM are his, verbatim (his spelling and line breaks, do not
+  // "fix"). Every other string is a DRAFT: the seat wrote it through the
+  // copywriting skill, reference/vote-v2-copy-draft-2026-10-06.md, and he edits.
   featureVote: {
-    picked: '{n} dari {max} dipilih',
-    thanks: 'Makasih!',
-    thanksTop: 'Makasih! Yang paling banyak diminta:',
+    // DRAFT-APPROVED-BY-HIM (step 1, his voice; one line per <p>)
+    invite: ['Halo guyss.', 'Mau bikin fitur baru tp bingung fiturnya apa.', 'Bantu voting doong... makasii'],
+    start: 'Pilih fitur', // DRAFT
+    later: 'Nanti aja', // DRAFT
+    title: 'Fitur apa yang kamu butuh?', // DRAFT
+    hint: 'Pilih maksimal 3', // DRAFT
+    picked: '{n} dari {max} dipilih', // DRAFT
+    idea: 'Belum ada di sini? Tulis aja', // DRAFT
+    send: 'Kirim pilihan', // DRAFT
+    failed: 'Pilihanmu belum terkirim. Coba lagi ya.', // DRAFT: shown when the ballot was refused or could not reach the server
+    // DRAFT-APPROVED-BY-HIM (the after-vote line: thanks AND the promise to tell them here)
+    thanks: 'Makasi votingnyaa. Kalo udah jadi nnti dikabarin di sini yaa',
+    top: 'Paling banyak dipilih:', // DRAFT
+    close: 'Tutup', // DRAFT
+    // DRAFT: the maker card's one line when a feature this person voted for has shipped (js/core/features.js SHIPPED); the wording is the one he gave the seat on 2026-10-06, not yet read as a card
+    shipped: '{feature} udah jadi nih. Kamu salah satu yang milih ini, makasii',
+    // DRAFT: one label per feature, IN THE ORDER of FEATURES (js/core/features.js)
+    labels: [
+      'PDF ke Word',
+      'PDF ke Excel',
+      'Simpan editan buat dilanjut nanti',
+      'Kunci dan buka PDF yang pakai password',
+      'Isi formulir PDF',
+      'Scan dokumen pakai kamera HP',
+      'Tempel gambar atau logo',
+      'Tambah watermark',
+    ],
   },
 
   // Page placeholder before a page is rendered (js/render/page-view.js)

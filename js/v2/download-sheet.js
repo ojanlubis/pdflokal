@@ -101,7 +101,7 @@ export function fmtMB(bytes) {
 // deps = {
 //   modal, getDoc, getBaseName,
 //   pickPages: () => Promise<pageIds[]|null>   — opens Kelola Halaman in pick mode
-//   download: (blob, filename) => void
+//   download: (blob, filename, { whole }) => void   — whole: all pages, not a picked subset
 //   onWholeDocExported?: () => void  — a download of ALL pages finished (never a picked subset)
 //   toast: (msg) => void
 // }
@@ -613,7 +613,7 @@ export function createDownloadSheet(deps) {
         // classify our own placeholder, which names nothing.
         if (!src) throw state.buildError || new Error('build missing');
         // No success toast: the BERES stamp (download chokepoint) is the one voice.
-        deps.download(new Blob([src.bytes], { type: 'application/pdf' }), `${baseName}-pdflokal.pdf`);
+        deps.download(new Blob([src.bytes], { type: 'application/pdf' }), `${baseName}-pdflokal.pdf`, { whole: !state.picked });
       } else {
         // The built PDF when we have it (it carries the annotations); the raw
         // source otherwise, but only where that is provably the whole truth —
@@ -653,12 +653,12 @@ export function createDownloadSheet(deps) {
         }
         if (files.length === 1) {
           const mime = state.imgfmt === 'png' ? 'image/png' : 'image/jpeg';
-          deps.download(new Blob([files[0].bytes], { type: mime }), files[0].name);
+          deps.download(new Blob([files[0].bytes], { type: mime }), files[0].name, { whole: !state.picked });
         } else {
           main.textContent = tr('sheet.progress.zip');
           await new Promise((r) => setTimeout(r, 30)); // let the label paint before the sync zip
           const zip = zipFiles(files);
-          deps.download(new Blob([zip], { type: 'application/zip' }), `${baseName}-gambar.zip`);
+          deps.download(new Blob([zip], { type: 'application/zip' }), `${baseName}-gambar.zip`, { whole: !state.picked });
           deps.toast(tr('sheet.toast.zipDone', { count: n }));
         }
       }

@@ -57,7 +57,7 @@ function names(fn) {
 // changing this list, which is the whole point.
 // ---------------------------------------------------------------------------
 const GA4_ONLY = [
-  'client_error', 'download', 'editor_action', 'file_failed', 'file_loaded',
+  'client_error', 'donate_tap', 'download', 'editor_action', 'file_failed', 'file_loaded',
   'gabungkan_used', 'ganti_no_text_layer', 'intent_armed', 'pwa_card_open',
   'pwa_install', 'pwa_installed', 'share_card_shown', 'share_sent', 'share_tap',
   'template_card', 'tester_optin', 'tool_opened', 'vote_playstore',
@@ -70,6 +70,15 @@ const GA4_ONLY = [
  * share themselves" — and only GA4 carries source. The first-party rail stores
  * no referrer or UTM by design. Ad-blocking drops the shown/tap/sent funnel and
  * the arrivals by the same factor, so the ratios survive it. */
+
+/* `donate_tap` added 2026-10-06, with a `surface` field ('share-card' | 'vote'). It
+ * is the Traktir kopi tap of the share card AND of the feature vote's last step,
+ * and it sits beside `share_card_shown` (which the vote's coffee step also sends,
+ * tagged surface:'vote') for the same reason they are here: the question is "did a
+ * person who was shown the coffee ask tap it, and from which door", read next to
+ * the visitor's traffic source, which only GA4 carries. A RATIO, so ad-blocking
+ * drops numerator and denominator alike. (`surface`, never `source`: GA4 reads
+ * `source` as the session's traffic source, see lib/analytics.js GA4_RESERVED.) */
 
 /* `template_card` added 2026-09-03, and the test's own question answered rather
  * than waved past: it belongs on THIS rail, not the first-party one, because the

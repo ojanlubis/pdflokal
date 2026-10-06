@@ -1088,22 +1088,102 @@
       "js/v2/maker-card.js"
     ]
   },
+  "featureVote.invite": {
+    "text": [
+      "Halo guyss.",
+      "Mau bikin fitur baru tp bingung fiturnya apa.",
+      "Bantu voting doong... makasii"
+    ],
+    "src": [
+      "js/v2/feature-vote.js"
+    ]
+  },
+  "featureVote.start": {
+    "text": "Pilih fitur",
+    "src": [
+      "js/v2/feature-vote.js"
+    ]
+  },
+  "featureVote.later": {
+    "text": "Nanti aja",
+    "src": [
+      "js/v2/feature-vote.js"
+    ]
+  },
+  "featureVote.title": {
+    "text": "Fitur apa yang kamu butuh?",
+    "src": [
+      "js/v2/feature-vote.js"
+    ]
+  },
+  "featureVote.hint": {
+    "text": "Pilih maksimal 3",
+    "src": [
+      "js/v2/feature-vote.js"
+    ]
+  },
   "featureVote.picked": {
     "text": "{n} dari {max} dipilih",
     "src": [
       "js/v2/feature-vote.js"
     ]
   },
-  "featureVote.thanks": {
-    "text": "Makasih!",
+  "featureVote.idea": {
+    "text": "Belum ada di sini? Tulis aja",
     "src": [
       "js/v2/feature-vote.js"
     ]
   },
-  "featureVote.thanksTop": {
-    "text": "Makasih! Yang paling banyak diminta:",
+  "featureVote.send": {
+    "text": "Kirim pilihan",
     "src": [
       "js/v2/feature-vote.js"
+    ]
+  },
+  "featureVote.failed": {
+    "text": "Pilihanmu belum terkirim. Coba lagi ya.",
+    "src": [
+      "js/v2/feature-vote.js"
+    ]
+  },
+  "featureVote.thanks": {
+    "text": "Makasi votingnyaa. Kalo udah jadi nnti dikabarin di sini yaa",
+    "src": [
+      "js/v2/feature-vote.js"
+    ]
+  },
+  "featureVote.top": {
+    "text": "Paling banyak dipilih:",
+    "src": [
+      "js/v2/feature-vote.js"
+    ]
+  },
+  "featureVote.close": {
+    "text": "Tutup",
+    "src": [
+      "js/v2/feature-vote.js"
+    ]
+  },
+  "featureVote.shipped": {
+    "text": "{feature} udah jadi nih. Kamu salah satu yang milih ini, makasii",
+    "src": [
+      "js/v2/maker-card.js"
+    ]
+  },
+  "featureVote.labels": {
+    "text": [
+      "PDF ke Word",
+      "PDF ke Excel",
+      "Simpan editan buat dilanjut nanti",
+      "Kunci dan buka PDF yang pakai password",
+      "Isi formulir PDF",
+      "Scan dokumen pakai kamera HP",
+      "Tempel gambar atau logo",
+      "Tambah watermark"
+    ],
+    "src": [
+      "js/v2/feature-vote.js",
+      "js/v2/maker-card.js"
     ]
   }
 }

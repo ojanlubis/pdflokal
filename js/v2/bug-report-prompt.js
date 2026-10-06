@@ -183,7 +183,8 @@ export function createBugReportPrompt() {
   // first commit — arm, then drag — so on the EDIT trigger this was the common
   // case, not a corner. A toast always self-clears after 2.6s (app.js toast()),
   // so waiting on it is short and bounded.
-  const OCCUPANTS = ['#support-card.show', '#vote-card.show', '#toast.show'];
+  // `dialog[open]` joined 2026-10-06 with the feature vote, a modal that must never share the screen with this card.
+  const OCCUPANTS = ['#support-card.show', '#vote-card.show', '#toast.show', 'dialog[open]'];
   const SETTLE_MS = 450; // celebrate's own card appears 200ms after the download
   const POLL_MS = 400;
   // The celebrate card waits on the USER to close it, who may never do so. After

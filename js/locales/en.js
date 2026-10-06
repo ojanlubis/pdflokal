@@ -318,10 +318,33 @@ export default {
     big: 'Please let me know about any bugs, here',
   },
 
+  // The feature vote card. Written from the same facts as id.js, not translated word
+  // for word; all DRAFT until he reads them (the step-1 and after-vote lines follow
+  // his casual tone: his Indonesian is the source).
   featureVote: {
+    invite: ['Hey guys.', "I want to build a new feature but I can't decide which one.", 'Help me vote pleaseee... thankss'],
+    start: 'Pick features',
+    later: 'Maybe later',
+    title: 'Which features do you need?',
+    hint: 'Pick up to 3',
     picked: '{n} of {max} picked',
-    thanks: 'Thanks!',
-    thanksTop: 'Thanks! Most requested so far:',
+    idea: 'Not here yet? Just write it',
+    send: 'Send my picks',
+    failed: "Your picks didn't go through. Try again.",
+    thanks: "Thanks for votingg. When it's done I'll tell you here ok",
+    top: 'Most picked so far:',
+    close: 'Close',
+    shipped: "{feature} is done. You're one of the people who picked it, thankss",
+    labels: [
+      'PDF to Word',
+      'PDF to Excel',
+      'Save your edits to continue later',
+      'Lock and unlock password-protected PDFs',
+      'Fill in PDF forms',
+      'Scan documents with your phone camera',
+      'Add an image or logo',
+      'Add a watermark',
+    ],
   },
 
   render: { loading: 'loading…' },

@@ -30,7 +30,7 @@
 import { validateEvent } from '../core/telemetry-schema.js';
 import { validateSample } from '../core/feedback-sample.js';
 import { validateShot } from '../core/feedback-shot.js';
-import { cleanVote, IDEA_MAX } from '../core/features.js';
+import { cleanVote, cleanIdea } from '../core/features.js';
 
 const ENDPOINT = '/api/t';
 const FLUSH_AT = 10;
@@ -374,7 +374,7 @@ export function feedback(rating, note, sample, shot) {
 export function featureRequest(features, text) {
   try {
     const vote = cleanVote(features);
-    const note = typeof text === 'string' ? text.trim().slice(0, IDEA_MAX) : '';
+    const note = cleanIdea(text);
     if (!vote.ok || !note) return;
     const body = JSON.stringify({
       session_id: sessionId, app_version: appVersion, kind: 'feature_request', features: vote.ids, note,
@@ -387,5 +387,39 @@ export function featureRequest(features, text) {
     }
   } catch {
     // Feedback can NEVER throw into app code — same law as tel().
+  }
+}
+
+/**
+ * THE BALLOT (js/v2/feature-vote.js; api/votes.js is the box). One per visitor_id,
+ * ever: the server answers 409 when this browser's visitor_id has already voted.
+ * Unlike every other function in this file this one is AWAITED and its answer
+ * matters: the card must not say "makasih" for a ballot that did not land.
+ *   'recorded'  the server wrote it
+ *   'already'   this visitor_id has voted before (another day, another tab, cleared storage)
+ *   'failed'    refused, offline, unreachable, or no visitor_id to vote under
+ * Never throws. Carries ids, a bool, the page language and visitor_id: no text.
+ * @param {string[]} features ids from js/core/features.js, at most three
+ * @param {boolean} hasText the same send also carried an idea (featureRequest)
+ * @returns {Promise<'recorded'|'already'|'failed'>}
+ */
+export async function submitBallot(features, hasText) {
+  try {
+    const vote = cleanVote(features);
+    if (!vote.ok || !visitorId || typeof fetch !== 'function') return 'failed';
+    const r = await fetch('/api/votes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'omit',
+      body: JSON.stringify({
+        visitor_id: visitorId, features: vote.ids, has_text: hasText === true,
+        lang: document.documentElement.lang === 'en' ? 'en' : 'id',
+      }),
+    });
+    if (r.status === 200) return 'recorded';
+    if (r.status === 409) return 'already';
+    return 'failed';
+  } catch {
+    return 'failed';
   }
 }

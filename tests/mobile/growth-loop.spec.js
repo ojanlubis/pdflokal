@@ -32,11 +32,12 @@ test.describe('growth loop — mobile', () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
       localStorage.setItem('pdflokal-ps-voted', '1');
-      // Same idea for the feature vote (2026-10-02): after a browser's second
-      // download it takes the moment from the share/tip card, and these tests
-      // download several times. Marked answered, the moment falls through to
-      // share/tip. The vote's own gating is tests/feature-vote.spec.js.
-      localStorage.setItem('pdflokal_vote_done', 'dismissed');
+      // Same idea for the feature vote (2026-10-02, v2 2026-10-06): it follows
+      // EVERY whole-document download and takes the moment from the share/tip card,
+      // and these tests download several times. Marked voted, the moment falls
+      // through to share/tip (a "Nanti aja" would only quiet it for one day).
+      // The vote's own gating is tests/feature-vote.spec.js.
+      localStorage.setItem('pdflokal_vote_done', 'voted');
     });
   });
 

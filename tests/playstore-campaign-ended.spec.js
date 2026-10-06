@@ -32,6 +32,15 @@ async function downloadOnce(page) {
 }
 
 test.describe('Play Store vote card — campaign ended', () => {
+  // The FEATURE vote (2026-10-06) is offered after every whole-document download
+  // and takes the moment from share/tip when due. This file is about the Play Store
+  // drive, so the feature vote is marked answered here: share/tip then takes the
+  // moment exactly as it did before. The feature vote's own gating is
+  // tests/feature-vote.spec.js.
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('pdflokal_vote_done', 'voted'));
+  });
+
   test('a download never shows the vote card; share/tip takes the moment as normal', async ({ page }) => {
     await page.goto('/');
     await page.setInputFiles('#file-input', FIXTURE);

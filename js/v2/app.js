@@ -265,7 +265,9 @@ function hideProcessing() {
   lpFill.classList.remove('lp-indet');
 }
 
-function download(blob, filename) {
+// `whole`: the file is the whole document, not a picked subset (Ekstrak, or the
+// Unduh sheet's chosen pages). The feature vote follows only whole-document downloads.
+function download(blob, filename, { whole = false } = {}) {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = filename;
@@ -273,7 +275,7 @@ function download(blob, filename) {
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
   // The chokepoint every export path funnels through — celebrate here, AFTER
   // the save was triggered. (Wave 5: reward the "I got my file" moment.)
-  celebration.onDownloadSuccess();
+  celebration.onDownloadSuccess({ whole });
   // The bug-report prompt's OTHER trigger (founder, 2026-09-16: "pertamakali
   // berhasil download sama pertamakali commit editan di hari itu"). Both call the
   // same capped entry point, so "whichever happens first" falls out of the cap
