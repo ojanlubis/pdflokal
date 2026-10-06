@@ -233,7 +233,11 @@ export function createFeatureVote() {
     sending = true;
     errorEl.hidden = true;
     sendBtn.disabled = true;
-    const result = await (telemetry.submitBallot?.(ids, text !== '') ?? 'failed');
+    // No usable visitor_id (private mode, blocked storage): there is no one to hold a
+    // ballot for, so no ballot is sent and nothing is remembered as voted. An idea,
+    // if there is one, is still filed (its visitor_id is simply null).
+    const noVisitor = telemetry.hasVisitorId?.() === false;
+    const result = noVisitor ? 'no-visitor' : await (telemetry.submitBallot?.(ids, text !== '') ?? 'failed');
     sending = false;
     if (result === 'failed') {
       errorEl.textContent = tr('featureVote.failed');
@@ -247,7 +251,7 @@ export function createFeatureVote() {
     if (result === 'recorded') {
       tel('feature_vote', { features: ids, has_text: text !== '' });
       rememberVote(ids);
-    } else {
+    } else if (result === 'already') {
       rememberVote([]); // voted before: we do not know what they picked then, so we never claim to
     }
     showDone();
@@ -306,6 +310,8 @@ export function createFeatureVote() {
     // this download's moment, so celebrate.js withholds the share/coffee card from
     // the rest of the session.
     maybeShow({ whole, supportShownThisSession }) {
+      // No visitor_id means no ballot can be held (one per visitor_id): do not invite.
+      if (telemetry.hasVisitorId?.() === false) return false;
       if (pending || !shouldOfferVote({
         whole, voted: isVoted(), nantiDay: nantiDay(), today: dayKey(), supportShownThisSession,
       })) return false;

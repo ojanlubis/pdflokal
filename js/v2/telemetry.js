@@ -117,6 +117,11 @@ function readVisitorId() {
 }
 const visitorId = readVisitorId();
 
+// Whether this browser could keep a visitor_id (false in private mode or with storage
+// blocked). The feature vote is one ballot per visitor_id, so without one it is not
+// offered and cannot be cast (js/v2/feature-vote.js).
+export function hasVisitorId() { return visitorId !== null; }
+
 // <meta name="pdflokal-rev"> is stamped at deploy time (commit SHA) when
 // present; local dev and any page that doesn't carry it are honestly 'dev'
 // rather than guessing — api/t.js's own APP_VERSION_RE only accepts exactly

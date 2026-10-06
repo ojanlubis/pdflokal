@@ -701,3 +701,14 @@ test('the vote is one concern in the files that matter: whole-document only, and
   assert.equal([...sheet.matchAll(/\{ whole: !state\.picked \}/g)].length, 3, 'every download from the Unduh sheet says whether it was the whole document');
   assert.ok(!/download\(new Blob\(\[bytes\][^;]*whole/.test(app), 'Ekstrak (a subset) never says whole');
 });
+
+test('no usable visitor_id: telemetry says so, the offer is gated on it, and the send path never submits a ballot without one', () => {
+  const tel = read('js/v2/telemetry.js');
+  assert.match(tel, /export function hasVisitorId\(\) \{ return visitorId !== null; \}/);
+  const fv = read('js/v2/feature-vote.js');
+  const gate = fv.indexOf('telemetry.hasVisitorId?.() === false) return false;');
+  assert.ok(gate > fv.indexOf('maybeShow('), 'maybeShow refuses to invite without a visitor_id');
+  assert.match(fv, /noVisitor \? 'no-visitor' : await/, 'send() skips the ballot without a visitor_id');
+  assert.ok(fv.indexOf("result === 'recorded'") < fv.indexOf('rememberVote(ids)'), 'ids are remembered only for a recorded ballot');
+  assert.ok(!/else\s*\{[^}]*rememberVote\(ids\)/.test(fv), 'no other branch remembers ids');
+});

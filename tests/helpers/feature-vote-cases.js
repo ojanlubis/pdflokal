@@ -358,6 +358,57 @@ export function defineFeatureVoteSuite({ door }) {
       expect(await ls(page, 'pdflokal_vote_ids')).toBe('[]'); // we do not know what they picked before
     });
 
+    test('NO visitor_id (private mode): the auto door stays shut; the menu still opens it, a send files only the idea, sends no ballot and remembers no vote', async ({ page }) => {
+      const { ballots } = await wire(page);
+      // storage that "accepts" the write but never keeps the visitor id: exactly what readVisitorId() treats as no id
+      await page.addInitScript(() => {
+        const set = Storage.prototype.setItem;
+        Storage.prototype.setItem = function (k, v) { if (k === 'pdflokal_visitor_id') return; return set.call(this, k, v); };
+      });
+      await openDoc(page);
+      await downloadOnce(page);
+      await page.waitForTimeout(NOT_BY);
+      await expect(page.locator('#fv-form')).toBeHidden(); // vacuity guard below: the same flow with a visitor id DOES show it (TRIGGER test)
+      expect(await ls(page, 'pdflokal_visitor_id')).toBeNull();
+
+      await page.goto('/');
+      await openFromMenu(page, door);
+      await expect(step(page, 'invite')).toBeVisible();
+      await toStep2(page);
+      await pick(page, 'pdf-word');
+      await page.fill('#fv-idea', 'format baru dong');
+      await page.click('#fv-send');
+      await expect(step(page, 'done')).toBeVisible();
+      expect(ballots).toHaveLength(0);                       // no ballot without a visitor
+      expect(await ls(page, 'pdflokal_vote_done')).toBeNull(); // not remembered as voted
+      expect(await ls(page, 'pdflokal_vote_ids')).toBeNull();
+      await expect.poll(async () => (await beacons(page)).filter((b) => b.url.endsWith('/api/feedback')).length).toBe(1);
+      const fb = (await beacons(page)).find((b) => b.url.endsWith('/api/feedback')).json;
+      expect(fb).toMatchObject({ kind: 'feature_request', note: 'format baru dong', visitor_id: null });
+      await flush(page);
+      const events = (await beacons(page)).filter((b) => b.url.endsWith('/api/t')).flatMap((b) => b.json.events || []);
+      expect(events.find((e) => e.event === 'feature_vote')).toBeUndefined(); // no vote event for a vote that did not count
+    });
+
+    test('NO visitor_id: ticks without an idea send nothing at all', async ({ page }) => {
+      const { ballots, feedback } = await wire(page);
+      await page.addInitScript(() => {
+        const set = Storage.prototype.setItem;
+        Storage.prototype.setItem = function (k, v) { if (k === 'pdflokal_visitor_id') return; return set.call(this, k, v); };
+      });
+      await page.goto('/');
+      await openFromMenu(page, door);
+      await toStep2(page);
+      await pick(page, 'pdf-excel');
+      await page.click('#fv-send');
+      await expect(step(page, 'done')).toBeVisible();
+      await page.waitForTimeout(500);
+      expect(ballots).toHaveLength(0);
+      expect(feedback).toHaveLength(0);
+      expect((await beacons(page)).filter((b) => b.url.endsWith('/api/feedback'))).toHaveLength(0);
+      expect(await ls(page, 'pdflokal_vote_done')).toBeNull();
+    });
+
     test('VOTE: the rail event carries ids only; the idea goes to feedback as feature_request, tag-free, and an idea alone is enough', async ({ page }) => {
       const { ballots } = await wire(page);
       await page.goto('/');
