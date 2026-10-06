@@ -73,6 +73,22 @@ const snapshot = (page) => page.evaluate(() => window.v2.getDoc().pages.map((p) 
   annotations: p.annotations.map((a) => ({ ...a })),
 })));
 
+// "Buka Baru" with a new file, resolved only when the NEW document is the live one. Waiting for
+// the first page image is not enough: the old document's page is still on screen until the
+// swap lands, and a spec that reads the store in that window races the autosave it is checking
+// (found as a 1-in-8 flake in "Buka Baru autosaves the document it replaces first").
+async function bukaBaru(page) {
+  const before = await page.evaluate(() => window.v2.getDoc().pages[0]?.id ?? null);
+  await page.click('#btn-file');
+  await page.click('#fm-new');
+  await page.setInputFiles('#file-input', FIXTURE);
+  await expect.poll(() => page.evaluate((old) => {
+    const first = window.v2.getDoc().pages[0];
+    return !!first && first.id !== old;
+  }, before)).toBe(true);
+  await expectFirstPage(page);
+}
+
 const storeList = (page) => page.evaluate(() => window.v2.saved.store.list());
 
 // Wait until the autosave has caught up with the live document (debounce + write).
@@ -266,10 +282,7 @@ test.describe('autosave and the reopen ask', () => {
     const manualId = (await storeList(page)).find((e) => e.kind === 'manual').id;
     // Seven further documents, one autosave each (Buka Baru swaps the document and its slot).
     for (let i = 0; i < 7; i++) {
-      await page.click('#btn-file');
-      await page.click('#fm-new');
-      await page.setInputFiles('#file-input', FIXTURE);
-      await expectFirstPage(page);
+      await bukaBaru(page);
       await addText(page, `Dokumen ${i}`);
       await autosaveCaughtUp(page);
     }
@@ -372,10 +385,7 @@ test.describe('opening a saved document over a dirty one', () => {
     await menuSave(page);
     await expect.poll(async () => (await storeList(page)).filter((e) => e.kind === 'manual').length).toBe(1);
     // A second, edited, undownloaded document replaces it (Buka Baru).
-    await page.click('#btn-file');
-    await page.click('#fm-new');
-    await page.setInputFiles('#file-input', FIXTURE);
-    await expectFirstPage(page);
+    await bukaBaru(page);
     await addText(page, 'Dokumen kedua');
     const armed = () => page.evaluate(() => window.v2.history.current !== window.v2.history.cleanId);
     expect(await armed(), 'precondition: the second document is dirty, so the guard is up').toBe(true);
@@ -423,6 +433,29 @@ test.describe('the Ojan card waits for the reopen dialog', () => {
     await expect(page.locator('#maker-card')).toBeHidden();
     await ask.getByRole('button', { name: 'Nanti aja' }).click();
     await expect(page.locator('#maker-card')).toBeVisible();
+  });
+
+  test('"Lihat semua" keeps the card waiting until the list is closed as well', async ({ page }) => {
+    await mock(page);
+    await openAndEdit(page);
+    await autosaveCaughtUp(page);
+    await page.reload();
+    await page.locator('#saved-ask .sv-link').click();
+    await expect(page.locator('#saved-list')).toBeVisible();
+    await page.waitForTimeout(2000);
+    await expect(page.locator('#maker-card')).toBeHidden();
+    await page.locator('#saved-list .sv-x').click();
+    await expect(page.locator('#maker-card')).toBeVisible();
+  });
+
+  test('the reopen button is the accent button, legible (a screenshot caught it white on white once)', async ({ page }) => {
+    await openAndEdit(page);
+    await autosaveCaughtUp(page);
+    await page.reload();
+    const open = page.locator('#saved-ask').getByRole('button', { name: 'Buka lagi' });
+    await expect(open).toBeVisible();
+    await expect(open).toHaveCSS('background-color', 'rgb(220, 38, 38)');
+    await expect(open).toHaveCSS('color', 'rgb(255, 255, 255)');
   });
 
   test('the dialog and the card are never visible in the same frame', async ({ page }) => {
@@ -613,10 +646,7 @@ test.describe('storage that fails never breaks editing', () => {
 test.describe('Buka Baru and Ctrl+Z around the saved document', () => {
   test('Buka Baru autosaves the document it replaces first', async ({ page }) => {
     await openAndEdit(page);
-    await page.click('#btn-file');
-    await page.click('#fm-new');
-    await page.setInputFiles('#file-input', FIXTURE);
-    await expectFirstPage(page);
+    await bukaBaru(page);
     // The first document's last state is stored without waiting for the debounce.
     const autos = (await storeList(page)).filter((e) => e.kind === 'auto');
     expect(autos).toHaveLength(1);

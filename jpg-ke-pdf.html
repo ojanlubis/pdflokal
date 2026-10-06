@@ -663,9 +663,11 @@
        plain dialogs on the standard .sheet system; nothing here is positioned in
        the bottom-right corner, which is the Ojan card's. */
     .sv-ask .sv-askfile { color: var(--ink); font-weight: 600; overflow-wrap: anywhere; margin: 0; }
-    .sv-primary { background: var(--accent); border-color: var(--accent) !important; color: #fff; box-shadow: 0 2px 0 var(--accent-down); }
-    .sv-primary:active { transform: translateY(1px); box-shadow: 0 1px 0 var(--accent-down); }
-    .sv-primary:disabled { opacity: .55; }
+    /* .hc-row button (specificity 0,1,1) paints the neutral button, so the primary needs the
+       row in its selector or it renders white on white. Caught by screenshot, not by a test. */
+    .hc-row .sv-primary { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 2px 0 var(--accent-down); }
+    .hc-row .sv-primary:active { transform: translateY(1px); box-shadow: 0 1px 0 var(--accent-down); }
+    .hc-row .sv-primary:disabled { opacity: .55; }
     .sv-link { align-self: center; min-height: 36px; padding: 0 8px; font-size: 13px; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
     .sv-sheet { max-width: 520px; max-height: 86vh; }
     .sv-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }

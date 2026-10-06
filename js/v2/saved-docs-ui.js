@@ -197,15 +197,23 @@ export function createSavedUi({ store, presence, session, tel, isLanding, isInte
         ask.sheet.replaceChildren(title, body, file, row, all);
 
         let accepted = false;
+        let toList = false;
         later.addEventListener('click', () => ask.dlg.close());
-        all.addEventListener('click', () => { ask.dlg.close(); openList(); });
+        // "See all": the ask is over, but the Ojan card keeps waiting until the LIST closes too,
+        // so it never appears behind a dialog the visitor is still using.
+        all.addEventListener('click', () => {
+          toList = true;
+          list.dlg.addEventListener('close', done, { once: true });
+          ask.dlg.close();
+          openList().then(() => { if (!list.dlg.open) done(); }, done);
+        });
         open.addEventListener('click', async () => {
           open.disabled = true;
           if (await session.openEntry(candidate.id)) { accepted = true; ask.dlg.close(); } else open.disabled = false;
         });
         ask.dlg.addEventListener('close', () => {
           tel('autosave_restore', { action: accepted ? 'accepted' : 'declined' });
-          done();
+          if (!toList) done();
         }, { once: true });
         tel('autosave_restore', { action: 'offered' });
         ask.dlg.showModal();

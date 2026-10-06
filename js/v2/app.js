@@ -3944,8 +3944,12 @@ try {
 // Start over: a FRESH doc + history. The signature stays (it's the user's,
 // not the document's). Cancelling the picker leaves everything untouched.
 async function resetDoc() {
-  // The document going away is autosaved FIRST (a flush reads it synchronously), then its
-  // slot and locks are released. Never throws: Buka Baru must not depend on storage.
+  // The leave guard comes down at once, as it always did: the autosave below takes a moment and
+  // is no reason for the browser to still ask about a document being thrown away on purpose
+  // (tests/v2-leave-guard.spec.js reloads right after the swap).
+  markClean(history);
+  // The document going away is autosaved FIRST, and the swap waits for the write; then its slot
+  // and locks are released. Never throws: Buka Baru must not depend on storage.
   await savedSession?.end();
   doc = createDoc();
   history.undoStack.length = 0;
