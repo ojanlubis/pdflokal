@@ -31,6 +31,7 @@
 // functions as Next.js API routes (@vercel/node implements the same bridge).
 export const config = { runtime: 'nodejs', api: { bodyParser: false } };
 
+import { wibDay } from './visitors.js';
 import { validateEvent } from '../js/core/telemetry-schema.js';
 import { tursoInsert, placeholders } from './_turso.js';
 import { createTally, flushRejects } from './_rejects.js';
@@ -42,6 +43,8 @@ import { createTally, flushRejects } from './_rejects.js';
 // tests/core/turso-dual-write.test.mjs. Pass null to restore the real path.
 let queryOverride = null;
 export function __setQueryForTests(fn) { queryOverride = fn; }
+let visitorDayOverride = null;
+export function __setVisitorDayForTests(fn) { visitorDayOverride = fn; }
 
 const MAX_EVENTS = 50;
 const MAX_BODY_BYTES = 32 * 1024;
@@ -234,6 +237,25 @@ async function ingest(req, tally) {
       console.error(`[telemetry] insert FAILED error=${out.error} rows_dropped=${rows.length}`);
     } else if (!out.dark && out.written !== rows.length) {
       console.error(`[telemetry] insert SHORT written=${out.written ?? 'unknown'} rows_expected=${rows.length}`);
+    }
+
+    // THE DAILY TALLY behind "N orang hari ini" (api/visitors.js, 2026-10-06).
+    // One (day, visitor_id) row per visitor per WIB day; a repeat is a no-op and
+    // the table's trigger bumps visitor_day_counts only on a real insert, so the
+    // count is read as one row instead of scanning the day's events (Turso bills
+    // rows read). Only after the events write landed, and its own failure is
+    // logged and swallowed: the tally may lag, the rail may never pay for it.
+    const vid = rows[0]?.visitor_id;
+    if (vid && !out.error && !out.dark) {
+      const tally = await tursoInsert({
+        url: process.env.TURSO_EVENTS_URL,
+        token: process.env.TURSO_EVENTS_TOKEN,
+        sql: 'insert into visitor_days (day, visitor_id) values (?, ?) on conflict do nothing',
+        values: [wibDay(Date.now()), vid],
+        expected: 1,
+        override: visitorDayOverride,
+      });
+      if (tally.error) console.error(`[telemetry] tally FAILED error=${tally.error}`);
     }
   }
 }

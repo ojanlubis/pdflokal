@@ -4,8 +4,8 @@
  * The header's "N orang" count (founder ask 2026-09-23: a sense that other
  * people use this too). GET-only, takes no input.
  *
- * WHAT IS COUNTED: distinct `visitor_id` on the events rail since midnight
- * WIB (Asia/Jakarta, UTC+7, no DST) — the calendar day the label "visitor
+ * WHAT IS COUNTED: distinct `visitor_id` that sent telemetry since midnight
+ * WIB (counted on arrival, see COST) (Asia/Jakarta, UTC+7, no DST) — the calendar day the label "visitor
  * hari ini" says. A visitor_id is one BROWSER, not one person — the same
  * person on a phone and a laptop is two, and cleared storage is a new one.
  * Stated here and in the page's tooltip so the number never claims more than
@@ -19,14 +19,16 @@
  *
  * PRIVACY: only an aggregate leaves this function. No id, no row, no input.
  *
- * COST: cached at the CDN for an hour, so Turso sees about one read an hour per
- * edge region no matter the traffic. Turso bills ROWS READ, not queries: on
- * 2026-10-06 this one query had read 203M rows in 6 days (89% of the free
- * month) because the planner picked the partial `events_visitor_id_idx` and
- * walked EVERY row that has a visitor_id (~276k per call). INDEXED BY pins
- * the `ts` index, so a call reads only today's rows. Do not remove it. On any failure it answers {visitors:null} with
- * a short cache, and the page shows nothing — a missing count is honest, a
- * wrong one is not.
+ * COST: one row read per cache miss. The count is a TALLY kept on the write
+ * path (api/t.js inserts one (day, visitor_id) per visitor per WIB day; the
+ * trigger in scripts/turso-visitor-days-migration.sql bumps
+ * visitor_day_counts), so reading it never scans events. History: on
+ * 2026-10-06 the old scan had read 203M rows in 6 days (89% of the free
+ * month) because the planner walked every visitor row (~276k a call); pinning
+ * the ts index cut it to ~20k a call, the tally to one. That is why the CDN can
+ * refresh it every minute. On any failure it answers {visitors:null} with a
+ * short cache, and the page shows nothing: a missing count is honest, a wrong
+ * one is not.
  */
 import { tursoScalar } from './_turso.js';
 
@@ -43,12 +45,21 @@ export function startOfDayWIB(now) {
   return new Date(Math.floor((now + WIB_MS) / DAY_MS) * DAY_MS - WIB_MS).toISOString();
 }
 
+// The WIB calendar date of `now`, YYYY-MM-DD: the key of the daily tally that
+// api/t.js maintains (visitor_days -> visitor_day_counts).
+export function wibDay(now) {
+  return new Date(now + WIB_MS).toISOString().slice(0, 10);
+}
+
+// ONE ROW READ (2026-10-06). The tally is kept on the write path (api/t.js +
+// the visitor_days trigger, scripts/turso-visitor-days-migration.sql), so the
+// count no longer scans the day's events: that scan was ~20k rows a call even
+// with the ts index, and ~276k before it, against a 500M rows-read month.
 export async function countVisitors({ now = Date.now(), url, token } = {}) {
-  const since = startOfDayWIB(now);
   const r = await tursoScalar({
     url, token,
-    sql: 'select count(distinct visitor_id) from events indexed by events_ts_idx where ts >= ? and visitor_id is not null',
-    args: [{ type: 'text', value: since }],
+    sql: 'select n from visitor_day_counts where day = ?',
+    args: [{ type: 'text', value: wibDay(now) }],
   });
   const n = r.ok ? Number(r.value) : NaN;
   return Number.isInteger(n) && n >= MIN_SHOWN ? n : null;
@@ -66,6 +77,6 @@ export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   res.setHeader('Cache-Control', visitors === null
     ? 'public, s-maxage=60'
-    : 'public, max-age=600, s-maxage=3600, stale-while-revalidate=3600');
+    : 'public, max-age=60, s-maxage=60, stale-while-revalidate=300');
   res.status(200).end(JSON.stringify({ visitors }));
 }

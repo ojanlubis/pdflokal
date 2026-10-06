@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 
 import { UPDATES, shownUpdates, updateText } from '../../js/updates.js';
 import { shouldShowCard, shortDate, formatCount } from '../../js/v2/maker-card.js';
-import { countVisitors, startOfDayWIB, MIN_SHOWN } from '../../api/visitors.js';
+import { countVisitors, startOfDayWIB, wibDay, MIN_SHOWN } from '../../api/visitors.js';
 
 const u = (id, date, approved = true) => ({ id, date, text: `t ${id}`, approved });
 
@@ -100,14 +100,20 @@ test('countVisitors: a real count comes back as a number', async () => {
   let sent;
   const n = await withFetch(async (url, init) => { sent = JSON.parse(init.body); return turso(row(184))(); }, () => countVisitors(cfg));
   assert.equal(n, 184);
-  assert.equal(sent.requests[0].stmt.args[0].value, '2026-09-22T17:00:00.000Z', 'window starts at midnight WIB today');
+  assert.equal(sent.requests[0].stmt.args[0].value, '2026-09-23', 'the WIB day of now (17:00 WIB)');
 });
 
-test('countVisitors: pins the ts index (the visitor_id index read every row, 2026-10-06)', async () => {
+test('countVisitors: reads ONE row of the tally, never the events table (rows-read quota, 2026-10-06)', async () => {
   let sent;
   await withFetch(async (url, init) => { sent = JSON.parse(init.body); return turso(row(184))(); }, () => countVisitors(cfg));
-  assert.match(sent.requests[0].stmt.sql, /\bindexed by events_ts_idx\b/i,
-    'without it SQLite walks events_visitor_id_idx end to end: ~276k rows read per call on the free quota');
+  const sql = sent.requests[0].stmt.sql;
+  assert.match(sql, /from visitor_day_counts where day = \?/i);
+  assert.doesNotMatch(sql, /\bevents\b/i, 'a count over events reads every row of the day (or worse) per call');
+});
+
+test('wibDay: the Jakarta calendar date', () => {
+  assert.equal(wibDay(Date.parse('2026-09-24T16:59:59Z')), '2026-09-24');
+  assert.equal(wibDay(Date.parse('2026-09-24T17:00:00Z')), '2026-09-25');
 });
 
 test('startOfDayWIB: the Jakarta calendar day, not the UTC one', () => {
