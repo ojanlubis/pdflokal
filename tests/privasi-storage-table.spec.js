@@ -101,7 +101,10 @@ test.describe('privasi.html — Local Storage table, ratified rows', () => {
       .locator('.privacy-section')
       .filter({ has: page.getByRole('heading', { name: 'Yang dikirim ke server PDFLokal sendiri' }) });
     await expect(telemetrySection).toHaveCount(1);
-    await expect(telemetrySection.getByText('pdflokal_visitor_id')).toHaveCount(1);
+    // Twice since the feature vote (2026-10-06): the id's own story, and the vote's
+    // one paragraph saying the ballot travels with it. Both live in this section.
+    await expect(telemetrySection.getByText('pdflokal_visitor_id')).toHaveCount(2);
+    await expect(telemetrySection.getByText('Kalau kamu ikut voting fitur')).toHaveCount(1);
     const telemetryText = await telemetrySection.innerText();
     expect(telemetryText).toMatch(/Mixpanel/);
     expect(telemetryText).toMatch(/Google Analytics/);
