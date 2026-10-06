@@ -108,6 +108,37 @@ export function storageProblems(sources, privasiHtml) {
   return problems;
 }
 
+// ---- IndexedDB (added 2026-10-06, with "Simpan editan") ------------------------------
+// The Local Storage scan above is blind to IndexedDB, and "Simpan editan" keeps whole documents
+// there. A database is the same promise to the visitor as a key: it must be listed on /privasi.
+// Scans `indexedDB.open(NAME` and `idb.open(NAME` (js/v2/saved-store.js passes the factory in as
+// `idb`); NAME is a literal or a same-file `const NAME = '...'`. Unresolvable names FAIL, like keys.
+export function indexedDbNames(sources) {
+  const names = new Set();
+  const unresolved = [];
+  for (const s of sources) {
+    const text = code(s.text);
+    const consts = new Map();
+    for (const m of text.matchAll(/\b(?:const|var|let)\s+(\w+)\s*=\s*(['"])([^'"]+)\2/g)) consts.set(m[1], m[3]);
+    for (const m of text.matchAll(/\b(?:indexedDB|idb)\.open\(\s*([^,)]+)/g)) {
+      const a = m[1].trim();
+      const lit = a.match(LITERAL);
+      if (lit) names.add(lit[2]);
+      else if (consts.has(a)) names.add(consts.get(a));
+      else unresolved.push(`${s.file}: ${a}`);
+    }
+  }
+  return { names, unresolved };
+}
+
+export function indexedDbProblems(sources, privasiHtml) {
+  const { names, unresolved } = indexedDbNames(sources);
+  const listed = new Set([...privasiHtml.matchAll(/<code>([^<]+)<\/code>/g)].map((c) => c[1].trim()));
+  const problems = unresolved.map((u) => `cannot resolve the IndexedDB name passed in ${u}`);
+  for (const n of names) if (!listed.has(n)) problems.push(`code opens the IndexedDB database "${n}" but privasi.html does not list it`);
+  return problems;
+}
+
 const privasi = () => fs.readFileSync(path.join(ROOT, 'privasi.html'), 'utf8');
 
 test('the scanner finds the keys it must (known positive)', () => {
@@ -153,4 +184,31 @@ test('red on revert: a row outlives the code that wrote it', () => {
 test('comments are not writes', () => {
   const { keys } = writtenKeys([{ file: 'a.js', text: "// localStorage.setItem('pdflokal_prose', 1)\n/* sessionStorage.setItem('pdflokal_block', 1) */" }]);
   assert.equal(keys.size, 0);
+});
+
+test('the IndexedDB scanner finds the database it must (known positive)', () => {
+  const { names, unresolved } = indexedDbNames(realSources());
+  assert.ok(names.has('pdflokal-saved'), 'scanner did not find pdflokal-saved: the instrument is blind to IndexedDB');
+  assert.deepEqual(unresolved, []);
+});
+
+test('red on revert: new code opens a database /privasi has never heard of, or one the scanner cannot name', () => {
+  const out = indexedDbProblems([
+    { file: 'js/v2/a.js', text: "const DB = 'pdflokal-other';\nindexedDB.open(DB, 1);" },
+    { file: 'js/v2/b.js', text: "idb.open('pdflokal-literal', 1);" },
+    { file: 'js/v2/c.js', text: 'indexedDB.open(makeName(), 1);' },
+    { file: 'js/v2/d.js', text: "// indexedDB.open('pdflokal-prose')" },
+  ], '<code>unrelated</code>').join('\n');
+  assert.match(out, /"pdflokal-other"/);
+  assert.match(out, /"pdflokal-literal"/);
+  assert.match(out, /cannot resolve/);
+  assert.doesNotMatch(out, /pdflokal-prose/);
+  assert.deepEqual(indexedDbProblems([{ file: 'a.js', text: "indexedDB.open('x-db')" }], '<td><code>x-db</code></td>'), []);
+});
+
+// OWED: /privasi IndexedDB disclosure (seat writes, founder approves). This is the visible debt, not a
+// silent one: `todo` runs the assertion and reports it as a known failure instead of failing the suite.
+// It goes green by itself the day privasi.html lists `pdflokal-saved`; then delete the `todo`.
+test('privasi.html lists every IndexedDB database the code opens', { todo: 'owed: /privasi IndexedDB disclosure (seat writes, founder approves)' }, () => {
+  assert.deepEqual(indexedDbProblems(realSources(), privasi()), []);
 });
