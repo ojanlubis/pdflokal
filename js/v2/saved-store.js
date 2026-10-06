@@ -10,7 +10,8 @@
  * SCHEMA — database `pdflokal-saved`, version 1, three stores:
  *   entries  keyPath id      small meta, the only thing the LIST reads:
  *                            { id, kind: 'auto'|'manual', name, createdAt,
- *                              updatedAt, pages, sourceIds, blobBytes, stateBytes }
+ *                              updatedAt, pages, sourceIds, blobBytes, stateBytes,
+ *                              slotId (manual) | manualId (auto): the link, declinedAt }
  *   states   keyPath id      { id, state }   the plain-data document state
  *                            (core/saved-docs.js serializeDoc), rewritten on
  *                            every autosave
@@ -156,6 +157,18 @@ export function createSavedStore({ idb = globalThis.indexedDB } = {}) {
           for (const id of evicted) await deleteEntryIn(tx, id);
         }
         return { ok: true, evicted };
+      });
+    },
+
+    // "Nanti aja": remember that the reopen ask for this entry, as it stood at `updatedAt`, was
+    // declined. Lives on the entry itself (a later save of the entry rewrites the meta and so
+    // clears it, which is exactly "the same slot changed after the decline"). No-op if the
+    // entry is gone.
+    async markDeclined(id, updatedAt) {
+      await inTx(['entries'], 'readwrite', async (tx) => {
+        const entries = tx.objectStore('entries');
+        const meta = await wrap(entries.get(id));
+        if (meta) entries.put({ ...meta, declinedAt: updatedAt });
       });
     },
 

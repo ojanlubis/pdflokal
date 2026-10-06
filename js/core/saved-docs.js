@@ -168,12 +168,29 @@ export function autosaveEvictions(entries, { keep = AUTOSAVE_KEEP, protect = new
 // The autosave to offer a returning visitor, or null. The LATEST autosave only:
 // if a tab already has it open the dialog is skipped, not downgraded to an older
 // entry (spec: "skipped when the latest autosave is open in another tab").
+//
+// "Nanti aja" IS REMEMBERED (seat call 2026-10-06): declining stamps the entry with
+// `declinedAt`, the `updatedAt` it had at that moment. The ask returns only when the
+// latest autosave is NEWER than that: another document (a newer entry, no stamp) or the
+// same slot edited since. It lives on the entry, in the same store, so no new browser
+// storage key exists for /privasi to list.
 export function reopenCandidate(entries, heldElsewhere) {
   const latest = entries
     .filter((e) => e.kind === 'auto')
     .sort((a, b) => b.updatedAt - a.updatedAt)[0];
   if (!latest || heldElsewhere.has(latest.id)) return null;
+  if (latest.declinedAt != null && latest.declinedAt >= latest.updatedAt) return null;
   return latest;
+}
+
+// What the saved LIST shows: one row per document. An autosave slot linked to a manual
+// entry (the manual entry names its slot, or the autosave names its manual entry) is the
+// same document twice, so only the manual one is shown ("Yang kamu simpan"). A link to
+// something that no longer exists hides nothing. Order is kept.
+export function visibleEntries(entries) {
+  const manual = new Set(entries.filter((e) => e.kind === 'manual').map((e) => e.id));
+  const slotsOfManual = new Set(entries.filter((e) => e.kind === 'manual' && e.slotId).map((e) => e.slotId));
+  return entries.filter((e) => !(e.kind === 'auto' && (slotsOfManual.has(e.id) || (e.manualId && manual.has(e.manualId)))));
 }
 
 // ---- when to save --------------------------------------------------------------

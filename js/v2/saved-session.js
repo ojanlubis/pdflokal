@@ -112,6 +112,10 @@ export function createSavedSession({
       meta: {
         id, kind, name, updatedAt: now(), createdAt: now(),
         pages: doc.pages.length,
+        // The two halves of "this autosave and this manual entry are one document" (the list
+        // shows it once, core/saved-docs.js visibleEntries): a manual entry names the slot it
+        // was saved from; an autosave names the manual entry its slot is linked to.
+        ...(kind === 'manual' ? { slotId: forSlot.autoId } : { manualId: forSlot.manualId || null }),
         sourceIds: cap.state.sources.map((s) => s.id),
         stateBytes: JSON.stringify(cap.state).length,
       },

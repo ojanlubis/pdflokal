@@ -187,21 +187,25 @@ test.describe('manual save', () => {
     await expect(del).toHaveCount(0);
   });
 
-  test('delete: first tap arms, second tap deletes', async ({ page }) => {
+  test('delete: first tap arms, second tap deletes the document whole, linked autosave included', async ({ page }) => {
     await openAndEdit(page);
     await menuSave(page);
     await expect.poll(async () => (await storeList(page)).filter((e) => e.kind === 'manual').length).toBe(1);
     await autosaveCaughtUp(page);
+    // A second, different document, so the list has two rows.
+    await bukaBaru(page);
+    await addText(page, 'Dokumen B');
+    await autosaveCaughtUp(page);
     await page.reload();
     await openListFromAsk(page);
-    const before = (await storeList(page)).length; // the manual entry and the autosave
-    expect(before).toBe(2);
+    expect((await storeList(page)).length, 'manual A, autosave A, autosave B').toBe(3);
+    await expect(page.locator('#saved-list .sv-row'), 'document A is one row, not two').toHaveCount(2);
     const del = page.locator('#saved-list .sv-row', { has: page.locator('.sv-del') }).first().locator('.sv-del');
     await del.click();
     await expect(del).toHaveText('Yakin hapus?');
-    expect((await storeList(page)).length, 'one tap deletes nothing').toBe(2);
+    expect((await storeList(page)).length, 'one tap deletes nothing').toBe(3);
     await del.click();
-    await expect.poll(async () => (await storeList(page)).length).toBe(1);
+    await expect.poll(async () => (await storeList(page)).length, { message: 'A went whole: its autosave too' }).toBe(1);
     await expect(page.locator('#saved-list .sv-row')).toHaveCount(1);
     // ...and nothing of it is left behind in the store.
     const left = await page.evaluate(() => new Promise((resolve) => {
@@ -214,6 +218,38 @@ test.describe('manual save', () => {
       };
     }));
     expect(left).toEqual({ entries: 1, states: 1, blobs: 1 });
+  });
+
+  test('the list shows a saved document once: manual save + its own autosave is ONE row, under "Yang kamu simpan"', async ({ page }) => {
+    await openAndEdit(page);
+    await menuSave(page);
+    await expect.poll(async () => (await storeList(page)).filter((e) => e.kind === 'manual').length).toBe(1);
+    await autosaveCaughtUp(page);
+    expect((await storeList(page)).map((e) => e.kind).sort(), 'both entries exist in the store').toEqual(['auto', 'manual']);
+    await page.reload();
+    await openListFromAsk(page);
+    const list = page.locator('#saved-list');
+    await expect(list.locator('.sv-row')).toHaveCount(1);
+    await expect(list.locator('.sv-group')).toHaveText(['Yang kamu simpan']);
+    await expect(list.locator('.sv-row')).toContainText('sample-2pages');
+  });
+
+  test('a manual entry opened later and edited: its autosave is the same document too', async ({ page }) => {
+    await openAndEdit(page);
+    await menuSave(page);
+    await expect.poll(async () => (await storeList(page)).filter((e) => e.kind === 'manual').length).toBe(1);
+    await autosaveCaughtUp(page);
+    await page.reload();
+    await openListFromAsk(page);
+    await page.locator('#saved-list .sv-open').first().click();
+    await expectFirstPage(page);
+    await addText(page, 'Sesudah dibuka');
+    await autosaveCaughtUp(page);
+    // The slot now in use is a NEW autosave naming the manual entry.
+    const autos = (await storeList(page)).filter((e) => e.kind === 'auto');
+    expect(autos.some((e) => e.manualId)).toBe(true);
+    await page.evaluate(() => window.v2.saved.ui.openList());
+    await expect(page.locator('#saved-list .sv-row')).toHaveCount(1);
   });
 
   test.describe('Safari', () => {
@@ -258,6 +294,46 @@ test.describe('autosave and the reopen ask', () => {
     await expect(page.locator('#saved-ask')).not.toBeVisible();
     expect((await storeList(page)).filter((e) => e.kind === 'auto')).toHaveLength(1);
     expect(await page.evaluate(() => document.body.classList.contains('is-empty'))).toBe(true);
+  });
+
+  test('"Nanti aja" is remembered: no nagging on the next landing, but a NEWER autosave asks again', async ({ page }) => {
+    await openAndEdit(page);
+    await autosaveCaughtUp(page);
+    const slot = await page.evaluate(() => window.v2.saved.session.ownIds()[0]);
+    await page.reload();
+    await page.locator('#saved-ask').getByRole('button', { name: 'Nanti aja' }).click();
+    await expect.poll(async () => (await storeList(page)).find((e) => e.id === slot)?.declinedAt).toBeTruthy();
+    // Same entry, unchanged: left alone, on this and every later landing.
+    for (let i = 0; i < 2; i++) {
+      await page.reload();
+      await page.waitForTimeout(1200);
+      await expect(page.locator('#saved-ask')).not.toBeVisible();
+    }
+    // A DIFFERENT document autosaved after the decline: asks again.
+    await page.setInputFiles('#file-input', FIXTURE);
+    await expectFirstPage(page);
+    await addText(page, 'Dokumen lain');
+    await autosaveCaughtUp(page);
+    await page.reload();
+    await expect(page.locator('#saved-ask')).toBeVisible();
+    await expect(page.locator('#saved-ask')).toContainText('sample-2pages');
+    const newest = await page.evaluate(() => window.v2.saved.store.list().then((es) => es[0].id));
+    expect(newest).not.toBe(slot);
+  });
+
+  test('"Nanti aja" then the SAME slot edited again: the ask comes back for it', async ({ page }) => {
+    await openAndEdit(page);
+    await autosaveCaughtUp(page);
+    const slot = await page.evaluate(() => window.v2.saved.session.ownIds()[0]);
+    await page.reload();
+    await page.locator('#saved-ask').getByRole('button', { name: 'Nanti aja' }).click();
+    await expect.poll(async () => (await storeList(page)).find((e) => e.id === slot)?.declinedAt).toBeTruthy();
+    expect(await page.evaluate((id) => window.v2.saved.session.openEntry(id), slot)).toBe(true);
+    await addText(page, 'Diubah setelah ditolak');
+    await autosaveCaughtUp(page);
+    expect((await storeList(page)).find((e) => e.id === slot).declinedAt, 'a later save clears the decline').toBeUndefined();
+    await page.reload();
+    await expect(page.locator('#saved-ask')).toBeVisible();
   });
 
   test('the dialog is skipped on a page that arrived with an intent', async ({ page }) => {
@@ -558,8 +634,7 @@ test.describe('two tabs', () => {
     await page.locator('#saved-ask').getByRole('button', { name: 'Nanti aja' }).click();
     const id = (await storeList(page)).find((e) => e.kind === 'auto').id;
     const tab2 = await context.newPage();
-    await tab2.goto('/');
-    await tab2.locator('#saved-ask').getByRole('button', { name: 'Nanti aja' }).click();
+    await tab2.goto('/'); // (declined above, so no ask here either)
     const results = await Promise.all([page, tab2].map((p) => p.evaluate((i) => window.v2.saved.session.openEntry(i), id)));
     expect(results).toEqual([true, true]); // both end up with a document...
     const owners = await Promise.all([page, tab2].map((p) => p.evaluate((i) => window.v2.saved.session.ownIds().includes(i), id)));

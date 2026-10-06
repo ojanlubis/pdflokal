@@ -24,7 +24,7 @@
  * ALL STRINGS are locales/*.js `saved.*`, DRAFT until the seat rewrites them.
  */
 import { t, numberLocale, formatDecimal } from '../lib/i18n.js';
-import { reopenCandidate, needsSafariNote } from '../core/saved-docs.js';
+import { reopenCandidate, needsSafariNote, visibleEntries } from '../core/saved-docs.js';
 import { savedCountBucket } from '../core/telemetry-schema.js';
 
 // A dialog shell from index.html, or one made on the spot when a STALE html (an
@@ -79,7 +79,8 @@ export function createSavedUi({ store, presence, session, tel, isLanding, isInte
     let entries = [];
     let held = new Set();
     let est = null;
-    try { entries = await store.list(); } catch { entries = []; }
+    let everything = [];
+    try { everything = await store.list(); entries = visibleEntries(everything); } catch { entries = []; }
     try { held = await presence.heldElsewhere(); } catch { /* single-tab */ }
     try { est = await store.estimate(); } catch { /* unknown */ }
     const own = new Set(session.ownIds());
@@ -102,7 +103,7 @@ export function createSavedUi({ store, presence, session, tel, isLanding, isInte
       shown += rows.length;
       body.append(el('p', 'sv-group', label));
       const ul = el('ul', 'sv-list');
-      for (const e of rows) ul.append(rowFor(e, { elsewhere: held.has(e.id), here: own.has(e.id) }));
+      for (const e of rows) ul.append(rowFor(e, { elsewhere: held.has(e.id), here: own.has(e.id), everything, held, own }));
       body.append(ul);
     }
     if (!shown) body.append(el('p', 'sv-empty', t('saved.listEmpty')));
@@ -115,7 +116,7 @@ export function createSavedUi({ store, presence, session, tel, isLanding, isInte
     list.sheet.replaceChildren(head, body, foot);
   }
 
-  function rowFor(e, { elsewhere, here }) {
+  function rowFor(e, { elsewhere, here, everything, held, own }) {
     const li = el('li', 'sv-row');
     const main = el('div', 'sv-main');
     main.append(el('div', 'sv-name', e.name || ''));
@@ -150,7 +151,14 @@ export function createSavedUi({ store, presence, session, tel, isLanding, isInte
         }
         clearTimeout(armed);
         del.disabled = true;
-        if (await session.remove(e.id)) renderList(); else del.disabled = false;
+        // Deleting a document deletes it whole: the autosave slot that is the same document (hidden
+        // from the list, see visibleEntries) goes with it, or it would resurface as a second row.
+        // One another tab or this tab holds open is left alone.
+        const linked = everything.filter((x) => x.kind === 'auto' && !held.has(x.id) && !own.has(x.id)
+          && (x.manualId === e.id || x.id === e.slotId)).map((x) => x.id);
+        let ok = await session.remove(e.id);
+        for (const id of linked) if (ok) ok = await session.remove(id);
+        if (ok) renderList(); else del.disabled = false;
       });
       acts.append(del);
     }
@@ -213,6 +221,8 @@ export function createSavedUi({ store, presence, session, tel, isLanding, isInte
         });
         ask.dlg.addEventListener('close', () => {
           tel('autosave_restore', { action: accepted ? 'accepted' : 'declined' });
+          // Remembered: the ask comes back only for a NEWER autosave (core reopenCandidate).
+          if (!accepted) store.markDeclined(candidate.id, candidate.updatedAt).catch(() => {});
           if (!toList) done();
         }, { once: true });
         tel('autosave_restore', { action: 'offered' });
