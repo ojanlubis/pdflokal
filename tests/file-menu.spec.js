@@ -33,14 +33,15 @@ async function openWithFile(page) {
 }
 
 test.describe('File menu — three items, one page sheet', () => {
-  test('the dropdown is exactly Tambah File / Buka Baru / Atur Halaman', async ({ page }) => {
+  test('the dropdown is Tambah File / Buka Baru / Atur Halaman, then the two saved-edits items', async ({ page }) => {
     await openWithFile(page);
     await page.click('#btn-file');
     await expect(page.locator('#file-menu')).toBeVisible();
     await expect(page.locator('#btn-file')).toHaveAttribute('aria-expanded', 'true');
 
     const items = page.locator('#file-menu [role="menuitem"]');
-    await expect(items).toHaveCount(3);
+    // His three, then "Simpan editan" and its list (2026-10-06, built not released; words are DRAFT).
+    await expect(items).toHaveCount(5);
     // Accessible NAME, in his order. toHaveAccessibleName would also pass on a
     // title= fallback; the labels must come from the visible text.
     await expect(items.nth(0)).toHaveText('Tambah File');
@@ -49,6 +50,8 @@ test.describe('File menu — three items, one page sheet', () => {
     await expect(items.nth(0)).toHaveAccessibleName('Tambah File');
     await expect(items.nth(1)).toHaveAccessibleName('Buka Baru');
     await expect(items.nth(2)).toHaveAccessibleName('Atur Halaman');
+    await expect(items.nth(3)).toHaveText('Simpan editan');
+    await expect(items.nth(4)).toHaveText('Editan tersimpan');
   });
 
   test('the grey inline notes are gone and the meaning lives in a tooltip', async ({ page }) => {
