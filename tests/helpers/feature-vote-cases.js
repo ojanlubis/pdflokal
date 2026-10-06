@@ -20,10 +20,12 @@ import { expectFirstPage } from './render.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE = path.join(__dirname, '..', 'fixtures', 'sample-2pages.pdf');
 
-// The card waits for the BERES stamp to clear (SHOW_DELAY_MS = 4400): positive
-// assertions allow for it, negative ones wait past it before they count.
-const SHOWS_WITHIN = 12_000;
-const NOT_BY = 6_000;
+// The card opens THE MOMENT a whole-document download completes (his ruling
+// 2026-10-06): positive assertions allow only a beat for the Unduh sheet to close
+// first; negative ones wait past the share card's own 200ms and the old 4.4s stamp
+// delay before they count, so a regression to the old timing cannot hide.
+const SHOWS_WITHIN = 1_500;
+const NOT_BY = 5_000;
 
 const TOP = { voters: 40, counts: { 'pdf-word': 22, watermark: 14, 'save-edits': 9, 'lock-unlock': 4 } };
 const IDS = ['pdf-word', 'pdf-excel', 'save-edits', 'lock-unlock', 'form-fill', 'camera-scan', 'canvas-image', 'watermark'];
@@ -112,8 +114,10 @@ export function defineFeatureVoteSuite({ door }) {
       // step 1: his words, verbatim; his photo BELOW them, with the top hat; two buttons
       await expect(step(page, 'invite')).toBeVisible();
       await expect(step(page, 'choose')).toBeHidden();
-      await expect(page.locator('#fv-invite-text p')).toHaveText(['Halo guyss.', 'Mau bikin fitur baru tp bingung fiturnya apa.', 'Bantu voting doong... makasii']);
-      const text = await page.locator('#fv-invite-text').boundingBox();
+      await expect(page.locator('#fv-invite-title')).toHaveText('Voting Fitur PDFLokal');
+      await expect(page.locator('#fv-invite-text')).toHaveText('Halo guyss. Mau bikin fitur baru tp bingung apaan. Bantu voting doong. terimakasii');
+      expect(await page.locator('#fv-invite-title').evaluate((el) => parseFloat(getComputedStyle(el).fontSize))).toBeGreaterThan(15.5); // styled as the dialog's heading
+      const text = await page.locator('.fv-invite-text').boundingBox();
       const face = await page.locator('#fv-form .fv-face').boundingBox();
       const hat = await page.locator('#fv-form .fv-topi').boundingBox();
       expect(face.y).toBeGreaterThan(text.y + text.height - 1);
@@ -240,7 +244,8 @@ export function defineFeatureVoteSuite({ door }) {
       await expect(page.locator('#fv-form')).toBeVisible({ timeout: SHOWS_WITHIN });
       await page.keyboard.press('Escape');
       await expect(page.locator('#fv-form')).toBeHidden();
-      expect(await ls(page, 'pdflokal_vote_nanti')).toBe(dayOf(new Date()));
+      // the dialog's `close` event is queued after it hides: poll, do not read once
+      await expect.poll(() => ls(page, 'pdflokal_vote_nanti')).toBe(dayOf(new Date()));
       await downloadOnce(page);
       await page.waitForTimeout(NOT_BY);
       await expect(page.locator('#fv-form')).toBeHidden();
@@ -263,18 +268,77 @@ export function defineFeatureVoteSuite({ door }) {
       await expect(page.locator('#fv-form .fv-top li')).toHaveCount(3);
     });
 
-    test('NO OTHER CARD while it is open: the coffee card stands down for the session, and the maker card is not on screen', async ({ page }) => {
+    test('TIMING: the dialog is open within ~1s of the download event, and the share/coffee card is ABSENT for that download', async ({ page }) => {
+      await wire(page);
+      await openDoc(page);
+      // The dialog opens the moment the download is handed over, not seconds later.
+      // t0 is the app's own anchor click that triggers the file (the "download event"),
+      // so the export build's time is not counted against the dialog.
+      await page.evaluate(() => {
+        window.__t = { dl: null, open: null };
+        const click = HTMLAnchorElement.prototype.click;
+        HTMLAnchorElement.prototype.click = function (...a) { if (this.download) window.__t.dl = performance.now(); return click.apply(this, a); };
+        const dlg = document.getElementById('fv-form');
+        new MutationObserver((_, o) => { if (dlg.open) { o.disconnect(); window.__t.open = performance.now(); } })
+          .observe(dlg, { attributes: true, attributeFilter: ['open'] });
+      });
+      await page.click('#btn-download');
+      const dl = page.waitForEvent('download');
+      await page.click('#ds-cta');
+      await dl;
+      await expect.poll(() => page.evaluate(() => window.__t.open), { timeout: 3000 }).not.toBeNull();
+      const t = await page.evaluate(() => window.__t);
+      expect(t.dl, 'the download anchor was never clicked').not.toBeNull();
+      expect(t.open - t.dl).toBeLessThan(1000);
+      expect(t.open - t.dl).toBeGreaterThanOrEqual(0);
+      await expect(page.locator('#fv-form')).toBeVisible({ timeout: SHOWS_WITHIN });
+      // and nothing else for this download: the share/coffee card is replaced outright
+      await page.waitForTimeout(NOT_BY);
+      await expect(page.locator('#fv-form')).toBeVisible();
+      await expect(page.locator('#support-card')).toBeHidden();
+      expect(await page.evaluate(() => localStorage.getItem('pdflokal-support-last'))).toBeNull(); // its daily cap was not spent
+    });
+
+    test('NO OTHER CARD pops over it: the bug-report card, the maker card and the install card wait', async ({ page }) => {
+      await wire(page);
+      await openDoc(page);
+      await downloadOnce(page);
+      await expect(page.locator('#fv-form')).toBeVisible({ timeout: SHOWS_WITHIN });
+      for (const sel of ['#support-card', '#maker-card', '#install-card', '#bug-prompt.show']) {
+        await expect(page.locator(sel)).toBeHidden();
+      }
+      await page.waitForTimeout(3000); // the bug-report card's own settle window
+      await expect(page.locator('#bug-prompt.show')).toHaveCount(0);
+      await expect(page.locator('#fv-form')).toBeVisible();
+    });
+
+    test('WHEN THE VOTE IS NOT OFFERED the share/coffee card behaves exactly as before (said "Nanti aja" today)', async ({ page }) => {
+      await wire(page, { pre: { pdflokal_vote_nanti: dayOf(new Date()) } });
+      await openDoc(page);
+      await downloadOnce(page);
+      await expect(page.locator('#support-card')).toBeVisible({ timeout: 4000 });
+      await expect(page.locator('#fv-form')).toBeHidden();
+    });
+
+    test('WHEN THE VOTE IS NOT OFFERED: already voted, or a partial (Ekstrak/picked) download, the share card runs as before', async ({ page }) => {
+      await wire(page, { pre: { pdflokal_vote_done: 'voted', pdflokal_vote_ids: '["pdf-word"]' } });
+      await openDoc(page);
+      await downloadOnce(page);
+      await expect(page.locator('#support-card')).toBeVisible({ timeout: 4000 });
+      await expect(page.locator('#fv-form')).toBeHidden();
+    });
+
+    test('A CLOSE FROM THE DOWNLOAD MOMENT counts as "Nanti aja"; the next download in the same session then gets the share card, as before', async ({ page }) => {
       await wire(page);
       await openDoc(page);
       await downloadOnce(page);
       await expect(page.locator('#fv-form')).toBeVisible({ timeout: SHOWS_WITHIN });
       await expect(page.locator('#support-card')).toBeHidden();
-      await expect(page.locator('#maker-card')).toBeHidden();
-      await expect(page.locator('#install-card')).toBeHidden();
       await page.keyboard.press('Escape');
+      await expect(page.locator('#fv-form')).toBeHidden();
       await downloadOnce(page);
-      await page.waitForTimeout(2000);
-      await expect(page.locator('#support-card')).toBeHidden(); // the vote took this session's moment
+      await expect(page.locator('#support-card')).toBeVisible({ timeout: 4000 });
+      await expect(page.locator('#fv-form')).toBeHidden();
     });
 
     test('NEVER beside the share card: when it spoke first in the session, the vote waits for a later visit', async ({ page }) => {
@@ -473,7 +537,7 @@ export function defineFeatureVoteSuite({ door }) {
       await page.goto('/');
       await openFromMenu(page, door);
       const dlg = page.locator('#fv-form');
-      await expect(page.getByRole('dialog', { name: /Halo guyss/ })).toBeVisible();
+      await expect(page.getByRole('dialog', { name: 'Voting Fitur PDFLokal' })).toBeVisible();
       await toStep2(page);
       await expect(page.getByRole('dialog', { name: 'Fitur apa yang kamu butuh?' })).toBeVisible();
       await expect(dlg.getByRole('checkbox')).toHaveCount(8);
@@ -512,7 +576,8 @@ export function defineFeatureVoteSuite({ door }) {
       await wire(page);
       await page.goto('/en');
       await openFromMenu(page, door);
-      await expect(page.locator('#fv-invite-text p')).toHaveText(['Hey guys.', "I want to build a new feature but I can't decide which one.", 'Help me vote pleaseee... thankss']);
+      await expect(page.locator('#fv-invite-title')).toHaveText('Feature vote');
+      await expect(page.locator('#fv-invite-text')).toHaveText("Hey guys. I want to build a new feature but I can't decide what. Help me vote pleaseee. thankss");
       await expect(page.locator('#fv-form .fv-start')).toHaveText('Pick features');
       await expect(step(page, 'invite').locator('[data-fv-later]')).toHaveText('Maybe later');
       await toStep2(page);

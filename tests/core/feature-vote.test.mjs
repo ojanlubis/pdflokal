@@ -75,7 +75,8 @@ test('the labels line up with the list in BOTH languages, are his draft words, a
 });
 
 test('his own words are verbatim (spelling and line breaks are his: do not fix them)', () => {
-  assert.deepEqual(ID.featureVote.invite, ['Halo guyss.', 'Mau bikin fitur baru tp bingung fiturnya apa.', 'Bantu voting doong... makasii']);
+  assert.equal(ID.featureVote.inviteTitle, 'Voting Fitur PDFLokal', 'the brand is written PDFLokal, not "PDF Lokal"');
+  assert.equal(ID.featureVote.invite, 'Halo guyss. Mau bikin fitur baru tp bingung apaan. Bantu voting doong. terimakasii');
   assert.equal(ID.featureVote.thanks, 'Makasi votingnyaa. Kalo udah jadi nnti dikabarin di sini yaa');
   assert.equal(ID.featureVote.shipped, '{feature} udah jadi nih. Kamu salah satu yang milih ini, makasii');
   const src = read('js/locales/id.js');
@@ -91,7 +92,7 @@ test('the card is a skeleton in index.html (no hard-coded option labels) and the
   for (const step of ['invite', 'choose', 'done']) assert.ok(dlg.includes(`data-fv-step="${step}"`), step);
   assert.equal([...dlg.matchAll(/type="checkbox"/g)].length, 0, 'the checkboxes are built from the ONE list, not written twice');
   assert.ok(dlg.includes('src="/images/topi.svg"') && dlg.includes('src="/images/ojan.jpg"'), 'the maker card\'s own photo and hat assets');
-  assert.ok(html.indexOf('class="fv-kepala"') > html.indexOf('id="fv-invite-text"'), 'his photo is BELOW his words');
+  assert.ok(html.indexOf('class="fv-kepala"') > html.indexOf('id="fv-invite-title"'), 'his photo is BELOW his words');
   for (const f of ['index.html', 'en/index.html']) {
     const h = read(f);
     const nav = h.match(/<nav class="ld-nav"[\s\S]*?<\/nav>/)[0];
@@ -711,4 +712,16 @@ test('no usable visitor_id: telemetry says so, the offer is gated on it, and the
   assert.match(fv, /noVisitor \? 'no-visitor' : await/, 'send() skips the ballot without a visitor_id');
   assert.ok(fv.indexOf("result === 'recorded'") < fv.indexOf('rememberVote(ids)'), 'ids are remembered only for a recorded ballot');
   assert.ok(!/else\s*\{[^}]*rememberVote\(ids\)/.test(fv), 'no other branch remembers ids');
+});
+
+test('TIMING: the offer opens at once (no stamp delay, no waiting for other cards) and replaces the share card for that download', () => {
+  const fv = read('js/v2/feature-vote.js');
+  assert.ok(!/SHOW_DELAY_MS|MAX_WAIT_MS|POLL_MS/.test(fv), 'the 4.4s stamp wait and the 25s card wait are gone');
+  assert.match(fv, /if \(document\.querySelector\(OCCUPANTS\)\) return false;/, 'another card up: not offered, never queued');
+  assert.match(fv, /dialog\[open\]:not\(#dl-sheet\)/, 'the Unduh sheet that is closing is not an occupant');
+  const cel = read('js/v2/celebrate.js');
+  const vote = cel.indexOf('featureVote.maybeShow(');
+  const share = cel.indexOf("LAST_SHOWN_KEY, new Date().toDateString()");
+  assert.ok(vote > 0 && vote < share, 'the vote is asked before the share card is scheduled, and its true return skips it');
+  assert.match(cel, /featureVote\.maybeShow\([^)]*\)\) \{\s*return;/, 'taking the moment ends onDownloadSuccess: the share/tip card does not show');
 });

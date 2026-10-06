@@ -39,6 +39,13 @@ async function openSheet(page) {
 }
 
 test.describe('unduh sheet — mobile', () => {
+  // The feature vote opens the moment a whole-document download completes (2026-10-06)
+  // and, being modal, would block a test that downloads twice. Marked answered here:
+  // this file is about the sheet. The vote's own timing is tests/feature-vote.spec.js.
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('pdflokal_vote_done', 'voted'));
+  });
+
   test('opens with correct defaults and a REAL size lands on the button', async ({ page }) => {
     await openSheet(page);
     await expect(page.locator('#ds-format button.on')).toHaveAttribute('data-v', 'pdf');
