@@ -15,7 +15,11 @@
  *     /en, /dukung and the twelve tool pages);
  *   - choosing a language in the menu must be remembered, or an English browser
  *     that picks "Bahasa Indonesia" on /en is bounced straight back;
- *   - private modes where storage throws still redirect, with no page error.
+ *   - private modes where storage throws still redirect, with no page error;
+ *   - (founder, 2026-10-06; 88% of /en visitors were in Indonesia) a device whose
+ *     time zone is one of Indonesia's four stays on `/` whatever the browser
+ *     language says, a stored choice still beats that, and every other time zone
+ *     (Malaysia included) is decided by the browser language as before.
  *
  * WHY THESE CONTEXTS SET A USER AGENT: playwright.config.js pins the browser
  * language to id-ID so every other spec keeps testing the Indonesian `/`. Here
@@ -41,8 +45,12 @@ const BOTS = [
   'Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)',
 ];
 
-async function open(browser, baseURL, { locale, userAgent = CHROME, stored, init } = {}) {
-  const ctx = await browser.newContext({ baseURL, locale, userAgent });
+// The time zone is pinned too, to a non-Indonesian one by default: the browser takes the HOST's
+// zone otherwise, and on a laptop in Jakarta every "an English browser goes to /en" case
+// would silently become a Jakarta case (measured: four red on first run). Cases that mean
+// Indonesia say so.
+async function open(browser, baseURL, { locale, timezoneId = 'America/New_York', userAgent = CHROME, stored, init } = {}) {
+  const ctx = await browser.newContext({ baseURL, locale, userAgent, timezoneId });
   if (stored) await ctx.addInitScript((v) => { try { localStorage.setItem('pdflokal_lang', v); } catch { /* no storage */ } }, stored);
   if (init) await ctx.addInitScript(init);
   const page = await ctx.newPage();
@@ -188,5 +196,84 @@ test.describe('the browser language chooses `/` or `/en`', () => {
     await expect(page).toHaveURL(/\/en$/);
     expect(errors.filter((m) => !/denied/.test(m) || /pdflokal_lang/.test(m))).toEqual([]);
     await ctx.close();
+  });
+
+  // ---- the time-zone rule: an Indonesian device stays Indonesian ------------------
+  // Each "stays" case is paired with a "goes" case under the same English browser, so
+  // a script that ignored the time zone fails the stays half and one that always
+  // stayed fails the goes half.
+
+  test('10. an English browser in an Indonesian time zone stays on `/`: Jakarta, Pontianak, Makassar, Jayapura', async ({ browser, baseURL }) => {
+    for (const timezoneId of ['Asia/Jakarta', 'Asia/Pontianak', 'Asia/Makassar', 'Asia/Jayapura']) {
+      const { ctx, page, errors } = await open(browser, baseURL, { locale: 'en-US', timezoneId });
+      await page.goto('/');
+      await settle(page);
+      expect(where(page), timezoneId).toBe('/');
+      await expect(page.locator('html'), timezoneId).toHaveAttribute('lang', 'id');
+      expect(errors).toEqual([]);
+      await ctx.close();
+    }
+  });
+
+  test('11. an English browser anywhere else still goes to /en: New York, Kuala Lumpur (Malaysia is not Indonesia)', async ({ browser, baseURL }) => {
+    for (const timezoneId of ['America/New_York', 'Asia/Kuala_Lumpur', 'Asia/Singapore', 'Europe/London']) {
+      const { ctx, page } = await open(browser, baseURL, { locale: 'en-US', timezoneId });
+      await page.goto('/');
+      await expect(page, timezoneId).toHaveURL(/\/en$/);
+      await ctx.close();
+    }
+  });
+
+  test('12. an Indonesian browser outside Indonesia stays: the browser language still counts', async ({ browser, baseURL }) => {
+    const { ctx, page } = await open(browser, baseURL, { locale: 'id-ID', timezoneId: 'Europe/London' });
+    await page.goto('/');
+    await settle(page);
+    expect(where(page)).toBe('/');
+    await ctx.close();
+  });
+
+  test('13. a stored choice beats the time zone: stored en in Jakarta goes to /en, stored id in New York stays', async ({ browser, baseURL }) => {
+    const goEn = await open(browser, baseURL, { locale: 'en-US', timezoneId: 'Asia/Jakarta', stored: 'en' });
+    await goEn.page.goto('/');
+    await expect(goEn.page).toHaveURL(/\/en$/);
+    await goEn.ctx.close();
+
+    const stayId = await open(browser, baseURL, { locale: 'en-US', timezoneId: 'America/New_York', stored: 'id' });
+    await stayId.page.goto('/');
+    await settle(stayId.page);
+    expect(where(stayId.page)).toBe('/');
+    await stayId.ctx.close();
+  });
+
+  test('14. a crawler in an Indonesian time zone stays too, and the other time-zone paths are inert off `/`', async ({ browser, baseURL }) => {
+    for (const userAgent of BOTS) {
+      const { ctx, page } = await open(browser, baseURL, { locale: 'en-US', timezoneId: 'Asia/Jakarta', userAgent });
+      await page.goto('/');
+      await settle(page);
+      expect(where(page), userAgent).toBe('/');
+      await ctx.close();
+    }
+    // Off `/` nothing moves, in any time zone.
+    const { ctx, page } = await open(browser, baseURL, { locale: 'en-US', timezoneId: 'Asia/Jakarta' });
+    await page.goto('/en');
+    await settle(page);
+    expect(where(page)).toBe('/en');
+    await ctx.close();
+  });
+
+  test('15. where the time zone cannot be read (old browsers), the browser language decides as before and nothing throws', async ({ browser, baseURL }) => {
+    const init = () => { Intl.DateTimeFormat = function () { throw new TypeError('no Intl'); }; };
+    const en = await open(browser, baseURL, { locale: 'en-US', timezoneId: 'Asia/Jakarta', init });
+    await en.page.goto('/');
+    await expect(en.page).toHaveURL(/\/en$/);
+    expect(en.errors).toEqual([]);
+    await en.ctx.close();
+
+    const id = await open(browser, baseURL, { locale: 'id-ID', init });
+    await id.page.goto('/');
+    await settle(id.page);
+    expect(where(id.page)).toBe('/');
+    expect(id.errors).toEqual([]);
+    await id.ctx.close();
   });
 });

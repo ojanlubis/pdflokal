@@ -16,11 +16,20 @@
        1. A click on any language link (.ld-lang-opt with an hreflang) writes
           pdflokal_lang = that link's language. Without it an English-browser user who
           picks "Bahasa Indonesia" on /en would be bounced straight back.
-       2. ONLY on the exact path `/`: a stored choice wins ('en' goes to /en, 'id'
-          stays); with none, a browser whose first language is English goes to /en and
-          anything else stays. `location.replace`, so Back does not return to `/`; the
-          query string and hash travel with it. It never moves /en, a tool page or any
-          other URL, and never an Indonesian browser off `/en`.
+       2. ONLY on the exact path `/`, in this order: a stored choice wins ('en' goes to
+          /en, 'id' stays); else a device whose time zone is Asia/Jakarta, Pontianak,
+          Makassar or Jayapura stays on `/`, whatever the browser language says; else a
+          browser whose first language is English goes to /en and anything else stays.
+          `location.replace`, so Back does not return to `/`; the query string and hash
+          travel with it. It never moves /en, a tool page or any other URL, and never an
+          Indonesian browser off `/en`.
+          WHY THE TIME ZONE (founder, 2026-10-06): 88% of one week's /en visitors were in
+          Indonesia. Indonesians often run an English browser, and the language alone
+          sent them to a page they did not want. The time zone is read from the browser
+          itself (Intl); no IP lookup, no request, nothing leaves the device. It is a
+          hint, not a border: Malaysia, Brunei and every other zone are unchanged (the
+          browser language decides), and a stored choice still beats it. A browser that
+          cannot report a time zone (try/catch) falls through to the language rule.
        NEVER FOR A CRAWLER: Googlebot renders as en-US, and a bot sent to /en would
        never index `/`. So a user agent that says bot, crawler, Lighthouse or headless
        stays put. navigator.webdriver is deliberately NOT tested: it is true under
@@ -47,7 +56,9 @@
     var saved = null;
     try { saved = localStorage.getItem(KEY); } catch (x) {}
     var first = (navigator.languages && navigator.languages[0]) || navigator.language || '';
-    if (saved === 'en' || (saved !== 'id' && /^en/i.test(first))) {
+    var inIndonesia = false;
+    try { inIndonesia = /^Asia\/(Jakarta|Pontianak|Makassar|Jayapura)$/.test(Intl.DateTimeFormat().resolvedOptions().timeZone); } catch (x) {}
+    if (saved === 'en' || (saved !== 'id' && !inIndonesia && /^en/i.test(first))) {
       window.__pdlLeaving = true;
       // Nothing of the Indonesian page may show while /en loads; undone if the move never lands.
       document.documentElement.style.visibility = 'hidden';

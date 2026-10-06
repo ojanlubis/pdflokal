@@ -65,7 +65,7 @@ test('2. it is the first script in index.html\'s head, ahead of gtag and the Mix
 const CHROME = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36';
 
 // Run the script as the browser would. Returns { went, store, click(link), leaving }.
-function run({ path: p = '/', search = '', hash = '', ua = CHROME, languages, language, stored, storageThrows = false, webdriver = true } = {}) {
+function run({ path: p = '/', search = '', hash = '', ua = CHROME, languages, language, stored, storageThrows = false, webdriver = true, timeZone, intlThrows = false } = {}) {
   const store = new Map(stored ? [['pdflokal_lang', stored]] : []);
   const went = [];
   const listeners = {};
@@ -79,6 +79,10 @@ function run({ path: p = '/', search = '', hash = '', ua = CHROME, languages, la
     navigator: { userAgent: ua, languages, language, webdriver },
     document: { addEventListener: (t, fn) => { listeners[t] = fn; }, documentElement: { style } },
     setTimeout: () => 0,
+    // The device's time zone as Intl reports it. `undefined` leaves the real Intl absent here,
+    // so the script must cope with a bare context (the vm has no Intl of its own).
+    Intl: intlThrows ? { DateTimeFormat: () => { throw new TypeError('no Intl'); } }
+      : { DateTimeFormat: () => ({ resolvedOptions: () => ({ timeZone }) }) },
   };
   ctx.window = ctx;
   Object.defineProperty(ctx, 'localStorage', { get: () => localStorage });
@@ -157,4 +161,34 @@ test('4. a click on a language link writes its hreflang; nothing else writes', (
   // Storage that throws must not throw out of the listener (a page error per click otherwise).
   const t = run({ path: '/en', storageThrows: true });
   assert.doesNotThrow(() => t.click('id'));
+});
+
+test('5. an Indonesian time zone keeps an English browser on `/`; every other zone leaves the browser language in charge', () => {
+  for (const timeZone of ['Asia/Jakarta', 'Asia/Pontianak', 'Asia/Makassar', 'Asia/Jayapura']) {
+    const r = run({ languages: ['en-US'], timeZone });
+    assert.deepEqual(r.went, [], timeZone);
+    assert.equal(r.leaving, false, timeZone);
+    assert.equal(r.hidden, false, timeZone);
+  }
+  // CONTROLS under the same harness: other zones (Malaysia, Brunei, anywhere) go.
+  for (const timeZone of ['Asia/Kuala_Lumpur', 'Asia/Kuching', 'Asia/Brunei', 'Asia/Singapore', 'America/New_York', 'UTC', undefined, '']) {
+    assert.deepEqual(run({ languages: ['en-US'], timeZone }).went, ['/en'], String(timeZone));
+  }
+  // Exact match only: a lookalike is not Indonesia.
+  assert.deepEqual(run({ languages: ['en-US'], timeZone: 'Asia/Jakarta2' }).went, ['/en']);
+  assert.deepEqual(run({ languages: ['en-US'], timeZone: 'asia/jakarta' }).went, ['/en']);
+  // An Indonesian browser stays in any zone.
+  assert.deepEqual(run({ languages: ['id-ID'], timeZone: 'Europe/London' }).went, []);
+});
+
+test('5b. the time zone sits below a stored choice and a crawler; Intl failing falls back to the language', () => {
+  assert.deepEqual(run({ languages: ['en-US'], timeZone: 'Asia/Jakarta', stored: 'en' }).went, ['/en'], 'stored en beats the Jakarta rule');
+  assert.deepEqual(run({ languages: ['id-ID'], timeZone: 'Asia/Jakarta', stored: 'en' }).went, ['/en']);
+  assert.deepEqual(run({ languages: ['en-US'], timeZone: 'America/New_York', stored: 'id' }).went, [], 'stored id still stays');
+  assert.deepEqual(run({ ua: 'Mozilla/5.0 (compatible; Googlebot/2.1)', languages: ['en-US'], timeZone: 'America/New_York' }).went, []);
+  // Old browsers: Intl throws -> the old rule, no exception out of the script.
+  assert.deepEqual(run({ languages: ['en-US'], intlThrows: true }).went, ['/en']);
+  assert.deepEqual(run({ languages: ['id-ID'], intlThrows: true }).went, []);
+  // Off `/` the time zone is never even asked.
+  assert.deepEqual(run({ path: '/en', languages: ['en-US'], timeZone: 'America/New_York' }).went, []);
 });
