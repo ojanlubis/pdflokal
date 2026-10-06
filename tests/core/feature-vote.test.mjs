@@ -168,7 +168,14 @@ const VISITOR = '9a1e0c44-2b7d-4f10-8c55-1d3e6f7a8b90';
 
 async function postVote(props) {
   const calls = [];
-  setTQuery(async (text, params) => { calls.push({ text, params }); return { rowCount: params.length / 6 }; });
+  // Only the `events` insert is a written vote. A dropped batch also writes one
+  // telemetry_rejects upsert (api/_rejects.js): it is the counter of what was NOT
+  // written, so it is answered but never counted as a call.
+  setTQuery(async (text, params) => {
+    if (/insert into telemetry_rejects/i.test(String(text))) return { rowCount: params.length / 5 };
+    calls.push({ text, params });
+    return { rowCount: params.length / 6 };
+  });
   const saved = process.env.TURSO_EVENTS_URL;
   const res = mkRes();
   try {
