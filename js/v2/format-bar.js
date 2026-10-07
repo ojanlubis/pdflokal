@@ -134,11 +134,13 @@ export function createFormatBar(deps) {
     customColor.value = cur;
   }
 
-  function apply(patch) {
+  // `record: false` = a continuation of a change whose undo step is already taken
+  // (the colour picker's drag, see below).
+  function apply(patch, { record: recordStep = true } = {}) {
     Object.assign(defaults, patch);          // sticky for the next new text
     const anno = deps.getTarget();
     if (anno) {
-      record(deps.history, deps.getDoc());
+      if (recordStep) record(deps.history, deps.getDoc());
       updateAnnotation(deps.getDoc(), anno.id, patch);
       deps.onStyled?.(anno);
     } else {
@@ -184,8 +186,24 @@ export function createFormatBar(deps) {
   boldBtn.addEventListener('click', toggleBold);
   italicBtn.addEventListener('click', toggleItalic);
   for (const s of swatches) s.addEventListener('click', () => apply({ color: s.dataset.color }));
-  // 'input' fires while dragging inside the OS picker → live preview on the text.
-  customColor.addEventListener('input', () => apply({ color: customColor.value }));
+  // 'input' fires on every tick while dragging inside the OS picker → live
+  // preview on the text. WHY only the FIRST tick records: one undo step per tick
+  // meant a single drag left a dozen steps, and Ctrl+Z walked back through shades
+  // nobody chose. A whole drag is ONE step, taken before the first tick changes
+  // anything, so undo returns to the colour the text had when the picker opened.
+  // 'change' (picker closed, or a browser that fires only that) ends the drag;
+  // with no tick before it, it is itself the one step. Blur ends it too, so an
+  // abandoned picker cannot swallow the next session's step.
+  let pickerDragging = false;
+  customColor.addEventListener('input', () => {
+    apply({ color: customColor.value }, { record: !pickerDragging });
+    pickerDragging = true;
+  });
+  customColor.addEventListener('change', () => {
+    if (!pickerDragging) apply({ color: customColor.value });
+    pickerDragging = false;
+  });
+  customColor.addEventListener('blur', () => { pickerDragging = false; });
 
   // Keep taps inside the bar from bubbling into the stage (deselecting), and
   // keep BUTTON taps from stealing focus (which would blur-commit an open
