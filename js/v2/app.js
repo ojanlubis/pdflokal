@@ -3302,7 +3302,6 @@ document.addEventListener('keydown', (e) => {
   const key = e.key.toLowerCase();
   if (mod && key === 'z') { e.preventDefault(); e.shiftKey ? doRedo() : doUndo(); }
   else if (mod && key === 'y') { e.preventDefault(); doRedo(); }
-  else if (mod && key === 's') { e.preventDefault(); doDownload(); }
   else if (mod && !e.altKey && !e.shiftKey && 'cxvd'.includes(key) && key.length === 1 && !document.querySelector('dialog[open]')) {
     // WHY the open-dialog guard: preventDefault on Ctrl+V's keydown suppresses the
     // `paste` event, which the signature sheet needs for image paste. WHY no
@@ -3900,6 +3899,18 @@ function doDownload() {
   downloadSheet.open();
 }
 on('btn-download', 'click', doDownload);
+// Ctrl/Cmd+S = the Unduh button. CAPTURE phase on purpose: the inline text editor
+// stops propagation of every keydown it sees (so typing never fires tool verbs),
+// and the main handler above stands down inside any field, so a bubbling listener
+// never saw Ctrl+S where people reach for it most, mid-typing, and the browser's
+// own Save Page opened over the editor. preventDefault runs even with no document
+// open or a sheet already up: "save this page" is never what the key means here.
+document.addEventListener('keydown', (e) => {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey || e.key.toLowerCase() !== 's') return;
+  e.preventDefault();
+  if (document.querySelector('dialog[open]')) return;
+  doDownload();
+}, true);
 
 // ---- wordmark → home (punch list #3) --------------------------------------------
 // On the landing the wordmark is already home; with a doc open it asks first —
