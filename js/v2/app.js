@@ -3313,13 +3313,25 @@ function deleteSelected() {
 }
 
 // ---- copy / cut / paste / duplicate (Canva/Figma-style) -----------------------------
-// The app's OWN clipboard, in memory only: the system clipboard is never read or
-// written (privacy is the product, and signature-modal.js owns image paste from
-// it). `annoClipboard` is a detached snapshot (core/model.js cloneForPaste), so
+// The app's OWN clipboard, in memory only: the system clipboard is never written,
+// and read only through the `paste` event the user's own Ctrl/Cmd+V raises (see
+// the paste listener below; signature-modal.js owns paste while its sheet is
+// open). `annoClipboard` is a detached snapshot (core/model.js cloneForPaste), so
 // editing the source after Ctrl+C cannot change what Ctrl+V pastes. `pasteCount`
 // steps the paste +10px from the SOURCE position each time, Canva-style.
 let annoClipboard = null;
 let pasteCount = 0;
+// True while the in-app copy is plausibly still the NEWEST thing on the user's
+// clipboard. The app never writes the system clipboard, so it cannot see another
+// app copy over it; what it CAN see is the window losing focus (you have to leave
+// to copy elsewhere) or a native copy/cut inside the page. Either one ends the
+// claim, and a later paste then goes to what the system clipboard carries.
+let annoCopyFresh = false;
+const staleAnnoCopy = () => { annoCopyFresh = false; };
+window.addEventListener('blur', staleAnnoCopy);
+document.addEventListener('visibilitychange', staleAnnoCopy);
+document.addEventListener('copy', staleAnnoCopy);
+document.addEventListener('cut', staleAnnoCopy);
 
 function selectedFound() {
   const id = doc.selection.annotationId;
@@ -3332,6 +3344,7 @@ function copySelected() {
   if (!found || !isCopyable(found.annotation)) return false; // doc-bound kinds: see cloneForPaste
   annoClipboard = cloneForPaste(found.annotation);
   pasteCount = 0;
+  annoCopyFresh = true;
   return true;
 }
 
@@ -3366,6 +3379,113 @@ function placeCopy(pageId, src, n) {
   syncPage(pageId);
   return clone;
 }
+
+// The paste (a system-clipboard image or text, see the listener below) shares
+// placeCopy's contract: ONE undo step, the new object selected, the pages involved
+// repainted, and the tool back to Pilih ("tools are verbs").
+function placePasted(pageId, type, props) {
+  const prev = selectedFound();
+  record(history, doc);
+  const created = addAnnotation(doc, pageId, createAnnotation(type, props));
+  selectAnnotation(doc, created.id);
+  if (prev && prev.page.id !== pageId) syncPage(prev.page.id);
+  syncPage(pageId);
+  if (tool !== 'select') setTool('select');
+  return created;
+}
+
+// The middle of what the user can see of `pageId`, in that page's own px (what
+// annotations are positioned in). A page scrolled out of view falls back to its
+// own middle.
+function visibleCentreOf(pageId) {
+  const slot = slots.find((sl) => sl.page.id === pageId);
+  const { width, height } = pageDisplaySize(getPage(doc, pageId));
+  if (!slot) return { x: width / 2, y: height / 2 };
+  const r = slot.view.getBoundingClientRect();
+  const vp = scrollEl.getBoundingClientRect();
+  const left = Math.max(r.left, vp.left), right = Math.min(r.right, vp.right);
+  const top = Math.max(r.top, vp.top), bottom = Math.min(r.bottom, vp.bottom);
+  if (right <= left || bottom <= top) return { x: width / 2, y: height / 2 };
+  return { x: ((left + right) / 2 - r.left) / zoom, y: ((top + bottom) / 2 - r.top) / zoom };
+}
+
+const PASTE_IMAGE_MAX_PX = 1200;  // longer side kept in the file; same cap as a drawn/uploaded signature
+const PASTE_IMAGE_PAGE_FRAC = 0.6; // an image never lands bigger than this share of the page's width or height
+
+// A pasted image becomes a signature-type object (movable, aspect-locked resize,
+// Semua Hal.) — the one image object the model and export already have. It is
+// decoded and re-drawn on a canvas, never uploaded: the bytes stay in this tab.
+// PNG unless the source is a JPEG, which export embeds as JPEG (a photo
+// re-encoded as PNG would bloat the file several times over).
+async function pasteImageFile(file) {
+  const img = new Image();
+  const url = URL.createObjectURL(file);
+  try {
+    await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; img.src = url; });
+  } catch { return; } finally { URL.revokeObjectURL(url); }
+  if (doc.pages.length === 0 || !img.naturalWidth || !img.naturalHeight) return;
+  const k = Math.min(1, PASTE_IMAGE_MAX_PX / Math.max(img.naturalWidth, img.naturalHeight));
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(img.naturalWidth * k));
+  c.height = Math.max(1, Math.round(img.naturalHeight * k));
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+  const image = file.type === 'image/jpeg' ? c.toDataURL('image/jpeg', 0.92) : c.toDataURL('image/png');
+  const pageId = pasteTargetPageId();
+  if (!pageId) return;
+  const pg = pageDisplaySize(getPage(doc, pageId));
+  const fit = Math.min(1, (pg.width * PASTE_IMAGE_PAGE_FRAC) / c.width, (pg.height * PASTE_IMAGE_PAGE_FRAC) / c.height);
+  const width = c.width * fit;
+  const height = c.height * fit;
+  const mid = visibleCentreOf(pageId);
+  placePasted(pageId, 'signature', {
+    image, width, height,
+    x: Math.max(0, Math.min(pg.width - width, mid.x - width / 2)),
+    y: Math.max(0, Math.min(pg.height - height, mid.y - height / 2)),
+  });
+}
+
+// Plain text becomes a text object in the bar's current style, exactly what the
+// Teks tool would have made (the same defaults, the same export path: newlines
+// are lines, odd whitespace is normalised at export).
+function pasteText(text) {
+  const pageId = pasteTargetPageId();
+  if (!pageId) return;
+  const pg = pageDisplaySize(getPage(doc, pageId));
+  const mid = visibleCentreOf(pageId);
+  placePasted(pageId, 'text', {
+    ...formatBar.getDefaults(), text,
+    x: Math.max(0, Math.min(pg.width - 20, mid.x - 60)),
+    y: Math.max(0, Math.min(pg.height - 20, mid.y - 10)),
+  });
+}
+
+// Ctrl/Cmd+V from the SYSTEM clipboard, read through the paste event only (never
+// the async Clipboard API: no permission prompt, and only what the user just
+// asked to paste). Order, a judgment call and why:
+//   1. the in-app copy while it is fresh (annoCopyFresh): the user pressed
+//      Ctrl+C on an object a moment ago and the system clipboard still holds
+//      whatever was there BEFORE, which is almost always stale (a URL, last
+//      week's screenshot). The keydown handler already took this case; it is
+//      repeated here for pastes that arrive without that keydown (context menu).
+//   2. an image on the system clipboard, then 3. its plain text.
+//   4. otherwise a stale in-app copy, e.g. the system clipboard held a file.
+// Stands down for: an open sheet (the signature dialog has its own paste), any
+// field or the inline editor (native paste into the text), no document, and a
+// paste another listener already took.
+document.addEventListener('paste', (e) => {
+  if (e.defaultPrevented || doc.pages.length === 0 || document.querySelector('dialog[open]')) return;
+  if (e.target.matches?.('input, select, textarea, [contenteditable="true"]')) return;
+  if (annoClipboard && annoCopyFresh) { if (pasteCopy()) e.preventDefault(); return; }
+  const cd = e.clipboardData;
+  let file = null;
+  for (const item of cd?.items || []) {
+    if (item.kind === 'file' && item.type.startsWith('image/')) { file = item.getAsFile(); if (file) break; }
+  }
+  if (file) { e.preventDefault(); void pasteImageFile(file); return; }
+  const text = (cd?.getData('text/plain') || '').replace(/\r\n?/g, '\n').trim();
+  if (text) { e.preventDefault(); pasteText(text); return; }
+  if (annoClipboard && pasteCopy()) e.preventDefault();
+});
 
 function pasteCopy() {
   if (!annoClipboard) return false;
@@ -3413,7 +3533,11 @@ document.addEventListener('keydown', (e) => {
     const textSelected = !!window.getSelection?.()?.toString();
     if (key === 'c' && !textSelected) { if (copySelected()) e.preventDefault(); }
     else if (key === 'x' && !textSelected) { if (copySelected()) { e.preventDefault(); deleteSelected(); } }
-    else if (key === 'v') { if (annoClipboard && pasteCopy()) e.preventDefault(); }
+    else if (key === 'v') {
+      // Only a FRESH in-app copy is pasted here (and so suppresses the paste event);
+      // anything else falls through to the paste listener, which can read the system clipboard.
+      if (annoClipboard && annoCopyFresh && pasteCopy()) e.preventDefault();
+    }
     else if (key === 'd' && selectedFound()) { e.preventDefault(); duplicateSelected(); } // browsers bookmark on Ctrl+D
   }
   else if (mod && !e.altKey && (key === 'b' || key === 'i') && selectedTextAnno()) {
