@@ -91,4 +91,27 @@ test.describe('zoom keys', () => {
     });
     expect(prevented).toBe(false);
   });
+
+  // Safari's trackpad pinch is WebKit-only, so Chromium cannot produce it. The
+  // wiring is proven with synthetic gesture events; real Safari is unverified.
+  test('Safari gesture events zoom the editor by their scale and are defaultPrevented', async ({ page }) => {
+    await openDoc(page);
+    const z0 = await zoomOf(page);
+    const r = await page.evaluate(() => {
+      const el = document.getElementById('v2-scroll');
+      const fire = (type, scale) => {
+        const ev = new Event(type, { bubbles: true, cancelable: true });
+        ev.scale = scale; ev.clientX = 400; ev.clientY = 300;
+        el.dispatchEvent(ev);
+        return ev.defaultPrevented;
+      };
+      const out = [fire('gesturestart', 1), fire('gesturechange', 1.5)];
+      const mid = parseFloat(document.getElementById('v2-stage').style.getPropertyValue('--zoom'));
+      out.push(fire('gesturechange', 0.5), fire('gestureend', 0.5));
+      return { out, mid };
+    });
+    expect(r.out).toEqual([true, true, true, true]);
+    expect(r.mid).toBeCloseTo(z0 * 1.5, 3);
+    expect(await zoomOf(page)).toBeCloseTo(z0 * 0.5, 3);
+  });
 });

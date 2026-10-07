@@ -531,6 +531,7 @@ on(scrollEl, 'touchcancel', endPinch);
 on(scrollEl, 'wheel', (e) => {
   if (!(e.ctrlKey || e.metaKey)) return;
   e.preventDefault();
+  if (gestureZoom0 !== null) return; // a Safari pinch is already driving the zoom
   setZoomAnchored(zoom * (e.deltaY < 0 ? 1.1 : 0.9), e.clientX, e.clientY);
 }, { passive: false });
 
@@ -559,6 +560,76 @@ document.addEventListener('keydown', (e) => {
   const r = scrollEl.getBoundingClientRect();
   setZoomAnchored(next, r.left + r.width / 2, r.top + r.height / 2);
 }, true);
+
+// Hold Space and drag = pan (grab cursor), the hand every canvas editor has. The
+// tool in use is irrelevant: while Space is down the press belongs to the camera,
+// so it never starts a move, a Tip-Ex stroke or a selection. The capture-phase
+// pointerdown on scrollEl runs BEFORE interaction.js's listener on the stage and
+// stops it there, which also covers the grey margin around the pages. Mouse and
+// pen only: touch already pans natively. Space is left alone in any field, on a
+// button or link (it activates those), with a sheet open, and with a modifier.
+// preventDefault on the keydown, or the browser scrolls a page down per press.
+let spaceHeld = false;
+let panDrag = null;
+const panStyle = document.createElement('style');
+panStyle.textContent = '.space-pan, .space-pan * { cursor: grab !important }'
+  + ' .space-pan.panning, .space-pan.panning * { cursor: grabbing !important }';
+document.head.appendChild(panStyle);
+function endSpacePan() {
+  spaceHeld = false;
+  panDrag = null;
+  scrollEl.classList.remove('space-pan', 'panning');
+}
+document.addEventListener('keydown', (e) => {
+  if (e.code !== 'Space' || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (doc.pages.length === 0 || document.querySelector('dialog[open]')) return;
+  if (e.target.matches?.('input, select, textarea, button, a, [contenteditable="true"]')) return;
+  e.preventDefault();
+  spaceHeld = true;
+  scrollEl.classList.add('space-pan');
+});
+document.addEventListener('keyup', (e) => { if (e.code === 'Space') endSpacePan(); });
+window.addEventListener('blur', endSpacePan); // alt-tab with Space down: keyup never arrives
+on(scrollEl, 'pointerdown', (e) => {
+  if (!spaceHeld || e.pointerType === 'touch' || e.button !== 0) return;
+  e.preventDefault();
+  e.stopPropagation(); // interaction.js never sees this press
+  panDrag = { id: e.pointerId, x: e.clientX, y: e.clientY, left: scrollEl.scrollLeft, top: scrollEl.scrollTop };
+  scrollEl.setPointerCapture(e.pointerId);
+  scrollEl.classList.add('panning');
+}, true);
+on(scrollEl, 'pointermove', (e) => {
+  if (!panDrag || e.pointerId !== panDrag.id) return;
+  scrollEl.scrollLeft = panDrag.left - (e.clientX - panDrag.x);
+  scrollEl.scrollTop = panDrag.top - (e.clientY - panDrag.y);
+});
+const endPan = (e) => {
+  if (!panDrag || e.pointerId !== panDrag.id) return;
+  panDrag = null;
+  scrollEl.classList.remove('panning');
+};
+on(scrollEl, 'pointerup', endPan);
+on(scrollEl, 'pointercancel', endPan);
+
+// Safari trackpad pinch: WebKit does NOT send ctrl+wheel for it (Chrome and
+// Firefox do, handled above); it sends gesture events whose `scale` runs from 1
+// at the start of the pinch. Same anchored zoom as every other path. Stands down
+// while a touch pinch is live (iOS can send both for one gesture), and the wheel
+// handler stands down while a gesture is, so one pinch is never applied twice.
+// Not testable in Chromium: tests/v2-zoom-keys.spec.js drives it with synthetic events.
+let gestureZoom0 = null;
+on(scrollEl, 'gesturestart', (e) => {
+  if (pinch) return;
+  e.preventDefault();
+  gestureZoom0 = zoom;
+}, { passive: false });
+on(scrollEl, 'gesturechange', (e) => {
+  if (pinch || gestureZoom0 === null) return;
+  e.preventDefault();
+  const r = scrollEl.getBoundingClientRect();
+  setZoomAnchored(gestureZoom0 * e.scale, e.clientX ?? r.left + r.width / 2, e.clientY ?? r.top + r.height / 2);
+}, { passive: false });
+on(scrollEl, 'gestureend', (e) => { e.preventDefault(); gestureZoom0 = null; }, { passive: false });
 
 // ---- streaming viewport --------------------------------------------------------
 let pillTimer = null;
