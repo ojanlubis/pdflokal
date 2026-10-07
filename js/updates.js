@@ -29,6 +29,27 @@ import { getLocale } from './lib/i18n.js';
 
 export const UPDATES = [
   {
+    id: '2026-10-07-paste-dari-luar',
+    date: '2026-10-07',
+    text: 'Sekarang kamu bisa paste gambar atau teks dari aplikasi lain ke halaman pakai Ctrl+V.',
+    en: 'You can now paste an image or text from another app onto the page with Ctrl+V.',
+    approved: true, // Fauzan, 2026-10-07
+  },
+  {
+    id: '2026-10-07-zoom-keyboard',
+    date: '2026-10-07',
+    text: 'Ctrl+plus dan Ctrl+minus nge-zoom halaman PDF-nya. Tahan spasi sambil drag buat geser.',
+    en: 'Ctrl+plus and Ctrl+minus zoom the PDF page. Hold Space and drag to move around.',
+    approved: true, // Fauzan, 2026-10-07
+  },
+  {
+    id: '2026-10-07-ctrl-s-unduh',
+    date: '2026-10-07',
+    text: 'Ctrl+S langsung buka Unduh.',
+    en: 'Ctrl+S opens Download.',
+    approved: true, // Fauzan, 2026-10-07
+  },
+  {
     id: '2026-10-06-tinggalkan-tab',
     date: '2026-10-06',
     text: 'Browser sekarang ngingetin kamu kalau mau nutup tab sebelum editan diunduh.',
