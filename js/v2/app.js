@@ -35,7 +35,7 @@ import { compareRegions } from '../core/visual-oracle.js';
 import { createOcrIndex, ocrEngineLoaded } from './ocr-runs.js';
 import { scanAppearance, scanPaper } from './scan-appearance.js';
 import { validateSample } from '../core/feedback-sample.js';
-import { createPageSlot, syncOverlay, textFontCss, applyTextFont, measureTextAnnoWidth } from '../render/page-view.js';
+import { createPageSlot, pageDisplaySize, syncOverlay, textFontCss, applyTextFont, measureTextAnnoWidth } from '../render/page-view.js';
 import { createViewportStream } from '../render/viewport.js';
 import { RASTER_BASE, sharpenScale, maxPixelsFor } from '../render/sharpen.js';
 import { createInteraction } from '../render/interaction.js';
@@ -354,13 +354,18 @@ function openingZoom(pageWidth) {
 // zoom_tap reports the zoom BEFORE the press (core/telemetry-schema.js says why).
 // Emitted ahead of the change so `zoom` is still the view being rejected; the
 // tel() call is try/catch-armoured, so it can never stop the zoom from happening.
+// SINGLE SOURCE OF TRUTH for how far and how finely the view zooms: the +/-
+// buttons, setZoomAnchored (pinch, wheel, keys) and the zoom keys all read these.
+const ZOOM_MIN = 0.3;
+const ZOOM_MAX = 3;
+const ZOOM_STEP = 0.25;
 on('z-in', 'click', () => {
   tel('zoom_tap', { dir: 'in', level: zoomBucket(zoom), device: deviceClass() });
-  zoom = Math.min(zoom + 0.25, 3); applyZoom();
+  zoom = Math.min(zoom + ZOOM_STEP, ZOOM_MAX); applyZoom();
 });
 on('z-out', 'click', () => {
   tel('zoom_tap', { dir: 'out', level: zoomBucket(zoom), device: deviceClass() });
-  zoom = Math.max(zoom - 0.25, 0.3); applyZoom();
+  zoom = Math.max(zoom - ZOOM_STEP, ZOOM_MIN); applyZoom();
 });
 
 // ---- contact bookmark: tap the tab, the panel slides up; tap again or tap
@@ -393,7 +398,7 @@ on('z-out', 'click', () => {
 // 2-touch touchstart keeps the browser from claiming the gesture, zoom anchors
 // on the pinch midpoint so the paper under your fingers stays put.
 function setZoomAnchored(next, midX, midY) {
-  const clamped = Math.min(3, Math.max(0.3, next));
+  const clamped = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, next));
   if (clamped === zoom) return;
   const rect = scrollEl.getBoundingClientRect();
   const mx = midX - rect.left;
@@ -528,6 +533,32 @@ on(scrollEl, 'wheel', (e) => {
   e.preventDefault();
   setZoomAnchored(zoom * (e.deltaY < 0 ? 1.1 : 0.9), e.clientX, e.clientY);
 }, { passive: false });
+
+// Keyboard zoom: Ctrl/Cmd + = / + / - / 0, the keys every editor and browser taught.
+// Without this they zoomed the BROWSER's UI (toolbar, sheets and all) while the
+// page stayed the same size relative to it. Same step and clamps as the +/-
+// buttons; 0 = fit the focused page to the width, the same fit a document opens
+// at (openingZoom). CAPTURE phase so it also works inside the inline text editor,
+// which stops propagation of every keydown. Anchored on the viewport centre, so
+// the paper under your eyes stays put. NOT telemetered: `zoom_tap` means a press
+// of the on-screen pill (core/telemetry-schema.js) and a keypress would change
+// what that field counts. No document, or a sheet open: the browser keeps its keys.
+function fitWidthZoom() {
+  const pg = getPage(doc, focusedPageId) || doc.pages[0];
+  return openingZoom(pageDisplaySize(pg).width);
+}
+document.addEventListener('keydown', (e) => {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey || doc.pages.length === 0) return;
+  if (document.querySelector('dialog[open]')) return;
+  let next;
+  if (e.key === '=' || e.key === '+' || e.code === 'NumpadAdd') next = zoom + ZOOM_STEP;
+  else if (e.key === '-' || e.key === '_' || e.code === 'NumpadSubtract') next = zoom - ZOOM_STEP;
+  else if (e.key === '0' || e.code === 'Numpad0') next = fitWidthZoom();
+  else return;
+  e.preventDefault();
+  const r = scrollEl.getBoundingClientRect();
+  setZoomAnchored(next, r.left + r.width / 2, r.top + r.height / 2);
+}, true);
 
 // ---- streaming viewport --------------------------------------------------------
 let pillTimer = null;
