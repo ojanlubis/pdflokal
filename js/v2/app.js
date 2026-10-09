@@ -23,7 +23,7 @@ import {
   addAnnotation, removeAnnotation, updateAnnotation, clearSelection, selectAnnotation,
   moveAnnotation, normalizePageWidths, duplicateAnnotation,
 } from '../core/operations.js';
-import { createHistory, record, undo, redo, canUndo, canRedo, markClean, markChanged, settle } from '../core/history.js';
+import { createHistory, record, undo, redo, canUndo, canRedo, markClean, markChanged, settle, isDirty } from '../core/history.js';
 import { setLeaveGuard } from './leave-guard.js';
 import { rasterFitsShape } from '../core/raster-key.js';
 import { importPdf, importImage, createPageRasterizer, probeTextLayer, pdfLibLoadError } from '../core/import.js';
@@ -3365,8 +3365,17 @@ on('fm-add', 'click', () => {
   toggleFileMenu(false);
   pickFiles(); // appends → merge, the default loadFiles path
 });
+// Buka Baru wipes the doc AND its undo history once a file is picked, so with
+// edits not yet downloaded it asks first. A clean doc (nothing edited, or
+// already downloaded whole) loses nothing, so the picker opens straight away.
 on('fm-new', 'click', () => {
   toggleFileMenu(false);
+  if (isDirty(history)) document.getElementById('new-confirm').showModal();
+  else pickFiles(true);
+});
+on('nc-cancel', 'click', () => document.getElementById('new-confirm').close());
+on('nc-go', 'click', () => {
+  document.getElementById('new-confirm').close();
   pickFiles(true);
 });
 on('fm-pages', 'click', () => {
@@ -3413,18 +3422,49 @@ on(fileInput, 'change', async (e) => {
   fileInput.setAttribute('accept', DEFAULT_ACCEPT); // undo any intent narrowing (Foto jadi PDF)
 });
 
-// Drag & drop anywhere (desktop).
+// Drag & drop anywhere (desktop). Onto an empty canvas the file just opens.
+// Onto an open doc it asks: add the pages, or replace the doc (his ask
+// 2026-10-09; before, a drop always appended without saying so). Closing the
+// dialog any other way (Batal, Esc, backdrop, back) drops nothing.
+const dropChoice = document.getElementById('drop-choice');
+let droppedFiles = null;
 document.addEventListener('dragover', (e) => e.preventDefault());
 document.addEventListener('drop', (e) => {
   e.preventDefault();
   // Never behind a sheet (the Halaman sheet re-renders itself on a merge, so it
   // is the one exception). Dropped behind Unduh, the merge missed the bytes the
   // sheet had already built, and markClean then called the merged doc saved.
+  // This also keeps a second drop from landing while #drop-choice is open.
   if (document.querySelector('dialog[open]:not(#pm-sheet)')) return;
-  if (e.dataTransfer?.files?.length) {
-    loadFiles(e.dataTransfer.files).catch((err) => { console.error(err); toast(tr('toast.openFailed')); });
+  const files = e.dataTransfer?.files;
+  if (!files?.length) return;
+  if (doc.pages.length === 0) {
+    loadFiles(files).catch((err) => { console.error(err); toast(tr('toast.openFailed')); });
+    return;
   }
+  droppedFiles = [...files]; // the DataTransfer empties once this handler returns
+  dropChoice.showModal();
 });
+on(dropChoice, 'close', () => { droppedFiles = null; });
+function takeDropped() {
+  const files = droppedFiles;
+  dropChoice.close(); // its close handler clears droppedFiles
+  return files;
+}
+on('dc-add', 'click', () => {
+  const files = takeDropped();
+  if (files) loadFiles(files).catch((err) => { console.error(err); toast(tr('toast.openFailed')); });
+});
+on('dc-replace', 'click', async () => {
+  const files = takeDropped();
+  if (!files) return;
+  // loadFiles refuses while another load runs; check BEFORE wiping the doc,
+  // or the user loses the old doc and never gets the new one.
+  if (loadingFiles) { toast(tr('toast.stillLoading')); return; }
+  await resetDoc();
+  await loadFiles(files).catch((err) => { console.error(err); toast(tr('toast.openFailed')); });
+});
+on('dc-cancel', 'click', () => dropChoice.close());
 
 // ---- download: the Unduh sheet (output pipeline) ------------------------------------------
 // Opening it starts building the REAL PDF in the background — by the time the
@@ -3500,7 +3540,7 @@ function pushEditorHistoryState() {
 (function wireDialogHistory() {
   // NOTE: window.history everywhere — plain `history` is SHADOWED in this
   // module by the undo history (const history = createHistory()).
-  const dialogs = ['pm-sheet', 'sig-modal', 'dl-sheet', 'home-confirm'].map((id) => document.getElementById(id));
+  const dialogs = ['pm-sheet', 'sig-modal', 'dl-sheet', 'home-confirm', 'drop-choice', 'new-confirm'].map((id) => document.getElementById(id));
   const stack = []; // open dialogs in STACKING order (array order lies for nesting)
   let expectPop = false;
 

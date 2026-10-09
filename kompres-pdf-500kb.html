@@ -756,11 +756,11 @@
     }
     /* The scan sheet's primary action. Same accent treatment as #hc-go — one
        grammar for "this is the button the sheet is about", never a second. */
-    #hc-go, #so-ocr { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 2px 0 var(--accent-down); }
+    #hc-go, #so-ocr, #dc-add, #nc-go { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 2px 0 var(--accent-down); }
     #so-ocr:active { transform: translateY(1px); box-shadow: 0 1px 0 var(--accent-down); }
     /* The primary action needs air above the row of alternatives under it. */
     #scan-offer .hc-row + .hc-row { margin-top: 2px; }
-    #hc-go:active { transform: translateY(1px); box-shadow: 0 1px 0 var(--accent-down); }
+    #hc-go:active, #dc-add:active, #nc-go:active { transform: translateY(1px); box-shadow: 0 1px 0 var(--accent-down); }
     .brand .beta { font-size: 10px; color: var(--accent); vertical-align: super; font-weight: 600; }
     .file-menu-wrap { position: relative; }
     #btn-file { font-size: 13px; color: var(--muted); padding: 0 8px; }
@@ -2796,6 +2796,36 @@
       <div class="hc-row">
         <button id="hc-cancel">Batal</button>
         <button id="hc-go">Ke Beranda</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- A file dropped onto an OPEN document: add its pages, or replace the doc.
+       Before this the drop always appended, silently. On an empty canvas the
+       drop just opens, no question. Same grammar as #home-confirm. Copy is his
+       (2026-10-09: buttons "max 2 kata. ini tools"). -->
+  <dialog id="drop-choice" aria-label="Tambahin atau ganti">
+    <div class="sheet hc-sheet">
+      <h2>Tambahin atau ganti?</h2>
+      <p>Halaman dari file baru mau ditaruh di belakang, atau gantiin dokumen ini? Kalau diganti, editanmu bakal hilang kalau belum kamu unduh.</p>
+      <div class="hc-row">
+        <button id="dc-add">Tambah</button>
+        <button id="dc-replace">Ganti</button>
+        <button id="dc-cancel">Batal</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- File > Buka Baru with edits not yet downloaded. Before this the picker
+       opened straight away and choosing a file wiped the doc AND its undo
+       history: the one silent, unrecoverable loss in the editor. -->
+  <dialog id="new-confirm" aria-label="Buka file baru">
+    <div class="sheet hc-sheet">
+      <h2>Buka file baru?</h2>
+      <p>Dokumen ini bakal ditutup. Editanmu bakal hilang kalau belum kamu unduh.</p>
+      <div class="hc-row">
+        <button id="nc-cancel">Batal</button>
+        <button id="nc-go">Buka Baru</button>
       </div>
     </div>
   </dialog>
