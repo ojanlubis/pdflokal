@@ -139,6 +139,7 @@ test.describe('leave guard', () => {
     await addText(page, 'Satu');
     await page.click('#btn-file');
     await page.click('#fm-new');
+    await page.click('#nc-go'); // edits not downloaded -> #new-confirm asks first
     await page.setInputFiles('#file-input', FIXTURE);
     await expectFirstPage(page);
     expect(await d.reload()).toEqual([]);

@@ -337,6 +337,7 @@ test.describe('edit beta: Increment D consent-gated sample', () => {
     // finish(), which records the still-open 👎 note-less, sample-less.
     await page.click('#btn-file');
     await page.click('#fm-new');
+    await page.click('#nc-go'); // edits not downloaded -> #new-confirm asks first
     await page.setInputFiles('#file-input', NASTY('undangan-cid.pdf'));
     await expectFirstPage(page);
 
