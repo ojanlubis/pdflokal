@@ -165,6 +165,7 @@ test.describe('page manager — mobile', () => {
     // Buka Baru → fresh doc (2 pages, 1 source, empty undo).
     await page.tap('#btn-file');
     await page.tap('#fm-new');
+    await page.tap('#nc-go'); // edits not downloaded -> #new-confirm asks first
     await page.setInputFiles('#file-input', FIXTURE);
     await expect(page.locator('.pv-page')).toHaveCount(2);
     const state = await page.evaluate(() => ({
