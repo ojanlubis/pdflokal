@@ -12,6 +12,8 @@
  *   - merge normalisation scales the frame  → scaleAnnotationGeometry
  *   - export draws in the NATIVE frame      → scaleAnnotationGeometry(1 / k)
  *   - a page turn rotates the frame         → quarterTurnAnnotation
+ * and a move (operations.js moveAnnotation) carries block.disp with x/y
+ * through withBlockFollowing.
  *
  * WHY a file of its own (2026-10-10): this contract used to be a comment in
  * export.js. operations.js did not know it, so merge normalisation resized
@@ -125,10 +127,22 @@ export function turnAnnotation(anno, steps, W, H) {
     out.x = clamp(cx - ext.w / 2, dw - ext.w);
     out.y = clamp(cy - ext.h / 2, dh - ext.h);
   }
-  if (anno.block?.disp) {
-    const dx = out.x - (anno.x || 0);
-    const dy = out.y - (anno.y || 0);
-    out.block = { ...anno.block, disp: { x: anno.block.disp.x + dx, y: anno.block.disp.y + dy } };
-  }
-  return out;
+  return withBlockFollowing(out, anno);
+}
+
+/**
+ * `moved` (a copy of `before` whose x/y changed) with its paragraph block's
+ * display anchor carried by the same delta. block.disp is the block's first
+ * baseline in the displayed frame and the file draws a declined block from it
+ * (export.js drawBlockText), so an x/y change that leaves it behind is a drag
+ * the screen shows and the download ignores. A NEW block object: history
+ * snapshots share `block` by reference.
+ */
+export function withBlockFollowing(moved, before) {
+  if (!before.block?.disp) return moved;
+  const dx = (moved.x || 0) - (before.x || 0);
+  const dy = (moved.y || 0) - (before.y || 0);
+  if (!dx && !dy) return moved;
+  const d = before.block.disp;
+  return { ...moved, block: { ...before.block, disp: { x: d.x + dx, y: d.y + dy } } };
 }
