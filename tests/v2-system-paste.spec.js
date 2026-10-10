@@ -14,14 +14,17 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { expectFirstPage } from './helpers/render.js';
 import { downloadBytes, expectRealPdf } from './helpers/download-bytes.js';
+import { armGanti, tapLine } from './helpers/lines.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE = path.join(__dirname, 'fixtures', 'sample-2pages.pdf');
 const MOD = process.platform === 'darwin' ? 'Meta' : 'Control';
 
-// Raise a paste event on `selector` carrying text and/or a w x h PNG; returns defaultPrevented.
-const paste = (page, { text, image, selector = 'body' } = {}) => page.evaluate(async ({ text, image, selector }) => {
+// Raise a paste event on `selector` carrying text (and the HTML a rich copy adds)
+// and/or a w x h PNG; returns defaultPrevented.
+const paste = (page, { text, html, image, selector = 'body' } = {}) => page.evaluate(async ({ text, html, image, selector }) => {
   const dt = new DataTransfer();
+  if (html != null) dt.setData('text/html', html);
   if (text != null) dt.setData('text/plain', text);
   if (image) {
     const c = document.createElement('canvas');
@@ -34,7 +37,7 @@ const paste = (page, { text, image, selector = 'body' } = {}) => page.evaluate(a
   const ev = new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true });
   document.querySelector(selector).dispatchEvent(ev);
   return ev.defaultPrevented;
-}, { text, image, selector });
+}, { text, html, image, selector });
 
 const annos = (page, i = 0) => page.evaluate((n) => window.v2.getDoc().pages[n].annotations.map((a) => ({ ...a })), i);
 
@@ -99,12 +102,15 @@ test.describe('system clipboard paste', () => {
     await expectRealPdf(page, buf, { pages: 2, text: ['Tempelan Luar'] });
   });
 
-  test('inside the inline text editor the paste stays native (nothing placed, not prevented)', async ({ page }) => {
+  test('inside the inline text editor the paste goes into the text (nothing placed on the page)', async ({ page }) => {
     await openDoc(page);
     await page.keyboard.press('t');
     await page.click('.pv-page >> nth=0', { position: { x: 200, y: 200 } });
     await expect(page.locator('.v2-text-edit')).toBeFocused();
-    expect(await paste(page, { text: 'ke editor', selector: '.v2-text-edit' })).toBe(false);
+    // Prevented by the EDITOR, which inserts the plain text itself
+    // (js/v2/editor-paste.js); the page-level paste stands down.
+    expect(await paste(page, { text: 'ke editor', selector: '.v2-text-edit' })).toBe(true);
+    await expect(page.locator('.v2-text-edit')).toHaveText('ke editor');
     expect(await annos(page)).toHaveLength(0);
   });
 
@@ -197,4 +203,95 @@ test('Gambar Ulang on the selected object replaces it in place', async ({ page }
   expect(after).toHaveLength(1);
   expect(after[0].id).toBe(pasted.id);
   expect(after[0].image).not.toBe(pasted.image);
+});
+
+// ---- a rich paste INTO the inline editor ---------------------------------------
+// Gmail, Docs and Word copy each line as its own <div> in text/html. The
+// browser's own paste put those <div>s in the contenteditable editor, so the
+// user SAW two lines, and the commit read textContent, which has no break at a
+// block boundary: the file got 'Jl. Merdeka 10Jakarta Pusat'. The editor now
+// inserts text/plain as one text node (js/v2/editor-paste.js).
+//
+// RED ON REVERT, two shapes. The synthetic ClipboardEvent below runs no browser
+// default action, so before the fix the editor stays empty and nothing commits
+// (anno undefined). The last test pastes through the REAL clipboard with the
+// real keyboard, which reproduces the glue itself: before the fix the editor
+// holds <div>s and the committed text has no '\n'.
+const ADDRESS = 'Jl. Merdeka 10\nJakarta Pusat';
+const RICH = '<meta charset="utf-8"><div dir="ltr"><div>Jl. Merdeka 10</div><div><b>Jakarta</b> Pusat</div></div>';
+const NASTY = (name) => path.join(__dirname, 'fixtures', 'nasty', name);
+
+// Nothing but text entered the editor: no element a rich paste would bring.
+const editorHoldsOnlyText = (page) => page.locator('.v2-text-edit').evaluate((el) => el.querySelector('*') === null);
+const committedText = (page) => page.evaluate(() =>
+  window.v2.getDoc().pages[0].annotations.filter((a) => a.type === 'text').map((a) => ({ text: a.text, block: a.block || null })));
+
+test.describe('rich paste into the inline editor keeps its lines', () => {
+  test('Teks: two pasted lines commit as two lines', async ({ page }) => {
+    await openDoc(page);
+    await page.keyboard.press('t');
+    await page.click('.pv-page >> nth=0', { position: { x: 200, y: 200 } });
+    await expect(page.locator('.v2-text-edit')).toBeFocused();
+    await page.keyboard.type('Alamat: ');
+    expect(await paste(page, { html: RICH, text: 'Jl. Merdeka 10\r\nJakarta Pusat', selector: '.v2-text-edit' })).toBe(true);
+    expect(await editorHoldsOnlyText(page)).toBe(true);
+    // At the caret, after what was typed; the caret ends after the paste.
+    await page.keyboard.type('!');
+    await expect.poll(() => page.locator('.v2-text-edit').evaluate((el) => el.textContent)).toBe(`Alamat: ${ADDRESS}!`);
+    await page.keyboard.press('Enter');
+    expect(await committedText(page)).toEqual([{ text: `Alamat: ${ADDRESS}!`, block: null }]);
+    // The page-level paste stood down: one object, the one typed.
+    expect(await annos(page)).toHaveLength(1);
+  });
+
+  test('Edit (Ganti) a line: the paste replaces the selected prefill and commits its lines', async ({ page }) => {
+    await openDoc(page);
+    await armGanti(page);
+    await tapLine(page, { str: 'Test Page 1' });
+    await expect(page.locator('.v2-text-edit')).toHaveText('Test Page 1');
+    expect(await paste(page, { html: RICH, text: ADDRESS, selector: '.v2-text-edit' })).toBe(true);
+    expect(await editorHoldsOnlyText(page)).toBe(true);
+    await page.keyboard.press('Enter');
+    await expect(page.locator('.v2-text-edit')).toHaveCount(0);
+    expect((await committedText(page)).map((a) => a.text)).toEqual([ADDRESS]);
+  });
+
+  test('Edit a paragraph (Rung D): the pasted break is a hard break in the stored lines', async ({ page }) => {
+    await page.goto('/');
+    await page.setInputFiles('#file-input', NASTY('paragraf-badan.pdf'));
+    await expectFirstPage(page);
+    await armGanti(page);
+    await tapLine(page, { str: 'lingkungan kantor' });
+    await expect(page.locator('.v2-text-edit')).toHaveAttribute('data-block', 'justify');
+    expect(await paste(page, { html: RICH, text: ADDRESS, selector: '.v2-text-edit' })).toBe(true);
+    expect(await editorHoldsOnlyText(page)).toBe(true);
+    await page.keyboard.press('Enter');
+    await expect(page.locator('.v2-text-edit')).toHaveCount(0);
+    const [a] = await committedText(page);
+    expect(a.text).toBe(ADDRESS);
+    expect(a.block.lines.map((l) => ({ text: l.text, hard: l.hard }))).toEqual([
+      { text: 'Jl. Merdeka 10', hard: true },
+      { text: 'Jakarta Pusat', hard: false },
+    ]);
+  });
+
+  test('through the real clipboard and keyboard, a rich copy does not glue its lines', async ({ page, context, browserName }) => {
+    test.skip(browserName !== 'chromium', 'clipboard permissions are Chromium-only in Playwright');
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await openDoc(page);
+    await page.keyboard.press('t');
+    await page.click('.pv-page >> nth=0', { position: { x: 200, y: 200 } });
+    await expect(page.locator('.v2-text-edit')).toBeFocused();
+    await page.evaluate(async ({ html, text }) => {
+      await navigator.clipboard.write([new ClipboardItem({
+        'text/html': new Blob([html], { type: 'text/html' }),
+        'text/plain': new Blob([text], { type: 'text/plain' }),
+      })]);
+    }, { html: RICH, text: ADDRESS });
+    await page.keyboard.press('ControlOrMeta+V');
+    await expect.poll(() => page.locator('.v2-text-edit').evaluate((el) => el.textContent)).toBe(ADDRESS);
+    expect(await editorHoldsOnlyText(page)).toBe(true);
+    await page.keyboard.press('Enter');
+    expect((await committedText(page)).map((a) => a.text)).toEqual([ADDRESS]);
+  });
 });
