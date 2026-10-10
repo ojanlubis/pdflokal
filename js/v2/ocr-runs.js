@@ -36,12 +36,14 @@
 import { ocrLinesToPageLines, ocrScaleFor } from '../core/ocr-lines.js';
 import { resolveTap } from '../core/text-lines.js';
 import { MIN_HIT } from './text-runs.js';
+import { displayFrameKey } from '../core/page-rotation.js';
 import { recognizeCanvas, ensureOcrEngine, ocrEngineLoaded } from './ocr-engine.js';
 
 export { ensureOcrEngine, ocrEngineLoaded };
 
 export function createOcrIndex({ getDoc, rasterizer }) {
-  // page.id -> Line[]  (present ⇒ this page has been recognised)
+  // page.id -> { frame, lines }  (present AND in the page's current display
+  // frame ⇒ this page has been recognised; core/page-rotation.js displayFrameKey)
   const lineCache = new Map();
   // page.id -> Promise<Line[]>  (in flight; a second tap must join, not
   // start a second recognition of the same pixels on a phone)
@@ -49,6 +51,19 @@ export function createOcrIndex({ getDoc, rasterizer }) {
 
   function pageOf(pageId) {
     return getDoc().pages.find((p) => p.id === pageId) || null;
+  }
+
+  // The cached lines, or null. An entry measured in another frame (undo/redo
+  // can turn or rescale a page without telling us) is dropped, not trusted:
+  // re-running recognition costs seconds, a tap in the wrong frame costs the
+  // wrong line.
+  function cached(pageId) {
+    const hit = lineCache.get(pageId);
+    if (!hit) return null;
+    const page = pageOf(pageId);
+    if (page && hit.frame === displayFrameKey(page)) return hit.lines;
+    lineCache.delete(pageId);
+    return null;
   }
 
   async function recognise(page, onProgress) {
@@ -67,13 +82,13 @@ export function createOcrIndex({ getDoc, rasterizer }) {
 
   return {
     /** Has this page already been recognised in this session? */
-    hasLines(pageId) { return lineCache.has(pageId); },
+    hasLines(pageId) { return cached(pageId) !== null; },
 
     /** Is a recognition for this page in flight right now? */
     isRunning(pageId) { return inFlight.has(pageId); },
 
     /** Recognised lines for a page, or [] if it has not been run. Synchronous. */
-    getLines(pageId) { return lineCache.get(pageId) || []; },
+    getLines(pageId) { return cached(pageId) || []; },
 
     /**
      * Recognise `pageId`, or join the run already in flight for it. Resolves
@@ -84,16 +99,18 @@ export function createOcrIndex({ getDoc, rasterizer }) {
      * how a broken download comes out as "this page has no text".
      */
     run(pageId, { onProgress } = {}) {
-      if (lineCache.has(pageId)) return Promise.resolve(lineCache.get(pageId));
+      const hit = cached(pageId);
+      if (hit) return Promise.resolve(hit);
       if (inFlight.has(pageId)) return inFlight.get(pageId);
       const page = pageOf(pageId);
       if (!page) return Promise.resolve([]);
+      const frame = displayFrameKey(page);
       const job = recognise(page, onProgress)
         .then((lines) => {
           // Only cache if the page is still around AND nothing invalidated it
           // mid-run (a rotate while OCR was working would otherwise install
           // boxes measured in the previous frame).
-          if (inFlight.get(pageId) === job) lineCache.set(pageId, lines);
+          if (inFlight.get(pageId) === job) lineCache.set(pageId, { frame, lines });
           return lines;
         })
         .finally(() => { if (inFlight.get(pageId) === job) inFlight.delete(pageId); });
@@ -104,7 +121,7 @@ export function createOcrIndex({ getDoc, rasterizer }) {
     /** The tap → line resolver. Same clamped, finger-sized hit box as every
      *  other tap in the editor (core/text-lines.js's resolveTap, MIN_HIT). */
     hitTest(pageId, x, y) {
-      return resolveTap(lineCache.get(pageId) || [], x, y, MIN_HIT);
+      return resolveTap(cached(pageId) || [], x, y, MIN_HIT);
     },
 
     /**
