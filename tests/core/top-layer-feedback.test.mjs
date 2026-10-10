@@ -96,11 +96,10 @@ test('index.html: the popover UA defaults are reset so the toast keeps its place
   assert.match(loading, /height:\s*auto/);
 });
 
-test('app.js raises the toast and the processing overlay on EVERY show', () => {
+test('app.js hands the toast the real raise/drop helpers and raises the processing overlay', () => {
   const src = read('js/v2/app.js');
   assert.match(src, /import \{[^}]*raiseToTopLayer[^}]*\} from '\.\/top-layer\.js'/);
-  const toastFn = src.match(/function toast\(msg\) \{[\s\S]*?\n\}/)[0];
-  assert.match(toastFn, /raiseToTopLayer\(toastEl\)/, 'toast() must re-raise per call');
+  assert.match(src, /createToast\(\{[^}]*raise: raiseToTopLayer[^}]*drop: dropFromTopLayer/, 'the toast controller gets the real helpers');
   const showFn = src.match(/function showProcessing\(total\) \{[\s\S]*?\n\}/)[0];
   assert.match(showFn, /raiseToTopLayer\(loadingOverlay\)/);
   const hideFn = src.match(/function hideProcessing\(\) \{[\s\S]*?\n\}/)[0];

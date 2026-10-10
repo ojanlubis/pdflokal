@@ -108,6 +108,7 @@ import { hitTestEditedLine, hitTestOcrEdit, editOwningLine } from '../core/edit-
 import { createEditBake, runWhenIdle } from './edit-bake.js';
 import { createDocFontLive } from './doc-font-live.js';
 import { raiseToTopLayer, dropFromTopLayer } from './top-layer.js';
+import { createToast } from './toast-layer.js';
 import { singleFlight } from './single-flight.js';
 
 // WHY there is no `window.pdfjsLib.…workerSrc = …` line here any more: pdf.js is
@@ -201,16 +202,15 @@ function displayMode() {
 // throws plain `Error` for everything, so a name-only classifier reports
 // 'unknown' for every export failure there is.
 
-let toastTimer = null;
+// In the top layer only while visible (js/v2/toast-layer.js): a toast left open
+// would paint above the support/install/maker/vote cards for the whole session.
+const toastCtl = createToast({
+  el: toastEl, durationMs: toastDurationMs, raise: raiseToTopLayer, drop: dropFromTopLayer,
+});
 function toast(msg) {
-  toastEl.textContent = msg;
-  toastEl.classList.add('show');
-  // Every call, not once: a sheet opened since the last toast sits above it.
-  raiseToTopLayer(toastEl);
-  clearTimeout(toastTimer);
   // Scales with length (edit-expectations.js): a sentence of a dozen words is
   // not readable in 2.6 s. Short text keeps the old 2.6 s.
-  toastTimer = setTimeout(() => toastEl.classList.remove('show'), toastDurationMs(msg));
+  toastCtl.show(msg);
 }
 
 // Pull a toast down early. Needed when a dialog opens on top of one: a toast
@@ -219,8 +219,7 @@ function toast(msg) {
 // arm-toast ("Tap tulisan yang mau kamu ubah") was sitting under a sheet whose
 // whole point is that there IS no tulisan to tap. No test could have seen that.
 function hideToast() {
-  clearTimeout(toastTimer);
-  toastEl.classList.remove('show');
+  toastCtl.hide();
 }
 
 // ---- processing telegraph ----------------------------------------------------
@@ -1149,7 +1148,7 @@ function reEditLine(pageId, cover, replacement) {
   const at = draft.turn ? { x: replacement.x, y: replacement.y } : { x: box.x, y: box.y };
   openTextEditor({ pageId, x: draft.block ? draft.block.disp.x : at.x, y: at.y, anno: null, draft });
   setTool('select');
-  toastEl.classList.remove('show');
+  hideToast();
   // Seed font preparation from the STORED decision (edit font design, Gaps):
   // it names the line's own resource and the bundled faces the edit was made
   // with. An edit committed before decisions existed has none — then the
@@ -1307,7 +1306,7 @@ async function smartReplace(pageId, x, y) {
   setTool('select');
   // The arm toast ("Tap tulisan…") must not outlive its own step — with the
   // editor open it instructs a thing already done (taste-judge, path law).
-  toastEl.classList.remove('show');
+  hideToast();
   matchReplaceColors(cover, draft, pageId, line); // async; colors land live
   prepareDocFont(pageId, line, draft); // async; never blocks the editor opening
 }
@@ -1337,7 +1336,7 @@ function openBlockReplace(pageId, line, plan) {
   };
   openTextEditor({ pageId, x: plan.disp.x, y: plan.box.y, anno: null, draft });
   setTool('select');
-  toastEl.classList.remove('show');
+  hideToast();
   matchReplaceColors(cover, draft, pageId, line); // async; colors land live
   // The font is decided over the WHOLE paragraph: every run of every line goes
   // to the dry run, so its dominant run is the paragraph's, not the tapped line's.
@@ -1387,7 +1386,7 @@ function ocrReplace(pageId, line) {
   };
   openTextEditor({ pageId, x: line.x, y: line.y, anno: null, draft });
   setTool('select'); // disarm now, not at commit — same founder ruling as smartReplace
-  toastEl.classList.remove('show');
+  hideToast();
   // Paper and ink sampled off the raster. This matters MORE on a scan than on
   // a born-digital page: paper in a photograph is never #fff, and a pure-white
   // cover on a grey-white scan is a visible patch.
@@ -1444,7 +1443,7 @@ function reEditOcrLine(pageId, cover, replacement) {
   };
   openTextEditor({ pageId, x: replacement?.x ?? box.x, y: replacement?.y ?? box.y, anno: null, draft });
   setTool('select');
-  toastEl.classList.remove('show');
+  hideToast();
 }
 
 // Recognise a page, then hand it to the tap gesture. The 5 MB engine is

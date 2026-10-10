@@ -30,9 +30,14 @@ test('short text keeps 2600 ms; longer text scales at 900 + 330 per word', () =>
 
 test('the real app toast() uses the duration function, not a literal', () => {
   const src = fs.readFileSync(path.join(ROOT, 'js/v2/app.js'), 'utf8');
-  const fn = src.match(/function toast\(msg\) \{[\s\S]*?\n\}/)?.[0] || '';
-  assert.match(fn, /toastDurationMs\(msg\)/);
-  assert.doesNotMatch(fn, /\b2600\b/);
+  // The duration now lives in the toast controller (js/v2/toast-layer.js), which
+  // app.js builds with durationMs: toastDurationMs; the controller calls it per msg.
+  const ctl = src.match(/createToast\(\{[\s\S]*?\}\);/)?.[0] || '';
+  assert.match(ctl, /durationMs: toastDurationMs\b/);
+  assert.doesNotMatch(ctl, /\b2600\b/);
+  const layer = fs.readFileSync(path.join(ROOT, 'js/v2/toast-layer.js'), 'utf8');
+  assert.match(layer, /durationMs\(msg\)/);
+  assert.doesNotMatch(layer, /\b2600\b/);
 });
 
 // ---- once per document -------------------------------------------------------------
