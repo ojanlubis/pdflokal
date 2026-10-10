@@ -42,6 +42,16 @@
 // Image pages have no source document and therefore no inherited /Rotate —
 // guarded explicitly (not merely inert) so a future image-page shape that
 // happens to carry a stray baseRotation cannot start double-counting.
+// SINGLE SOURCE OF TRUTH for "the frame an on-screen box was measured in".
+// Text and OCR line boxes are display coordinates: a box measured under one
+// rotation or merge scale is wrong under another. Undo/redo restores both
+// without telling any cache, so the caches compare this key on every read
+// rather than trusting someone to invalidate them (round-3 hunt, 2026-10-10:
+// rotate, tap Ganti, Ctrl+Z, and the next tap resolved in the turned frame).
+export function displayFrameKey(page) {
+  return `${totalPageRotation(page)}:${page.width}x${page.height}`;
+}
+
 export function totalPageRotation(page) {
   const base = page?.isFromImage ? 0 : (page?.baseRotation || 0);
   const user = page?.rotation || 0;
