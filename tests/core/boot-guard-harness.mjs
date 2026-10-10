@@ -51,11 +51,12 @@ export function guardOf(file) {
   return hits;
 }
 
-export function runGuard({ online = true, storage = 'ok', randomUUID = true, healedAlready = false } = {}) {
+// `store`: pass the same Map to two runs to model ONE session across them
+// (test 6: offline, then back online in the same tab).
+export function runGuard({ online = true, storage = 'ok', randomUUID = true, healedAlready = false, store = new Map() } = {}) {
   const src = guardOf('index.html')[0];
   const calls = { reloads: 0, cachesDeleted: [], unregisters: 0, beacons: [] };
   const listeners = {};
-  const store = new Map();
   if (healedAlready) store.set(MARKER, '1');
 
   const sessionStorage = storage === 'throws'

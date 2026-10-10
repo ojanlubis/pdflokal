@@ -24,6 +24,8 @@ test('only approved entries are shown, newest first, at most three', () => {
 });
 
 test('the shipped list: every entry is well-formed and ids are unique', () => {
+  // VACUITY: an empty UPDATES makes every check below pass having checked nothing.
+  assert.ok(Array.isArray(UPDATES) && UPDATES.length > 0, 'UPDATES is empty, so the shipped list is unchecked');
   const ids = new Set();
   for (const e of UPDATES) {
     assert.match(e.id, /^[a-z0-9-]+$/);

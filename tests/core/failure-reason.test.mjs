@@ -159,6 +159,9 @@ test('12. failureCause: every value it can return is in the failure_cause schema
   const names = new Set(SCHEMA.failure_cause.name);
   const hints = new Set(SCHEMA.failure_cause.hint);
   assert.ok(names.size > 5 && hints.size > 5, 'enums must be non-empty or this is vacuous');
+  // The validateEvent loop below runs once per STAGE: an empty stage enum
+  // would skip every validation and still pass.
+  assert.ok(SCHEMA.failure_cause.stage.length > 0, 'VACUITY: failure_cause.stage is empty, so no event below would be validated');
   const probes = [
     null, undefined, 'x', {}, new Error(''), new TypeError('x is not a function'), new RangeError('Invalid string length'),
     new SyntaxError('Unexpected token'), new ReferenceError('foo is not defined'),
@@ -187,6 +190,8 @@ test('13. failureCause and the schema agree on the enum lists BOTH ways (no dead
   // and every HINT must be reachable from some message — otherwise the schema claims evidence the
   // classifier can never produce.
   const { SCHEMA } = await import('../../js/core/telemetry-schema.js');
+  // VACUITY: both loops below pass for free over an empty enum.
+  assert.ok(SCHEMA.failure_cause.name.length > 2 && SCHEMA.failure_cause.hint.length > 1, 'failure_cause enums are empty');
   for (const name of SCHEMA.failure_cause.name) {
     if (name === 'other' || name === 'none') continue;
     assert.equal(failureCause({ name, message: '' }).name, name, `schema name ${name} is not recognised by failureCause`);

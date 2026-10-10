@@ -122,4 +122,13 @@ test('the sheet renders the note from the build\'s count, in the PDF format only
   const src = fs.readFileSync(path.join(ROOT, 'js/v2/download-sheet.js'), 'utf8');
   assert.match(src, /state\.base = \{[^}]*covered[^}]*\}/);
   assert.match(src, /coveredNoteShows\(\{[\s\S]*?format: state\.format/);
+  // The note must read the BUILD's count. The two checks above stayed green
+  // with the call hard-wired to `covered: 0` (the note never shows): pin every
+  // field of the call's argument to the state it must come from.
+  const call = src.match(/coveredNoteShows\(\{([\s\S]*?)\}\);/);
+  assert.ok(call, 'VACUITY: download-sheet.js no longer calls coveredNoteShows({ ... }); repoint this test');
+  assert.match(call[1], /(^|[\s,])covered: state\.base\?\.covered\s*,/, 'covered comes from state.base, the build\'s count');
+  assert.match(call[1], /(^|[\s,])format: state\.format\s*,/);
+  assert.match(call[1], /(^|[\s,])size: state\.size\s*,/);
+  assert.match(call[1], /(^|[\s,])compressedUnchanged: !!state\.compressed\?\.unchanged\s*,/);
 });

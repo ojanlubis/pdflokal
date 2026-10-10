@@ -152,9 +152,13 @@ const fakeRaster = (page, n = 0) => ({ dataUrl: 'data:image/png;base64,' + 'A'.r
 
 // Every object reachable from the history stacks, so a snapshot cannot hide a
 // raster behind a new field name. Strings are values; objects are identity.
-function reachable(root) {
+// `strings` collects every string value too: the dataUrl IS the retained
+// memory, so a snapshot copying `raster.dataUrl` into a new string field pins
+// the same megabytes with no raster object in sight.
+function reachable(root, strings = new Set()) {
   const seen = new Set();
   const walk = (v) => {
+    if (typeof v === 'string') { strings.add(v); return; }
     if (!v || typeof v !== 'object' || seen.has(v)) return;
     seen.add(v);
     for (const k of Object.keys(v)) walk(v[k]);
@@ -172,8 +176,21 @@ test('history keeps NO page raster alive, however many rasters replace each othe
     addAnnotation(doc, doc.pages[0].id, createAnnotation('text', { x: i, y: i, text: 'e' + i }));
     for (const p of doc.pages) { p.raster = fakeRaster(p, i); live.add(p.raster); } // zoom-sharpen / re-render swaps it
   }
-  const held = [...reachable([h.undoStack, h.redoStack])].filter((o) => o.dataUrl !== undefined || live.has(o));
+  // VACUITY: an empty stack holds no raster for free. 30 records under a cap
+  // of 50 must all be there, each with both pages.
+  assert.equal(h.undoStack.length, 30, 'every recorded step is on the undo stack');
+  assert.ok(h.undoStack.every((snap) => snap.pages.length === 2), 'each snapshot carries both pages');
+  const strings = new Set();
+  const held = [...reachable([h.undoStack, h.redoStack], strings)].filter((o) => o.dataUrl !== undefined || live.has(o));
   assert.equal(held.length, 0, 'no raster object is reachable from the undo/redo stacks');
+  // Catches snapshotPage copying `raster.dataUrl` into a string field: no
+  // string in the stacks may BE a raster's pixels. Known-positive first: the
+  // walker does see strings (the annotation texts).
+  assert.ok(strings.has('e0'), 'VACUITY: the string walk reaches annotation text');
+  const liveUrls = new Set([...live].map((r) => r.dataUrl));
+  assert.equal(liveUrls.size, 30, 'VACUITY: one dataUrl per re-render round');
+  const pinned = [...strings].filter((v) => liveUrls.has(v));
+  assert.equal(pinned.length, 0, 'no raster dataUrl string is reachable from the undo/redo stacks');
   for (const snap of h.undoStack) for (const p of snap.pages) assert.equal('raster' in p, false, 'snapshot page has no raster field');
 });
 

@@ -196,6 +196,52 @@ test('the bake-failure reporter is wired into the edited-page provider the raste
   assert.match(app, /createPageRasterizer\(doc, \{ editedPageProvider \}\)/, 'the rasterizer must use this provider');
 });
 
+// The harness above hand-builds onBakeFailure, so it proves the provider and
+// the reporter, not the KEY or the console.warn edit-bake.js actually wires.
+// This drives the REAL createEditBake (it loads under node: nothing DOM-bound
+// runs at construction). getDoc's sources throw with document text in the
+// message, so getSource fails inside the provider's try and reaches the real
+// onBakeFailure. Catches: a constant key (`reportBakeFailure(err, "k")`), a key
+// that drops the edit signature, and console.warn handed the raw
+// `err` instead of scrubbedError(err).
+test('createEditBake: the real onBakeFailure keys per page + edit state and warns only the scrubbed error', async () => {
+  const { createEditBake } = await import('../../js/v2/edit-bake.js');
+  const captures = [];
+  const sentry = {
+    withScope(fn) { fn({ addEventProcessor() {} }); },
+    captureException(err, ctx) { captures.push({ err, ctx }); },
+  };
+  const thrown = new Error(`WinAnsi cannot encode "${SECRET}"`);
+  const doc = { sources: { find() { throw thrown; } }, pages: [] };
+  const bake = createEditBake({
+    getDoc: () => doc, getSlots: () => new Map(), getRasterizer: () => null,
+    rasterScaleFor: () => 1, tel: () => {}, getSentry: () => sentry,
+  });
+  const warns = [];
+  const origWarn = console.warn;
+  console.warn = (...args) => warns.push(args);
+  try {
+    const page = editedPage('p1', 'satu');
+    assert.equal(await bake.editedPageProvider(page), null, 'the fallback is the plain source render');
+    assert.equal(captures.length, 1, 'VACUITY: the real onBakeFailure must have reported');
+    await bake.editedPageProvider(page);
+    assert.equal(captures.length, 1, 'the same edit state reports once');
+    await bake.editedPageProvider(editedPage('p1', 'dua'));
+    assert.equal(captures.length, 2, 'a new edit state on the same page is a new key (constant-key mutation)');
+    await bake.editedPageProvider(editedPage('p2', 'dua'));
+    assert.equal(captures.length, 3, 'the same edit on another page is a new key');
+  } finally {
+    console.warn = origWarn;
+  }
+  const bakeWarns = warns.filter((a) => String(a[0]).startsWith('editedPageProvider gagal'));
+  assert.equal(bakeWarns.length, 4, 'every failed bake warns once');
+  for (const args of bakeWarns) {
+    assert.notEqual(args[1], thrown, 'console.warn must never get the raw error (Sentry breadcrumbs it)');
+    assert.equal(args[1].message, '[scrubbed]');
+    assert.ok(!args.map((a) => `${a} ${a?.stack ?? ''}`).join(' ').includes(SECRET), 'no document text in the warning');
+  }
+});
+
 // Seat ruling 2026-10-01: a commit-bake capture must NOT trigger the on-error
 // replay upload; every other error keeps it. In the vendored 10.55.0 bundle,
 // replayIntegration calls beforeErrorSampling from its afterSendEvent handler

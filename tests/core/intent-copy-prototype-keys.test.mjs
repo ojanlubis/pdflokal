@@ -21,3 +21,32 @@ test('1. inherited Object.prototype names are unknown intents, not crashes', () 
     assert.doesNotThrow(() => applyIntentCopy(name), `?buat=${name} threw out of applyIntentCopy, which kills app.js at boot`);
   }
 });
+
+// doesNotThrow above is satisfied by a no-op: an applyIntentCopy that returned
+// at once (the early-return mutation) passed it while every ?buat= link lost its
+// words. Stub the DOM and assert the BEHAVIOUR: a known intent writes the
+// dropzone title, an inherited name writes nothing.
+test('2. a known intent re-words the page; an inherited name writes nothing', () => {
+  const written = new Map();
+  const realDocument = globalThis.document;
+  globalThis.document = {
+    querySelector: (sel) => {
+      const el = {};
+      Object.defineProperty(el, 'textContent', { set(v) { written.set(sel, v); }, get() { return written.get(sel); } });
+      return el;
+    },
+  };
+  try {
+    for (const name of ['__proto__', 'valueOf', 'constructor']) applyIntentCopy(name);
+    assert.deepEqual([...written.keys()], [], 'an inherited key must write nothing');
+
+    applyIntentCopy('gabung');
+    const title = written.get('.dz-title');
+    assert.equal(typeof title, 'string', '?buat=gabung must write the dropzone title');
+    assert.ok(title.length > 0, 'the written title is not empty');
+    assert.equal(title, INTENT_COPY.gabung().dzTitle, 'it writes gabung\'s own title');
+    assert.equal(written.get('.dz-hint'), INTENT_COPY.gabung().dzHint);
+  } finally {
+    if (realDocument === undefined) delete globalThis.document; else globalThis.document = realDocument;
+  }
+});
