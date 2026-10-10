@@ -527,7 +527,15 @@ on(scrollEl, 'wheel', (e) => {
   if (!(e.ctrlKey || e.metaKey)) return;
   e.preventDefault();
   if (gestureZoom0 !== null) return; // a Safari pinch is already driving the zoom
-  setZoomAnchored(zoom * (e.deltaY < 0 ? 1.1 : 0.9), e.clientX, e.clientY);
+  // WHY proportional to deltaY: a trackpad pinch arrives as MANY small-delta
+  // events, and a fixed 1.1 per event crossed the whole zoom range in ~25 of
+  // them (a light pinch snapped to a clamp). deltaY 0 is a ctrl+sideways swipe,
+  // not a zoom. Lines/pages (deltaMode 1/2) are scaled to pixels; one mouse
+  // notch (~100px) stays a ~16% step, capped so no single event jumps.
+  const px = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1);
+  if (!px) return;
+  const factor = Math.min(1.25, Math.max(0.8, Math.exp(-px * 0.0015)));
+  setZoomAnchored(zoom * factor, e.clientX, e.clientY);
 }, { passive: false });
 
 // Keyboard zoom: Ctrl/Cmd + = / + / - / 0, the keys every editor and browser taught.
