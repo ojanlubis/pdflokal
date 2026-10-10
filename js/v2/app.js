@@ -29,6 +29,7 @@ import { createHistory, record, undo, redo, canUndo, canRedo, markClean, markCha
 import { setLeaveGuard } from './leave-guard.js';
 import { rasterFitsShape } from '../core/raster-key.js';
 import { baseNameOf } from '../core/file-kind.js';
+import { ZOOM_MAX, ZOOM_STEP, zoomFloor, clampZoom, openingZoom as coreOpeningZoom } from '../core/zoom.js';
 import { importPdf, importImage, createPageRasterizer, probeTextLayer, pdfLibLoadError } from '../core/import.js';
 import {
   pagesBucket, durationBucket, intentValue,
@@ -339,32 +340,41 @@ function applyZoom() {
 // now always is. Measuring clientWidth before that scrollbar exists and then
 // filling to the last pixel would hand every desktop user a horizontal
 // scrollbar on open.
-const OPENING_GUTTER_DESKTOP = 96; // 48 a side
-const OPENING_GUTTER_TOUCH = 16;
+// The numbers and the floor's rule live in core/zoom.js (a node test holds them).
+// This wrapper only reads the live viewport and document.
+function widestPageWidth() {
+  let w = 0;
+  for (const pg of doc.pages) w = Math.max(w, pageDisplaySize(pg).width);
+  return w;
+}
+function currentZoomFloor() {
+  return zoomFloor({
+    viewport: scrollEl.clientWidth,
+    widestPageWidth: widestPageWidth(),
+    desktop: deviceClass() === 'desktop',
+  });
+}
 function openingZoom(pageWidth) {
-  if (!(pageWidth > 0)) return 1;
-  const desktop = deviceClass() === 'desktop';
-  const gutter = desktop ? OPENING_GUTTER_DESKTOP : OPENING_GUTTER_TOUCH;
-  const fit = (scrollEl.clientWidth - gutter) / pageWidth;
-  // Same clamps the +/- buttons obey, so the opening view is always a zoom the
-  // user could have reached by hand.
-  return Math.max(0.3, Math.min(fit, desktop ? 3 : 1));
+  return coreOpeningZoom({
+    viewport: scrollEl.clientWidth,
+    pageWidth,
+    desktop: deviceClass() === 'desktop',
+    widestPageWidth: widestPageWidth(),
+  });
 }
 // zoom_tap reports the zoom BEFORE the press (core/telemetry-schema.js says why).
 // Emitted ahead of the change so `zoom` is still the view being rejected; the
 // tel() call is try/catch-armoured, so it can never stop the zoom from happening.
-// SINGLE SOURCE OF TRUTH for how far and how finely the view zooms: the +/-
-// buttons, setZoomAnchored (pinch, wheel, keys) and the zoom keys all read these.
-const ZOOM_MIN = 0.3;
-const ZOOM_MAX = 3;
-const ZOOM_STEP = 0.25;
+// SINGLE SOURCE OF TRUTH for how far and how finely the view zooms: core/zoom.js.
+// The +/- buttons, setZoomAnchored (pinch, wheel, keys) and the zoom keys all
+// read it; the floor follows the document's widest page (see that file's header).
 on('z-in', 'click', () => {
   tel('zoom_tap', { dir: 'in', level: zoomBucket(zoom), device: deviceClass() });
   zoom = Math.min(zoom + ZOOM_STEP, ZOOM_MAX); applyZoom();
 });
 on('z-out', 'click', () => {
   tel('zoom_tap', { dir: 'out', level: zoomBucket(zoom), device: deviceClass() });
-  zoom = Math.max(zoom - ZOOM_STEP, ZOOM_MIN); applyZoom();
+  zoom = clampZoom(zoom - ZOOM_STEP, { floor: currentZoomFloor(), current: zoom }); applyZoom();
 });
 
 // ---- contact bookmark: tap the tab, the panel slides up; tap again or tap
@@ -397,7 +407,7 @@ on('z-out', 'click', () => {
 // 2-touch touchstart keeps the browser from claiming the gesture, zoom anchors
 // on the pinch midpoint so the paper under your fingers stays put.
 function setZoomAnchored(next, midX, midY) {
-  const clamped = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, next));
+  const clamped = clampZoom(next, { floor: currentZoomFloor(), current: zoom });
   if (clamped === zoom) return;
   const rect = scrollEl.getBoundingClientRect();
   const mx = midX - rect.left;
