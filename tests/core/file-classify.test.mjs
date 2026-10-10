@@ -80,9 +80,14 @@ test('9. only the guarded classifier is public: the raw sniff cannot be called a
   assert.equal(core.fileKind, undefined);
 });
 
-test('10. app.js classifies through classifyFiles and keeps no name/type test of its own', () => {
-  assert.match(APP, /import \{[^}]*\bclassifyFiles\b[^}]*\} from '\.\.\/core\/file-kind\.js'/);
-  assert.ok(head.includes('await classifyFiles(files)'), 'loadFilesInner must await classifyFiles(files)');
+// The chain is app.js -> core/incoming-files.js (checkIncoming, also asked by the
+// replace guard before a wipe) -> classifyFiles. Pinned link by link.
+const INCOMING = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'js', 'core', 'incoming-files.js'), 'utf8');
+test('10. app.js classifies through checkIncoming -> classifyFiles and keeps no name/type test of its own', () => {
+  assert.ok(head.includes('await checkIncoming(files)'), 'loadFilesInner must await checkIncoming(files)');
+  assert.match(INCOMING, /import \{[^}]*\bclassifyFiles\b[^}]*\} from '\.\/file-kind\.js'/);
+  assert.match(INCOMING, /await classifyFiles\(files\)/, 'checkIncoming must classify with classifyFiles');
+  assert.ok(!/f\.type === 'application\/pdf'|startsWith\('image\//.test(INCOMING), 'incoming-files keeps no name/type test of its own');
   assert.ok(!/application\/pdf/.test(head) && !/\\\.pdf\$/.test(head), 'no inline pdf name/type test before the loop');
   assert.ok(!/startsWith\('image\//.test(head), 'no inline image type test before the loop');
 });
