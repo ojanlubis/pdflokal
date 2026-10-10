@@ -537,6 +537,11 @@ export function createPageManager(deps) {
     if (!act || selected.size === 0 || btn.getAttribute('aria-disabled') === 'true') return;
     const doc = deps.getDoc();
     const pages = doc.pages.filter((p) => selected.has(p.id));
+    // 'clear' acts on the selection itself, so it runs even when no chosen id is
+    // in the document any more. Every other action needs real pages: a stale
+    // selection (ids of a document that was replaced) must never reach
+    // Ekstrak, which would download a 0-page file and toast success.
+    if (act !== 'clear' && pages.length === 0) return;
 
     if (act === 'rotate') {
       rotatePages(pages.map((p) => p.id));
@@ -554,7 +559,10 @@ export function createPageManager(deps) {
   // Wholesale flush, for a document that is GONE (Buka Baru). Undo/redo does not
   // call it: an entry carries its rasterKey, so a restored rotation or edit is a
   // key mismatch (a miss) on its own, and flushing re-rendered every page for nothing.
-  function invalidateThumbs() { thumbs.clear(); }
+  // The selection goes with it: its ids belong to the document that is gone, and
+  // left behind it kept saying "2 dipilih" over a new file whose Ekstrak then
+  // filtered to zero pages.
+  function invalidateThumbs() { thumbs.clear(); selected.clear(); }
 
   return {
     open,
