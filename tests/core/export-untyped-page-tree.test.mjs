@@ -23,6 +23,7 @@ import * as ops from '../../js/core/operations.js';
 import { buildPdfBytes } from '../../js/core/export.js';
 import { pdfLibLoadError } from '../../js/core/import.js';
 import { loadForRebuild, retypePageTree } from '../../js/core/pdflib-load.js';
+import { createEditBake } from '../../js/v2/edit-bake.js';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const loadUmd = (p) => {
@@ -170,4 +171,20 @@ test('the merge guard declines a page tree pdf-lib still cannot walk', async () 
   s = s.replace('/Kids', '/Kidz'); // same length: every xref offset stays valid
   const bytes = Uint8Array.from(Buffer.from(s, 'latin1'));
   assert.notEqual(await pdfLibLoadError(PDFLib, bytes), null);
+});
+
+// The edit preview bakes from its OWN pdf-lib load (v2/edit-bake.js
+// getDryRunDoc), not the exporter's. If that load skipped the repair, the
+// screen would bake an untyped file's edit over nothing while Unduh worked.
+// Driven through the real createEditBake, so reverting its call site to a raw
+// PDFDocument.load goes red here.
+test('the edit preview loads through the same repair as the export', async () => {
+  const bytes = untype(await sourcePdf(3, { nested: true }), { trees: true, leaves: true });
+  const { doc } = docOf(bytes, 3, INHERITED);
+  const bake = createEditBake({
+    getDoc: () => doc, getSlots: () => new Map(), getRasterizer: () => null,
+    rasterScaleFor: () => 1, tel: () => {}, getSentry: () => null,
+  });
+  const dry = await bake.getDryRunDoc(PDFLib, doc.sources[0]);
+  assert.equal(dry.getPageCount(), 3, 'the preview sees every page');
 });
