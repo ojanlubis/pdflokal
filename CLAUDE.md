@@ -105,6 +105,10 @@ glyph operators (why: `decisions.md`). Two laws from that, both load-bearing:
   `tests/core/` runs headless via `npm run test:core`. `tests/fixtures/nasty/` is the corpus of real
   documents that have actually broken things — **add to it whenever a real file finds a bug.**
 - **Wild corpus: cite files as `w001`–`w154`, never by filename** — they carry real client names.
+- **Fixtures come from the PDF format's parameters first** (his ruling 2026-10-10): `tests/helpers/pdf-params.js`
+  holds the axes (page geometry, printed text) and a pairwise picker; `tests/pdf-params-*.spec.js` assert the
+  download matches the screen for every case. A new class of file bug gets an AXIS there, not only a file in
+  `nasty/`. The wild corpus is the second witness, because real files break the spec.
 
 ## Verification law
 
