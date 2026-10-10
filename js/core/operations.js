@@ -156,10 +156,45 @@ export function reorderPage(doc, pageId, toIndex) {
   return pg;
 }
 
+// WHY rotatePage moves annotations (2026-10-10): their geometry lives in the
+// page's DISPLAYED frame, so turning only `rotation` left a signature at y=700
+// on an A4 page that is now 595 tall: off the page on screen and in the file.
+// The rule, one quarter turn clockwise at a time (a behaviour call for the
+// seat to judge; tests/core/rotate-annotations.test.mjs):
+//   - a whiteout (Tip-Ex, or an edit cover) turns WITH the content it hides:
+//     its rect rotates, width and height swap;
+//   - anything else (signature, text) keeps reading upright and follows the
+//     spot it marked: its centre moves with the content, its size stays, and
+//     it is clamped inside the page.
+// New objects, never in-place edits (history snapshots share nested fields).
+function quarterTurn(anno, H, newW, newH) {
+  const w = Number.isFinite(anno.width) ? anno.width : 0;
+  const h = Number.isFinite(anno.height) ? anno.height : 0;
+  if (anno.type === 'whiteout') {
+    return { ...anno, x: H - (anno.y + h), y: anno.x, width: h, height: w };
+  }
+  const cx = H - (anno.y + h / 2);
+  const cy = anno.x + w / 2;
+  const clamp1 = (v, max) => Math.min(Math.max(v, 0), Math.max(max, 0));
+  return { ...anno, x: clamp1(cx - w / 2, newW - w), y: clamp1(cy - h / 2, newH - h) };
+}
+
 export function rotatePage(doc, pageId, deltaDeg = 90) {
   const pg = getPage(doc, pageId);
   if (!pg) return null;
-  pg.rotation = (((pg.rotation + deltaDeg) % 360) + 360) % 360;
+  if (deltaDeg % 90 !== 0) { // not a page turn the UI can make; no frame mapping exists for it
+    pg.rotation = (((pg.rotation + deltaDeg) % 360) + 360) % 360;
+    return pg;
+  }
+  const steps = (((deltaDeg / 90) % 4) + 4) % 4;
+  for (let i = 0; i < steps; i += 1) {
+    const rotated = (pg.rotation || 0) % 180 !== 0;
+    const H = rotated ? pg.width : pg.height; // displayed height BEFORE this turn
+    const newW = H;
+    const newH = rotated ? pg.height : pg.width;
+    pg.annotations = pg.annotations.map((a) => quarterTurn(a, H, newW, newH));
+    pg.rotation = ((pg.rotation || 0) + 90) % 360;
+  }
   return pg;
 }
 
