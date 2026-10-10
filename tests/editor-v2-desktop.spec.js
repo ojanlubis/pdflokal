@@ -137,18 +137,30 @@ test('Kelola drag settles even when pointer capture fails', async ({ page }) => 
     Element.prototype.setPointerCapture = () => { throw new Error('capture denied'); };
   });
 
+  const order = await page.evaluate(() => window.v2.getDoc().pages.map((p) => p.id));
+  expect(order).toHaveLength(2);
   const tile = await page.locator('.pm-tile:not(.pm-add)').first().elementHandle();
   const box = await tile.boundingBox();
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
-  // Past DRAG_SLOP arms the mouse drag, then wander and release elsewhere.
+  // Past DRAG_SLOP arms the mouse drag, then wander and release elsewhere
+  // (past tile 2's centre: the drop slot is AFTER page 2).
   await page.mouse.move(box.x + box.width / 2 + 40, box.y + 20, { steps: 4 });
   await page.mouse.move(box.x + box.width + 120, box.y + box.height / 2, { steps: 6 });
+  // The drag really ARMED despite the capture failure, and its placeholder sits
+  // in slot 1. Catches: a drag that never armed, under which "no ghost left
+  // behind" below passed for free.
+  await expect(page.locator('.pm-drag-ghost'), 'the drag never armed').toHaveCount(1);
+  await expect(page.locator('.pm-placeholder')).toHaveCount(1);
+  await expect.poll(() => page.evaluate(() => [...document.querySelectorAll('#pm-grid .pm-tile:not(.pm-add):not(.pm-drag-ghost)')]
+    .findIndex((t) => t.classList.contains('pm-placeholder')))).toBe(1);
   await page.mouse.up();
 
-  await page.waitForTimeout(500); // glide + settle window
-  await expect(page.locator('.pm-drag-ghost')).toHaveCount(0);
+  await expect(page.locator('.pm-drag-ghost')).toHaveCount(0); // retrying: covers the glide + settle window
   await expect(page.locator('.pm-placeholder')).toHaveCount(0);
+  // The drop COMMITTED where the placeholder was. Catches: a window-level release
+  // that tidies the ghost but never reaches movePage.
+  await expect.poll(() => page.evaluate(() => window.v2.getDoc().pages.map((p) => p.id))).toEqual([order[1], order[0]]);
 });
 
 // Founder telegraph (Jul 3): after drawing a TTD, the signature rides the
@@ -197,23 +209,35 @@ test('Kelola grid re-render mid-drag neither throws nor kills the drop', async (
   await expect(page.locator('#pm-sheet')).toBeVisible();
   await expect(page.locator('.pm-tile:not(.pm-add)')).toHaveCount(4);
 
+  const order = await page.evaluate(() => window.v2.getDoc().pages.map((p) => p.id));
+  expect(order).toHaveLength(4);
   const tile = await page.locator('.pm-tile:not(.pm-add)').first().elementHandle();
   const box = await tile.boundingBox();
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
   await page.mouse.move(box.x + box.width / 2 + 40, box.y + 20, { steps: 3 }); // arm the drag
+  // Known-positive: the drag IS live before the re-render (else the re-render
+  // would not be "mid-drag" and nothing below would be exercised).
+  await expect(page.locator('.pm-drag-ghost'), 'the drag never armed').toHaveCount(1);
   // The killer: an external re-render while the drag is live (thumbnail
   // upgrade / late settle timer in the wild).
   await page.evaluate(() => window.v2.pageManager.render());
   // Wander across the middle slots, then drop between tiles 2 and 3.
   await page.mouse.move(box.x + box.width * 2.6, box.y + box.height / 2, { steps: 8 });
   await page.mouse.move(box.x + box.width * 1.7, box.y + box.height / 2, { steps: 6 });
+  // Still the same live drag after the re-render, placeholder between tiles 2 and 3.
+  await expect(page.locator('.pm-drag-ghost')).toHaveCount(1);
+  await expect.poll(() => page.evaluate(() => [...document.querySelectorAll('#pm-grid .pm-tile:not(.pm-add):not(.pm-drag-ghost)')]
+    .findIndex((t) => t.classList.contains('pm-placeholder')))).toBe(1);
   await page.mouse.up();
-  await page.waitForTimeout(500);
 
-  expect(errors.filter((m) => m.includes('NotFoundError') || m.includes('insertBefore'))).toEqual([]);
-  await expect(page.locator('.pm-drag-ghost')).toHaveCount(0);
+  await expect(page.locator('.pm-drag-ghost')).toHaveCount(0); // retrying: covers the glide + settle window
   await expect(page.locator('.pm-placeholder')).toHaveCount(0);
+  expect(errors.filter((m) => m.includes('NotFoundError') || m.includes('insertBefore'))).toEqual([]);
   // The deferred render flushed: all four pages are back in the grid.
   await expect(page.locator('.pm-tile:not(.pm-add)')).toHaveCount(4);
+  // "Neither kills the drop": page 1 landed between pages 2 and 3. Catches a
+  // drop that cleans up visually but was silently cancelled by the re-render.
+  await expect.poll(() => page.evaluate(() => window.v2.getDoc().pages.map((p) => p.id)))
+    .toEqual([order[1], order[0], order[2], order[3]]);
 });

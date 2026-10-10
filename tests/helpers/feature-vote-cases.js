@@ -164,6 +164,9 @@ export function defineFeatureVoteSuite({ door }) {
       expect(await page.locator('#fv-form input:checked').count()).toBe(3);
 
       await page.click('#fv-send');
+      // Polled: the ballot is a fetch the route answers asynchronously. Catches a read
+      // that raced the POST (flaky red) — and, with toHaveLength(1), a double send.
+      await expect.poll(() => ballots.length).toBe(1);
       expect(ballots).toHaveLength(1);
       expect(ballots[0]).toMatchObject({ features: ['pdf-word', 'save-edits', 'watermark'], has_text: false, lang: 'id' });
       expect(ballots[0].visitor_id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
@@ -204,6 +207,8 @@ export function defineFeatureVoteSuite({ door }) {
       await page.goto('/');
       await openFromMenu(page, door);
       await toStep2(page);
+      // Count guard: a loop over an empty .all() passes for free. Catches a renamed row class.
+      await expect(page.locator('#fv-form .fv-opt')).toHaveCount(IDS.length);
       for (const row of await page.locator('#fv-form .fv-opt').all()) {
         expect((await row.boundingBox()).height).toBeGreaterThanOrEqual(44);
       }
@@ -449,8 +454,19 @@ export function defineFeatureVoteSuite({ door }) {
       await expect.poll(async () => (await beacons(page)).filter((b) => b.url.endsWith('/api/feedback')).length).toBe(1);
       const fb = (await beacons(page)).find((b) => b.url.endsWith('/api/feedback')).json;
       expect(fb).toMatchObject({ kind: 'feature_request', note: 'format baru dong', visitor_id: null });
+      // Known-positive: queue a marker on the SAME rail queue (same module URL as
+      // app.js's import) AFTER the send, flush, and wait until it lands. A
+      // feature_vote queued by the send would ride the same or an earlier batch.
+      // Catches: a feature_vote that was queued but read off a not-yet-flushed rail.
+      await page.evaluate(async () => {
+        const { tel } = await import('/js/v2/telemetry.js');
+        tel('tool_use', { tool: 'select', action: 'select' });
+      });
       await flush(page);
-      const events = (await beacons(page)).filter((b) => b.url.endsWith('/api/t')).flatMap((b) => b.json.events || []);
+      const railEvents = async () => (await beacons(page)).filter((b) => b.url.endsWith('/api/t')).flatMap((b) => b.json.events || []);
+      await expect.poll(async () => (await railEvents()).some((e) => e.event === 'tool_use' && e.props.tool === 'select' && e.props.action === 'select'),
+        { message: 'the marker never reached the rail, so "no feature_vote" below proves nothing' }).toBe(true);
+      const events = await railEvents();
       expect(events.find((e) => e.event === 'feature_vote')).toBeUndefined(); // no vote event for a vote that did not count
     });
 

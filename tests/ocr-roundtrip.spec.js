@@ -117,6 +117,16 @@ test.describe('a document WE made searchable, opened in OUR editor', () => {
     const file = await makeOcrPdf(page, 0, 'ocr-visible.pdf');
     await tapWithEditArmed(page, file);
 
+    // The POSITIVE outcome first: the tap opened the text editor on the line.
+    // Catches: a tap that did nothing at all (missed, dead tool, broken writer),
+    // under which "#scan-offer is hidden" alone would still pass.
+    const editor = page.locator('.v2-text-edit');
+    await expect(
+      editor,
+      'the visible twin did not open the text editor, so the decline above is not evidence of anything',
+    ).toBeVisible();
+    await expect(editor, 'the editor opened on some other line than the one tapped').toContainText('Yang');
+
     await expect(
       page.locator('#scan-offer'),
       'flipping the layer to VISIBLE did not change the editor\'s behaviour, so the decline above '

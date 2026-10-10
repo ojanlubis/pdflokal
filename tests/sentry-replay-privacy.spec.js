@@ -97,6 +97,16 @@ test('sentry replay sends no filename, no typed text and no document pixels', as
   await page.keyboard.press('Enter');
   await expect(page.locator('.pv-anno-text')).toHaveText(SECRET_TYPED);
 
+  // OPEN THE UNDUH SHEET: #ds-meta is the only place the filename is painted as
+  // ordinary DOM text (download-sheet.js render()), and it is empty until the
+  // sheet opens — mirrors tests/mixpanel-replay-privacy.spec.js.
+  // Catches: a replay that leaks the painted filename, which the old run never put in the DOM.
+  await page.click('#btn-download');
+  await expect(
+    page.locator('#ds-meta'),
+    'the sheet never painted the filename, so the leak check below is vacuous',
+  ).toContainText(SECRET_FILENAME);
+
   await page.evaluate(() => { try { window.Sentry?.flush?.(3000); } catch { /* SDK blocked */ } });
 
   /** @type {string[]} */

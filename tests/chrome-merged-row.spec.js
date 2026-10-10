@@ -98,6 +98,9 @@ test.describe('editor chrome — the merged row', () => {
     // have shrunk below a usable target in the process.
     await page.setViewportSize({ width: 1280, height: 800 });
     await openEditor(page);
+    // Count guard: a loop over an empty .all() passes for free. Catches a renamed
+    // toolbar/tool class (Teks, Tip-Ex, Edit, TTD at the very least).
+    expect(await page.locator('#toolbar .tool').count()).toBeGreaterThanOrEqual(4);
     for (const t of await page.locator('#toolbar .tool').all()) {
       const box = await t.boundingBox();
       expect(box.height, await t.innerText()).toBeGreaterThanOrEqual(32);

@@ -154,7 +154,21 @@ test.describe('Hapus armed: what a tap must NOT do', () => {
     await page.mouse.click(c.x, c.y);
     await page.waitForTimeout(400);
     expect(await annos(page)).toEqual([]);
-    expect(await page.evaluate(() => window.__beacons.length)).toBe(0);
+    // FLUSH, then read. The old `__beacons.length === 0` never flushed the queue,
+    // so it could not be non-zero whatever the tap did. Known-positive: the
+    // flushed rail carries this open's doc_open, so a hapus row would be there too.
+    // Catches: a Pilih tap that deletes/reports as Hapus (original_delete/_miss).
+    let evs = [];
+    await expect.poll(async () => {
+      await page.evaluate(() => {
+        Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+      evs = (await page.evaluate(() => window.__beacons.slice())).flatMap((b) => b.events || []);
+      return evs.some((e) => e.event === 'doc_open');
+    }, { message: 'doc_open never reached the rail, so the absence below proves nothing' }).toBe(true);
+    expect(hapusActions(evs)).toEqual([]);
+    expect(evs.filter((e) => e.event === 'tool_use' && /^original_/.test(e.props.action))).toEqual([]);
   });
 
   test('a tap on an object the person ADDED still deletes it, reports delete not original_delete, and disarms', async ({ page }) => {

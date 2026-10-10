@@ -244,6 +244,7 @@ test.describe('page manager — mobile', () => {
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
     await openSheet(page);
+    const order = await page.evaluate(() => window.v2.getDoc().pages.map((p) => p.id));
     const first = await page.locator('.pm-tile >> nth=0').elementHandle();
     const a = await first.boundingBox();
     await first.dispatchEvent('pointerdown', {
@@ -259,6 +260,26 @@ test.describe('page manager — mobile', () => {
     // The sheet is still alive: tapping a (rebuilt) tile selects it.
     await page.tap('.pm-tile >> nth=0');
     await expect(page.locator('#pm-bulk')).toBeVisible();
+    expect(await page.evaluate(() => window.v2.getDoc().pages.map((p) => p.id))).toEqual(order);
+
+    // KNOWN-POSITIVE for "no ghost" above: the SAME long-press with the SAME 380ms
+    // wait on a LIVE (rebuilt) tile does arm. Catches: a long-press that can no
+    // longer arm at all (or a wait too short to see it), under which the
+    // stale-tile absence passed for free.
+    const fresh = await page.locator('.pm-tile >> nth=1').elementHandle();
+    const b = await fresh.boundingBox();
+    const press = (type) => fresh.dispatchEvent(type, {
+      pointerId: 12, pointerType: 'touch', clientX: b.x + 40, clientY: b.y + 40, bubbles: true, isPrimary: true,
+    });
+    await press('pointerdown');
+    await page.waitForTimeout(380);
+    await expect(page.locator('.pm-drag-ghost'), 'a live long-press did not arm the drag').toHaveCount(1);
+    await expect(page.locator('.pm-placeholder')).toHaveCount(1);
+    await press('pointerup'); // released in place: the drop slot is its own
+    await expect(page.locator('.pm-drag-ghost')).toHaveCount(0);
+    await expect(page.locator('.pm-placeholder')).toHaveCount(0);
+    expect(await page.evaluate(() => window.v2.getDoc().pages.map((p) => p.id)), 'a drop in place moved a page').toEqual(order);
+    expect(errors).toEqual([]);
   });
 
   test('a second finger on a pressed tile cannot arm a drag that has lost its origin', async ({ page }) => {
@@ -287,6 +308,10 @@ test.describe('page manager — mobile', () => {
 
     // Finger 1 is still down, so a drag armed for IT is legitimate — and it
     // must be able to end cleanly, because its origin is its own.
+    // Assert it DID arm: otherwise "ends cleanly" below is about a drag that
+    // never existed. Catches: finger 2's lift killing finger 1's press outright.
+    await expect(page.locator('.pm-drag-ghost'), 'finger 1\'s long-press never armed').toHaveCount(1);
+    await expect(page.locator('.pm-placeholder')).toHaveCount(1);
     await touch('pointerup', 21, 0);
     await expect(page.locator('.pm-drag-ghost')).toHaveCount(0);
     await expect(page.locator('.pm-placeholder')).toHaveCount(0);

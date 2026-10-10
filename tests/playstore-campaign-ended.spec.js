@@ -62,9 +62,15 @@ test.describe('Play Store vote card — campaign ended', () => {
     await page.setInputFiles('#file-input', FIXTURE);
     await expectFirstPage(page);
     await downloadOnce(page);
-    await page.waitForTimeout(1500);
+    // Known-positive: the celebrate moment actually ran (share/tip took the slot),
+    // so maybeShow WOULD have run by now if the campaign gate were open.
+    await expect(page.locator('#support-card')).toBeVisible({ timeout: 4000 });
 
     const voted = await page.evaluate(() => localStorage.getItem('pdflokal-ps-voted'));
     expect(voted).toBeNull();
+    // maybeShow() writes pdflokal-ps-last the instant it is invoked, before any card shows.
+    // Catches: the module being called again (gate reopened) even if its card stays hidden.
+    const last = await page.evaluate(() => localStorage.getItem('pdflokal-ps-last'));
+    expect(last, 'playstore-vote maybeShow() ran: the campaign gate is open again').toBeNull();
   });
 });
