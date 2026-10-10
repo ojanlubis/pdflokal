@@ -3101,7 +3101,12 @@ async function loadFilesInner(files) {
 
   // Every file failed → leave the landing untouched, say it plainly, bail. Also
   // guards the doc.pages[0] read below, which would throw on an empty document.
+  // After Buka Baru the landing is NOT showing (resetDoc emptied the editor in
+  // place), so put it back: a blank editor with stale chrome was the result.
   if (doc.pages.length === 0) {
+    document.body.classList.add('is-empty');
+    emptyEl.style.display = '';
+    refreshChrome();
     const singleLocked = usable.length === 1 && lastFailureReason === 'encrypted';
     toast(singleLocked
       ? tr('toast.openLocked')
@@ -3133,7 +3138,9 @@ async function loadFilesInner(files) {
   // every time someone starts over. See wireDialogHistory below for the other half.
   const wasEmpty = document.body.classList.contains('is-empty');
   document.body.classList.remove('is-empty'); // landing yields, editor chrome returns
-  if (wasEmpty) pushEditorHistoryState();
+  // A failed Buka Baru returns to the landing while still sitting on the guard
+  // entry it pushed earlier; pushing again would orphan a second one.
+  if (wasEmpty && !window.history.state?.v2doc) pushEditorHistoryState();
 
   if (firstLoad) {
     zoom = openingZoom(doc.pages[0].width);
