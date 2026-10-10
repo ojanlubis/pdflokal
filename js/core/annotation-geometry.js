@@ -71,8 +71,10 @@ const turnRect = (r, H) => ({ x: H - (r.y + r.h), y: r.x, w: r.h, h: r.w });
  * (the view sizes it from its text), and treating it as a point pivoted it on
  * its top-left corner and let the clamp pass it off the page. 0.6em per
  * character over-estimates most fonts, which errs toward staying on the page.
+ * Export reuses it to find which source annotations a user object lies over
+ * (core/export.js userObjectRects), where erring wide errs toward covering.
  */
-function extentOf(anno) {
+export function extentOf(anno) {
   const w = Number.isFinite(anno.width) ? anno.width : null;
   const h = Number.isFinite(anno.height) ? anno.height : null;
   if (w !== null && h !== null) return { w, h };

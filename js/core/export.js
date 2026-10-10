@@ -29,7 +29,7 @@ import { CLONE_FONT_VARIANTS, CLONE_FONT_URLS, isSfntFontProgram } from './clone
 import { toStandardFontSafe, drawTextSafe, unencodableInStandardFont } from './text-encode.js';
 import { totalPageRotation } from './page-rotation.js';
 import { orderedForPaint } from './annotation-order.js';
-import { scaleAnnotationGeometry } from './annotation-geometry.js';
+import { scaleAnnotationGeometry, extentOf } from './annotation-geometry.js';
 import { sniffImageFormat } from './image-format.js';
 
 // ---- fonts ------------------------------------------------------------------
@@ -528,18 +528,25 @@ function scalePageWithBoxes(pdfPage, k) {
 // CONTENT, and a reader paints /Annots AFTER the content: a filled form field
 // copied across verbatim landed ON TOP of the Tip-Ex meant to hide it, and the
 // correction typed over it disappeared under the field's box
-// (tests/core/export-annots-under-cover.test.mjs). So on a page that carries
-// user objects, each annotation pdf.js painted is drawn into the content
-// first, from its OWN appearance (never regenerated: that would change how it
-// looks), and taken out of /Annots. Pages without user objects keep their
-// annotations live. The output never had the source's /AcroForm (newDoc is
-// created empty), so a flattened widget loses no fillability it still had.
+// (tests/core/export-annots-under-cover.test.mjs). So each annotation pdf.js
+// painted whose /Rect meets a user object's drawn rect (userObjectRects) is
+// drawn into the content first, from its OWN appearance (never regenerated:
+// that would change how it looks), and taken out of /Annots. Everything else
+// stays live, on this page and on every page without user objects: flattening
+// costs an annotation its interaction, so it is spent only where the cover
+// needs it. The output never had the source's /AcroForm (newDoc is created
+// empty), so a flattened widget loses no fillability it still had.
 //
-// Not flattened, so left exactly as before: Link and Popup (interaction, not
-// paint); Hidden or NoView (pdf.js does not paint them); NoRotate (it stays
-// upright on a turned page, which drawn content cannot); and anything without
-// an /AP pdf.js would pick (it may synthesize one we cannot see).
-const KEEP_AS_ANNOTATION = new Set(['Link', 'Popup']);
+// Not flattened, so left exactly as before, even under a cover: Link and
+// Popup (interaction, not paint; a Popup leaves only with its flattened
+// parent); FileAttachment, Text (sticky note) and the media kinds, whose point
+// is a file, a comment or a player, not their icon; Hidden or NoView (pdf.js
+// does not paint them); NoRotate (it stays upright on a turned page, which
+// drawn content cannot); and anything without an /AP pdf.js would pick (it
+// may synthesize one we cannot see).
+const KEEP_AS_ANNOTATION = new Set([
+  'Link', 'Popup', 'FileAttachment', 'Text', 'Sound', 'Movie', 'Screen', 'RichMedia', '3D',
+]);
 const FLAG_HIDDEN = 1 << 1;
 const FLAG_NO_ROTATE = 1 << 4;
 const FLAG_NO_VIEW = 1 << 5;
@@ -593,16 +600,62 @@ function appearanceFit(annot, stream, PDFLib) {
   return [sx, 0, 0, sy, rx0 - tx0 * sx, ry0 - ty0 * sy];
 }
 
-// In /Annots order, the order a reader (and pdf.js) paints them.
-function flattenPaintedAnnotations(pdfPage, PDFLib) {
+// The PDF-space box [x0, y0, x1, y1] each user object paints, in the frame
+// the drawers use (transformAnnotationCoords, visibleBox), so a turned or
+// cropped page is measured where the drawing lands. Each corner of the
+// view-space box goes through the transform: on a quarter-turned page width
+// and height trade axes. Text stores no extent; extentOf's 0.6em estimate is
+// the one rotation already uses, and erring wide errs toward covering. A
+// watermark (unreachable from v2) is bounded by the circle its tilt sweeps.
+function userObjectRects(annos, frame) {
+  const rects = [];
+  for (const anno of annos) {
+    let box;
+    if (anno.type === 'watermark') {
+      const size = anno.fontSize || DEFAULT_FONT_SIZE.watermark;
+      const r = Math.hypot(((anno.text || '').length * size * 0.6) / 2, size / 2);
+      box = { x: anno.x - r, y: anno.y - r, w: 2 * r, h: 2 * r };
+    } else {
+      const asText = anno.type === 'pageNumber'
+        ? { ...anno, type: 'text', fontSize: anno.fontSize || DEFAULT_FONT_SIZE.pageNumber }
+        : anno;
+      const { w, h } = extentOf(asText);
+      box = { x: anno.x, y: anno.y, w, h };
+    }
+    if (![box.x, box.y, box.w, box.h].every(Number.isFinite) || !(box.w > 0 && box.h > 0)) continue;
+    const pts = [[box.x, box.y], [box.x + box.w, box.y], [box.x, box.y + box.h], [box.x + box.w, box.y + box.h]]
+      .map(([x, y]) => transformAnnotationCoords(frame.rotation, x, y, frame.wU, frame.hU, frame.x0, frame.y0));
+    const xs = pts.map((p) => p.x);
+    const ys = pts.map((p) => p.y);
+    rects.push([Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]);
+  }
+  return rects;
+}
+
+// Does the annotation's /Rect share area with any of `rects`? Touching edges
+// do not count. /Rect corners are not guaranteed to be ordered.
+function meetsAny(annot, rects, PDFLib) {
+  const { PDFName, PDFArray, PDFNumber } = PDFLib;
+  const arr = annot.lookup(PDFName.of('Rect'));
+  if (!(arr instanceof PDFArray) || arr.size() !== 4) return false;
+  const r = arr.asArray().map((v) => annot.context.lookup(v)).map((v) => (v instanceof PDFNumber ? v.asNumber() : NaN));
+  if (!r.every(Number.isFinite)) return false;
+  const [ax0, ax1] = [Math.min(r[0], r[2]), Math.max(r[0], r[2])];
+  const [ay0, ay1] = [Math.min(r[1], r[3]), Math.max(r[1], r[3])];
+  return rects.some(([x0, y0, x1, y1]) => ax0 < x1 && x0 < ax1 && ay0 < y1 && y0 < ay1);
+}
+
+// In /Annots order, the order a reader (and pdf.js) paints them. `rects`:
+// userObjectRects for the objects about to be drawn on this page.
+function flattenPaintedAnnotations(pdfPage, PDFLib, rects) {
   const { PDFName, PDFArray, PDFDict } = PDFLib;
   const annots = pdfPage.node.lookup(PDFName.of('Annots'));
-  if (!(annots instanceof PDFArray)) return;
+  if (!(annots instanceof PDFArray) || rects.length === 0) return;
   const ctx = pdfPage.doc.context;
   const gone = new Set();
   for (const entry of annots.asArray()) {
     const annot = ctx.lookup(entry);
-    if (!(annot instanceof PDFDict)) continue;
+    if (!(annot instanceof PDFDict) || !meetsAny(annot, rects, PDFLib)) continue;
     const ref = paintedAppearanceRef(annot, PDFLib);
     const fit = ref && appearanceFit(annot, ctx.lookup(ref), PDFLib);
     if (!fit) continue;
@@ -820,10 +873,6 @@ export async function buildPdfBytes(doc, deps = {}) {
     const needsScale = !page.isFromImage && Number.isFinite(pageScale) && pageScale !== 1;
 
     if (annotations.length > 0) {
-      // After surgery (it must see the original stream), before the first
-      // user draw (so they paint over it), before the merge scale (so it
-      // scales with the page). See flattenPaintedAnnotations.
-      if (!page.isFromImage) flattenPaintedAnnotations(pdfPage, PDFLib);
       // wU/hU: UNROTATED dims of the visible box (visibleBox above), x0/y0 its
       // origin — setRotation is metadata only, drawing happens in this frame.
       // See transformAnnotationCoords. Read BEFORE the scale below, so it is
@@ -838,6 +887,20 @@ export async function buildPdfBytes(doc, deps = {}) {
       // (10,10) into the file as 20x40 at x=812 — the far edge, turned. The
       // 2026-08-09 /Rotate fix corrected the line above and stopped here.
       const frame = { rotation: totalRotation, wU, hU, x0, y0 };
+      // The source annotations under what the loop below will draw go into
+      // the content first. After surgery (it must see the original stream),
+      // before the loop (so the user's objects paint over them), before the
+      // merge scale (so they scale with the page). NOT before Rung C's native
+      // text: surgery already wrote that, so objects surgery handled
+      // (skipCovers, skipDraw) are left out of the rects; flattening an
+      // annotation there would still paint it over the new text, and only
+      // cost it its interaction. See flattenPaintedAnnotations.
+      if (!page.isFromImage) {
+        const drawn = annotations
+          .filter((a) => !skipCovers.has(a.id) && !skipDraw.has(a.id))
+          .map((a) => (needsScale ? scaleAnnotationGeometry(a, 1 / pageScale) : a));
+        flattenPaintedAnnotations(pdfPage, PDFLib, userObjectRects(drawn, frame));
+      }
       // PAINT ORDER (core/annotation-order.js, founder ruling 2026-08-09):
       // Tip-Ex is a GROUND, not a layer. The SAME helper the screen uses, so
       // the two can't drift. It returns a COPY — `annotations` itself must
