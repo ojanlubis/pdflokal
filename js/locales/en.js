@@ -307,6 +307,7 @@ export default {
     delete: 'Delete page',
     use: 'Use ({n})',
     selected: '{count} selected',
+    add: 'Add PDF',
     deleted: {
       one: '{count} page deleted. Wrong one? Just Undo',
       other: '{count} pages deleted. Wrong ones? Just Undo',
