@@ -326,12 +326,17 @@ async function decidedFontFor(pdfPage, anno, env, text) {
 
 // RUNG D: a whole-paragraph edit whose stamp did not bake (its cover's
 // surgery declined) still draws its painted lines at the block's own leading
-// and alignment, in PDF user space — never at the twin's 1.2 line height from
-// `anno.y`. Same placement function the stamp uses (core/block-edit.js), with
-// this font's widths. The block's coordinates are the SOURCE page's user
-// space, which is the frame annotations are drawn in here (rotation is /Rotate
-// metadata; a merged page is drawn at native scale and scaled afterwards), so
-// they are neither transformed nor scaled.
+// and alignment — never at the twin's 1.2 line height from `anno.y`. Same
+// placement function the stamp uses (core/block-edit.js), with this font's
+// widths, laid out in the block's own PDF units.
+//
+// It is DRAWN where the overlay rows paint (render/page-view.js
+// renderBlockRows): that overlay is the user's to drag, resize and turn the
+// page under, so the lines go through the displayed frame like every other
+// annotation, anchored at block.disp (the first baseline, carried by every
+// move, turn and rescale, core/annotation-geometry.js), at the annotation's
+// fontSize, upright. Drawing them at block.origin, as this did until
+// 2026-10-10, threw all three away on download. Unmoved, the two agree.
 async function drawBlockText(pdfPage, anno, env) {
   const block = anno.block;
   const joined = toStandardFontSafe(blockText(block));
@@ -342,10 +347,29 @@ async function drawBlockText(pdfPage, anno, env) {
     const asLines = block.lines.map((l) => l.text).join('\n');
     if (await drawTextAsImage(pdfPage, { ...anno, fontSize: anno.fontSize || DEFAULT_FONT_SIZE.text }, env.frame, env, asLines)) return;
   }
-  const size = block.size;
+  // A block with no display anchor cannot have been moved by the user; one
+  // missing field must not abort the whole export, so it keeps its birth spot.
+  if (!block.disp) {
+    const widthOf = (str) => font.widthOfTextAtSize(toStandardFontSafe(str), block.size);
+    for (const line of placeBlockLines(block, widthOf)) {
+      for (const seg of line.segments) drawTextSafe(pdfPage, seg.text, { x: seg.x, y: line.y, size: block.size, font, color });
+    }
+    return;
+  }
+  const { frame } = env;
+  const k = block.k > 0 ? block.k : 1;
+  // The size the overlay paints, in the block's PDF units: block.size until
+  // a resize (commit sets fontSize = k * size, js/v2/app.js).
+  const size = (anno.fontSize > 0 ? anno.fontSize : k * block.size) / k;
   const widthOf = (str) => font.widthOfTextAtSize(toStandardFontSafe(str), size);
+  const rotate = env.PDFLib.degrees(frame.rotation);
   for (const line of placeBlockLines(block, widthOf)) {
-    for (const seg of line.segments) drawTextSafe(pdfPage, seg.text, { x: seg.x, y: line.y, size, font, color });
+    for (const seg of line.segments) {
+      const xV = block.disp.x + k * (seg.x - block.origin.x);
+      const yV = block.disp.y + k * (block.origin.y - line.y);
+      const { x, y } = transformAnnotationCoords(frame.rotation, xV, yV, frame.wU, frame.hU, frame.x0, frame.y0);
+      drawTextSafe(pdfPage, seg.text, { x, y, size: size * k, font, color, rotate });
+    }
   }
 }
 
