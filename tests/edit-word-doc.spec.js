@@ -74,7 +74,7 @@ test('surat-word.pdf (Word-shape simple TrueType font): the replacement stamps N
   // so the doc-subset rung must prove it, never fall to clone/twin.
   // style_source (spec-edit-fidelity-instrumentation.md Increment B; FIXED
   // 2026-07-26, founder-flagged correctness bug): used to ride on js/v2/
-  // app.js's prepareDocFont's async race and flake between 'pdf-name' and
+  // doc-font-live.js's prepareDocFont async race and flake between 'pdf-name' and
   // 'none' under full-suite load. core/stamp.js's resolveStampFont now
   // resolves AUTHORITATIVELY against the real document on every path — this
   // fixture's /BaseFont IS informative, so it resolves cleanly to 'pdf-name'

@@ -6,7 +6,7 @@
  * rung-c-native.spec.js) — but until now the EDITOR only ever showed the twin
  * CSS font while typing and after commit, so "what you see" and "what you
  * get" visibly diverged for the whole window between tap and download. This
- * suite proves the fix: js/v2/app.js's prepareDocFont loads the SAME font
+ * suite proves the fix: js/v2/doc-font-live.js's prepareDocFont loads the SAME font
  * program into the browser via FontFace so the draft (and the committed
  * annotation) render in the document's real font live, AND the founder's
  * companion ruling — when a substitute font WILL be used, the app says so

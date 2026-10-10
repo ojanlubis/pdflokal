@@ -111,7 +111,7 @@ test.describe('bug 2 — bold/italic adoption', () => {
     await expect(page.locator('.v2-text-edit')).toBeVisible();
 
     // Bold detection rides the SAME async pdf-lib dry run as the doc-font
-    // preview (js/v2/app.js's prepareDocFont) — poll until it lands.
+    // preview (js/v2/doc-font-live.js's prepareDocFont) — poll until it lands.
     await expect.poll(async () => page.evaluate(
       () => getComputedStyle(document.querySelector('.v2-text-edit')).fontWeight,
     ), { timeout: 10_000 }).toBe('700');

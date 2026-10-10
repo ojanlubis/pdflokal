@@ -157,7 +157,7 @@ test('buildEditedPageBytes: undangan-cid.pdf — target line surgically cut + na
   // style_source/glyph_shortfall (spec-edit-fidelity-instrumentation.md
   // Increment B, fixed 2026-07-26 for determinism — founder-flagged
   // correctness bug): addGantiPair's synthetic text annotation carries no
-  // styleSource (only js/v2/app.js's prepareDocFont ever sets one), but
+  // styleSource (only js/v2/doc-font-live.js's prepareDocFont ever sets one), but
   // core/stamp.js's resolveStampFont no longer trusts that blind 'none' —
   // it resolves AUTHORITATIVELY against the real document on every path, not
   // just the clone rung. This fixture's font (Montserrat) has an informative

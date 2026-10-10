@@ -168,7 +168,7 @@ export function extractFontMetrics(page, PDFLib) {
 // decode shape removeRunsFromPdfPage uses internally (Contents may be a
 // single stream or an array; PDF 32000 7.8.2 treats multiple streams as one
 // logical stream), exposed here for a caller that only needs to LOOK, never
-// write: Rung C's live-font-preview dry run (js/v2/app.js's prepareDocFont)
+// write: Rung C's live-font-preview dry run (js/v2/doc-font-live.js's prepareDocFont)
 // runs planRunRemoval read-only against the SOURCE page to learn a tapped
 // line's resource font name, and must not duplicate this decode inline.
 export function readPageContents(page, PDFLib) {
