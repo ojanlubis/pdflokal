@@ -2964,21 +2964,23 @@ async function firstUnrebuildableSource() {
 
 let loadingFiles = false; // re-entry guard: double-taps and rapid picks interleave imports
 
-async function loadFiles(files) {
+// `replace` is Ganti / Buka Baru: the batch is built into a fresh Doc and takes
+// the open document's place only once it has pages (see loadFilesInner).
+async function loadFiles(files, { replace = false } = {}) {
   if (loadingFiles) { toast(tr('toast.stillLoading')); return; }
   // A fresh document (first load / after Buka Baru) is a new editing session —
   // the beta feedback may be asked again. A merge-add into an open doc doesn't reset.
   if (doc.pages.length === 0) resetEditFeedback();
   loadingFiles = true;
   try {
-    await loadFilesInner(files);
+    await loadFilesInner(files, { replace });
   } finally {
     loadingFiles = false;
     hideProcessing();
   }
 }
 
-async function loadFilesInner(files) {
+async function loadFilesInner(files, { replace = false } = {}) {
   // In picker order: PDFs append their pages, images become one page each.
   // A PDF whose name lost its extension is told apart by its header
   // (core/file-kind.js, behind checkIncoming); a file that cannot even be read
@@ -2987,9 +2989,18 @@ async function loadFilesInner(files) {
   if (verdict.refusal) { toastRefusal(verdict); return; }
   const { usable, kinds } = verdict;
   const isPdf = (f) => kinds.get(f) === 'pdf';
-  const pagesBefore = doc.pages.length;
+  // WHY a replace imports into a STAGED Doc and not into `doc`: whether a file
+  // opens is only known after it is decoded (a HEIC photo, a password PDF, a
+  // corrupt PDF all pass the type and size check), and wiping first left the
+  // user on an empty landing with the old work and its undo history gone. The
+  // open document stays untouched until the staged one has pages; an append
+  // (`into === doc`) is the unchanged path.
+  const into = replace ? createDoc() : doc;
+  const pagesBefore = into.pages.length;
   const firstLoad = pagesBefore === 0;
-  if (firstLoad) baseName = baseNameOf(usable[0].name);
+  // A staged replace names the file at the commit below: now it would rename
+  // the document that is still open.
+  if (firstLoad && !replace) baseName = baseNameOf(usable[0].name);
 
   // Telegraph the parse loop. Note the >20MB heads-up toast is gone: it fired
   // here but sat hidden BEHIND this overlay (z-order), and the overlay itself
@@ -2999,8 +3010,8 @@ async function loadFilesInner(files) {
   // parse (see the merge guard above). Already-open sources first: if one of
   // THEM cannot be rebuilt, adding anything makes the export impossible, and
   // blaming the new file would be wrong. Say which side it is, and stop.
-  const rebuilds = doc.sources.length > 0 || usable.length > 1;
-  if (doc.sources.length > 0) {
+  const rebuilds = into.sources.length > 0 || usable.length > 1;
+  if (into.sources.length > 0) {
     const err = await firstUnrebuildableSource();
     if (err) {
       toast(tr('toast.mergeBlocked'));
@@ -3039,8 +3050,8 @@ async function loadFilesInner(files) {
           const loadErr = await rebuildLoadError(bytes);
           if (loadErr) throw loadErr;
         }
-        const importedPages = await importPdf(doc, { name: f.name, bytes });
-        if (rebuilds) rebuildVerdicts.set(doc.sources.at(-1).id, Promise.resolve(null)); // just proven
+        const importedPages = await importPdf(into, { name: f.name, bytes });
+        if (rebuilds) rebuildVerdicts.set(into.sources.at(-1).id, Promise.resolve(null)); // just proven
         // A protected PDF opens and renders perfectly (PDF.js decrypts) but can
         // NEVER be written back — pdf-lib has no decryption. Say so HERE, at
         // import, rather than letting them edit a 444-page document and meet
@@ -3055,7 +3066,7 @@ async function loadFilesInner(files) {
         // only) — so this must never imply one.
         //
         // COPY IS PLACEHOLDER — client-facing words are Fauzan's, per the seat.
-        if (doc.sources.at(-1)?.encrypted) {
+        if (into.sources.at(-1)?.encrypted) {
           toast(tr('toast.lockedReadOnly')); // TODO(copy): his words
           // blocked:FALSE — this file OPENED and is fully editable. It shares
           // its stage and reason with the genuine decline further down (the
@@ -3074,7 +3085,7 @@ async function loadFilesInner(files) {
         // .then can resolve after the NEXT file in a multi-file merge loop has
         // already been added, and `doc.sources.at(-1)` would then describe the
         // wrong file.
-        const docSigned = !!doc.sources.at(-1)?.signed;
+        const docSigned = !!into.sources.at(-1)?.signed;
         probeTextLayer(bytes)
           .then((hasText) => tel('doc_open', {
             text_layer: hasText, signed: docSigned,
@@ -3083,7 +3094,7 @@ async function loadFilesInner(files) {
           }))
           .catch(() => {});
       } else {
-        await importImage(doc, { name: f.name, bytes, mimeType: f.type });
+        await importImage(into, { name: f.name, bytes, mimeType: f.type });
         // An image page has no text layer at all — that's the scan ladder's
         // own job (spec-edit-dokumen-foto.md), not this rail's.
         // signed:false — an image has no PDF structure to carry a signature.
@@ -3142,12 +3153,14 @@ async function loadFilesInner(files) {
 
   // Every file failed → leave the landing untouched, say it plainly, bail. Also
   // guards the doc.pages[0] read below, which would throw on an empty document.
-  // After Buka Baru the landing is NOT showing (resetDoc emptied the editor in
-  // place), so put it back: a blank editor with stale chrome was the result.
-  if (doc.pages.length === 0) {
-    document.body.classList.add('is-empty');
-    emptyEl.style.display = '';
-    refreshChrome();
+  // A replace has nothing to put back: its old document was never touched and
+  // is still on screen. Only an append onto an empty editor shows the landing.
+  if (into.pages.length === 0) {
+    if (!replace) {
+      document.body.classList.add('is-empty');
+      emptyEl.style.display = '';
+      refreshChrome();
+    }
     const singleLocked = usable.length === 1 && lastFailureReason === 'encrypted';
     toast(singleLocked
       ? tr('toast.openLocked')
@@ -3155,6 +3168,14 @@ async function loadFilesInner(files) {
         ? tr('toast.openFailedOne')
         : tr('toast.openFailedAll'));
     return;
+  }
+
+  // The commit of a staged replace: the new file opened, so it takes the old
+  // document's place (and its undo history) now. This is the one wipe.
+  if (replace) {
+    await resetDoc(into);
+    resetEditFeedback(); // a new editing session, as an open on the empty editor is
+    baseName = baseNameOf(usable[0].name);
   }
 
   // Every page takes the width of the first page (founder note 6 Aug 2026).
@@ -3416,10 +3437,12 @@ on('fm-pages', 'click', () => {
   openPagesSheet(); // the SAME opener the toolbar button uses — never a second one
 });
 
-// Start over: a FRESH doc + history. The signature stays (it's the user's,
-// not the document's). Cancelling the picker leaves everything untouched.
-async function resetDoc() {
-  doc = createDoc();
+// Start over: `next` (a fresh doc by default) + a fresh history. The signature
+// stays (it's the user's, not the document's). Only loadFilesInner calls it, at
+// the moment a staged replace has pages; cancelling the picker or a file that
+// does not open leaves everything untouched.
+async function resetDoc(next = createDoc()) {
+  doc = next;
   history.undoStack.length = 0;
   history.redoStack.length = 0;
   markClean(history); // a fresh doc has nothing to lose; takes the leave guard down
@@ -3446,12 +3469,12 @@ async function resetDoc() {
 }
 on(fileInput, 'change', async (e) => {
   const files = e.target.files;
-  // Refuse while the old doc is still intact: resetDoc is the point of no
-  // return (it empties the undo history too). Appending needs no pre-check;
-  // loadFiles asks the same rule and nothing is lost by its refusal.
-  if (files?.length && !(pendingReplace && await refuseReplace(files))) {
-    if (pendingReplace) await resetDoc();
-    await loadFiles(files).catch((err) => { console.error(err); toast(tr('toast.openFailed')); });
+  const replace = pendingReplace; // read before any await: the mode of THIS pick
+  // Refuse early while the old doc is intact. This is the cheap half (type,
+  // size, a running load); a file that passes it but cannot be decoded is
+  // caught by loadFiles' staging, which wipes nothing until a page exists.
+  if (files?.length && !(replace && await refuseReplace(files))) {
+    await loadFiles(files, { replace }).catch((err) => { console.error(err); toast(tr('toast.openFailed')); });
   }
   pendingReplace = false; // picker cancelled → nothing was destroyed
   fileInput.value = '';
@@ -3494,11 +3517,10 @@ on('dc-add', 'click', () => {
 on('dc-replace', 'click', async () => {
   const files = takeDropped();
   if (!files) return;
-  // Refuse BEFORE wiping the doc (a running load, a .docx, a 100MB+ file), or
-  // the user loses the old doc and never gets the new one.
+  // Refuse early while the old doc is intact (a running load, a .docx, a
+  // 100MB+ file); one that cannot be decoded is caught by loadFiles' staging.
   if (await refuseReplace(files)) return;
-  await resetDoc();
-  await loadFiles(files).catch((err) => { console.error(err); toast(tr('toast.openFailed')); });
+  await loadFiles(files, { replace: true }).catch((err) => { console.error(err); toast(tr('toast.openFailed')); });
 });
 on('dc-cancel', 'click', () => dropChoice.close());
 

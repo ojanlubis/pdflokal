@@ -113,8 +113,10 @@ function world({ loading = false } = {}) {
     fileInput: { value: 'x', setAttribute() {} },
     DEFAULT_ACCEPT: '',
     takeDropped: () => dropped.files,
+    // resetDoc is no longer called from the handlers: loadFiles({ replace }) wipes
+    // only once the new file has pages (tests/core/replace-keeps-doc.test.mjs).
     resetDoc: async () => { calls.push('resetDoc'); },
-    loadFiles: async () => { calls.push('loadFiles'); },
+    loadFiles: async (_files, opts) => { calls.push(opts?.replace ? 'loadFiles:replace' : 'loadFiles'); },
   };
   const keys = Object.keys(env);
   const api = new Function(...keys, src)(...keys.map((k) => env[k]));
@@ -128,10 +130,10 @@ for (const [name, run] of [
   ['Ganti (dc-replace)', (w, files) => { w.dropped.files = files; return w.handlers['dc-replace'](); }],
   ['Buka Baru (picker change handler)', (w, files) => { w.api.setPending(true); return w.handlers.fileInput({ target: { files } }); }],
 ]) {
-  test(`${name}: a usable pick with nothing running resets then loads`, async () => {
+  test(`${name}: a usable pick with nothing running loads as a replace, wiping nothing itself`, async () => {
     const w = world();
     await run(w, GOOD);
-    assert.deepEqual(w.calls, ['resetDoc', 'loadFiles']);
+    assert.deepEqual(w.calls, ['loadFiles:replace']);
   });
   test(`${name}: a load already running refuses BEFORE resetDoc (doc not wiped)`, async () => {
     const w = world({ loading: true });
@@ -163,9 +165,10 @@ test('a refused Buka Baru clears pendingReplace', async () => {
   assert.equal(w.api.getPending(), false);
 });
 
-test('resetDoc is only awaited at the two replace sites, both behind refuseReplace', async () => {
+test('both replace sites ask refuseReplace, then hand the wipe to loadFiles', async () => {
   assert.ok(!/refuseIncoming/.test(APP), 'refuseIncoming is gone; refuseReplace is the one guard');
-  assert.equal([...APP.matchAll(/await resetDoc\(\)/g)].length, 2, 'exactly the two replace call sites');
+  assert.equal([...APP.matchAll(/await refuseReplace\(files\)/g)].length, 2, 'exactly the two replace call sites');
+  assert.ok(!/await resetDoc\(\)/.test(APP), 'no handler wipes before the file is decoded (replace-keeps-doc.test.mjs)');
 });
 
 test('loadFiles itself still uses the same rule (one rule, one home)', async () => {
