@@ -157,10 +157,15 @@ function bandWords(words) {
       const overlap = bottom - top;
       if (overlap > 0 && overlap >= 0.5 * Math.min(last.h, box.h)) {
         last.words.push(box);
+        // Far edges from the box as it was BEFORE x/y move: a word sorted
+        // later can sit further left (baseline jitter), and computing w from
+        // the already-moved x shrank the line and left words uncovered.
+        const right = Math.max(last.x + last.w, box.x + box.w);
+        const bottom2 = Math.max(last.y + last.h, box.y + box.h);
         last.x = Math.min(last.x, box.x);
         last.y = Math.min(last.y, box.y);
-        last.h = Math.max(last.y + last.h, box.y + box.h) - last.y;
-        last.w = Math.max(last.x + last.w, box.x + box.w) - last.x;
+        last.w = right - last.x;
+        last.h = bottom2 - last.y;
         continue;
       }
     }
