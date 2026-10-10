@@ -91,7 +91,14 @@ export function createSignatureModal({ modal, onReady, toast }) {
   // async now: SignaturePad (11 KB) is fetched when the sheet opens, not at page
   // load. Sizing the canvas stays synchronous so the pad is never constructed
   // against a zero-size canvas if the fetch is slow.
+  // WHY a generation: the off() below only reaches a pad that EXISTS. On a first
+  // open over a slow network, Batal + reopen before the library arrived ran a
+  // second initPad while the first was still awaiting; both then built a pad on
+  // the same canvas, and the first was never off()ed (strokes drawn twice,
+  // isEmpty() asking only one of them). Only the newest init may install a pad.
+  let padGen = 0;
   async function initPad() {
+    const gen = ++padGen;
     // Detach the previous pad's pointer listeners first (review M3): each
     // SignaturePad constructor adds its own set to the SAME canvas — without
     // off(), N modal opens = N pads all drawing every stroke N× thick.
@@ -103,6 +110,7 @@ export function createSignatureModal({ modal, onReady, toast }) {
     canvas.height = canvas.offsetHeight * dpr;
     canvas.getContext('2d').scale(dpr, dpr);
     const SignaturePad = await ensureSignaturePad();
+    if (gen !== padGen) return false; // a newer open owns the canvas now
     pad = new SignaturePad(canvas, { minWidth: 1, maxWidth: 2.4 });
     // THE SIGNAL, not a courtesy: until this line the canvas takes NO ink (the
     // pad's pointer listeners do not exist yet), and on the first open of a page
@@ -110,6 +118,7 @@ export function createSignatureModal({ modal, onReady, toast }) {
     // without a trace, then Pakai answers "draw first" and the sheet stays up.
     // tests/signature-save.spec.js waits on it instead of racing the fetch.
     canvas.dataset.ready = 'true';
+    return true;
   }
   // "Ulangi" is also how a restored signature is discarded — without dropping
   // `restored` the confirm handler would hand back the stored bytes the user
@@ -311,7 +320,9 @@ export function createSignatureModal({ modal, onReady, toast }) {
       // Set synchronously: a stored signature means the box reads as already
       // kept, so leaving it alone keeps it and unchecking it deletes it.
       if (saveCheck) saveCheck.checked = !!saved;
-      await initPad();
+      // A superseded open (Batal + reopen during the fetch) stops here: the
+      // newer open restores the saved signature onto ITS pad.
+      if (!(await initPad())) return;
       if (!saved || !modal.open) return; // closed while the pad was fetched
       const img = await decodeImage(saved);
       // Re-check: the user may have closed the sheet or started drawing while
