@@ -27,6 +27,7 @@ import {
 } from '../core/operations.js';
 import { createHistory, record, undo, redo, canUndo, canRedo, markClean, markChanged, settle, isDirty } from '../core/history.js';
 import { setLeaveGuard } from './leave-guard.js';
+import { blurLeavesEditor } from './editor-blur.js';
 import { rasterFitsShape } from '../core/raster-key.js';
 import { baseNameOf } from '../core/file-kind.js';
 import { importPdf, importImage, createPageRasterizer, probeTextLayer, pdfLibLoadError } from '../core/import.js';
@@ -2415,7 +2416,8 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
     }
   };
 
-  ed.addEventListener('blur', commit);
+  // A window switch blurs the editor without moving focus off it (editor-blur.js).
+  ed.addEventListener('blur', () => { if (blurLeavesEditor(document.activeElement, ed)) commit(); });
   ed.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ed.blur(); }
     // Ctrl/Cmd+B / I = the format bar's buttons, for the WHOLE box. WHY
