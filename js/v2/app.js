@@ -583,12 +583,24 @@ function endSpacePan() {
 document.addEventListener('keydown', (e) => {
   if (e.code !== 'Space' || e.ctrlKey || e.metaKey || e.altKey) return;
   if (doc.pages.length === 0 || document.querySelector('dialog[open]')) return;
-  if (e.target.matches?.('input, select, textarea, button, a, [contenteditable="true"]')) return;
+  if (e.target.isContentEditable || e.target.closest?.('input, select, textarea')) return;
+  // A button or link keeps Space only when the KEYBOARD focused it. Chrome and
+  // Firefox also focus a button on mouse click, so after a click on a zoom or
+  // tool button Space-pan never armed and the Space release clicked it again.
+  // preventDefault on the keydown stops that activation; blur moves focus off.
+  if (e.target.closest?.('button, a')) {
+    let keyboardFocus = true;
+    try { keyboardFocus = e.target.matches(':focus-visible'); } catch { /* old engine: keep Space for the control */ }
+    if (keyboardFocus) return;
+    e.target.blur();
+  }
   e.preventDefault();
   spaceHeld = true;
   scrollEl.classList.add('space-pan');
 });
-document.addEventListener('keyup', (e) => { if (e.code === 'Space') endSpacePan(); });
+// Meta too: macOS sends no keyup for a key released while Cmd is held, so
+// Space up during a Cmd+wheel zoom would leave pan mode stuck on.
+document.addEventListener('keyup', (e) => { if (e.code === 'Space' || e.key === 'Meta') endSpacePan(); });
 window.addEventListener('blur', endSpacePan); // alt-tab with Space down: keyup never arrives
 on(scrollEl, 'pointerdown', (e) => {
   if (!spaceHeld || e.pointerType === 'touch' || e.button !== 0) return;
@@ -3526,6 +3538,15 @@ document.addEventListener('keydown', (e) => {
   // WHY lowercased: Shift (or CapsLock) turns e.key into 'Z', so a bare
   // `e.key === 'z'` never matched Ctrl/Cmd+Shift+Z and redo-by-keyboard never fired.
   const key = e.key.toLowerCase();
+  // WHY the open-sheet guard: the editor's keys must not act on the document
+  // behind a sheet. Ctrl+Z behind Unduh changed the doc after the sheet built
+  // its bytes, so the download was the old state and markClean then called the
+  // changed doc saved; Delete on a focused Halaman tile deleted the editor's
+  // selected annotation. Kept: Escape (resets the tool, the dialog closes
+  // itself) and undo/redo in the Halaman sheet, whose page moves it shows live.
+  const openSheet = document.querySelector('dialog[open]');
+  if (openSheet && e.key !== 'Escape'
+    && !(openSheet.id === 'pm-sheet' && mod && (key === 'z' || key === 'y'))) return;
   if (mod && key === 'z') { e.preventDefault(); e.shiftKey ? doRedo() : doUndo(); }
   else if (mod && key === 'y') { e.preventDefault(); doRedo(); }
   else if (mod && !e.altKey && !e.shiftKey && 'cxvd'.includes(key) && key.length === 1 && !document.querySelector('dialog[open]')) {
@@ -3538,15 +3559,6 @@ document.addEventListener('keydown', (e) => {
     if (key === 'c' && !textSelected) { if (copySelected()) e.preventDefault(); }
     else if (key === 'x' && !textSelected) { if (copySelected()) { e.preventDefault(); deleteSelected(); } }
     else if (key === 'v') {
-  // WHY the open-sheet guard: the editor's keys must not act on the document
-  // behind a sheet. Ctrl+Z behind Unduh changed the doc after the sheet built
-  // its bytes, so the download was the old state and markClean then called the
-  // changed doc saved; Delete on a focused Halaman tile deleted the editor's
-  // selected annotation. Kept: Escape (resets the tool, the dialog closes
-  // itself) and undo/redo in the Halaman sheet, whose page moves it shows live.
-  const openSheet = document.querySelector('dialog[open]');
-  if (openSheet && e.key !== 'Escape'
-    && !(openSheet.id === 'pm-sheet' && mod && (key === 'z' || key === 'y'))) return;
       // Only a FRESH in-app copy is pasted here (and so suppresses the paste event);
       // anything else falls through to the paste listener, which can read the system clipboard.
       if (annoClipboard && annoCopyFresh && pasteCopy()) e.preventDefault();
