@@ -21,6 +21,7 @@
  */
 
 import { planRunRemoval } from './text-walk.js';
+import { decodeName } from './content-stream.js';
 
 // PDF dict/array values are direct objects OR indirect references (PDFRef) —
 // there is no way to tell which without checking, and every getter below can
@@ -129,7 +130,11 @@ export function extractFontMetrics(page, PDFLib) {
   if (!(fontDict instanceof PDFDict)) return metrics;
 
   for (const key of fontDict.keys()) {
-    const name = key.toString().slice(1); // '/F1' -> 'F1'
+    // '/F1' -> 'F1', with #xx escapes decoded the SAME way the tokenizer
+    // decodes a Tf operand. pdf-lib keeps the encoded form ('A#20B'), so a font
+    // whose resource name carried an escape was never found and every target
+    // on it declined.
+    const name = decodeName(key.toString().slice(1));
     // subtypeName is captured OUTSIDE the risky parse calls below so the
     // catch can still pick the right-shaped opaque fallback (2-byte for a
     // Type0 font whose W-array parsing chokes, 1-byte otherwise) — it's inert

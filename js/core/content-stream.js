@@ -54,7 +54,9 @@ function decodeHexString(body) {
 
 // Decode a PDF name token's body (the part after the leading '/'): #xx hex
 // escapes stand for a raw byte (e.g. a space in a font subset name).
-function decodeName(body) {
+// SINGLE SOURCE OF TRUTH: redact.js keys its font map with this too, so a
+// Tf operand and a /Font resource key decode to the same string.
+export function decodeName(body) {
   return body.replace(/#([0-9a-fA-F]{2})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
 }
 
