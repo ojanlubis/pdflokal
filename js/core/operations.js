@@ -209,6 +209,18 @@ export function placeSignature(doc, pageId, { image, ratio }, cx, cy) {
   return addAnnotation(doc, pageId, anno);
 }
 
+// The size `src` takes on `page`: its own, or scaled UNIFORMLY (the screen draws
+// a signature's height from the image ratio, so one axis alone would make screen
+// and file disagree) until its displayed box fits the page. originInside only
+// MOVES a box, and a box bigger than the page overhangs wherever it sits. One
+// home, so the copy and the "already there" test cannot drift apart.
+function signatureFitFor(page, src) {
+  const frame = displayedFrame(page);
+  const box = displayedBox(src, { w: src.width || 0, h: src.height || 0 });
+  const f = Math.min(1, box.w > 0 ? frame.w / box.w : 1, box.h > 0 ? frame.h / box.h : 1);
+  return { width: src.width * f, height: src.height * f };
+}
+
 // "Semua Hal.": the pages (other than the signature's own) that still need a copy.
 // Separate from the copy so the caller can record history only when a tap will
 // actually change something; a re-tap must not leave a dead undo step.
@@ -223,9 +235,10 @@ export function pagesMissingSignature(doc, annotationId) {
   // page the copy is held inside it, and comparing against the source's own
   // x/y would call that copy missing and stack another on every tap.
   const alreadyThere = (pg) => {
-    const at = originInside(pg, src, src.x, src.y);
+    const fit = signatureFitFor(pg, src);
+    const at = originInside(pg, { ...src, ...fit }, src.x, src.y);
     return (a) => a.type === 'signature' && a.image === src.image
-      && a.x === at.x && a.y === at.y && a.width === src.width && a.height === src.height
+      && a.x === at.x && a.y === at.y && a.width === fit.width && a.height === fit.height
       && (a.turn || 0) === (src.turn || 0);
   };
   return doc.pages.filter((pg) => pg.id !== found.page.id && !pg.annotations.some(alreadyThere(pg)));
@@ -242,9 +255,12 @@ export function copySignatureToAllPages(doc, annotationId) {
     // A turned source (its page was turned) stamps the same box the same way
     // round: "same position" is what the user sees, not the upright image.
     // A page smaller than the source's (a merged file) gets it moved inside.
-    const at = originInside(pg, src, src.x, src.y);
+    // A page too small for the box gets a smaller copy (signatureFitFor): moving
+    // alone cannot hold a box taller or wider than the page.
+    const fit = signatureFitFor(pg, src);
+    const at = originInside(pg, { ...src, ...fit }, src.x, src.y);
     added.push(addAnnotation(doc, pg.id, createAnnotation('signature', {
-      image: src.image, x: at.x, y: at.y, width: src.width, height: src.height,
+      image: src.image, x: at.x, y: at.y, width: fit.width, height: fit.height,
       ...(src.turn ? { turn: src.turn } : {}),
     })));
   }
