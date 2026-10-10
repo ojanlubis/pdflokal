@@ -27,6 +27,7 @@ import {
 } from '../core/operations.js';
 import { createHistory, record, undo, redo, canUndo, canRedo, markClean, markChanged, settle, isDirty } from '../core/history.js';
 import { setLeaveGuard } from './leave-guard.js';
+import { holdEditor } from './editor-blur.js';
 import { rasterFitsShape } from '../core/raster-key.js';
 import { baseNameOf } from '../core/file-kind.js';
 import { ZOOM_MAX, ZOOM_STEP, zoomFloor, clampZoom, openingZoom as coreOpeningZoom } from '../core/zoom.js';
@@ -2009,11 +2010,13 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
   let escaped = false;   // Escape = back out; an empty commit without it = delete the line
   let releaseKeyboardWatch = () => {};
   let releaseHold = () => {};
+  let releaseBarHold = () => {}; // the format-bar hold of an empty new draft
   const commit = () => {
     if (committed) return;
     committed = true;
     releaseKeyboardWatch(); // before ed.remove(), so the listener never outlives its element
-    releaseHold();
+    releaseHold(); // holdEditor's release (editor-blur.js), with the editor
+    releaseBarHold();
     // RUNG D: read the paragraph's line breaks off the editor BEFORE it leaves
     // the DOM — they are what the file will hold (js/v2/block-editor.js).
     // The text is normalised HERE (a TAB is the one space the file draws), so
@@ -2432,7 +2435,9 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
     }
   };
 
-  ed.addEventListener('blur', (e) => {
+  // A window switch blurs the editor without moving focus off it, so it
+  // stays open (editor-blur.js); a real blur comes here.
+  const onRealBlur = (e) => {
     const text = editorCommit(ed.textContent, null).text;
     if (blurCommitsDraft({ relatedTarget: e.relatedTarget, barEl: formatBarEl, text, hasAnno: !!anno, hasDraft: !!draft })) {
       commit();
@@ -2443,7 +2448,7 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
     // blur-commits path; going anywhere else is a click-away, so it commits.
     const onBarLeave = (ev) => {
       if (formatBarEl.contains(ev.relatedTarget)) return;
-      releaseHold();
+      releaseBarHold();
       if (ev.relatedTarget !== ed) commit();
     };
     formatBarEl.addEventListener('focusout', onBarLeave);
@@ -2460,12 +2465,13 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
       },
     };
     heldDraft = hold;
-    releaseHold = () => {
+    releaseBarHold = () => {
       formatBarEl.removeEventListener('focusout', onBarLeave);
       if (heldDraft === hold) heldDraft = null;
-      releaseHold = () => {};
+      releaseBarHold = () => {};
     };
-  });
+  };
+  releaseHold = holdEditor(ed, commit, { onBlur: onRealBlur });
   ed.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ed.blur(); }
     // Ctrl/Cmd+B / I = the format bar's buttons, for the WHOLE box. WHY
