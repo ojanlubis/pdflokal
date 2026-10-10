@@ -88,6 +88,32 @@ function rewriteReachable(context, PDFLib, roots, rewrite) {
   }
 }
 
+// NEVER pdf-lib's typed getters here (node.Annots(), node.Resources()): they
+// THROW on a wrong-typed value, and the fence runs on every rebuild, so one
+// kept page with a dict for /Annots failed a download that copyPages alone
+// carried across fine (review of 5245a21). Raw get + lookup + instanceof; a
+// value of the wrong type is skipped, which leaves it exactly as it was.
+function annotsOf(PDFLib, context, node) {
+  const annots = context.lookup(node.get(PDFLib.PDFName.of('Annots')));
+  return annots instanceof PDFLib.PDFArray ? annots : null;
+}
+
+// /Resources is inheritable, so walk /Parent (raw, cycle-guarded) the way
+// copyPages does before it writes the value onto the copied page.
+function resourcesOf(PDFLib, context, node) {
+  const { PDFName, PDFDict } = PDFLib;
+  const seen = new Set();
+  for (let n = node; n instanceof PDFDict && !seen.has(n); n = context.lookup(n.get(PDFName.of('Parent')))) {
+    seen.add(n);
+    const raw = n.get(PDFName.of('Resources'));
+    if (raw !== undefined) {
+      const res = context.lookup(raw);
+      return res instanceof PDFDict ? res : null;
+    }
+  }
+  return null;
+}
+
 function isSubtype(PDFLib, dict, name) {
   return dict instanceof PDFLib.PDFDict && dict.lookup(PDFLib.PDFName.of('Subtype')) === PDFLib.PDFName.of(name);
 }
@@ -181,7 +207,7 @@ export function fenceUnkeptPages(srcDoc, keptNums, tag, PDFLib) {
   //    at nothing.
   const keptAnnots = new Set();
   for (const page of kept) {
-    const annots = page.node.Annots();
+    const annots = annotsOf(PDFLib, context, page.node);
     if (!annots) continue;
     const entries = annots.asArray();
     const survivors = entries.filter((raw) => {
@@ -198,7 +224,7 @@ export function fenceUnkeptPages(srcDoc, keptNums, tag, PDFLib) {
   //    field, carrying the field's inheritable entries so it still shows (and
   //    a reader can still synthesise) the same value.
   for (const page of kept) {
-    for (const raw of page.node.Annots()?.asArray() || []) {
+    for (const raw of annotsOf(PDFLib, context, page.node)?.asArray() || []) {
       const widget = context.lookup(raw);
       if (!isSubtype(PDFLib, widget, 'Widget') || !widget.get(PDFName.of('Parent'))) continue;
       const { ancestors, refs, direct } = fieldFamily(PDFLib, context, widget);
@@ -219,8 +245,8 @@ export function fenceUnkeptPages(srcDoc, keptNums, tag, PDFLib) {
   let placed = false;
   const roots = kept.map((p) => p.node);
   for (const page of kept) {
-    const res = page.node.Resources();
-    if (res instanceof PDFDict) roots.push(res);
+    const res = resourcesOf(PDFLib, context, page.node);
+    if (res) roots.push(res);
   }
   rewriteReachable(context, PDFLib, roots, (value) => {
     if (!(value instanceof PDFRef)) return undefined;
