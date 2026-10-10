@@ -16,6 +16,13 @@
  * a /Link (interaction, not paint) and a Hidden annotation (pdf.js does not
  * show it) are left alone on the edited page; a flattened annotation's /Popup
  * leaves with it.
+ *
+ * SCOPE (review of the first fix, 2026-10-10): only an annotation whose /Rect
+ * meets a user object's drawn rect is flattened. One elsewhere on the same
+ * page stays live, and an attachment, a sticky note or a media annotation
+ * stays live even under the cover: flattening those loses a file or a
+ * comment, not just a look. The overlap is computed in the frame the user's
+ * objects are drawn in, so a turned and a cropped page are pinned too.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -53,18 +60,15 @@ async function sourceBytes() {
   }
   const p0 = src.getPages()[0];
   const ctx = src.context;
+  // Everything below but the far stamp sits UNDER the cover (PDF x 90..310,
+  // y 682..732, see exportWithCoverOnPage0).
   // A link: interaction, no paint. Must survive.
   const link = ctx.register(ctx.obj({
-    Type: 'Annot', Subtype: 'Link', Rect: [10, 10, 60, 30], Border: [0, 0, 0],
+    Type: 'Annot', Subtype: 'Link', Rect: [95, 685, 140, 700], Border: [0, 0, 0],
     A: { S: 'URI', URI: PDFLib.PDFString.of('https://example.com') },
   }));
   // A Hidden stamp WITH an appearance: pdf.js does not paint it, so neither may we.
-  const hiddenAp = ctx.register(ctx.stream('0 0 1 rg 0 0 50 50 re f', {
-    Type: 'XObject', Subtype: 'Form', BBox: [0, 0, 50, 50],
-  }));
-  const hidden = ctx.register(ctx.obj({
-    Type: 'Annot', Subtype: 'Stamp', Rect: [400, 100, 450, 150], F: 2, AP: { N: hiddenAp },
-  }));
+  const hidden = withAp(ctx, 'Stamp', [200, 690, 240, 720], '0 0 1 rg', { F: 2 });
   // A square with its comment window: once the square is paint, the window
   // would point at nothing, so it goes with it.
   const squareAp = ctx.register(ctx.stream('0 1 0 RG 1 w 0.5 0.5 39 39 re S', {
@@ -72,12 +76,44 @@ async function sourceBytes() {
   }));
   const popupRef = ctx.nextRef();
   const square = ctx.register(ctx.obj({
-    Type: 'Annot', Subtype: 'Square', Rect: [200, 300, 240, 340], AP: { N: squareAp }, Popup: popupRef,
+    Type: 'Annot', Subtype: 'Square', Rect: [250, 690, 290, 720], F: 4, AP: { N: squareAp }, Popup: popupRef,
   }));
-  ctx.assign(popupRef, ctx.obj({ Type: 'Annot', Subtype: 'Popup', Rect: [250, 300, 400, 400], Parent: square }));
-  for (const r of [link, hidden, square, popupRef]) p0.node.lookup(PDFName.of('Annots'), PDFArray).push(r);
+  ctx.assign(popupRef, ctx.obj({ Type: 'Annot', Subtype: 'Popup', Rect: [400, 600, 550, 700], Parent: square }));
+  // Under the cover too, and still never flattened: an attachment (its file
+  // would become unreachable) and a sticky note (its comment would be gone).
+  const attach = withAp(ctx, 'FileAttachment', [120, 700, 136, 716], '1 1 0 rg', { F: 4 });
+  const note = withAp(ctx, 'Text', [140, 700, 156, 716], '0 1 1 rg', { F: 4, Contents: PDFLib.PDFString.of('cek lagi') });
+  // The same kind of stamp the cover would flatten, nowhere near the cover.
+  const far = withAp(ctx, 'Stamp', [400, 100, 450, 150], '1 0 1 rg', { F: 4 });
+  for (const r of [link, hidden, square, popupRef, attach, note, far]) p0.node.lookup(PDFName.of('Annots'), PDFArray).push(r);
   return src.save();
 }
+
+// An annotation whose appearance is one solid fill of `rg` over its whole Rect.
+function withAp(ctx, subtype, rect, rg, extra = {}) {
+  const [w, h] = [rect[2] - rect[0], rect[3] - rect[1]];
+  const ap = ctx.register(ctx.stream(`${rg} 0 0 ${w} ${h} re f`, { Type: 'XObject', Subtype: 'Form', BBox: [0, 0, w, h] }));
+  return ctx.register(ctx.obj({ Type: 'Annot', Subtype: subtype, Rect: rect, AP: { N: ap }, ...extra }));
+}
+
+// One page of `size` carrying the annotations `build(ctx)` returns, with an
+// optional crop; exported with `userObjects` on it in a page of `view`.
+async function exportOnePage({ size = PAGE, crop, view = size, rotation = 0, build, userObjects }) {
+  const src = await PDFLib.PDFDocument.create();
+  const p = src.addPage(size);
+  if (crop) p.setCropBox(...crop);
+  p.node.set(PDFName.of('Annots'), src.context.obj(build(src.context)));
+  const bytes = await src.save();
+  const doc = model.createDoc();
+  const source = ops.addSource(doc, model.createSource({ name: 'one.pdf', bytes, numPages: 1 }));
+  const page = model.createPage({ source, sourcePageNum: 0, width: view[0], height: view[1], rotation });
+  ops.addPages(doc, [page]);
+  for (const [type, props] of userObjects) ops.addAnnotation(doc, page.id, model.createAnnotation(type, props));
+  const out = await PDFLib.PDFDocument.load(await buildPdfBytes(doc, { PDFLib, fontkit }));
+  return out.getPages()[0];
+}
+const liveStamps = (page) => annotsOf(page).filter((a) => subtype(a) === 'Stamp')
+  .map((a) => numbers(a.lookup(PDFName.of('Rect'), PDFArray)).join(','));
 
 async function exportWithCoverOnPage0() {
   const bytes = await sourceBytes();
@@ -144,10 +180,83 @@ test('the edited page keeps its link, leaves a Hidden annotation, and takes a po
   const page = out.getPages()[0];
   const kinds = annotsOf(page).map(subtype);
   assert.ok(kinds.includes('Link'), `the link is interaction, not paint: ${kinds}`);
-  assert.ok(kinds.includes('Stamp'), `the Hidden stamp stays an annotation: ${kinds}`);
+  assert.ok(liveStamps(page).includes('200,690,240,720'), `the Hidden stamp stays an annotation: ${kinds}`);
   assert.ok(!contentOf(page).includes('0 0 1 rg'), 'a Hidden appearance was painted');
   assert.ok(!kinds.includes('Square') && !kinds.includes('Popup'), `the square and its window go together: ${kinds}`);
   assert.equal((contentOf(page).match(/ Do\b/g) || []).length, 2, 'the field and the square are both painted');
+});
+
+test('the edited page: only what lies under a user object is flattened, and never an attachment or a note', async () => {
+  const { out } = await exportWithCoverOnPage0();
+  const page = out.getPages()[0];
+  const kinds = annotsOf(page).map(subtype);
+  assert.ok(liveStamps(page).includes('400,100,450,150'), `a stamp far from the cover was flattened: ${kinds}`);
+  assert.ok(kinds.includes('FileAttachment'), `an attachment under the cover lost its file: ${kinds}`);
+  assert.ok(kinds.includes('Text'), `a sticky note under the cover lost its comment: ${kinds}`);
+  const content = contentOf(page);
+  for (const rg of ['1 0 1 rg', '1 1 0 rg', '0 1 1 rg']) {
+    assert.ok(!Object.values(xobjectsDrawn(page)).some((s) => s.includes(rg)), `${rg} was painted into the content:\n${content}`);
+  }
+});
+
+// The streams the page content draws with Do, by resource name.
+function xobjectsDrawn(page) {
+  const xo = page.node.Resources().lookup(PDFName.of('XObject'));
+  const out = {};
+  for (const [, name] of contentOf(page).matchAll(/\/(\S+) Do\b/g)) {
+    out[name] = streamText(xo.lookup(PDFName.of(name), PDFStream));
+  }
+  return out;
+}
+
+test('a turned page: the overlap is measured where the user drew, not in the unturned frame', async () => {
+  // Displayed 792 wide by 612 tall (turned 90). A Tip-Ex at view (10,10,50,50)
+  // lands at PDF x 10..60, y 10..60. Read without the turn it would be at
+  // y 732..782, which is where the decoy stamp sits.
+  const page = await exportOnePage({
+    view: [792, 612], rotation: 90,
+    build: (ctx) => [
+      withAp(ctx, 'Stamp', [15, 15, 55, 55], '0 1 0 rg', { F: 4 }),
+      withAp(ctx, 'Stamp', [15, 737, 55, 777], '1 0 1 rg', { F: 4 }),
+    ],
+    userObjects: [['whiteout', { x: 10, y: 10, width: 50, height: 50, color: '#ff0000' }]],
+  });
+  assert.deepEqual(liveStamps(page), ['15,737,55,777']);
+});
+
+test('a cropped page: the overlap is measured from the crop origin', async () => {
+  // Visible box x 100..512, y 100..692. A Tip-Ex at view (10,10,50,50) lands
+  // at PDF x 110..160, y 632..682; measured from (0,0) of the MediaBox it would
+  // be at x 10..60, y 732..782, where the decoy sits.
+  const page = await exportOnePage({
+    crop: [100, 100, 412, 592], view: [412, 592],
+    build: (ctx) => [
+      withAp(ctx, 'Stamp', [115, 640, 155, 675], '0 1 0 rg', { F: 4 }),
+      withAp(ctx, 'Stamp', [15, 740, 55, 775], '1 0 1 rg', { F: 4 }),
+    ],
+    userObjects: [['whiteout', { x: 10, y: 10, width: 50, height: 50, color: '#ff0000' }]],
+  });
+  assert.deepEqual(liveStamps(page), ['15,740,55,775']);
+});
+
+// A 1x1 PNG, enough for drawSignature to embed.
+const DOT = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
+test('Teks and TTD count as user objects, each over its own drawn extent', async () => {
+  // Text at view (100,70), 16pt, "BUDI BENAR": about PDF x 100..196,
+  // y 703..722. A signature at view (300,300,80,40): PDF x 300..380, y 452..492.
+  const page = await exportOnePage({
+    build: (ctx) => [
+      withAp(ctx, 'Stamp', [120, 705, 160, 715], '0 1 0 rg', { F: 4 }),
+      withAp(ctx, 'Stamp', [320, 460, 360, 480], '0 1 0 rg', { F: 4 }),
+      withAp(ctx, 'Stamp', [120, 600, 160, 640], '1 0 1 rg', { F: 4 }),
+    ],
+    userObjects: [
+      ['text', { text: 'BUDI BENAR', x: 100, y: 70, fontSize: 16, color: '#000000', fontFamily: 'Helvetica' }],
+      ['signature', { image: DOT, x: 300, y: 300, width: 80, height: 40 }],
+    ],
+  });
+  assert.deepEqual(liveStamps(page), ['120,600,160,640']);
 });
 
 test('known-positive: a page with no user objects keeps its field as a live annotation', async () => {
