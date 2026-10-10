@@ -115,6 +115,7 @@ test('a file dropped while the Unduh sheet is open is not merged behind it', asy
 test('KNOWN-POSITIVE: a file dropped on the open editor still merges', async ({ page }) => {
   await open(page);
   await dropPdf(page, ONE);
+  await page.click('#dc-add'); // a drop onto an open doc asks first (drop-choice.spec.js)
   await expect.poll(() => pageCount(page)).toBe(3);
 });
 
