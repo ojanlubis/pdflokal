@@ -54,7 +54,8 @@
 // first place. Writing this file the obvious way mangled it twice before it
 // was written this way. Numbers cannot be normalised.
 //
-// Each entry: a codepoint WinAnsi cannot encode -> what it already looks like.
+// Each entry: a codepoint WinAnsi cannot encode (one exception, NBSP, noted at
+// its row) -> what it already looks like.
 // tests/core/text-encode.test.mjs re-derives the throwing set from the REAL
 // vendored pdf-lib on every run, so this table cannot silently fall behind.
 const LOOKALIKES = new Map([
@@ -65,6 +66,10 @@ const LOOKALIKES = new Map([
   [0x2060, ''],  // WORD JOINER
   [0xfeff, ''],  // BYTE ORDER MARK         (pasted from a file)
   // Fixed-width and typographic spaces -> an ordinary space.
+  // NBSP is the one entry WinAnsi CAN encode. It is here anyway because its
+  // glyph has no contours, so line-font.js's glyphPaints judged it unwritable
+  // in every font and the editor refused a pasted "Rp 1.000" (Word, the web).
+  [0x00a0, ' '],  // NO-BREAK SPACE
   [0x2000, ' '], [0x2001, ' '], [0x2002, ' '], [0x2003, ' '], [0x2004, ' '],
   [0x2005, ' '], [0x2006, ' '], [0x2007, ' '], [0x2008, ' '],
   [0x2009, ' '],  // THIN SPACE             (currency formatting out of Word)
