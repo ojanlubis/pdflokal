@@ -91,11 +91,26 @@ const IMG_DIMS = { asli: null, sedang: 1500, kecil: 800 };
 // about whether it fits. "335 KB" answers the question they actually have.
 // DECIMAL, to match the presets: KB = 1000 bytes, MB = 1,000,000 (TARGETS above).
 // A 204,000-byte result must not read "199 KB" beside "belum masuk 200 KB".
+//
+// `side` is the cap the number is printed beside: 'under' floors (it fits, so the
+// number must not read above the cap), 'over' ceils (it missed, so the number must
+// not read at or below it). Nearest-rounding printed "2,0 MB" beside "belum masuk
+// 2 MB" for 2,040,000 B and "1000 KB" beside a 1 MB cap for 999,600 B. Without a
+// cap there is nothing to contradict, so it rounds to nearest.
 // Exported for tests/core/size-caps.test.mjs.
-export function fmtMB(bytes) {
-  const mb = bytes / 1_000_000;
-  if (mb < 1) return `${Math.max(1, Math.round(bytes / 1000))} KB`;
-  return `${formatDecimal(mb, 1)} MB`;
+export function fmtMB(bytes, side) {
+  const round = side === 'under' ? Math.floor : side === 'over' ? Math.ceil : Math.round;
+  const kb = round(bytes / 1000);
+  // 'over' can ceil to 1000 KB, which sits on the 1 MB boundary; MB reads cleaner.
+  if (bytes < 1_000_000 && kb < 1000) return `${Math.max(1, kb)} KB`;
+  return `${formatDecimal(round(bytes / 100_000) / 10, 1)} MB`;
+}
+
+// Which side of its cap a compress result sits on, so fmtMB rounds away from the
+// cap instead of onto it. No cap, no side.
+export function sizeSide(c) {
+  if (!c || !c.target) return undefined;
+  return c.reachedTarget ? 'under' : 'over';
 }
 
 // deps = {
@@ -418,7 +433,7 @@ export function createDownloadSheet(deps) {
       else if (state.compressed) {
         sub = state.compressed.unchanged
           ? tr('sheet.size.optimal')
-          : `${fmtMB(state.compressed.size)} · <span class="ds-hemat">${tr('sheet.size.saved', { pct: Math.round((1 - state.compressed.size / state.base.size) * 100) })}</span>`;
+          : `${fmtMB(state.compressed.size, sizeSide(state.compressed))} · <span class="ds-hemat">${tr('sheet.size.saved', { pct: Math.round((1 - state.compressed.size / state.base.size) * 100) })}</span>`;
       }
       mkBtn('kompres', tr('sheet.size.compress'), sub);
     } else {
@@ -484,18 +499,18 @@ export function createDownloadSheet(deps) {
     if (state.format === 'pdf') {
       const src = state.size === 'kompres' ? state.compressed : state.base;
       const busy = state.size === 'kompres' ? (state.compressing || state.building) : state.building;
-      main.innerHTML = `${tr('sheet.cta.pdf')}${halTxt}${busy ? ' · <span class="ds-spin ds-spin-lite"></span>' : (src ? ` · ${fmtMB(src.size)}` : '')}`;
+      main.innerHTML = `${tr('sheet.cta.pdf')}${halTxt}${busy ? ' · <span class="ds-spin ds-spin-lite"></span>' : (src ? ` · ${fmtMB(src.size, src === state.compressed ? sizeSide(src) : undefined)}` : '')}`;
       const c = state.compressed;
       if (state.size === 'kompres' && c && c.target && !c.reachedTarget) {
         // THE HONEST MISS. We could not get under the cap. Say so plainly and give
         // the user the one lever that actually works next (fewer pages) — never
         // imply the berkas will pass when it won't.
         const cap = TARGETS.find((t) => t.v === c.target)?.label ?? fmtMB(c.target);
-        sub.textContent = tr('sheet.sub.missed', { size: fmtMB(c.size), cap });
+        sub.textContent = tr('sheet.sub.missed', { size: fmtMB(c.size, sizeSide(c)), cap });
         sub.hidden = false;
       } else if (state.size === 'kompres' && c && c.target && c.reachedTarget) {
         const cap = TARGETS.find((t) => t.v === c.target)?.label ?? fmtMB(c.target);
-        sub.textContent = tr('sheet.sub.fits', { size: fmtMB(c.size), cap });
+        sub.textContent = tr('sheet.sub.fits', { size: fmtMB(c.size, sizeSide(c)), cap });
         sub.hidden = false;
       } else if (state.size === 'kompres' && c && !c.unchanged) {
         sub.textContent = tr('sheet.sub.saved', { pct: Math.round((1 - c.size / state.base.size) * 100), size: fmtMB(state.base.size) });

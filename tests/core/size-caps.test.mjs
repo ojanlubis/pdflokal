@@ -26,7 +26,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { TARGETS, fmtMB } from '../../js/v2/download-sheet.js';
+import { TARGETS, fmtMB, sizeSide } from '../../js/v2/download-sheet.js';
 import { compressToTargetBytes } from '../../js/core/compress.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -131,4 +131,43 @@ test('fmtMB is decimal: a result over a preset never displays at or under its la
     const label = fmtMB(t.v);
     assert.notEqual(over, label, `${t.label}: 4 KB over the cap must not display as the cap`);
   }
+});
+
+// THE SHOWN NUMBER NEVER SITS ON OR ACROSS THE CAP IT IS PRINTED BESIDE.
+// fmtMB rounds to nearest, so beside a cap "2,040,000 B" read "2,0 MB, belum masuk
+// 2 MB" (the number says it fits, the words say it does not) and 999,600 B read
+// "1000 KB" beside "muat di bawah 1 MB". The side comes from the compress result
+// (sizeSide), so the rounding direction is chosen by the same fact the words are.
+const shownBytes = (txt) => {
+  const m = /^([\d.]+(?:,\d+)?) (KB|MB)$/.exec(txt);
+  assert.ok(m, `unparseable size "${txt}"`);
+  return Number(m[1].replace(',', '.')) * (m[2] === 'KB' ? 1000 : 1_000_000);
+};
+
+test('size line: a missed result reads strictly above the cap, a fitting one at or under it', () => {
+  for (const t of PRESETS) {
+    const missed = sizeSide({ target: t.v, reachedTarget: false });
+    const fits = sizeSide({ target: t.v, reachedTarget: true });
+    assert.equal(missed, 'over');
+    assert.equal(fits, 'under');
+    let n = 0;
+    for (let b = t.v - 40_000; b <= t.v + 40_000; b += 37) {
+      if (b <= 0) continue;
+      n++;
+      if (b > t.v) assert.ok(shownBytes(fmtMB(b, missed)) > t.v, `${t.label}: ${b} B missed the cap but reads "${fmtMB(b, missed)}"`);
+      else assert.ok(shownBytes(fmtMB(b, fits)) <= t.v, `${t.label}: ${b} B fits but reads "${fmtMB(b, fits)}"`);
+    }
+    assert.ok(n > 1000, 'vacuity guard: the sweep ran');
+  }
+  // the two reported cases, by name
+  assert.equal(fmtMB(2_040_000, 'over'), '2,1 MB');
+  assert.equal(fmtMB(999_600, 'under'), '999 KB');
+  assert.equal(fmtMB(999_600, 'over'), '1,0 MB'); // never "1000 KB"
+});
+
+test('size line: no cap, no side; rounding to nearest is unchanged', () => {
+  assert.equal(sizeSide(null), undefined);
+  assert.equal(sizeSide({ target: null, reachedTarget: true }), undefined);
+  assert.equal(fmtMB(2_040_000), '2,0 MB');
+  assert.equal(fmtMB(999_600), '1,0 MB'); // not '1000 KB'
 });
