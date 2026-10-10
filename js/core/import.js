@@ -15,6 +15,7 @@ import { createSource, createPage, getSource } from './model.js';
 import { addSource, addPages } from './operations.js';
 import { ensurePdfJs } from './vendor.js';
 import { editSignature } from './page-surgery.js';
+import { totalPageRotation } from './page-rotation.js';
 import { rasterKey } from './raster-key.js';
 import { pageHasVisibleText } from './text-visibility.js';
 import { failureReason } from './failure-reason.js';
@@ -452,17 +453,15 @@ export function createPageRasterizer(doc, opts = {}) {
     // page, so the arithmetic is a no-op there.
     const norm = page.baseWidth > 0 ? page.width / page.baseWidth : 1;
     const px = scale * norm;
-    // Edited docs are a single already-baked page — buildEditedPageBytes sets
-    // its /Rotate exactly the way buildPdfBytes does (see page-surgery.js),
-    // so its OWN metadata is authoritative and pdf.js should just read it —
-    // no explicit override, unlike the plain path below. This is also
-    // exactly what a downloaded PDF would render as, so the editor's live
-    // raster and the final export stay pixel-consistent by construction.
-    // Plain path: intrinsic /Rotate + the user's rotation (PDF.js
-    // `rotation:` is absolute, not additive over the intrinsic value).
-    const vp = editedDoc
-      ? pdfPage.getViewport({ scale: px })
-      : pdfPage.getViewport({ scale: px, rotation: ((page.baseRotation || 0) + (page.rotation || 0)) % 360 });
+    // ONE rotation for both paths: intrinsic /Rotate + the user's rotation
+    // (PDF.js `rotation:` is absolute, not additive over the intrinsic value).
+    // WHY the edited doc gets the override too: it is cached by editSignature,
+    // which deliberately ignores rotation, so after a rotate the cache still
+    // holds bytes baked with the OLD /Rotate. Reading their own metadata showed
+    // an edited page in its old orientation, stretched into the rotated slot,
+    // while the export was right. Surgery works in unrotated page space, so the
+    // baked content is the same at any rotation; only the view turns.
+    const vp = pdfPage.getViewport({ scale: px, rotation: totalPageRotation(page) });
     const canvas = document.createElement('canvas');
     canvas.width = Math.ceil(vp.width);
     canvas.height = Math.ceil(vp.height);
