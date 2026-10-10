@@ -20,6 +20,7 @@ import { rasterKey } from './raster-key.js';
 import { pageHasVisibleText } from './text-visibility.js';
 import { failureReason } from './failure-reason.js';
 import { sniffImageFormat } from './image-format.js';
+import { stripJpegMetadata } from './jpeg-metadata.js';
 
 // bytes → append a Source + its Pages (metadata only) to `doc`. Returns the pages.
 // SINGLE SOURCE OF TRUTH for "this PDF is password/permissions protected".
@@ -298,7 +299,10 @@ const TRANSCODE_MAX_PIXELS = 16_777_216;
 // not only in the preview. JPEG, not PNG, for the second case: a 12-megapixel
 // photo as PNG is tens of megabytes, and the source was lossy already.
 // Re-encoding also drops the EXIF block (camera model, timestamps, GPS), which
-// the file never needed to carry.
+// the file never needed to carry. An UPRIGHT JPEG is stored without a
+// re-encode but not untouched: its metadata segments and any Motion Photo
+// video after EOI are cut losslessly (core/jpeg-metadata.js), because export
+// embeds these bytes verbatim into the user's PDF.
 //
 // CAPPED at TRANSCODE_MAX_PIXELS: an iPhone "HEIF Max" photo is 48.8 MP, so
 // the full-size canvas got no context and the import was refused as
@@ -307,6 +311,7 @@ const TRANSCODE_MAX_PIXELS = 16_777_216;
 async function storableImageBytes(bytes, bitmap, width, height) {
   const format = sniffImageFormat(bytes);
   const turned = format === 'jpg' && jpegExifOrientation(bytes) !== 1;
+  if (format === 'jpg' && !turned) return stripJpegMetadata(bytes);
   if (format && !turned) return bytes;
   const k = Math.min(1, Math.sqrt(TRANSCODE_MAX_PIXELS / (width * height)));
   const canvas = document.createElement('canvas');
