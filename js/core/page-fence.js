@@ -203,6 +203,29 @@ export function fenceUnkeptPages(srcDoc, keptNums, tag, PDFLib) {
 
   const kept = [...keptNums].filter((n) => pages[n]).map((n) => pages[n]);
 
+  // Annotations that live on a page that was not kept. One annotation can
+  // point at another (a reply's /IRT, a /Popup, a popup's /Parent, chains of
+  // them), and the copier would follow that into a removed page's note and
+  // ship its text. Classified now, before step 3 nulls the /P that tells.
+  // An annotation also listed on a kept page is on a kept page.
+  const onKeptPage = new Set();
+  const onUnkeptPage = new Set();
+  pages.forEach((page, i) => {
+    const into = keptNums.has(i) ? onKeptPage : onUnkeptPage;
+    for (const raw of annotsOf(PDFLib, context, page.node)?.asArray() || []) {
+      if (raw instanceof PDFRef) into.add(raw.toString());
+    }
+  });
+  // Listed on no kept page, and either listed on an unkept one or naming one
+  // as its page (/P): an annotation listed nowhere is placed only by its /P.
+  const offKeptPages = (ref) => {
+    const key = ref.toString();
+    if (onKeptPage.has(key)) return false;
+    if (onUnkeptPage.has(key)) return true;
+    const target = context.lookup(ref);
+    return target instanceof PDFDict && unkept(target.get(PDFName.of('P')));
+  };
+
   // 1. Links to a page that was not kept go, rather than shipping pointing
   //    at nothing.
   const keptAnnots = new Set();
@@ -240,8 +263,11 @@ export function fenceUnkeptPages(srcDoc, keptNums, tag, PDFLib) {
   }
 
   // 3. Every remaining page reference reachable from a kept page: a kept page
-  //    becomes its placeholder, anything else null. Inherited /Resources are
-  //    walked too: copyPages copies them onto the page it writes.
+  //    becomes its placeholder, anything else null, and so does a reference
+  //    to an annotation that lives off the kept pages (cut on the kept side,
+  //    so the walk never enters it and a chain stops at its first hop).
+  //    Inherited /Resources are walked too: copyPages copies them onto the
+  //    page it writes.
   let placed = false;
   const roots = kept.map((p) => p.node);
   for (const page of kept) {
@@ -255,7 +281,7 @@ export function fenceUnkeptPages(srcDoc, keptNums, tag, PDFLib) {
       placed = true;
       return pagePlaceholder(PDFLib, tag, i);
     }
-    return unkept(value) ? PDFNull : undefined;
+    return unkept(value) || offKeptPages(value) ? PDFNull : undefined;
   });
   return placed;
 }
