@@ -11,7 +11,7 @@
  */
 
 import { getPage, findAnnotation, getSource, cloneForPaste, createAnnotation } from './model.js';
-import { scaleAnnotationGeometry, turnAnnotation, withBlockFollowing } from './annotation-geometry.js';
+import { scaleAnnotationGeometry, turnAnnotation, withBlockFollowing, displayedBox } from './annotation-geometry.js';
 import { normaliseEnteredText } from './text-encode.js';
 
 const clamp = (n, lo, hi) => Math.min(Math.max(n, lo), hi);
@@ -142,7 +142,9 @@ export function reorderPage(doc, pageId, toIndex) {
 // page's DISPLAYED frame (core/annotation-geometry.js), so turning only
 // `rotation` left a signature at y=700 on an A4 page that is now 595 tall: off
 // the page on screen and in the file. The whole turn is ONE mapping
-// (core/annotation-geometry.js turnAnnotation), clamped once at the end.
+// (core/annotation-geometry.js turnAnnotation). Since 2026-10-11 (founder
+// ruling, "semua harus ngikut rotasi") every object turns with the page, text
+// and signatures included, so the mapping is rigid and needs no clamp.
 export function rotatePage(doc, pageId, deltaDeg = 90) {
   const pg = getPage(doc, pageId);
   if (!pg) return null;
@@ -196,7 +198,8 @@ export function pagesMissingSignature(doc, annotationId) {
   // button stays on screen, and a second tap must not stack a twin that makes
   // Hapus look broken. "Already there" = same image, same box.
   const alreadyThere = (a) => a.type === 'signature' && a.image === src.image
-    && a.x === src.x && a.y === src.y && a.width === src.width && a.height === src.height;
+    && a.x === src.x && a.y === src.y && a.width === src.width && a.height === src.height
+    && (a.turn || 0) === (src.turn || 0);
   return doc.pages.filter((pg) => pg.id !== found.page.id && !pg.annotations.some(alreadyThere));
 }
 
@@ -208,8 +211,11 @@ export function copySignatureToAllPages(doc, annotationId) {
   for (const pg of pagesMissingSignature(doc, annotationId)) {
     // Same position on every page; each copy is its OWN object (new id) so it
     // moves/deletes independently afterwards.
+    // A turned source (its page was turned) stamps the same box the same way
+    // round: "same position" is what the user sees, not the upright image.
     added.push(addAnnotation(doc, pg.id, createAnnotation('signature', {
       image: src.image, x: src.x, y: src.y, width: src.width, height: src.height,
+      ...(src.turn ? { turn: src.turn } : {}),
     })));
   }
   return added;
@@ -247,12 +253,17 @@ export function moveAnnotation(doc, annotationId, dx, dy) {
   const rotated = (page.rotation || 0) % 180 !== 0;
   const frameW = rotated ? page.height : page.width;
   const frameH = rotated ? page.width : page.height;
-  const w = annotation.width || 0;
-  const h = annotation.height || 0;
+  // The box the SCREEN shows (core/annotation-geometry.js displayedBox): a
+  // turned object's own width/height trade axes and its origin is no longer
+  // its top-left. Stored sizes only, as before: text (no stored size) clamps
+  // its origin, exactly as it did unturned.
+  const box = displayedBox(annotation, { w: annotation.width || 0, h: annotation.height || 0 });
+  const bx = clamp(box.x + dx, 0, Math.max(0, frameW - box.w));
+  const by = clamp(box.y + dy, 0, Math.max(0, frameH - box.h));
   const moved = withBlockFollowing({
     ...annotation,
-    x: clamp((annotation.x || 0) + dx, 0, Math.max(0, frameW - w)),
-    y: clamp((annotation.y || 0) + dy, 0, Math.max(0, frameH - h)),
+    x: (annotation.x || 0) + (bx - box.x),
+    y: (annotation.y || 0) + (by - box.y),
   }, annotation);
   // In place: the drag holds this object and reads its x/y back.
   annotation.x = moved.x;
