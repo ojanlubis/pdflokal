@@ -54,3 +54,33 @@ test('app.js wraps the Halaman onExtract in singleFlight', () => {
   const src = fs.readFileSync(path.join(ROOT, 'js/v2/app.js'), 'utf8');
   assert.match(src, /onExtract: singleFlight\(async \(pages\) => \{/);
 });
+
+// ---- EXCLUDE 4: the rail event is "the tap", so it fires on EVERY tap ----------
+test('onCall fires on every call, including one the guard drops', async () => {
+  let taps = 0; let runs = 0; let release;
+  const gate = new Promise((r) => { release = r; });
+  const fn = singleFlight(async () => { runs++; await gate; }, { onCall: () => { taps++; } });
+  const first = fn(); const second = fn();
+  assert.equal(taps, 2, 'both taps are counted');
+  assert.equal(runs, 1, 'only one export runs');
+  release(); await first; await second;
+});
+
+test('onCall receives the arguments and a throwing onCall never blocks the run', async () => {
+  let seen; let runs = 0;
+  const fn = singleFlight(async () => { runs++; }, { onCall: (a) => { seen = a; throw new Error('tel'); } });
+  await fn(['p1']);
+  assert.deepEqual(seen, ['p1']);
+  assert.equal(runs, 1);
+});
+
+test('app.js: tool_use/halaman/extract is the guard\'s onCall, not inside the guarded body', () => {
+  const src = fs.readFileSync(path.join(ROOT, 'js/v2/app.js'), 'utf8');
+  const start = src.indexOf('onExtract: singleFlight(');
+  const end = src.indexOf('\n  toast,\n});', start);
+  const block = src.slice(start, end);
+  assert.match(block, /onCall:\s*\(\)\s*=>\s*tel\('tool_use', \{ tool: 'halaman', action: 'extract' \}\)/);
+  assert.equal(block.match(/action: 'extract'/g).length, 1, 'exactly one extract tap event');
+  const body = block.slice(0, block.indexOf('onCall:'));
+  assert.doesNotMatch(body, /action: 'extract'/, 'must not sit inside the guarded body');
+});

@@ -1886,12 +1886,6 @@ const pageManager = createPageManager({
   onDocChanged: () => { textRuns.invalidateAll(); ocrIndex.invalidateAll(); rebuildStage(); },
   onAddFiles: () => pickFiles(),
   onExtract: singleFlight(async (pages) => {
-    // The tap, on the rail (2026-10-02). Split/Ekstrak was invisible to it: GA4's
-    // editor_action/split is the only other trace and GA4 is ad-blocked wholesale
-    // for a large share of users. Fired here, not in page-manager.js, which has no
-    // tel import and whose only job is the selection. An intent-side action like
-    // 'arm' — it is deliberately NOT in COMMIT_ACTIONS (nothing was edited).
-    tel('tool_use', { tool: 'halaman', action: 'extract' });
     const t0 = performance.now(); // extract_export.duration — tap to bytes-in-hand
     // Export ONLY the selected pages: a shallow Doc sharing the same sources.
     try {
@@ -1923,6 +1917,15 @@ const pageManager = createPageManager({
       console.error(err);
       toast(tr('toast.extractFailed'));
     }
+  }, {
+    // The tap, on the rail (2026-10-02). Split/Ekstrak was invisible to it: GA4's
+    // editor_action/split is the only other trace and GA4 is ad-blocked wholesale
+    // for a large share of users. Fired here, not in page-manager.js, which has no
+    // tel import and whose only job is the selection. An intent-side action like
+    // 'arm' — it is deliberately NOT in COMMIT_ACTIONS (nothing was edited).
+    // onCall = EVERY tap, including one the in-flight guard drops: the field
+    // means "the tap", and a narrower meaning would be EXCLUDE 4.
+    onCall: () => tel('tool_use', { tool: 'halaman', action: 'extract' }),
   }),
   toast,
 });
