@@ -275,17 +275,11 @@ test('COVERAGE: only the pure classifier may read err.message, and it cannot tra
 // EVERY FILE, NOT A LIST (2026-10-10). This scanned app.js and
 // download-sheet.js only, so js/v2/bake-failure.js's tel('failure', …) was
 // never read: `reason: 'unknown'` there stayed green.
-//
-// ⚠️ NEEDS A SEAT RULING — one expression is exempt, by exact text, not by
-// file. bake-failure.js sends `reason === 'unsupported' ? 'unknown' : reason`
-// (reason = failureReason(err)): it REWRITES a classified 'unsupported' into a
-// hard-coded 'unknown', the very literal this test exists to refuse. It is
-// tolerated here only because changing production code is not a test's call.
-// Anything else in that file, including a bare 'unknown', still fails.
-const RULING_PENDING = { 'v2/bake-failure.js': "reason === 'unsupported' ? 'unknown' : reason" };
+// (The one exemption that stood here, bake-failure.js rewriting a classified
+// 'unsupported' into a literal 'unknown', ended with the founder ruling of
+// 2026-10-11: the classifier's answer is now sent as is.)
 test('COVERAGE: no failure report hard-codes its reason', () => {
   const seen = new Set();
-  const pendingMatched = new Set();
   for (const relPath of sourceFiles(JS).map((f) => path.relative(JS, f).split(path.sep).join('/'))) {
     const rel = relPath.split('/');
     const src = strip(fs.readFileSync(path.join(JS, ...rel), 'utf8'));
@@ -362,15 +356,8 @@ test('COVERAGE: no failure report hard-codes its reason', () => {
       // every addition is a place the rail can start asserting without knowing.
       const DETERMINED = ["'encrypted'", "'unsupported'", "'font-fallback'"];
       const documentFact = DETERMINED.includes(expr);
-      const pending = RULING_PENDING[relPath] === expr;
-      if (pending) {
-        // The exemption leans on `reason` being the classifier's output.
-        assert.match(src, /\bconst\s+reason\s*=\s*failureReason\(err\);/,
-          `js/${relPath}'s ruling-pending expression no longer maps a failureReason(err) result`);
-        pendingMatched.add(relPath);
-      }
       assert.ok(
-        classified || documentFact || pending,
+        classified || documentFact,
         `hard-coded failure reason in js/${rel.join('/')} → reason: ${expr.slice(0, 60)}\n`
         + 'A literal here is indistinguishable from a real classification once it is on the rail — '
         + 'that is exactly how 41 real export failures all reported "unknown" on 2026-07-28. '
@@ -382,9 +369,5 @@ test('COVERAGE: no failure report hard-codes its reason', () => {
   // or "no hard-coded reason found" is a scan that found nothing.
   for (const rel of ['v2/app.js', 'v2/download-sheet.js', 'v2/bake-failure.js']) {
     assert.ok(seen.has(rel), `no failure reports found in js/${rel} — the scan broke`);
-  }
-  // The exemption must still be needed: once the ruling lands, delete it.
-  for (const rel of Object.keys(RULING_PENDING)) {
-    assert.ok(pendingMatched.has(rel), `js/${rel} no longer sends the ruling-pending expression — delete its exemption`);
   }
 });

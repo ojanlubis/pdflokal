@@ -27,6 +27,7 @@
  * (Decision 2).
  */
 import { orderedForPaint, annotationZIndex } from '../core/annotation-order.js';
+import { turnOf } from '../core/annotation-geometry.js';
 import { t as tr } from '../lib/i18n.js';
 
 // SINGLE SOURCE OF TRUTH for a page's displayed size, in page-space px. It
@@ -311,6 +312,29 @@ export function measureTextAnnoWidth(anno) {
   return measureCtx.measureText(anno.text).width;
 }
 
+// A TURNED OBJECT on screen (founder ruling 2026-10-11, "semua harus ngikut
+// rotasi"): text and signatures carry `turn`, the quarter turns their page
+// made under them, and x/y is their ORIGIN (core/annotation-geometry.js
+// turnAnnotation). Drawn as a CSS rotate about that origin, which is the same
+// clockwise matrix the model and the file use (turnVector; export.js
+// objectPoint), so screen and download agree. `origin` is where x/y sits
+// inside the element: '10px 10px' for a plain text overlay (its padding ring),
+// '0 0' for everything else. The browser hit-tests the rotated box, so
+// selection, drag and delete need nothing more. data-turn is for the specs.
+// Exported: the inline editor (js/v2/app.js openTextEditor) opens turned too.
+export function applyTurn(el, anno, origin = '0 0') {
+  const turn = turnOf(anno);
+  if (!turn) {
+    el.style.transform = '';
+    el.style.transformOrigin = '';
+    delete el.dataset.turn;
+    return;
+  }
+  el.style.transformOrigin = origin;
+  el.style.transform = `rotate(${turn}deg)`;
+  el.dataset.turn = String(turn);
+}
+
 // One annotation as a positioned DOM element (page-space px).
 export function renderAnnotationEl(anno) {
   const el = document.createElement('div');
@@ -325,6 +349,7 @@ export function renderAnnotationEl(anno) {
   if (anno.type === 'text' && anno.block && Array.isArray(anno.block.lines)) {
     el.style.color = anno.color || '#000';
     renderBlockRows(el, anno);
+    applyTurn(el, anno);
   } else if (anno.type === 'text') {
     el.textContent = anno.text || '';
     applyTextFont(el, anno);
@@ -336,6 +361,7 @@ export function renderAnnotationEl(anno) {
     // negative margin cancels the layout shift. (≥44px rule, product def §6.5.)
     el.style.padding = '10px';
     el.style.margin = '-10px';
+    applyTurn(el, anno, '10px 10px');
   } else if (anno.type === 'whiteout') {
     el.style.width = (anno.width || 0) + 'px';
     el.style.height = (anno.height || 0) + 'px';
@@ -350,6 +376,7 @@ export function renderAnnotationEl(anno) {
     im.draggable = false;
     im.style.cssText = `display:block;width:${anno.width || 150}px;height:auto;pointer-events:none;user-select:none`;
     el.appendChild(im);
+    applyTurn(el, anno);
   } else if (anno.type === 'watermark') {
     el.textContent = anno.text || '';
     el.style.font = `700 ${anno.fontSize || 48}px Helvetica, Arial, sans-serif`;

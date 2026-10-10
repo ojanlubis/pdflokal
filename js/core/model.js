@@ -71,11 +71,14 @@ export function createAnnotation(type, props = {}) {
 //                replaceTargets/replaceBox/ocrBox/paperImage) IS the binding.
 //   - signature: image (an immutable data-URL string, shared by reference as
 //                history snapshots and "Semua Hal." already do) + geometry.
+//   - `turn` (text, signature): the quarter turn a page turn gave the object
+//                (core/annotation-geometry.js turnAnnotation). A paste reads
+//                the way its source does on screen.
 //   - anything else (watermark/pageNumber are unreachable from v2): not copyable.
 const COPY_FIELDS = {
-  text: ['text', 'x', 'y', 'fontSize', 'fontFamily', 'bold', 'italic', 'color'],
+  text: ['text', 'x', 'y', 'turn', 'fontSize', 'fontFamily', 'bold', 'italic', 'color'],
   whiteout: ['x', 'y', 'width', 'height', 'color'],
-  signature: ['image', 'x', 'y', 'width', 'height'],
+  signature: ['image', 'x', 'y', 'turn', 'width', 'height'],
 };
 const DOC_BOUND_COVER = ['replaceTargets', 'replaceBox', 'ocrBox', 'paperImage'];
 

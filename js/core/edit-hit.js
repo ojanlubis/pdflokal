@@ -13,6 +13,7 @@
 import { pageEdits } from './page-surgery.js';
 import { blockExtent } from './block-edit.js';
 import { resolveTap } from './text-lines.js';
+import { displayedRect } from './annotation-geometry.js';
 
 // spec-live-surgery.md §5 Decision 3 (increment 4 — re-edit): does `x, y`
 // land inside a committed edit's OWN box? Scoped to page.annotations (the
@@ -38,7 +39,11 @@ export function hitTestEditedLine(page, x, y, { measure, minHit }) {
     // leading per painted line — not as one long line of its whole text.
     const blk = edit.replacement?.block;
     if (blk && Array.isArray(blk.lines)) {
-      const e = blockExtent(blk, edit.replacement.y);
+      // A turned page turned the paragraph about its origin (turnAnnotation):
+      // the extent is an own-frame rect, shown turned (displayedRect).
+      const r0 = edit.replacement;
+      const own = blockExtent(blk, r0.y);
+      const e = displayedRect(r0, own.x - (r0.x || 0), own.y - (r0.y || 0), own.w, own.h);
       const x0 = Math.min(b.x, e.x);
       const y0 = Math.min(b.y, e.y);
       return { x: x0, y: y0, w: Math.max(b.x + b.w, e.x + e.w) - x0, h: Math.max(b.y + b.h, e.y + e.h) - y0, edit };
@@ -63,12 +68,13 @@ export function hitTestEditedLine(page, x, y, { measure, minHit }) {
     const painted = measure(edit.replacement);
     if (!painted) return { x: b.x, y: b.y, w: b.w, h: b.h, edit };
     const r = edit.replacement;
-    // 1.2 is renderAnnotationEl's own line-height for a text annotation.
-    const rh = (r.fontSize || 24) * 1.2;
-    const x0 = Math.min(b.x, r.x);
-    const y0 = Math.min(b.y, r.y);
-    const x1 = Math.max(b.x + b.w, r.x + painted);
-    const y1 = Math.max(b.y + b.h, r.y + rh);
+    // 1.2 is renderAnnotationEl's own line-height for a text annotation. A
+    // turned replacement paints that extent turned about its origin.
+    const p = displayedRect(r, 0, 0, painted, (r.fontSize || 24) * 1.2);
+    const x0 = Math.min(b.x, p.x);
+    const y0 = Math.min(b.y, p.y);
+    const x1 = Math.max(b.x + b.w, p.x + p.w);
+    const y1 = Math.max(b.y + b.h, p.y + p.h);
     return { x: x0, y: y0, w: x1 - x0, h: y1 - y0, edit };
   });
   const hit = resolveTap(boxes, x, y, minHit);

@@ -22,6 +22,7 @@ import { selectAnnotation, clearSelection, moveAnnotation, resizeAnnotation, upd
 import { record } from '../core/history.js';
 import { decorateSelected, undecorateSelected } from './page-view.js';
 import { annotationZIndex } from '../core/annotation-order.js';
+import { ownDelta } from '../core/annotation-geometry.js';
 
 const TAP_SLOP = 12; // px of finger movement beyond which a press is not a tap
 
@@ -348,15 +349,20 @@ export function createInteraction(ctx) {
         if (ctx.history) record(ctx.history, doc);
       }
       if (!gesture.moved) return;
+      // The handle sits on the object's OWN bottom-right corner, which a page
+      // turn moved (render/page-view.js applyTurn): read the drag in the
+      // object's own frame, or dragging a turned signature's handle outward
+      // shrinks it. Unturned this is (dx, dy) unchanged.
+      const own = ownDelta(gesture.anno, dx, dy);
       if (gesture.anno.type === 'text') {
         // Text resize = fontSize scaling (no width/height on text annos).
-        const factor = Math.max(0.2, (gesture.baseElW + dx) / gesture.baseElW);
+        const factor = Math.max(0.2, (gesture.baseElW + own.x) / gesture.baseElW);
         const fontSize = Math.min(120, Math.max(1, Math.round(gesture.baseFontSize * factor)));
         updateAnnotation(doc, gesture.anno.id, { fontSize });
         gesture.annoEl.style.fontSize = fontSize + 'px'; // longhand beats the shorthand
       } else {
-        const w = gesture.baseW + dx;
-        const h = gesture.aspect ? w / gesture.aspect : gesture.baseH + dy;
+        const w = gesture.baseW + own.x;
+        const h = gesture.aspect ? w / gesture.aspect : gesture.baseH + own.y;
         const a = resizeAnnotation(doc, gesture.anno.id, { width: w, height: h });
         if (a) {
           gesture.annoEl.style.width = a.width + 'px';

@@ -3,7 +3,7 @@
  * ============================================================================
  * Rung D: a whole-paragraph edit whose surgery or stamp declined stays an
  * overlay (render/page-view.js renderBlockRows), placed at the annotation's
- * x/y, painted at its fontSize, upright on a turned page. The user can still
+ * x/y, painted at its fontSize, and since 2026-10-11 turned with its page. The user can still
  * drag it, resize it, or turn the page under it. The file used to draw it at
  * the block's BIRTH spot in source PDF units (block.origin, block.size, no
  * rotate), so all three were lost on download.
@@ -125,11 +125,26 @@ test('4. resized: the file draws the block at the size the overlay paints', asyn
   near(got.x, anno.x, 'resized x');
 });
 
-test('5. page turned: the block follows its spot and reads upright, like plain text does', async () => {
+test('5. page turned: the block turns with the page like ink (founder ruling 2026-10-11)', async () => {
+  // Ink stays, paper turns: the raw glyph matrix is the one the unturned page
+  // wrote; only /Rotate differs. Until 2026-10-11 the block was re-uprighted.
+  const raw = async (bytes) => {
+    const pj = await pdfjs.getDocument({ data: bytes, disableFontFace: true, isEvalSupported: false, verbosity: 0 }).promise;
+    const tc = await (await pj.getPage(1)).getTextContent();
+    return tc.items.find((i) => i.str.startsWith('Paragraf')).transform;
+  };
+  const flat = await raw(await buildPdfBytes(declinedBlockDoc(await blankA4()).doc, { PDFLib, fontkit }));
   const { doc, page, anno } = declinedBlockDoc(await blankA4());
   rotatePage(doc, page.id, 90);
   const turned = page.annotations.find((a) => a.id === anno.id);
-  const got = await firstLineOnScreen(await buildPdfBytes(doc, { PDFLib, fontkit }));
-  assertBaselineAtModel(got, turned, 'turned 90');
+  assert.equal(turned.turn, 90, 'VACUITY GUARD: the model carries the turn');
+  const bytes = await buildPdfBytes(doc, { PDFLib, fontkit });
+  (await raw(bytes.slice())).forEach((v, i) => near(v, flat[i], `raw matrix [${i}]`)); // a copy: pdf.js detaches what it reads
+  // On screen: the baseline offset (0, 12) below the origin, turned a
+  // clockwise quarter, is 12 to the LEFT of it, and the line reads downward.
+  const got = await firstLineOnScreen(bytes);
+  near(got.x, turned.x - BASELINE_BELOW_TOP, 'turned 90, x');
+  near(got.y, turned.y, 'turned 90, y');
   near(got.size, 12, 'turned size');
+  assert.ok(Math.abs(got.dir[0]) < 1e-6 && got.dir[1] > 0, `reads down the page, direction ${got.dir}`);
 });
