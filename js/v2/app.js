@@ -883,8 +883,27 @@ function rebuildStage() {
 }
 
 // Re-render one page's overlay after a structural annotation change.
+// WHY deferred while an editor is open on the page (found 2026-10-10): every
+// bake ends in syncPage (Hapus's bakeAfterEditChange, Edit's commit), and
+// syncOverlay empties the overlay, the open inline editor included. Hapus a
+// line, tap Edit on the next one before the bake lands, and the editor vanished
+// mid-word: the typed text was lost and the following keystrokes hit the tool
+// keys (an "s" opened the signature sheet). The page re-syncs the moment that
+// editor closes (flushDeferredSync, from commit()).
+const deferredSync = new Set();
+function flushDeferredSync() {
+  const ids = [...deferredSync];
+  deferredSync.clear();
+  for (const id of ids) syncPage(id);
+}
+
 function syncPage(pageId) {
   const slot = slots.find((s) => s.page.id === pageId);
+  if (editingEl && slot?.view.contains(editingEl)) {
+    deferredSync.add(pageId);
+    refreshChrome();
+    return;
+  }
   // syncOverlay does overlay.innerHTML = '' — that would silently detach
   // gantiGlowEl if it happened to be riding THIS page's overlay; drop the
   // reference rather than leave it dangling (see rebuildStage).
@@ -2523,6 +2542,9 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
     editingAnno = null;
     editingEl = null;
     editingIsReplace = false;
+    // After the rest of this commit has run: a sync deferred while the editor
+    // was open (see syncPage) catches up now.
+    if (deferredSync.size) Promise.resolve().then(flushDeferredSync);
     // spec-live-surgery.md §5/§8.3 (increment 3): did THIS commit create,
     // re-type, or clear a Ganti edit's cover/text (an annotation carrying
     // replaceCoverId, or the cover it points at)? Gates the re-bake below —
