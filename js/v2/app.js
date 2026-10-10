@@ -28,6 +28,7 @@ import {
 import { createHistory, record, undo, redo, canUndo, canRedo, markClean, markChanged, settle, isDirty } from '../core/history.js';
 import { setLeaveGuard } from './leave-guard.js';
 import { rasterFitsShape } from '../core/raster-key.js';
+import { baseNameOf } from '../core/file-kind.js';
 import { importPdf, importImage, createPageRasterizer, probeTextLayer, pdfLibLoadError } from '../core/import.js';
 import {
   pagesBucket, durationBucket, intentValue,
@@ -2968,7 +2969,7 @@ async function loadFilesInner(files) {
   const { usable } = verdict;
   const pagesBefore = doc.pages.length;
   const firstLoad = pagesBefore === 0;
-  if (firstLoad) baseName = usable[0].name.replace(/\.[^.]+$/, '');
+  if (firstLoad) baseName = baseNameOf(usable[0].name);
 
   // Telegraph the parse loop. Note the >20MB heads-up toast is gone: it fired
   // here but sat hidden BEHIND this overlay (z-order), and the overlay itself
