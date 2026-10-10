@@ -662,6 +662,23 @@ function meetsAny(annot, rects, PDFLib) {
   return rects.some(([x0, y0, x1, y1]) => ax0 < x1 && x0 < ax1 && ay0 < y1 && y0 < ay1);
 }
 
+// The annotation's own opacity as [stroke, fill], or null when it is opaque.
+// A reader applies a live annotation's /CA to its appearance; drawn bare, a
+// translucent highlight would turn opaque and hide the text under it. PDF 1.x
+// /CA covers both; PDF 2.0's /ca, when present, is the fill's own. (pdf.js
+// 3.11 ignores both on screen, so this follows Acrobat and Preview, not the
+// raster.)
+function annotationOpacity(annot, PDFLib) {
+  const { PDFName, PDFNumber } = PDFLib;
+  const num = (key) => {
+    const v = annot.lookup(PDFName.of(key));
+    return v instanceof PDFNumber && Number.isFinite(v.asNumber()) ? Math.min(Math.max(v.asNumber(), 0), 1) : null;
+  };
+  const stroke = num('CA') ?? 1;
+  const fill = num('ca') ?? stroke;
+  return stroke < 1 || fill < 1 ? [stroke, fill] : null;
+}
+
 // In /Annots order, the order a reader (and pdf.js) paints them. `rects`:
 // userObjectRects for the objects about to be drawn on this page.
 function flattenPaintedAnnotations(pdfPage, PDFLib, rects) {
@@ -677,8 +694,11 @@ function flattenPaintedAnnotations(pdfPage, PDFLib, rects) {
     const fit = ref && appearanceFit(annot, ctx.lookup(ref), PDFLib);
     if (!fit || !asFormXObject(ctx.lookup(ref), PDFLib)) continue;
     const name = pdfPage.node.newXObject('FlatAnnot', ref);
+    const alpha = annotationOpacity(annot, PDFLib);
+    const gs = alpha && pdfPage.node.newExtGState('FlatAnnotGS', ctx.obj({ Type: 'ExtGState', CA: alpha[0], ca: alpha[1] }));
     pdfPage.pushOperators(
       PDFLib.pushGraphicsState(),
+      ...(gs ? [PDFLib.setGraphicsState(gs)] : []),
       PDFLib.concatTransformationMatrix(...fit),
       PDFLib.drawObject(name),
       PDFLib.popGraphicsState(),
