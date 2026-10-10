@@ -25,6 +25,15 @@
  * The repair retypes those nodes, and registers inlined kids as objects of
  * their own, in the in-memory pdf-lib copy only. The user's own bytes are
  * never touched; a sound tree (typed, indirect) is left exactly as parsed.
+ *
+ * WHAT NO REPAIR CAN FIX: the two parsers building DIFFERENT page lists from
+ * one file. PDF.js trusts a node's /Count to skip a subtree; pdf-lib walks
+ * every /Kids. A /Count that lies makes the screen show "Halo 0", "Halo 2"
+ * while pdf-lib lists all three, so the screen's page 2 downloaded as
+ * "Halo 1", silently (tests/core/rebuild-page-count.test.mjs). There is no
+ * telling which list the user meant, so a rebuild of a Source compares the
+ * counts (Source.numPages is PDF.js's, set by importPdf) and refuses a
+ * disagreement out loud, as corrupt: a failed download, never a wrong page.
  */
 
 // Load `bytes` for a rebuild. `options` pass straight to PDFDocument.load.
@@ -32,6 +41,29 @@ export async function loadForRebuild(PDFLib, bytes, options) {
   const doc = await PDFLib.PDFDocument.load(bytes, options);
   retypePageTree(PDFLib, doc);
   return doc;
+}
+
+// Load a Source for a rebuild, refusing a page list that is not the screen's.
+// The exporter (core/export.js) and the edit preview (v2/edit-bake.js) both
+// load through here, so the preview never bakes over a neighbour page either.
+export async function loadSourceForRebuild(PDFLib, source) {
+  const doc = await loadForRebuild(PDFLib, source.bytes);
+  const err = pageCountError(doc, source.numPages);
+  if (err) throw err;
+  return doc;
+}
+
+// The error to refuse with when pdf-lib's page count is not `expected`
+// (PDF.js's numPages), or null. An expected count that is not a positive
+// integer means "not known" (createSource defaults to 0) and is not checked.
+// The words matter: "Invalid PDF" is the pdf-lib family core/failure-reason.js
+// buckets as corrupt (hint: parse), the vocabulary the rail already has.
+// Counts only, never a name or a byte of content.
+export function pageCountError(doc, expected) {
+  if (!Number.isInteger(expected) || expected <= 0) return null;
+  const found = doc.getPageCount();
+  if (found === expected) return null;
+  return new Error(`Invalid PDF page tree: pdf-lib reads ${found} pages, PDF.js ${expected}`);
 }
 
 // Give every untyped node of `doc`'s page tree the class pdf-lib would have

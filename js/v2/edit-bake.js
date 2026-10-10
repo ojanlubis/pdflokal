@@ -19,7 +19,7 @@
  */
 import { getSource } from '../core/model.js';
 import { ensurePdfLib } from '../core/vendor.js';
-import { loadForRebuild } from '../core/pdflib-load.js';
+import { loadSourceForRebuild } from '../core/pdflib-load.js';
 import { editSignature } from '../core/page-surgery.js';
 import { rasterIsCurrent, boxToRasterPx, boxFitsRaster } from '../core/raster-key.js';
 import { compareRegions } from '../core/visual-oracle.js';
@@ -100,7 +100,7 @@ export function createEditBake({ getDoc, getSlots, getRasterizer, rasterScaleFor
   const pdfLibDocCache = new Map(); // sourceId -> Promise<PDFLib PDFDocument>
   function getDryRunDoc(PDFLib, source) {
     if (!pdfLibDocCache.has(source.id)) {
-      pdfLibDocCache.set(source.id, loadForRebuild(PDFLib, source.bytes));
+      pdfLibDocCache.set(source.id, loadSourceForRebuild(PDFLib, source));
     }
     return pdfLibDocCache.get(source.id);
   }
