@@ -40,6 +40,7 @@
 
 import { blocksFromLines } from './paragraph-detect.js';
 import { layoutLines } from './reflow.js';
+import { normaliseEnteredText } from './text-encode.js';
 
 export const BLOCK_DECLINE_REASONS = ['rotated', 'mixed-sizes', 'columns', 'list', 'not-prose', 'heading', 'align-unknown'];
 
@@ -387,6 +388,31 @@ export function logicalTextOf(lines) {
   return lines.map((l) => l.text + (l.brk ?? (l.hard ? '\n' : ' '))).join('').replace(/\s+$/, '');
 }
 
+// A TAB (or VT / FF / LS / PS) is resolved to what the file draws when text
+// ENTERS the model (core/text-encode.js normaliseEnteredText). The painted
+// lines are part of that: block renderers read `block.lines`, not `anno.text`,
+// so they hold the same normalised string. `text` and the break (`brk`: a soft
+// wrap can hang a TAB) are both normalised; `hard` follows the new `brk`.
+export function normaliseBlockLines(lines) {
+  return lines.map((l) => {
+    const out = { ...l, text: normaliseEnteredText(l.text) };
+    if (l.brk != null) {
+      out.brk = normaliseEnteredText(l.brk);
+      if ('hard' in l) out.hard = out.brk.includes('\n');
+    }
+    return out;
+  });
+}
+
+// What a Ganti/Teks editor commit holds: the editor's raw text (or, for a
+// paragraph, its painted lines) as the NORMALISED text and lines. The commit
+// compares `text` against the stored anno.text (did anything change?), so this
+// is called BEFORE that comparison. `rawLines` null = a single-line editor.
+export function editorCommit(rawText, rawLines) {
+  const lines = rawLines ? normaliseBlockLines(rawLines) : null;
+  return { text: lines ? logicalTextOf(lines) : normaliseEnteredText(rawText).trim(), lines };
+}
+
 // The stored (JSON) half of a plan, plus the painted lines: what rides the
 // committed text annotation as `block`. `lines` = [{ text, brk }] exactly as
 // the editor painted them (js/v2/block-editor.js readEditorLines); `hard` is
@@ -407,7 +433,7 @@ export function blockAnnotation(plan, lines) {
     srcLines: plan.srcLines,
     srcWords: src ? [...src] : null,
     below: plan.below ?? null,
-    lines: lines.map((l) => {
+    lines: normaliseBlockLines(lines).map((l) => {
       const brk = l.brk ?? (l.hard ? '\n' : ' ');
       return { text: l.text, brk, hard: brk.includes('\n') };
     }),
