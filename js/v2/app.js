@@ -102,6 +102,7 @@ import {
 import { planBlockEdit, blockOfLine, blockAnnotation, editorCommit } from '../core/block-edit.js';
 import { totalPageRotation } from '../core/page-rotation.js';
 import { styleBlockEditor, placeBlockEditor, readEditorLines } from './block-editor.js';
+import { clipboardPlainText, pasteAsPlainText } from './editor-paste.js';
 import { pageEdits } from '../core/page-surgery.js';
 import { whiteoutRingPoints, whiteoutColorFrom, paperPoints, inkPoints, coverColorFrom, inkColorFrom } from '../core/color-sample.js';
 import { hitTestEditedLine, hitTestOcrEdit, editOwningLine } from '../core/edit-hit.js';
@@ -2457,6 +2458,9 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
     e.stopPropagation(); // don't trigger app shortcuts while typing
   });
   ed.addEventListener('pointerdown', (e) => e.stopPropagation());
+  // A rich paste (Gmail, Docs, Word) would put lines the user sees but the
+  // commit's textContent glues together; the editor takes plain text only.
+  ed.addEventListener('paste', (e) => pasteAsPlainText(ed, e));
 
   overlay.appendChild(ed);
   ed.focus();
@@ -2762,8 +2766,9 @@ function pasteText(text) {
 //   2. an image on the system clipboard, then 3. its plain text.
 //   4. otherwise a stale in-app copy, e.g. the system clipboard held a file.
 // Stands down for: an open sheet (the signature dialog has its own paste), any
-// field or the inline editor (native paste into the text), no document, and a
-// paste another listener already took.
+// field or the inline editor (native paste into a field; the editor takes its
+// own as plain text, js/v2/editor-paste.js), no document, and a paste another
+// listener already took.
 document.addEventListener('paste', (e) => {
   if (e.defaultPrevented || doc.pages.length === 0 || document.querySelector('dialog[open]')) return;
   // WHY isContentEditable, not a selector on the target: a paste's target is the
@@ -2778,7 +2783,7 @@ document.addEventListener('paste', (e) => {
     if (item.kind === 'file' && item.type.startsWith('image/')) { file = item.getAsFile(); if (file) break; }
   }
   if (file) { e.preventDefault(); void pasteImageFile(file); return; }
-  const text = (cd?.getData('text/plain') || '').replace(/\r\n?/g, '\n').trim();
+  const text = clipboardPlainText(cd).trim();
   if (text) { e.preventDefault(); pasteText(text); return; }
   if (annoClipboard && pasteCopy()) e.preventDefault();
 });
