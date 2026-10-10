@@ -297,3 +297,29 @@ test('an appearance stream without /Subtype /Form still paints once it is page c
   assert.ok(fills.includes('0,128,0'), `the stamp's green is gone from the file: ${fills}`);
   assert.ok(fills.indexOf('0,128,0') < fills.indexOf('255,0,0'), `the stamp must be under the cover: ${fills}`);
 });
+
+test("a flattened annotation keeps its own opacity (/CA, /ca)", async () => {
+  // A reader applies a live annotation's /CA to its appearance; drawn into the
+  // content bare, a translucent highlight would turn opaque and hide the text
+  // under it. PDF 1.x /CA covers both stroke and fill; PDF 2.0's /ca, when
+  // present, is the fill's own.
+  const page = await exportOnePage({
+    build: (ctx) => [
+      withAp(ctx, 'Square', [100, 600, 140, 640], '0 1 0 rg', { F: 4, CA: 0.3 }),
+      withAp(ctx, 'Square', [150, 600, 190, 640], '0 1 0 rg', { F: 4, CA: 0.8, ca: 0.4 }),
+      withAp(ctx, 'Square', [200, 600, 240, 640], '0 1 0 rg', { F: 4 }),
+    ],
+    userObjects: [['whiteout', { x: 90, y: 160, width: 160, height: 20, color: '#ff0000' }]],
+  });
+  assert.equal(annotsOf(page).length, 0, 'all three lie under the cover');
+  const content = contentOf(page);
+  const states = page.node.Resources().lookup(PDFName.of('ExtGState'));
+  const draws = [...content.matchAll(/q\s+((?:\/(\S+) gs\s+)?)[-\d.\s]+cm\s+\/\S+ Do\s+Q/g)];
+  assert.equal(draws.length, 3, `three appearances drawn:\n${content}`);
+  const alphaOf = (m) => {
+    if (!m[2]) return null;
+    const gs = states.lookup(PDFName.of(m[2]), PDFDict);
+    return ['CA', 'ca'].map((k) => gs.lookup(PDFName.of(k)).asNumber());
+  };
+  assert.deepEqual(draws.map(alphaOf), [[0.3, 0.3], [0.8, 0.4], null]);
+});
