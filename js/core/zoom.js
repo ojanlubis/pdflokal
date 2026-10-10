@@ -49,3 +49,20 @@ export function openingZoom({ viewport, pageWidth, desktop, widestPageWidth = pa
 export function clampZoom(next, { floor, current }) {
   return Math.min(ZOOM_MAX, Math.max(Math.min(floor, current), next));
 }
+
+// The zoom after a load has put its pages on screen.
+//
+// WHY a load can need a refit that is not the first one: merging normalises every
+// page to the first PDF's width (operations.js normalizePageWidths). A phone photo
+// opened first sits at its own fit (0.131 for a 3024pt page); add an A4 and that
+// photo page shrinks to 595pt while the zoom stays 0.131, so every page renders
+// ~78px wide, and clampZoom's never-raise rule makes zoom-out a no-op. The view
+// followed pages that no longer exist at that size.
+// `existingRescaled` is "a page that was already on screen changed width": new
+// pages scaled to the document leave the user's chosen zoom alone (a PDF first,
+// then a photo added). The refit lives here and not in clampZoom, whose
+// never-raise rule is deliberate.
+export function zoomAfterLoad({ firstLoad, existingRescaled, current, viewport, desktop, firstPageWidth, widestPageWidth }) {
+  if (!firstLoad && !existingRescaled) return current;
+  return openingZoom({ viewport, pageWidth: firstPageWidth, desktop, widestPageWidth });
+}

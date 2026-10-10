@@ -29,6 +29,34 @@ import { getLocale } from './lib/i18n.js';
 
 export const UPDATES = [
   {
+    id: '2026-10-11-unduh-sama-layar',
+    date: '2026-10-11',
+    text: 'Hasil Unduh sekarang sama kayak di layar, tulisan dan Tip-Ex nggak turun lagi.',
+    en: 'Your download now matches the screen: text and Tip-Ex no longer shift down.',
+    approved: false,
+  },
+  {
+    id: '2026-10-11-putar-semua',
+    date: '2026-10-11',
+    text: 'Putar halaman sekarang ikut muter teks dan TTD di atasnya.',
+    en: 'Turning a page now turns the text and signatures on it too.',
+    approved: false,
+  },
+  {
+    id: '2026-10-11-foto-pas',
+    date: '2026-10-11',
+    text: 'Foto dari HP langsung pas di layar, dan PDF-nya nggak bawa lokasi GPS foto lagi.',
+    en: "A phone photo opens fitted to the screen, and its PDF no longer carries the photo's GPS.",
+    approved: false,
+  },
+  {
+    id: '2026-10-11-ganti-aman',
+    date: '2026-10-11',
+    text: 'Kalau file baru gagal dibuka, dokumen yang lagi kamu edit tetap aman.',
+    en: "If a new file fails to open, the document you're editing stays.",
+    approved: false,
+  },
+  {
     id: '2026-10-07-paste-dari-luar',
     date: '2026-10-07',
     text: 'Sekarang kamu bisa paste gambar atau teks dari aplikasi lain ke halaman pakai Ctrl+V.',

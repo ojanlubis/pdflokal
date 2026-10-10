@@ -30,7 +30,7 @@ import { setLeaveGuard } from './leave-guard.js';
 import { holdEditor } from './editor-blur.js';
 import { rasterFitsShape } from '../core/raster-key.js';
 import { baseNameOf } from '../core/file-kind.js';
-import { ZOOM_MAX, ZOOM_STEP, zoomFloor, clampZoom, openingZoom as coreOpeningZoom } from '../core/zoom.js';
+import { ZOOM_MAX, ZOOM_STEP, zoomFloor, clampZoom, openingZoom as coreOpeningZoom, zoomAfterLoad } from '../core/zoom.js';
 import { importPdf, importImage, createPageRasterizer, probeTextLayer, pdfLibLoadError } from '../core/import.js';
 import {
   pagesBucket, durationBucket, intentValue,
@@ -143,6 +143,7 @@ let editingAnno = null;       // text annotation currently in the inline editor
 let editingEl = null;         // its contenteditable (format bar restyles it live)
 let editingIsReplace = false; // Ganti Teks draft open → NO format bar (see below)
 let heldDraft = null;         // { resume, commit } while an empty draft waits on a format-bar control (blurCommitsDraft)
+let openEditorCommit = null;  // the open inline editor's commit, while one is open (closeOpenEditor)
 
 // ---- BETA edit-feedback (founder ruling 2026-07-22, SIMPLIFIED) -----------------
 // Ask 👍/👎 ONCE, on the FIRST successful commit of a document. The founder
@@ -1967,11 +1968,29 @@ on('pm-close', 'click', () => pageManager.close());
 // ---- inline text editing ------------------------------------------------------------
 // One code path for "place new text" and "edit existing text": a contenteditable
 // positioned in the page overlay at page coords. Commit on blur / Enter.
-function openTextEditor({ pageId, x, y, anno, draft }) {
-  // A held empty draft is unfocused, so no blur will ever close it: a tap that
-  // opens the next editor (Teks is still armed) closes it here, BEFORE this
-  // editor claims editingEl, or its commit would clear the new editor's state.
+//
+// Closes the open inline editor, if any, through its own commit. A held empty
+// draft goes first through heldDraft.commit, which blurs the format-bar control
+// so a size typed but not yet entered still lands.
+function closeOpenEditor() {
   heldDraft?.commit();
+  openEditorCommit?.();
+}
+
+function openTextEditor({ pageId, x, y, anno, draft }) {
+  // The open editor closes HERE, before this one claims editingEl and before
+  // the overlay is looked up. Left to its blur, it closed only once this
+  // editor took focus: its commit then cleared the state this editor had
+  // claimed and re-synced the page, which emptied the overlay with this editor
+  // in it, so a second tap with Teks armed left no box at all, and the next
+  // Backspace deleted the text just written. A held empty draft is unfocused
+  // and has no blur coming at all.
+  // The closing commit disarms (setTool('select')); the tap that opens this
+  // editor came from the armed tool, which stays armed for the next blank,
+  // as it does for a tap with no box open.
+  const armed = tool;
+  closeOpenEditor();
+  if (tool !== armed) setTool(armed);
   const slot = slots.find((s) => s.page.id === pageId);
   if (!slot) return;
   const overlay = slot.view.querySelector('.pv-overlay');
@@ -2036,9 +2055,14 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
     const { text, lines: blockLines } = editorCommit(ed.textContent, blockPlan ? readEditorLines(ed) : null);
     const blockTop = blockPlan ? parseFloat(ed.style.top) : null;
     ed.remove();
-    editingAnno = null;
-    editingEl = null;
-    editingIsReplace = false;
+    // Only while the state is still this editor's: a commit that arrives after
+    // a newer editor opened (a late blur) must not close that one.
+    if (editingEl === ed) {
+      editingAnno = null;
+      editingEl = null;
+      editingIsReplace = false;
+    }
+    if (openEditorCommit === commit) openEditorCommit = null;
     // After the rest of this commit has run: a sync deferred while the editor
     // was open (see syncPage) catches up now.
     if (deferredSync.size) Promise.resolve().then(flushDeferredSync);
@@ -2458,8 +2482,11 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
     // Held open while a format-bar control has focus. Focus moving between
     // controls keeps it held; coming back to the editor resumes the plain
     // blur-commits path; going anywhere else is a click-away, so it commits.
+    // A window or app switch (a native colour picker can be one) fires
+    // focusout with relatedTarget null and leaves activeElement on the control:
+    // focus never left the bar, so the hold stands (editor-blur.js's rule).
     const onBarLeave = (ev) => {
-      if (formatBarEl.contains(ev.relatedTarget)) return;
+      if (formatBarEl.contains(ev.relatedTarget) || formatBarEl.contains(document.activeElement)) return;
       releaseBarHold();
       if (ev.relatedTarget !== ed) commit();
     };
@@ -2484,6 +2511,7 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
     };
   };
   releaseHold = holdEditor(ed, commit, { onBlur: onRealBlur });
+  openEditorCommit = commit;
   ed.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ed.blur(); }
     // Ctrl/Cmd+B / I = the format bar's buttons, for the WHOLE box. WHY
@@ -3056,6 +3084,13 @@ async function loadFilesInner(files, { replace = false } = {}) {
   // for that is skipped there, never thrown here.
   const verdict = await checkIncoming(files);
   if (verdict.refusal) { toastRefusal(verdict); return; }
+  // The load empties the stage (rebuildStage, or resetDoc on a replace), and an
+  // editor in it would go without its commit. One held open across a window
+  // switch (the person went to Finder to drag this file in) lost its text, and
+  // its page-hidden listener later committed into whatever document was open
+  // then. It closes here, into the document it was typed on and before the
+  // import's own undo step: on a replace that document is then discarded whole.
+  closeOpenEditor();
   const { usable, kinds } = verdict;
   const isPdf = (f) => kinds.get(f) === 'pdf';
   // WHY a replace imports into a STAGED Doc and not into `doc`: whether a file
@@ -3067,6 +3102,9 @@ async function loadFilesInner(files, { replace = false } = {}) {
   const into = replace ? createDoc() : doc;
   const pagesBefore = into.pages.length;
   const firstLoad = pagesBefore === 0;
+  // Pages already on screen, to tell after normalising whether the merge resized
+  // any of them (zoomAfterLoad, core/zoom.js).
+  const idsBefore = new Set(into.pages.map((p) => p.id));
   // A staged replace names the file at the commit below: now it would rename
   // the document that is still open.
   if (firstLoad && !replace) baseName = baseNameOf(usable[0].name);
@@ -3257,7 +3295,7 @@ async function loadFilesInner(files, { replace = false } = {}) {
   // Placed BEFORE the rasterizer and rebuildStage below: both read page.width,
   // and a raster taken at the pre-normalisation size would have to be thrown
   // away immediately.
-  normalizePageWidths(doc);
+  const rescaled = normalizePageWidths(doc);
 
   if (!rasterizer) rasterizer = createPageRasterizer(doc, { editedPageProvider });
   emptyEl.style.display = 'none';
@@ -3274,9 +3312,16 @@ async function loadFilesInner(files, { replace = false } = {}) {
   // would orphan a second one. (A refused replace never leaves the editor.)
   if (wasEmpty && !window.history.state?.v2doc) pushEditorHistoryState();
 
-  if (firstLoad) {
-    zoom = openingZoom(doc.pages[0].width);
-  }
+  // Also on a merge that resized pages already on screen: see zoomAfterLoad.
+  zoom = zoomAfterLoad({
+    firstLoad,
+    existingRescaled: rescaled.some((p) => idsBefore.has(p.id)),
+    current: zoom,
+    viewport: scrollEl.clientWidth,
+    desktop: deviceClass() === 'desktop',
+    firstPageWidth: firstLoad ? doc.pages[0].width : pageDisplaySize(doc.pages[0]).width,
+    widestPageWidth: widestPageWidth(),
+  });
   rebuildStage(); // applies zoom + sizer at the end
   // A non-first load that actually grew the doc IS a merge (gabung). Fire at
   // COMPLETION so it counts real merges from EVERY entry point — the [+] tile,

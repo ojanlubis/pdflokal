@@ -15,8 +15,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const { openingZoom, zoomFloor, clampZoom, ZOOM_MIN, ZOOM_MAX, ZOOM_STEP } =
-  await import('../../js/core/zoom.js');
+const zoomMod = await import('../../js/core/zoom.js');
+const { openingZoom, zoomFloor, clampZoom, ZOOM_MIN, ZOOM_MAX, ZOOM_STEP } = zoomMod;
+const model = await import('../../js/core/model.js');
+const ops = await import('../../js/core/operations.js');
 const APP = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'js', 'v2', 'app.js'), 'utf8');
 
 const PHONE = { viewport: 412, desktop: false };
@@ -75,4 +77,54 @@ test('app.js asks core/zoom.js for the range instead of carrying its own', () =>
   assert.match(zOut, /zoomFloor|currentZoomFloor/, 'the zoom-out button must use the document floor');
   const setZ = APP.slice(APP.indexOf('function setZoomAnchored'), APP.indexOf('function setZoomAnchored') + 300);
   assert.match(setZ, /clampZoom/, 'pinch/wheel/keys must clamp through the same floor');
+});
+
+// ---- a photo first, a PDF added: the view must follow the pages that shrank ----
+
+// Photo opened first (3024x4032, isFromImage), then an A4 PDF added with Tambah.
+// Returns what loadFilesInner knows at the refit point: the doc after
+// normalizePageWidths and which of the pages that moved were already on screen.
+function photoThenPdf() {
+  model._resetIds();
+  const doc = model.createDoc();
+  const photoSrc = ops.addSource(doc, model.createSource({ name: 'ktp.jpg', bytes: new Uint8Array([1]), numPages: 1 }));
+  ops.addPages(doc, [model.createPage({ source: photoSrc, sourcePageNum: 0, width: 3024, height: 4032, isFromImage: true })]);
+  const before = new Set(doc.pages.map((p) => p.id));
+  const zoomBefore = openingZoom({ ...PHONE, pageWidth: 3024 });
+  const pdfSrc = ops.addSource(doc, model.createSource({ name: 'a.pdf', bytes: new Uint8Array([2]), numPages: 1 }));
+  ops.addPages(doc, [model.createPage({ source: pdfSrc, sourcePageNum: 0, width: 595, height: 842 })]);
+  const changed = ops.normalizePageWidths(doc);
+  return { doc, zoomBefore, existingRescaled: changed.some((p) => before.has(p.id)) };
+}
+
+test('photo first, PDF added: the pages are refitted, not left at the photo\'s 0.131 stamp size', () => {
+  const { doc, zoomBefore, existingRescaled } = photoThenPdf();
+  assert.ok(zoomBefore < 0.14, 'VACUITY GUARD: the photo opened zoomed far out');
+  assert.equal(doc.pages[0].width, 595, 'VACUITY GUARD: the photo page was shrunk to the PDF width');
+  assert.equal(existingRescaled, true);
+  assert.equal(typeof zoomMod.zoomAfterLoad, 'function', 'core/zoom.js owns the refit decision');
+  const z = zoomMod.zoomAfterLoad({
+    ...PHONE, firstLoad: false, existingRescaled, current: zoomBefore,
+    firstPageWidth: doc.pages[0].width, widestPageWidth: 595,
+  });
+  assert.ok(z * 595 >= 300, `a page renders ${Math.round(z * 595)}px on a 412px phone`);
+});
+
+test('a PDF first and a photo added keeps the zoom the user chose', () => {
+  const z = zoomMod.zoomAfterLoad({
+    ...PHONE, firstLoad: false, existingRescaled: false, current: 1.4,
+    firstPageWidth: 595, widestPageWidth: 595,
+  });
+  assert.equal(z, 1.4);
+});
+
+test('the first load still lands on the opening zoom', () => {
+  const z = zoomMod.zoomAfterLoad({ ...PHONE, firstLoad: true, existingRescaled: false, current: 1, firstPageWidth: 595, widestPageWidth: 595 });
+  assert.equal(z, openingZoom({ ...PHONE, pageWidth: 595 }));
+});
+
+test('app.js refits through zoomAfterLoad using the normalisation result', () => {
+  assert.match(APP, /zoomAfterLoad/);
+  assert.match(APP, /= normalizePageWidths\(doc\)/, 'the result of the normalisation is kept');
+  assert.doesNotMatch(APP, /if \(firstLoad\) \{\s*zoom = openingZoom/, 'no first-load-only refit left');
 });

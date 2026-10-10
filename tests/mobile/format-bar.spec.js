@@ -129,6 +129,56 @@ test.describe('format bar — mobile', () => {
     expect(after.map((a) => [a.text, a.fontSize])).toEqual([['Satu', 18], ['Dua', 10]]);
   });
 
+  // A window or app switch while the size field holds the empty box: the field
+  // gets blur + focusout with no relatedTarget, and focus stays on it. The hold
+  // took that for a click-away and closed the box, so the size went to 'Satu'.
+  test('a window switch while the size field holds an empty box keeps the box', async ({ page }) => {
+    await emptyDraftAfterSatu(page);
+    await page.focus('.fb-size');
+    await expect(page.locator('.v2-text-edit')).toHaveCount(1);
+    const stillOnField = await page.evaluate(() => {
+      const f = document.querySelector('.fb-size');
+      f.dispatchEvent(new FocusEvent('blur'));
+      f.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: null }));
+      return document.activeElement === f;
+    });
+    expect(stillOnField).toBe(true);
+    await expect(page.locator('.v2-text-edit')).toHaveCount(1);
+
+    await page.fill('.fb-size', '10');
+    await page.press('.fb-size', 'Enter');
+    await page.keyboard.type('Dua');
+    await page.keyboard.press('Enter');
+    const after = await annos(page);
+    expect(after.map((a) => [a.text, a.fontSize])).toEqual([['Satu', 18], ['Dua', 10]]);
+  });
+
+  // Bug 2026-10-11: filling a form, a tap on the next blank while the box was
+  // still open (no Enter) left NO box: the first box's late blur commit cleared
+  // the new box's state and re-synced the page over it, Teks turned off, and the
+  // next Backspace deleted the text just written. app.js closeOpenEditor now
+  // closes the open box before the new one opens. Desktop clicks:
+  // tests/editor-handoff.spec.js.
+  test('tapping blank after blank with a box open: one focused box per tap, Teks stays armed', async ({ page }) => {
+    await page.goto('/');
+    await page.setInputFiles('#file-input', FIXTURE);
+    await expectFirstPage(page);
+    await page.tap('[data-tool="text"]');
+    await page.tap('.pv-page >> nth=0', { position: { x: 120, y: 180 } });
+    await page.keyboard.type('Satu');
+
+    for (const [y, text] of [[320, 'Dua'], [400, 'Tiga']]) {
+      await page.tap('.pv-page >> nth=0', { position: { x: 100, y } });
+      await expect(page.locator('.v2-text-edit')).toHaveCount(1);
+      expect(await editorFocused(page)).toBe(true);
+      await expect(page.locator('[data-tool="text"]')).toHaveAttribute('aria-pressed', 'true');
+      await page.keyboard.type(text);
+    }
+    await page.keyboard.press('Enter');
+
+    expect((await annos(page)).map((a) => a.text)).toEqual(['Satu', 'Dua', 'Tiga']);
+  });
+
   test('styling change is one undo step', async ({ page }) => {
     await openAndPlaceText(page, 'undoable');
     await page.tap('.fb-color[data-color="#1d6fdc"]');
