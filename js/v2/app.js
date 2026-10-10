@@ -3474,7 +3474,11 @@ function pasteText(text) {
 // paste another listener already took.
 document.addEventListener('paste', (e) => {
   if (e.defaultPrevented || doc.pages.length === 0 || document.querySelector('dialog[open]')) return;
-  if (e.target.matches?.('input, select, textarea, [contenteditable="true"]')) return;
+  // WHY isContentEditable, not a selector on the target: a paste's target is the
+  // element holding the caret, which after a rich paste into the inline editor
+  // is a <span> INSIDE it. The selector missed, and the next Ctrl+V placed a new
+  // object and tore the open editor out of the DOM, losing what was typed.
+  if (e.target.isContentEditable || e.target.closest?.('input, select, textarea')) return;
   if (annoClipboard && annoCopyFresh) { if (pasteCopy()) e.preventDefault(); return; }
   const cd = e.clipboardData;
   let file = null;
