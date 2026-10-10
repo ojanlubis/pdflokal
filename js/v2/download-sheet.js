@@ -605,7 +605,11 @@ export function createDownloadSheet(deps) {
         buildCompressed();
       }
       // Any in-flight build: the tap means "when it's ready".
-      while ((state.building || (state.format === 'pdf' && state.size === 'kompres' && (state.compressing || !state.compressed))) && seq === state.seq) {
+      // `!state.compressed` only counts while a base exists to compress: with
+      // no base (a build that failed, e.g. an owner-locked PDF opened on
+      // /kompres-pdf) nothing will ever fill it, and the CTA spun forever with
+      // no failure event. Falling through reaches the rethrow of buildError.
+      while ((state.building || (state.format === 'pdf' && state.size === 'kompres' && (state.compressing || (!state.compressed && state.base)))) && seq === state.seq) {
         await new Promise((r) => setTimeout(r, 120));
       }
       if (seq !== state.seq) return;
