@@ -92,3 +92,18 @@ test('commit() clears the shared editing state only while it is still its own', 
   assert.match(commit, /if \(openEditorCommit === commit\) openEditorCommit = null;/,
     'commit() does not release the open-editor handle (or releases one that is not its own)');
 });
+
+// A file load empties the stage (rebuildStage on Tambah, resetDoc on Ganti).
+// An editor held open across a window switch (the person went to Finder to
+// drag the file in) was emptied with it, never committed: its typed text was
+// gone, and its page-hidden listener lived on to commit it later into the NEW
+// document (a phantom undo step, then a TypeError on the old page id).
+test('a file load closes the open editor through its commit, before the import touches either document', () => {
+  const body = fnBody('async function loadFilesInner(');
+  const close = body.indexOf('closeOpenEditor();');
+  assert.ok(close >= 0, 'loadFilesInner does not close the open editor: the load empties the stage under it');
+  const into = body.indexOf('const into = ');
+  assert.ok(into > 0, 'loadFilesInner no longer stages into `into`');
+  assert.ok(close < into,
+    'the editor must close before the import: its text belongs to the open document and its history step comes before the merge');
+});

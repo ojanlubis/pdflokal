@@ -3081,6 +3081,13 @@ async function loadFilesInner(files, { replace = false } = {}) {
   // for that is skipped there, never thrown here.
   const verdict = await checkIncoming(files);
   if (verdict.refusal) { toastRefusal(verdict); return; }
+  // The load empties the stage (rebuildStage, or resetDoc on a replace), and an
+  // editor in it would go without its commit. One held open across a window
+  // switch (the person went to Finder to drag this file in) lost its text, and
+  // its page-hidden listener later committed into whatever document was open
+  // then. It closes here, into the document it was typed on and before the
+  // import's own undo step: on a replace that document is then discarded whole.
+  closeOpenEditor();
   const { usable, kinds } = verdict;
   const isPdf = (f) => kinds.get(f) === 'pdf';
   // WHY a replace imports into a STAGED Doc and not into `doc`: whether a file

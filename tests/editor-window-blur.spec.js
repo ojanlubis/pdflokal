@@ -129,6 +129,51 @@ test.describe('switching app or window while typing keeps the editor open', () =
       .toEqual(['abc']);
   });
 
+  // A held editor and a file load (the person went to Finder to drag a file
+  // in). The load empties the stage; the editor used to go with it, never
+  // committed. app.js loadFilesInner closes it first (closeOpenEditor). The
+  // loads below run without moving focus, as a drop onto an inactive window
+  // does, so the editor is still held when they start.
+  test('file added while the editor is held: the typed text lands, once', async ({ page }) => {
+    await openTeks(page);
+    await page.keyboard.type('Halo');
+    expect(await windowBlur(page)).toBe(true);
+
+    await page.setInputFiles('#file-input', FIXTURE); // Tambah: append to the open doc
+    await expect.poll(() => page.evaluate(() => window.v2.getDoc().pages.length)).toBe(4);
+    await expect(page.locator('.v2-text-edit')).toHaveCount(0);
+    expect(await page.evaluate(() => window.v2.getDoc().pages[0].annotations.map((a) => a.text)))
+      .toEqual(['Halo']);
+
+    // The closed editor no longer listens: going hidden adds nothing.
+    const steps = await page.evaluate(() => window.v2.history.undoStack.length);
+    await goHidden(page);
+    expect(await page.evaluate(() => window.v2.history.undoStack.length)).toBe(steps);
+    expect(await page.evaluate(() => window.v2.getDoc().pages[0].annotations.map((a) => a.text)))
+      .toEqual(['Halo']);
+  });
+
+  test('document replaced while the editor is held: no late commit into the new one', async ({ page }) => {
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    await openTeks(page);
+    await page.keyboard.type('Halo');
+    expect(await windowBlur(page)).toBe(true);
+
+    await page.evaluate(async () => {
+      const buf = await (await fetch('/tests/fixtures/sample-2pages.pdf')).arrayBuffer();
+      await window.v2.loadFiles([new File([buf], 'baru.pdf', { type: 'application/pdf' })], { replace: true });
+    });
+    await expect.poll(() => page.evaluate(() => window.v2.getDoc().sources.length)).toBe(1);
+    await expect(page.locator('.v2-text-edit')).toHaveCount(0);
+
+    await goHidden(page);
+    expect(await page.evaluate(() => window.v2.getDoc().pages.flatMap((p) => p.annotations))).toEqual([]);
+    expect(await page.evaluate(() => window.v2.history.undoStack.length)).toBe(0);
+    await expect(page.locator('#btn-undo')).toBeDisabled();
+    expect(errors).toEqual([]);
+  });
+
   test('page hidden: a cleared Edit line stays open to paste into', async ({ page }) => {
     await openDoc(page);
     await armGanti(page);
