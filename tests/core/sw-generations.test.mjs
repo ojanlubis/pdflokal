@@ -71,7 +71,10 @@ test('2. the recovery reload happens at most once a minute — a link that stays
 test('3. after the page booted, a lazy module that fails is refused WITHOUT a reload — the open document survives', async () => {
   const worker = loadWorker(network({ '/': 'html', [APP]: 'app' }));
   await onlineLoad(worker, 'tab', '/', [APP]);
-  const res = await dispatch(worker, moduleReq('/js/core/compress.js'), { clientId: 'tab' });
+  // No shipped module is lazy any more (tests/core/sw-lazy-modules.test.mjs), so
+  // this names a path no page imports: what matters is the worker's answer to a
+  // module request that fails after boot, whatever asks for it.
+  const res = await dispatch(worker, moduleReq('/js/core/not-yet-imported.js'), { clientId: 'tab' });
   assert.equal(res.type, 'error');
   assert.deepEqual(worker.navigations, [], 'a lazy import that failed mid-session reloaded the tab and threw away the user\'s document');
 });

@@ -23,6 +23,15 @@ import { durationBucket, pagesBucket } from '../core/telemetry-schema.js';
 import { showStamp } from './celebrate.js';
 import { buildPdfArtifact } from './pdf-builder.js';
 import { passThroughSource } from '../core/export.js';
+// STATIC ON PURPOSE, not import() on the tap. The service worker serves an
+// offline page load from the set of modules that load fetched (sw.js,
+// GENERATIONS), so a module reached only on a tap is in no generation and
+// Kompres / Unduh as JPG died offline and after a connection drop while the
+// app said everything still worked. Both are pure and read pdf.js / pdf-lib /
+// fflate off globalThis at call time, so linking them costs bytes, not boot work.
+// tests/core/sw-lazy-modules.test.mjs fails any own module imported lazily.
+import { compressPdfBytes, compressToTargetBytes } from '../core/compress.js';
+import { renderPdfToImages, zipFiles } from '../core/export-images.js';
 import { coveredNoteShows } from './edit-expectations.js';
 
 // WHAT TO SAY WHEN IT FAILS, AND WHEN NOT TO SAY "TRY AGAIN".
@@ -315,9 +324,7 @@ export function createDownloadSheet(deps) {
       // off globalThis. pdf-lib is already up (buildBase needed it), but pdf.js
       // may NOT be — a doc built from images alone never imported a PDF. Ensure
       // both; the already-loaded one resolves instantly.
-      const [{ compressPdfBytes, compressToTargetBytes }] = await Promise.all([
-        import('../core/compress.js'), ensurePdfJs(), ensurePdfLib(),
-      ]);
+      await Promise.all([ensurePdfJs(), ensurePdfLib()]);
       const target = state.target;
       const out = target
         // Hunt for the highest quality that fits under the user's hard cap. Costs
@@ -635,9 +642,7 @@ export function createDownloadSheet(deps) {
         const imgBytes = state.base ? state.base.bytes : fallback.bytes;
         // renderPdfToImages rasterizes with pdf.js; zipFiles zips with fflate.
         // Both come off globalThis, so both must be up before we call in.
-        const [{ renderPdfToImages, zipFiles }] = await Promise.all([
-          import('../core/export-images.js'), ensurePdfJs(), ensureFflate(),
-        ]);
+        await Promise.all([ensurePdfJs(), ensureFflate()]);
         // Punch list #5: rendering N pages to images is real work — narrate it
         // on the CTA so "working" never looks like "hung". Surgical text update,
         // never a full render() mid-export.
