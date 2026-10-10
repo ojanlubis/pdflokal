@@ -175,15 +175,37 @@ export function createPageManager(deps) {
     return tile;
   }
 
+  // WHY one job per (page, picture) with a SET of tiles waiting on it: every grid
+  // rebuild (reorder, delete, undo) re-runs renderTile, and a thumb that has not
+  // landed yet is still a cache miss, so each rebuild used to queue another full
+  // render of the same page (2-3x on a long PDF) while the older jobs painted
+  // tiles that were already out of the grid. A rebuild now joins the job already
+  // in flight, and the job paints only tiles that are still in the grid.
+  const inflight = new Map(); // `${page.id}\n${rasterKey}` -> Set of waiting tile elements
   function queueThumb(page, el) {
+    const key = rasterKey(page);
+    const flightKey = page.id + '\n' + key;
+    const waiting = inflight.get(flightKey);
+    if (waiting) { waiting.add(el); return; }
+    const targets = new Set([el]);
+    inflight.set(flightKey, targets);
     thumbQueue = thumbQueue.then(async () => {
-      if (!sheet.open) return; // sheet closed mid-queue; skip quietly
       try {
-        const key = rasterKey(page); // read when issued, like rasterize() does
-        const t = await deps.getRasterizer().rasterizeThumb(page, { width: 150 });
-        thumbs.set(page.id, { key, dataUrl: t.dataUrl });
-        el.style.backgroundImage = `url(${t.dataUrl})`;
-      } catch { /* tile keeps its blank placeholder */ }
+        if (!sheet.open) return; // sheet closed mid-queue; skip quietly
+        let hit = thumbs.get(page.id);
+        if (!hit || hit.key !== key) {
+          // Every tile that asked is gone (deleted, or rebuilt under a newer job):
+          // rendering would be work nobody sees.
+          if (![...targets].some((t) => t.isConnected)) return;
+          const issuedKey = rasterKey(page); // read when issued, like rasterize() does
+          const t = await deps.getRasterizer().rasterizeThumb(page, { width: 150 });
+          hit = { key: issuedKey, dataUrl: t.dataUrl };
+          thumbs.set(page.id, hit);
+        }
+        for (const t of targets) if (t.isConnected) t.style.backgroundImage = `url(${hit.dataUrl})`;
+      } catch { /* tile keeps its blank placeholder */ } finally {
+        inflight.delete(flightKey);
+      }
     });
   }
 
@@ -529,8 +551,9 @@ export function createPageManager(deps) {
     }
   });
 
-  // Undo/redo can revert rotations the thumb cache baked in (review M4) — the
-  // caller flushes us wholesale; thumbs regenerate lazily on next open.
+  // Wholesale flush, for a document that is GONE (Buka Baru). Undo/redo does not
+  // call it: an entry carries its rasterKey, so a restored rotation or edit is a
+  // key mismatch (a miss) on its own, and flushing re-rendered every page for nothing.
   function invalidateThumbs() { thumbs.clear(); }
 
   return {
