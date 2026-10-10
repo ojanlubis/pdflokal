@@ -131,7 +131,8 @@ export function pagesBucket(n) {
   return '21+';
 }
 
-// zoom (a multiplier, 0.3..3 as the +/- buttons clamp it) → a percent bucket.
+// zoom (a multiplier, up to 3; the floor is 0.3 or lower for a page wider than
+// the screen at 0.3, js/core/zoom.js, since 2026-10-11) → a percent bucket.
 // Cuts are placed against the MEASURED opening zooms of 913eb38 (desktop fit-
 // width: 2.38 at 1512px, 1.59 at 1040px; touch path: ~1.0 tablet, ~0.65 phone),
 // so each of those openings lands in its OWN bucket and "left it where it

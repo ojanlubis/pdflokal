@@ -27,9 +27,20 @@
 // what Chrome on Windows often names a JPEG.
 const REAL_EXT = /\.(pdf|jpe?g|jpe|jfif|png|webp|heic|heif|gif|bmp|avif|tiff?|svg|ico)$/i;
 
-/** The file's name without its extension — a REAL extension only. */
+// The suffix download-sheet appends to every export (`${baseName}-pdflokal.pdf`),
+// plus the " (1)" a browser adds when the name is already taken. Without
+// stripping it, re-editing our own output stacks it: "surat-pdflokal-pdflokal.pdf".
+const OWN_SUFFIX = /(?:-pdflokal)+(?: ?\(\d+\))?$/i;
+
+/**
+ * The name the export is built on: the file's name without a REAL extension and
+ * without our own export suffix.
+ */
 export function baseNameOf(name) {
-  return name.replace(REAL_EXT, '');
+  const bare = name.replace(REAL_EXT, '');
+  // A file named only "-pdflokal" would strip to nothing and export as
+  // "-pdflokal.pdf"; keep the name then.
+  return bare.replace(OWN_SUFFIX, '') || bare;
 }
 
 // PDF 32000-1 Annex H: the header may sit anywhere in the first 1024 bytes

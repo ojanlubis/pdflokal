@@ -20,6 +20,7 @@ import { rasterKey } from './raster-key.js';
 import { pageHasVisibleText } from './text-visibility.js';
 import { failureReason } from './failure-reason.js';
 import { sniffImageFormat } from './image-format.js';
+import { stripJpegMetadata } from './jpeg-metadata.js';
 
 // bytes → append a Source + its Pages (metadata only) to `doc`. Returns the pages.
 // SINGLE SOURCE OF TRUTH for "this PDF is password/permissions protected".
@@ -298,7 +299,10 @@ const TRANSCODE_MAX_PIXELS = 16_777_216;
 // not only in the preview. JPEG, not PNG, for the second case: a 12-megapixel
 // photo as PNG is tens of megabytes, and the source was lossy already.
 // Re-encoding also drops the EXIF block (camera model, timestamps, GPS), which
-// the file never needed to carry.
+// the file never needed to carry. An UPRIGHT JPEG is stored without a
+// re-encode but not untouched: its metadata segments and any Motion Photo
+// video after EOI are cut losslessly (core/jpeg-metadata.js), because export
+// embeds these bytes verbatim into the user's PDF.
 //
 // CAPPED at TRANSCODE_MAX_PIXELS: an iPhone "HEIF Max" photo is 48.8 MP, so
 // the full-size canvas got no context and the import was refused as
@@ -307,6 +311,7 @@ const TRANSCODE_MAX_PIXELS = 16_777_216;
 async function storableImageBytes(bytes, bitmap, width, height) {
   const format = sniffImageFormat(bytes);
   const turned = format === 'jpg' && jpegExifOrientation(bytes) !== 1;
+  if (format === 'jpg' && !turned) return stripJpegMetadata(bytes);
   if (format && !turned) return bytes;
   const k = Math.min(1, Math.sqrt(TRANSCODE_MAX_PIXELS / (width * height)));
   const canvas = document.createElement('canvas');
@@ -586,6 +591,17 @@ export function createPageRasterizer(doc, opts = {}) {
   // needs width, height and toDataURL().
   const renderToCanvas = opts.renderToCanvas || renderPageToCanvas;
 
+  // Only the data URL outlives a render, so the pixel buffer goes back now, not
+  // at GC: iOS counts every live canvas against one budget, and a long scroll
+  // could otherwise leave later pages as grey placeholders. Same release as
+  // storableImageBytes. NOT applied to renderCanvas: its caller owns the pixels.
+  function releaseCanvas(canvas) { canvas.width = 0; canvas.height = 0; }
+  function encodeAndRelease(canvas) {
+    const out = { width: canvas.width, height: canvas.height };
+    try { out.dataUrl = canvas.toDataURL('image/png'); } finally { releaseCanvas(canvas); }
+    return { dataUrl: out.dataUrl, width: out.width, height: out.height };
+  }
+
   return {
     async rasterize(page, { scale = 2 } = {}) {
       // Stale-guard (founder doubling bug, 2026-07-20): renderToCanvas is async
@@ -605,8 +621,9 @@ export function createPageRasterizer(doc, opts = {}) {
       // restore only if this still equals the restored page's key.
       const key = rasterKey(page);
       const canvas = await renderToCanvas(page, scale);
-      if (renderSeq.get(page.id) !== seq) return page.raster;
-      page.raster = { dataUrl: canvas.toDataURL('image/png'), width: canvas.width, height: canvas.height, scale, key };
+      if (renderSeq.get(page.id) !== seq) { releaseCanvas(canvas); return page.raster; }
+      const { dataUrl, width, height } = encodeAndRelease(canvas);
+      page.raster = { dataUrl, width, height, scale, key };
       return page.raster;
     },
     // Small render for page-manager tiles. Does NOT touch page.raster (the main
@@ -614,8 +631,7 @@ export function createPageRasterizer(doc, opts = {}) {
     async rasterizeThumb(page, { width = 150 } = {}) {
       const rotated = (page.rotation || 0) % 180 !== 0;
       const pageW = rotated ? page.height : page.width;
-      const canvas = await renderToCanvas(page, width / pageW);
-      return { dataUrl: canvas.toDataURL('image/png'), width: canvas.width, height: canvas.height };
+      return encodeAndRelease(await renderToCanvas(page, width / pageW));
     },
     // A raw canvas at an arbitrary scale, for a caller that needs PIXELS
     // rather than a raster to display — today that is only OCR (rung S2,
