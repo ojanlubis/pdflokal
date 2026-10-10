@@ -41,3 +41,23 @@ test('app.js names the document through baseNameOf, not an inline regex', () => 
   assert.ok(!/replace\(\s*\/\\\.\[\^\.\]\+\$\//.test(head), 'no inline extension-strip regex left in loadFilesInner');
   assert.match(APP, /import \{[^}]*\bbaseNameOf\b[^}]*\} from '\.\.\/core\/file-kind\.js'/);
 });
+
+// Re-editing a file pdflokal itself exported must not stack our suffix
+// ("surat-pdflokal-pdflokal.pdf" is what HR would receive). The suffix is
+// download-sheet's `${baseName}-pdflokal.pdf`; a browser may also append its
+// own " (1)" duplicate counter to the saved name.
+test('baseNameOf drops our own export suffix and a browser duplicate counter', () => {
+  assert.equal(baseNameOf('Surat Lamaran-pdflokal.pdf'), 'Surat Lamaran');
+  assert.equal(baseNameOf('Surat Lamaran-pdflokal (1).pdf'), 'Surat Lamaran');
+  assert.equal(baseNameOf('Surat Lamaran-pdflokal(2).pdf'), 'Surat Lamaran');
+  assert.equal(baseNameOf('Surat Lamaran-pdflokal-pdflokal.pdf'), 'Surat Lamaran', 'already stacked by an earlier version');
+  assert.equal(baseNameOf('Surat Lamaran-PDFLokal.PDF'), 'Surat Lamaran');
+  assert.equal(baseNameOf('Surat Lamaran-pdflokal'), 'Surat Lamaran', 'extensionless, as WhatsApp hands it over');
+});
+
+test('baseNameOf only strips the suffix at the END and never empties the name', () => {
+  assert.equal(baseNameOf('pdflokal-notes.pdf'), 'pdflokal-notes');
+  assert.equal(baseNameOf('a-pdflokal-b.pdf'), 'a-pdflokal-b');
+  assert.equal(baseNameOf('Laporan (1).pdf'), 'Laporan (1)', 'a counter without our suffix is the user\'s own');
+  assert.equal(baseNameOf('-pdflokal.pdf'), '-pdflokal', 'nothing left to name the export after: keep it');
+});
