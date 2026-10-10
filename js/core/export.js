@@ -31,6 +31,7 @@ import { totalPageRotation } from './page-rotation.js';
 import { orderedForPaint } from './annotation-order.js';
 import { scaleAnnotationGeometry, extentOf, displayedBox, turnOf, turnVector } from './annotation-geometry.js';
 import { sniffImageFormat } from './image-format.js';
+import { loadForRebuild } from './pdflib-load.js';
 
 // ---- fonts ------------------------------------------------------------------
 
@@ -837,7 +838,7 @@ export async function buildPdfBytes(doc, deps = {}) {
   // (O(pages × parse)). One pdf-lib load per source is strictly better.
   const srcDocCache = new Map(); // sourceId → Promise<PDFDocument>
   function getSrcDoc(source) {
-    if (!srcDocCache.has(source.id)) srcDocCache.set(source.id, PDFLib.PDFDocument.load(source.bytes));
+    if (!srcDocCache.has(source.id)) srcDocCache.set(source.id, loadForRebuild(PDFLib, source.bytes));
     return srcDocCache.get(source.id);
   }
 

@@ -20,6 +20,7 @@ import { rasterKey } from './raster-key.js';
 import { pageHasVisibleText } from './text-visibility.js';
 import { failureReason } from './failure-reason.js';
 import { sniffImageFormat } from './image-format.js';
+import { loadForRebuild } from './pdflib-load.js';
 
 // bytes → append a Source + its Pages (metadata only) to `doc`. Returns the pages.
 // SINGLE SOURCE OF TRUTH for "this PDF is password/permissions protected".
@@ -71,9 +72,12 @@ async function detectEncrypted(pdf) {
 //
 // Returns the ORIGINAL error so the caller classifies it with failureReason /
 // failureCause exactly as the export path would: one vocabulary, nothing new
-// on the rail, and the message stays on the device. LOAD only, on purpose:
-// the rail's `hint: parse` is a load-time failure; copyPages/save failures are
-// a different class with their own witness (v2/bake-failure.js).
+// on the rail, and the message stays on the device. It runs the rebuild's OWN
+// load (core/pdflib-load.js, which retypes a page tree that forgot its /Type)
+// and then walks the page tree, because a file pdf-lib parses but cannot walk
+// fails every rebuild just as surely as one it cannot parse. Nothing past
+// that: copyPages/save failures are a different class with their own witness
+// (v2/bake-failure.js).
 //
 // An ENCRYPTED file also fails pdf-lib's load, but that is the protected-PDF
 // path (flagged on the Source, warned at import, honest at export), not a
@@ -82,7 +86,7 @@ async function detectEncrypted(pdf) {
 // Never throws. PDFLib is injected (this file has no vendor imports).
 export async function pdfLibLoadError(PDFLib, bytes) {
   try {
-    await PDFLib.PDFDocument.load(bytes);
+    (await loadForRebuild(PDFLib, bytes)).getPageCount();
     return null;
   } catch (err) {
     return failureReason(err) === 'encrypted' ? null : err;

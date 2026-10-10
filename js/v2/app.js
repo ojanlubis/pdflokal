@@ -2937,7 +2937,8 @@ async function refuseReplace(files) {
 // moment a second file would join, every PDF involved is proven loadable by
 // pdf-lib first, and a file that is not is declined through the same path as
 // any unreadable file (skipped, counted on the rail as import/corrupt). Nothing
-// is rasterised or repaired: the user's document is never changed behind their
+// is rasterised or repaired beyond what every rebuild already does in memory
+// (core/pdflib-load.js): the user's document is never changed behind their
 // back, and they learn which file to leave out while it still costs nothing.
 // Rail before this: `export/corrupt`, 5 sessions, every one a merge, no file.
 const rebuildVerdicts = new Map(); // sourceId -> Promise<Error|null>
