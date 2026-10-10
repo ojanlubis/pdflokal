@@ -30,6 +30,7 @@ import { toStandardFontSafe, drawTextSafe, unencodableInStandardFont } from './t
 import { totalPageRotation } from './page-rotation.js';
 import { orderedForPaint } from './annotation-order.js';
 import { scaleAnnotationGeometry } from './annotation-geometry.js';
+import { sniffImageFormat } from './image-format.js';
 
 // ---- fonts ------------------------------------------------------------------
 
@@ -446,12 +447,6 @@ const ANNOTATION_DRAWERS = {
 };
 
 // ---- image pages -------------------------------------------------------------
-
-function sniffImageFormat(bytes) {
-  if (bytes.length > 3 && bytes[0] === 0xff && bytes[1] === 0xd8) return 'jpg';
-  if (bytes.length > 3 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return 'png';
-  return null;
-}
 
 // A page whose source is an IMAGE file: create a blank PDF page at the page's
 // point size and draw the image edge-to-edge.
