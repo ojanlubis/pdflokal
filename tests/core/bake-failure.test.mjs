@@ -18,6 +18,7 @@ import assert from 'node:assert/strict';
 import { createEditedPageProvider } from '../../js/v2/edited-page-provider.js';
 import { createBakeFailureReporter, scrubbedError, safeErrorMessage, BAKE_FAILURE_CAP } from '../../js/v2/bake-failure.js';
 import { validateEvent } from '../../js/core/telemetry-schema.js';
+import handler, { __setQueryForTests } from '../../api/t.js';
 
 // A page carrying one committed Ganti pair — the same shape page-surgery.js's
 // pageEdits filter counts as an edit, so editSignature(page) is non-empty and
@@ -95,10 +96,10 @@ test('the same bake throw reaches Sentry, scrubbed, tagged, with no breadcrumbs'
 
   // And nothing on the rail carries a string.
   assert.ok(!JSON.stringify(events).includes(SECRET));
-  // A `cannot encode` throw is failureReason's 'unsupported' — but commit/
-  // unsupported already MEANS "an unencodable character was committed"
-  // (js/v2/app.js). It must not be redefined (EXCLUDE 4).
-  assert.equal(events[0][1].reason, 'unknown');
+  // A `cannot encode` throw is failureReason's 'unsupported', and the rail
+  // records it as 'unsupported' (founder ruling 2026-10-11, replacing the
+  // 2026-10-01 'unknown' rewrite): the classifier's answer is not overwritten.
+  assert.equal(events[0][1].reason, 'unsupported');
   assert.deepEqual(events[1][1], { stage: 'commit', name: 'Error', hint: 'encode' });
 });
 
@@ -324,4 +325,40 @@ test('sentry-init: a console breadcrumb leaves the device content-free; other br
 
   const html = fs.readFileSync(new URL('../../alat-gambar.html', import.meta.url), 'utf8');
   assert.match(html, /beforeBreadcrumb:\s*\(b\)\s*=>[^\n]*category === 'console'/, 'the old wing carries the same hook');
+});
+
+// FOUNDER RULING 2026-10-11: a classified 'unsupported' bake failure is recorded
+// as 'unsupported', not rewritten to 'unknown'. Both classifier routes into it
+// (a `cannot encode` throw, a blown stack) must reach the server's validator
+// and the events insert with that exact value.
+test('a classified unsupported bake failure reaches the server as reason "unsupported"', async () => {
+  const stack = new RangeError('Maximum call stack size exceeded');
+  for (const thrown of [new Error('WinAnsi cannot encode "x" (0x2009)'), stack]) {
+    const { events, provider } = harness(async () => { throw thrown; });
+    await provider(editedPage());
+    const [name, props] = events[0];
+    assert.equal(name, 'failure');
+    assert.deepEqual(props, { stage: 'commit', reason: 'unsupported', class: 'none', blocked: false });
+    assert.equal(validateEvent(name, props).ok, true, 'the shared validator accepts it');
+
+    // The real endpoint: not dropped, and the written row carries the value.
+    const writes = [];
+    __setQueryForTests(async (text, params) => {
+      if (/telemetry_rejects/.test(String(text))) return { rowCount: params.length / 5 };
+      writes.push(params);
+      return { rowCount: params.length / 6 };
+    });
+    const chunks = [Buffer.from(JSON.stringify({
+      session_id: '3f1c9a52-0b6e-4a7d-9c11-2f7e5d8a4b30', app_version: 'abc1234',
+      events: events.map(([event, p]) => ({ event, props: p })),
+    }), 'utf8')];
+    const req = { method: 'POST', headers: { 'content-type': 'application/json' },
+      on(evt, cb) { if (evt === 'data') chunks.forEach((c) => cb(c)); if (evt === 'end') cb(); return this; } };
+    const res = { status() { return res; }, end() { return res; } };
+    try { await handler(req, res); } finally { __setQueryForTests(null); }
+    const rows = writes.flatMap((params) => params).filter((v) => typeof v === 'string' && v.startsWith('{'));
+    const failure = rows.map((r) => JSON.parse(r)).find((r) => r.stage === 'commit' && 'reason' in r);
+    assert.ok(failure, 'the failure event was written, not dropped at the edge');
+    assert.equal(failure.reason, 'unsupported');
+  }
 });

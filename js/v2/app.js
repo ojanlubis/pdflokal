@@ -2232,6 +2232,8 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
       // committed", and it still does — it is now also the count of
       // annotations that take the raster path at export. blocked:false as
       // before: the text below is committed either way.
+      // Since 2026-10-11 it is ALSO sent by js/v2/bake-failure.js (class 'none')
+      // for a bake that threw a classified 'unsupported' — see that file's header.
       // AUTHORED TEXT ONLY. A Ganti Teks replace runs a real coverage check
       // against the document's own font a few lines up and reports through
       // `insert` instead. Caught by tests/font-coverage.spec.js.
