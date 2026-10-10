@@ -75,6 +75,26 @@ export function anchorPage(pages) {
 // Callers: the merge path only (js/v2/app.js's loadFilesInner). Reorder and
 // rotate deliberately do NOT call this — re-anchoring under the user's finger
 // would resize the document mid-gesture.
+// An annotation's DISPLAY-frame geometry scaled by `k`, as a new object. The
+// same fields export.js's scaleAnnotationGeometry scales, plus a paragraph
+// block's display mapping (k = display px per pdf unit, disp, below). Doc-bound
+// surgery inputs (replaceBox/replaceTargets, block.width/origin/leading) are
+// in PDF units and stay put. Undefined stays undefined.
+function scaleDisplayGeometry(anno, k) {
+  const out = { ...anno };
+  for (const key of ['x', 'y', 'width', 'height', 'fontSize']) {
+    if (Number.isFinite(out[key])) out[key] *= k;
+  }
+  if (out.block) {
+    const b = { ...out.block };
+    if (Number.isFinite(b.k)) b.k *= k;
+    if (Number.isFinite(b.below)) b.below *= k;
+    if (b.disp) b.disp = { x: b.disp.x * k, y: b.disp.y * k };
+    out.block = b;
+  }
+  return out;
+}
+
 export function normalizePageWidths(doc) {
   if (doc.pages.length < 2) return [];
   // Count sources that actually CONTRIBUTED a page: a failed import can leave
@@ -95,6 +115,10 @@ export function normalizePageWidths(doc) {
     if (factor === 1) continue;
     page.width *= factor;
     page.height *= factor;
+    // Annotations live in this same display frame, so they move with it, or a
+    // signature at x=800 stays at 800 on a page now 595 wide. New objects, not
+    // in-place edits: history snapshots share nested fields (block) by reference.
+    page.annotations = page.annotations.map((a) => scaleDisplayGeometry(a, factor));
     // Drop the cached raster: it was rendered at the OLD point size. The view
     // stretches a raster to fit, so a stale one is geometrically right and
     // merely soft — but on a page scaled up several times over (a photo
