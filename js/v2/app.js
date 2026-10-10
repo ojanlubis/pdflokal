@@ -107,7 +107,7 @@ import { whiteoutRingPoints, whiteoutColorFrom, paperPoints, inkPoints, coverCol
 import { hitTestEditedLine, hitTestOcrEdit, editOwningLine } from '../core/edit-hit.js';
 import { createEditBake, runWhenIdle } from './edit-bake.js';
 import { createDocFontLive } from './doc-font-live.js';
-import { raiseToTopLayer, dropFromTopLayer } from './top-layer.js';
+import { raiseToTopLayer, dropFromTopLayer, openModalDialogs, shouldRaiseOverlay } from './top-layer.js';
 import { createToast } from './toast-layer.js';
 import { singleFlight } from './single-flight.js';
 
@@ -242,7 +242,12 @@ function showProcessing(total) {
   if (!loadingOverlay) return;
   clearTimeout(processingTimer);
   updateProcessing(0, total);
-  processingTimer = setTimeout(() => { loadingOverlay.hidden = false; raiseToTopLayer(loadingOverlay); }, 180);
+  // Dialogs open NOW: one opened before the timer fires must stay above the cover.
+  const openAtStart = openModalDialogs(document);
+  processingTimer = setTimeout(() => {
+    loadingOverlay.hidden = false;
+    if (shouldRaiseOverlay(openAtStart, openModalDialogs(document))) raiseToTopLayer(loadingOverlay);
+  }, 180);
 }
 function updateProcessing(done, total) {
   if (!loadingOverlay) return;

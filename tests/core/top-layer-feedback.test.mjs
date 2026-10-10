@@ -105,3 +105,41 @@ test('app.js hands the toast the real raise/drop helpers and raises the processi
   const hideFn = src.match(/function hideProcessing\(\) \{[\s\S]*?\n\}/)[0];
   assert.match(hideFn, /dropFromTopLayer\(loadingOverlay\)/);
 });
+
+// ---- the delayed raise must not cover a dialog opened since --------------------
+// showProcessing() raises #v2-loading 180ms later. A modal dialog opened inside
+// that window (Ctrl+S right after a file load starts) would otherwise sit UNDER
+// the 94%-opaque Memproses cover until the load ends. Raise only when no modal
+// dialog has opened since showProcessing; a dialog that was already open when
+// it started (the Halaman sheet's [+]) is the very case the raise exists for.
+const { openModalDialogs, shouldRaiseOverlay } = await import('../../js/v2/top-layer.js');
+
+test('openModalDialogs reads :modal dialogs, and falls back to [open] where :modal is unknown', () => {
+  const a = { id: 'a' }; const b = { id: 'b' };
+  const withModal = { querySelectorAll: (s) => (s === 'dialog:modal' ? [a] : [a, b]) };
+  assert.deepEqual(openModalDialogs(withModal), [a]);
+  const noModal = {
+    querySelectorAll: (s) => { if (s === 'dialog:modal') throw new SyntaxError('bad selector'); return [a, b]; },
+  };
+  assert.deepEqual(openModalDialogs(noModal), [a, b]);
+  assert.deepEqual(openModalDialogs(null), []);
+});
+
+test('shouldRaiseOverlay: nothing new opened -> raise; the Halaman sheet already open -> raise', () => {
+  const sheet = {}; const dlg = {};
+  assert.equal(shouldRaiseOverlay([], []), true);
+  assert.equal(shouldRaiseOverlay([sheet], [sheet]), true);
+  assert.equal(shouldRaiseOverlay([sheet], []), true);
+  assert.equal(shouldRaiseOverlay([sheet], [sheet, dlg]), false, 'a dialog opened since must stay above the overlay');
+  assert.equal(shouldRaiseOverlay([], [dlg]), false);
+});
+
+test('app.js: the delayed raise asks shouldRaiseOverlay with the dialogs seen at showProcessing', () => {
+  const src = fs.readFileSync(path.join(ROOT, 'js/v2/app.js'), 'utf8');
+  assert.match(src, /import \{[^}]*shouldRaiseOverlay[^}]*\} from '\.\/top-layer\.js'/);
+  const showFn = src.match(/function showProcessing\(total\) \{[\s\S]*?\n\}/)[0];
+  assert.match(showFn, /openModalDialogs\(document\)/, 'snapshot the open dialogs when processing starts');
+  assert.match(showFn, /shouldRaiseOverlay\(/);
+  assert.doesNotMatch(showFn, /\{ loadingOverlay\.hidden = false; raiseToTopLayer\(loadingOverlay\); \}/,
+    'an unconditional raise is the bug');
+});
