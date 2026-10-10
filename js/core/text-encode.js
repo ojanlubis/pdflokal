@@ -81,13 +81,36 @@ const LOOKALIKES = new Map([
   [0x2212, '-'],  // MINUS SIGN             (Word/Excel)
   // Primes -> the quotes they are mistaken for.
   [0x2032, "'"], [0x2033, '"'],
-  // Line/paragraph separators -> a plain newline, which the caller splits on.
-  [0x2028, '\n'], [0x2029, '\n'],
-  // TAB from Excel/Word -> the space it reads as. Refused, it sent the whole
-  // annotation to drawTextAsImage over one invisible character. VT/FF break
-  // the line, which is what they meant.
-  [0x0009, ' '], [0x000b, '\n'], [0x000c, '\n'],
 ].map(([cp, to]) => [String.fromCodePoint(cp), to]));
+
+// Whitespace the FILE draws differently from the SCREEN. The editor shows text
+// with `white-space: pre`, so a TAB there is a tab-stop gap while the export
+// draws one space: the words after it sat further right on screen than in the
+// download. These are therefore normalised when text ENTERS the model
+// (normaliseEnteredText), not only at export, so both read the same string.
+// Only these: every other lookalike above is something the user can see, and
+// the model keeps what they see (see the header).
+//   - TAB from Excel/Word -> the space it reads as. Refused, it sent the whole
+//     annotation to drawTextAsImage over one invisible character.
+//   - VT/FF break the line, which is what they meant; LS/PS likewise (the
+//     caller splits on the newline).
+const LAYOUT_CONTROLS = new Map([
+  [0x0009, ' '], [0x000b, '\n'], [0x000c, '\n'], [0x2028, '\n'], [0x2029, '\n'],
+].map(([cp, to]) => [String.fromCodePoint(cp), to]));
+for (const [ch, to] of LAYOUT_CONTROLS) LOOKALIKES.set(ch, to);
+
+/**
+ * The text an annotation should HOLD: layout controls resolved to what the
+ * export will draw, everything else untouched. Call where text enters the model.
+ * @param {string} text
+ * @returns {string}
+ */
+export function normaliseEnteredText(text) {
+  const s = String(text ?? '');
+  let out = '';
+  for (const ch of s) out += LAYOUT_CONTROLS.has(ch) ? LAYOUT_CONTROLS.get(ch) : ch;
+  return out;
+}
 
 /**
  * Normalise text so a WinAnsi standard font can encode it, WITHOUT changing
