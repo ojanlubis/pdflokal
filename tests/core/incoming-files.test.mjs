@@ -30,34 +30,34 @@ const { checkIncoming, replaceRefusal, SIZE_BLOCK } = await import('../../js/cor
 
 const file = (name, type, size = 10) => ({ name, type, size });
 
-test('a PDF (by type or by extension) and an image are usable', () => {
-  const r = checkIncoming([file('a.pdf', 'application/pdf'), file('b.PDF', ''), file('c.png', 'image/png')]);
+test('a PDF (by type or by extension) and an image are usable', async () => {
+  const r = await checkIncoming([file('a.pdf', 'application/pdf'), file('b.PDF', ''), file('c.png', 'image/png')]);
   assert.equal(r.refusal, undefined);
   assert.deepEqual(r.usable.map((f) => f.name), ['a.pdf', 'b.PDF', 'c.png']);
 });
 
-test('only unusable types refuse with pickFile', () => {
-  const r = checkIncoming([file('surat.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')]);
+test('only unusable types refuse with pickFile', async () => {
+  const r = await checkIncoming([file('surat.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')]);
   assert.equal(r.refusal, 'pickFile');
-  assert.equal(checkIncoming([]).refusal, 'pickFile');
+  assert.equal((await checkIncoming([])).refusal, 'pickFile');
 });
 
-test('an unusable file next to a usable one is skipped, not a refusal', () => {
-  const r = checkIncoming([file('x.docx', 'application/msword'), file('a.pdf', 'application/pdf')]);
+test('an unusable file next to a usable one is skipped, not a refusal', async () => {
+  const r = await checkIncoming([file('x.docx', 'application/msword'), file('a.pdf', 'application/pdf')]);
   assert.equal(r.refusal, undefined);
   assert.deepEqual(r.usable.map((f) => f.name), ['a.pdf']);
 });
 
-test('an oversize usable file refuses with tooBig naming the first one', () => {
+test('an oversize usable file refuses with tooBig naming the first one', async () => {
   const big = SIZE_BLOCK + 1;
-  const r = checkIncoming([file('ok.pdf', 'application/pdf'), file('huge.pdf', 'application/pdf', big), file('huger.png', 'image/png', big)]);
+  const r = await checkIncoming([file('ok.pdf', 'application/pdf'), file('huge.pdf', 'application/pdf', big), file('huger.png', 'image/png', big)]);
   assert.equal(r.refusal, 'tooBig');
   assert.equal(r.name, 'huge.pdf');
-  assert.equal(checkIncoming([file('edge.pdf', 'application/pdf', SIZE_BLOCK)]).refusal, undefined, 'exactly 100 MB is allowed');
+  assert.equal((await checkIncoming([file('edge.pdf', 'application/pdf', SIZE_BLOCK)])).refusal, undefined, 'exactly 100 MB is allowed');
 });
 
-test('an oversize file of an unusable type is not "too big", it is skipped', () => {
-  const r = checkIncoming([file('movie.mp4', 'video/mp4', SIZE_BLOCK + 1)]);
+test('an oversize file of an unusable type is not "too big", it is skipped', async () => {
+  const r = await checkIncoming([file('movie.mp4', 'video/mp4', SIZE_BLOCK + 1)]);
   assert.equal(r.refusal, 'pickFile');
 });
 
@@ -68,13 +68,13 @@ const sliceFrom = (needle, len = 900) => {
   return APP.slice(i, i + len);
 };
 
-test('replaceRefusal: a running load wins, then the selection is checked', () => {
+test('replaceRefusal: a running load wins, then the selection is checked', async () => {
   const pdf = [file('a.pdf', 'application/pdf')];
-  assert.equal(replaceRefusal({ loading: false, files: pdf }), null);
-  assert.equal(replaceRefusal({ loading: true, files: pdf }).refusal, 'stillLoading');
-  assert.equal(replaceRefusal({ loading: true, files: [file('x.docx', 'application/msword')] }).refusal, 'stillLoading');
-  assert.equal(replaceRefusal({ loading: false, files: [file('x.docx', 'application/msword')] }).refusal, 'pickFile');
-  const tooBig = replaceRefusal({ loading: false, files: [file('h.pdf', 'application/pdf', SIZE_BLOCK + 1)] });
+  assert.equal(await replaceRefusal({ loading: false, files: pdf }), null);
+  assert.equal((await replaceRefusal({ loading: true, files: pdf })).refusal, 'stillLoading');
+  assert.equal((await replaceRefusal({ loading: true, files: [file('x.docx', 'application/msword')] })).refusal, 'stillLoading');
+  assert.equal((await replaceRefusal({ loading: false, files: [file('x.docx', 'application/msword')] })).refusal, 'pickFile');
+  const tooBig = await replaceRefusal({ loading: false, files: [file('h.pdf', 'application/pdf', SIZE_BLOCK + 1)] });
   assert.deepEqual([tooBig.refusal, tooBig.name], ['tooBig', 'h.pdf']);
 });
 
@@ -101,7 +101,7 @@ function world({ loading = false } = {}) {
   const src = `
     let loadingFiles = ${loading}; let pendingReplace = false;
     ${cut('function toastRefusal(', '{', '}')}
-    ${cut('function refuseReplace(', '{', '}')}
+    ${cut('async function refuseReplace(', '{', '}')}
     ${cut("on(fileInput, 'change'", '(', ')')}
     ${cut("on('dc-replace', 'click'", '(', ')')}
     return { setPending(v) { pendingReplace = v; }, getPending() { return pendingReplace; } };`;
@@ -163,12 +163,12 @@ test('a refused Buka Baru clears pendingReplace', async () => {
   assert.equal(w.api.getPending(), false);
 });
 
-test('resetDoc is only awaited at the two replace sites, both behind refuseReplace', () => {
+test('resetDoc is only awaited at the two replace sites, both behind refuseReplace', async () => {
   assert.ok(!/refuseIncoming/.test(APP), 'refuseIncoming is gone; refuseReplace is the one guard');
   assert.equal([...APP.matchAll(/await resetDoc\(\)/g)].length, 2, 'exactly the two replace call sites');
 });
 
-test('loadFiles itself still uses the same rule (one rule, one home)', () => {
+test('loadFiles itself still uses the same rule (one rule, one home)', async () => {
   assert.ok(!/SIZE_BLOCK\s*=/.test(APP), 'app.js must not redefine the size limit');
   assert.match(sliceFrom('async function loadFilesInner', 800), /checkIncoming\(/);
 });

@@ -18,7 +18,7 @@
 
 import { createDoc, createAnnotation, getPage, findAnnotation, isCopyable, cloneForPaste } from '../core/model.js';
 import { failureReason, failureCause } from '../core/failure-reason.js';
-import { checkIncoming, isPdf, replaceRefusal } from '../core/incoming-files.js';
+import { checkIncoming, replaceRefusal } from '../core/incoming-files.js';
 import { isStandardFamily, unencodableInStandardFont } from '../core/text-encode.js';
 import {
   addAnnotation, removeAnnotation, updateAnnotation, clearSelection, selectAnnotation,
@@ -2897,7 +2897,7 @@ document.addEventListener('keydown', (e) => {
 // ---- file loading (multi-file = merge, by construction) --------------------------------
 // The type and size guard (100MB block) lives in core/incoming-files.js: the
 // replace paths must ask it BEFORE they wipe the open document.
-// Says why and returns true when the selection is not worth opening.
+// Says why a selection or a replace was refused.
 function toastRefusal({ refusal, name }) {
   if (refusal === 'stillLoading') toast(tr('toast.stillLoading'));
   else toast(refusal === 'tooBig' ? tr('toast.tooBig', { name }) : tr('toast.pickFile'));
@@ -2905,8 +2905,8 @@ function toastRefusal({ refusal, name }) {
 // The one guard of both replace paths (Ganti, Buka Baru). Toasts and returns
 // true when the replace must not wipe the doc: a load is running, or the
 // selection is unusable. Call it BEFORE resetDoc.
-function refuseReplace(files) {
-  const verdict = replaceRefusal({ loading: loadingFiles, files });
+async function refuseReplace(files) {
+  const verdict = await replaceRefusal({ loading: loadingFiles, files });
   if (!verdict) return false;
   toastRefusal(verdict);
   return true;
@@ -2964,9 +2964,14 @@ async function loadFiles(files) {
 }
 
 async function loadFilesInner(files) {
-  const verdict = checkIncoming(files);
+  // In picker order: PDFs append their pages, images become one page each.
+  // A PDF whose name lost its extension is told apart by its header
+  // (core/file-kind.js, behind checkIncoming); a file that cannot even be read
+  // for that is skipped there, never thrown here.
+  const verdict = await checkIncoming(files);
   if (verdict.refusal) { toastRefusal(verdict); return; }
-  const { usable } = verdict;
+  const { usable, kinds } = verdict;
+  const isPdf = (f) => kinds.get(f) === 'pdf';
   const pagesBefore = doc.pages.length;
   const firstLoad = pagesBefore === 0;
   if (firstLoad) baseName = baseNameOf(usable[0].name);
@@ -3429,7 +3434,7 @@ on(fileInput, 'change', async (e) => {
   // Refuse while the old doc is still intact: resetDoc is the point of no
   // return (it empties the undo history too). Appending needs no pre-check;
   // loadFiles asks the same rule and nothing is lost by its refusal.
-  if (files?.length && !(pendingReplace && refuseReplace(files))) {
+  if (files?.length && !(pendingReplace && await refuseReplace(files))) {
     if (pendingReplace) await resetDoc();
     await loadFiles(files).catch((err) => { console.error(err); toast(tr('toast.openFailed')); });
   }
@@ -3476,7 +3481,7 @@ on('dc-replace', 'click', async () => {
   if (!files) return;
   // Refuse BEFORE wiping the doc (a running load, a .docx, a 100MB+ file), or
   // the user loses the old doc and never gets the new one.
-  if (refuseReplace(files)) return;
+  if (await refuseReplace(files)) return;
   await resetDoc();
   await loadFiles(files).catch((err) => { console.error(err); toast(tr('toast.openFailed')); });
 });
