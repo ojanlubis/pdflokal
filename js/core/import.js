@@ -14,6 +14,7 @@
 import { createSource, createPage, getSource } from './model.js';
 import { addSource, addPages } from './operations.js';
 import { ensurePdfJs } from './vendor.js';
+import { openPdf } from './pdfjs-open.js';
 import { editSignature } from './page-surgery.js';
 import { totalPageRotation } from './page-rotation.js';
 import { rasterKey } from './raster-key.js';
@@ -159,8 +160,7 @@ export async function importPdf(doc, { name, bytes }) {
   // fetched on demand (core/vendor.js). This is the first moment it's genuinely
   // needed, and it's already async, so the load costs the user nothing extra.
   const pdfjsLib = await ensurePdfJs();
-  // Defensive .slice(): PDF.js may detach the ArrayBuffer it's handed.
-  const pdf = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+  const pdf = await openPdf(pdfjsLib, bytes);
   // WHY the Source joins the doc only AFTER every page loaded, and destroy() is
   // in a finally: a broken page tree (getDocument fine, getPage(k) throws) used
   // to leak the PDF.js document and leave a page-less Source behind, so the next
@@ -216,7 +216,7 @@ export async function importPdf(doc, { name, bytes }) {
 // core/text-visibility.js carries the why; tests/ocr-layer.spec.js the proof.
 export async function probeTextLayer(bytes) {
   const pdfjsLib = await ensurePdfJs();
-  const pdf = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+  const pdf = await openPdf(pdfjsLib, bytes);
   try {
     const page = await pdf.getPage(1);
     return await pageHasVisibleText(page, pdfjsLib);
@@ -448,9 +448,7 @@ export function createPageRasterizer(doc, opts = {}) {
         return null;
       }
       if (!result || !result.bytes) return null;
-      const pdfjsLib = await ensurePdfJs();
-      const bytes = result.bytes;
-      return pdfjsLib.getDocument({ data: bytes.slice ? bytes.slice() : Uint8Array.from(bytes) }).promise;
+      return openPdf(await ensurePdfJs(), result.bytes);
     })();
     editedDocCache.set(page.id, { signature, docPromise });
     return docPromise;
@@ -467,7 +465,7 @@ export function createPageRasterizer(doc, opts = {}) {
       remember(
         docCache,
         sourceId,
-        ensurePdfJs().then((lib) => lib.getDocument({ data: source.bytes.slice() }).promise),
+        ensurePdfJs().then((lib) => openPdf(lib, source.bytes)),
       );
     }
     return docCache.get(sourceId);

@@ -40,6 +40,8 @@
  *   thread unchanged.
  */
 
+import { openPdf } from './pdfjs-open.js';
+
 // WHY 0.97: require the rebuilt PDF to be at least 3% smaller before we ship
 // it. Below that the "win" is noise (or negative) and not worth degrading text
 // to images — return the original instead. See the honesty guard above.
@@ -106,10 +108,9 @@ export async function compressPdfBytes(bytes, deps = {}) {
 // pipeline. Behaviour is byte-identical to what compressPdfBytes always did.
 async function compressOnce(input, { PDFLib, pdfjsLib, quality, maxDim, onProgress, originalSize }) {
 
-  // WHY .slice(): PDF.js detaches the ArrayBuffer it's handed. We MUST keep
-  // `input` intact — the honesty guard returns it verbatim when compression
-  // doesn't win, so it can't be left detached.
-  const pdf = await pdfjsLib.getDocument({ data: input.slice() }).promise;
+  // openPdf copies before handing pdf.js the bytes: `input` MUST stay intact,
+  // the honesty guard returns it verbatim when compression doesn't win.
+  const pdf = await openPdf(pdfjsLib, input);
   const total = pdf.numPages;
 
   // try/finally: a page that throws (corrupt page, an out-of-memory canvas

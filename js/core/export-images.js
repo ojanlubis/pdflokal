@@ -17,6 +17,8 @@
  * doesn't balloon into a multi-megapixel canvas (memory + upscaling artifacts).
  */
 
+import { openPdf } from './pdfjs-open.js';
+
 // jpg → image/jpeg is the ONE spot the short format name maps to a MIME type.
 const FORMAT_MIME = { jpg: 'image/jpeg', png: 'image/png' };
 
@@ -62,9 +64,7 @@ export async function renderPdfToImages(bytes, opts = {}) {
   if (!mime) throw new Error(`renderPdfToImages: unsupported format "${format}" (jpg|png)`);
   const ext = format === 'png' ? 'png' : 'jpg';
 
-  // Defensive .slice(): PDF.js may detach the ArrayBuffer it's handed (same
-  // guard as import.js / loadPdfDocument).
-  const pdf = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+  const pdf = await openPdf(pdfjsLib, bytes);
   try {
     // null → every page, 1..numPages, in order.
     const nums = pageNumbers ?? Array.from({ length: pdf.numPages }, (_, i) => i + 1);

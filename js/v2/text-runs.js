@@ -17,6 +17,7 @@
 
 import { getSource } from '../core/model.js';
 import { ensurePdfJs } from '../core/vendor.js';
+import { openPdf } from '../core/pdfjs-open.js';
 import { groupRunsIntoLines, resolveTap, runsNotOwned } from '../core/text-lines.js';
 import { pageHasVisibleText } from '../core/text-visibility.js';
 import { displayFrameKey } from '../core/page-rotation.js';
@@ -55,7 +56,7 @@ export function createTextRunIndex({ getDoc }) {
       const source = getSource(getDoc(), sourceId);
       docCache.set(
         sourceId,
-        ensurePdfJs().then((lib) => lib.getDocument({ data: source.bytes.slice() }).promise),
+        ensurePdfJs().then((lib) => openPdf(lib, source.bytes)),
       );
     }
     return docCache.get(sourceId);
