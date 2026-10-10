@@ -341,10 +341,11 @@ test.describe('edit beta: Increment D consent-gated sample', () => {
     // Don't wait for the ask block on purpose — this pins the abandon path
     // regardless of whether capture had landed yet.
 
-    // "Buka Baru": File menu -> Buka Baru -> pick a new file. resetDoc() zeroes
-    // doc.pages BEFORE loadFiles() runs, so loadFiles's own `doc.pages.length
-    // === 0` check fires resetEditFeedback() -> dismissEditFeedback() ->
-    // finish(), which records the still-open 👎 note-less, sample-less.
+    // "Buka Baru": File menu -> Buka Baru -> pick a new file. The replace is
+    // staged: the new file opens into a fresh Doc and, at the commit in
+    // loadFilesInner (after resetDoc(staged)), resetEditFeedback() ->
+    // dismissEditFeedback() -> finish() records the still-open 👎 note-less,
+    // sample-less.
     await page.click('#btn-file');
     await page.click('#fm-new');
     await page.click('#nc-go'); // edits not downloaded -> #new-confirm asks first

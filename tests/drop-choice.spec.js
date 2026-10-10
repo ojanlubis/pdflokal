@@ -145,3 +145,43 @@ test.describe('File > Buka Baru', () => {
     await expect(page.locator('body')).not.toHaveClass(/is-empty/);
   });
 });
+
+// A file can pass the type check and still not decode. Red on revert: resetDoc
+// ran before the import loop found out, so a HEIC photo or a corrupt PDF left
+// the landing (0 pages) with the old work and its undo history gone.
+test.describe('a replace with a file that cannot be decoded', () => {
+  const HEIC = { name: 'foto.heic', mimeType: 'image/heic', buffer: Buffer.from('bukan gambar sungguhan') };
+  const RUSAK = { name: 'rusak.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 bukan pdf sungguhan') };
+
+  async function expectDocKept(page) {
+    await page.waitForTimeout(800); // give a wrongly-ordered wipe time to land
+    expect(await pageCount(page)).toBe(2);
+    await expect(page.locator('.pv-anno-text')).toHaveCount(1);
+    expect(await page.evaluate(() => window.v2.history.undoStack.length)).toBeGreaterThan(0);
+    await expect(page.locator('body')).not.toHaveClass(/is-empty/);
+  }
+
+  for (const bad of [HEIC, RUSAK]) {
+    test(`Ganti with ${bad.name} keeps the doc and its edits`, async ({ page }) => {
+      await open(page);
+      await addText(page);
+      await page.evaluate(async ({ name, type, text }) => {
+        const dt = new DataTransfer();
+        dt.items.add(new File([text], name, { type }));
+        document.getElementById('v2-stage').dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
+      }, { name: bad.name, type: bad.mimeType, text: bad.buffer.toString() });
+      await page.click('#dc-replace');
+      await expectDocKept(page);
+    });
+
+    test(`Buka Baru with ${bad.name} keeps the doc and its edits`, async ({ page }) => {
+      await open(page);
+      await addText(page, 'Satu');
+      await page.click('#btn-file');
+      await page.click('#fm-new');
+      await page.click('#nc-go');
+      await page.setInputFiles('#file-input', bad);
+      await expectDocKept(page);
+    });
+  }
+});
