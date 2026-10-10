@@ -2809,7 +2809,6 @@ function doRedo() {
   if (redo(history, doc)) afterHistoryStep(prevPages);
 }
 function afterHistoryStep(prevPages) {
-  pageManager.invalidateThumbs();
   rebuildStage();
   syncEditedRasters(prevPages);
   // Ctrl+Z is allowed inside the Halaman sheet (keydown below), so its grid
