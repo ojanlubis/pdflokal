@@ -74,7 +74,8 @@ export function createOcrIndex({ getDoc, rasterizer }) {
     // relationship — see core/ocr-lines.js's header.
     const rotated = (page.rotation || 0) % 180 !== 0;
     const widthPt = rotated ? page.height : page.width;
-    const scale = ocrScaleFor(widthPt);
+    const heightPt = rotated ? page.width : page.height;
+    const scale = ocrScaleFor(widthPt, heightPt);
     const canvas = await rasterizer.renderCanvas(page, { scale });
     const data = await recognizeCanvas(canvas, { onProgress });
     return ocrLinesToPageLines(data, scale);

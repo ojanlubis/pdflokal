@@ -242,9 +242,18 @@ export function ocrLinesToPageLines(data, scale) {
  * (2026-08-22: 53 words, 0 skipped, 0.7s under the live CSP), and the ×3 cap
  * keeps a small page — a photo cropped to a receipt — from being blown up
  * past the resolution its own pixels actually carry.
- * @param {number} widthPt  page width in page-space px (== points)
+ *
+ * The HEIGHT caps the pixels too: width alone gave a long phone screenshot
+ * (1080x10000) a 30 MP canvas, past iOS Safari's ~16.7 MP limit and the
+ * engine's memory on a mid-range Android. OCR_MAX_PIXELS sits above A4 at ×3
+ * (4.5 MP), so every ordinary page keeps its proven density.
+ * @param {number} widthPt   page width in page-space px (== points)
+ * @param {number} [heightPt] page height; omitted = width-only (old answer)
  */
-export function ocrScaleFor(widthPt) {
+const OCR_MAX_PIXELS = 5e6;
+export function ocrScaleFor(widthPt, heightPt) {
   if (!Number.isFinite(widthPt) || widthPt <= 0) return 2;
-  return Math.min(3, 1800 / widthPt);
+  const byWidth = Math.min(3, 1800 / widthPt);
+  if (!Number.isFinite(heightPt) || heightPt <= 0) return byWidth;
+  return Math.min(byWidth, Math.sqrt(OCR_MAX_PIXELS / (widthPt * heightPt)));
 }
