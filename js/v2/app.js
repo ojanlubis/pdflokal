@@ -3409,7 +3409,13 @@ on(fileInput, 'change', async (e) => {
 document.addEventListener('dragover', (e) => e.preventDefault());
 document.addEventListener('drop', (e) => {
   e.preventDefault();
-  if (e.dataTransfer?.files?.length) loadFiles(e.dataTransfer.files);
+  // Never behind a sheet (the Halaman sheet re-renders itself on a merge, so it
+  // is the one exception). Dropped behind Unduh, the merge missed the bytes the
+  // sheet had already built, and markClean then called the merged doc saved.
+  if (document.querySelector('dialog[open]:not(#pm-sheet)')) return;
+  if (e.dataTransfer?.files?.length) {
+    loadFiles(e.dataTransfer.files).catch((err) => { console.error(err); toast(tr('toast.openFailed')); });
+  }
 });
 
 // ---- download: the Unduh sheet (output pipeline) ------------------------------------------
