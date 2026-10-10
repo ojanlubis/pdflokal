@@ -108,6 +108,33 @@ test.describe('Hapus armed: what a tap must NOT do', () => {
     expect(countIn(await unduh(page), LINE)).toBe(2);
   });
 
+  // A mouse has no implicit pointer capture: a press released OUTSIDE the stage
+  // (dragged into the gutter or the toolbar) never sent its pointerup to
+  // interaction.js, so the stale tap candidate swallowed the next press, and
+  // that press's release fired the OLD tap instead.
+  test('a press released outside the stage does not swallow the next tap', async ({ page }) => {
+    test.setTimeout(60000);
+    await openDoc(page);
+    await armHapus(page);
+    // Press on the margin paper of the line's row, then leave the stage.
+    const paper = await paperPoint(page);
+    await page.mouse.move(paper.x, paper.y);
+    await page.mouse.down();
+    await page.mouse.move(2, 2, { steps: 4 }); // the header: not the stage
+    await page.mouse.up();
+    await page.waitForTimeout(200);
+    expect(await annos(page), 'a press that left the stage must delete nothing').toEqual([]);
+
+    // Measured AFTER the release: the drag toward the header can autoscroll.
+    const target = centerOf(await lineBox(page, { str: LINE, nth: 1 }));
+    // Guard: the click must land beyond the 12px tap slop of the abandoned
+    // press, or a stale candidate would fire AT it and this test passes broken.
+    expect(Math.hypot(target.x - paper.x, target.y - paper.y)).toBeGreaterThan(40);
+    await page.mouse.click(target.x, target.y);
+    await expect.poll(async () => (await annos(page)).length, { timeout: 15000 }).toBe(1);
+    await expect.poll(async () => inkOf(page, (await crop(page, { str: LINE, nth: 1 })).buf), { timeout: 15000 }).toBe(0);
+  });
+
   test('a drag is the camera: nothing deleted, nothing reported', async ({ page }) => {
     await openDoc(page);
     await armHapus(page);
