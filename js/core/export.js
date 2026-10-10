@@ -29,6 +29,7 @@ import { CLONE_FONT_VARIANTS, CLONE_FONT_URLS, isSfntFontProgram } from './clone
 import { toStandardFontSafe, drawTextSafe, unencodableInStandardFont } from './text-encode.js';
 import { totalPageRotation } from './page-rotation.js';
 import { orderedForPaint } from './annotation-order.js';
+import { scaleAnnotationGeometry } from './annotation-geometry.js';
 
 // ---- fonts ------------------------------------------------------------------
 
@@ -452,28 +453,13 @@ async function addImagePage(env, page, source) {
 
 // ---- merge width normalisation ------------------------------------------------
 
-// The geometric fields every drawer above reads, scaled by `k`. Used to express
-// annotation coordinates — which live in the page's NORMALISED display frame —
-// back in the source page's NATIVE frame, so they can be drawn alongside the
-// original content and then scaled up with it in one uniform move (see the
-// ordering argument in buildPdfBytes).
-//
-// ⚠️ Deliberately NOT applied to `replaceBox`/`replaceTargets`. Those are
-// surgery inputs, and surgery reads content-stream geometry, which is native
-// already — applyPageSurgery runs on the untouched annotation list, before any
-// of this. Scaling them here would send a doubly-transformed target into
-// text-walk.js and silently lose the match.
-//
-// Undefined fields stay undefined: drawSignature derives a missing `height`
-// from the embedded image's own ratio, and multiplying `undefined` would turn
-// that into NaN and drop the signature off the page.
-function scaleAnnotationGeometry(anno, k) {
-  const out = { ...anno };
-  for (const key of ['x', 'y', 'width', 'height', 'fontSize']) {
-    if (Number.isFinite(out[key])) out[key] *= k;
-  }
-  return out;
-}
+// Annotation coordinates live in the page's NORMALISED display frame; the
+// drawers express them back in the source page's NATIVE frame by scaling with
+// 1 / pageScale, drawing alongside the original content, and then scaling the
+// finished page up in one uniform move (see the ordering argument in
+// buildPdfBytes). The scaling itself is core/annotation-geometry.js's, the one
+// home of that frame contract. Surgery inputs (replaceBox/replaceTargets) are
+// native already and are never scaled: applyPageSurgery reads the untouched list.
 
 // ---- pass-through: the untouched document -----------------------------------
 
