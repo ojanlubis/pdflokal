@@ -215,3 +215,69 @@ export function removeRunsFromPdfPage(page, PDFLib, targets) {
 
   return { removed, results };
 }
+
+// Which /Font resource paints this line (its DOMINANT run), and does the line
+// mix resources? A dry run against the SOURCE page. Moved out of prepareDocFont
+// unchanged (2026-10-01) so the re-edit path can skip it and seed from the
+// stored decision instead; moved here from js/v2/app.js (2026-10-10) because it
+// is a pure read of this module's own removal plan, testable headless.
+export function dominantLineFont(pdfPage, PDFLib, line) {
+  // DRY RUN ONLY: learns the resource font name painting this line on the
+  // SOURCE page. Nothing here is written back anywhere — same throwaway
+  // read core/redact.js's own removeRunsFromPdfPage performs for real at
+  // export time, run here purely to look.
+  const joined = readPageContents(pdfPage, PDFLib);
+  const fonts = extractFontMetrics(pdfPage, PDFLib);
+  // ONE TARGET PER CONSTITUENT RUN, not one blended target — the same
+  // correction 39e0b9f made to smartReplace's surgery geometry (js/v2/app.js).
+  // This call site was missed by that fix.
+  //
+  // WHY it matters here: a blended target takes its `size` from the LINE
+  // (text-lines.js's dominant run), so planRunRemoval's per-target sizeOk
+  // gate silently rejects any run painted at a materially different size,
+  // and `insert` then describes only whichever ops survived that filter.
+  // With per-run targets each run keeps its own size and is matched on its
+  // own terms, so the answer is correct BY CONSTRUCTION rather than by
+  // luck — and, just as importantly, the per-run results make a
+  // multi-font line VISIBLE instead of collapsing it to one blended guess.
+  //
+  // Byte-identical no-op on a single-run line (the overwhelming common
+  // case): `line.runs` has one entry whose `.pdf` IS `line.pdf`.
+  const targets = line.runs?.length ? line.runs.map((r) => r.pdf) : [line.pdf];
+  const { results } = planRunRemoval(joined, fonts, targets);
+  const names = results.map((r) => r.insert?.fontName || null);
+
+  // WHICH run's font represents the line — and what that entitles us to say
+  // about it. Seat ruling 2026-07-28 (option C): the two halves of "the
+  // line's font" have DIFFERENT epistemic status, so they get different
+  // policies.
+  //
+  // FAMILY is answerable. The draft has to render in something, and the
+  // DOMINANT run (widest by pdf.len) is defensible: it is already what
+  // core/text-lines.js calls this line's font, it is what the hover glow
+  // implies, and it is most of the glyphs. Note it is a proxy — a dash
+  // leader can out-width the text it trails — but it is the same proxy the
+  // rest of the system already uses, so this stays consistent rather than
+  // inventing a third answer to a question that already had two.
+  //
+  // WEIGHT is NOT answerable on a line whose runs use different fonts. It
+  // was being taken from planRunRemoval's `insert`, which reports the FIRST
+  // run BY CONTENT-STREAM POSITION — a different selector from the dominant
+  // one, so on `Nama : Budi` (bold label painted first, regular value wider)
+  // the two disagreed and `draft.bold = draft.bold || fp.bold` bolded the
+  // ENTIRE replacement, value included. Since a mixed-font line also makes
+  // the native stamp decline, the twin fallback then RENDERED that wrong
+  // flag — a visible defect, not just a telemetry one.
+  //
+  // So: answer what's answerable, decline what isn't. One policy for both is
+  // what produced the defect.
+  let domIdx = 0;
+  for (let i = 1; i < targets.length; i += 1) {
+    if ((targets[i]?.len ?? 0) > (targets[domIdx]?.len ?? 0)) domIdx = i;
+  }
+  return {
+    fontName: names[domIdx] || names.find(Boolean) || null,
+    mixedFonts: new Set(names.filter(Boolean)).size > 1,
+  };
+}
+
