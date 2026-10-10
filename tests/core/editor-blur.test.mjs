@@ -47,7 +47,7 @@ test('no active element at all (focused node removed) commits', () => {
 // A stand-in editor and document: EventTargets carrying the two fields the
 // binder reads. `guard` stands in for leave-guard.js's guardDraft.
 function rig(text = '') {
-  const ed = Object.assign(new EventTarget(), { textContent: text });
+  const ed = Object.assign(new EventTarget(), { textContent: text, isConnected: true });
   const doc = Object.assign(new EventTarget(), { activeElement: ed, visibilityState: 'visible' });
   const calls = { commit: 0, check: null, released: 0 };
   const commit = () => { calls.commit++; };
@@ -63,6 +63,25 @@ test('holdEditor: a window blur keeps the editor; a real focus move commits', ()
   doc.activeElement = null;
   ed.dispatchEvent(new Event('blur'));
   assert.equal(calls.commit, 1, 'focus left the editor');
+});
+
+test('holdEditor: typed text in an open editor arms the leave guard, no history step', () => {
+  // LEAVE GUARD (founder ruling 2026-10-06): held open across a window switch,
+  // typed text on a clean document is in no history yet. Quitting the browser
+  // from another app must still ask.
+  const { ed, doc, calls, commit, guard } = rig('Halo');
+  const release = editorBlur.holdEditor(ed, commit, { doc, guard });
+  assert.equal(typeof calls.check, 'function', 'the editor registered no leave-guard check');
+  assert.equal(calls.check(), false, 'nothing typed: what it opened with');
+  ed.textContent = 'Halo dunia';
+  assert.equal(calls.check(), true, 'typed text');
+  ed.textContent = '';
+  assert.equal(calls.check(), true, 'cleared is a change too');
+  ed.isConnected = false;
+  assert.equal(calls.check(), false, 'an editor removed without its commit has nothing to keep');
+  assert.equal(calls.commit, 0, 'the guard alone never commits');
+  release();
+  assert.equal(calls.released, 1, 'the commit releases the hold');
 });
 
 // The function body of openTextEditor in the app as shipped, comments

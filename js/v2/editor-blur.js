@@ -17,13 +17,24 @@
  * the test can read app.js for the call (a bare blur listener there is the
  * reverted shape).
  */
+import { guardDraft } from './leave-guard.js';
+
 export function blurLeavesEditor(activeElement, editorEl) {
   return activeElement !== editorEl;
 }
 
 // Binds the editor's ways out. Returns the release, which app.js's commit()
 // calls: commit() is the only path out of the editor.
-export function holdEditor(ed, commit, { doc = document } = {}) {
+//
+// LEAVE GUARD: held open across a window switch, typed text on a clean
+// document is in no history yet, so quitting the browser from another app
+// lost it without the leave prompt. While the editor is open, text that
+// differs from what it opened with counts as unsaved work (leave-guard.js
+// guardDraft), and no history step is recorded for it. The check is live:
+// an editor removed without its commit reads false.
+export function holdEditor(ed, commit, { doc = document, guard = guardDraft } = {}) {
+  const opened = ed.textContent;
   ed.addEventListener('blur', () => { if (blurLeavesEditor(doc.activeElement, ed)) commit(); });
-  return () => {};
+  const releaseGuard = guard(() => ed.isConnected && ed.textContent !== opened);
+  return () => { releaseGuard(); };
 }
