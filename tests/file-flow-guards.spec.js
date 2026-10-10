@@ -13,6 +13,10 @@
  *    the pre-merge bytes and markClean called the merged doc saved.
  * 4. Buka Baru with a file that fails to open left a blank, chrome-less editor
  *    with the old document already destroyed.
+ * 5. Arrow keys nudged the selected annotation behind an open sheet (the nudge
+ *    is its own keydown listener, so the main handler's open-sheet guard never
+ *    covered it). Unduh then shipped the pre-nudge bytes and markClean called
+ *    the moved doc saved.
  */
 import { test, expect } from '@playwright/test';
 import path from 'path';
@@ -134,3 +138,32 @@ test('Buka Baru with a file that cannot open returns to the landing, not a blank
   await expectFirstPage(page);
   await expect(page.locator('body')).not.toHaveClass(/is-empty/);
 });
+
+// The nudge listener is separate from the main keydown handler, so it needs its
+// own open-sheet guard (2a82d89 covered undo/Delete/tool keys only).
+for (const sheet of [
+  { name: 'Unduh', open: '#btn-download', sel: '#dl-sheet' },
+  { name: 'Halaman', open: '#btn-pages', sel: '#pm-sheet' },
+]) {
+  test(`arrow keys do not nudge the selected annotation behind the ${sheet.name} sheet`, async ({ page }) => {
+    await open(page);
+    await page.keyboard.press('t');
+    await page.click('.pv-page >> nth=0', { position: { x: 200, y: 200 } });
+    await page.keyboard.type('Geser aku');
+    await page.keyboard.press('Enter');
+    await expect(page.locator('.pv-anno-text')).toHaveText('Geser aku');
+    const x = () => page.evaluate(() => window.v2.getDoc().pages[0].annotations[0].x);
+    const x0 = await x();
+
+    // KNOWN-POSITIVE first: with no sheet open the same key does move it, so the
+    // equality below cannot pass merely because the selection was lost.
+    await page.keyboard.press('ArrowRight');
+    expect(await x(), 'VACUITY GUARD: nudge works with no sheet open').toBe(x0 + 1);
+
+    await page.click(sheet.open);
+    await expect(page.locator(sheet.sel)).toHaveJSProperty('open', true);
+    expect(await page.evaluate(() => window.v2.getDoc().selection.annotationId), 'still selected behind the sheet').not.toBeNull();
+    for (let i = 0; i < 5; i++) await page.keyboard.press('ArrowRight');
+    expect(await x(), 'the annotation did not move behind the sheet').toBe(x0 + 1);
+  });
+}
