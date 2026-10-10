@@ -40,7 +40,7 @@ import { createPageSlot, pageDisplaySize, syncOverlay, textFontCss, applyTextFon
 import { createViewportStream } from '../render/viewport.js';
 import { RASTER_BASE, sharpenScale, maxPixelsFor, imageScaleCap } from '../render/sharpen.js';
 import { createInteraction } from '../render/interaction.js';
-import { createFormatBar, formatTarget } from './format-bar.js';
+import { createFormatBar, formatTarget, blurCommitsDraft } from './format-bar.js';
 import { createTextRunIndex, mapRunFont, MIN_HIT } from './text-runs.js';
 import { createGantiSteer } from './ganti-steer.js';
 import { resolveTap, draftFontSize } from '../core/text-lines.js';
@@ -137,6 +137,7 @@ let baseName = 'dokumen';
 let editingAnno = null;       // text annotation currently in the inline editor
 let editingEl = null;         // its contenteditable (format bar restyles it live)
 let editingIsReplace = false; // Ganti Teks draft open → NO format bar (see below)
+let heldDraft = null;         // { resume, commit } while an empty draft waits on a format-bar control (blurCommitsDraft)
 
 // ---- BETA edit-feedback (founder ruling 2026-07-22, SIMPLIFIED) -----------------
 // Ask 👍/👎 ONCE, on the FIRST successful commit of a document. The founder
@@ -939,8 +940,9 @@ function selectedTextAnno() {
   return found && found.annotation.type === 'text' ? found.annotation : null;
 }
 
+const formatBarEl = document.getElementById('format-bar');
 const formatBar = createFormatBar({
-  el: document.getElementById('format-bar'),
+  el: formatBarEl,
   getDoc: () => doc,
   history,
   getTarget: () => formatTarget({ editingAnno, editingEl, selected: selectedTextAnno() }),
@@ -961,6 +963,7 @@ const formatBar = createFormatBar({
       editingEl.style.color = d.color || '#000';
     }
   },
+  onControlDone: () => heldDraft?.resume(),
 });
 
 function syncFormatBar() {
@@ -1944,6 +1947,10 @@ on('pm-close', 'click', () => pageManager.close());
 // One code path for "place new text" and "edit existing text": a contenteditable
 // positioned in the page overlay at page coords. Commit on blur / Enter.
 function openTextEditor({ pageId, x, y, anno, draft }) {
+  // A held empty draft is unfocused, so no blur will ever close it: a tap that
+  // opens the next editor (Teks is still armed) closes it here, BEFORE this
+  // editor claims editingEl, or its commit would clear the new editor's state.
+  heldDraft?.commit();
   const slot = slots.find((s) => s.page.id === pageId);
   if (!slot) return;
   const overlay = slot.view.querySelector('.pv-overlay');
@@ -1993,10 +2000,12 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
   let committed = false; // guard: blur fires after Enter-commit too
   let escaped = false;   // Escape = back out; an empty commit without it = delete the line
   let releaseKeyboardWatch = () => {};
+  let releaseHold = () => {};
   const commit = () => {
     if (committed) return;
     committed = true;
     releaseKeyboardWatch(); // before ed.remove(), so the listener never outlives its element
+    releaseHold();
     // RUNG D: read the paragraph's line breaks off the editor BEFORE it leaves
     // the DOM — they are what the file will hold (js/v2/block-editor.js).
     // The text is normalised HERE (a TAB is the one space the file draws), so
@@ -2415,7 +2424,40 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
     }
   };
 
-  ed.addEventListener('blur', commit);
+  ed.addEventListener('blur', (e) => {
+    const text = editorCommit(ed.textContent, null).text;
+    if (blurCommitsDraft({ relatedTarget: e.relatedTarget, barEl: formatBarEl, text, hasAnno: !!anno, hasDraft: !!draft })) {
+      commit();
+      return;
+    }
+    // Held open while a format-bar control has focus. Focus moving between
+    // controls keeps it held; coming back to the editor resumes the plain
+    // blur-commits path; going anywhere else is a click-away, so it commits.
+    const onBarLeave = (ev) => {
+      if (formatBarEl.contains(ev.relatedTarget)) return;
+      releaseHold();
+      if (ev.relatedTarget !== ed) commit();
+    };
+    formatBarEl.addEventListener('focusout', onBarLeave);
+    // resume = the control is done (onControlDone). An editor a rebuild has
+    // detached, or one a newer editor replaced, cannot take focus back: close it.
+    // commit (from openTextEditor) blurs the control first: a size typed but not
+    // yet entered lands on the draft's defaults under the field's own blur rule,
+    // before the close re-syncs the bar to the selected text and overwrites it.
+    const hold = {
+      resume: () => { if (ed.isConnected && editingEl === ed) ed.focus(); else commit(); },
+      commit: () => {
+        if (formatBarEl.contains(document.activeElement)) document.activeElement.blur();
+        commit();
+      },
+    };
+    heldDraft = hold;
+    releaseHold = () => {
+      formatBarEl.removeEventListener('focusout', onBarLeave);
+      if (heldDraft === hold) heldDraft = null;
+      releaseHold = () => {};
+    };
+  });
   ed.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ed.blur(); }
     // Ctrl/Cmd+B / I = the format bar's buttons, for the WHOLE box. WHY
