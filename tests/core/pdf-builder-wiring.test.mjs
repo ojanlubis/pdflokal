@@ -43,7 +43,12 @@ test('buildPdfArtifact keeps a clean build distinct from a substituted one', asy
 
 test('both UI routes use the adapter instead of rebuilding its logic', () => {
   for (const file of ['js/v2/app.js', 'js/v2/download-sheet.js']) {
-    const source = fs.readFileSync(path.join(ROOT, file), 'utf8');
+    // Comments stripped (block, whole-line and trailing `//`): a removed call
+    // left behind as `// buildPdfArtifact(subset)` must not satisfy the match.
+    // Catches: the real call replaced while a comment still names it.
+    const source = fs.readFileSync(path.join(ROOT, file), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/(^|[^:'"`\\])\/\/.*$/gm, '$1');
     assert.match(source, /buildPdfArtifact\s*\(/, `${file} does not call the shared PDF builder`);
     assert.doesNotMatch(source, /buildPdfBytes\s*\(/,
       `${file} still calls the core exporter directly, so the duplicate survives`);
