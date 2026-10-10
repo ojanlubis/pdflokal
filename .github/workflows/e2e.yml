@@ -46,6 +46,13 @@ jobs:
               - 'tests/**'
               - 'images/**'
               - 'fonts/**'
+              # /en is generated from i18n; core tests read both and the
+              # sitemap. Without these a PR touching only them skipped every
+              # test and stayed green until the nightly run after merge.
+              - 'en/**'
+              - 'i18n/**'
+              - 'sitemap.xml'
+              - 'robots.txt'
               - 'playwright.config.js'
               - 'eslint.config.js'
               - 'package.json'
