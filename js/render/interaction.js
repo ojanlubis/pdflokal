@@ -177,6 +177,12 @@ export function createInteraction(ctx) {
   }
 
   function onPointerDown(e) {
+    // A new press from the SAME pointer proves its old candidate's release went
+    // elsewhere: a mouse has no implicit capture, so a press released over the
+    // gutter or toolbar never reached the stage. Kept, the stale candidate
+    // swallowed this press and its release then fired the OLD tap (with Hapus,
+    // deleting a printed line, even after a tool switch).
+    if (tapCandidate && tapCandidate.pointerId === e.pointerId) tapCandidate = null;
     if (gesture || tapCandidate) return;    // one gesture at a time
     if (e.button !== undefined && e.button !== 0 && e.pointerType === 'mouse') return;
     const doc = ctx.getDoc();
