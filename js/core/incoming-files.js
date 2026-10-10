@@ -34,3 +34,13 @@ export function checkIncoming(files) {
   if (oversize) return { usable, refusal: 'tooBig', name: oversize.name };
   return { usable };
 }
+
+// The ONE guard both replace paths (Ganti, Buka Baru) ask before they wipe the
+// open document: a load already running (loadFiles would refuse after the wipe,
+// leaving nothing), then the selection itself. → null when the replace may go
+// ahead, else the checkIncoming verdict or { refusal: 'stillLoading' }.
+export function replaceRefusal({ loading, files }) {
+  if (loading) return { refusal: 'stillLoading' };
+  const verdict = checkIncoming(files);
+  return verdict.refusal ? verdict : null;
+}
