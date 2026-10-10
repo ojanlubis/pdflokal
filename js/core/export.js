@@ -22,6 +22,7 @@
  */
 
 import { buildExportPlan } from './operations.js';
+import { fenceUnkeptPages, landPageRefs, pagePlaceholder } from './page-fence.js';
 import { applyPageSurgery } from './page-surgery.js';
 import { resolveDecidedFont, blockText } from './stamp.js';
 import { placeBlockLines } from './block-edit.js';
@@ -835,9 +836,23 @@ export async function buildPdfBytes(doc, deps = {}) {
 
   // WHY cache: the old exporter re-parsed the source PDF for EVERY page
   // (O(pages × parse)). One pdf-lib load per source is strictly better.
+  //
+  // The load and the fence are ONE step (core/page-fence.js), so no copy can
+  // ever read a source whose unkept pages are still reachable. The fence
+  // rewrites this private load only; `batched` (below) is the kept set.
   const srcDocCache = new Map(); // sourceId → Promise<PDFDocument>
+  const fenceTags = new Map();   // sourceId → placeholder tag
+  let placedPageRefs = false;
   function getSrcDoc(source) {
-    if (!srcDocCache.has(source.id)) srcDocCache.set(source.id, PDFLib.PDFDocument.load(source.bytes));
+    if (!srcDocCache.has(source.id)) {
+      const tag = `PDFLokalPage${srcDocCache.size}n`;
+      fenceTags.set(source.id, tag);
+      srcDocCache.set(source.id, PDFLib.PDFDocument.load(source.bytes).then((srcDoc) => {
+        const kept = new Set(batched.get(source.id)?.keys() || []);
+        if (fenceUnkeptPages(srcDoc, kept, tag, PDFLib)) placedPageRefs = true;
+        return srcDoc;
+      }));
+    }
     return srcDocCache.get(source.id);
   }
 
@@ -863,6 +878,8 @@ export async function buildPdfBytes(doc, deps = {}) {
     nums.forEach((n, i) => byNum.set(n, copies[i]));
   }
 
+  const copiedPages = [];
+  const landing = new Map(); // placeholder PDFName → output page ref (core/page-fence.js)
   for (const { page, source, annotations } of plan) {
     if (!source) throw new Error(`buildPdfBytes: page ${page.id} references missing source ${page.sourceId}`);
 
@@ -875,6 +892,10 @@ export async function buildPdfBytes(doc, deps = {}) {
       if (copied) byNum.set(page.sourcePageNum, null); // first occurrence takes the batched copy
       else [copied] = await newDoc.copyPages(await getSrcDoc(source), [page.sourcePageNum]);
       pdfPage = newDoc.addPage(copied);
+      copiedPages.push(pdfPage);
+      // A link to a repeated page lands on its first copy.
+      const placeholder = pagePlaceholder(PDFLib, fenceTags.get(source.id), page.sourcePageNum);
+      if (!landing.has(placeholder)) landing.set(placeholder, pdfPage.ref);
     }
     // /Rotate — SINGLE SOURCE OF TRUTH for "how is this page turned"
     // (core/page-rotation.js). This used to be `setRotation(page.rotation)`,
@@ -990,6 +1011,10 @@ export async function buildPdfBytes(doc, deps = {}) {
 
     if (needsScale) scalePageWithBoxes(pdfPage, pageScale);
   }
+
+  // Only a source that actually linked to a kept page wrote a placeholder;
+  // every other export skips the walk.
+  if (placedPageRefs) landPageRefs(newDoc, copiedPages, landing, PDFLib);
 
   return newDoc.save({ useObjectStreams: true, addDefaultPage: false });
 }
