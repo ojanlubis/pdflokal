@@ -147,6 +147,22 @@ export function markChanged(history) {
   syncDirty(history);
 }
 
+// The merge's close-out: raises the barrier iff a non-first load really put
+// pages in, and returns whether it did so the caller can count the merge.
+//
+// WHY `added` is a tally of what the imports returned and NOT a before/after
+// diff of doc.pages.length: the Halaman sheet stays open over a running merge
+// and its delete is live behind the overlay. Deleting as many pages as the file
+// brings leaves the length where it was, the diff reads "nothing merged", the
+// barrier is skipped, and undo restores the delete's snapshot - which predates
+// the merged pages - wholesale. The tally cannot be reduced by anything the
+// user does while the imports run.
+export function closeMerge(history, { firstLoad, added }) {
+  if (firstLoad || !(added > 0)) return false;
+  markChanged(history);
+  return true;
+}
+
 // A gesture that record()ed and then backed out leaving the doc exactly as it
 // was (Ganti: the cover is placed after record(), removed again on Escape). The
 // undo entry stays — undo behaviour is unchanged — but the state is the one

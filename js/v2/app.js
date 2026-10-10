@@ -25,7 +25,7 @@ import {
   moveAnnotation, normalizePageWidths, duplicateAnnotation,
   copySignatureToAllPages, pagesMissingSignature,
 } from '../core/operations.js';
-import { createHistory, record, undo, redo, canUndo, canRedo, markClean, markChanged, settle, isDirty } from '../core/history.js';
+import { createHistory, record, undo, redo, canUndo, canRedo, markClean, closeMerge, settle, isDirty } from '../core/history.js';
 import { setLeaveGuard } from './leave-guard.js';
 import { rasterFitsShape } from '../core/raster-key.js';
 import { baseNameOf } from '../core/file-kind.js';
@@ -3018,6 +3018,10 @@ async function loadFilesInner(files) {
   // onunhandledrejection — the user saw a silent broken load. Now we skip the bad
   // one, keep the good ones, and say so plainly. Honest failure is still feedback.
   let failed = 0;
+  // Pages the imports below put in, tallied as they return. NOT pagesBefore vs
+  // doc.pages.length: a page deleted from the open Halaman sheet mid-import
+  // cancels the growth and the merge would lose its undo barrier (closeMerge).
+  let added = 0;
   let lastFailureReason = null; // see the catch block below and the toast after the loop
   for (let i = 0; i < usable.length; i++) {
     const f = usable[i];
@@ -3040,6 +3044,7 @@ async function loadFilesInner(files) {
           if (loadErr) throw loadErr;
         }
         const importedPages = await importPdf(doc, { name: f.name, bytes });
+        added += importedPages.length;
         if (rebuilds) rebuildVerdicts.set(doc.sources.at(-1).id, Promise.resolve(null)); // just proven
         // A protected PDF opens and renders perfectly (PDF.js decrypts) but can
         // NEVER be written back — pdf-lib has no decryption. Say so HERE, at
@@ -3083,7 +3088,7 @@ async function loadFilesInner(files) {
           }))
           .catch(() => {});
       } else {
-        await importImage(doc, { name: f.name, bytes, mimeType: f.type });
+        added += (await importImage(doc, { name: f.name, bytes, mimeType: f.type })).length;
         // An image page has no text layer at all — that's the scan ladder's
         // own job (spec-edit-dokumen-foto.md), not this rail's.
         // signed:false — an image has no PDF structure to carry a signature.
@@ -3192,8 +3197,8 @@ async function loadFilesInner(files) {
   // the File menu, dropping more files onto an open doc — not sheet-opens. GA4's
   // gabungkan_used fired on page-manager open, which also covers split/reorder/
   // delete; this is the clean, merge-only signal the first-party rail lacked.
-  if (!firstLoad && doc.pages.length > pagesBefore) {
-    markChanged(history); // a merge is not undoable: an undo barrier (core/history.js)
+  if (closeMerge(history, { firstLoad, added })) {
+    // closeMerge raised the barrier (a merge is not undoable, core/history.js)
     refreshChrome(); // the barrier just emptied the stacks; grey Undo/Redo now
     tel('tool_use', { tool: 'gabung', action: 'merge' });
   }
