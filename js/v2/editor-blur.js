@@ -12,7 +12,18 @@
  * dialog opening) has already moved activeElement off the editor when the event
  * runs, so it still commits. Tested by tests/core/editor-blur.test.mjs and
  * tests/editor-window-blur.spec.js.
+ *
+ * holdEditor is the one place app.js's openTextEditor binds these rules, so
+ * the test can read app.js for the call (a bare blur listener there is the
+ * reverted shape).
  */
 export function blurLeavesEditor(activeElement, editorEl) {
   return activeElement !== editorEl;
+}
+
+// Binds the editor's ways out. Returns the release, which app.js's commit()
+// calls: commit() is the only path out of the editor.
+export function holdEditor(ed, commit, { doc = document } = {}) {
+  ed.addEventListener('blur', () => { if (blurLeavesEditor(doc.activeElement, ed)) commit(); });
+  return () => {};
 }
