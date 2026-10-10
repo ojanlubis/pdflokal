@@ -573,6 +573,23 @@ function paintedAppearanceRef(annot, PDFLib) {
   return raw instanceof PDFRef ? raw : annot.context.register(annot.context.lookup(raw));
 }
 
+// A reader paints an annotation's appearance without asking its /Subtype,
+// but a content Do needs a Form XObject (pdf.js drops anything else: "XObject
+// should have a Name subtype"), so an appearance that omits it would vanish
+// once flattened. A missing /Subtype is supplied (this is newDoc's copy, never
+// the source); one naming something else is not a form at all, so the
+// annotation stays live. False = do not flatten.
+function asFormXObject(stream, PDFLib) {
+  const { PDFName } = PDFLib;
+  const sub = stream.dict.get(PDFName.of('Subtype'));
+  if (sub === undefined) {
+    stream.dict.set(PDFName.of('Type'), PDFName.of('XObject'));
+    stream.dict.set(PDFName.of('Subtype'), PDFName.of('Form'));
+    return true;
+  }
+  return sub === PDFName.of('Form');
+}
+
 // ISO 32000 §12.5.5: the appearance's BBox, carried through its own /Matrix,
 // is scaled and translated onto /Rect. Do applies the form's /Matrix itself,
 // so the cm is that fit alone. Null for a degenerate box.
@@ -658,7 +675,7 @@ function flattenPaintedAnnotations(pdfPage, PDFLib, rects) {
     if (!(annot instanceof PDFDict) || !meetsAny(annot, rects, PDFLib)) continue;
     const ref = paintedAppearanceRef(annot, PDFLib);
     const fit = ref && appearanceFit(annot, ctx.lookup(ref), PDFLib);
-    if (!fit) continue;
+    if (!fit || !asFormXObject(ctx.lookup(ref), PDFLib)) continue;
     const name = pdfPage.node.newXObject('FlatAnnot', ref);
     pdfPage.pushOperators(
       PDFLib.pushGraphicsState(),

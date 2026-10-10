@@ -44,6 +44,8 @@ const loadUmd = (p) => {
 };
 const PDFLib = loadUmd('js/vendor/pdf-lib.min.js');
 const fontkit = loadUmd('js/vendor/fontkit.umd.min.js');
+globalThis.pdfjsWorker = loadUmd('js/vendor/pdf.worker.min.js');
+const pdfjs = loadUmd('js/vendor/pdf.min.js');
 const { PDFName, PDFDict, PDFStream, PDFArray, decodePDFRawStream, PDFRawStream } = PDFLib;
 
 const FIELD = { x: 100, y: 692, width: 200, height: 30 }; // PDF space, bottom-left origin
@@ -268,4 +270,30 @@ test('known-positive: a page with no user objects keeps its field as a live anno
   const [x0, y0, x1, y1] = numbers(widgets[0].lookup(PDFName.of('Rect'), PDFArray));
   assert.ok(x0 < FIELD.x + 1 && y0 < FIELD.y + 1 && x1 > FIELD.x + FIELD.width - 1 && y1 > FIELD.y + FIELD.height - 1,
     'the field kept its place');
+});
+
+// What a reader paints, asked of pdf.js (it shares no code with the pdf-lib
+// writer): every fill colour set on the page as 'r,g,b' (0-255), annotations
+// included.
+async function fillsPainted(page) {
+  const bytes = await page.doc.save();
+  const pj = await pdfjs.getDocument({ data: new Uint8Array(bytes), disableFontFace: true, isEvalSupported: false, verbosity: 0 }).promise;
+  const ol = await (await pj.getPage(page.doc.getPages().indexOf(page) + 1)).getOperatorList({ annotationMode: pdfjs.AnnotationMode.ENABLE });
+  return ol.fnArray.flatMap((fn, i) => (fn === pdfjs.OPS.setFillRGBColor ? [Array.from(ol.argsArray[i]).join(',')] : []));
+}
+
+test('an appearance stream without /Subtype /Form still paints once it is page content', async () => {
+  // Readers paint an annotation's /AP without asking its /Subtype, so such a
+  // stamp shows; a content Do of it does not (pdf.js: "XObject should have a
+  // Name subtype"), and the stamp vanished from the file under the first fix.
+  const page = await exportOnePage({
+    build: (ctx) => {
+      const ap = ctx.register(ctx.stream('0 0.5 0 rg 0 0 40 40 re f', { BBox: [0, 0, 40, 40] }));
+      return [ctx.register(ctx.obj({ Type: 'Annot', Subtype: 'Stamp', Rect: [100, 600, 140, 640], F: 4, AP: { N: ap } }))];
+    },
+    userObjects: [['whiteout', { x: 130, y: 160, width: 40, height: 20, color: '#ff0000' }]],
+  });
+  const fills = await fillsPainted(page);
+  assert.ok(fills.includes('0,128,0'), `the stamp's green is gone from the file: ${fills}`);
+  assert.ok(fills.indexOf('0,128,0') < fills.indexOf('255,0,0'), `the stamp must be under the cover: ${fills}`);
 });
