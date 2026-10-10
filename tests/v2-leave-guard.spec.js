@@ -64,6 +64,23 @@ async function downloadAll(page) {
   await expect(page.locator('#dl-sheet')).not.toBeVisible();
 }
 
+// WHY SEEDED: every whole-document download can raise an ask over the page: the
+// feature-vote dialog (js/v2/feature-vote.js, a modal that makes everything behind
+// it inert) and the bug-report and share/tip cards. These cases download and then
+// click .pv-page again, so whether that click lands depended on which ask had
+// already closed: it passed on main by timing luck and timed out on a branch that
+// shifted the timing. The asks are not under test here (feature-vote.spec.js,
+// bug-report tests and growth-loop.spec.js own them), so mark each as already seen
+// today, in the keys the app itself reads, before the page loads.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    const today = new Date().toDateString();
+    localStorage.setItem('pdflokal_vote_done', 'voted');
+    localStorage.setItem('pdflokal_bugreport_last', today);
+    localStorage.setItem('pdflokal-support-last', today);
+  });
+});
+
 test.describe('leave guard', () => {
   test('landing with no document: no prompt', async ({ page }) => {
     const d = watchDialogs(page);
