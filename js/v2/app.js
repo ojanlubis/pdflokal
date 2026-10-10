@@ -3521,7 +3521,7 @@ on('btn-redo', 'click', doRedo);
 
 document.addEventListener('keydown', (e) => {
   // Never hijack typing surfaces (the inline editor stops propagation itself).
-  if (e.target.matches?.('input, select, textarea, [contenteditable="true"]')) return;
+  if (e.target.isContentEditable || e.target.closest?.('input, select, textarea')) return;
   const mod = e.ctrlKey || e.metaKey;
   // WHY lowercased: Shift (or CapsLock) turns e.key into 'Z', so a bare
   // `e.key === 'z'` never matched Ctrl/Cmd+Shift+Z and redo-by-keyboard never fired.
@@ -3538,6 +3538,15 @@ document.addEventListener('keydown', (e) => {
     if (key === 'c' && !textSelected) { if (copySelected()) e.preventDefault(); }
     else if (key === 'x' && !textSelected) { if (copySelected()) { e.preventDefault(); deleteSelected(); } }
     else if (key === 'v') {
+  // WHY the open-sheet guard: the editor's keys must not act on the document
+  // behind a sheet. Ctrl+Z behind Unduh changed the doc after the sheet built
+  // its bytes, so the download was the old state and markClean then called the
+  // changed doc saved; Delete on a focused Halaman tile deleted the editor's
+  // selected annotation. Kept: Escape (resets the tool, the dialog closes
+  // itself) and undo/redo in the Halaman sheet, whose page moves it shows live.
+  const openSheet = document.querySelector('dialog[open]');
+  if (openSheet && e.key !== 'Escape'
+    && !(openSheet.id === 'pm-sheet' && mod && (key === 'z' || key === 'y'))) return;
       // Only a FRESH in-app copy is pasted here (and so suppresses the paste event);
       // anything else falls through to the paste listener, which can read the system clipboard.
       if (annoClipboard && annoCopyFresh && pasteCopy()) e.preventDefault();
