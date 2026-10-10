@@ -342,3 +342,26 @@ test('dirty: markChanged (an un-undoable mutation) dirties; settle() takes back 
   assert.equal(canUndo(h), true, 'undo behaviour is unchanged by settle');
   settle(createHistory());      // empty stack: no throw, nothing to do
 });
+
+// A merge is not undoable, so it only calls markChanged(). Every snapshot taken
+// before it holds the doc WITHOUT the merged pages: undoing an earlier edit
+// after a merge used to restore one of those wholesale and silently drop every
+// page the merge added. An un-undoable mutation is a barrier: nothing before
+// it is reachable any more.
+test('markChanged is an undo barrier: undo after a merge never drops the merged pages', () => {
+  const doc = docWithTwoPages();
+  const h = createHistory();
+  const [p1] = doc.pages;
+  record(h, doc);
+  addAnnotation(doc, p1.id, createAnnotation('text', { x: 10, y: 20, text: 'ttd' }));
+  assert.equal(canUndo(h), true, 'known-positive: the edit is undoable before the merge');
+
+  const src = addSource(doc, createSource({ name: 'b.pdf', bytes: new Uint8Array([4]), numPages: 1 }));
+  addPages(doc, [createPage({ source: src, sourcePageNum: 0, width: 595, height: 842 })]);
+  markChanged(h);
+
+  assert.equal(undo(h, doc), false, 'undo crossed the merge barrier');
+  assert.equal(doc.pages.length, 3, 'the merged page is gone after undo');
+  assert.equal(canUndo(h), false);
+  assert.equal(canRedo(h), false);
+});

@@ -3852,7 +3852,8 @@ async function loadFilesInner(files) {
   // gabungkan_used fired on page-manager open, which also covers split/reorder/
   // delete; this is the clean, merge-only signal the first-party rail lacked.
   if (!firstLoad && doc.pages.length > pagesBefore) {
-    markChanged(history); // a merge is not undoable, so it never went through record()
+    markChanged(history); // a merge is not undoable: an undo barrier (core/history.js)
+    refreshChrome(); // the barrier just emptied the stacks; grey Undo/Redo now
     tel('tool_use', { tool: 'gabung', action: 'merge' });
   }
   // Honest close-out: skips take priority over the merge tally — the user needs to
