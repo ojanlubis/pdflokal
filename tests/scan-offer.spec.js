@@ -106,7 +106,10 @@ test.describe('scan dead end', () => {
     expect(offers[0].props).toEqual({ action: 'shown', tool: 'none' });
   });
 
-  for (const [btn, toolId, name] of [['#so-tipex', 'tipex', 'tipex'], ['#so-teks', 'teks', 'teks']]) {
+  // toolId is the DOM's data-tool id, name the rail's word. Asserting the id
+  // alone once passed while the offer armed 'tipex', a tool that does not exist:
+  // the lit toolbar button below is the behaviour.
+  for (const [btn, toolId, name] of [['#so-tipex', 'whiteout', 'tipex'], ['#so-teks', 'text', 'teks']]) {
     test(`taking the ${name} route ARMS the tool and reports accepted exactly once`, async ({ page }) => {
       await hitTheWall(page);
       await page.click(btn);
@@ -114,6 +117,7 @@ test.describe('scan dead end', () => {
 
       // `accepted` means the tool actually armed, not that a button was pressed.
       expect(await page.evaluate(() => window.v2.getTool())).toBe(toolId);
+      await expect(page.locator(`#toolbar .tool[data-tool="${toolId}"]`)).toHaveClass(/active/);
 
       // EXACTLY ONE outcome. The close handler fires on button-driven closes too,
       // so without the resolved guard this would report accepted AND dismissed —

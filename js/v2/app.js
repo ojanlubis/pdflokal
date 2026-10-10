@@ -4302,8 +4302,11 @@ function showScanOffer(pageId) {
     dlg.close();
   };
 
-  dlg.querySelector('#so-tipex').onclick = take('tipex', 'tipex');
-  dlg.querySelector('#so-teks').onclick = take('teks', 'teks');
+  // First arg is the DOM tool id (data-tool), second the rail's word (ARM_TOOL).
+  // They differ on purpose; arming 'tipex'/'teks' armed a tool that does not
+  // exist and left the page unscrollable (touchAction none) on a phone.
+  dlg.querySelector('#so-tipex').onclick = take('whiteout', 'tipex');
+  dlg.querySelector('#so-teks').onclick = take('text', 'teks');
   // RUNG S2. Settles as `accepted` on the CLICK rather than on an armed tool,
   // unlike the two above, and the difference is honest rather than sloppy:
   // recognition takes seconds and can fail, so there is no synchronous "the
