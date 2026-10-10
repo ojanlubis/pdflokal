@@ -2779,11 +2779,19 @@ function duplicateSelected() {
 // re-bake only the pages that actually changed.
 function doUndo() {
   const prevPages = doc.pages;
-  if (undo(history, doc)) { pageManager.invalidateThumbs(); rebuildStage(); syncEditedRasters(prevPages); }
+  if (undo(history, doc)) afterHistoryStep(prevPages);
 }
 function doRedo() {
   const prevPages = doc.pages;
-  if (redo(history, doc)) { pageManager.invalidateThumbs(); rebuildStage(); syncEditedRasters(prevPages); }
+  if (redo(history, doc)) afterHistoryStep(prevPages);
+}
+function afterHistoryStep(prevPages) {
+  pageManager.invalidateThumbs();
+  rebuildStage();
+  syncEditedRasters(prevPages);
+  // Ctrl+Z is allowed inside the Halaman sheet (keydown below), so its grid
+  // must show the restored pages, or the next drag reorders a stale grid.
+  if (document.getElementById('pm-sheet').open) pageManager.render();
 }
 on('btn-undo', 'click', doUndo);
 on('btn-redo', 'click', doRedo);
@@ -2800,10 +2808,13 @@ document.addEventListener('keydown', (e) => {
   // its bytes, so the download was the old state and markClean then called the
   // changed doc saved; Delete on a focused Halaman tile deleted the editor's
   // selected annotation. Kept: Escape (resets the tool, the dialog closes
-  // itself) and undo/redo in the Halaman sheet, whose page moves it shows live.
-  const openSheet = document.querySelector('dialog[open]');
-  if (openSheet && e.key !== 'Escape'
-    && !(openSheet.id === 'pm-sheet' && mod && (key === 'z' || key === 'y'))) return;
+  // itself) and undo/redo in the Halaman sheet, whose page moves it shows live,
+  // but only when it is the ONLY open dialog: in pick mode it sits on top of
+  // Unduh, and querySelector returns the first in DOM order (#pm-sheet), which
+  // let Ctrl+Z through behind Unduh's already-built bytes.
+  const openSheets = document.querySelectorAll('dialog[open]');
+  if (openSheets.length && e.key !== 'Escape'
+    && !(openSheets.length === 1 && openSheets[0].id === 'pm-sheet' && mod && (key === 'z' || key === 'y'))) return;
   if (mod && key === 'z') { e.preventDefault(); e.shiftKey ? doRedo() : doUndo(); }
   else if (mod && key === 'y') { e.preventDefault(); doRedo(); }
   else if (mod && !e.altKey && !e.shiftKey && 'cxvd'.includes(key) && key.length === 1 && !document.querySelector('dialog[open]')) {
