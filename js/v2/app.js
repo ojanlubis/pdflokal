@@ -2772,9 +2772,11 @@ function pasteText(text) {
 document.addEventListener('paste', (e) => {
   if (e.defaultPrevented || doc.pages.length === 0 || document.querySelector('dialog[open]')) return;
   // WHY isContentEditable, not a selector on the target: a paste's target is the
-  // element holding the caret, which after a rich paste into the inline editor
-  // is a <span> INSIDE it. The selector missed, and the next Ctrl+V placed a new
-  // object and tore the open editor out of the DOM, losing what was typed.
+  // element holding the caret, which can be a node INSIDE an editable (it was a
+  // <span> a rich paste left in the inline editor, before that editor took its
+  // own paste). A selector missed it, and the next Ctrl+V placed a new object
+  // and tore the open editor out of the DOM, losing what was typed. Kept for any
+  // editable whose own listener does not take the paste first.
   if (e.target.isContentEditable || e.target.closest?.('input, select, textarea')) return;
   if (annoClipboard && annoCopyFresh) { if (pasteCopy()) e.preventDefault(); return; }
   const cd = e.clipboardData;
