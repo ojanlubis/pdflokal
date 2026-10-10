@@ -12,7 +12,7 @@
  * No repair can say which list is right, so every rebuild load compares
  * pdf-lib's page count with PDF.js's (Source.numPages, set by importPdf) and
  * refuses a disagreement through the existing failure path: loud, classified
- * `corrupt`, never a wrong page.
+ * `corrupt`, never a wrong page. A merge meets the same check at import.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -23,6 +23,7 @@ import { fileURLToPath } from 'node:url';
 import * as model from '../../js/core/model.js';
 import * as ops from '../../js/core/operations.js';
 import { buildPdfBytes } from '../../js/core/export.js';
+import { importPdf, pdfLibLoadError } from '../../js/core/import.js';
 import { failureReason, failureCause } from '../../js/core/failure-reason.js';
 import { createEditBake } from '../../js/v2/edit-bake.js';
 
@@ -113,4 +114,33 @@ test('no regression: a nested file whose counts tell the truth still downloads e
   assert.equal(texts.length, 3);
   assert.match(texts[0], /Nama Baru/);
   assert.deepEqual(texts.slice(1), ['Halo 1', 'Halo 2']);
+});
+
+// THE MERGE GUARD. A merge always rebuilds, so a file the parsers disagree on
+// is declined while joining (the existing import/corrupt path in v2/app.js),
+// not discovered at Unduh. importPdf hands PDF.js's count to the check before
+// the Source joins the doc.
+test('the merge guard declines a file whose page count PDF.js and pdf-lib disagree on', async () => {
+  const bytes = await lyingPdf();
+  assert.equal(await pdfLibLoadError(PDFLib, bytes), null, 'VACUITY GUARD: without a count to compare, pdf-lib loads and walks it');
+  const err = await pdfLibLoadError(PDFLib, bytes, 2);
+  assert.ok(err, 'declined against PDF.js\'s count');
+  assert.equal(failureReason(err), 'corrupt');
+  assert.equal(await pdfLibLoadError(PDFLib, await honestPdf(), 3), null, 'an agreeing file passes');
+});
+
+test('importPdf runs the check with the real PDF.js count, and a refusal joins nothing', async () => {
+  globalThis.window = { pdfjsLib: pdfjs };
+  const check = (bytes) => (numPages) => pdfLibLoadError(PDFLib, bytes, numPages);
+
+  const lying = await lyingPdf();
+  const doc = model.createDoc();
+  await assert.rejects(importPdf(doc, { name: 'x.pdf', bytes: lying, rebuildCheck: check(lying) }),
+    (e) => failureReason(e) === 'corrupt');
+  assert.equal(doc.sources.length, 0);
+
+  const honest = await honestPdf();
+  const pages = await importPdf(doc, { name: 'y.pdf', bytes: honest, rebuildCheck: check(honest) });
+  assert.equal(pages.length, 3);
+  assert.equal(doc.sources.length, 1);
 });
