@@ -519,6 +519,110 @@ function scalePageWithBoxes(pdfPage, k) {
   for (const [name, b] of before) pdfPage[`set${name}`](b.x * k, b.y * k, b.width * k, b.height * k);
 }
 
+// ---- the source's own annotations, under the user's objects -----------------
+
+// WHY: the screen and the file paint a source annotation in different places.
+// import.js rasterizes with pdf.js's default annotationMode, which paints every
+// viewable annotation's /AP INTO the page image, and the user's objects sit in
+// an overlay above it. The export draws the user's objects into the page
+// CONTENT, and a reader paints /Annots AFTER the content: a filled form field
+// copied across verbatim landed ON TOP of the Tip-Ex meant to hide it, and the
+// correction typed over it disappeared under the field's box
+// (tests/core/export-annots-under-cover.test.mjs). So on a page that carries
+// user objects, each annotation pdf.js painted is drawn into the content
+// first, from its OWN appearance (never regenerated: that would change how it
+// looks), and taken out of /Annots. Pages without user objects keep their
+// annotations live. The output never had the source's /AcroForm (newDoc is
+// created empty), so a flattened widget loses no fillability it still had.
+//
+// Not flattened, so left exactly as before: Link and Popup (interaction, not
+// paint); Hidden or NoView (pdf.js does not paint them); NoRotate (it stays
+// upright on a turned page, which drawn content cannot); and anything without
+// an /AP pdf.js would pick (it may synthesize one we cannot see).
+const KEEP_AS_ANNOTATION = new Set(['Link', 'Popup']);
+const FLAG_HIDDEN = 1 << 1;
+const FLAG_NO_ROTATE = 1 << 4;
+const FLAG_NO_VIEW = 1 << 5;
+
+// The ref of the appearance stream pdf.js would paint, or null. A /N that is a
+// dict of states is chosen by /AS, and no /AS means no appearance (pdf.js's
+// own rule, so screen and file agree on checkboxes and radios).
+function paintedAppearanceRef(annot, PDFLib) {
+  const { PDFName, PDFDict, PDFStream, PDFRef, PDFNumber } = PDFLib;
+  if (KEEP_AS_ANNOTATION.has(annot.lookup(PDFName.of('Subtype'))?.decodeText?.())) return null;
+  const flags = annot.lookup(PDFName.of('F'));
+  const f = flags instanceof PDFNumber ? flags.asNumber() : 0;
+  if (f & (FLAG_HIDDEN | FLAG_NO_VIEW | FLAG_NO_ROTATE)) return null;
+  const ap = annot.lookup(PDFName.of('AP'));
+  if (!(ap instanceof PDFDict)) return null;
+  let raw = ap.get(PDFName.of('N'));
+  const n = annot.context.lookup(raw);
+  if (n instanceof PDFDict && !(n instanceof PDFStream)) {
+    const state = annot.lookup(PDFName.of('AS'));
+    if (!(state instanceof PDFName)) return null;
+    raw = n.get(state);
+  }
+  if (!(annot.context.lookup(raw) instanceof PDFStream)) return null;
+  return raw instanceof PDFRef ? raw : annot.context.register(annot.context.lookup(raw));
+}
+
+// ISO 32000 §12.5.5: the appearance's BBox, carried through its own /Matrix,
+// is scaled and translated onto /Rect. Do applies the form's /Matrix itself,
+// so the cm is that fit alone. Null for a degenerate box.
+function appearanceFit(annot, stream, PDFLib) {
+  const { PDFName, PDFArray, PDFNumber } = PDFLib;
+  const nums = (arr, n) => {
+    if (!(arr instanceof PDFArray) || arr.size() !== n) return null;
+    const out = arr.asArray().map((v) => annot.context.lookup(v)).map((v) => (v instanceof PDFNumber ? v.asNumber() : NaN));
+    return out.every(Number.isFinite) ? out : null;
+  };
+  const rect = nums(annot.lookup(PDFName.of('Rect')), 4);
+  const bbox = nums(stream.dict.lookup(PDFName.of('BBox')), 4);
+  if (!rect || !bbox) return null;
+  const [a, b, c, d, e, f] = nums(stream.dict.lookup(PDFName.of('Matrix')), 6) || [1, 0, 0, 1, 0, 0];
+  const corners = [[bbox[0], bbox[1]], [bbox[2], bbox[1]], [bbox[0], bbox[3]], [bbox[2], bbox[3]]]
+    .map(([x, y]) => [a * x + c * y + e, b * x + d * y + f]);
+  const xs = corners.map((p) => p[0]);
+  const ys = corners.map((p) => p[1]);
+  const [tx0, tx1, ty0, ty1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  const [rx0, rx1] = [Math.min(rect[0], rect[2]), Math.max(rect[0], rect[2])];
+  const [ry0, ry1] = [Math.min(rect[1], rect[3]), Math.max(rect[1], rect[3])];
+  if (!(tx1 > tx0 && ty1 > ty0)) return null;
+  const sx = (rx1 - rx0) / (tx1 - tx0);
+  const sy = (ry1 - ry0) / (ty1 - ty0);
+  return [sx, 0, 0, sy, rx0 - tx0 * sx, ry0 - ty0 * sy];
+}
+
+// In /Annots order, the order a reader (and pdf.js) paints them.
+function flattenPaintedAnnotations(pdfPage, PDFLib) {
+  const { PDFName, PDFArray, PDFDict } = PDFLib;
+  const annots = pdfPage.node.lookup(PDFName.of('Annots'));
+  if (!(annots instanceof PDFArray)) return;
+  const ctx = pdfPage.doc.context;
+  const gone = new Set();
+  for (const entry of annots.asArray()) {
+    const annot = ctx.lookup(entry);
+    if (!(annot instanceof PDFDict)) continue;
+    const ref = paintedAppearanceRef(annot, PDFLib);
+    const fit = ref && appearanceFit(annot, ctx.lookup(ref), PDFLib);
+    if (!fit) continue;
+    const name = pdfPage.node.newXObject('FlatAnnot', ref);
+    pdfPage.pushOperators(
+      PDFLib.pushGraphicsState(),
+      PDFLib.concatTransformationMatrix(...fit),
+      PDFLib.drawObject(name),
+      PDFLib.popGraphicsState(),
+    );
+    gone.add(entry);
+    // Its comment window would be left pointing at nothing.
+    const popup = annot.get(PDFName.of('Popup'));
+    if (popup) gone.add(popup);
+  }
+  if (gone.size === 0) return;
+  const kept = annots.asArray().filter((entry) => !gone.has(entry));
+  pdfPage.node.set(PDFName.of('Annots'), ctx.obj(kept));
+}
+
 // ---- pass-through: the untouched document -----------------------------------
 
 // Is this Doc PROVABLY the source file, unchanged? Returns the Source whose
@@ -716,6 +820,10 @@ export async function buildPdfBytes(doc, deps = {}) {
     const needsScale = !page.isFromImage && Number.isFinite(pageScale) && pageScale !== 1;
 
     if (annotations.length > 0) {
+      // After surgery (it must see the original stream), before the first
+      // user draw (so they paint over it), before the merge scale (so it
+      // scales with the page). See flattenPaintedAnnotations.
+      if (!page.isFromImage) flattenPaintedAnnotations(pdfPage, PDFLib);
       // wU/hU: UNROTATED dims of the visible box (visibleBox above), x0/y0 its
       // origin — setRotation is metadata only, drawing happens in this frame.
       // See transformAnnotationCoords. Read BEFORE the scale below, so it is
