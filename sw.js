@@ -318,9 +318,12 @@ self.addEventListener('fetch', (event) => {
   // Same-origin only — let GA/gtag/DoubleClick/Sentry and Vercel insights pass straight through.
   if (url.origin !== self.location.origin) return;
   if (url.pathname.startsWith('/_vercel/')) return;
-  // A count of people is a claim about NOW: served from cache offline it would
-  // show yesterday's number as today's. Network or nothing (api/visitors.js).
-  if (url.pathname === '/api/visitors') return;
+  // The API is a claim about NOW, so network or nothing, never the cache: a
+  // visitor count served offline shows yesterday's number as today's
+  // (api/visitors.js), and a cached /api/rev outlives its deploy and stamps the
+  // next build's session with the previous SHA (api/rev.js;
+  // tests/core/sw-api-passthrough.test.mjs).
+  if (url.pathname.startsWith('/api/')) return;
 
   // OUR OWN ES MODULES: from the page's own source, never chosen per file.
   //
