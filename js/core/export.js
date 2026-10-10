@@ -564,15 +564,39 @@ export async function buildPdfBytes(doc, deps = {}) {
     return srcDocCache.get(source.id);
   }
 
-  for (const { page, source, annotations } of buildExportPlan(doc)) {
+  // WHY one copyPages per SOURCE, not per page: every copyPages call is a
+  // fresh object copier, so a font or logo shared by all pages of a Word PDF
+  // was written into the output once PER PAGE (a 20-page letter with one
+  // Tip-Ex grew from ~20 KB to ~320 KB; tests/core/export-shared-resources).
+  // One batched call per source shares them. Only a page's FIRST occurrence is
+  // batched: a repeated source page takes its own copy below, exactly as
+  // before, so two plan slots never share one page object. Surgery is safe on
+  // a batched copy: redact.js writes a NEW content stream, never the shared one.
+  const plan = buildExportPlan(doc);
+  const batched = new Map(); // sourceId → Map(sourcePageNum → copied PDFPage)
+  for (const { page, source } of plan) {
+    if (!source || page.isFromImage) continue;
+    if (!batched.has(source.id)) batched.set(source.id, new Map());
+    batched.get(source.id).set(page.sourcePageNum, null);
+  }
+  for (const [sourceId, byNum] of batched) {
+    const source = plan.find((e) => e.source?.id === sourceId).source;
+    const nums = [...byNum.keys()];
+    const copies = await newDoc.copyPages(await getSrcDoc(source), nums);
+    nums.forEach((n, i) => byNum.set(n, copies[i]));
+  }
+
+  for (const { page, source, annotations } of plan) {
     if (!source) throw new Error(`buildPdfBytes: page ${page.id} references missing source ${page.sourceId}`);
 
     let pdfPage;
     if (page.isFromImage) {
       pdfPage = await addImagePage(env, page, source);
     } else {
-      const srcDoc = await getSrcDoc(source);
-      const [copied] = await newDoc.copyPages(srcDoc, [page.sourcePageNum]);
+      const byNum = batched.get(source.id);
+      let copied = byNum.get(page.sourcePageNum);
+      if (copied) byNum.set(page.sourcePageNum, null); // first occurrence takes the batched copy
+      else [copied] = await newDoc.copyPages(await getSrcDoc(source), [page.sourcePageNum]);
       pdfPage = newDoc.addPage(copied);
     }
     // /Rotate — SINGLE SOURCE OF TRUTH for "how is this page turned"
