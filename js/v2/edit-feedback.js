@@ -248,7 +248,16 @@ function renderNote() {
   renderBottom(); // reads whatever pendingSample already holds (often none yet)
 
   input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); submitDown(!!pendingSample); }
+    // WHY Enter never sends crops: they can render in place WHILE the user is
+    // typing (setFeedbackSample → renderBottom), so an Enter meant for the note
+    // would ship document images nobody chose. With crops on screen Enter only
+    // moves focus to the choice row (Nggak usah first); Kirim stays a deliberate
+    // press, per the "👎 THEN Kirim" invariant in the header.
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const choice = pendingSample && bottomEl && bottomEl.querySelector('.ef-btnrow button');
+      if (choice) choice.focus(); else submitDown(false);
+    }
     e.stopPropagation();
   });
   input.focus();
