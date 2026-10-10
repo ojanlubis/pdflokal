@@ -22,8 +22,8 @@ import { checkIncoming, replaceRefusal } from '../core/incoming-files.js';
 import { isStandardFamily, unencodableInStandardFont } from '../core/text-encode.js';
 import {
   addAnnotation, removeAnnotation, updateAnnotation, clearSelection, selectAnnotation,
-  moveAnnotation, normalizePageWidths, duplicateAnnotation,
-  copySignatureToAllPages, pagesMissingSignature,
+  moveAnnotation, resizeAnnotation, normalizePageWidths, duplicateAnnotation,
+  copySignatureToAllPages, pagesMissingSignature, placeSignature, SIGNATURE_PLACE_WIDTH,
 } from '../core/operations.js';
 import { createHistory, record, undo, redo, canUndo, canRedo, markClean, markChanged, settle, isDirty } from '../core/history.js';
 import { setLeaveGuard } from './leave-guard.js';
@@ -1531,7 +1531,7 @@ const FINE_POINTER = window.matchMedia('(pointer: fine)').matches;
 
 document.addEventListener('pointermove', (e) => {
   if (FINE_POINTER && tool === 'signature' && storedSignature) {
-    const w = 150 * zoom;
+    const w = SIGNATURE_PLACE_WIDTH * zoom;
     const h = w * (storedSignature.height / storedSignature.width);
     if (sigGhost.dataset.sig !== storedSignature.dataUrl.slice(-40)) {
       sigGhost.src = storedSignature.dataUrl;
@@ -1846,12 +1846,10 @@ const interaction = createInteraction({
       smartReplace(pageId, x, y); // async: extraction may need a moment on first tap
     } else if (t === 'signature' && storedSignature) {
       record(history, doc);
-      const w = 150; // signature at document scale
-      const h = w * (storedSignature.height / storedSignature.width);
-      const created = addAnnotation(doc, pageId, createAnnotation('signature', {
+      const created = placeSignature(doc, pageId, {
         image: storedSignature.dataUrl,
-        x: Math.max(0, x - w / 2), y: Math.max(0, y - h / 2), width: w, height: h,
-      }));
+        ratio: storedSignature.height / storedSignature.width,
+      }, x, y);
       track('editor_action', { action: 'signature' });
       tel('tool_use', { tool: 'ttd', action: 'signature' });
       selectAnnotation(doc, created.id); // selected → "Semua Hal." is one tap away
@@ -2589,8 +2587,10 @@ const signatureModal = createSignatureModal({
     const found = hit && hit.annotation.type === 'signature' ? { page: hit.page, anno: hit.annotation } : null;
     if (found) {
       record(history, doc);
-      found.anno.image = sig.dataUrl;
-      found.anno.height = found.anno.width * (sig.height / sig.width);
+      // Through resizeAnnotation: a taller drawing at the same width can run
+      // past the bottom edge, and that holds it inside the page.
+      updateAnnotation(doc, found.anno.id, { image: sig.dataUrl });
+      resizeAnnotation(doc, found.anno.id, { width: found.anno.width, height: found.anno.width * (sig.height / sig.width) });
       rebuildStage();
       toast(tr('toast.signatureReplaced'));
       return;
