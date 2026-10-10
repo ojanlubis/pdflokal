@@ -129,6 +129,30 @@ test.describe('format bar — mobile', () => {
     expect(after.map((a) => [a.text, a.fontSize])).toEqual([['Satu', 18], ['Dua', 10]]);
   });
 
+  // A window or app switch while the size field holds the empty box: the field
+  // gets blur + focusout with no relatedTarget, and focus stays on it. The hold
+  // took that for a click-away and closed the box, so the size went to 'Satu'.
+  test('a window switch while the size field holds an empty box keeps the box', async ({ page }) => {
+    await emptyDraftAfterSatu(page);
+    await page.focus('.fb-size');
+    await expect(page.locator('.v2-text-edit')).toHaveCount(1);
+    const stillOnField = await page.evaluate(() => {
+      const f = document.querySelector('.fb-size');
+      f.dispatchEvent(new FocusEvent('blur'));
+      f.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: null }));
+      return document.activeElement === f;
+    });
+    expect(stillOnField).toBe(true);
+    await expect(page.locator('.v2-text-edit')).toHaveCount(1);
+
+    await page.fill('.fb-size', '10');
+    await page.press('.fb-size', 'Enter');
+    await page.keyboard.type('Dua');
+    await page.keyboard.press('Enter');
+    const after = await annos(page);
+    expect(after.map((a) => [a.text, a.fontSize])).toEqual([['Satu', 18], ['Dua', 10]]);
+  });
+
   // Bug 2026-10-11: filling a form, a tap on the next blank while the box was
   // still open (no Enter) left NO box: the first box's late blur commit cleared
   // the new box's state and re-synced the page over it, Teks turned off, and the

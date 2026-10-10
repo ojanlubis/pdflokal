@@ -107,3 +107,20 @@ test('a file load closes the open editor through its commit, before the import t
   assert.ok(close < into,
     'the editor must close before the import: its text belongs to the open document and its history step comes before the merge');
 });
+
+// An EMPTY new box held open while a format-bar control has focus (size,
+// font, custom colour). A window or app switch fires focusout on that control
+// with relatedTarget null while activeElement stays on it, exactly the case
+// editor-blur.js blurLeavesEditor exists for. The bar's own leave handler read
+// only relatedTarget, so it took the switch for a click-away: the box closed,
+// Teks disarmed, and the size or colour chosen next landed on the previous text.
+test('the format-bar hold stands down while focus is still inside the bar', () => {
+  const { body } = openTextEditorParts();
+  const m = body.match(/const onBarLeave = \(ev\) => \{([\s\S]*?)\n {4}\};/);
+  assert.ok(m, 'onBarLeave not found in openTextEditor');
+  const firstLine = m[1].trim().split('\n')[0];
+  assert.match(firstLine, /^if \(.*formatBarEl\.contains\(ev\.relatedTarget\).*\) return;$/,
+    'onBarLeave no longer stands down first for focus moving between controls');
+  assert.match(firstLine, /formatBarEl\.contains\(document\.activeElement\)/,
+    'onBarLeave ignores activeElement: a window switch with a control focused closes the held box');
+});

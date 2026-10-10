@@ -2482,8 +2482,11 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
     // Held open while a format-bar control has focus. Focus moving between
     // controls keeps it held; coming back to the editor resumes the plain
     // blur-commits path; going anywhere else is a click-away, so it commits.
+    // A window or app switch (a native colour picker can be one) fires
+    // focusout with relatedTarget null and leaves activeElement on the control:
+    // focus never left the bar, so the hold stands (editor-blur.js's rule).
     const onBarLeave = (ev) => {
-      if (formatBarEl.contains(ev.relatedTarget)) return;
+      if (formatBarEl.contains(ev.relatedTarget) || formatBarEl.contains(document.activeElement)) return;
       releaseBarHold();
       if (ev.relatedTarget !== ed) commit();
     };
