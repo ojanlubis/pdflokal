@@ -60,9 +60,10 @@ const SRC = `
   ${cut('async function loadFiles(', '{', '}')}
   ${cut('async function loadFilesInner(', '{', '}')}
   ${cut('async function resetDoc(', '{', '}')}
+  ${cut('function doDownload(', '{', '}')}
   ${cut("on(fileInput, 'change'", '(', ')')}
   ${cut("on('dc-replace', 'click'", '(', ')')}
-  return { setPending(v) { pendingReplace = v; }, load: (f, o) => loadFiles(f, o) };`;
+  return { setPending(v) { pendingReplace = v; }, download: () => doDownload(), load: (f, o) => loadFiles(f, o) };`;
 
 // A PDF-or-image fake File; `name` ending .heic / .locked.pdf is what the stub importers cannot decode.
 const file = (name, type) => ({ name, type, size: 10, arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer });
@@ -90,6 +91,8 @@ function world() {
     baseNameOf,
     createDoc,
     toast: (m) => toasts.push(m),
+    sheetOpens: [],
+    downloadSheet: { open: (...a) => env.sheetOpens.push(a) },
     tr: (k) => k,
     importPdf: async (d, { name }) => {
       if (undecodable(name)) throw new Error('password or corrupt');
@@ -208,6 +211,43 @@ test('after a refused replace, undo on the live document still reverses the edit
   assert.equal(w.env.doc.pages[0].rotation, 0, 'undo restores the pre-edit state on the open document');
   redo(w.env.history, w.env.doc);
   assert.equal(w.env.doc.pages[0].rotation, 90, 'redo too');
+});
+
+// Unduh / Ctrl+S while a staged replace is loading: the OLD document is still
+// live under the load, so the sheet would open on it, pre-build its bytes, and
+// the commit would then swap doc and baseName under the open sheet.
+for (const [name, run] of [
+  ['Ganti', (w, files) => { w.env.dropped = files; return handlers['dc-replace'](); }],
+  ['Buka Baru', (w, files) => { w.api.setPending(true); return handlers.fileInput({ target: { files } }); }],
+]) {
+  test(`Unduh does not open the sheet on the old document while ${name} is loading`, async () => {
+    const w = world();
+    let release;
+    const gate = new Promise((r) => { release = r; });
+    const realImport = w.env.importPdf;
+    w.env.importPdf = async (...a) => { await gate; return realImport(...a); };
+
+    w.api.download();
+    assert.equal(w.env.sheetOpens.length, 1, 'KNOWN-POSITIVE: with no load running Unduh opens the sheet');
+    w.env.sheetOpens.length = 0;
+
+    const running = run(w, [file('baru.pdf', 'application/pdf')]);
+    await new Promise((r) => setImmediate(r)); // let the load reach the gated import
+    w.api.download();
+    assert.equal(w.env.sheetOpens.length, 0, 'no sheet over the old document mid-replace');
+    assert.deepEqual(w.toasts, ['toast.stillLoading'], 'told with the existing words');
+
+    release();
+    await running;
+    w.env.sheetOpens.length = 0;
+    w.api.download();
+    assert.equal(w.env.sheetOpens.length, 1, 'once the load is over Unduh opens again, on the new document');
+  });
+}
+
+test('Ctrl/Cmd+S and the Unduh button both go through doDownload', () => {
+  assert.match(APP, /on\('btn-download', 'click', doDownload\)/);
+  assert.match(cut("document.addEventListener('keydown', (e) => {\n  if (!(e.ctrlKey || e.metaKey) || e.altKey || e.key.toLowerCase() !== 's')", '(', ')'), /\bdoDownload\(\)/);
 });
 
 test('appending a file that cannot be decoded still keeps the open document (the old behaviour)', async () => {

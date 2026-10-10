@@ -3545,6 +3545,11 @@ const downloadSheet = createDownloadSheet({
 });
 function doDownload() {
   if (doc.pages.length === 0) return;
+  // Unduh button and Ctrl+S both land here. A load in flight (a staged Ganti /
+  // Buka Baru keeps the OLD doc live under it) would open the sheet on a
+  // document that is about to be swapped: its pre-built bytes would then be
+  // saved under the new file's name. The same loadingFiles flag loadFiles uses.
+  if (loadingFiles) { toast(tr('toast.stillLoading')); return; }
   downloadSheet.open();
 }
 on('btn-download', 'click', doDownload);
