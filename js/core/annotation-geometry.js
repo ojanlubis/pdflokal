@@ -124,13 +124,30 @@ export function turnVector(turn, px, py) {
  * w, h]; 270 -> [x, y - w, h, w].
  */
 export function displayedBox(anno, ext) {
+  return displayedRect(anno, 0, 0, ext.w, ext.h);
+}
+
+/**
+ * The same, for a rect at own-frame offset (ox, oy) from the origin: a
+ * paragraph's painted block, say, which does not start at the origin.
+ */
+export function displayedRect(anno, ox, oy, w, h) {
   const turn = turnOf(anno);
-  const pts = [[0, 0], [ext.w, 0], [0, ext.h], [ext.w, ext.h]].map(([px, py]) => turnVector(turn, px, py));
+  const pts = [[ox, oy], [ox + w, oy], [ox, oy + h], [ox + w, oy + h]].map(([px, py]) => turnVector(turn, px, py));
   const xs = pts.map((p) => p.x);
   const ys = pts.map((p) => p.y);
   const x0 = Math.min(...xs);
   const y0 = Math.min(...ys);
   return { x: (anno.x || 0) + x0, y: (anno.y || 0) + y0, w: Math.max(...xs) - x0, h: Math.max(...ys) - y0 };
+}
+
+/**
+ * A screen-frame drag (dx, dy) expressed in `anno`'s own unturned frame: the
+ * delta a resize handle means. On an object turned 90, dragging DOWN grows its
+ * own width.
+ */
+export function ownDelta(anno, dx, dy) {
+  return turnVector((360 - turnOf(anno)) % 360, dx, dy);
 }
 
 /**
