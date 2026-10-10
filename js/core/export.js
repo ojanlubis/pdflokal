@@ -148,14 +148,31 @@ async function getFont(env, fontFamily, bold, italic) {
 // the old editor export (golden-tested there) minus the canvas scale factors.
 // Pair with `rotate: degrees(rotation)` on drawText/drawImage so glyphs/images
 // are oriented correctly after the page is /Rotate'd. wU/hU are the UNROTATED
-// page dims from page.getSize() (the MediaBox).
-function transformAnnotationCoords(rotation, xV, yV, wU, hU) {
+// dims of the VISIBLE box and (x0, y0) its origin: see visibleBox below.
+function transformAnnotationCoords(rotation, xV, yV, wU, hU, x0 = 0, y0 = 0) {
   switch (rotation) {
-    case 90:  return { x: yV,      y: xV };
-    case 180: return { x: wU - xV, y: yV };
-    case 270: return { x: wU - yV, y: hU - xV };
-    default:  return { x: xV,      y: hU - yV };
+    case 90:  return { x: x0 + yV,      y: y0 + xV };
+    case 180: return { x: x0 + wU - xV, y: y0 + yV };
+    case 270: return { x: x0 + wU - yV, y: y0 + hU - xV };
+    default:  return { x: x0 + xV,      y: y0 + hU - yV };
   }
+}
+
+// SINGLE SOURCE OF TRUTH for the box annotations are drawn into: the CropBox
+// clipped to the MediaBox, which is exactly the viewport PDF.js gave the
+// editor (the frame every annotation coordinate was measured in). Using the
+// MediaBox from (0,0) shifted every annotation on a cropped page by the crop
+// origin: a Tip-Ex at the visible top-left landed outside the visible area
+// (round-3 hunt, 2026-10-10; tests/core/export-cropbox.test.mjs).
+function visibleBox(pdfPage) {
+  const m = pdfPage.getMediaBox();
+  const c = pdfPage.getCropBox();
+  const x0 = Math.max(m.x, c.x);
+  const y0 = Math.max(m.y, c.y);
+  const x1 = Math.min(m.x + m.width, c.x + c.width);
+  const y1 = Math.min(m.y + m.height, c.y + c.height);
+  if (!(x1 > x0 && y1 > y0)) return { x0: m.x, y0: m.y, wU: m.width, hU: m.height }; // degenerate crop: PDF.js falls back too
+  return { x0, y0, wU: x1 - x0, hU: y1 - y0 };
 }
 
 // Whiteout: pdf-lib drawRectangle is axis-aligned in the unrotated page frame.
@@ -164,23 +181,23 @@ function transformAnnotationCoords(rotation, xV, yV, wU, hU) {
 // view-space rect that becomes the bottom-left of the unrotated PDF rect
 // after the rotation transform (verify each case by hand against
 // transformAnnotationCoords).
-function whiteoutCornerAndDims(rotation, anno, wU, hU) {
+function whiteoutCornerAndDims(rotation, anno, wU, hU, x0 = 0, y0 = 0) {
   const { x: xC, y: yC, width: wC, height: hC } = anno;
   switch (rotation) {
     case 90: {  // view TL → PDF bottom-left
-      const { x, y } = transformAnnotationCoords(90, xC, yC, wU, hU);
+      const { x, y } = transformAnnotationCoords(90, xC, yC, wU, hU, x0, y0);
       return { x, y, width: hC, height: wC };
     }
     case 180: {  // view TR → PDF bottom-left
-      const { x, y } = transformAnnotationCoords(180, xC + wC, yC, wU, hU);
+      const { x, y } = transformAnnotationCoords(180, xC + wC, yC, wU, hU, x0, y0);
       return { x, y, width: wC, height: hC };
     }
     case 270: {  // view BR → PDF bottom-left
-      const { x, y } = transformAnnotationCoords(270, xC + wC, yC + hC, wU, hU);
+      const { x, y } = transformAnnotationCoords(270, xC + wC, yC + hC, wU, hU, x0, y0);
       return { x, y, width: hC, height: wC };
     }
     default: {  // rotation 0: view BL → PDF bottom-left
-      const { x, y } = transformAnnotationCoords(0, xC, yC + hC, wU, hU);
+      const { x, y } = transformAnnotationCoords(0, xC, yC + hC, wU, hU, x0, y0);
       return { x, y, width: wC, height: hC };
     }
   }
@@ -224,7 +241,7 @@ async function drawWhiteout(pdfPage, anno, frame, env) {
     await drawSignature(pdfPage, { ...anno, image: anno.paperImage }, frame, env);
     return;
   }
-  const r = whiteoutCornerAndDims(frame.rotation, anno, frame.wU, frame.hU);
+  const r = whiteoutCornerAndDims(frame.rotation, anno, frame.wU, frame.hU, frame.x0, frame.y0);
   // Color-matched Tip-Ex: anno.color is sampled from the page background at
   // draw time (app layer). White stays the default for plain documents.
   const color = anno.color ? parseHexColor(env.PDFLib, anno.color) : env.PDFLib.rgb(1, 1, 1);
@@ -278,7 +295,7 @@ async function drawTextAsImage(pdfPage, anno, frame, env, text) {
   const img = await env.newDoc.embedPng(raster.png);
   // Anchor at the view-space BOTTOM-LEFT of the block, exactly like drawSignature.
   const yV = anno.y + raster.height;
-  const { x, y } = transformAnnotationCoords(frame.rotation, anno.x, yV, frame.wU, frame.hU);
+  const { x, y } = transformAnnotationCoords(frame.rotation, anno.x, yV, frame.wU, frame.hU, frame.x0, frame.y0);
   pdfPage.drawImage(img, {
     x, y, width: raster.width, height: raster.height, rotate: env.PDFLib.degrees(frame.rotation),
   });
@@ -347,7 +364,7 @@ async function drawText(pdfPage, anno, frame, env) {
   const lines = safeText.split('\n');
   for (let i = 0; i < lines.length; i += 1) {
     const yV = anno.y + size * TEXT_BASELINE_RATIO + i * size * TEXT_LINE_HEIGHT;
-    const { x, y } = transformAnnotationCoords(frame.rotation, anno.x, yV, frame.wU, frame.hU);
+    const { x, y } = transformAnnotationCoords(frame.rotation, anno.x, yV, frame.wU, frame.hU, frame.x0, frame.y0);
     drawTextSafe(pdfPage, lines[i], { x, y, size, font, color, rotate });
   }
 }
@@ -372,7 +389,7 @@ async function drawSignature(pdfPage, anno, frame, env) {
   // transformed through the page rotation, this lands the visible image
   // exactly where the user placed it in the rotated view.
   const yV = anno.y + height;
-  const { x, y } = transformAnnotationCoords(frame.rotation, anno.x, yV, frame.wU, frame.hU);
+  const { x, y } = transformAnnotationCoords(frame.rotation, anno.x, yV, frame.wU, frame.hU, frame.x0, frame.y0);
   pdfPage.drawImage(img, { x, y, width, height, rotate: env.PDFLib.degrees(frame.rotation) });
 }
 
@@ -390,7 +407,7 @@ async function drawWatermark(pdfPage, anno, frame, env) {
   // 0.35em ≈ cap-height/2 (baseline→optical-center distance).
   const halfW = font.widthOfTextAtSize(anno.text || '', size) / 2;
   const halfCap = size * 0.35;
-  const { x: cx, y: cy } = transformAnnotationCoords(frame.rotation, anno.x, anno.y, frame.wU, frame.hU);
+  const { x: cx, y: cy } = transformAnnotationCoords(frame.rotation, anno.x, anno.y, frame.wU, frame.hU, frame.x0, frame.y0);
   drawTextSafe(pdfPage, anno.text || '', {
     x: cx - halfW * Math.cos(rad) + halfCap * Math.sin(rad),
     y: cy - halfW * Math.sin(rad) - halfCap * Math.cos(rad),
@@ -409,7 +426,7 @@ async function drawPageNumber(pdfPage, anno, frame, env) {
   const font = await env.getFont('Helvetica', false, false);
   const size = anno.fontSize || DEFAULT_FONT_SIZE.pageNumber;
   const yV = anno.y + size * TEXT_BASELINE_RATIO;
-  const { x, y } = transformAnnotationCoords(frame.rotation, anno.x, yV, frame.wU, frame.hU);
+  const { x, y } = transformAnnotationCoords(frame.rotation, anno.x, yV, frame.wU, frame.hU, frame.x0, frame.y0);
   drawTextSafe(pdfPage, anno.text || '', {
     x, y, size, font,
     color: parseHexColor(env.PDFLib, anno.color),
@@ -460,6 +477,20 @@ async function addImagePage(env, page, source) {
 // buildPdfBytes). The scaling itself is core/annotation-geometry.js's, the one
 // home of that frame contract. Surgery inputs (replaceBox/replaceTargets) are
 // native already and are never scaled: applyPageSurgery reads the untouched list.
+
+// pdf-lib's page.scale() resizes the MediaBox from ITS ORIGIN (the origin
+// itself is not scaled, though the content is, about 0,0) and only moves a
+// Crop/Bleed/Trim/ArtBox that equals the MediaBox. A distinct CropBox stayed
+// at native size, so a merge-rescaled cropped page showed a shifted, zoomed-in
+// piece of itself. Every box present is scaled about 0,0, with the content.
+const PAGE_BOXES = ['MediaBox', 'CropBox', 'BleedBox', 'TrimBox', 'ArtBox'];
+function scalePageWithBoxes(pdfPage, k) {
+  const before = PAGE_BOXES
+    .filter((name) => name === 'MediaBox' || pdfPage.node[name]?.())
+    .map((name) => [name, pdfPage[`get${name}`]()]);
+  pdfPage.scale(k, k);
+  for (const [name, b] of before) pdfPage[`set${name}`](b.x * k, b.y * k, b.width * k, b.height * k);
+}
 
 // ---- pass-through: the untouched document -----------------------------------
 
@@ -658,11 +689,11 @@ export async function buildPdfBytes(doc, deps = {}) {
     const needsScale = !page.isFromImage && Number.isFinite(pageScale) && pageScale !== 1;
 
     if (annotations.length > 0) {
-      // wU/hU: UNROTATED page dims (MediaBox) — setRotation is metadata only,
-      // drawing happens in this frame. See transformAnnotationCoords. Read
-      // BEFORE the scale below, so it is the native frame the annotations are
-      // being expressed in.
-      const { width: wU, height: hU } = pdfPage.getSize();
+      // wU/hU: UNROTATED dims of the visible box (visibleBox above), x0/y0 its
+      // origin — setRotation is metadata only, drawing happens in this frame.
+      // See transformAnnotationCoords. Read BEFORE the scale below, so it is
+      // the native frame the annotations are being expressed in.
+      const { x0, y0, wU, hU } = visibleBox(pdfPage);
       // base + user, the SAME sum written to /Rotate above (core/page-rotation.js)
       // — not page.rotation alone. The page and its annotations must be
       // expressed in ONE frame: the reader applies /Rotate to the whole page,
@@ -671,7 +702,7 @@ export async function buildPdfBytes(doc, deps = {}) {
       // source carrying an inherited /Rotate 90 that put a 40x20 bar drawn at
       // (10,10) into the file as 20x40 at x=812 — the far edge, turned. The
       // 2026-08-09 /Rotate fix corrected the line above and stopped here.
-      const frame = { rotation: totalRotation, wU, hU };
+      const frame = { rotation: totalRotation, wU, hU, x0, y0 };
       // PAINT ORDER (core/annotation-order.js, founder ruling 2026-08-09):
       // Tip-Ex is a GROUND, not a layer. The SAME helper the screen uses, so
       // the two can't drift. It returns a COPY — `annotations` itself must
@@ -697,7 +728,7 @@ export async function buildPdfBytes(doc, deps = {}) {
       }
     }
 
-    if (needsScale) pdfPage.scale(pageScale, pageScale);
+    if (needsScale) scalePageWithBoxes(pdfPage, pageScale);
   }
 
   return newDoc.save({ useObjectStreams: true, addDefaultPage: false });
