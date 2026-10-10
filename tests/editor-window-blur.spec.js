@@ -154,9 +154,10 @@ test.describe('switching app or window while typing keeps the editor open', () =
   });
 
   test('document replaced while the editor is held: no late commit into the new one', async ({ page }) => {
+    await openTeks(page);
+    // From here on: the late commit's TypeError, not anything at boot.
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
-    await openTeks(page);
     await page.keyboard.type('Halo');
     expect(await windowBlur(page)).toBe(true);
 

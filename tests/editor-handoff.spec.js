@@ -53,7 +53,7 @@ test.describe('Teks: the next click while a box is open opens the next box', () 
 
     await page.keyboard.type('Dua');
     // A third blank, without pressing t again: Teks is still armed.
-    await page.click('.pv-page >> nth=0', { position: { x: 100, y: 500 } });
+    await page.click('.pv-page >> nth=0', { position: { x: 100, y: 420 } });
     await expectOneFocusedBoxTeksArmed(page);
     await page.keyboard.type('Tiga');
     await page.keyboard.press('Enter');

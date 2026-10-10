@@ -167,7 +167,7 @@ test.describe('format bar — mobile', () => {
     await page.tap('.pv-page >> nth=0', { position: { x: 120, y: 180 } });
     await page.keyboard.type('Satu');
 
-    for (const [y, text] of [[320, 'Dua'], [460, 'Tiga']]) {
+    for (const [y, text] of [[320, 'Dua'], [400, 'Tiga']]) {
       await page.tap('.pv-page >> nth=0', { position: { x: 100, y } });
       await expect(page.locator('.v2-text-edit')).toHaveCount(1);
       expect(await editorFocused(page)).toBe(true);
