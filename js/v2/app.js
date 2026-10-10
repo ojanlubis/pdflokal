@@ -2933,22 +2933,29 @@ async function refuseReplace(files) {
 // do not agree on every file (core/import.js pdfLibLoadError has the why). A
 // single untouched file never meets pdf-lib (core/export.js passThroughSource
 // hands its bytes back), so a lone file is NEVER checked here; it keeps opening,
-// editing-for-view and downloading as before. A MERGE always rebuilds, so the
-// moment a second file would join, every PDF involved is proven loadable by
-// pdf-lib first, and a file that is not is declined through the same path as
-// any unreadable file (skipped, counted on the rail as import/corrupt). Nothing
-// is rasterised or repaired beyond what every rebuild already does in memory
-// (core/pdflib-load.js): the user's document is never changed behind their
-// back, and they learn which file to leave out while it still costs nothing.
+// editing-for-view and downloading as before (an EDITED lone file meets the
+// same page-count check at Unduh, core/pdflib-load.js loadSourceForRebuild). A
+// MERGE always rebuilds, so the moment a second file would join, every PDF
+// involved must pass the rebuild's own load first: pdf-lib parses it, walks its
+// page tree, and counts the same pages PDF.js showed (a different count means
+// page N on screen is not page N in the download). A file that fails any of
+// the three is declined through the same path as any unreadable file (skipped,
+// counted on the rail as import/corrupt). A joining file is checked inside
+// importPdf (its rebuildCheck), where PDF.js's count first exists, before its
+// Source is built. Nothing is rasterised or repaired beyond what every rebuild
+// already does in memory (core/pdflib-load.js): the user's document is never
+// changed behind their back, and they learn which file to leave out while it
+// still costs nothing.
 // Rail before this: `export/corrupt`, 5 sessions, every one a merge, no file.
 const rebuildVerdicts = new Map(); // sourceId -> Promise<Error|null>
 
-// pdf-lib's load error for `bytes`, or null. If pdf-lib itself cannot be
-// fetched (offline) we do not know, and not knowing never blocks an import.
-async function rebuildLoadError(bytes) {
+// pdf-lib's rebuild error for `bytes` (whose PDF.js page count is `numPages`),
+// or null. If pdf-lib itself cannot be fetched (offline) we do not know, and
+// not knowing never blocks an import.
+async function rebuildLoadError(bytes, numPages) {
   let PDFLib;
   try { ({ PDFLib } = await ensurePdfLib()); } catch { return null; }
-  return pdfLibLoadError(PDFLib, bytes);
+  return pdfLibLoadError(PDFLib, bytes, numPages);
 }
 
 // The first already-open PDF source pdf-lib cannot rebuild, as its error, or null.
@@ -2956,7 +2963,7 @@ async function rebuildLoadError(bytes) {
 async function firstUnrebuildableSource() {
   for (const source of doc.sources) {
     if (!doc.pages.some((p) => p.sourceId === source.id && !p.isFromImage)) continue; // an image's bytes are not parsed
-    if (!rebuildVerdicts.has(source.id)) rebuildVerdicts.set(source.id, rebuildLoadError(source.bytes));
+    if (!rebuildVerdicts.has(source.id)) rebuildVerdicts.set(source.id, rebuildLoadError(source.bytes, source.numPages));
     const err = await rebuildVerdicts.get(source.id);
     if (err) return err;
   }
@@ -3036,11 +3043,10 @@ async function loadFilesInner(files) {
       const docIntent = intentValue(pendingIntent);
       if (isPdf(f)) {
         // Same catch as any unreadable file: skipped, rail import/corrupt, blocked:true.
-        if (rebuilds) {
-          const loadErr = await rebuildLoadError(bytes);
-          if (loadErr) throw loadErr;
-        }
-        const importedPages = await importPdf(doc, { name: f.name, bytes });
+        const importedPages = await importPdf(doc, {
+          name: f.name, bytes,
+          rebuildCheck: rebuilds ? (numPages) => rebuildLoadError(bytes, numPages) : null,
+        });
         if (rebuilds) rebuildVerdicts.set(doc.sources.at(-1).id, Promise.resolve(null)); // just proven
         // A protected PDF opens and renders perfectly (PDF.js decrypts) but can
         // NEVER be written back — pdf-lib has no decryption. Say so HERE, at

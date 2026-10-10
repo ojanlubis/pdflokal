@@ -20,7 +20,7 @@ import { rasterKey } from './raster-key.js';
 import { pageHasVisibleText } from './text-visibility.js';
 import { failureReason } from './failure-reason.js';
 import { sniffImageFormat } from './image-format.js';
-import { loadForRebuild } from './pdflib-load.js';
+import { loadForRebuild, pageCountError } from './pdflib-load.js';
 
 // bytes → append a Source + its Pages (metadata only) to `doc`. Returns the pages.
 // SINGLE SOURCE OF TRUTH for "this PDF is password/permissions protected".
@@ -75,19 +75,23 @@ async function detectEncrypted(pdf) {
 // on the rail, and the message stays on the device. It runs the rebuild's OWN
 // load (core/pdflib-load.js, which retypes a page tree that forgot its /Type)
 // and then walks the page tree, because a file pdf-lib parses but cannot walk
-// fails every rebuild just as surely as one it cannot parse. Nothing past
-// that: copyPages/save failures are a different class with their own witness
-// (v2/bake-failure.js).
+// fails every rebuild just as surely as one it cannot parse. Given PDF.js's
+// `numPages`, it also refuses a page list of another length: the two parsers
+// then disagree on WHICH page is page N, and the rebuild would ship a
+// neighbour (pdflib-load.js pageCountError; importPdf passes the count via
+// its rebuildCheck). Nothing past that: copyPages/save failures are a
+// different class with their own witness (v2/bake-failure.js).
 //
 // An ENCRYPTED file also fails pdf-lib's load, but that is the protected-PDF
 // path (flagged on the Source, warned at import, honest at export), not a
 // parse failure. It answers null here so it is never declined as "corrupt".
 //
 // Never throws. PDFLib is injected (this file has no vendor imports).
-export async function pdfLibLoadError(PDFLib, bytes) {
+export async function pdfLibLoadError(PDFLib, bytes, numPages) {
   try {
-    (await loadForRebuild(PDFLib, bytes)).getPageCount();
-    return null;
+    const doc = await loadForRebuild(PDFLib, bytes);
+    doc.getPageCount();
+    return pageCountError(doc, numPages);
   } catch (err) {
     return failureReason(err) === 'encrypted' ? null : err;
   }
@@ -158,7 +162,10 @@ export function detectSigned(bytes) {
   }
 }
 
-export async function importPdf(doc, { name, bytes }) {
+// `rebuildCheck(numPages)` (optional, async, Error|null) is the merge guard's
+// door (v2/app.js): it is asked with PDF.js's page count, the first moment one
+// exists, and an Error it returns is thrown before any Source is built.
+export async function importPdf(doc, { name, bytes, rebuildCheck = null }) {
   // WHY the ensure: pdf.js is no longer a <script> tag in index.html — it is
   // fetched on demand (core/vendor.js). This is the first moment it's genuinely
   // needed, and it's already async, so the load costs the user nothing extra.
@@ -172,6 +179,10 @@ export async function importPdf(doc, { name, bytes }) {
   let source;
   const pages = [];
   try {
+    if (rebuildCheck) {
+      const refusal = await rebuildCheck(pdf.numPages);
+      if (refusal) throw refusal;
+    }
     source = createSource({
       name,
       bytes,

@@ -47,3 +47,29 @@ test('2. a page that fails to load: the error surfaces, no orphan Source, PDF.js
   assert.equal(doc.pages.length, 0);
   assert.equal(state.destroyed, 1, 'the PDF.js document leaked');
 });
+
+// The merge guard's page-count check (core/pdflib-load.js pageCountError)
+// rides on importPdf, because PDF.js's page count first exists here. Asked
+// before the Source is built, so a refusal leaves nothing behind either.
+test('3. a rebuild check that refuses: the error surfaces, no Source, PDF.js destroyed, asked with PDF.js\'s count', async () => {
+  const state = stubPdfJs({ failAt: -1 });
+  const doc = createDoc();
+  const asked = [];
+  const refusal = new Error('Invalid PDF page tree');
+  await assert.rejects(importPdf(doc, {
+    name: 'c.pdf', bytes: new Uint8Array([1, 2, 3]),
+    rebuildCheck: async (numPages) => { asked.push(numPages); return refusal; },
+  }), (e) => e === refusal);
+  assert.deepEqual(asked, [3], 'the check got PDF.js\'s numPages, once');
+  assert.equal(doc.sources.length, 0);
+  assert.equal(doc.pages.length, 0);
+  assert.equal(state.destroyed, 1);
+});
+
+test('4. a rebuild check that passes changes nothing', async () => {
+  stubPdfJs({ failAt: -1 });
+  const doc = createDoc();
+  const pages = await importPdf(doc, { name: 'd.pdf', bytes: new Uint8Array([1, 2, 3]), rebuildCheck: async () => null });
+  assert.equal(pages.length, 3);
+  assert.equal(doc.sources.length, 1);
+});
