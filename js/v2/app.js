@@ -37,7 +37,7 @@ import { scanAppearance, scanPaper } from './scan-appearance.js';
 import { validateSample } from '../core/feedback-sample.js';
 import { createPageSlot, pageDisplaySize, syncOverlay, textFontCss, applyTextFont, measureTextAnnoWidth } from '../render/page-view.js';
 import { createViewportStream } from '../render/viewport.js';
-import { RASTER_BASE, sharpenScale, maxPixelsFor } from '../render/sharpen.js';
+import { RASTER_BASE, sharpenScale, maxPixelsFor, imageScaleCap } from '../render/sharpen.js';
 import { createInteraction } from '../render/interaction.js';
 import { createFormatBar } from './format-bar.js';
 import { createTextRunIndex, mapRunFont, MIN_HIT } from './text-runs.js';
@@ -774,14 +774,17 @@ function focusedSlot() {
 // replaced are exactly how the softness survived: the streaming entry path and
 // the Ganti re-bake path each had their own copy of the number.
 function rasterScaleFor(page) {
-  if (page.id !== focusedPageId) return RASTER_BASE;
-  return sharpenScale({
+  const budget = maxPixelsFor(deviceClass());
+  const scale = page.id !== focusedPageId ? RASTER_BASE : sharpenScale({
     pageWidth: page.width,
     pageHeight: page.height,
     zoom,
     dpr: window.devicePixelRatio,
-    maxPixels: maxPixelsFor(deviceClass()),
+    maxPixels: budget,
   });
+  // An image page never past its own pixels or the budget (render/sharpen.js
+  // imageScaleCap: a phone photo at scale 2 was a blank 48MP canvas on iOS).
+  return Math.min(scale, imageScaleCap(page, budget));
 }
 
 function scheduleSharpen() {
