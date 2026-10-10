@@ -2919,7 +2919,7 @@ function toastRefusal({ refusal, name }) {
 }
 // The one guard of both replace paths (Ganti, Buka Baru). Toasts and returns
 // true when the replace must not wipe the doc: a load is running, or the
-// selection is unusable. Call it BEFORE resetDoc.
+// selection is unusable. Call it BEFORE starting the replace load.
 async function refuseReplace(files) {
   const verdict = await replaceRefusal({ loading: loadingFiles, files });
   if (!verdict) return false;
@@ -3200,8 +3200,9 @@ async function loadFilesInner(files, { replace = false } = {}) {
   // every time someone starts over. See wireDialogHistory below for the other half.
   const wasEmpty = document.body.classList.contains('is-empty');
   document.body.classList.remove('is-empty'); // landing yields, editor chrome returns
-  // A failed Buka Baru returns to the landing while still sitting on the guard
-  // entry it pushed earlier; pushing again would orphan a second one.
+  // An append onto an empty editor whose files all fail returns to the landing
+  // while still sitting on the guard entry it pushed earlier; pushing again
+  // would orphan a second one. (A refused replace never leaves the editor.)
   if (wasEmpty && !window.history.state?.v2doc) pushEditorHistoryState();
 
   if (firstLoad) {
@@ -3419,7 +3420,8 @@ on('fm-add', 'click', () => {
   toggleFileMenu(false);
   pickFiles(); // appends → merge, the default loadFiles path
 });
-// Buka Baru wipes the doc AND its undo history once a file is picked, so with
+// Buka Baru wipes the doc AND its undo history once a picked file OPENS (a file
+// that cannot be decoded changes nothing), so with
 // edits not yet downloaded it asks first. A clean doc (nothing edited, or
 // already downloaded whole) loses nothing, so the picker opens straight away.
 on('fm-new', 'click', () => {
