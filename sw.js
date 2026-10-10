@@ -304,9 +304,64 @@ async function recover(clientId) {
   }
 }
 
+// ADOPTION: the FIRST visit's generation (found 2026-10-10). A first visit has
+// no controller, so this worker never saw its navigation or its modules: no
+// load record, no generation, and an install made on that visit launched
+// offline into the precached shell with every module refused (gen: null) — a
+// dead editor. Once this worker takes control, the page (js/v2/app.js) sends
+// the module URLs it actually ran. The worker refetches the page's own URL and
+// those modules into ONE new generation and commits it, but only if the deploy
+// did not move under the pass: /api/rev must read the same SHA before and
+// after, or nothing is kept. Same coherence bar as a network load, which also
+// fetches its modules over a few seconds. Only while no complete generation
+// exists and only for a client this worker has no record of, so it can never
+// overwrite a real network load's generation.
+const ADOPT_MAX = 200;
+async function adopt(clientId, urls) {
+  if (await loadFor(clientId)) return;
+  if ((await completeGens()).length > 0) return;
+  const client = await self.clients.get(clientId);
+  if (!client || !client.url) return;
+  const page = new URL(client.url);
+  if (page.origin !== self.location.origin) return;
+  const modules = [...new Set(Array.isArray(urls) ? urls : [])]
+    .map((u) => { try { return new URL(u, self.location.origin); } catch { return null; } })
+    .filter((u) => u && u.origin === self.location.origin
+      && u.pathname.startsWith('/js/') && !u.pathname.startsWith('/js/vendor/'))
+    .slice(0, ADOPT_MAX)
+    .map((u) => u.href);
+  if (modules.length === 0) return;
+
+  const rev = () => fetch('/api/rev', { cache: 'no-store' }).then((r) => (r.ok ? r.text() : Promise.reject(new Error('rev'))));
+  const before = await rev();
+  const urlsToKeep = [page.href, ...modules];
+  const responses = await Promise.all(urlsToKeep.map((u) => fetch(u).then((r) => {
+    if (!cacheable({ method: 'GET' }, r)) throw new Error('uncacheable');
+    return r;
+  })));
+  if ((await rev()) !== before) return; // a deploy landed mid-pass: keep nothing
+
+  const gen = newGen();
+  try {
+    const home = homeFor(page.pathname);
+    // Cloned BEFORE the original body goes to the cache, the way the navigate
+    // branch stores its last-resort home.
+    if (page.pathname === home && page.search) writeTo(gen, self.location.origin + home, responses[0].clone());
+    urlsToKeep.forEach((u, i) => { writeTo(gen, u, responses[i]); });
+    await pending.get(gen);
+    await (await caches.open(gen)).put(COMPLETE, new Response(JSON.stringify({ at: Date.now() }), { headers: { 'content-type': 'application/json' } }));
+    await setLoad(clientId, { mode: 'network', gen, committed: true });
+    await prune();
+  } catch {
+    await caches.delete(gen);
+  }
+}
+
 self.addEventListener('message', (event) => {
   const data = event.data;
-  if (!data || data.type !== 'pdflokal:booted' || !event.source || !event.source.id) return;
+  if (!data || !event.source || !event.source.id) return;
+  if (data.type === 'pdflokal:adopt') { event.waitUntil(adopt(event.source.id, data.urls).catch(() => {})); return; }
+  if (data.type !== 'pdflokal:booted') return;
   event.waitUntil(commit(event.source.id).catch(() => {}));
 });
 

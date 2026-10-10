@@ -4435,11 +4435,27 @@ if ('serviceWorker' in navigator) {
     // No block comment in this catch: several tests strip block comments with a
     // lazy regex, and the accept string for images earlier in this file opens
     // one as far as that regex can tell, so a closer here swallows the file.
+    const firstVisit = !navigator.serviceWorker.controller;
     try {
       navigator.serviceWorker.controller?.postMessage({ type: 'pdflokal:booted' });
     } catch {
       // enhancement only
     }
     navigator.serviceWorker.register('/sw.js').catch(() => {});
+    // FIRST VISIT: no worker saw this load, so it has no offline generation and an
+    // install made now would launch offline into a dead shell. Once the worker
+    // takes control, hand it the module URLs this page actually ran so it can
+    // adopt them as a generation (sw.js ADOPTION; it keeps nothing if a deploy
+    // landed meanwhile). Same reach as 'booted': only a page that got here.
+    if (firstVisit) {
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        try {
+          const urls = performance.getEntriesByType('resource').map((e) => e.name);
+          navigator.serviceWorker.controller?.postMessage({ type: 'pdflokal:adopt', urls });
+        } catch {
+          // enhancement only
+        }
+      }, { once: true });
+    }
   });
 }

@@ -65,6 +65,13 @@ function startServer() {
       });
       return;
     }
+    // The deploy's SHA, as api/rev.js answers it: sw.js ADOPTION reads it
+    // before and after its pass and keeps nothing if it moved.
+    if (u.pathname === '/api/rev') {
+      res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+      res.end(JSON.stringify({ rev: state.gen === 'A' ? 'aaaaaaa' : 'bbbbbbb' }));
+      return;
+    }
     if (u.pathname.startsWith('/api/')) { res.writeHead(404); res.end(); return; }
     let file = u.pathname === '/' ? '/index.html' : u.pathname;
     if (!path.extname(file)) file += '.html';
@@ -229,6 +236,29 @@ test.describe('sw.js generations', () => {
     expect(await genOf(page)).toBe('A');
   });
 
+  // A first visit is never seen by the worker (no controller yet), so before
+  // ADOPTION an install made on that visit launched offline into the install-day
+  // shell with every module refused: buttons on screen, no editor behind them.
+  test('the FIRST visit alone is enough: offline, the installed app opens a live editor', async ({ page, context }) => {
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    await page.goto(srv.base + '/');
+    await expect.poll(() => alive(page), { timeout: 20000 }).toBe(true);
+    // No reload: the worker takes control of THIS document and adopts it.
+    await expect.poll(() => page.evaluate(async () => {
+      if (!navigator.serviceWorker.controller) return false;
+      for (const k of await caches.keys()) {
+        if (k.startsWith('pdflokal-gen-') && await caches.match('/__sw/complete', { cacheName: k })) return true;
+      }
+      return false;
+    }), { timeout: 20000, message: 'the first visit never became a complete generation' }).toBe(true);
+
+    errors.length = 0;
+    await goOfflineAndLaunch(page, context, srv.base);
+    await expect.poll(() => alive(page), { timeout: 20000 }).toBe(true);
+    expect(errors).toEqual([]);
+  });
+
   test('CONTROL: offline cold launch opens the newest complete generation', async ({ page, context }) => {
     // Green before and after v8: the falsifier for the two offline tests above,
     // and the guard on the pruning — the newest booted deploy is the one served.
@@ -238,6 +268,22 @@ test.describe('sw.js generations', () => {
     srv.state.gen = 'B';
     await warm(page, srv.base, 2);
     expect(await genOf(page)).toBe('B');
+    // Counting complete generations no longer proves B committed: the first
+    // visit's ADOPTED generation is a complete A of its own, so "two complete"
+    // can be reached before B's load posts 'booted'. Wait for the NEWEST complete
+    // generation to be B's, which is the state the offline launch reads.
+    await expect.poll(() => page.evaluate(async () => {
+      let best = null;
+      for (const k of await caches.keys()) {
+        if (!k.startsWith('pdflokal-gen-')) continue;
+        const mark = await caches.match('/__sw/complete', { cacheName: k });
+        if (!mark) continue;
+        const at = (await mark.json()).at || 0;
+        if (!best || at > best.at) best = { k, at };
+      }
+      const imp = best && await caches.match('/js/core/import.js', { cacheName: best.k });
+      return imp ? (await imp.text()).includes('__genB') : false;
+    }), { timeout: 20000, message: "deploy B's load never became the newest complete generation" }).toBe(true);
 
     errors.length = 0;
     const fromWorker = [];
