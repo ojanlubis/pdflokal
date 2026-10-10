@@ -143,6 +143,7 @@ let editingAnno = null;       // text annotation currently in the inline editor
 let editingEl = null;         // its contenteditable (format bar restyles it live)
 let editingIsReplace = false; // Ganti Teks draft open → NO format bar (see below)
 let heldDraft = null;         // { resume, commit } while an empty draft waits on a format-bar control (blurCommitsDraft)
+let openEditorCommit = null;  // the open inline editor's commit, while one is open (closeOpenEditor)
 
 // ---- BETA edit-feedback (founder ruling 2026-07-22, SIMPLIFIED) -----------------
 // Ask 👍/👎 ONCE, on the FIRST successful commit of a document. The founder
@@ -1967,11 +1968,29 @@ on('pm-close', 'click', () => pageManager.close());
 // ---- inline text editing ------------------------------------------------------------
 // One code path for "place new text" and "edit existing text": a contenteditable
 // positioned in the page overlay at page coords. Commit on blur / Enter.
-function openTextEditor({ pageId, x, y, anno, draft }) {
-  // A held empty draft is unfocused, so no blur will ever close it: a tap that
-  // opens the next editor (Teks is still armed) closes it here, BEFORE this
-  // editor claims editingEl, or its commit would clear the new editor's state.
+//
+// Closes the open inline editor, if any, through its own commit. A held empty
+// draft goes first through heldDraft.commit, which blurs the format-bar control
+// so a size typed but not yet entered still lands.
+function closeOpenEditor() {
   heldDraft?.commit();
+  openEditorCommit?.();
+}
+
+function openTextEditor({ pageId, x, y, anno, draft }) {
+  // The open editor closes HERE, before this one claims editingEl and before
+  // the overlay is looked up. Left to its blur, it closed only once this
+  // editor took focus: its commit then cleared the state this editor had
+  // claimed and re-synced the page, which emptied the overlay with this editor
+  // in it, so a second tap with Teks armed left no box at all, and the next
+  // Backspace deleted the text just written. A held empty draft is unfocused
+  // and has no blur coming at all.
+  // The closing commit disarms (setTool('select')); the tap that opens this
+  // editor came from the armed tool, which stays armed for the next blank,
+  // as it does for a tap with no box open.
+  const armed = tool;
+  closeOpenEditor();
+  if (tool !== armed) setTool(armed);
   const slot = slots.find((s) => s.page.id === pageId);
   if (!slot) return;
   const overlay = slot.view.querySelector('.pv-overlay');
@@ -2036,9 +2055,14 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
     const { text, lines: blockLines } = editorCommit(ed.textContent, blockPlan ? readEditorLines(ed) : null);
     const blockTop = blockPlan ? parseFloat(ed.style.top) : null;
     ed.remove();
-    editingAnno = null;
-    editingEl = null;
-    editingIsReplace = false;
+    // Only while the state is still this editor's: a commit that arrives after
+    // a newer editor opened (a late blur) must not close that one.
+    if (editingEl === ed) {
+      editingAnno = null;
+      editingEl = null;
+      editingIsReplace = false;
+    }
+    if (openEditorCommit === commit) openEditorCommit = null;
     // After the rest of this commit has run: a sync deferred while the editor
     // was open (see syncPage) catches up now.
     if (deferredSync.size) Promise.resolve().then(flushDeferredSync);
@@ -2484,6 +2508,7 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
     };
   };
   releaseHold = holdEditor(ed, commit, { onBlur: onRealBlur });
+  openEditorCommit = commit;
   ed.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ed.blur(); }
     // Ctrl/Cmd+B / I = the format bar's buttons, for the WHOLE box. WHY
