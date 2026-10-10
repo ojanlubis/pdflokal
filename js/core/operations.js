@@ -11,7 +11,7 @@
  */
 
 import { getPage, findAnnotation, getSource, cloneForPaste, createAnnotation } from './model.js';
-import { scaleAnnotationGeometry, turnAnnotation } from './annotation-geometry.js';
+import { scaleAnnotationGeometry, turnAnnotation, withBlockFollowing } from './annotation-geometry.js';
 
 const clamp = (n, lo, hi) => Math.min(Math.max(n, lo), hi);
 
@@ -246,8 +246,15 @@ export function moveAnnotation(doc, annotationId, dx, dy) {
   const frameH = rotated ? page.width : page.height;
   const w = annotation.width || 0;
   const h = annotation.height || 0;
-  annotation.x = clamp((annotation.x || 0) + dx, 0, Math.max(0, frameW - w));
-  annotation.y = clamp((annotation.y || 0) + dy, 0, Math.max(0, frameH - h));
+  const moved = withBlockFollowing({
+    ...annotation,
+    x: clamp((annotation.x || 0) + dx, 0, Math.max(0, frameW - w)),
+    y: clamp((annotation.y || 0) + dy, 0, Math.max(0, frameH - h)),
+  }, annotation);
+  // In place: the drag holds this object and reads its x/y back.
+  annotation.x = moved.x;
+  annotation.y = moved.y;
+  if (moved.block !== annotation.block) annotation.block = moved.block;
   return annotation;
 }
 
