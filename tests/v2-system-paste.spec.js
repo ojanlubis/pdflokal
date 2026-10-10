@@ -147,3 +147,54 @@ test.describe('system clipboard paste', () => {
     expect((await annos(page)).map((x) => x.text)).toEqual(['Papan', 'Papan']);
   });
 });
+
+// A pasted image is a signature-type object and stays SELECTED after the paste.
+// Tapping TTD to make a first signature then used to swap the pasted image
+// (a company stamp, a logo) for the drawing, because onReady replaced whatever
+// signature was selected. Replacing is Gambar Ulang's job, never a side effect.
+test('TTD after pasting an image makes a NEW signature; the pasted image is untouched', async ({ page }) => {
+  await openDoc(page);
+  expect(await paste(page, { image: { w: 400, h: 200 } })).toBe(true);
+  await expect.poll(async () => (await annos(page)).length).toBe(1);
+  const [pasted] = await annos(page);
+  expect(await page.evaluate(() => window.v2.getDoc().selection.annotationId), 'known-positive: the paste is selected').toBe(pasted.id);
+
+  await page.click('[data-tool="signature"]');
+  await expect(page.locator('#sig-modal')).toBeVisible();
+  await expect(page.locator('#sig-canvas')).toHaveAttribute('data-ready', 'true');
+  const box = await page.locator('#sig-canvas').boundingBox();
+  await page.mouse.move(box.x + 40, box.y + 60);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 160, box.y + 80, { steps: 8 });
+  await page.mouse.up();
+  await page.click('#sig-use');
+  await expect(page.locator('#sig-modal')).toBeHidden();
+
+  const after = await annos(page);
+  expect(after.find((a) => a.id === pasted.id)?.image, 'the pasted image was replaced by the drawing').toBe(pasted.image);
+  expect(await page.evaluate(() => window.v2.getTool()), 'TTD must arm placement of the new signature').toBe('signature');
+});
+
+// The other half: Gambar Ulang with a signature-type object selected IS the
+// explicit "replace this one" (founder punch list #1), and must still swap it in
+// place, one object, one undo step.
+test('Gambar Ulang on the selected object replaces it in place', async ({ page }) => {
+  await openDoc(page);
+  expect(await paste(page, { image: { w: 400, h: 200 } })).toBe(true);
+  await expect.poll(async () => (await annos(page)).length).toBe(1);
+  const [pasted] = await annos(page);
+  await expect(page.locator('#btn-redraw-sig')).toBeVisible();
+  await page.click('#btn-redraw-sig');
+  await expect(page.locator('#sig-canvas')).toHaveAttribute('data-ready', 'true');
+  const box = await page.locator('#sig-canvas').boundingBox();
+  await page.mouse.move(box.x + 40, box.y + 60);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 160, box.y + 80, { steps: 8 });
+  await page.mouse.up();
+  await page.click('#sig-use');
+  await expect(page.locator('#sig-modal')).toBeHidden();
+  const after = await annos(page);
+  expect(after).toHaveLength(1);
+  expect(after[0].id).toBe(pasted.id);
+  expect(after[0].image).not.toBe(pasted.image);
+});

@@ -994,7 +994,7 @@ for (const btn of document.querySelectorAll('#toolbar .tool[data-tool]')) {
     // on purpose: pressing TTD with no saved signature never reaches setTool,
     // and that is precisely the path that was invisible.
     if (ARM_TOOL[t]) tel('tool_use', { tool: ARM_TOOL[t], action: 'arm' });
-    if (t === 'signature' && !storedSignature) { signatureModal.open(); return; }
+    if (t === 'signature' && !storedSignature) { openSignatureModal(); return; }
     setTool(t);
     if (t === 'text') toast(tr('toast.armText'));
     if (t === 'whiteout') toast(tr('toast.armWhiteout'));
@@ -3245,6 +3245,18 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
 }
 
 // ---- signature modal (draw / upload) --------------------------------------------
+// The signature the open modal will REPLACE, or null for "make a new one". Set
+// only by Gambar Ulang, read once by onReady. WHY not "whatever is selected at
+// onReady": a pasted image is a signature-type object and stays selected after
+// the paste, so tapping TTD to make a first signature swapped the user's pasted
+// stamp or logo for the drawing. Replacing is an explicit act, never a side effect.
+let redrawTargetId = null;
+// SINGLE SOURCE OF TRUTH for opening the sheet: every open states its target, so
+// a cancelled Gambar Ulang can never leave one behind for the next TTD tap.
+function openSignatureModal(targetId = null) {
+  redrawTargetId = targetId;
+  signatureModal.open();
+}
 const signatureModal = createSignatureModal({
   modal: document.getElementById('sig-modal'),
   toast,
@@ -3253,7 +3265,10 @@ const signatureModal = createSignatureModal({
     // Founder punch list #1: if a placed signature is SELECTED when the user
     // redraws, they're fixing THAT one — swap its image in place instead of
     // making them delete + re-place. Otherwise arm placement as before.
-    const found = selectedSignatureAnno();
+    const targetId = redrawTargetId;
+    redrawTargetId = null;
+    const hit = targetId ? findAnnotation(doc, targetId) : null;
+    const found = hit && hit.annotation.type === 'signature' ? { page: hit.page, anno: hit.annotation } : null;
     if (found) {
       record(history, doc);
       found.anno.image = sig.dataUrl;
@@ -3293,7 +3308,7 @@ function syncSigBar() {
     ? tr('sigBar.signatureSelected')
     : (armed ? tr('sigBar.armed') : '');
 }
-on('btn-redraw-sig', 'click', () => signatureModal.open());
+on('btn-redraw-sig', 'click', () => openSignatureModal(selectedSignatureAnno()?.anno.id ?? null));
 
 on('btn-all-pages', 'click', () => {
   const found = selectedSignatureAnno();
@@ -3589,7 +3604,7 @@ document.addEventListener('keydown', (e) => {
     else if (k === 'g') setTool('ganti');
     else if (k === 's' || k === 'p') {
       if (storedSignature) setTool('signature');
-      else signatureModal.open();
+      else openSignatureModal();
     }
   }
 });
@@ -3918,7 +3933,7 @@ function applyIntent(intent) {
   if (intent === 'ttd' || intent === 'paraf') {
     // Same semantics as the toolbar button: no stored signature → the modal
     // opens to make one; otherwise arm placement.
-    if (!storedSignature) { signatureModal.open(); return; }
+    if (!storedSignature) { openSignatureModal(); return; }
     setTool('signature');
     toast(tr('toast.armSignature'));
   } else if (intent === 'teks') {
