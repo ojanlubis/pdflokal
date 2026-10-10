@@ -19,10 +19,17 @@
  * pages and left signatures off the bottom edge. A rule only a comment states is
  * a rule the next mutation path does not follow.
  *
- * NOT in this frame, and never moved here: the doc-bound surgery inputs
- * (replaceBox, replaceTargets, a block's width/origin/leading/size), which are
- * in the source page's own PDF units, read by surgery from the content stream.
- * Scaling them would send a doubly transformed target to text-walk.js.
+ * ALSO in this frame, and moved with the cover: an edit cover's BIRTH rects,
+ * replaceBox (Ganti/Hapus) and ocrBox (scan edits). page-surgery.js's
+ * overlapsBirthBox compares the cover against replaceBox directly; moving one
+ * without the other made every rotated or merge-rescaled edit look "dragged
+ * away", surgery declined, and the original text stayed in the file under a
+ * painted box (round-3 regression, 2026-10-10).
+ *
+ * NOT in this frame, and never moved here: replaceTargets and a block's
+ * width/origin/leading/size. Those are in the source page's own PDF units,
+ * read by surgery from the content stream; transforming them would send a
+ * doubly transformed target to text-walk.js.
  *
  * Pure: always returns a NEW object (history snapshots share nested fields such
  * as `block` by reference, so nothing here may mutate its input).
@@ -38,6 +45,10 @@ export function scaleAnnotationGeometry(anno, k) {
   for (const key of ['x', 'y', 'width', 'height', 'fontSize']) {
     if (Number.isFinite(out[key])) out[key] *= k;
   }
+  for (const key of BIRTH_RECTS) {
+    const r = out[key];
+    if (r) out[key] = { x: r.x * k, y: r.y * k, w: r.w * k, h: r.h * k };
+  }
   if (out.block) {
     const b = { ...out.block };
     if (Number.isFinite(b.k)) b.k *= k;
@@ -48,26 +59,76 @@ export function scaleAnnotationGeometry(anno, k) {
   return out;
 }
 
+const BIRTH_RECTS = ['replaceBox', 'ocrBox'];
+
+// One clockwise quarter turn of a rect in a frame whose displayed height is H.
+const turnRect = (r, H) => ({ x: H - (r.y + r.h), y: r.x, w: r.h, h: r.w });
+
 /**
- * `anno` after its page turns one quarter clockwise. `H` is the displayed
- * height BEFORE the turn; `newW`/`newH` the displayed size after it.
+ * The extent rotation reasons with. A text annotation stores no width/height
+ * (the view sizes it from its text), and treating it as a point pivoted it on
+ * its top-left corner and let the clamp pass it off the page. 0.6em per
+ * character over-estimates most fonts, which errs toward staying on the page.
+ */
+function extentOf(anno) {
+  const w = Number.isFinite(anno.width) ? anno.width : null;
+  const h = Number.isFinite(anno.height) ? anno.height : null;
+  if (w !== null && h !== null) return { w, h };
+  if (anno.type === 'text' && typeof anno.text === 'string') {
+    const size = Number.isFinite(anno.fontSize) ? anno.fontSize : 16;
+    const lines = anno.text.split('\n');
+    return {
+      w: w ?? Math.max(...lines.map((l) => l.length)) * size * 0.6,
+      h: h ?? lines.length * size * 1.2,
+    };
+  }
+  return { w: w ?? 0, h: h ?? 0 };
+}
+
+/**
+ * `anno` after its page turns `steps` quarters clockwise (0-3; a -90 is 3).
+ * `W`/`H` are the displayed size BEFORE the turn.
  *
  * The rule (2026-10-10, a behaviour call for the seat to judge;
  * tests/core/rotate-annotations.test.mjs):
  *   - a whiteout (Tip-Ex, or an edit cover) turns WITH the content it hides:
- *     its rect rotates, width and height swap;
+ *     its rect rotates, width and height swap, and its birth rects with it;
  *   - anything else (signature, text) keeps reading upright and follows the
  *     spot it marked: its centre moves with the content, its size stays, and
- *     it is clamped inside the page.
+ *     it is clamped inside the page ONCE, in the final frame (clamping per
+ *     quarter made a -90 three lossy moves instead of one).
  */
-export function quarterTurnAnnotation(anno, H, newW, newH) {
-  const w = Number.isFinite(anno.width) ? anno.width : 0;
-  const h = Number.isFinite(anno.height) ? anno.height : 0;
-  if (anno.type === 'whiteout') {
-    return { ...anno, x: H - (anno.y + h), y: anno.x, width: h, height: w };
+export function turnAnnotation(anno, steps, W, H) {
+  const out = { ...anno };
+  const isWhiteout = anno.type === 'whiteout';
+  const ext = extentOf(anno);
+  let rect = { x: anno.x || 0, y: anno.y || 0, w: ext.w, h: ext.h };
+  let cx = rect.x + ext.w / 2;
+  let cy = rect.y + ext.h / 2;
+  const births = {};
+  for (const key of BIRTH_RECTS) if (anno[key]) births[key] = { ...anno[key] };
+  let dw = W;
+  let dh = H;
+  for (let i = 0; i < steps; i += 1) {
+    if (isWhiteout) rect = turnRect(rect, dh);
+    for (const key of Object.keys(births)) births[key] = turnRect(births[key], dh);
+    [cx, cy] = [dh - cy, cx];
+    [dw, dh] = [dh, dw];
   }
-  const cx = H - (anno.y + h / 2);
-  const cy = anno.x + w / 2;
-  const clamp = (v, max) => Math.min(Math.max(v, 0), Math.max(max, 0));
-  return { ...anno, x: clamp(cx - w / 2, newW - w), y: clamp(cy - h / 2, newH - h) };
+  Object.assign(out, births);
+  if (isWhiteout) {
+    out.x = rect.x;
+    out.y = rect.y;
+    if (steps % 2 === 1) { out.width = anno.height; out.height = anno.width; }
+  } else {
+    const clamp = (v, max) => Math.min(Math.max(v, 0), Math.max(max, 0));
+    out.x = clamp(cx - ext.w / 2, dw - ext.w);
+    out.y = clamp(cy - ext.h / 2, dh - ext.h);
+  }
+  if (anno.block?.disp) {
+    const dx = out.x - (anno.x || 0);
+    const dy = out.y - (anno.y || 0);
+    out.block = { ...anno.block, disp: { x: anno.block.disp.x + dx, y: anno.block.disp.y + dy } };
+  }
+  return out;
 }

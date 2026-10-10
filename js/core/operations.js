@@ -11,7 +11,7 @@
  */
 
 import { getPage, findAnnotation, getSource, cloneForPaste } from './model.js';
-import { scaleAnnotationGeometry, quarterTurnAnnotation } from './annotation-geometry.js';
+import { scaleAnnotationGeometry, turnAnnotation } from './annotation-geometry.js';
 
 const clamp = (n, lo, hi) => Math.min(Math.max(n, lo), hi);
 
@@ -140,7 +140,8 @@ export function reorderPage(doc, pageId, toIndex) {
 // WHY rotatePage moves annotations (2026-10-10): their geometry lives in the
 // page's DISPLAYED frame (core/annotation-geometry.js), so turning only
 // `rotation` left a signature at y=700 on an A4 page that is now 595 tall: off
-// the page on screen and in the file. One quarter turn at a time.
+// the page on screen and in the file. The whole turn is ONE mapping
+// (core/annotation-geometry.js turnAnnotation), clamped once at the end.
 export function rotatePage(doc, pageId, deltaDeg = 90) {
   const pg = getPage(doc, pageId);
   if (!pg) return null;
@@ -149,14 +150,12 @@ export function rotatePage(doc, pageId, deltaDeg = 90) {
     return pg;
   }
   const steps = (((deltaDeg / 90) % 4) + 4) % 4;
-  for (let i = 0; i < steps; i += 1) {
-    const rotated = (pg.rotation || 0) % 180 !== 0;
-    const H = rotated ? pg.width : pg.height; // displayed height BEFORE this turn
-    const newW = H;
-    const newH = rotated ? pg.height : pg.width;
-    pg.annotations = pg.annotations.map((a) => quarterTurnAnnotation(a, H, newW, newH));
-    pg.rotation = ((pg.rotation || 0) + 90) % 360;
-  }
+  if (steps === 0) return pg;
+  const rotated = (pg.rotation || 0) % 180 !== 0;
+  const W = rotated ? pg.height : pg.width; // displayed size BEFORE the turn
+  const H = rotated ? pg.width : pg.height;
+  pg.annotations = pg.annotations.map((a) => turnAnnotation(a, steps, W, H));
+  pg.rotation = ((pg.rotation || 0) + 90 * steps) % 360;
   return pg;
 }
 

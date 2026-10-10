@@ -61,3 +61,64 @@ test('3. four quarter turns bring every annotation back to where it started', ()
   assert.ok(Math.abs(get(t.id).x - 300) < 1e-9 && Math.abs(get(t.id).y - 400) < 1e-9);
   assert.equal(p.rotation, 0);
 });
+
+// ---- round-3 hardening (2026-10-10) ------------------------------------------
+// An edit cover's replaceBox / ocrBox are its BIRTH rect in the SAME displayed
+// frame as the cover (page-surgery.js overlapsBirthBox compares them directly).
+// Turning the cover without them made surgery decline: the original text stayed
+// in the file under a painted box. tests/core/rotate-merge-edit-surgery.test.mjs
+// proves the export consequence; this pins the geometry.
+test('4. an edit cover turns WITH its replaceBox / ocrBox, so they still coincide', () => {
+  const doc = a4();
+  const [p] = doc.pages;
+  const box = { x: 60, y: 200, w: 300, h: 18 };
+  const c = addAnnotation(doc, p.id, createAnnotation('whiteout', {
+    x: box.x, y: box.y, width: box.w, height: box.h, replaceTargets: [{}], replaceBox: { ...box }, ocrBox: { ...box },
+  }));
+  rotatePage(doc, p.id, 90);
+  const r = p.annotations.find((a) => a.id === c.id);
+  const rect = { x: r.x, y: r.y, w: r.width, h: r.height };
+  assert.notDeepEqual(rect, box, 'VACUITY GUARD: the cover really moved');
+  assert.deepEqual(r.replaceBox, rect);
+  assert.deepEqual(r.ocrBox, rect);
+  assert.deepEqual(c.replaceBox, box, 'the history snapshot\'s nested box was not mutated');
+});
+
+test('5. text with no stored width/height stays on the page after a turn', () => {
+  const doc = a4();
+  const [p] = doc.pages;
+  // v2 text annotations carry no width/height: the view sizes them from the text.
+  const t = addAnnotation(doc, p.id, createAnnotation('text', { x: 40, y: 20, fontSize: 14, text: 'Nomor: 123/ABC/2026' }));
+  assert.equal(t.width, undefined, 'VACUITY GUARD: the case under test has no stored size');
+  rotatePage(doc, p.id, 90);
+  const r = p.annotations.find((a) => a.id === t.id);
+  const d = display(p);
+  // ~19 chars at 14pt is well over 100pt wide: its left edge must leave room.
+  assert.ok(r.x + 100 <= d.w, `text starts at x=${r.x} on a ${d.w}-wide page: it runs off the right edge`);
+  assert.equal(r.width, undefined, 'no size is invented onto the stored annotation');
+});
+
+test('6. a -90 turn is ONE counter-clockwise turn, clamped once, not three clamped clockwise ones', () => {
+  const doc = a4();
+  const [p] = doc.pages;
+  const s = addAnnotation(doc, p.id, createAnnotation('signature', { x: 10, y: 10, width: 580, height: 100, image: 'data:,' }));
+  rotatePage(doc, p.id, -90);
+  const r = p.annotations.find((a) => a.id === s.id);
+  // Counter-clockwise, the centre (300, 60) lands at (60, 595 - 300) = (60, 295):
+  // x = 60 - 290 clamps to 0, y = 295 - 50 = 245.
+  assert.deepEqual([r.x, r.y], [0, 245]);
+  assert.equal(p.rotation, 270);
+});
+
+test('7. a paragraph block\'s display origin moves with its annotation', () => {
+  const doc = a4();
+  const [p] = doc.pages;
+  const t = addAnnotation(doc, p.id, createAnnotation('text', {
+    x: 60, y: 200, width: 300, height: 40, fontSize: 12, text: 'a\nb',
+    block: { k: 1, disp: { x: 60, y: 212 }, below: 260, lines: ['a', 'b'] },
+  }));
+  rotatePage(doc, p.id, 90);
+  const r = p.annotations.find((a) => a.id === t.id);
+  assert.deepEqual([r.block.disp.x - r.x, r.block.disp.y - r.y], [0, 12], 'disp keeps its offset from the annotation');
+  assert.deepEqual(t.block.disp, { x: 60, y: 212 }, 'the original block was not mutated');
+});
