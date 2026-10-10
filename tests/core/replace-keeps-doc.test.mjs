@@ -112,7 +112,8 @@ function world() {
     probeTextLayer: async () => false,
     failureReason: () => 'unknown',
     failureCause: () => ({}),
-    normalizePageWidths: () => {},
+    normalizePageWidths: () => [], // the real one returns the pages it resized
+    zoomAfterLoad: ({ current }) => current,
     markChanged,
     markClean,
     document: {

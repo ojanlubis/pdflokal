@@ -177,3 +177,42 @@ test('"Semua Hal." onto a shorter page moves the copy inside it, and a second ta
   assert.deepEqual(pagesMissingSignature(doc, sig.id), [], 'the clamped copy counts as already there');
   assert.equal(copySignatureToAllPages(doc, sig.id).length, 0);
 });
+
+test('"Semua Hal." of an enlarged signature onto a SHORTER page shrinks the copy to fit, ratio kept, and a second tap adds nothing', () => {
+  // The origin clamp alone cannot help when the box is taller than the page:
+  // y clamps to 0 and the bottom still overhangs (295 > 280), cut in the file.
+  const doc = docWith([[595, 842], [595, 280]]);
+  const [home, short] = doc.pages;
+  const sig = addAnnotation(doc, home.id, createAnnotation('signature', { image: IMG, x: 0, y: 300, width: 150, height: 50 }));
+  resizeAnnotation(doc, sig.id, { x: 0, y: 300, width: 590, height: 295 });
+  assert.equal(sig.height, 295, 'VACUITY GUARD: the source is enlarged and fits its own tall page');
+  const [copy] = copySignatureToAllPages(doc, sig.id);
+  assert.ok(copy, 'the shorter page got a copy');
+  assertInside(short, copy, 'copy on the short page');
+  assert.ok(Math.abs(ratioOf(copy) - ratioOf(sig)) < 1e-9, 'uniform scale: the ratio is the source\'s');
+  assert.equal(sig.width, 590, 'the source itself is untouched');
+  assert.deepEqual(pagesMissingSignature(doc, sig.id), [], 'the fitted copy counts as already there');
+  assert.equal(copySignatureToAllPages(doc, sig.id).length, 0);
+  assert.equal(short.annotations.length, 1, 'no stacked twin');
+});
+
+test('"Semua Hal." onto a NARROWER page also shrinks a wide signature', () => {
+  const doc = docWith([[600, 800], [200, 800]]);
+  const [home, narrow] = doc.pages;
+  const sig = addAnnotation(doc, home.id, createAnnotation('signature', { image: IMG, x: 100, y: 100, width: 400, height: 100 }));
+  const [copy] = copySignatureToAllPages(doc, sig.id);
+  assertInside(narrow, copy, 'copy on the narrow page');
+  assert.ok(Math.abs(ratioOf(copy) - 4) < 1e-9);
+  assert.equal(copySignatureToAllPages(doc, sig.id).length, 0);
+});
+
+test('"Semua Hal." fits a TURNED signature by the box the screen shows', () => {
+  const doc = docWith([[600, 800], [600, 200]]);
+  const [home, short] = doc.pages;
+  // Own 300x100 turned 90: it stands 100 wide and 300 tall on screen.
+  const sig = addAnnotation(doc, home.id, createAnnotation('signature', { image: IMG, x: 100, y: 100, width: 300, height: 100, turn: 90 }));
+  const [copy] = copySignatureToAllPages(doc, sig.id);
+  assertInside(short, copy, 'turned copy on the short page');
+  assert.equal(copy.turn, 90);
+  assert.equal(copySignatureToAllPages(doc, sig.id).length, 0);
+});
