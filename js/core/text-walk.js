@@ -192,11 +192,15 @@ export function walkShowOps(src, fonts) {
 
         const font = fonts.get(fontName);
         const advanceText = computeAdvance(showTokens, font, fontSize, Tc, Tw, Th);
+        // The same advance in USER space (Tm·CTM row 0), so the matcher can
+        // see where the op ENDS, not only where it starts.
+        const tmc = mul(Tm, CTM);
+        const len = advanceText === null ? null : advanceText * Math.hypot(tmc[0], tmc[1]);
 
         records.push({
           op: rec.op, start: rec.start, end: rec.end, tokens: rec.tokens,
           x: full[4], y: full[5], ux, uy, size,
-          exact, advanceText, th: Th, fontSize, btIndex,
+          exact, advanceText, len, th: Th, fontSize, btIndex,
           // The RESOURCE font name (the Tf operand) — Rung C's re-insert needs
           // it to write replacement text with the document's OWN font; pdf.js
           // only ever exposes its internal id, so the walk is the one place
@@ -258,11 +262,33 @@ export function planRunRemoval(src, fonts, targets) {
   // which page-surgery.js reported as `reason:'clean'`. The planner KNEW it had
   // declined painted content inside the span it was told to clear. Keeping that
   // knowledge is the difference between an instrument and a decoration.
+  // WHY the end check (OVERRUN): pdf.js splits ONE op into two items at a gap
+  // over 0.6em, and text-lines.js can put them on different Lines, so a form's
+  // `(Nama        : Budi) Tj` became Lines "Nama" and ": Budi". Matching by the
+  // start alone cut the whole op for "Nama" and deleted ": Budi" uncovered,
+  // reported 'clean'. An op is claimable only if its end lands inside SOME
+  // target of this set (editing the whole line covers both runs). Otherwise it
+  // stays a positional hit: residual > 0, the target declines, the cover stays.
+  // A 1em tail tolerance absorbs a few trailing spaces pdf.js leaves out of an
+  // item's width.
+  const endInsideSomeTarget = (rec) => {
+    if (rec.len === null || rec.len === undefined) return true; // unknown → the inexact rule decides
+    const ex = rec.x + rec.ux * rec.len;
+    const ey = rec.y + rec.uy * rec.len;
+    return targets.some((t) => {
+      const vx = ex - t.x0;
+      const vy = ey - t.y0;
+      const along = vx * t.ux + vy * t.uy;
+      const perp = Math.abs(vx * t.uy - vy * t.ux);
+      return perp <= 0.4 * t.size && along >= -0.35 * t.size && along <= t.len + t.size;
+    });
+  };
   const matchesByTarget = targets.map(() => []);
   const insideByTarget = targets.map(() => []);
   const claimed = new Set(); // records some target actually matched
   for (const rec of records) {
     if (!rec.exact) continue;
+    const endOk = endInsideSomeTarget(rec);
     let claimedBy = -1;
     for (let ti = 0; ti < targets.length; ti += 1) {
       const t = targets[ti];
@@ -283,7 +309,7 @@ export function planRunRemoval(src, fonts, targets) {
       // First matching target still wins — behaviour is unchanged. We keep
       // scanning only to finish collecting positional hits for the OTHER
       // targets, never to re-assign a match.
-      if (sizeOk && claimedBy === -1) {
+      if (sizeOk && endOk && claimedBy === -1) {
         claimedBy = ti;
         matchesByTarget[ti].push(rec);
       }
