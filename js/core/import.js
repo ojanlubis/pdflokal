@@ -19,6 +19,7 @@ import { totalPageRotation } from './page-rotation.js';
 import { rasterKey } from './raster-key.js';
 import { pageHasVisibleText } from './text-visibility.js';
 import { failureReason } from './failure-reason.js';
+import { sniffImageFormat } from './image-format.js';
 
 // bytes → append a Source + its Pages (metadata only) to `doc`. Returns the pages.
 // SINGLE SOURCE OF TRUTH for "this PDF is password/permissions protected".
@@ -227,8 +228,9 @@ export async function probeTextLayer(bytes) {
 // pdf-lib (the export adapter) can only embed PNG and JPEG. Anything else
 // (WEBP/GIF/BMP/…) is transcoded to PNG HERE, at the browser edge, so the bytes
 // stored on the Source are always export-safe and export never has to sniff for
-// a format it can't handle.
-const EMBEDDABLE_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/jpg']);
+// a format it can't handle. "Anything else" is decided from the BYTES
+// (image-format.js), never the MIME type: File.type comes from the extension,
+// so a WebP saved as foto.jpg claims image/jpeg and used to be stored as-is.
 
 // EXIF Orientation (tag 0x0112) of a JPEG, or 1 when absent/unreadable.
 // WHY THIS EXISTS (2026-09-06, measured with tests/image-orientation.spec.js):
@@ -302,10 +304,10 @@ const TRANSCODE_MAX_PIXELS = 16_777_216;
 // the full-size canvas got no context and the import was refused as
 // unreadable (round-3 hunt, 2026-10-10). The stored image is downscaled; the
 // PAGE keeps the photo's size (export draws full-bleed), so nothing moves.
-async function storableImageBytes(bytes, type, bitmap, width, height) {
-  const isJpeg = type === 'image/jpeg' || type === 'image/jpg';
-  const turned = isJpeg && jpegExifOrientation(bytes) !== 1;
-  if (EMBEDDABLE_IMAGE_TYPES.has(type) && !turned) return bytes;
+async function storableImageBytes(bytes, bitmap, width, height) {
+  const format = sniffImageFormat(bytes);
+  const turned = format === 'jpg' && jpegExifOrientation(bytes) !== 1;
+  if (format && !turned) return bytes;
   const k = Math.min(1, Math.sqrt(TRANSCODE_MAX_PIXELS / (width * height)));
   const canvas = document.createElement('canvas');
   canvas.width = Math.max(1, Math.floor(width * k));
@@ -341,7 +343,7 @@ export async function importImage(doc, { name, bytes, mimeType }) {
 
   let storeBytes;
   try {
-    storeBytes = await storableImageBytes(bytes, type, bitmap, width, height);
+    storeBytes = await storableImageBytes(bytes, bitmap, width, height);
   } finally {
     // In a finally: a transcode that throws must not strand a ~200 MB decode.
     if (typeof bitmap.close === 'function') bitmap.close();
