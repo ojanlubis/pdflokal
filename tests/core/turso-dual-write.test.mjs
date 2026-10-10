@@ -21,6 +21,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { tursoWrite, toHttpUrl, arg, placeholders } from '../../api/_turso.js';
+import { Buffer } from 'node:buffer';
+import handler, { __setQueryForTests, __setVisitorDayForTests } from '../../api/t.js';
 
 const URL_OK = 'libsql://db-x.aws-ap-south-1.turso.io';
 const TOKEN = 'test-token';
@@ -64,15 +66,31 @@ test('THE BLACKOUT GATE: a refused statement inside an HTTP 200 is a FAILURE, no
   } finally { restore(); }
 });
 
-test('GATE 2 goes RED if removed: deleting the results[].type==="error" check makes the case above pass', async () => {
-  // A structural guard: the ONLY thing distinguishing the failing payload from
-  // the succeeding one is the `type` field, since both are HTTP 200. If a
-  // refactor starts trusting `r.ok`, the assertion above is what catches it —
-  // this test documents that the two payloads are otherwise indistinguishable.
-  const errPayload = { results: [{ type: 'error', error: { code: 'SQLITE_CONSTRAINT' } }, { type: 'ok', response: { type: 'close' } }] };
-  const okPayload = okBody(1);
-  assert.equal(jsonRes(errPayload, 200).ok, jsonRes(okPayload, 200).ok,
-    'both payloads are HTTP 200 — transport status cannot tell them apart, which is the whole point');
+// Was a tautology over two local fakes (it compared jsonRes(...).ok with itself
+// and never called tursoWrite). Now it drives the REAL writer with a refused
+// statement that ALSO carries a full row count, so GATE 3 would wave it
+// through: only GATE 2 (results[].type === 'error') can tell the two apart.
+// Catches: deleting GATE 2 from api/_turso.js.
+test('GATE 2 goes RED if removed: a refusal that also reports the expected row count is still a failure', async () => {
+  const refusedButCounted = {
+    results: [
+      { type: 'error', error: { code: 'SQLITE_CONSTRAINT' }, response: { type: 'execute', result: { affected_row_count: 1 } } },
+      { type: 'ok', response: { type: 'close' } },
+    ],
+  };
+  let restore = stubFetch(async () => jsonRes(refusedButCounted, 200));
+  try {
+    const out = await tursoWrite({ url: URL_OK, token: TOKEN, sql: 'insert', args: [], expected: 1 });
+    assert.deepEqual(out, { ok: false, written: 0, reason: 'sql_SQLITE_CONSTRAINT' },
+      'the statement-level error is the ONLY thing marking this refused; it must win over the row count');
+  } finally { restore(); }
+  // Known-positive: the same count without the error IS a success, so the
+  // verdict above is GATE 2's and nothing else's.
+  restore = stubFetch(async () => jsonRes(okBody(1), 200));
+  try {
+    const out = await tursoWrite({ url: URL_OK, token: TOKEN, sql: 'insert', args: [], expected: 1 });
+    assert.equal(out.ok, true);
+  } finally { restore(); }
 });
 
 // ---------------------------------------------------------------- GATE 3 ----
@@ -205,4 +223,42 @@ test('the row shape api/t.js sends satisfies the Turso CHECKs it will be measure
   const mixed = '00000000-0000-4000-8000-0000000000AA';
   assert.ok(!UUID_LOWER.test(mixed), 'the uppercase form is what Turso refuses');
   assert.ok(UUID_LOWER.test(mixed.toLowerCase()), 'and lowercasing is what api/t.js does about it');
+});
+
+// The test above proves the CHECK refuses uppercase; this one proves api/t.js
+// actually lowercases before binding. Drives the real handler through its test
+// seam with UPPERCASE ids and reads the bound row.
+// Catches: removing `.toLowerCase()` from session_id or visitor_id in api/t.js.
+test('api/t.js binds session_id and visitor_id LOWERCASED, whatever case the client sent', async () => {
+  const SESSION = '3F1C9A52-0B6E-4A7D-9C11-2F7E5D8A4B30';
+  const VISITOR = 'AB12CD34-EF56-4A7B-8C9D-0E1F2A3B4C5D';
+  const inserts = [];
+  __setQueryForTests(async (sql, params) => {
+    if (/insert into events/.test(String(sql))) inserts.push(params);
+    return { rowCount: /insert into events/.test(String(sql)) ? params.length / 6 : params.length / 5 };
+  });
+  __setVisitorDayForTests(async () => ({ rowCount: 1 })); // never the network
+  const chunks = [Buffer.from(JSON.stringify({
+    session_id: SESSION,
+    visitor_id: VISITOR,
+    app_version: 'abc1234',
+    events: [{ event: 'doc_open', props: { text_layer: true, signed: false, pages: '1', device: 'desktop', intent: 'none', display_mode: 'browser' } }],
+  }))];
+  const req = {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    on(evt, cb) { if (evt === 'data') chunks.forEach((c) => cb(c)); if (evt === 'end') cb(); return this; },
+  };
+  const res = { status() { return res; }, end() { return res; } };
+  try {
+    await handler(req, res);
+  } finally { __setQueryForTests(null); __setVisitorDayForTests(null); }
+
+  assert.equal(inserts.length, 1, 'the uppercase batch never reached the insert — nothing to assert on');
+  // Column order: ts, session_id, app_version, event, props, visitor_id.
+  const [, sessionId, , , , visitorId] = inserts[0];
+  const UUID_LOWER = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+  assert.equal(sessionId, SESSION.toLowerCase());
+  assert.equal(visitorId, VISITOR.toLowerCase());
+  assert.ok(UUID_LOWER.test(sessionId) && UUID_LOWER.test(visitorId), 'a bound id would be refused by Turso\'s lowercase CHECK');
 });

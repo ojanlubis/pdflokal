@@ -209,14 +209,59 @@ test('COVERAGE: only the pure classifier may read err.message, and it cannot tra
     + 'with no way to send anything anywhere — that isolation IS the content-blindness guarantee.',
   );
 
-  // Modules carved out of app.js join this list the day they are made
-  // (2026-10-10): a guard over app.js alone would let a moved call site escape it.
-  for (const rel of [['v2', 'app.js'], ['v2', 'download-sheet.js'], ['v2', 'telemetry.js'],
-    ['v2', 'edit-bake.js'], ['v2', 'ganti-steer.js'], ['v2', 'doc-font-live.js']]) {
-    const src = strip(fs.readFileSync(path.join(JS, ...rel), 'utf8'));
+  // EVERY FILE, NOT A LIST (2026-10-10). This was a hand-kept list of six
+  // modules, and it already missed js/v2/bake-failure.js, which sends
+  // tel('failure', …) AND reads err.message: a function appended there
+  // returning String(err.message) stayed green. A list protects the files
+  // someone remembered; the class is "any module that can reach a rail".
+  // Exemptions are NAMED, each with why and with a check that it is still
+  // needed and still narrow, so an exemption cannot outlive its reason.
+  const READS = /err\?\.message|err\.message/;
+  const sliceFn = (src, signature) => {
+    const at = src.indexOf(signature);
+    if (at < 0) return null;
+    const open = src.indexOf('{', at + signature.length - 1);
+    let depth = 0; let i = open;
+    for (; i < src.length; i++) {
+      if (src[i] === '{') depth++;
+      else if (src[i] === '}' && --depth === 0) break;
+    }
+    return { body: src.slice(open, i + 1), rest: src.slice(0, at) + src.slice(i + 1) };
+  };
+  const EXEMPT = {
+    // The pure classifier itself; its isolation is asserted just above.
+    'core/failure-reason.js': () => {},
+    // A developer lab page (lab-edit.html), never linked from the product. It
+    // prints the message on its OWN screen and has no telemetry door at all.
+    'lab-edit.js': (src) => {
+      assert.match(src, READS, 'js/lab-edit.js no longer reads err.message — delete its exemption');
+      assert.equal(/\b(tel|track|feedback)\s*\(|telemetry|analytics|sentry/i.test(src), false,
+        'js/lab-edit.js reads err.message AND now touches a telemetry door — its exemption no longer holds');
+    },
+    // safeErrorMessage reads the message ONLY to allowlist it (anything that is
+    // not a fixed engine phrasing becomes '[scrubbed]'). Exempt is that ONE
+    // function body; any other read in the file is still banned.
+    'v2/bake-failure.js': (src) => {
+      const fn = sliceFn(src, 'export function safeErrorMessage(err) {');
+      assert.ok(fn, 'js/v2/bake-failure.js lost safeErrorMessage — delete or re-aim its exemption');
+      assert.match(fn.body, READS, 'safeErrorMessage no longer reads err.message — delete its exemption');
+      assert.match(fn.body, /SAFE_MESSAGES\.some\(/, 'safeErrorMessage no longer allowlists the message it reads');
+      assert.equal(READS.test(fn.rest), false,
+        'js/v2/bake-failure.js reads err.message OUTSIDE safeErrorMessage — that read is not allowlisted. '
+        + 'Pass the error to safeErrorMessage() or failureReason().');
+    },
+  };
+  const files = sourceFiles(JS).map((f) => path.relative(JS, f).split(path.sep).join('/'));
+  // Known-positive: the scan reaches the file the old list missed, and more.
+  assert.ok(files.length > 50 && files.includes('v2/bake-failure.js'),
+    `the source scan found ${files.length} files and ${files.includes('v2/bake-failure.js') ? 'did' : 'did NOT'} reach v2/bake-failure.js`);
+  for (const rel of Object.keys(EXEMPT)) assert.ok(files.includes(rel), `exempted js/${rel} no longer exists — delete its exemption`);
+  for (const rel of files) {
+    const src = strip(fs.readFileSync(path.join(JS, rel), 'utf8'));
+    if (EXEMPT[rel]) { EXEMPT[rel](src); continue; }
     assert.equal(
-      /err\?\.message|err\.message/.test(src), false,
-      `err.message appeared in js/${rel.join('/')} — a thrown message can quote the document back to us. `
+      READS.test(src), false,
+      `err.message appeared in js/${rel} — a thrown message can quote the document back to us. `
       + 'Pass the error to failureReason() and send only the bucket it returns.',
     );
   }
@@ -227,11 +272,25 @@ test('COVERAGE: only the pure classifier may read err.message, and it cannot tra
 // constant — the classifier was never asked. A hard-coded enum value in a
 // failure report is indistinguishable from a real classification on the rail,
 // which is what made it survive review and a full gate.
+// EVERY FILE, NOT A LIST (2026-10-10). This scanned app.js and
+// download-sheet.js only, so js/v2/bake-failure.js's tel('failure', …) was
+// never read: `reason: 'unknown'` there stayed green.
+//
+// ⚠️ NEEDS A SEAT RULING — one expression is exempt, by exact text, not by
+// file. bake-failure.js sends `reason === 'unsupported' ? 'unknown' : reason`
+// (reason = failureReason(err)): it REWRITES a classified 'unsupported' into a
+// hard-coded 'unknown', the very literal this test exists to refuse. It is
+// tolerated here only because changing production code is not a test's call.
+// Anything else in that file, including a bare 'unknown', still fails.
+const RULING_PENDING = { 'v2/bake-failure.js': "reason === 'unsupported' ? 'unknown' : reason" };
 test('COVERAGE: no failure report hard-codes its reason', () => {
-  for (const rel of [['v2', 'app.js'], ['v2', 'download-sheet.js']]) {
+  const seen = new Set();
+  const pendingMatched = new Set();
+  for (const relPath of sourceFiles(JS).map((f) => path.relative(JS, f).split(path.sep).join('/'))) {
+    const rel = relPath.split('/');
     const src = strip(fs.readFileSync(path.join(JS, ...rel), 'utf8'));
     const calls = src.match(/tel\('failure',\s*\{[^}]*\}/g) || [];
-    assert.ok(calls.length > 0, `no failure reports found in js/${rel.join('/')} — the scan broke`);
+    if (calls.length > 0) seen.add(relPath);
     for (const call of calls) {
       // ⚠️ A MISSING `reason` IS A FAILURE, NOT A SKIP. This block was
       // `const m = ...; if (!m) continue;` — so a `tel('failure', {...})` call
@@ -303,13 +362,29 @@ test('COVERAGE: no failure report hard-codes its reason', () => {
       // every addition is a place the rail can start asserting without knowing.
       const DETERMINED = ["'encrypted'", "'unsupported'", "'font-fallback'"];
       const documentFact = DETERMINED.includes(expr);
+      const pending = RULING_PENDING[relPath] === expr;
+      if (pending) {
+        // The exemption leans on `reason` being the classifier's output.
+        assert.match(src, /\bconst\s+reason\s*=\s*failureReason\(err\);/,
+          `js/${relPath}'s ruling-pending expression no longer maps a failureReason(err) result`);
+        pendingMatched.add(relPath);
+      }
       assert.ok(
-        classified || documentFact,
+        classified || documentFact || pending,
         `hard-coded failure reason in js/${rel.join('/')} → reason: ${expr.slice(0, 60)}\n`
         + 'A literal here is indistinguishable from a real classification once it is on the rail — '
         + 'that is exactly how 41 real export failures all reported "unknown" on 2026-07-28. '
         + 'Call failureReason(err).',
       );
     }
+  }
+  // Known-positive: the scan must reach every file that reports failures today,
+  // or "no hard-coded reason found" is a scan that found nothing.
+  for (const rel of ['v2/app.js', 'v2/download-sheet.js', 'v2/bake-failure.js']) {
+    assert.ok(seen.has(rel), `no failure reports found in js/${rel} — the scan broke`);
+  }
+  // The exemption must still be needed: once the ruling lands, delete it.
+  for (const rel of Object.keys(RULING_PENDING)) {
+    assert.ok(pendingMatched.has(rel), `js/${rel} no longer sends the ruling-pending expression — delete its exemption`);
   }
 });

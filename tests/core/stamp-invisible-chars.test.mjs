@@ -48,6 +48,19 @@ const loadUmd = (p) => {
 };
 const PDFLib = loadUmd('js/vendor/pdf-lib.min.js');
 const fontkit = loadUmd('js/vendor/fontkit.umd.min.js');
+globalThis.pdfjsWorker = loadUmd('js/vendor/pdf.worker.min.js');
+const pdfjs = loadUmd('js/vendor/pdf.min.js');
+
+// "Did not throw" is not "the words are on the page": drawTextSafe swallowing
+// the WinAnsi error would pass doesNotThrow with the text simply gone. So the
+// saved document is read back by pdf.js, a reader that shares no code with
+// the pdf-lib writer under test.
+async function pageText(doc) {
+  const bytes = await doc.save();
+  const pj = await pdfjs.getDocument({ data: new Uint8Array(bytes), disableFontFace: true, isEvalSupported: false, verbosity: 0 }).promise;
+  const tc = await (await pj.getPage(1)).getTextContent();
+  return tc.items.map((it) => it.str).join('').replace(/\s+/g, ' ').trim();
+}
 
 // The characters real users actually paste. All invisible; all fatal to a
 // WinAnsi standard font.
@@ -63,11 +76,11 @@ async function standardFontPage() {
   doc.registerFontkit(fontkit);
   const page = doc.addPage([595, 842]);
   const font = await doc.embedFont(PDFLib.StandardFonts.Helvetica);
-  return { page, font };
+  return { doc, page, font };
 }
 
 test('1. REPRODUCTION: the edit path stamps text carrying a ZWSP without throwing', async () => {
-  const { page, font } = await standardFontPage();
+  const { doc, page, font } = await standardFontPage();
   const insert = { fontName: 'Helvetica', x: 72, y: 700, ux: 1, uy: 0, size: 11, mixedFonts: false };
   // Exactly the shape of the live failure: ordinary Indonesian with one
   // invisible character pasted into the middle of it.
@@ -77,16 +90,23 @@ test('1. REPRODUCTION: the edit path stamps text carrying a ZWSP without throwin
     'the Edit/ganti reinsert still throws on an invisible pasted character, which is the '
     + '2026-07-28 live breakage: 24 commits, 10 failures, zero exports',
   );
+  // Catches: drawTextSafe swallowing the error so the commit "succeeds" with no text.
+  assert.equal(await pageText(doc), 'Nama : Budi Santoso', 'the stamp did not put the user\'s words on the page');
 });
 
 test('2. every invisible offender, one at a time', async () => {
   const insert = { fontName: 'Helvetica', x: 72, y: 700, ux: 1, uy: 0, size: 11, mixedFonts: false };
-  for (const [name, ch] of [['ZWSP', ZWSP], ['THIN SPACE', THIN], ['BOM', BOM], ['NB-HYPHEN', NBHY]]) {
-    const { page, font } = await standardFontPage();
+  for (const [name, ch, want] of [
+    ['ZWSP', ZWSP, 'JalanMerdeka 17'], ['THIN SPACE', THIN, 'Jalan Merdeka 17'],
+    ['BOM', BOM, 'JalanMerdeka 17'], ['NB-HYPHEN', NBHY, 'Jalan-Merdeka 17'],
+  ]) {
+    const { doc, page, font } = await standardFontPage();
     assert.doesNotThrow(
       () => stampText(page, PDFLib, font, insert, `Jalan${ch}Merdeka 17`, '#000000'),
       `${name} still kills an Edit commit`,
     );
+    // Catches: the text vanishing instead of being sanitised (see test 1).
+    assert.equal(await pageText(doc), want, `${name}: the stamped text is not what landed on the page`);
   }
 });
 

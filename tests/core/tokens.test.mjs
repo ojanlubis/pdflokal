@@ -139,16 +139,40 @@ test('4. the dark accent clears 4.5:1 on the dark ground — red is a LINK colou
     return (hi + 0.05) / (lo + 0.05);
   };
 
-  const accent = light.get('--d-accent');
-  const bg = light.get('--d-bg');
-  assert.ok(accent && bg, 'the dark palette lost --d-accent or --d-bg');
-
-  const r = ratio(accent, bg);
-  assert.ok(r >= 4.5,
-    `the dark accent ${accent} on ${bg} measures ${r.toFixed(2)}:1, under the 4.5:1 floor. `
-    + 'Red is THE touchable colour in this system, so it lands on links and has to stay readable. '
-    + `The light accent ${light.get('--accent')} measures ${ratio(light.get('--accent'), bg).toFixed(2)}:1 `
-    + 'here, which is why dark uses a lighter red rather than the same one.');
+  // WHAT DARK MODE ACTUALLY PAINTS, not the palette entry it is meant to use.
+  // This measured --d-accent on --d-bg straight off :root, so a dark block
+  // writing `--accent: #dc2626` (bypassing the palette) stayed green while
+  // every link went 3.71:1. Each dark block's own --accent and --bg are
+  // resolved through var() the way the cascade does: the block first, then :root.
+  // Catches: either dark block setting --accent (or --bg) to a failing value.
+  const resolve = (scope, value, depth = 0) => {
+    assert.ok(depth < 10, `var() chain too deep resolving ${value}`);
+    const m = /^var\(\s*(--[\w-]+)\s*(?:,\s*([^)]+))?\)$/.exec(String(value).trim());
+    if (!m) return String(value).trim();
+    const next = scope.get(m[1]) ?? light.get(m[1]) ?? m[2];
+    assert.ok(next, `${m[1]} is referenced but declared nowhere`);
+    return resolve(scope, next, depth + 1);
+  };
+  const hex6 = (v) => {
+    const h = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(v);
+    assert.ok(h, `expected a hex colour, resolved to "${v}" — the parser cannot measure this`);
+    return h[1].length === 3 ? `#${[...h[1]].map((c) => c + c).join('')}` : v;
+  };
+  for (const [name, re] of [
+    ['the system-preference dark block', /:root:not\(\[data-theme="light"\]\)\s*\{/],
+    ['the explicit [data-theme="dark"] block', /:root\[data-theme="dark"\]\s*\{/],
+  ]) {
+    const scope = block(re);
+    assert.ok(scope.has('--accent') && scope.has('--bg'), `${name} no longer sets --accent and --bg`);
+    const accent = hex6(resolve(scope, scope.get('--accent')));
+    const bg = hex6(resolve(scope, scope.get('--bg')));
+    const r = ratio(accent, bg);
+    assert.ok(r >= 4.5,
+      `in ${name}, the accent ${accent} on ${bg} measures ${r.toFixed(2)}:1, under the 4.5:1 floor. `
+      + 'Red is THE touchable colour in this system, so it lands on links and has to stay readable. '
+      + `The light accent ${light.get('--accent')} measures ${ratio(light.get('--accent'), bg).toFixed(2)}:1 `
+      + 'here, which is why dark uses a lighter red rather than the same one.');
+  }
 
   // VACUITY GUARD: prove the metric can fail, using the value we rejected.
   // Without this, a broken `ratio()` returning Infinity would pass silently.
