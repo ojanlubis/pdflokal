@@ -160,35 +160,43 @@ export async function importPdf(doc, { name, bytes }) {
   const pdfjsLib = await ensurePdfJs();
   // Defensive .slice(): PDF.js may detach the ArrayBuffer it's handed.
   const pdf = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
-  const source = addSource(doc, createSource({
-    name,
-    bytes,
-    numPages: pdf.numPages,
-    encrypted: await detectEncrypted(pdf),
-    // The RAW bytes, not the PDF.js document: the signature dictionary is a
-    // file-layout fact, and PDF.js exposes no handle on it. See detectSigned.
-    signed: detectSigned(bytes),
-  }));
-
+  // WHY the Source joins the doc only AFTER every page loaded, and destroy() is
+  // in a finally: a broken page tree (getDocument fine, getPage(k) throws) used
+  // to leak the PDF.js document and leave a page-less Source behind, so the next
+  // single-file open looked like a MERGE and could be refused as one.
+  let source;
   const pages = [];
-  for (let n = 1; n <= pdf.numPages; n += 1) {
-    const pdfPage = await pdf.getPage(n);
-    const vp = pdfPage.getViewport({ scale: 1 }); // honors the PDF's intrinsic /Rotate
-    const page = createPage({
-      source,
-      sourcePageNum: n - 1,
-      width: vp.width,
-      height: vp.height,
-      rotation: 0,
+  try {
+    source = createSource({
+      name,
+      bytes,
+      numPages: pdf.numPages,
+      encrypted: await detectEncrypted(pdf),
+      // The RAW bytes, not the PDF.js document: the signature dictionary is a
+      // file-layout fact, and PDF.js exposes no handle on it. See detectSigned.
+      signed: detectSigned(bytes),
     });
-    // WHY: scanned/landscape PDFs carry an intrinsic /Rotate. PDF.js's explicit
-    // `rotation:` param OVERRIDES it (not additive), so rasterize must pass
-    // intrinsic + user rotation or pre-rotated documents render sideways.
-    page.baseRotation = pdfPage.rotate || 0;
-    pages.push(page);
+    for (let n = 1; n <= pdf.numPages; n += 1) {
+      const pdfPage = await pdf.getPage(n);
+      const vp = pdfPage.getViewport({ scale: 1 }); // honors the PDF's intrinsic /Rotate
+      const page = createPage({
+        source,
+        sourcePageNum: n - 1,
+        width: vp.width,
+        height: vp.height,
+        rotation: 0,
+      });
+      // WHY: scanned/landscape PDFs carry an intrinsic /Rotate. PDF.js's explicit
+      // `rotation:` param OVERRIDES it (not additive), so rasterize must pass
+      // intrinsic + user rotation or pre-rotated documents render sideways.
+      page.baseRotation = pdfPage.rotate || 0;
+      pages.push(page);
+    }
+  } finally {
+    await pdf.destroy().catch(() => { /* already gone */ });
   }
+  addSource(doc, source);
   addPages(doc, pages);
-  await pdf.destroy();
   return pages;
 }
 
