@@ -377,6 +377,17 @@ export function createPageRasterizer(doc, opts = {}) {
   const editedDocCache = new Map(); // page.id -> { signature, docPromise: Promise<PDF.js doc|null> }
   const renderSeq = new Map(); // page.id -> latest ISSUED rasterize seq (stale-guard, see rasterize)
 
+  // WHY a rejection is never cached: both caches hold PROMISES, and a promise
+  // that rejected once (a transient decode failure, pdf.js failing to arrive on
+  // a flaky link) stayed in the map for the whole session, so that page could
+  // never render again until Buka Baru. A failure is forgotten; the next
+  // rasterize tries again. A success is kept exactly as before.
+  function remember(map, key, promise) {
+    map.set(key, promise);
+    promise.catch(() => { if (map.get(key) === promise) map.delete(key); });
+    return promise;
+  }
+
   // Drop (and destroy) any cached edited-page doc for `pageId`. Increment 2
   // wires this method but nothing yet CALLS it on commit/undo/redo (spec
   // build order §8.2 — that's increment 3's job); it exists now so the cache
@@ -429,7 +440,8 @@ export function createPageRasterizer(doc, opts = {}) {
       // page you never imported), but rasterizing is the hot path and must not
       // depend on that ordering holding forever. The cached promise makes the
       // already-loaded case free.
-      docCache.set(
+      remember(
+        docCache,
         sourceId,
         ensurePdfJs().then((lib) => lib.getDocument({ data: source.bytes.slice() }).promise),
       );
@@ -440,7 +452,7 @@ export function createPageRasterizer(doc, opts = {}) {
   function getImageBitmap(sourceId) {
     if (!imgCache.has(sourceId)) {
       const source = getSource(doc, sourceId);
-      imgCache.set(sourceId, window.createImageBitmap(new Blob([source.bytes.slice()])));
+      remember(imgCache, sourceId, window.createImageBitmap(new Blob([source.bytes.slice()])));
     }
     return imgCache.get(sourceId);
   }
