@@ -2874,6 +2874,11 @@ let nudgeLast = 0;
 document.addEventListener('keydown', (e) => {
   if (!doc.selection.annotationId) return;
   if (e.target.matches?.('input, select, textarea, [contenteditable="true"]')) return;
+  // WHY the open-sheet guard, here and not only in the handler above: this
+  // listener is separate, so that guard never reached it. An arrow behind Unduh
+  // moved the still-selected annotation after the sheet built its bytes; the
+  // download was the old position and markClean called the moved doc saved.
+  if (document.querySelector('dialog[open]')) return;
   const dir = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
   if (!dir) return;
   e.preventDefault();
