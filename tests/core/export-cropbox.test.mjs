@@ -30,9 +30,10 @@ const loadUmd = (p) => {
 const PDFLib = loadUmd('js/vendor/pdf-lib.min.js');
 const fontkit = loadUmd('js/vendor/fontkit.umd.min.js');
 
-async function sourcePdf({ crop, rotate = 0 } = {}) {
+async function sourcePdf({ crop, media, rotate = 0 } = {}) {
   const d = await PDFLib.PDFDocument.create();
   const p = d.addPage([612, 792]);
+  if (media) p.setMediaBox(...media);
   if (crop) p.setCropBox(...crop);
   if (rotate) p.setRotation(PDFLib.degrees(rotate));
   return d.save();
@@ -83,6 +84,24 @@ test('a cropped page turned 90 keeps the Tip-Ex inside the crop', async () => {
   const r = await redRectOrigin(await buildPdfBytes(doc, { PDFLib, fontkit }));
   // Visible top-left of a page turned 90 clockwise is the crop's bottom-left.
   assert.deepEqual([r.x, r.y], [100, 100]);
+});
+
+// The spec allows a rectangle's corners in any order. PDF.js normalises
+// (min/max) and shows the page; raw pdf-lib boxes came back with a negative
+// height, the intersection was empty, and export drew every edit off the page.
+test('an inverted MediaBox [0 792 612 0] still puts a top-left Tip-Ex at the visible top-left', async () => {
+  // pdf-lib writes setMediaBox(x, y, w, h) as [x y x+w y+h]: this is [0 792 612 0].
+  const { doc, page } = docWith(await sourcePdf({ media: [0, 792, 612, -792] }), 612, 792);
+  page.annotations.push(model.createAnnotation('whiteout', RED));
+  const r = await redRectOrigin(await buildPdfBytes(doc, { PDFLib, fontkit }));
+  assert.deepEqual([r.x, r.y], [0, 792 - 50]);
+});
+
+test('an inverted CropBox [100 700 500 100] still puts a top-left Tip-Ex at the crop top-left', async () => {
+  const { doc, page } = docWith(await sourcePdf({ crop: [100, 700, 400, -600] }), 400, 600);
+  page.annotations.push(model.createAnnotation('whiteout', RED));
+  const r = await redRectOrigin(await buildPdfBytes(doc, { PDFLib, fontkit }));
+  assert.deepEqual([r.x, r.y], [100, 700 - 50]);
 });
 
 test('a merge rescale scales the CropBox with the page, so the reader sees the whole page', async () => {

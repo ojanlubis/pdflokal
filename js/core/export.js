@@ -166,14 +166,22 @@ function transformAnnotationCoords(rotation, xV, yV, wU, hU, x0 = 0, y0 = 0) {
 // origin: a Tip-Ex at the visible top-left landed outside the visible area
 // (round-3 hunt, 2026-10-10; tests/core/export-cropbox.test.mjs).
 function visibleBox(pdfPage) {
-  const m = pdfPage.getMediaBox();
-  const c = pdfPage.getCropBox();
+  const m = normalizedBox(pdfPage.getMediaBox());
+  const c = normalizedBox(pdfPage.getCropBox());
   const x0 = Math.max(m.x, c.x);
   const y0 = Math.max(m.y, c.y);
   const x1 = Math.min(m.x + m.width, c.x + c.width);
   const y1 = Math.min(m.y + m.height, c.y + c.height);
   if (!(x1 > x0 && y1 > y0)) return { x0: m.x, y0: m.y, wU: m.width, hU: m.height }; // degenerate crop: PDF.js falls back too
   return { x0, y0, wU: x1 - x0, hU: y1 - y0 };
+}
+
+// A PDF rectangle may list its corners in any order ([0 792 612 0] is legal)
+// and PDF.js takes min/max, so the editor showed the page upright. pdf-lib's
+// getMediaBox/getCropBox return the raw numbers (negative height), the
+// intersection above came out empty, and every edit was drawn off the page.
+function normalizedBox({ x, y, width, height }) {
+  return { x: Math.min(x, x + width), y: Math.min(y, y + height), width: Math.abs(width), height: Math.abs(height) };
 }
 
 // Whiteout: pdf-lib drawRectangle is axis-aligned in the unrotated page frame.
