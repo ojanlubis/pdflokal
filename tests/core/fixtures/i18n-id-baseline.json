@@ -1027,6 +1027,12 @@
       "js/v2/page-manager.js"
     ]
   },
+  "pm.add": {
+    "text": "Tambah PDF",
+    "src": [
+      "js/v2/page-manager.js"
+    ]
+  },
   "pm.deleted": {
     "text": "{count} halaman dihapus. Salah? Tinggal Undo",
     "src": [

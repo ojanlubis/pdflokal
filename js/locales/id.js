@@ -314,6 +314,8 @@ export default {
     delete: 'Hapus Halaman',
     use: 'Pakai ({n})',
     selected: '{count} dipilih',
+    // The [+] tile at the end of the grid (merge more files from the sheet).
+    add: 'Tambah PDF',
     deleted: '{count} halaman dihapus. Salah? Tinggal Undo',
   },
 

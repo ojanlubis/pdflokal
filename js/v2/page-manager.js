@@ -114,7 +114,9 @@ export function createPageManager(deps) {
     if (!pickResolve) {
       const add = document.createElement('button');
       add.className = 'pm-tile pm-add';
-      add.innerHTML = '<span>+</span>Tambah PDF';
+      const plus = document.createElement('span');
+      plus.textContent = '+';
+      add.append(plus, tr('pm.add')); // was hard-coded Indonesian: /en showed 'Tambah PDF'
       add.addEventListener('click', () => deps.onAddFiles());
       grid.appendChild(add);
     }
