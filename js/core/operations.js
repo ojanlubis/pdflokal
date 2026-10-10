@@ -11,6 +11,7 @@
  */
 
 import { getPage, findAnnotation, getSource, cloneForPaste } from './model.js';
+import { scaleAnnotationGeometry, quarterTurnAnnotation } from './annotation-geometry.js';
 
 const clamp = (n, lo, hi) => Math.min(Math.max(n, lo), hi);
 
@@ -75,26 +76,6 @@ export function anchorPage(pages) {
 // Callers: the merge path only (js/v2/app.js's loadFilesInner). Reorder and
 // rotate deliberately do NOT call this — re-anchoring under the user's finger
 // would resize the document mid-gesture.
-// An annotation's DISPLAY-frame geometry scaled by `k`, as a new object. The
-// same fields export.js's scaleAnnotationGeometry scales, plus a paragraph
-// block's display mapping (k = display px per pdf unit, disp, below). Doc-bound
-// surgery inputs (replaceBox/replaceTargets, block.width/origin/leading) are
-// in PDF units and stay put. Undefined stays undefined.
-function scaleDisplayGeometry(anno, k) {
-  const out = { ...anno };
-  for (const key of ['x', 'y', 'width', 'height', 'fontSize']) {
-    if (Number.isFinite(out[key])) out[key] *= k;
-  }
-  if (out.block) {
-    const b = { ...out.block };
-    if (Number.isFinite(b.k)) b.k *= k;
-    if (Number.isFinite(b.below)) b.below *= k;
-    if (b.disp) b.disp = { x: b.disp.x * k, y: b.disp.y * k };
-    out.block = b;
-  }
-  return out;
-}
-
 export function normalizePageWidths(doc) {
   if (doc.pages.length < 2) return [];
   // Count sources that actually CONTRIBUTED a page: a failed import can leave
@@ -118,7 +99,7 @@ export function normalizePageWidths(doc) {
     // Annotations live in this same display frame, so they move with it, or a
     // signature at x=800 stays at 800 on a page now 595 wide. New objects, not
     // in-place edits: history snapshots share nested fields (block) by reference.
-    page.annotations = page.annotations.map((a) => scaleDisplayGeometry(a, factor));
+    page.annotations = page.annotations.map((a) => scaleAnnotationGeometry(a, factor));
     // Drop the cached raster: it was rendered at the OLD point size. The view
     // stretches a raster to fit, so a stale one is geometrically right and
     // merely soft — but on a page scaled up several times over (a photo
@@ -157,28 +138,9 @@ export function reorderPage(doc, pageId, toIndex) {
 }
 
 // WHY rotatePage moves annotations (2026-10-10): their geometry lives in the
-// page's DISPLAYED frame, so turning only `rotation` left a signature at y=700
-// on an A4 page that is now 595 tall: off the page on screen and in the file.
-// The rule, one quarter turn clockwise at a time (a behaviour call for the
-// seat to judge; tests/core/rotate-annotations.test.mjs):
-//   - a whiteout (Tip-Ex, or an edit cover) turns WITH the content it hides:
-//     its rect rotates, width and height swap;
-//   - anything else (signature, text) keeps reading upright and follows the
-//     spot it marked: its centre moves with the content, its size stays, and
-//     it is clamped inside the page.
-// New objects, never in-place edits (history snapshots share nested fields).
-function quarterTurn(anno, H, newW, newH) {
-  const w = Number.isFinite(anno.width) ? anno.width : 0;
-  const h = Number.isFinite(anno.height) ? anno.height : 0;
-  if (anno.type === 'whiteout') {
-    return { ...anno, x: H - (anno.y + h), y: anno.x, width: h, height: w };
-  }
-  const cx = H - (anno.y + h / 2);
-  const cy = anno.x + w / 2;
-  const clamp1 = (v, max) => Math.min(Math.max(v, 0), Math.max(max, 0));
-  return { ...anno, x: clamp1(cx - w / 2, newW - w), y: clamp1(cy - h / 2, newH - h) };
-}
-
+// page's DISPLAYED frame (core/annotation-geometry.js), so turning only
+// `rotation` left a signature at y=700 on an A4 page that is now 595 tall: off
+// the page on screen and in the file. One quarter turn at a time.
 export function rotatePage(doc, pageId, deltaDeg = 90) {
   const pg = getPage(doc, pageId);
   if (!pg) return null;
@@ -192,7 +154,7 @@ export function rotatePage(doc, pageId, deltaDeg = 90) {
     const H = rotated ? pg.width : pg.height; // displayed height BEFORE this turn
     const newW = H;
     const newH = rotated ? pg.height : pg.width;
-    pg.annotations = pg.annotations.map((a) => quarterTurn(a, H, newW, newH));
+    pg.annotations = pg.annotations.map((a) => quarterTurnAnnotation(a, H, newW, newH));
     pg.rotation = ((pg.rotation || 0) + 90) % 360;
   }
   return pg;
