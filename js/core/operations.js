@@ -11,7 +11,7 @@
  */
 
 import { getPage, findAnnotation, getSource, cloneForPaste, createAnnotation } from './model.js';
-import { scaleAnnotationGeometry, turnAnnotation, withBlockFollowing, displayedBox } from './annotation-geometry.js';
+import { scaleAnnotationGeometry, turnAnnotation, withBlockFollowing, displayedBox, turnOf } from './annotation-geometry.js';
 import { normaliseEnteredText } from './text-encode.js';
 
 const clamp = (n, lo, hi) => Math.min(Math.max(n, lo), hi);
@@ -187,6 +187,28 @@ export function duplicateAnnotation(doc, pageId, src, n = 1) {
   return clone;
 }
 
+// A fresh signature's width in page points, before the page caps it. The
+// desktop ghost that rides the cursor (v2/app.js) draws at the same size.
+export const SIGNATURE_PLACE_WIDTH = 150;
+
+// Drop a signature centred on a tap at (cx, cy), held whole inside the page
+// (displayedFrame): a tap near the margin used to leave half of it hanging off
+// the edge, shown on screen and cut off in the file. `ratio` is the image's
+// height / width; a page narrower or shorter than the default size gets a
+// smaller signature with the same ratio. The caller records history first.
+export function placeSignature(doc, pageId, { image, ratio }, cx, cy) {
+  const pg = getPage(doc, pageId);
+  if (!pg) return null;
+  const frame = displayedFrame(pg);
+  const width = Math.min(SIGNATURE_PLACE_WIDTH, frame.w, frame.h / ratio);
+  const height = width * ratio;
+  const anno = createAnnotation('signature', { image, x: 0, y: 0, width, height });
+  const at = originInside(pg, anno, cx - width / 2, cy - height / 2);
+  anno.x = at.x;
+  anno.y = at.y;
+  return addAnnotation(doc, pageId, anno);
+}
+
 // "Semua Hal.": the pages (other than the signature's own) that still need a copy.
 // Separate from the copy so the caller can record history only when a tap will
 // actually change something; a re-tap must not leave a dead undo step.
@@ -197,10 +219,16 @@ export function pagesMissingSignature(doc, annotationId) {
   // Idempotent by state, not by timing: the selection survives the copy so the
   // button stays on screen, and a second tap must not stack a twin that makes
   // Hapus look broken. "Already there" = same image, same box.
-  const alreadyThere = (a) => a.type === 'signature' && a.image === src.image
-    && a.x === src.x && a.y === src.y && a.width === src.width && a.height === src.height
-    && (a.turn || 0) === (src.turn || 0);
-  return doc.pages.filter((pg) => pg.id !== found.page.id && !pg.annotations.some(alreadyThere));
+  // The spot is the one copySignatureToAllPages gives THAT page: on a smaller
+  // page the copy is held inside it, and comparing against the source's own
+  // x/y would call that copy missing and stack another on every tap.
+  const alreadyThere = (pg) => {
+    const at = originInside(pg, src, src.x, src.y);
+    return (a) => a.type === 'signature' && a.image === src.image
+      && a.x === at.x && a.y === at.y && a.width === src.width && a.height === src.height
+      && (a.turn || 0) === (src.turn || 0);
+  };
+  return doc.pages.filter((pg) => pg.id !== found.page.id && !pg.annotations.some(alreadyThere(pg)));
 }
 
 export function copySignatureToAllPages(doc, annotationId) {
@@ -213,8 +241,10 @@ export function copySignatureToAllPages(doc, annotationId) {
     // moves/deletes independently afterwards.
     // A turned source (its page was turned) stamps the same box the same way
     // round: "same position" is what the user sees, not the upright image.
+    // A page smaller than the source's (a merged file) gets it moved inside.
+    const at = originInside(pg, src, src.x, src.y);
     added.push(addAnnotation(doc, pg.id, createAnnotation('signature', {
-      image: src.image, x: src.x, y: src.y, width: src.width, height: src.height,
+      image: src.image, x: at.x, y: at.y, width: src.width, height: src.height,
       ...(src.turn ? { turn: src.turn } : {}),
     })));
   }
@@ -242,6 +272,31 @@ export function removeAnnotation(doc, annotationId) {
 // large enough that a resize handle can't collapse the object to untouchable.
 const MIN_ANNO_SIZE = 8;
 
+// SINGLE SOURCE OF TRUTH for "inside the page". The screen draws an object
+// past the page edge (.pv-page does not clip) while every PDF viewer clips the
+// file at the page box, so an object that overhangs looks whole on screen and
+// arrives cut off in the download. Every path that sets where or how big an
+// object is (move, resize, place, "Semua Hal.") holds it inside through here.
+
+// The frame annotations live in: the page as displayed, so it swaps at 90/270.
+function displayedFrame(page) {
+  const rotated = (page.rotation || 0) % 180 !== 0;
+  return rotated ? { w: page.height, h: page.width } : { w: page.width, h: page.height };
+}
+
+// The origin nearest (x, y) at which `anno`'s displayed box lies inside `page`.
+// The box is the one the SCREEN shows (core/annotation-geometry.js
+// displayedBox): a turned object's own width/height trade axes and its origin
+// is no longer its top-left. Stored sizes only: text (no stored size) clamps
+// its origin, exactly as it did unturned.
+function originInside(page, anno, x, y) {
+  const frame = displayedFrame(page);
+  const box = displayedBox({ ...anno, x, y }, { w: anno.width || 0, h: anno.height || 0 });
+  const bx = clamp(box.x, 0, Math.max(0, frame.w - box.w));
+  const by = clamp(box.y, 0, Math.max(0, frame.h - box.h));
+  return { x: x + (bx - box.x), y: y + (by - box.y) };
+}
+
 // Move by delta in PAGE space (the UI converts screen→page first). The anchor
 // clamps inside the page so an annotation can never be dragged unrecoverably
 // off-canvas — the failure mode behind several old "invisible annotation" bugs.
@@ -249,22 +304,8 @@ export function moveAnnotation(doc, annotationId, dx, dy) {
   const found = findAnnotation(doc, annotationId);
   if (!found) return null;
   const { page, annotation } = found;
-  // Annotations live in the ROTATED view frame — the clamp box swaps at 90/270.
-  const rotated = (page.rotation || 0) % 180 !== 0;
-  const frameW = rotated ? page.height : page.width;
-  const frameH = rotated ? page.width : page.height;
-  // The box the SCREEN shows (core/annotation-geometry.js displayedBox): a
-  // turned object's own width/height trade axes and its origin is no longer
-  // its top-left. Stored sizes only, as before: text (no stored size) clamps
-  // its origin, exactly as it did unturned.
-  const box = displayedBox(annotation, { w: annotation.width || 0, h: annotation.height || 0 });
-  const bx = clamp(box.x + dx, 0, Math.max(0, frameW - box.w));
-  const by = clamp(box.y + dy, 0, Math.max(0, frameH - box.h));
-  const moved = withBlockFollowing({
-    ...annotation,
-    x: (annotation.x || 0) + (bx - box.x),
-    y: (annotation.y || 0) + (by - box.y),
-  }, annotation);
+  const to = originInside(page, annotation, (annotation.x || 0) + dx, (annotation.y || 0) + dy);
+  const moved = withBlockFollowing({ ...annotation, x: to.x, y: to.y }, annotation);
   // In place: the drag holds this object and reads its x/y back.
   annotation.x = moved.x;
   annotation.y = moved.y;
@@ -272,8 +313,25 @@ export function moveAnnotation(doc, annotationId, dx, dy) {
   return annotation;
 }
 
+// The largest factor s <= 1 that keeps the span [lo, hi], scaled about the
+// origin o, inside [0, F]. A resize grows an object from its origin, so this
+// is how far each displayed axis may go.
+function fitFactor(o, lo, hi, F) {
+  let s = 1;
+  if (hi > F && hi > o) s = Math.min(s, (F - o) / (hi - o));
+  if (lo < 0 && lo < o) s = Math.min(s, -o / (lo - o));
+  return Math.max(0, s);
+}
+
 // Set bounds atomically (any subset of x/y/width/height). Sizes are floored at
-// MIN_ANNO_SIZE so resize handles can't produce a zero-size object.
+// MIN_ANNO_SIZE so resize handles can't produce a zero-size object, and capped
+// so the displayed box stays inside the page (see displayedFrame above).
+// WHY a signature shrinks on both axes together: the screen draws its height
+// from the image's own ratio (render/page-view.js) and the file from
+// anno.height (core/export.js drawSignature), so capping one axis alone would
+// make the screen and the file disagree again. A whiteout is a plain rect:
+// only the axis that ran off the page is capped. The floor wins over the cap:
+// an object too small to grab is worse than one that grazes the edge.
 export function resizeAnnotation(doc, annotationId, bounds = {}) {
   const found = findAnnotation(doc, annotationId);
   if (!found) return null;
@@ -282,6 +340,26 @@ export function resizeAnnotation(doc, annotationId, bounds = {}) {
   if (bounds.y !== undefined) a.y = bounds.y;
   if (bounds.width !== undefined) a.width = Math.max(MIN_ANNO_SIZE, bounds.width);
   if (bounds.height !== undefined) a.height = Math.max(MIN_ANNO_SIZE, bounds.height);
+  if (Number.isFinite(a.width) && Number.isFinite(a.height)) {
+    const frame = displayedFrame(found.page);
+    const box = displayedBox(a, { w: a.width, h: a.height });
+    const sx = fitFactor(a.x || 0, box.x, box.x + box.w, frame.w);
+    const sy = fitFactor(a.y || 0, box.y, box.y + box.h, frame.h);
+    if (sx < 1 || sy < 1) {
+      let sw;
+      let sh;
+      if (a.type === 'signature') {
+        sw = sh = Math.min(sx, sy);
+      } else {
+        // At 90/270 the own width runs down the page.
+        const across = turnOf(a) % 180 !== 0;
+        sw = across ? sy : sx;
+        sh = across ? sx : sy;
+      }
+      a.width = Math.max(MIN_ANNO_SIZE, a.width * sw);
+      a.height = Math.max(MIN_ANNO_SIZE, a.height * sh);
+    }
+  }
   return a;
 }
 
