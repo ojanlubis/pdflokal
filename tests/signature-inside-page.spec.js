@@ -72,6 +72,8 @@ test('a signature tapped at the corner, then dragged bigger, stays whole inside 
   await page.mouse.up();
   const handle = page.locator('.pv-handle').first();
   await expect(handle).toBeVisible();
+  // The page is taller than the viewport: bring the handle on screen first.
+  await handle.scrollIntoViewIfNeeded();
   const hb = await handle.boundingBox();
   await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
   await page.mouse.down();
