@@ -32,7 +32,7 @@ import { totalPageRotation } from './page-rotation.js';
 import { orderedForPaint } from './annotation-order.js';
 import { scaleAnnotationGeometry, extentOf, displayedBox, turnOf, turnVector } from './annotation-geometry.js';
 import { sniffImageFormat } from './image-format.js';
-import { loadForRebuild } from './pdflib-load.js';
+import { loadSourceForRebuild } from './pdflib-load.js';
 
 // ---- fonts ------------------------------------------------------------------
 
@@ -848,9 +848,10 @@ export async function buildPdfBytes(doc, deps = {}) {
     if (!srcDocCache.has(source.id)) {
       const tag = `PDFLokalPage${srcDocCache.size}n`;
       fenceTags.set(source.id, tag);
-      // loadForRebuild retypes an untyped page tree (core/pdflib-load.js)
-      // BEFORE the fence walks it, so the fence sees every page as a page.
-      srcDocCache.set(source.id, loadForRebuild(PDFLib, source.bytes).then((srcDoc) => {
+      // loadSourceForRebuild (core/pdflib-load.js) retypes an untyped page
+      // tree and refuses a page list PDF.js counts differently, both on the
+      // PRISTINE tree, BEFORE the fence walks and rewrites it.
+      srcDocCache.set(source.id, loadSourceForRebuild(PDFLib, source).then((srcDoc) => {
         const kept = new Set(batched.get(source.id)?.keys() || []);
         if (fenceUnkeptPages(srcDoc, kept, tag, PDFLib)) placedPageRefs = true;
         return srcDoc;
