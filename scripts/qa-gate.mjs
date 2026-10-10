@@ -82,12 +82,24 @@ const REPO = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 // `scripts` is watched even though nothing serves it: it holds the fixture
 // generators, and this gate. A run whose fixtures were regenerated halfway
 // through is as meaningless as one whose modules changed.
-const WATCHED_DIRS = ['js', 'tests', 'seo', 'scripts'];
+//
+// css/fonts/images/en/i18n are SERVED (tokens.css loads on `/`, specs assert
+// computed CSS; /en is generated from i18n), and api/ is imported by the core
+// tests. They were missing until 2026-10-10 (test-infra audit), so another
+// session editing tokens.css mid-run got a GREEN over two trees. ~3 MB more
+// per 4s sample; docs/ stays out (prose other sessions edit constantly, never
+// served to a test).
+const WATCHED_DIRS = ['js', 'tests', 'seo', 'scripts', 'api', 'css', 'fonts', 'images', 'en', 'i18n'];
 
 // Watched because they define what the run MEANS, not what it serves. Change
 // `playwright.config.js` mid-run and the second half tests a different set of
 // projects than the first; change `package.json` and the stage commands differ.
-const WATCHED_FILES = ['package.json', 'playwright.config.js', 'eslint.config.js'];
+// The rest are root files the server hands to a page (the service worker
+// and its manifest, the old wing's stylesheet, crawl files a spec reads).
+const WATCHED_FILES = [
+  'package.json', 'playwright.config.js', 'eslint.config.js', 'vercel.json',
+  'sw.js', 'manifest.webmanifest', 'style.css', 'sitemap.xml', 'robots.txt',
+];
 
 const WATCHED_ROOT_FILES = (root) => [
   ...readdirSync(root).filter((f) => f.endsWith('.html')),
@@ -118,7 +130,11 @@ const IGNORED = new Set(['node_modules', '.git', 'test-results', 'playwright-rep
  * DID change mid-run would be a person adding files by hand, which the file
  * COUNT in the verdict line still surfaces.
  */
-const IGNORED_PATHS = ['tests/fixtures/wild'];
+//
+// tests/golden/actual is where a golden MISMATCH writes its PNGs. Watched, a
+// real visual regression moved the tree and came out VOID ("re-run it")
+// instead of RED. It is an output of the run, like test-results.
+const IGNORED_PATHS = ['tests/fixtures/wild', 'tests/golden/actual'];
 
 function walk(dir, out = []) {
   let entries;
@@ -397,7 +413,10 @@ async function main() {
   // else's lifecycle: when that owner exits, every remaining page.goto()
   // becomes ERR_CONNECTION_REFUSED. Targeted local runs may still reuse a
   // developer server; only the gate closes this escape hatch.
-  const pw = await stage('PLAYWRIGHT', 'npx', ['playwright', 'test'], {
+  // --forbid-only: playwright.config.js forbids `.only` only when CI is set,
+  // and the gate does not set it, so one stray test.only ran a single test
+  // here and printed GREEN while CI went red (test-infra audit 2026-10-10).
+  const pw = await stage('PLAYWRIGHT', 'npx', ['playwright', 'test', '--forbid-only'], {
     env: { ...process.env, PDFLOKAL_GATE_OWNS_SERVER: '1' },
   });
 
