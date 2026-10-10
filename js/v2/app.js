@@ -1858,7 +1858,7 @@ const pageManager = createPageManager({
   history,
   getRasterizer: () => rasterizer,
   onDocChanged: () => { textRuns.invalidateAll(); ocrIndex.invalidateAll(); rebuildStage(); },
-  onAddFiles: () => document.getElementById('file-input').click(),
+  onAddFiles: () => pickFiles(),
   onExtract: async (pages) => {
     // The tap, on the rail (2026-10-02). Split/Ekstrak was invisible to it: GA4's
     // editor_action/split is the only other trace and GA4 is ad-blocked wholesale
@@ -3324,14 +3324,24 @@ on(fileBtn, 'click', (e) => { e.stopPropagation(); toggleFileMenu(fileMenu.hidde
 document.addEventListener('pointerdown', (e) => {
   if (!fileMenu.hidden && !e.target.closest('.file-menu-wrap')) toggleFileMenu(false);
 });
+// WHY every in-editor add goes through here with an explicit mode: a Buka Baru
+// whose picker was CANCELLED used to stay armed (only `change` cleared it; a
+// cancelled picker fires `cancel` at best, nothing at all on older Safari), so
+// the next Tambah file wiped the document instead of merging into it. Setting
+// the mode at every open is the fix that needs no event. (Not a `cancel`
+// listener: headless Chromium auto-dismisses the picker the moment it opens,
+// which would disarm every Buka Baru a spec drives with setInputFiles.)
+function pickFiles(replace = false) {
+  pendingReplace = replace; // applied when the picker actually returns files
+  fileInput.click();
+}
 on('fm-add', 'click', () => {
   toggleFileMenu(false);
-  fileInput.click(); // appends → merge, the default loadFiles path
+  pickFiles(); // appends → merge, the default loadFiles path
 });
 on('fm-new', 'click', () => {
   toggleFileMenu(false);
-  pendingReplace = true; // applied when the picker actually returns files
-  fileInput.click();
+  pickFiles(true);
 });
 on('fm-pages', 'click', () => {
   toggleFileMenu(false);
