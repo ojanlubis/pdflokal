@@ -1956,10 +1956,6 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
   ed.contentEditable = 'true';
   ed.style.left = (anno ? anno.x : x) + 'px';
   ed.style.top = (anno ? anno.y : y) + 'px';
-  // A turned text (its page was turned) edits turned, about the same origin
-  // its overlay turns about, so the words do not jump while typing. The
-  // editor has no padding ring, so the origin is its own top-left.
-  applyTurn(ed, anno || draft || {});
   applyTextFont(ed, style);
   ed.style.color = style.color || '#000';
   ed.textContent = anno?.text || draft?.text || '';
@@ -1967,6 +1963,12 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
   // width, alignment, indent; line height comes with the font, above).
   const blockPlan = draft?.block || null;
   if (blockPlan) styleBlockEditor(ed, blockPlan);
+  // A turned text (its page was turned) edits turned, about the same origin
+  // its overlay turns about, so the words do not jump while typing. The
+  // editor has no padding ring, so the origin is its own top-left. A
+  // paragraph edits upright: block-editor.js reads its wraps and baseline
+  // from viewport rects, which a rotate scrambles; the commit keeps the turn.
+  if (!blockPlan) applyTurn(ed, anno || draft || {});
 
   // Hide the original while editing (the editor visually replaces it).
   const origEl = anno ? overlay.querySelector(`[data-anno-id="${anno.id}"]`) : null;
