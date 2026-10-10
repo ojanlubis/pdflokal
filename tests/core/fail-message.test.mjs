@@ -29,6 +29,14 @@ test('1. deterministic failures NEVER suggest a retry', () => {
 });
 
 test('2. genuinely transient failures DO', () => {
+  // Pin the set itself. Looping over RETRYABLE alone passed with
+  // `RETRYABLE = new Set()`: no reason offered a retry and nothing was checked.
+  assert.deepEqual([...RETRYABLE].sort(), ['out-of-memory', 'timeout', 'unknown'],
+    'the retryable split changed: decide it here on purpose, not by accident');
+  // And by name, not through the set, so an emptied set cannot excuse it.
+  for (const reason of ['timeout', 'out-of-memory', 'unknown']) {
+    assert.match(failMessage(reason), RETRY_RE, `${reason} must offer a retry (it can succeed next time)`);
+  }
   for (const reason of RETRYABLE) {
     assert.match(failMessage(reason), RETRY_RE, `${reason} should offer a retry`);
   }

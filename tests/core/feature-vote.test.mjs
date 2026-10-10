@@ -92,7 +92,12 @@ test('the card is a skeleton in index.html (no hard-coded option labels) and the
   for (const step of ['invite', 'choose', 'done']) assert.ok(dlg.includes(`data-fv-step="${step}"`), step);
   assert.equal([...dlg.matchAll(/type="checkbox"/g)].length, 0, 'the checkboxes are built from the ONE list, not written twice');
   assert.ok(dlg.includes('src="/images/topi.svg"') && dlg.includes('src="/images/ojan.jpg"'), 'the maker card\'s own photo and hat assets');
-  assert.ok(html.indexOf('class="fv-kepala"') > html.indexOf('id="fv-invite-title"'), 'his photo is BELOW his words');
+  // Both anchors must exist: a missing title is indexOf -1, and anything is
+  // "below" -1, so the order check alone passed with the title deleted.
+  const titleAt = html.indexOf('id="fv-invite-title"');
+  const photoAt = html.indexOf('class="fv-kepala"');
+  assert.ok(titleAt >= 0 && photoAt >= 0, 'VACUITY: the invite title and his photo are both in index.html');
+  assert.ok(photoAt > titleAt, 'his photo is BELOW his words');
   for (const f of ['index.html', 'en/index.html']) {
     const h = read(f);
     const nav = h.match(/<nav class="ld-nav"[\s\S]*?<\/nav>/)[0];
@@ -697,6 +702,12 @@ test('the storage rows the code writes are the ones /privasi lists', () => {
 test('the vote is one concern in the files that matter: whole-document only, and the share card is still reachable', () => {
   const app = read('js/v2/app.js');
   assert.match(app, /celebration\.onDownloadSuccess\(\{ whole \}\)/);
+  // The DEFAULT is the rule: a caller that says nothing (Ekstrak, every path
+  // outside the Unduh sheet) is not a whole-document download. With
+  // `{ whole = true } = {}` every subset download would offer the vote and the
+  // checks below stayed green.
+  assert.match(app, /^function download\(blob, filename, \{ whole = false \} = \{\}\) \{$/m,
+    'download() defaults `whole` to false');
   const sheet = read('js/v2/download-sheet.js');
   assert.equal([...sheet.matchAll(/deps\.download\(/g)].length, 3);
   assert.equal([...sheet.matchAll(/\{ whole: !state\.picked \}/g)].length, 3, 'every download from the Unduh sheet says whether it was the whole document');
@@ -710,7 +721,13 @@ test('no usable visitor_id: telemetry says so, the offer is gated on it, and the
   const gate = fv.indexOf('telemetry.hasVisitorId?.() === false) return false;');
   assert.ok(gate > fv.indexOf('maybeShow('), 'maybeShow refuses to invite without a visitor_id');
   assert.match(fv, /noVisitor \? 'no-visitor' : await/, 'send() skips the ballot without a visitor_id');
-  assert.ok(fv.indexOf("result === 'recorded'") < fv.indexOf('rememberVote(ids)'), 'ids are remembered only for a recorded ballot');
+  // The exact branch, not two indexOf positions: with the guard rewritten as
+  // `if (result !== 'failed')`, indexOf("result === 'recorded'") was -1 and
+  // -1 < anything passed. Now the recorded-only branch must exist verbatim.
+  assert.ok(fv.indexOf('rememberVote(ids)') >= 0, 'VACUITY: send() still remembers ids somewhere');
+  assert.match(fv, /if \(result === 'recorded'\) \{\s*tel\('feature_vote', [^\n]*\n\s*rememberVote\(ids\);\s*\}/,
+    'ids are remembered only inside the `result === \'recorded\'` branch');
+  assert.equal([...fv.matchAll(/rememberVote\(ids\)/g)].length, 1, 'exactly one place remembers ids');
   assert.ok(!/else\s*\{[^}]*rememberVote\(ids\)/.test(fv), 'no other branch remembers ids');
 });
 
