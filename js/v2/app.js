@@ -25,7 +25,7 @@ import {
 } from '../core/operations.js';
 import { createHistory, record, undo, redo, canUndo, canRedo, markClean, markChanged, settle } from '../core/history.js';
 import { setLeaveGuard } from './leave-guard.js';
-import { rasterFitsShape, rasterIsCurrent } from '../core/raster-key.js';
+import { rasterFitsShape, rasterIsCurrent, boxToRasterPx, boxFitsRaster } from '../core/raster-key.js';
 import { importPdf, importImage, createPageRasterizer, probeTextLayer, pdfLibLoadError } from '../core/import.js';
 import {
   pagesBucket, durationBucket, ratioBucket, inkRatioBucket, intentValue,
@@ -67,7 +67,7 @@ import { initMakerCard, initVisitorCount } from './maker-card.js';
 import { initH1Rotation } from './h1-rotation.js';
 import { applyIntentCopy } from './intent-copy.js';
 import { ensurePdfLib } from '../core/vendor.js';
-import { readPageContents, extractFontMetrics } from '../core/redact.js';
+import { dominantLineFont } from '../core/redact.js';
 
 // ---- the bug-report prompt's edit trigger -------------------------------------
 // The actions on `tool_use` that mean AN EDIT WAS APPLIED TO THE DOCUMENT.
@@ -93,7 +93,6 @@ function tel(event, props) {
     }
   } catch { /* a prompt may never break the rail */ }
 }
-import { planRunRemoval } from '../core/text-walk.js';
 import { extractFontProgram, lookupFontObject } from '../core/doc-fonts.js';
 import { textCoveredBy, nativeCandidate } from '../core/stamp.js';
 import { faceLadder, faceStyle } from '../core/line-font.js';
@@ -101,12 +100,14 @@ import { loadFaceFont, startLineFont, refusalNote } from './line-font-live.js';
 import {
   toastDurationMs, firstTimeForDoc, alreadyShownForDoc, armEditNoticeKey, lineOutgrew,
 } from './edit-expectations.js';
-import { planBlockEdit, blockOfLine, blockAnnotation, blockExtent, logicalTextOf } from '../core/block-edit.js';
+import { planBlockEdit, blockOfLine, blockAnnotation, logicalTextOf } from '../core/block-edit.js';
 import { totalPageRotation } from '../core/page-rotation.js';
 import { styleBlockEditor, placeBlockEditor, readEditorLines } from './block-editor.js';
 import { resolveFontFingerprint, docFontFaceDescriptors, FAMILY_BUCKET_TO_CLONE, isInformativeBaseFont } from '../core/font-fingerprint.js';
 import { cloneFamilyFor } from '../core/font-decide.js';
 import { editSignature, pageEdits } from '../core/page-surgery.js';
+import { whiteoutRingPoints, whiteoutColorFrom, paperPoints, inkPoints, coverColorFrom, inkColorFrom } from '../core/color-sample.js';
+import { hitTestEditedLine, hitTestOcrEdit, editOwningLine } from '../core/edit-hit.js';
 import { createEditedPageProvider } from './edited-page-provider.js';
 import { createBakeFailureReporter, scrubbedError } from './bake-failure.js';
 
@@ -1016,6 +1017,10 @@ for (const btn of document.querySelectorAll('#toolbar .tool[data-tool]')) {
   });
 }
 
+// The two injected halves of core/edit-hit.js: the overlay's own measurer and
+// the editor's one finger-sized hit law.
+const EDIT_HIT = { measure: measureTextAnnoWidth, minHit: MIN_HIT };
+
 // ---- Ganti Teks (Edit Teks Asli, Rung A — seat spec-edit-teks-asli.md) -----------
 // Tap a PRINTED run → cover it with a color-matched Tip-Ex + reopen the same
 // words as an editable text object, pre-selected so typing replaces. One
@@ -1126,44 +1131,6 @@ async function rebakePage(pageId) {
   if (slots.find((s) => s.page.id === pageId) !== slot) return null;
   await slot.reattach(raster);
   return raster;
-}
-
-// spec-edit-fidelity-instrumentation.md Increment C: crops ONE box (page-
-// space points, top-left frame — same convention as annotation x/y/w/h and
-// replaceBox) out of an already-rasterized {dataUrl,width,height,scale} and
-// returns it as ImageData.
-//
-// PM-flagged 2026-07-26: the original version of this function did a plain
-// `new Image()` + drawImage, which decodes the ENTIRE page PNG synchronously
-// on the main thread — twice (pristine + stamped), right when the bake
-// resolves and the user is looking at their fresh edit. On a low-end phone
-// with a large page that's plausibly 100-300ms of jank landing at exactly
-// the wrong moment. Preferred path now: `createImageBitmap(blob, sx, sy, sw,
-// sh)` decodes OFF the main thread and only the requested region — precisely
-// this use case. `img.decode()`+drawImage is kept as a FALLBACK (never worse
-// than before this fix) for any engine/shape where the bitmap path throws.
-function boxToRasterPx(raster, box) {
-  const s = raster.scale;
-  return {
-    cx: Math.round(box.x * s),
-    cy: Math.round(box.y * s),
-    cw: Math.max(1, Math.round(box.w * s)),
-    ch: Math.max(1, Math.round(box.h * s)),
-  };
-}
-
-// PM question, 2026-07-26: should a crop that spills past its raster's own
-// edge decline outright, rather than trust ALPHA_MIN alone to neutralize the
-// padding? Yes — this is the layer that CAN answer it (core/visual-oracle.js
-// only ever sees already-cropped ImageData, no raster dimensions to compare
-// against, see that module's own header note). A box whose requested pixels
-// spill outside [0,raster.width) x [0,raster.height) means the geometry
-// itself doesn't fit what's being measured against — decline before even
-// fetching/decoding, rather than return a technically-alpha-correct but
-// still partially-fabricated comparison.
-function boxFitsRaster(raster, box) {
-  const { cx, cy, cw, ch } = boxToRasterPx(raster, box);
-  return cx >= 0 && cy >= 0 && cx + cw <= raster.width && cy + ch <= raster.height;
 }
 
 async function cropRasterRegion(raster, box) {
@@ -1412,70 +1379,6 @@ function loadDocFont(sourceId, fontName, pdfPage, PDFLib, fontkit, facts) {
   return docFontCache.get(key);
 }
 
-// Which /Font resource paints this line (its DOMINANT run), and does the line
-// mix resources? A dry run against the SOURCE page. Moved out of prepareDocFont
-// unchanged (2026-10-01) so the re-edit path can skip it and seed from the
-// stored decision instead.
-function dominantLineFont(pdfPage, PDFLib, line) {
-  // DRY RUN ONLY: learns the resource font name painting this line on the
-  // SOURCE page. Nothing here is written back anywhere — same throwaway
-  // read core/redact.js's own removeRunsFromPdfPage performs for real at
-  // export time, run here purely to look.
-  const joined = readPageContents(pdfPage, PDFLib);
-  const fonts = extractFontMetrics(pdfPage, PDFLib);
-  // ONE TARGET PER CONSTITUENT RUN, not one blended target — the same
-  // correction 39e0b9f made to smartReplace's surgery geometry at the
-  // bottom of this file. This call site was missed by that fix.
-  //
-  // WHY it matters here: a blended target takes its `size` from the LINE
-  // (text-lines.js's dominant run), so planRunRemoval's per-target sizeOk
-  // gate silently rejects any run painted at a materially different size,
-  // and `insert` then describes only whichever ops survived that filter.
-  // With per-run targets each run keeps its own size and is matched on its
-  // own terms, so the answer is correct BY CONSTRUCTION rather than by
-  // luck — and, just as importantly, the per-run results make a
-  // multi-font line VISIBLE instead of collapsing it to one blended guess.
-  //
-  // Byte-identical no-op on a single-run line (the overwhelming common
-  // case): `line.runs` has one entry whose `.pdf` IS `line.pdf`.
-  const targets = line.runs?.length ? line.runs.map((r) => r.pdf) : [line.pdf];
-  const { results } = planRunRemoval(joined, fonts, targets);
-  const names = results.map((r) => r.insert?.fontName || null);
-
-  // WHICH run's font represents the line — and what that entitles us to say
-  // about it. Seat ruling 2026-07-28 (option C): the two halves of "the
-  // line's font" have DIFFERENT epistemic status, so they get different
-  // policies.
-  //
-  // FAMILY is answerable. The draft has to render in something, and the
-  // DOMINANT run (widest by pdf.len) is defensible: it is already what
-  // core/text-lines.js calls this line's font, it is what the hover glow
-  // implies, and it is most of the glyphs. Note it is a proxy — a dash
-  // leader can out-width the text it trails — but it is the same proxy the
-  // rest of the system already uses, so this stays consistent rather than
-  // inventing a third answer to a question that already had two.
-  //
-  // WEIGHT is NOT answerable on a line whose runs use different fonts. It
-  // was being taken from planRunRemoval's `insert`, which reports the FIRST
-  // run BY CONTENT-STREAM POSITION — a different selector from the dominant
-  // one, so on `Nama : Budi` (bold label painted first, regular value wider)
-  // the two disagreed and `draft.bold = draft.bold || fp.bold` bolded the
-  // ENTIRE replacement, value included. Since a mixed-font line also makes
-  // the native stamp decline, the twin fallback then RENDERED that wrong
-  // flag — a visible defect, not just a telemetry one.
-  //
-  // So: answer what's answerable, decline what isn't. One policy for both is
-  // what produced the defect.
-  let domIdx = 0;
-  for (let i = 1; i < targets.length; i += 1) {
-    if ((targets[i]?.len ?? 0) > (targets[domIdx]?.len ?? 0)) domIdx = i;
-  }
-  return {
-    fontName: names[domIdx] || names.find(Boolean) || null,
-    mixedFonts: new Set(names.filter(Boolean)).size > 1,
-  };
-}
-
 // Fire-and-forget from smartReplace: never blocks the editor opening (the
 // twin shows immediately, same as before this feature existed). `draft` is
 // the SAME object handed to openTextEditor — mutated in place once the doc
@@ -1673,67 +1576,6 @@ async function prepareDocFont(pageId, line, draft, seed = null) {
   }
 }
 
-// spec-live-surgery.md §5 Decision 3 (increment 4 — re-edit): does `x, y`
-// land inside a committed edit's OWN box? Scoped to page.annotations (the
-// live model — never the pristine source), so this is orthogonal to
-// textRuns.hitTest, which only ever knows about the ORIGINAL bytes and would
-// have no idea an edit exists at all. Boxes come from each edit's cover's
-// replaceBox — the pristine-source line geometry captured at the edit's
-// BIRTH, not the cover's current x/y/width/height — because that birth box
-// is the one guaranteed to still be the honest target (a committed edit
-// never drags, spec Decision 1, but anchoring to replaceBox rather than
-// "wherever the cover currently sits" is the same defensive discipline
-// core/page-surgery.js's own overlapsBirthBox already applies at export/bake
-// time). Reuses core/text-lines.js's resolveTap (same clamped, finger-sized
-// inflation as every other tap) scoped to just this page's edited lines, so
-// a tap that's a few px off a small edited line still resolves the same way
-// a fresh line tap would.
-function hitTestEditedLine(page, x, y) {
-  const edits = pageEdits(page);
-  if (edits.length === 0) return null;
-  const boxes = edits.map((edit) => {
-    const b = edit.cover.replaceBox;
-    // RUNG D: a committed paragraph paints as its block — box width, one
-    // leading per painted line — not as one long line of its whole text.
-    const blk = edit.replacement?.block;
-    if (blk && Array.isArray(blk.lines)) {
-      const e = blockExtent(blk, edit.replacement.y);
-      const x0 = Math.min(b.x, e.x);
-      const y0 = Math.min(b.y, e.y);
-      return { x: x0, y: y0, w: Math.max(b.x + b.w, e.x + e.w) - x0, h: Math.max(b.y + b.h, e.y + e.h) - y0, edit };
-    }
-    // FIELD REPORT 2026-08-26: the birth box ALONE is not the whole target.
-    // Everything above is still true — the box is the honest ANCHOR, and a
-    // committed edit never drags — but the REPLACEMENT is free to be longer
-    // than the words it replaced, and then it paints past the box that
-    // birthed it. Hit-testing the anchor alone left the visible overflow
-    // dead: a tap there missed here, then fell through to the fresh
-    // textRuns.hitTest against the PRISTINE source, where the original line
-    // had already ended — so neither branch matched and the tap did nothing
-    // at all. A user with a replacement wider than its original simply could
-    // not reopen their own edit ("tidak bisa di edit lagi"), with no toast
-    // and nothing in the rail to say so.
-    //
-    // So: anchor UNION painted extent. Union, never replace — the box stays
-    // the floor, so this can only ever grow the target, never move or shrink
-    // one that already worked. Width comes from render/page-view.js's own
-    // measurer, i.e. the same font stack the overlay paints with, because the
-    // region has to match what the user SEES to be worth tapping.
-    const painted = measureTextAnnoWidth(edit.replacement);
-    if (!painted) return { x: b.x, y: b.y, w: b.w, h: b.h, edit };
-    const r = edit.replacement;
-    // 1.2 is renderAnnotationEl's own line-height for a text annotation.
-    const rh = (r.fontSize || 24) * 1.2;
-    const x0 = Math.min(b.x, r.x);
-    const y0 = Math.min(b.y, r.y);
-    const x1 = Math.max(b.x + b.w, r.x + painted);
-    const y1 = Math.max(b.y + b.h, r.y + rh);
-    return { x: x0, y: y0, w: x1 - x0, h: y1 - y0, edit };
-  });
-  const hit = resolveTap(boxes, x, y, MIN_HIT);
-  return hit ? hit.edit : null;
-}
-
 // spec-live-surgery.md §5 Decision 3 (increment 4): reopen Ganti Teks on an
 // ALREADY-EDITED line. Prefills with the edit's CURRENT text (the paired
 // replacement text annotation) — never the original line's words — and
@@ -1806,7 +1648,7 @@ async function smartReplace(pageId, x, y) {
   // increment exists to fix).
   const page = getPage(doc, pageId);
   if (page) {
-    const hit = hitTestEditedLine(page, x, y);
+    const hit = hitTestEditedLine(page, x, y, EDIT_HIT);
     if (hit) { tel('ganti_tap', { hit: true }); reEditLine(pageId, hit.cover, hit.replacement); return; }
     // RUNG S2, same guard one ladder over, and it is NOT optional here: OCR
     // reads the PRISTINE pixels, so a word already covered still recognises
@@ -1815,7 +1657,7 @@ async function smartReplace(pageId, x, y) {
     // two replacements painted over each other, which is worse than the
     // born-digital version of this bug because nothing on a scan visually
     // says an edit is already there.
-    const ocrHit = hitTestOcrEdit(page, x, y);
+    const ocrHit = hitTestOcrEdit(page, x, y, MIN_HIT);
     if (ocrHit) { tel('ganti_tap', { hit: true }); reEditOcrLine(pageId, ocrHit.cover, ocrHit.replacement); return; }
   }
   // A page that has been recognised is a SCAN, and its tap targets are OCR
@@ -1996,23 +1838,6 @@ function openBlockReplace(pageId, line, plan) {
 // have (a header, a stamp, a searchable scan's own invisible layer) and delete
 // it. Naming the fields differently means the export path cannot see an S2
 // pair at all: it exports as what it is, a filled rect and a text object.
-
-// A tap inside an already-committed S2 edit. Mirrors hitTestEditedLine one
-// ladder over, including anchoring to the BIRTH box rather than to wherever
-// the cover currently sits.
-function hitTestOcrEdit(page, x, y) {
-  const covers = page.annotations.filter((a) => a.type === 'whiteout' && a.ocrBox);
-  if (covers.length === 0) return null;
-  const hit = resolveTap(
-    covers.map((c) => ({ x: c.ocrBox.x, y: c.ocrBox.y, w: c.ocrBox.w, h: c.ocrBox.h, cover: c })),
-    x, y, MIN_HIT,
-  );
-  if (!hit) return null;
-  return {
-    cover: hit.cover,
-    replacement: page.annotations.find((a) => a.type === 'text' && a.ocrCoverId === hit.cover.id) || null,
-  };
-}
 
 // Tap a recognised line → cover it → reopen its words as an editable draft.
 function ocrReplace(pageId, line) {
@@ -2264,30 +2089,24 @@ async function withPageRasterCtx(pageId) {
   const frameW = rotated ? page.height : page.width;
   return { cx, w: c.width, h: c.height, s: img.width / frameW }; // s = raster px per page point
 }
-const medOf = (arr) => arr.sort((a, b) => a - b)[Math.floor(arr.length / 2)];
-const medColor = (px) =>
-  `#${[0, 1, 2].map((ch) => medOf(px.map((p) => p[ch])).toString(16).padStart(2, '0')).join('')}`;
-const lumOf = (p) => 0.299 * p[0] + 0.587 * p[1] + 0.114 * p[2];
-
-function takeSample(r, x, y, into) {
-  if (x < 0 || y < 0 || x >= r.w || y >= r.h) return;
-  const px = r.cx.getImageData(Math.round(x), Math.round(y), 1, 1).data;
-  into.push([px[0], px[1], px[2]]);
+// Read the raster at `pts` (raster px); points off the raster are skipped.
+// The arithmetic on the samples is core/color-sample.js's.
+function sampleAt(r, pts) {
+  const out = [];
+  for (const [x, y] of pts) {
+    if (x < 0 || y < 0 || x >= r.w || y >= r.h) continue;
+    const px = r.cx.getImageData(Math.round(x), Math.round(y), 1, 1).data;
+    out.push([px[0], px[1], px[2]]);
+  }
+  return out;
 }
 
 async function matchWhiteoutColor(anno, pageId, ox, oy) {
   try {
     const r = await withPageRasterCtx(pageId);
     if (!r) return;
-    const samples = [];
-    for (const radius of [6 * r.s, 12 * r.s]) {
-      for (let i = 0; i < 10; i += 1) {
-        const ang = (Math.PI * 2 * i) / 10;
-        takeSample(r, ox * r.s + radius * Math.cos(ang), oy * r.s + radius * Math.sin(ang), samples);
-      }
-    }
-    if (samples.length < 8) return;
-    const color = medColor(samples);
+    const color = whiteoutColorFrom(sampleAt(r, whiteoutRingPoints(ox, oy, r.s)));
+    if (!color) return;
     updateAnnotation(doc, anno.id, { color });
     // Mid-gesture: update the LIVE element directly — rebuilding the overlay
     // here would destroy the element holding the pointer capture.
@@ -2310,55 +2129,17 @@ async function matchReplaceColors(cover, draft, pageId, line) {
     if (!r) return;
     if (cover.ocrBox && (findAnnotation(doc, cover.id)?.annotation !== cover
       || draft.appearanceLocked || editingEl !== draft.editorEl)) return;
-    const o = 3 * r.s;
-    const paper = [];
-    for (let i = 0; i <= 4; i += 1) {
-      const x = (line.x + (line.w * i) / 4) * r.s;
-      takeSample(r, x, line.y * r.s - o, paper);
-      takeSample(r, x, (line.y + line.h) * r.s + o, paper);
-    }
-    for (const fy of [0.25, 0.75]) {
-      takeSample(r, line.x * r.s - o, (line.y + line.h * fy) * r.s, paper);
-      takeSample(r, (line.x + line.w) * r.s + o, (line.y + line.h * fy) * r.s, paper);
-    }
-    if (paper.length < 6) return;
-    const coverColor = medColor(paper);
+    const paper = sampleAt(r, paperPoints(line, r.s));
+    const coverColor = coverColorFrom(paper);
+    if (!coverColor) return;
     updateAnnotation(doc, cover.id, { color: coverColor });
     const el = stage.querySelector(`[data-anno-id="${cover.id}"]`);
     if (el) el.style.backgroundColor = coverColor;
-
-    const paperLum = lumOf(paper.map((p) => [p[0], p[1], p[2]])
-      .reduce((a, b) => [a[0] + b[0] / paper.length, a[1] + b[1] / paper.length, a[2] + b[2] / paper.length], [0, 0, 0]));
-    const inside = [];
-    for (let ix = 1; ix <= 8; ix += 1) {
-      for (let iy = 1; iy <= 3; iy += 1) {
-        takeSample(r, (line.x + (line.w * ix) / 9) * r.s, (line.y + (line.h * iy) / 4) * r.s, inside);
-      }
-    }
-    // BUG FIX (founder phone test, 2026-07-19): solid BLACK bold text was
-    // coming back visibly GRAY. Root cause — the old code ranked all 24
-    // interior samples by |luminance - paper|, took the top QUARTILE (up to
-    // 6 points), then took the MEDIAN of that quartile. A glyph's bounding
-    // box is mostly background even for bold text (strokes cover maybe a
-    // third of their own box), so most "farthest from paper" samples that
-    // land near a stroke land on its ANTI-ALIASED EDGE (a partial ink/paper
-    // blend), not its solid interior — genuinely solid-black pixels are rare
-    // in a sparse grid. The median of a quartile stuffed with edge pixels
-    // lands in the middle of the ink<->paper range: literal gray, not a
-    // sampling fluke. Fix: find the single most extreme (most ink-like)
-    // sample actually seen, then keep only samples within a tight band of
-    // THAT extreme — the genuine ink-CORE cluster — and median only those.
-    // A real solid-ink glyph always has a few pixels near its own extreme;
-    // partial-coverage edge pixels fall well short of it and get excluded
-    // instead of diluting the result toward gray.
-    const dists = inside.map((p) => Math.abs(lumOf(p) - paperLum));
-    const maxDist = inside.length ? Math.max(...dists) : 0;
-    // Anti-aliased gray on plain paper must NOT tint the text — only adopt
-    // the ink color when SOMETHING in the box clearly separates from paper.
-    if (maxDist > 40) {
-      const CORE_BAND = 0.75; // keep samples within 25% of the extreme seen
-      const core = inside.filter((_, i) => dists[i] >= maxDist * CORE_BAND);
-      draft.color = medColor(core);
+    // The ink-core rule (and why it is not a quartile median) is
+    // core/color-sample.js inkColorFrom's.
+    const ink = inkColorFrom(sampleAt(r, inkPoints(line, r.s)), paper);
+    if (ink) {
+      draft.color = ink;
       if (editingEl && !editingAnno) editingEl.style.color = draft.color;
     }
   } catch { /* best-effort; white cover + default ink stand */ }
@@ -2503,7 +2284,7 @@ async function deleteOriginalAt(pageId, x, y) {
     // Not over any printed line, but a replacement longer than the words it
     // replaced paints past its birth box (field report 2026-08-26): that overflow
     // is visible, so it is tappable.
-    const hit = hitTestEditedLine(page, x, y);
+    const hit = hitTestEditedLine(page, x, y, EDIT_HIT);
     if (hit?.replacement) deleteEditedReplacement(pageId, hit); else missOriginal();
     return;
   }
@@ -2511,12 +2292,7 @@ async function deleteOriginalAt(pageId, x, y) {
   // edit's box toward a finger-sized target, and a deleted line has no ink to
   // show where its box ends, so it would swallow taps meant for the line beside it.
   // Ownership is geometric: an edit owns the line whose centre is in its birth box.
-  const cx = line.x + line.w / 2;
-  const cy = line.y + line.h / 2;
-  const owner = pageEdits(page).find(({ cover }) => {
-    const b = cover.replaceBox;
-    return cx >= b.x && cx <= b.x + b.w && cy >= b.y && cy <= b.y + b.h;
-  });
+  const owner = editOwningLine(page, line);
   if (owner) { deleteEditedReplacement(pageId, owner); return; }
   await deleteOriginalLine(pageId, line);
 }
