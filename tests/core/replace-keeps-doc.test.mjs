@@ -12,7 +12,8 @@
  * headless, so this EXECUTES the real source text of the handlers, loadFiles,
  * loadFilesInner and resetDoc against stubs (the technique of
  * incoming-files.test.mjs): break the logic and it goes red. Browser half:
- * tests/replace-undecodable.spec.js.
+ * tests/drop-choice.spec.js ('a replace with a file that cannot be decoded') and
+ * tests/file-flow-guards.spec.js (Buka Baru with a file that cannot open).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -196,19 +197,17 @@ for (const [name, run] of [
   });
 }
 
-test('the old document undoes and redoes exactly as before after a refused replace', async () => {
+test('after a refused replace, undo on the live document still reverses the edit made before it', async () => {
   const w = world();
-  const { oldDoc, history } = w;
-  const before = JSON.stringify(oldDoc.pages.map((p) => [p.id, p.width, p.height, p.rotation]));
+  w.oldDoc.pages[0].rotation = 90; // the edit; world() recorded the pre-edit snapshot
   w.api.setPending(true);
   await handlers.fileInput({ target: { files: PICKS.heic } });
-  assert.equal(JSON.stringify(oldDoc.pages.map((p) => [p.id, p.width, p.height, p.rotation])), before, 'untouched pages are identical');
-  record(history, oldDoc); // record BEFORE mutating, as the app does
-  oldDoc.pages[0].rotation = 90; // a later edit on the surviving document
-  undo(history, oldDoc);
-  assert.equal(oldDoc.pages[0].rotation, 0, 'undo still restores the state across the staged load');
-  redo(history, oldDoc);
-  assert.equal(oldDoc.pages[0].rotation, 90, 'redo too');
+  // Through env, not oldDoc: it is whatever the APP now holds as its document and history.
+  assert.equal(w.env.doc.pages[0].rotation, 90, 'the edit survived the refused replace');
+  undo(w.env.history, w.env.doc);
+  assert.equal(w.env.doc.pages[0].rotation, 0, 'undo restores the pre-edit state on the open document');
+  redo(w.env.history, w.env.doc);
+  assert.equal(w.env.doc.pages[0].rotation, 90, 'redo too');
 });
 
 test('appending a file that cannot be decoded still keeps the open document (the old behaviour)', async () => {
