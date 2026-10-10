@@ -31,8 +31,8 @@ export const UPDATES = [
   {
     id: '2026-10-11-unduh-sama-layar',
     date: '2026-10-11',
-    text: 'File yang kamu unduh sekarang sama kayak di layar, termasuk PDF yang dulu bikin tulisan dan Tip-Ex turun.',
-    en: 'Your download now matches the screen, including PDFs where text and Tip-Ex used to shift down.',
+    text: 'Hasil Unduh sekarang sama kayak di layar, tulisan dan Tip-Ex nggak turun lagi.',
+    en: 'Your download now matches the screen: text and Tip-Ex no longer shift down.',
     approved: false,
   },
   {
@@ -45,8 +45,8 @@ export const UPDATES = [
   {
     id: '2026-10-11-foto-pas',
     date: '2026-10-11',
-    text: 'Foto dari HP sekarang langsung pas di layar, dan PDF-nya nggak bawa lokasi GPS fotonya lagi.',
-    en: "A phone photo now opens fitted to the screen, and its PDF no longer carries the photo's GPS location.",
+    text: 'Foto dari HP langsung pas di layar, dan PDF-nya nggak bawa lokasi GPS foto lagi.',
+    en: "A phone photo opens fitted to the screen, and its PDF no longer carries the photo's GPS.",
     approved: false,
   },
   {
