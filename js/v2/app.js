@@ -97,7 +97,7 @@ import { faceStyle } from '../core/line-font.js';
 import {
   toastDurationMs, firstTimeForDoc, alreadyShownForDoc, armEditNoticeKey, lineOutgrew,
 } from './edit-expectations.js';
-import { planBlockEdit, blockOfLine, blockAnnotation, logicalTextOf } from '../core/block-edit.js';
+import { planBlockEdit, blockOfLine, blockAnnotation, editorCommit } from '../core/block-edit.js';
 import { totalPageRotation } from '../core/page-rotation.js';
 import { styleBlockEditor, placeBlockEditor, readEditorLines } from './block-editor.js';
 import { pageEdits } from '../core/page-surgery.js';
@@ -1985,9 +1985,10 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
     releaseKeyboardWatch(); // before ed.remove(), so the listener never outlives its element
     // RUNG D: read the paragraph's line breaks off the editor BEFORE it leaves
     // the DOM — they are what the file will hold (js/v2/block-editor.js).
-    const blockLines = blockPlan ? readEditorLines(ed) : null;
+    // The text is normalised HERE (a TAB is the one space the file draws), so
+    // the no-op comparisons below see what will actually be stored.
+    const { text, lines: blockLines } = editorCommit(ed.textContent, blockPlan ? readEditorLines(ed) : null);
     const blockTop = blockPlan ? parseFloat(ed.style.top) : null;
-    const text = blockLines ? logicalTextOf(blockLines) : ed.textContent.trim();
     ed.remove();
     editingAnno = null;
     editingEl = null;
@@ -2718,8 +2719,9 @@ async function pasteImageFile(file) {
 }
 
 // Plain text becomes a text object in the bar's current style, exactly what the
-// Teks tool would have made (the same defaults, the same export path: newlines
-// are lines, odd whitespace is normalised at export).
+// Teks tool would have made (the same defaults, the same entry path: newlines
+// are lines, a TAB or other layout control is normalised when the text enters
+// the model, by createAnnotation).
 function pasteText(text) {
   const pageId = pasteTargetPageId();
   if (!pageId) return;
