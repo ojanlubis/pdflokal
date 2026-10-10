@@ -22,6 +22,7 @@ import { isStandardFamily, unencodableInStandardFont } from '../core/text-encode
 import {
   addAnnotation, removeAnnotation, updateAnnotation, clearSelection, selectAnnotation,
   moveAnnotation, normalizePageWidths, duplicateAnnotation,
+  copySignatureToAllPages, pagesMissingSignature,
 } from '../core/operations.js';
 import { createHistory, record, undo, redo, canUndo, canRedo, markClean, markChanged, settle, isDirty } from '../core/history.js';
 import { setLeaveGuard } from './leave-guard.js';
@@ -2560,16 +2561,11 @@ on('btn-redraw-sig', 'click', () => openSignatureModal(selectedSignatureAnno()?.
 on('btn-all-pages', 'click', () => {
   const found = selectedSignatureAnno();
   if (!found) return;
-  const { page: home, anno } = found;
-  record(history, doc);
-  for (const page of doc.pages) {
-    if (page.id === home.id) continue;
-    // Same position on every page; each copy is its OWN object (new id) so it
-    // moves/deletes independently afterwards.
-    addAnnotation(doc, page.id, createAnnotation('signature', {
-      image: anno.image,
-      x: anno.x, y: anno.y, width: anno.width, height: anno.height,
-    }));
+  // A re-tap with every page already covered changes nothing, so it records
+  // nothing: no dead undo step, no phantom "unsaved changes".
+  if (pagesMissingSignature(doc, found.anno.id).length) {
+    record(history, doc);
+    copySignatureToAllPages(doc, found.anno.id);
   }
   rebuildStage();
   toast(tr('toast.signatureCopied', { count: doc.pages.length - 1 }));

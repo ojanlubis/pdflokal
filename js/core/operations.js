@@ -10,7 +10,7 @@
  * `mutatePages()` and its six-parallel-map dance simply don't exist here.
  */
 
-import { getPage, findAnnotation, getSource, cloneForPaste } from './model.js';
+import { getPage, findAnnotation, getSource, cloneForPaste, createAnnotation } from './model.js';
 import { scaleAnnotationGeometry, turnAnnotation } from './annotation-geometry.js';
 
 const clamp = (n, lo, hi) => Math.min(Math.max(n, lo), hi);
@@ -182,6 +182,36 @@ export function duplicateAnnotation(doc, pageId, src, n = 1) {
   addAnnotation(doc, pageId, clone);
   moveAnnotation(doc, clone.id, PASTE_OFFSET * n, PASTE_OFFSET * n);
   return clone;
+}
+
+// "Semua Hal.": the pages (other than the signature's own) that still need a copy.
+// Separate from the copy so the caller can record history only when a tap will
+// actually change something; a re-tap must not leave a dead undo step.
+export function pagesMissingSignature(doc, annotationId) {
+  const found = findAnnotation(doc, annotationId);
+  if (!found || found.annotation.type !== 'signature') return [];
+  const src = found.annotation;
+  // Idempotent by state, not by timing: the selection survives the copy so the
+  // button stays on screen, and a second tap must not stack a twin that makes
+  // Hapus look broken. "Already there" = same image, same box.
+  const alreadyThere = (a) => a.type === 'signature' && a.image === src.image
+    && a.x === src.x && a.y === src.y && a.width === src.width && a.height === src.height;
+  return doc.pages.filter((pg) => pg.id !== found.page.id && !pg.annotations.some(alreadyThere));
+}
+
+export function copySignatureToAllPages(doc, annotationId) {
+  const found = findAnnotation(doc, annotationId);
+  if (!found) return [];
+  const src = found.annotation;
+  const added = [];
+  for (const pg of pagesMissingSignature(doc, annotationId)) {
+    // Same position on every page; each copy is its OWN object (new id) so it
+    // moves/deletes independently afterwards.
+    added.push(addAnnotation(doc, pg.id, createAnnotation('signature', {
+      image: src.image, x: src.x, y: src.y, width: src.width, height: src.height,
+    })));
+  }
+  return added;
 }
 
 export function updateAnnotation(doc, annotationId, patch) {
