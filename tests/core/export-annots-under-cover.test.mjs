@@ -323,3 +323,18 @@ test("a flattened annotation keeps its own opacity (/CA, /ca)", async () => {
   };
   assert.deepEqual(draws.map(alphaOf), [[0.3, 0.3], [0.8, 0.4], null]);
 });
+
+test('an annotation not marked to print stays live, even under a cover', async () => {
+  // Without the Print flag (F bit 3) a reader shows it but never prints it.
+  // As page content it would print, so it is left as it was.
+  const page = await exportOnePage({
+    build: (ctx) => [
+      withAp(ctx, 'Stamp', [100, 600, 140, 640], '0 1 0 rg', { F: 4 }),
+      withAp(ctx, 'Stamp', [150, 600, 190, 640], '1 0 1 rg'),
+      withAp(ctx, 'Stamp', [200, 600, 240, 640], '1 0 1 rg', { F: 0 }),
+    ],
+    userObjects: [['whiteout', { x: 90, y: 160, width: 160, height: 20, color: '#ff0000' }]],
+  });
+  assert.deepEqual(liveStamps(page), ['150,600,190,640', '200,600,240,640']);
+  assert.ok(!Object.values(xobjectsDrawn(page)).some((s) => s.includes('1 0 1 rg')), 'a no-print appearance was painted');
+});
