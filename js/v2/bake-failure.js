@@ -19,13 +19,15 @@
  *     the next occurrence finally brings a stack. Nothing ever called
  *     captureException before, which is why Sentry has no record of this.
  *
- * ⚠️ MEANING NARROWED 2026-10-11 (founder ruling, seat decisions.md item 3):
+ * ⚠️ MEANING CHANGED 2026-10-11 (founder ruling, seat decisions.md item 3):
  * failureReason()'s 'unsupported' (a blown stack, a `cannot encode` throw) is
  * recorded as 'unsupported' — before that date it was rewritten to 'unknown'.
  * `commit/unsupported` rows now come from two sources: the committed
  * unencodable character (js/v2/app.js, class names the script) and this bake
  * failure (class 'none', blocked:false; failure_cause says 'stack' or 'encode').
- * Do not compare counts across 2026-10-11 blindly.
+ * `commit/unknown` narrowed and `commit/unsupported` broadened (filter class
+ * 'none' to separate the bake source). Do not compare counts across
+ * 2026-10-11 blindly.
  *
  * blocked:false, truthfully: the commit itself went through — the edit is in
  * the model and on screen as an overlay. What it forewarns is the export,
