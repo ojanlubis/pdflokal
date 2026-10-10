@@ -172,3 +172,14 @@ test('8. emoji and CJK are REPORTED, never silently removed', async () => {
   assert.deepEqual(unencodableInStandardFont(txt), ['\u{1F44D}', '中']);
   assert.equal(toStandardFontSafe(txt), txt, 'sanitiser must leave visible characters alone');
 });
+
+// Round-3 hunt (2026-10-10): text pasted from Excel or Word carries TABs. The
+// predicate refused 0x09, so fontCanPaint said no and the whole annotation was
+// exported as a picture (not selectable, not searchable) for one invisible
+// character. A tab draws as the space it reads as.
+test('7. a TAB (and VT / FF) is rescued, never a reason to rasterise the line', () => {
+  assert.deepEqual(unencodableInStandardFont('Nama\tAndi'), []);
+  assert.equal(toStandardFontSafe('Nama\tAndi'), 'Nama Andi');
+  assert.equal(toStandardFontSafe('a\u000bb\u000cc'), 'a\nb\nc');
+  assert.deepEqual(unencodableInStandardFont('a\u0001b'), ['\u0001'], 'KNOWN-POSITIVE: other control chars are still reported');
+});

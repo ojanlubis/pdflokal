@@ -83,6 +83,10 @@ const LOOKALIKES = new Map([
   [0x2032, "'"], [0x2033, '"'],
   // Line/paragraph separators -> a plain newline, which the caller splits on.
   [0x2028, '\n'], [0x2029, '\n'],
+  // TAB from Excel/Word -> the space it reads as. Refused, it sent the whole
+  // annotation to drawTextAsImage over one invisible character. VT/FF break
+  // the line, which is what they meant.
+  [0x0009, ' '], [0x000b, '\n'], [0x000c, '\n'],
 ].map(([cp, to]) => [String.fromCodePoint(cp), to]));
 
 /**
