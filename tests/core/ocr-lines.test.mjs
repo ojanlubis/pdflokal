@@ -180,3 +180,19 @@ test('word banding: a word sorted later but further left still widens the box to
   assert.ok(out[0].x + out[0].w >= 200, `right edge ${out[0].x + out[0].w} misses "Lengkap"`);
   assert.ok(out[0].y + out[0].h >= 122, `bottom edge ${out[0].y + out[0].h} misses "Nama"`);
 });
+
+// Round-3 hunt (2026-10-10): the scale read the WIDTH only, so a long phone
+// screenshot (1080x10000) asked for a 1800x16667 = 30 MP canvas, over iOS
+// Safari's ~16.7 MP cap (getContext fails: "Gagal scan") and the OCR engine's
+// memory on Android (Sentry JAVASCRIPT-11). The height now caps the pixels.
+test('12 · ocrScaleFor caps the canvas PIXELS on a tall page; A4 is unchanged', () => {
+  const PX = 5e6;
+  for (const [w, h] of [[1080, 10000], [595, 5000]]) {
+    const s = ocrScaleFor(w, h);
+    assert.ok(s > 0 && Number.isFinite(s), `VACUITY GUARD: a real scale for ${w}x${h}`);
+    assert.ok(s * s * w * h <= PX * 1.0001, `${w}x${h} at ${s} is ${(s * s * w * h / 1e6).toFixed(1)} MP`);
+  }
+  assert.equal(ocrScaleFor(595, 842), 3, 'A4 portrait keeps its proven density');
+  assert.ok(Math.abs(ocrScaleFor(842, 595) - 1800 / 842) < 1e-9, 'A4 landscape unchanged');
+  assert.equal(ocrScaleFor(595), 3, 'callers that pass no height keep the old answer');
+});
