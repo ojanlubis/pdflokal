@@ -33,6 +33,16 @@ const COLORS = ['#000000', '#d33131', '#1d6fdc', '#1d8a44', '#ffffff'];
 //     stops affecting the draft under the cursor. Documented because the
 //     failure is silence, not a throw.
 // }
+// The one rule for "which annotation does the bar style". WHY editingEl blocks
+// the selection fallback: a NEW text being typed has an editor but no
+// annotation yet, while the previously committed text stays selected (app.js
+// keeps authored text selected after commit). Falling through to that
+// selection restyled the OLD text and left the draft unchanged.
+export function formatTarget({ editingAnno, editingEl, selected }) {
+  if (editingAnno) return editingAnno;
+  return editingEl ? null : selected;
+}
+
 export function createFormatBar(deps) {
   const { el } = deps;
   // Sticky defaults for the NEXT new text annotation.

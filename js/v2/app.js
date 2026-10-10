@@ -37,7 +37,7 @@ import { createPageSlot, pageDisplaySize, syncOverlay, textFontCss, applyTextFon
 import { createViewportStream } from '../render/viewport.js';
 import { RASTER_BASE, sharpenScale, maxPixelsFor, imageScaleCap } from '../render/sharpen.js';
 import { createInteraction } from '../render/interaction.js';
-import { createFormatBar } from './format-bar.js';
+import { createFormatBar, formatTarget } from './format-bar.js';
 import { createTextRunIndex, mapRunFont, MIN_HIT } from './text-runs.js';
 import { createGantiSteer } from './ganti-steer.js';
 import { resolveTap, draftFontSize } from '../core/text-lines.js';
@@ -940,7 +940,7 @@ const formatBar = createFormatBar({
   el: document.getElementById('format-bar'),
   getDoc: () => doc,
   history,
-  getTarget: () => editingAnno || selectedTextAnno(),
+  getTarget: () => formatTarget({ editingAnno, editingEl, selected: selectedTextAnno() }),
   onStyled: (anno) => {
     // Restyle the open inline editor live; re-render the committed element.
     if (editingEl && editingAnno && anno.id === editingAnno.id) {
