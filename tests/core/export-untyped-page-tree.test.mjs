@@ -188,3 +188,46 @@ test('the edit preview loads through the same repair as the export', async () =>
   const dry = await bake.getDryRunDoc(PDFLib, doc.sources[0]);
   assert.equal(dry.getPageCount(), 3, 'the preview sees every page');
 });
+
+// A /Kids entry that is the page dict ITSELF rather than a reference to it.
+// The spec says kids are indirect; some producers inline one anyway. PDF.js
+// walks it like any other kid, so the screen shows every page. pdf-lib's
+// page list either skips it (untyped: every later page shifts down one, and
+// the download silently carries the WRONG page) or throws (typed: PDFPage
+// needs a ref). Measured by the round-1 review: pages [0,1] of an all-untyped
+// 3-page file downloaded as "Halo 0", "Halo 2".
+async function directKidPdf({ keepType }) {
+  const d = await PDFLib.PDFDocument.create();
+  for (let i = 0; i < 3; i += 1) d.addPage([595, 842]).drawText(`Halo ${i}`, { x: 50, y: 700 });
+  const rootNode = d.context.lookup(d.catalog.get(PDFName.of('Pages')));
+  const kids = rootNode.Kids().asArray();
+  const inlined = d.context.obj({});
+  for (const [k, v] of d.context.lookup(kids[1]).entries()) inlined.set(k, v);
+  if (!keepType) inlined.delete(PDFName.of('Type'));
+  rootNode.set(PDFName.of('Kids'), d.context.obj([kids[0], inlined, kids[2]]));
+  return d.save({ useObjectStreams: false });
+}
+
+const DIRECT_CASES = [
+  { name: 'every leaf untyped, the middle one inlined', make: async () => untype(await directKidPdf({ keepType: true }), { trees: false, leaves: true }) },
+  { name: 'only the inlined middle leaf untyped', make: () => directKidPdf({ keepType: false }) },
+  { name: 'the inlined middle leaf typed', make: () => directKidPdf({ keepType: true }) },
+];
+
+for (const c of DIRECT_CASES) {
+  test(`${c.name}: the download carries the pages the screen showed, not their neighbours`, async () => {
+    const bytes = await c.make();
+    assert.deepEqual(await pageTexts(bytes), ['Halo 0', 'Halo 1', 'Halo 2'], 'PDF.js opens it with all three pages');
+
+    const { doc, pages } = docOf(bytes, 3, [595, 842]);
+    ops.removePage(doc, pages[2].id);
+    ops.addAnnotation(doc, pages[0].id, model.createAnnotation('text', { text: 'Nama Baru', x: 50, y: 50, fontSize: 12 }));
+    const texts = await pageTexts(await buildPdfBytes(doc, { PDFLib, fontkit }));
+    assert.equal(texts.length, 2);
+    assert.match(texts[0], /Halo 0/);
+    assert.match(texts[0], /Nama Baru/);
+    assert.equal(texts[1], 'Halo 1', 'page 2 is source page 2, not source page 3');
+
+    assert.equal((await loadForRebuild(PDFLib, bytes)).getPageCount(), 3, 'pdf-lib sees the same three pages');
+  });
+}
