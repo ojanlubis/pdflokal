@@ -101,6 +101,38 @@ const PRECACHE = [
   '/images/icon-maskable-512.png',
 ];
 
+// THE EXPORT PATH'S VENDOR FILES, fetched by the worker itself (found 2026-10-11).
+// pdf-lib, fontkit and fflate load only when someone taps Unduh / Unduh as JPG
+// (js/core/vendor.js), and /js/vendor/ is stale-while-revalidate below, which
+// serves only what an earlier use already cached. A first-time user whose
+// signal dropped after opening a PDF was told the app works offline and then
+// could not download. The cost is ~0.55 MB over the wire, once per device, for
+// people who may never download: that is the trade (tests/core/sw-vendor-warm.test.mjs).
+// Add a file here when ensurePdfLib / ensureFflate start loading another one.
+const PRECACHE_VENDOR = [
+  '/js/vendor/pdf-lib.min.js',
+  '/js/vendor/fontkit.umd.min.js',
+  '/js/vendor/fflate.min.js',
+];
+
+// Runs after a page says it booted or was adopted, never at install: an install
+// that waits on 0.55 MB delays activation, and activation is what lets the first
+// visit's shell be adopted. Best-effort per file: a miss costs the very thing
+// that was missing before, and the next boot tries again. Files already stored
+// are left to the stale-while-revalidate branch.
+async function warmVendor() {
+  const c = await caches.open(CACHE);
+  await Promise.all(PRECACHE_VENDOR.map(async (u) => {
+    try {
+      if (await c.match(u)) return;
+      const res = await fetch(u);
+      if (cacheable({ method: 'GET' }, res)) await c.put(u, res);
+    } catch {
+      // offline or a bad response: leave it for the next boot
+    }
+  }));
+}
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE)
@@ -360,6 +392,7 @@ async function adopt(clientId, urls) {
 self.addEventListener('message', (event) => {
   const data = event.data;
   if (!data || !event.source || !event.source.id) return;
+  if (data.type === 'pdflokal:adopt' || data.type === 'pdflokal:booted') event.waitUntil(warmVendor().catch(() => {}));
   if (data.type === 'pdflokal:adopt') { event.waitUntil(adopt(event.source.id, data.urls).catch(() => {})); return; }
   if (data.type !== 'pdflokal:booted') return;
   event.waitUntil(commit(event.source.id).catch(() => {}));
