@@ -155,6 +155,14 @@ test.describe('scan dead end', () => {
     const pt = await visiblePagePoint(page);
     await page.mouse.click(pt.x, pt.y);
 
+    // Known-positive first: the tap's own ganti_tap event reached the rail, so the
+    // router has run and the capture shim is live. Catches: a tap that never routed
+    // (or a dead rail), under which "no scan_offer" passed for free.
+    await expect
+      .poll(async () => (await railEvents(page)).filter((e) => e.event === 'ganti_tap').length,
+        { message: 'the tap never reached the router/rail, so the absence below would prove nothing' })
+      .toBeGreaterThan(0);
+
     await expect(page.locator('#scan-offer')).toBeHidden();
     expect(await scanOffers(page)).toEqual([]);
   });

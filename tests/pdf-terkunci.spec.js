@@ -121,6 +121,12 @@ test.describe('protected PDFs', () => {
     const encrypted = await page.evaluate(() => window.v2.getDoc().sources.map((s) => s.encrypted));
     expect(encrypted).toEqual([false]);
 
+    // Known-positive: this open's doc_open is on the rail, so an import failure
+    // row would have been flushed with it. Catches: a "no failure" read off an
+    // empty rail (not yet flushed, or capture dead), which passed for free.
+    await expect.poll(async () => (await railEvents(page)).some((e) => e.event === 'doc_open'),
+      { message: 'doc_open never reached the rail, so the absence below proves nothing' }).toBe(true);
+
     // No protection warning, and no failure event, on a perfectly good file.
     const events = await railEvents(page);
     expect(events.filter((e) => e.event === 'failure')).toEqual([]);
@@ -231,7 +237,10 @@ test.describe('protected PDFs — the image path', () => {
     expect(entries.map((e) => e.name.replace(/^.*-hal-/, '')).sort())
       .toEqual(['1.jpg', '2.jpg']);
 
-    // And nothing was reported as a failure, because nothing failed.
+    // And nothing was reported as a failure, because nothing failed. Wait for the
+    // success path's `export` event first (blob.text() lands a microtask late), so
+    // the absence is read off a rail that provably carried this export.
+    await expect.poll(async () => (await railEvents(page)).some((e) => e.event === 'export')).toBe(true);
     const events = await railEvents(page);
     expect(events.filter((e) => e.event === 'failure' && e.props.stage === 'export')).toEqual([]);
     // The export event still describes the job honestly.
@@ -286,6 +295,12 @@ test.describe('protected PDFs — the image path', () => {
     expect(buf.equals(source)).toBe(true);
     // Still protected. This is not a lock-removal tool and must never become one.
     expect(buf.toString('latin1')).toMatch(/\/Filter\s*\/Standard/);
+
+    // Known-positive: the success path's own `export` event is on the rail, so a
+    // failure/export row (fired before it) would be there too. Catches: an
+    // export failure hidden by reading an unflushed or dead rail.
+    await expect.poll(async () => (await railEvents(page)).some((e) => e.event === 'export'),
+      { message: 'the export event never reached the rail, so the absence below proves nothing' }).toBe(true);
 
     // Nothing failed, so nothing is reported as failing.
     const events = await railEvents(page);

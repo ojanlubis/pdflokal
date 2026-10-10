@@ -70,12 +70,19 @@ test.describe('bug 1 — no-op commit is a cancel', () => {
     await armGanti(page);
     await tapLine(page, { str: 'Test Page 1' });
 
-    // Simulate "typed something, then deleted it back to the original words"
-    // — the comparison must be against the FINAL committed text, not against
-    // whether any keystroke happened.
-    await page.evaluate(() => {
-      document.querySelector('.v2-text-edit').textContent = 'Test Page 1';
-    });
+    // "Typed something, then retyped it back to the original words" — through
+    // REAL keystrokes, so the app's input handlers see every change. The
+    // comparison must be against the FINAL committed text, not against whether
+    // any keystroke happened. (Setting textContent bypassed the input path, so a
+    // cancel keyed on "no input event fired" passed this test for free.)
+    const ed = page.locator('.v2-text-edit');
+    await expect(ed).toHaveText('Test Page 1');
+    await page.keyboard.type('Halaman Lain');
+    // Known-positive: the content really was edited away from the prefill.
+    await expect(ed).not.toHaveText('Test Page 1');
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.type('Test Page 1');
+    await expect(ed).toHaveText('Test Page 1');
     await page.mouse.click(400, 300);
     await expect(page.locator('.v2-text-edit')).toHaveCount(0);
     expect(await page.evaluate(() => window.v2.getDoc().pages[0].annotations.length)).toBe(0);
@@ -140,9 +147,10 @@ test.describe('bug 2 — bold/italic adoption', () => {
     await armGanti(page);
     await tapLine(page, { str: 'Diterbitkan' });
     await expect(page.locator('.v2-text-edit')).toBeVisible();
-    // Give prepareDocFont a beat to settle either way (it never blocks the
-    // editor, but the assertion must not race a still-pending lookup).
-    await page.waitForTimeout(500);
+    // Wait for prepareDocFont to FINISH DECIDING (data-style-prepared, set in its
+    // finally), not a fixed beat. Catches: a bold applied after the old 500ms
+    // budget, which read not-bold off a still-pending lookup and passed.
+    await expect(page.locator('.v2-text-edit')).toHaveAttribute('data-style-prepared', '1', { timeout: 10_000 });
     const weight = await page.evaluate(
       () => getComputedStyle(document.querySelector('.v2-text-edit')).fontWeight,
     );

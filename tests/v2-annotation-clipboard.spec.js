@@ -101,8 +101,15 @@ test.describe('annotation clipboard — desktop', () => {
       pg.annotations.push({ id: 'cover_t', type: 'whiteout', x: 50, y: 50, width: 40, height: 20, ocrBox: { x: 50, y: 50, w: 40, h: 20 } });
       d.selection = { pageId: pg.id, annotationId: 'cover_t' };
     });
-    for (const k of ['c', 'x', 'v']) await page.keyboard.press(`${MOD}+${k}`);
-    expect(await annos(page)).toHaveLength(1);
+    // Checked after EACH key, by id: a cut-then-paste (X deletes, V re-adds) or a
+    // D that adds a copy would otherwise net out to "one annotation" at the end.
+    // Catches: X deleting the cover, V pasting a re-id'd copy of it, D duplicating it.
+    const ids = () => page.evaluate(() => window.v2.getDoc().pages[0].annotations.map((a) => a.id));
+    expect(await ids(), 'known-positive: the injected cover is the only annotation').toEqual(['cover_t']);
+    for (const k of ['c', 'x', 'v', 'd']) {
+      await page.keyboard.press(`${MOD}+${k}`);
+      expect(await ids(), `after ${MOD}+${k.toUpperCase()} the cover must be untouched and alone`).toEqual(['cover_t']);
+    }
   });
 
   test('a pasted annotation reaches the exported PDF', async ({ page }) => {

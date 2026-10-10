@@ -66,6 +66,17 @@ const mergeBlocked = async (page) => {
     .flatMap((b) => b.body.events || [])
     .filter((e) => e.event === 'merge_blocked'));
 };
+// Every event name the rail has carried so far (flushes first, like the two above).
+const railEventNames = async (page) => {
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  return page.evaluate(() => (window.__rail || [])
+    .filter((b) => b.url.includes('/api/t'))
+    .flatMap((b) => b.body.events || [])
+    .map((e) => e.event));
+};
 const pageCount = (page) => page.evaluate(() => window.v2.getDoc().pages.length);
 
 test.describe('merge guard: a document pdf-lib cannot rebuild', () => {
@@ -75,6 +86,11 @@ test.describe('merge guard: a document pdf-lib cannot rebuild', () => {
     await page.setInputFiles('#file-input', BAD);
     await expectFirstPage(page);
     expect(await pageCount(page)).toBe(2); // PDF.js read both pages
+    // Known-positive: the open's own doc_open reached the rail, so a failure row
+    // would have arrived by now too. Catches: an import/corrupt row hidden by an
+    // empty (not-yet-flushed or dead) rail — the old read-once passed for free.
+    await expect.poll(async () => (await railEventNames(page)).includes('doc_open'),
+      { message: 'doc_open never reached the rail, so "no import failure" proves nothing' }).toBe(true);
     expect(await importFailures(page)).toEqual([]); // alone it is never checked, never declined
 
     // And the untouched download still hands back the user's own bytes, so
