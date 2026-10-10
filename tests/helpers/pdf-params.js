@@ -97,3 +97,59 @@ export async function buildGeometryPdf(page, c) {
     return Array.from(await d.save());
   }, { c, crop }));
 }
+
+// ---- Slice 2: printed text, the subject of Edit (Ganti/Hapus) --------------
+// font        the three built-in (non-embedded, WinAnsi) faces, and an
+//             embedded TrueType (pdf-lib writes it as Type0 / Identity-H;
+//             tests/fixtures/carlito-latin.ttf, Carlito OFL cut to Latin-1 with
+//             pyftsubset, since pdf-lib cannot subset a woff2).
+// size        font size in points.
+// squeeze     Tz, horizontal scaling in percent.
+// charSpacing Tc, extra space after every glyph.
+// mediaBox    the slice-1 axis that broke the field report, crossed with text.
+export const TEXT_AXES = {
+  font: ['Helvetica', 'TimesRoman', 'Courier', 'ttf'],
+  size: [9, 14, 28],
+  squeeze: [100, 130],
+  charSpacing: [0, 1.5],
+  mediaBox: [[0, 0, 612, 792], [0, 200, 612, 592]],
+};
+export const TEXT_SUBJECT = 'Halo Budi Santoso';
+export const TEXT_BYSTANDER = 'Nomor 12345';
+
+export function textCaseName(c) {
+  return `font:${c.font} ${c.size}pt Tz:${c.squeeze} Tc:${c.charSpacing} media[${c.mediaBox.join(',')}]`;
+}
+
+/**
+ * One page with TEXT_SUBJECT at 30% from the top and TEXT_BYSTANDER at 60%,
+ * both drawn with raw text operators so Tz/Tc are really in the stream.
+ */
+export async function buildTextPdf(page, c) {
+  for (const [glob, url] of [['PDFLib', '/js/vendor/pdf-lib.min.js'], ['fontkit', '/js/vendor/fontkit.umd.min.js']]) {
+    if (!(await page.evaluate((g) => Boolean(window[g]), glob))) await page.addScriptTag({ url });
+  }
+  return Buffer.from(await page.evaluate(async ({ c, subject, bystander }) => {
+    const L = window.PDFLib;
+    const d = await L.PDFDocument.create();
+    d.registerFontkit(window.fontkit);
+    const font = c.font === 'ttf'
+      ? await d.embedFont(new Uint8Array(await (await fetch('/tests/fixtures/carlito-latin.ttf')).arrayBuffer()), { subset: true })
+      : await d.embedFont(L.StandardFonts[c.font]);
+    const [x, y, w, h] = c.mediaBox;
+    const p = d.addPage([w, h]);
+    p.setMediaBox(x, y, w, h);
+    const key = p.node.newFontDictionary(font.name, font.ref);
+    const line = (str, top) => [
+      L.beginText(),
+      L.setFontAndSize(key, c.size),
+      L.setCharacterSqueeze(c.squeeze),
+      L.setCharacterSpacing(c.charSpacing),
+      L.moveText(x + 72, y + h * (1 - top)),
+      L.showText(font.encodeText(str)),
+      L.endText(),
+    ];
+    p.pushOperators(...line(subject, 0.3), ...line(bystander, 0.6));
+    return Array.from(await d.save());
+  }, { c, subject: TEXT_SUBJECT, bystander: TEXT_BYSTANDER }));
+}
