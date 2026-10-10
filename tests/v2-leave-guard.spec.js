@@ -154,11 +154,15 @@ test.describe('leave guard', () => {
     const d = watchDialogs(page);
     await open(page);
     await addText(page, 'Satu');
+    const oldFirstId = await page.evaluate(() => window.v2.getDoc().pages[0].id);
     await page.click('#btn-file');
     await page.click('#fm-new');
     await page.click('#nc-go'); // edits not downloaded -> #new-confirm asks first
     await page.setInputFiles('#file-input', FIXTURE);
     await expectFirstPage(page);
+    // A replace keeps the old document on screen until the new file opens, so
+    // expectFirstPage alone can pass on the OLD page: wait for the swap.
+    await expect.poll(() => page.evaluate(() => window.v2.getDoc().pages[0]?.id)).not.toBe(oldFirstId);
     expect(await d.reload()).toEqual([]);
   });
 

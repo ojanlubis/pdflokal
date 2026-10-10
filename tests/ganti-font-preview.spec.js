@@ -236,10 +236,14 @@ test.describe('ganti teks — live doc-font preview', () => {
     // real "Buka Baru" menu path (File menu -> fm-new sets the replace flag,
     // the subsequent file selection triggers resetDoc() before loadFiles()).
     await page.keyboard.press('Escape');
+    const oldFirstId = await page.evaluate(() => window.v2.getDoc().pages[0].id);
     await page.click('#btn-file');
     await page.click('#fm-new');
     await page.setInputFiles('#file-input', FRAGMEN_FIXTURE);
     await expectFirstPage(page);
+    // A replace keeps the old document on screen until the new file opens, so
+    // expectFirstPage alone can pass on the OLD page: wait for the swap.
+    await expect.poll(() => page.evaluate(() => window.v2.getDoc().pages[0]?.id)).not.toBe(oldFirstId);
 
     const stillRegistered = await page.evaluate(isFamilyRegistered, docFontName);
     expect(stillRegistered).toBe(false);
