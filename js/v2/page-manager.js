@@ -19,6 +19,7 @@
 
 import { removePage, reorderPage, rotatePage } from '../core/operations.js';
 import { record } from '../core/history.js';
+import { rasterKey } from '../core/raster-key.js';
 import { track } from '../lib/analytics.js';
 import { t as tr } from '../lib/i18n.js';
 
@@ -47,7 +48,11 @@ const DRAG_SLOP = 8; // px of movement that cancels a pending long-press
 export function createPageManager(deps) {
   const { sheet, grid, bulkBar } = deps;
   const selected = new Set();          // page ids (UI-transient, not core state)
-  const thumbs = new Map();            // page.id -> dataUrl (invalidated on rotate)
+  // page.id -> { key, dataUrl }. WHY keyed by rasterKey too: the thumb shows the
+  // page as the rasterizer draws it (edits included), and a Ganti/Hapus commit
+  // changes that picture without touching the page's id, so an id-only cache
+  // kept showing the pre-edit page. A key mismatch is a miss (core/raster-key.js).
+  const thumbs = new Map();
   let thumbQueue = Promise.resolve();  // serialize thumb renders (keep UI smooth)
   let pickResolve = null;              // non-null = PICK MODE (Unduh sheet asked)
 
@@ -150,7 +155,7 @@ export function createPageManager(deps) {
     const im = document.createElement('div');
     im.className = 'pm-thumb';
     const cached = thumbs.get(page.id);
-    if (cached) im.style.backgroundImage = `url(${cached})`;
+    if (cached && cached.key === rasterKey(page)) im.style.backgroundImage = `url(${cached.dataUrl})`;
     else queueThumb(page, im);
     tile.appendChild(im);
 
@@ -172,8 +177,9 @@ export function createPageManager(deps) {
     thumbQueue = thumbQueue.then(async () => {
       if (!sheet.open) return; // sheet closed mid-queue; skip quietly
       try {
+        const key = rasterKey(page); // read when issued, like rasterize() does
         const t = await deps.getRasterizer().rasterizeThumb(page, { width: 150 });
-        thumbs.set(page.id, t.dataUrl);
+        thumbs.set(page.id, { key, dataUrl: t.dataUrl });
         el.style.backgroundImage = `url(${t.dataUrl})`;
       } catch { /* tile keeps its blank placeholder */ }
     });
