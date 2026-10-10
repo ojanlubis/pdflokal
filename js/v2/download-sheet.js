@@ -302,6 +302,7 @@ export function createDownloadSheet(deps) {
   async function buildCompressed() {
     if (state.compressed || state.compressing) return;
     const seq = state.seq;
+    let capChanged = false; // see the target check below
     state.compressing = true;
     render();
     try {
@@ -333,6 +334,11 @@ export function createDownloadSheet(deps) {
           quality: COMPRESS_QUALITY, maxDim: COMPRESS_MAXDIM,
         });
       if (seq !== state.seq) return;
+      // WHY: a cap tap while this run was in flight set compressed=null and
+      // called us, but the single-flight guard above returned at once. Storing
+      // this result would hand Unduh a file built for the OLD cap (Otomatis
+      // bytes for a 500 KB portal). Drop it; finally restarts for the new cap.
+      if (target !== state.target) { capChanged = true; return; }
       // reachedTarget is carried through so the UI can be HONEST when we couldn't
       // make the cap. A berkas the user believes is 500 KB but isn't gets silently
       // rejected by the portal — worse than one they know is too big. It is
@@ -358,11 +364,12 @@ export function createDownloadSheet(deps) {
       // makes the unconditional clear safe: the guard prevents a second run
       // while this one is alive.
       state.compressing = false;
-      if (seq === state.seq) {
+      if (seq === state.seq && !capChanged) {
         render();
       } else if (state.format === 'pdf' && state.size === 'kompres' && !state.compressed) {
         // Superseded while Compress is still what the user wants → restart
-        // for the NEW selection (this run's result was for stale pages).
+        // for the NEW selection (this run's result was for stale pages, or
+        // for a cap the user has since changed).
         buildCompressed();
       }
     }
