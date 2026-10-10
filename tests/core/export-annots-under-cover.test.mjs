@@ -261,6 +261,20 @@ test('Teks and TTD count as user objects, each over its own drawn extent', async
   assert.deepEqual(liveStamps(page), ['120,600,160,640']);
 });
 
+test('a TURNED signature counts over the box it shows, not its unturned one (2026-10-11)', async () => {
+  // turn 90 about its origin (300, 300): own 120x40 shows as view x 260..300,
+  // y 300..420, i.e. PDF x 260..300, y 372..492. Unturned it would cover
+  // PDF x 300..420, y 452..492, where the decoy sits.
+  const page = await exportOnePage({
+    build: (ctx) => [
+      withAp(ctx, 'Stamp', [270, 400, 290, 480], '0 1 0 rg', { F: 4 }),
+      withAp(ctx, 'Stamp', [330, 460, 400, 485], '1 0 1 rg', { F: 4 }),
+    ],
+    userObjects: [['signature', { image: DOT, x: 300, y: 300, width: 120, height: 40, turn: 90 }]],
+  });
+  assert.deepEqual(liveStamps(page), ['330,460,400,485']);
+});
+
 test('known-positive: a page with no user objects keeps its field as a live annotation', async () => {
   const { out } = await exportWithCoverOnPage0();
   const page = out.getPages()[1];

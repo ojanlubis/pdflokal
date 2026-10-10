@@ -29,7 +29,7 @@ import { CLONE_FONT_VARIANTS, CLONE_FONT_URLS, isSfntFontProgram } from './clone
 import { toStandardFontSafe, drawTextSafe, unencodableInStandardFont } from './text-encode.js';
 import { totalPageRotation } from './page-rotation.js';
 import { orderedForPaint } from './annotation-order.js';
-import { scaleAnnotationGeometry, extentOf } from './annotation-geometry.js';
+import { scaleAnnotationGeometry, extentOf, displayedBox, turnOf, turnVector } from './annotation-geometry.js';
 import { sniffImageFormat } from './image-format.js';
 
 // ---- fonts ------------------------------------------------------------------
@@ -157,6 +157,26 @@ function transformAnnotationCoords(rotation, xV, yV, wU, hU, x0 = 0, y0 = 0) {
     case 270: return { x: x0 + wU - yV, y: y0 + hU - xV };
     default:  return { x: x0 + xV,      y: y0 + hU - yV };
   }
+}
+
+// A TURNED OBJECT (founder ruling 2026-10-11, "semua harus ngikut rotasi"):
+// text and signatures carry `turn`, the quarter turns their page made under
+// them (core/annotation-geometry.js turnAnnotation), and (x, y) is their
+// ORIGIN, the point the screen rotates them about (render/page-view.js
+// applyTurn). pdf-lib rotates a drawing about its own anchor (a text's
+// baseline-left, an image's bottom-left), so every drawer names that anchor
+// as an offset (px, py) in the object's OWN unturned frame, objectPoint turns
+// the offset with the object and maps it into PDF space, and objectRotate
+// gives the angle: pdf-lib's rotate is counter-clockwise in PDF space, the
+// reader's /Rotate and `turn` are clockwise on screen, so the page's R minus
+// the object's turn. Unturned (turn 0) both reduce to the old calls exactly.
+function objectPoint(anno, px, py, frame) {
+  const v = turnVector(turnOf(anno), px, py);
+  return transformAnnotationCoords(frame.rotation, (anno.x || 0) + v.x, (anno.y || 0) + v.y,
+    frame.wU, frame.hU, frame.x0, frame.y0);
+}
+function objectRotate(anno, frame, PDFLib) {
+  return PDFLib.degrees((((frame.rotation - turnOf(anno)) % 360) + 360) % 360);
 }
 
 // SINGLE SOURCE OF TRUTH for the box annotations are drawn into: the CropBox
@@ -302,11 +322,10 @@ async function drawTextAsImage(pdfPage, anno, frame, env, text) {
   }
   if (!raster || !raster.png || !(raster.width > 0) || !(raster.height > 0)) return false;
   const img = await env.newDoc.embedPng(raster.png);
-  // Anchor at the view-space BOTTOM-LEFT of the block, exactly like drawSignature.
-  const yV = anno.y + raster.height;
-  const { x, y } = transformAnnotationCoords(frame.rotation, anno.x, yV, frame.wU, frame.hU, frame.x0, frame.y0);
+  // Anchor at the BOTTOM-LEFT of the block in its own frame, exactly like drawSignature.
+  const { x, y } = objectPoint(anno, 0, raster.height, frame);
   pdfPage.drawImage(img, {
-    x, y, width: raster.width, height: raster.height, rotate: env.PDFLib.degrees(frame.rotation),
+    x, y, width: raster.width, height: raster.height, rotate: objectRotate(anno, frame, env.PDFLib),
   });
   return true;
 }
@@ -335,7 +354,8 @@ async function decidedFontFor(pdfPage, anno, env, text) {
 // page under, so the lines go through the displayed frame like every other
 // annotation, anchored at block.disp (the first baseline, carried by every
 // move, turn and rescale, core/annotation-geometry.js), at the annotation's
-// fontSize, upright. Drawing them at block.origin, as this did until
+// fontSize, turned with its page (objectPoint, since 2026-10-11). Drawing
+// them at block.origin, as this did until
 // 2026-10-10, threw all three away on download. Unmoved, the two agree.
 async function drawBlockText(pdfPage, anno, env) {
   const block = anno.block;
@@ -362,12 +382,15 @@ async function drawBlockText(pdfPage, anno, env) {
   // a resize (commit sets fontSize = k * size, js/v2/app.js).
   const size = (anno.fontSize > 0 ? anno.fontSize : k * block.size) / k;
   const widthOf = (str) => font.widthOfTextAtSize(toStandardFontSafe(str), size);
-  const rotate = env.PDFLib.degrees(frame.rotation);
+  const rotate = objectRotate(anno, frame, env.PDFLib);
+  // disp - (x, y) is the first baseline's offset in the block's OWN frame
+  // (core/annotation-geometry.js withBlockFollowing), so each segment is an
+  // own-frame offset from the origin, turned by objectPoint.
+  const ox = block.disp.x - (anno.x || 0);
+  const oy = block.disp.y - (anno.y || 0);
   for (const line of placeBlockLines(block, widthOf)) {
     for (const seg of line.segments) {
-      const xV = block.disp.x + k * (seg.x - block.origin.x);
-      const yV = block.disp.y + k * (block.origin.y - line.y);
-      const { x, y } = transformAnnotationCoords(frame.rotation, xV, yV, frame.wU, frame.hU, frame.x0, frame.y0);
+      const { x, y } = objectPoint(anno, ox + k * (seg.x - block.origin.x), oy + k * (block.origin.y - line.y), frame);
       drawTextSafe(pdfPage, seg.text, { x, y, size: size * k, font, color, rotate });
     }
   }
@@ -381,7 +404,7 @@ async function drawText(pdfPage, anno, frame, env) {
   const font = await decidedFontFor(pdfPage, anno, env, toStandardFontSafe(anno.text))
     || await env.getFont(anno.fontFamily, anno.bold, anno.italic);
   const color = parseHexColor(env.PDFLib, anno.color);
-  const rotate = env.PDFLib.degrees(frame.rotation);
+  const rotate = objectRotate(anno, frame, env.PDFLib);
   const size = anno.fontSize || DEFAULT_FONT_SIZE.text;
   // Normalise the invisible half of pasted text BEFORE pdf-lib sees it. A
   // standard font encodes through WinAnsi, and one codepoint outside it throws
@@ -396,8 +419,7 @@ async function drawText(pdfPage, anno, frame, env) {
   }
   const lines = safeText.split('\n');
   for (let i = 0; i < lines.length; i += 1) {
-    const yV = anno.y + size * TEXT_BASELINE_RATIO + i * size * TEXT_LINE_HEIGHT;
-    const { x, y } = transformAnnotationCoords(frame.rotation, anno.x, yV, frame.wU, frame.hU, frame.x0, frame.y0);
+    const { x, y } = objectPoint(anno, 0, size * TEXT_BASELINE_RATIO + i * size * TEXT_LINE_HEIGHT, frame);
     drawTextSafe(pdfPage, lines[i], { x, y, size, font, color, rotate });
   }
 }
@@ -418,12 +440,12 @@ async function drawSignature(pdfPage, anno, frame, env) {
   // absent on the annotation. Derive it from the embedded image's intrinsic
   // aspect ratio so the export never distorts the signature.
   const height = anno.height || width * (img.height / img.width);
-  // Anchor pdf-lib drawImage at the view-space BOTTOM-LEFT of the image:
-  // transformed through the page rotation, this lands the visible image
-  // exactly where the user placed it in the rotated view.
-  const yV = anno.y + height;
-  const { x, y } = transformAnnotationCoords(frame.rotation, anno.x, yV, frame.wU, frame.hU, frame.x0, frame.y0);
-  pdfPage.drawImage(img, { x, y, width, height, rotate: env.PDFLib.degrees(frame.rotation) });
+  // Anchor pdf-lib drawImage at the BOTTOM-LEFT of the image in its own
+  // frame: turned with the object and transformed through the page rotation,
+  // this lands the visible image exactly where the user sees it. (A scan
+  // cover's paper patch comes through here too; a whiteout has no turn.)
+  const { x, y } = objectPoint(anno, 0, height, frame);
+  pdfPage.drawImage(img, { x, y, width, height, rotate: objectRotate(anno, frame, env.PDFLib) });
 }
 
 async function drawWatermark(pdfPage, anno, frame, env) {
@@ -639,8 +661,8 @@ function userObjectRects(annos, frame) {
       const asText = anno.type === 'pageNumber'
         ? { ...anno, type: 'text', fontSize: anno.fontSize || DEFAULT_FONT_SIZE.pageNumber }
         : anno;
-      const { w, h } = extentOf(asText);
-      box = { x: anno.x, y: anno.y, w, h };
+      // A turned object's box trades axes about its origin (displayedBox).
+      box = displayedBox(anno, extentOf(asText));
     }
     if (![box.x, box.y, box.w, box.h].every(Number.isFinite) || !(box.w > 0 && box.h > 0)) continue;
     const pts = [[box.x, box.y], [box.x + box.w, box.y], [box.x, box.y + box.h], [box.x + box.w, box.y + box.h]]
