@@ -25,7 +25,7 @@ const APP = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url
 const head = APP.slice(APP.indexOf('async function loadFilesInner'), APP.indexOf('showProcessing(usable.length)'));
 
 test('baseNameOf strips a real extension, any case', () => {
-  for (const ext of ['pdf', 'PDF', 'jpg', 'jpeg', 'png', 'webp', 'heic', 'gif']) {
+  for (const ext of ['pdf', 'PDF', 'jpg', 'jpeg', 'jpe', 'jfif', 'png', 'webp', 'heic', 'HEIF', 'gif', 'bmp', 'avif', 'tif', 'tiff', 'svg', 'ico']) {
     assert.equal(baseNameOf(`Surat.${ext}`), 'Surat', ext);
   }
 });
