@@ -35,7 +35,11 @@ export function decodeLiteralString(body) {
       for (let k = 1; k <= 3 && body[i + k] >= '0' && body[i + k] <= '7'; k += 1) oct += body[i + k];
       out += String.fromCharCode(parseInt(oct, 8));
       i += oct.length;
-    } else { out += n; i += 1; } // \\, \(, \), and line continuations
+    } else if (n === '\r' || n === '\n') {
+      // Line continuation: backslash + EOL contributes NOTHING (\r\n is one
+      // EOL). Keeping it added a code and skewed the walk's advance.
+      i += (n === '\r' && body[i + 2] === '\n') ? 2 : 1;
+    } else { out += n; i += 1; } // \\, \(, \) and any other escaped char
   }
   return out;
 }
@@ -143,8 +147,17 @@ export function tokenizeOps(src) {
     const op = src.slice(i, j);
 
     if (op === 'BI') {                             // inline image: raw-skip to EI
-      const ei = src.indexOf('EI', j);
-      const end = ei === -1 ? src.length : ei + 2;
+      // The image data is binary and can hold the bytes "EI" anywhere, so EI
+      // ends it only as a TOKEN, searched from after the ID marker: whitespace
+      // before, whitespace/delimiter/end after. Taking the first "EI" pair
+      // tokenised the rest of the image as operators.
+      const idRe = /\sID\s/g;
+      idRe.lastIndex = j;
+      const id = idRe.exec(src);
+      const eiRe = /\sEI(?=[\s()<>[\]{}/%]|$)/g;
+      eiRe.lastIndex = id ? id.index + id[0].length : j;
+      const ei = eiRe.exec(src);
+      const end = ei ? ei.index + ei[0].length : src.length;
       ops.push({ op: 'BI', start: groupStart, end, strings: [], tokens: [] });
     } else {
       ops.push({ op, start: groupStart, end: j, strings, tokens });
