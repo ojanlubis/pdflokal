@@ -108,6 +108,7 @@ import { hitTestEditedLine, hitTestOcrEdit, editOwningLine } from '../core/edit-
 import { createEditBake, runWhenIdle } from './edit-bake.js';
 import { createDocFontLive } from './doc-font-live.js';
 import { raiseToTopLayer, dropFromTopLayer } from './top-layer.js';
+import { singleFlight } from './single-flight.js';
 
 // WHY there is no `window.pdfjsLib.…workerSrc = …` line here any more: pdf.js is
 // loaded on demand now (core/vendor.js), so touching it at module top-level
@@ -1880,7 +1881,7 @@ const pageManager = createPageManager({
   getRasterizer: () => rasterizer,
   onDocChanged: () => { textRuns.invalidateAll(); ocrIndex.invalidateAll(); rebuildStage(); },
   onAddFiles: () => pickFiles(),
-  onExtract: async (pages) => {
+  onExtract: singleFlight(async (pages) => {
     // The tap, on the rail (2026-10-02). Split/Ekstrak was invisible to it: GA4's
     // editor_action/split is the only other trace and GA4 is ad-blocked wholesale
     // for a large share of users. Fired here, not in page-manager.js, which has no
@@ -1918,7 +1919,7 @@ const pageManager = createPageManager({
       console.error(err);
       toast(tr('toast.extractFailed'));
     }
-  },
+  }),
   toast,
 });
 // The per-page control strip above each page in the stage (↑ ↓ putar hapus). It
