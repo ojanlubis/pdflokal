@@ -209,7 +209,10 @@ test('COVERAGE: only the pure classifier may read err.message, and it cannot tra
     + 'with no way to send anything anywhere — that isolation IS the content-blindness guarantee.',
   );
 
-  for (const rel of [['v2', 'app.js'], ['v2', 'download-sheet.js'], ['v2', 'telemetry.js']]) {
+  // Modules carved out of app.js join this list the day they are made
+  // (2026-10-10): a guard over app.js alone would let a moved call site escape it.
+  for (const rel of [['v2', 'app.js'], ['v2', 'download-sheet.js'], ['v2', 'telemetry.js'],
+    ['v2', 'edit-bake.js'], ['v2', 'ganti-steer.js']]) {
     const src = strip(fs.readFileSync(path.join(JS, ...rel), 'utf8'));
     assert.equal(
       /err\?\.message|err\.message/.test(src), false,

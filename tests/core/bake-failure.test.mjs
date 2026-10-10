@@ -176,17 +176,24 @@ test('scrubbedError keeps an identifier-shaped constructor name, never a message
   assert.equal(scrubbedError(odd).name, 'Error');
 });
 
-// The provider is driven above; this pins that app.js actually HANDS it the
+// The provider is driven above; this pins that the app actually HANDS it the
 // reporter. Same source-scan precedent as pdf-builder-wiring.test.mjs: the
-// wiring lives in a module that cannot load under node.
-test('app.js wires the bake-failure reporter into the edited-page provider', async () => {
+// wiring lives in modules that cannot load under node. Since 2026-10-10 the
+// provider is built in js/v2/edit-bake.js and app.js hands its instance to the
+// rasterizer; both halves are pinned, and the VACUITY guard below fails loudly
+// if the provider call moves again rather than letting a slice of '' pass.
+test('the bake-failure reporter is wired into the edited-page provider the rasterizer uses', async () => {
   const fs = await import('node:fs');
-  const src = fs.readFileSync(new URL('../../js/v2/app.js', import.meta.url), 'utf8');
-  const call = src.slice(src.indexOf('createEditedPageProvider({'));
+  const bake = fs.readFileSync(new URL('../../js/v2/edit-bake.js', import.meta.url), 'utf8');
+  const app = fs.readFileSync(new URL('../../js/v2/app.js', import.meta.url), 'utf8');
+  const at = bake.indexOf('createEditedPageProvider({');
+  assert.ok(at >= 0, 'VACUITY: js/v2/edit-bake.js no longer builds the provider; repoint this test');
+  const call = bake.slice(at);
   const body = call.slice(0, call.indexOf('});'));
   assert.match(body, /onBakeFailure:/, 'createEditedPageProvider must receive onBakeFailure');
   assert.match(body, /reportBakeFailure\(err,/, 'onBakeFailure must call the reporter');
-  assert.match(src, /createPageRasterizer\(doc, \{ editedPageProvider \}\)/, 'the rasterizer must use this provider');
+  assert.match(app, /const \{ editedPageProvider[^}]*\} = editBake;/, 'app.js must take the provider from edit-bake.js');
+  assert.match(app, /createPageRasterizer\(doc, \{ editedPageProvider \}\)/, 'the rasterizer must use this provider');
 });
 
 // Seat ruling 2026-10-01: a commit-bake capture must NOT trigger the on-error
