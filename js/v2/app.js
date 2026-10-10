@@ -107,6 +107,7 @@ import { whiteoutRingPoints, whiteoutColorFrom, paperPoints, inkPoints, coverCol
 import { hitTestEditedLine, hitTestOcrEdit, editOwningLine } from '../core/edit-hit.js';
 import { createEditBake, runWhenIdle } from './edit-bake.js';
 import { createDocFontLive } from './doc-font-live.js';
+import { raiseToTopLayer, dropFromTopLayer } from './top-layer.js';
 
 // WHY there is no `window.pdfjsLib.…workerSrc = …` line here any more: pdf.js is
 // loaded on demand now (core/vendor.js), so touching it at module top-level
@@ -203,6 +204,8 @@ let toastTimer = null;
 function toast(msg) {
   toastEl.textContent = msg;
   toastEl.classList.add('show');
+  // Every call, not once: a sheet opened since the last toast sits above it.
+  raiseToTopLayer(toastEl);
   clearTimeout(toastTimer);
   // Scales with length (edit-expectations.js): a sentence of a dozen words is
   // not readable in 2.6 s. Short text keeps the old 2.6 s.
@@ -239,7 +242,7 @@ function showProcessing(total) {
   if (!loadingOverlay) return;
   clearTimeout(processingTimer);
   updateProcessing(0, total);
-  processingTimer = setTimeout(() => { loadingOverlay.hidden = false; }, 180);
+  processingTimer = setTimeout(() => { loadingOverlay.hidden = false; raiseToTopLayer(loadingOverlay); }, 180);
 }
 function updateProcessing(done, total) {
   if (!loadingOverlay) return;
@@ -260,6 +263,7 @@ function hideProcessing() {
   if (!loadingOverlay) return;
   clearTimeout(processingTimer);
   loadingOverlay.hidden = true;
+  dropFromTopLayer(loadingOverlay);
   lpFill.style.width = '0';
   lpFill.classList.remove('lp-indet');
 }

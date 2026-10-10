@@ -1019,8 +1019,12 @@
        (contact-form feedback, Jul 2026). This covers that exact surface and shows
        honest, advancing progress. General word "Memproses" on purpose (founder
        ruling): comprehension of THIS step beats the "menjepit" metaphor. */
+    /* popover="manual" puts it in the TOP LAYER so it paints above an open modal
+       sheet (js/v2/top-layer.js). [popover]'s UA defaults (fit-content size,
+       auto margin, border) would shrink it off the full-screen cover, so reset them. */
     #v2-loading {
       position: fixed; inset: 0; z-index: 60;
+      width: auto; height: auto; margin: 0; border: 0; overflow: visible;
       display: flex; align-items: center; justify-content: center; padding: 24px;
       background: rgba(241,237,231,.94);
       -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
@@ -2083,8 +2087,13 @@
       text-decoration: underline; min-height: 32px; padding: 0 8px;
     }
 
+    /* popover="manual": top layer, so it paints above an open modal sheet
+       (js/v2/top-layer.js). The reset undoes [popover]'s UA inset:0 + margin:auto,
+       which would centre it on screen; display:block keeps the fade-in, since the
+       UA would otherwise hide it (display:none) until its first showPopover(). */
     #toast {
       position: fixed; left: 50%; transform: translateX(-50%); bottom: 130px; z-index: 40;
+      top: auto; right: auto; margin: 0; border: 0; overflow: visible; display: block;
       background: rgba(26,29,33,.9); color: #fff; font-size: 13px;
       padding: 9px 16px; border-radius: 10px; opacity: 0; transition: opacity .2s;
       pointer-events: none; max-width: 88vw; text-align: center;
@@ -2641,7 +2650,7 @@
   </main>
 
   <div id="v2-pill" aria-hidden="true"></div>
-  <div id="v2-loading" hidden>
+  <div id="v2-loading" popover="manual" hidden>
     <div class="lp-box" role="status" aria-live="polite">
       <div class="lp-track"><div class="lp-fill"></div></div>
       <div class="lp-title">Memproses…</div>
@@ -2667,7 +2676,7 @@
        Wired by js/v2/feedback-form.js, alongside the footer's own link — one
        dialog, one code path, two doors. -->
   <button id="contact-tab-btn">Ada masukan?</button>
-  <div id="toast" role="status" aria-live="polite"></div>
+  <div id="toast" popover="manual" role="status" aria-live="polite"></div>
 
   <!-- The general feedback channel, opened from the footer's "Ada masukan?".
        Mirrors #home-confirm: a dialog with a .sheet child, because the global
