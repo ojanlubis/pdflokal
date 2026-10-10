@@ -12,7 +12,9 @@
  * 3. A file dropped while a sheet was open merged behind it; Unduh then saved
  *    the pre-merge bytes and markClean called the merged doc saved.
  * 4. Buka Baru with a file that fails to open left a blank, chrome-less editor
- *    with the old document already destroyed.
+ *    with the old document already destroyed. (Now the document is not
+ *    destroyed at all: the replace is staged and commits only once the new
+ *    file has pages.)
  * 5. Arrow keys nudged the selected annotation behind an open sheet (the nudge
  *    is its own keydown listener, so the main handler's open-sheet guard never
  *    covered it). Unduh then shipped the pre-nudge bytes and markClean called
@@ -123,20 +125,37 @@ test('KNOWN-POSITIVE: a file dropped on the open editor still merges', async ({ 
   await expect.poll(() => pageCount(page)).toBe(3);
 });
 
-test('Buka Baru with a file that cannot open returns to the landing, not a blank editor', async ({ page }) => {
+test('Buka Baru with a file that cannot open keeps the open document, its edit and its undo history', async ({ page }) => {
+  // The contract since the staged replace (replace-keeps-doc.test.mjs): the wipe
+  // happens only once the new file has pages, so a refused file loses nothing.
   await open(page);
+  await page.keyboard.press('t');
+  await page.click('.pv-page >> nth=0', { position: { x: 200, y: 200 } });
+  await page.keyboard.type('Jangan hilang');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.pv-anno-text')).toHaveText('Jangan hilang');
+  const undoDepth = await page.evaluate(() => window.v2.history.undoStack.length);
+  expect(undoDepth, 'VACUITY GUARD: there is history to lose').toBeGreaterThan(0);
+
   await page.click('#btn-file');
   await page.click('#fm-new');
+  await page.click('#nc-go'); // edits not downloaded -> #new-confirm asks first
   await page.setInputFiles('#file-input', { name: 'rusak.pdf', mimeType: 'application/pdf', buffer: Buffer.from('not a pdf') });
 
-  await expect(page.locator('body')).toHaveClass(/is-empty/);
-  await expect(page.locator('#empty')).toBeVisible();
-  await expect(page.locator('#btn-undo')).toBeDisabled();
-  expect(await pageCount(page)).toBe(0);
-  // And the landing still works: a good file opens.
-  await page.setInputFiles('#file-input', ONE);
-  await expectFirstPage(page);
+  await expect(page.locator('#toast')).toContainText('nggak bisa dibuka'); // toast.openFailedOne
+  await page.waitForTimeout(800); // give a wrongly-ordered wipe time to land
   await expect(page.locator('body')).not.toHaveClass(/is-empty/);
+  expect(await pageCount(page)).toBe(2);
+  await expect(page.locator('.pv-anno-text')).toHaveText('Jangan hilang');
+  expect(await page.evaluate(() => window.v2.history.undoStack.length)).toBe(undoDepth);
+  await expect(page.locator('#btn-undo')).toBeEnabled();
+  // And the document is still alive: a good file replaces it.
+  await page.click('#btn-file');
+  await page.click('#fm-new');
+  await page.click('#nc-go');
+  await page.setInputFiles('#file-input', ONE);
+  await expect.poll(() => pageCount(page)).toBe(1);
+  await expect(page.locator('#btn-undo')).toBeDisabled();
 });
 
 // The nudge listener is separate from the main keydown handler, so it needs its
