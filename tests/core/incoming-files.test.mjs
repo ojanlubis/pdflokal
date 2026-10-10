@@ -10,9 +10,13 @@
  *   1. the checks are ONE rule with ONE home (core/incoming-files.js) and they
  *      say what loadFiles said: pickFile when nothing is usable, tooBig first
  *      oversize usable file;
- *   2. in app.js the check runs BEFORE resetDoc at both replace call sites.
- *      That half is static (app.js is not loadable headless); the browser half
- *      is tests/drop-choice.spec.js.
+ *   2. in app.js BOTH replace call sites (Ganti, Buka Baru) ask ONE guard
+ *      (refuseReplace) BEFORE resetDoc, and that guard also refuses while a
+ *      load is running (loadFiles would refuse after the wipe).
+ *      app.js is not loadable headless, so this half EXECUTES the real source
+ *      text of the guard and of both handlers against stubs (not a text-order
+ *      check: break the logic and it goes red). Browser half:
+ *      tests/drop-choice.spec.js.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -22,7 +26,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const APP = fs.readFileSync(path.join(ROOT, 'js/v2/app.js'), 'utf8');
-const { checkIncoming, SIZE_BLOCK } = await import('../../js/core/incoming-files.js');
+const { checkIncoming, replaceRefusal, SIZE_BLOCK } = await import('../../js/core/incoming-files.js');
 
 const file = (name, type, size = 10) => ({ name, type, size });
 
@@ -57,27 +61,111 @@ test('an oversize file of an unusable type is not "too big", it is skipped', () 
   assert.equal(r.refusal, 'pickFile');
 });
 
-// ---- the ORDER at the two call sites -------------------------------------------------
+// ---- the guard at the two call sites ----
 const sliceFrom = (needle, len = 900) => {
   const i = APP.indexOf(needle);
   assert.ok(i >= 0, `anchor not found: ${needle}`);
   return APP.slice(i, i + len);
 };
 
-test('Ganti (dc-replace) checks the files before resetDoc', () => {
-  const body = sliceFrom("on('dc-replace', 'click'");
-  const check = body.indexOf('refuseIncoming(');
-  const reset = body.indexOf('resetDoc()');
-  assert.ok(check >= 0, 'dc-replace never calls refuseIncoming');
-  assert.ok(reset >= 0 && check < reset, 'refuseIncoming must come BEFORE resetDoc()');
+test('replaceRefusal: a running load wins, then the selection is checked', () => {
+  const pdf = [file('a.pdf', 'application/pdf')];
+  assert.equal(replaceRefusal({ loading: false, files: pdf }), null);
+  assert.equal(replaceRefusal({ loading: true, files: pdf }).refusal, 'stillLoading');
+  assert.equal(replaceRefusal({ loading: true, files: [file('x.docx', 'application/msword')] }).refusal, 'stillLoading');
+  assert.equal(replaceRefusal({ loading: false, files: [file('x.docx', 'application/msword')] }).refusal, 'pickFile');
+  const tooBig = replaceRefusal({ loading: false, files: [file('h.pdf', 'application/pdf', SIZE_BLOCK + 1)] });
+  assert.deepEqual([tooBig.refusal, tooBig.name], ['tooBig', 'h.pdf']);
 });
 
-test('Buka Baru (the file picker change handler) checks the files before resetDoc', () => {
-  const body = sliceFrom("on(fileInput, 'change'", 700);
-  const check = body.indexOf('refuseIncoming(');
-  const reset = body.indexOf('resetDoc()');
-  assert.ok(check >= 0, 'the picker handler never calls refuseIncoming');
-  assert.ok(reset >= 0 && check < reset, 'refuseIncoming must come BEFORE resetDoc()');
+// ---- the REAL app.js source, executed against stubs ----------------------------------
+// Cut a statement/function out of app.js by balanced brackets from its anchor.
+function cut(anchor, open, close) {
+  const start = APP.indexOf(anchor);
+  assert.ok(start >= 0, `anchor not found: ${anchor}`);
+  let i = open === '{' ? APP.slice(start).search(/\)\s*\{/) + start : start;
+  i = APP.indexOf(open, i);
+  let depth = 0;
+  for (; i < APP.length; i++) {
+    if (APP[i] === open) depth++;
+    else if (APP[i] === close && --depth === 0) return APP.slice(start, i + 1) + (open === '(' ? ';' : '');
+  }
+  throw new Error(`unbalanced: ${anchor}`);
+}
+
+// Fresh world per scenario: the real guard + both real handlers, stub effects.
+function world({ loading = false } = {}) {
+  const calls = [];
+  const dropped = { files: null };
+  const handlers = {};
+  const src = `
+    let loadingFiles = ${loading}; let pendingReplace = false;
+    ${cut('function toastRefusal(', '{', '}')}
+    ${cut('function refuseReplace(', '{', '}')}
+    ${cut("on(fileInput, 'change'", '(', ')')}
+    ${cut("on('dc-replace', 'click'", '(', ')')}
+    return { setPending(v) { pendingReplace = v; }, getPending() { return pendingReplace; } };`;
+  const env = {
+    replaceRefusal,
+    toast: (m) => calls.push(`toast:${m}`),
+    tr: (k) => k,
+    on: (target, ev, fn) => { handlers[typeof target === 'string' ? target : 'fileInput'] = fn; },
+    fileInput: { value: 'x', setAttribute() {} },
+    DEFAULT_ACCEPT: '',
+    takeDropped: () => dropped.files,
+    resetDoc: async () => { calls.push('resetDoc'); },
+    loadFiles: async () => { calls.push('loadFiles'); },
+  };
+  const keys = Object.keys(env);
+  const api = new Function(...keys, src)(...keys.map((k) => env[k]));
+  return { calls, handlers, dropped, api };
+}
+const GOOD = [file('a.pdf', 'application/pdf')];
+const DOCX = [file('x.docx', 'application/msword')];
+const HUGE = [file('h.pdf', 'application/pdf', SIZE_BLOCK + 1)];
+
+for (const [name, run] of [
+  ['Ganti (dc-replace)', (w, files) => { w.dropped.files = files; return w.handlers['dc-replace'](); }],
+  ['Buka Baru (picker change handler)', (w, files) => { w.api.setPending(true); return w.handlers.fileInput({ target: { files } }); }],
+]) {
+  test(`${name}: a usable pick with nothing running resets then loads`, async () => {
+    const w = world();
+    await run(w, GOOD);
+    assert.deepEqual(w.calls, ['resetDoc', 'loadFiles']);
+  });
+  test(`${name}: a load already running refuses BEFORE resetDoc (doc not wiped)`, async () => {
+    const w = world({ loading: true });
+    await run(w, GOOD);
+    assert.deepEqual(w.calls, ['toast:toast.stillLoading']);
+  });
+  test(`${name}: an unusable pick refuses BEFORE resetDoc (doc not wiped)`, async () => {
+    const w = world();
+    await run(w, DOCX);
+    assert.deepEqual(w.calls, ['toast:toast.pickFile']);
+  });
+  test(`${name}: an oversize pick refuses BEFORE resetDoc (doc not wiped)`, async () => {
+    const w = world();
+    await run(w, HUGE);
+    assert.deepEqual(w.calls, ['toast:toast.tooBig']);
+  });
+}
+
+test('the picker still APPENDS (no reset, no guard) when no replace is pending', async () => {
+  const w = world({ loading: true });
+  await w.handlers.fileInput({ target: { files: GOOD } });
+  assert.deepEqual(w.calls, ['loadFiles'], 'loadFiles owns its own stillLoading refusal on the append path');
+});
+
+test('a refused Buka Baru clears pendingReplace', async () => {
+  const w = world();
+  w.api.setPending(true);
+  await w.handlers.fileInput({ target: { files: DOCX } });
+  assert.equal(w.api.getPending(), false);
+});
+
+test('resetDoc is only awaited at the two replace sites, both behind refuseReplace', () => {
+  assert.ok(!/refuseIncoming/.test(APP), 'refuseIncoming is gone; refuseReplace is the one guard');
+  assert.equal([...APP.matchAll(/await resetDoc\(\)/g)].length, 2, 'exactly the two replace call sites');
 });
 
 test('loadFiles itself still uses the same rule (one rule, one home)', () => {
