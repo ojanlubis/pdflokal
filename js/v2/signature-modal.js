@@ -159,7 +159,7 @@ export function createSignatureModal({ modal, onReady, toast }) {
     fileInput.value = '';
     acceptImageFile(f);
   });
-  removeBgCheck.addEventListener('change', renderUploadPreview);
+  removeBgCheck?.addEventListener('change', renderUploadPreview); // optional, like every checkbox ref here (deploy skew)
 
   /*
    * ---- paste (Ctrl/Cmd+V) --------------------------------------------------
