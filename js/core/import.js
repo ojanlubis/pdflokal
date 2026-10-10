@@ -373,7 +373,8 @@ export async function rasterizePage(doc, page, opts = {}) {
 // `opts.renderToCanvas`: a test seam, see renderToCanvas below. Not for production.
 export function createPageRasterizer(doc, opts = {}) {
   const docCache = new Map(); // sourceId -> PDF.js document promise
-  const imgCache = new Map(); // sourceId -> ImageBitmap promise (image sources)
+  // sourceId -> { promise: Promise<ImageBitmap>, users, closed } — see withImageBitmap
+  const imgCache = new Map();
   const editedDocCache = new Map(); // page.id -> { signature, docPromise: Promise<PDF.js doc|null> }
   const renderSeq = new Map(); // page.id -> latest ISSUED rasterize seq (stale-guard, see rasterize)
 
@@ -449,12 +450,50 @@ export function createPageRasterizer(doc, opts = {}) {
     return docCache.get(sourceId);
   }
 
-  function getImageBitmap(sourceId) {
-    if (!imgCache.has(sourceId)) {
+  // Decoded image bitmaps: the IMG_KEEP most recently used, ref-counted.
+  //
+  // WHY bounded: a 12 MP phone photo decodes to ~46 MB, and the cache used to
+  // keep EVERY image source's bitmap until Buka Baru: scroll through 30
+  // photos and ~1.4 GB stayed resident whatever the viewport released, which
+  // kills a mid-range Android tab (round-3 hunt, 2026-10-10).
+  // WHY ref-counted: closing a bitmap another render is still drawing from
+  // throws InvalidStateError mid-draw. An evicted entry closes only when its
+  // last user is done. Two kept: the page in view and its neighbour, so a
+  // scroll back and forth does not re-decode.
+  const IMG_KEEP = 2;
+  function closeImg(entry) {
+    if (entry.closed) return;
+    entry.closed = true;
+    entry.promise.then((b) => b?.close?.(), () => {});
+  }
+  function evictImg(key, entry) {
+    imgCache.delete(key);
+    entry.evicted = true;
+    if (entry.users === 0) closeImg(entry);
+  }
+  async function withImageBitmap(sourceId, fn) {
+    let entry = imgCache.get(sourceId);
+    if (entry) {
+      imgCache.delete(sourceId); // re-insert: Map order is the LRU order
+      imgCache.set(sourceId, entry);
+    } else {
       const source = getSource(doc, sourceId);
-      remember(imgCache, sourceId, window.createImageBitmap(new Blob([source.bytes.slice()])));
+      entry = { promise: window.createImageBitmap(new Blob([source.bytes.slice()])), users: 0, evicted: false, closed: false };
+      imgCache.set(sourceId, entry);
+      // A rejected decode is never cached (same rule as remember() above).
+      entry.promise.catch(() => { if (imgCache.get(sourceId) === entry) imgCache.delete(sourceId); });
+      while (imgCache.size > IMG_KEEP) {
+        const [oldKey, old] = imgCache.entries().next().value;
+        evictImg(oldKey, old);
+      }
     }
-    return imgCache.get(sourceId);
+    entry.users += 1;
+    try {
+      return fn(await entry.promise);
+    } finally {
+      entry.users -= 1;
+      if (entry.evicted && entry.users === 0) closeImg(entry);
+    }
   }
 
   async function renderPdfToCanvas(page, scale) {
@@ -493,8 +532,10 @@ export function createPageRasterizer(doc, opts = {}) {
   // at `scale` (page point size × scale, matching the PDF path's raster px) and
   // bake in the page rotation. Image pages carry no intrinsic /Rotate, so only
   // page.rotation applies. Rotation is clockwise, matching PDF.js viewports.
-  async function renderImageToCanvas(page, scale) {
-    const bitmap = await getImageBitmap(page.sourceId);
+  function renderImageToCanvas(page, scale) {
+    return withImageBitmap(page.sourceId, (bitmap) => drawImagePage(page, scale, bitmap));
+  }
+  function drawImagePage(page, scale, bitmap) {
     const rotation = (page.rotation || 0) % 360;
     const drawW = page.width * scale;   // unrotated draw size in px
     const drawH = page.height * scale;
@@ -576,8 +617,7 @@ export function createPageRasterizer(doc, opts = {}) {
     async destroy() {
       for (const p of docCache.values()) { try { (await p).destroy(); } catch { /* already gone */ } }
       docCache.clear();
-      for (const p of imgCache.values()) { try { (await p).close(); } catch { /* already gone */ } }
-      imgCache.clear();
+      for (const [key, entry] of [...imgCache]) evictImg(key, entry); // in-use ones close when their render ends
       for (const { docPromise } of editedDocCache.values()) {
         try { const pdfDoc = await docPromise; if (pdfDoc) await pdfDoc.destroy(); } catch { /* already gone */ }
       }
