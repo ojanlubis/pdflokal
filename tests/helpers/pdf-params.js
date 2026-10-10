@@ -20,22 +20,34 @@
 
 // SINGLE SOURCE OF TRUTH for the page-geometry axes.
 // mediaBox  [x, y, w, h]. The origin is NOT always 0,0 (scanners, imposition).
+//           A negative w or h writes the corners swapped ([0,792,612,-792] is
+//           the file's [0 792 612 0]); the spec allows any corner order and
+//           readers take min/max.
 // cropBox   null = none; else [x, y, w, h], may poke outside the MediaBox
-//           (the reader shows the intersection).
+//           (the reader shows the intersection). 'inverted' = the inset crop
+//           with its corners written top-down.
 // rotate    /Rotate, multiples of 90.
 // inherit   true: /Rotate sits on the Pages node and the page inherits it.
 // userUnit  /UserUnit (PDF 1.6): a unit larger than 1/72 inch.
 export const GEOMETRY_AXES = {
-  mediaBox: [[0, 0, 612, 792], [0, 200, 612, 592], [-50, -150, 595, 842]],
-  cropBox: [null, 'inset', 'overhang'],
+  mediaBox: [[0, 0, 612, 792], [0, 200, 612, 592], [-50, -150, 595, 842], [0, 792, 612, -792]],
+  cropBox: [null, 'inset', 'overhang', 'inverted'],
   rotate: [0, 90, 180, 270],
   inherit: [false, true],
   userUnit: [1, 2],
 };
 
+// The same rectangle with a positive width and height, whatever corner order
+// the axis value was written in.
+export function normalizedRect([x, y, w, h]) {
+  return [Math.min(x, x + w), Math.min(y, y + h), Math.abs(w), Math.abs(h)];
+}
+
 // A crop described relative to the MediaBox, so it stays meaningful whatever
 // the MediaBox axis picked.
-export function cropFor(kind, [x, y, w, h]) {
+export function cropFor(kind, box) {
+  const [x, y, w, h] = normalizedRect(box);
+  if (kind === 'inverted') return [x + 40, y + 60 + (h - 160), w - 120, -(h - 160)]; // inset, top edge first
   if (kind === 'inset') return [x + 40, y + 60, w - 120, h - 160];
   if (kind === 'overhang') return [x + 30, y - 40, w, h - 100]; // pokes below and right
   return null;
@@ -85,10 +97,12 @@ export async function buildGeometryPdf(page, c) {
     const { PDFDocument, PDFName, PDFNumber, rgb } = window.PDFLib;
     const d = await PDFDocument.create();
     const [x, y, w, h] = c.mediaBox;
-    const p = d.addPage([w, h]);
+    const p = d.addPage([Math.abs(w), Math.abs(h)]);
     p.setMediaBox(x, y, w, h);
     if (crop) p.setCropBox(...crop);
-    p.drawRectangle({ x: x + 4, y: y + 4, width: w - 8, height: h - 8, borderColor: rgb(0.6, 0.6, 0.6), borderWidth: 2 });
+    // The frame follows the box the reader shows, not the written corners.
+    const [fx, fy, fw, fh] = [Math.min(x, x + w), Math.min(y, y + h), Math.abs(w), Math.abs(h)];
+    p.drawRectangle({ x: fx + 4, y: fy + 4, width: fw - 8, height: fh - 8, borderColor: rgb(0.6, 0.6, 0.6), borderWidth: 2 });
     if (c.rotate) {
       if (c.inherit) d.catalog.Pages().set(PDFName.of('Rotate'), PDFNumber.of(c.rotate));
       else p.node.set(PDFName.of('Rotate'), PDFNumber.of(c.rotate));
