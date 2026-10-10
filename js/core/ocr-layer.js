@@ -45,6 +45,7 @@
  */
 
 import { toStandardFontSafe, unencodableInStandardFont } from './text-encode.js';
+import { loadForRebuild } from './pdflib-load.js';
 
 // ---- geometry / font-size --------------------------------------------------
 
@@ -253,9 +254,9 @@ function appendToPageContents(pdfPage, PDFLib, ops) {
 export async function writeInvisibleTextLayer(pdfBytes, pages, deps, opts) {
   const { PDFLib } = deps;
   const renderMode = modeFrom(opts);
-  const { PDFDocument, StandardFonts } = PDFLib;
+  const { StandardFonts } = PDFLib;
 
-  const doc = await PDFDocument.load(pdfBytes);
+  const doc = await loadForRebuild(PDFLib, pdfBytes);
   // Embedded ONCE for the whole document. Helvetica is a pdf-lib STANDARD
   // font (no bytes to embed), but the font dictionary object this creates is
   // still one shared indirect object — every touched page just registers its
