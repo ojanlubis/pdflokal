@@ -36,7 +36,7 @@ import {
 } from '../core/telemetry-schema.js';
 import { createOcrIndex, ocrEngineLoaded } from './ocr-runs.js';
 import { scanAppearance, scanPaper } from './scan-appearance.js';
-import { createPageSlot, pageDisplaySize, syncOverlay, textFontCss, applyTextFont, measureTextAnnoWidth } from '../render/page-view.js';
+import { createPageSlot, pageDisplaySize, syncOverlay, textFontCss, applyTextFont, measureTextAnnoWidth, applyTurn } from '../render/page-view.js';
 import { createViewportStream } from '../render/viewport.js';
 import { RASTER_BASE, sharpenScale, maxPixelsFor, imageScaleCap } from '../render/sharpen.js';
 import { createInteraction } from '../render/interaction.js';
@@ -1126,6 +1126,10 @@ function reEditLine(pageId, cover, replacement) {
     // geometry IS the plan (core/block-edit.js blockAnnotation), and the box
     // is the cover's birth box.
     ...(replacement?.block ? { block: { ...replacement.block, box: { ...box } } } : {}),
+    // A page turned since the commit turned the replacement with it (founder
+    // ruling 2026-10-11): the editor reopens turned, at the replacement's own
+    // origin, and the fresh text the commit creates keeps the turn.
+    ...(replacement?.turn ? { turn: replacement.turn } : {}),
     // Everything commit's `draft.reEdit` branch needs to remove the PREVIOUS
     // edit and reapply a fresh one against the SAME pristine-source target
     // (Decision 3: drop-and-reapply, never surgery-on-surgery).
@@ -1137,7 +1141,8 @@ function reEditLine(pageId, cover, replacement) {
       coverColor: cover.color,
     },
   };
-  openTextEditor({ pageId, x: draft.block ? draft.block.disp.x : box.x, y: box.y, anno: null, draft });
+  const at = draft.turn ? { x: replacement.x, y: replacement.y } : { x: box.x, y: box.y };
+  openTextEditor({ pageId, x: draft.block ? draft.block.disp.x : at.x, y: at.y, anno: null, draft });
   setTool('select');
   toastEl.classList.remove('show');
   // Seed font preparation from the STORED decision (edit font design, Gaps):
@@ -1423,6 +1428,7 @@ function reEditOcrLine(pageId, cover, replacement) {
     bold: !!replacement?.bold,
     italic: !!replacement?.italic,
     color: replacement?.color,
+    ...(replacement?.turn ? { turn: replacement.turn } : {}), // see reEditLine
     ocrReEdit: {
       coverId: cover.id,
       textId: replacement?.id ?? null,
@@ -1950,6 +1956,10 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
   ed.contentEditable = 'true';
   ed.style.left = (anno ? anno.x : x) + 'px';
   ed.style.top = (anno ? anno.y : y) + 'px';
+  // A turned text (its page was turned) edits turned, about the same origin
+  // its overlay turns about, so the words do not jump while typing. The
+  // editor has no padding ring, so the origin is its own top-left.
+  applyTurn(ed, anno || draft || {});
   applyTextFont(ed, style);
   ed.style.color = style.color || '#000';
   ed.textContent = anno?.text || draft?.text || '';
@@ -2182,6 +2192,7 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
         ...styleSourceProps,
         ...fontDecisionProps,
         ...blockProps,
+        ...(d.turn ? { turn: d.turn } : {}),
       }));
       // RUNG D, spec §6 (his ⚖, recommended default): width is law, height is
       // not. A paragraph that grew past its own lines into the text below it
