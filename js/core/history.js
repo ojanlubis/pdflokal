@@ -135,7 +135,14 @@ export function markClean(history) {
 
 // A mutation that is NOT undoable and so never went through record() (merging
 // another file into the open doc). Gives the live state a serial no file has.
+//
+// WHY it also clears both stacks: every snapshot taken before this mutation
+// holds a doc WITHOUT it, and restore() swaps doc.pages wholesale. Undoing an
+// earlier edit after a merge used to silently drop every merged page. An
+// un-undoable mutation is a barrier; nothing on the far side is reachable.
 export function markChanged(history) {
+  history.undoStack.length = 0;
+  history.redoStack.length = 0;
   history.current = history.nextId++;
   syncDirty(history);
 }
