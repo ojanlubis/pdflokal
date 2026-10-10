@@ -18,6 +18,7 @@
 
 import { createDoc, createAnnotation, getPage, findAnnotation, isCopyable, cloneForPaste } from '../core/model.js';
 import { failureReason, failureCause } from '../core/failure-reason.js';
+import { checkIncoming, isPdf } from '../core/incoming-files.js';
 import { isStandardFamily, unencodableInStandardFont } from '../core/text-encode.js';
 import {
   addAnnotation, removeAnnotation, updateAnnotation, clearSelection, selectAnnotation,
@@ -2893,10 +2894,18 @@ document.addEventListener('keydown', (e) => {
 });
 
 // ---- file loading (multi-file = merge, by construction) --------------------------------
-// Size guard (carried from the live app): block at 100MB — a 100MB+ file will OOM
-// the weak phones we build for before it ever renders. (The old >20MB heads-up
-// toast was retired when the processing overlay landed — see showProcessing.)
-const SIZE_BLOCK = 100 * 1024 * 1024;
+// The type and size guard (100MB block) lives in core/incoming-files.js: the
+// replace paths must ask it BEFORE they wipe the open document.
+// Says why and returns true when the selection is not worth opening.
+function toastRefusal({ refusal, name }) {
+  toast(refusal === 'tooBig' ? tr('toast.tooBig', { name }) : tr('toast.pickFile'));
+}
+function refuseIncoming(files) {
+  const verdict = checkIncoming(files);
+  if (!verdict.refusal) return false;
+  toastRefusal(verdict);
+  return true;
+}
 
 // ---- the merge guard: a document that cannot be rebuilt must not be merged ----
 //
@@ -2950,13 +2959,9 @@ async function loadFiles(files) {
 }
 
 async function loadFilesInner(files) {
-  const isPdf = (f) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
-  const isImg = (f) => f.type.startsWith('image/');
-  // In picker order: PDFs append their pages, images become one page each.
-  const usable = [...files].filter((f) => isPdf(f) || isImg(f));
-  if (usable.length === 0) { toast(tr('toast.pickFile')); return; }
-  const oversize = usable.find((f) => f.size > SIZE_BLOCK);
-  if (oversize) { toast(tr('toast.tooBig', { name: oversize.name })); return; }
+  const verdict = checkIncoming(files);
+  if (verdict.refusal) { toastRefusal(verdict); return; }
+  const { usable } = verdict;
   const pagesBefore = doc.pages.length;
   const firstLoad = pagesBefore === 0;
   if (firstLoad) baseName = usable[0].name.replace(/\.[^.]+$/, '');
@@ -3416,7 +3421,10 @@ async function resetDoc() {
 }
 on(fileInput, 'change', async (e) => {
   const files = e.target.files;
-  if (files?.length) {
+  // Refuse an unusable pick while the old doc is still intact: resetDoc is the
+  // point of no return (it empties the undo history too). Appending needs no
+  // pre-check; loadFiles asks the same rule and nothing is lost by its refusal.
+  if (files?.length && !(pendingReplace && refuseIncoming(files))) {
     if (pendingReplace) await resetDoc();
     await loadFiles(files).catch((err) => { console.error(err); toast(tr('toast.openFailed')); });
   }
@@ -3464,6 +3472,8 @@ on('dc-replace', 'click', async () => {
   // loadFiles refuses while another load runs; check BEFORE wiping the doc,
   // or the user loses the old doc and never gets the new one.
   if (loadingFiles) { toast(tr('toast.stillLoading')); return; }
+  // Same reason: a .docx or a 100MB+ file is refused with the old doc intact.
+  if (refuseIncoming(files)) return;
   await resetDoc();
   await loadFiles(files).catch((err) => { console.error(err); toast(tr('toast.openFailed')); });
 });

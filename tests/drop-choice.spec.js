@@ -72,6 +72,24 @@ test.describe('drop onto the canvas', () => {
     expect(await page.evaluate(() => window.v2.history.undoStack.length)).toBe(0);
   });
 
+  test('Ganti with a file we cannot open refuses and keeps the doc and its edits', async ({ page }) => {
+    // Red on revert: resetDoc ran before loadFiles' type check, so a dropped
+    // .docx emptied the editor (0 pages, no landing) and the undo history.
+    await open(page);
+    await addText(page);
+    await page.evaluate(() => {
+      const dt = new DataTransfer();
+      dt.items.add(new File(['x'], 'surat.docx', { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }));
+      document.getElementById('v2-stage').dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
+    });
+    await page.click('#dc-replace');
+    await page.waitForTimeout(500); // give a wrongly-ordered wipe time to land
+    expect(await pageCount(page)).toBe(2);
+    await expect(page.locator('.pv-anno-text')).toHaveCount(1);
+    expect(await page.evaluate(() => window.v2.history.undoStack.length)).toBeGreaterThan(0);
+    await expect(page.locator('body')).not.toHaveClass(/is-empty/);
+  });
+
   test('Batal and Esc leave the doc untouched', async ({ page }) => {
     await open(page);
     await dropFixture(page);
@@ -112,5 +130,18 @@ test.describe('File > Buka Baru', () => {
     await expectFirstPage(page);
     await expect(page.locator('.pv-anno-text')).toHaveCount(0);
     expect(await page.evaluate(() => window.v2.history.undoStack.length)).toBe(0);
+  });
+
+  test('Buka Baru with a file we cannot open refuses and keeps the doc and its edits', async ({ page }) => {
+    await open(page);
+    await addText(page, 'Satu');
+    await page.click('#btn-file');
+    await page.click('#fm-new');
+    await page.click('#nc-go');
+    await page.setInputFiles('#file-input', { name: 'surat.docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', buffer: Buffer.from('x') });
+    await page.waitForTimeout(500);
+    expect(await pageCount(page)).toBe(2);
+    await expect(page.locator('.pv-anno-text')).toHaveCount(1);
+    await expect(page.locator('body')).not.toHaveClass(/is-empty/);
   });
 });
