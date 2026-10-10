@@ -193,7 +193,7 @@ test.describe('edit beta: rename + first-commit feedback', () => {
     expect(evs.find((e) => e.event === 'surgery').props).toEqual({ matched: true, reason: 'clean' });
     // style_source (spec-edit-fidelity-instrumentation.md Increment B; FIXED
     // 2026-07-26, founder-flagged correctness bug): used to ride on js/v2/
-    // app.js's prepareDocFont's async race and flake under full-suite load.
+    // doc-font-live.js's prepareDocFont async race and flake under full-suite load.
     // core/stamp.js's resolveStampFont now resolves AUTHORITATIVELY against
     // the real document on every path — undangan-cid.pdf's Montserrat font
     // has an informative /BaseFont, so this resolves cleanly to 'pdf-name'

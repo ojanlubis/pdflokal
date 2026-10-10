@@ -5,7 +5,7 @@
  * makes the Ganti Teks editor live by that decision while the user types:
  *
  *   - every candidate font is loaded into the browser from the SAME bytes the
- *     stamp will embed — the doc's own program (js/v2/app.js's loadDocFont) or
+ *     stamp will embed — the doc's own program (js/v2/doc-font-live.js's loadDocFont) or
  *     the bundled TTF in fonts/ttf/ (never the CSS woff2);
  *   - on every input the line is re-decided and the editor renders exactly
  *     that one face (render/page-view.js applyTextFont: one family, no stack,

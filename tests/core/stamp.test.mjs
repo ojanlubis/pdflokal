@@ -403,7 +403,7 @@ test('resolveStampFont: ACCEPTANCE — org-structure.pdf "T & PPGA"->"testingg" 
 });
 
 // ---- CORRECTNESS FIX (founder-flagged 2026-07-26): the LOST-RACE case -----
-// js/v2/app.js's prepareDocFont resolves the style/family ladder ASYNC,
+// js/v2/doc-font-live.js's prepareDocFont resolves the style/family ladder ASYNC,
 // UNAWAITED, at draft-open time — a slow device or a fast typist can commit
 // before it lands, leaving the annotation with NO styleSource at all (the
 // exact shape page-surgery.js's planNativeInserts produces via

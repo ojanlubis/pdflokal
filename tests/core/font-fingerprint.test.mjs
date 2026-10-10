@@ -199,9 +199,10 @@ test('docFontFaceDescriptors: italic and regular facts map to style/weight, an u
 });
 
 test('loadDocFont registers the FontFace WITH the descriptors and is handed the font facts', () => {
-  // app.js cannot be imported headless; pin the wiring at its source — the one
-  // FontFace constructed for a document font, and its one caller.
-  const app = fs.readFileSync(path.join(root, 'js', 'v2', 'app.js'), 'utf8');
-  assert.match(app, /new FontFace\(cssFamily, extracted\.bytes, docFontFaceDescriptors\(facts\)\)/);
-  assert.match(app, /await loadDocFont\(page\.sourceId, fontName, pdfPage, PDFLib, fontkit, fp\)/);
+  // js/v2/doc-font-live.js (moved out of app.js 2026-10-10) cannot be imported
+  // headless; pin the wiring at its source — the one FontFace constructed for a
+  // document font, and its one caller.
+  const live = fs.readFileSync(path.join(root, 'js', 'v2', 'doc-font-live.js'), 'utf8');
+  assert.match(live, /new FontFace\(cssFamily, extracted\.bytes, docFontFaceDescriptors\(facts\)\)/);
+  assert.match(live, /await loadDocFont\(page\.sourceId, fontName, pdfPage, PDFLib, fontkit, fp\)/);
 });

@@ -212,7 +212,7 @@ export async function planNativeInserts(pdfPage, PDFLib, fontkit, annotations, s
       const isBlock = !!(anno.block && Array.isArray(anno.block.lines) && anno.block.lines.length);
       const text = isBlock ? blockText(anno.block) : (anno.text ?? '');
       // styleSource (spec-edit-fidelity-instrumentation.md Increment B):
-      // riding on the annotation since js/v2/app.js's prepareDocFont is the
+      // riding on the annotation since js/v2/doc-font-live.js's prepareDocFont is the
       // ONLY place that ever decides it (draft.styleSource -> the committed
       // text annotation's own field) — stamp.js never re-derives style, only
       // echoes this through for the `insert` telemetry event.
