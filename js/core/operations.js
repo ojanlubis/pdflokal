@@ -12,6 +12,7 @@
 
 import { getPage, findAnnotation, getSource, cloneForPaste, createAnnotation } from './model.js';
 import { scaleAnnotationGeometry, turnAnnotation, withBlockFollowing } from './annotation-geometry.js';
+import { normaliseEnteredText } from './text-encode.js';
 
 const clamp = (n, lo, hi) => Math.min(Math.max(n, lo), hi);
 
@@ -217,6 +218,8 @@ export function copySignatureToAllPages(doc, annotationId) {
 export function updateAnnotation(doc, annotationId, patch) {
   const found = findAnnotation(doc, annotationId);
   if (!found) return null;
+  // WHY: the editor commit lands here; see createAnnotation (core/model.js).
+  if (found.annotation.type === 'text' && typeof patch.text === 'string') patch = { ...patch, text: normaliseEnteredText(patch.text) };
   Object.assign(found.annotation, patch);
   return found.annotation;
 }

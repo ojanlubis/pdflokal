@@ -15,6 +15,8 @@
  * there is exactly one mutation path (invariant #5).
  */
 
+import { normaliseEnteredText } from './text-encode.js';
+
 // Monotonic ids — deterministic within a session, collision-free, and (unlike
 // array indices) stable across reorder/delete. Not persisted; identity only.
 let _seq = 0;
@@ -47,6 +49,9 @@ export function createSource({ name, bytes, numPages = 0, encrypted = false, sig
 // `type` is one of: 'whiteout' | 'text' | 'signature' | 'watermark' | 'pageNumber'.
 // `props` carries the type-specific fields (x, y, width, text, …).
 export function createAnnotation(type, props = {}) {
+  // WHY here and in updateAnnotation: every text the user pastes or types lands
+  // through one of these two, and the screen and the file must read one string.
+  if (type === 'text' && typeof props.text === 'string') props = { ...props, text: normaliseEnteredText(props.text) };
   return { id: nextId('anno'), type, ...props };
 }
 
