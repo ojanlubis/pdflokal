@@ -131,9 +131,20 @@ export function setPageRaster(view, raster) {
 // and removal of the old one happen in the SAME synchronous tick (no
 // `await` between them), so the browser can only ever paint the FINAL state;
 // there is no frame where neither image (or a blank view) is on screen.
+//
+// WHY a per-view sequence (found 2026-10-10): what to remove used to be read
+// BEFORE the decode await. Two overlapping swaps (a sharpen and a re-bake on the
+// same page) both captured the same old image and both inserted theirs, so the
+// one that finished FIRST could end up painted on top (stale picture, leaked
+// <img>); a release during the decode left the new image under a placeholder
+// that nothing removed. Last ISSUED wins, as in core/import.js's renderSeq:
+// a swap that is no longer the newest for this view, or whose view was released
+// meanwhile, stands down, and the winner clears every old layer it finds.
+const viewSeq = new WeakMap();
+const bumpView = (view) => { const n = (viewSeq.get(view) || 0) + 1; viewSeq.set(view, n); return n; };
+
 export async function swapPageRaster(view, raster) {
-  const old = view.querySelector('.pv-bg');
-  const ph = view.querySelector('.pv-ph');
+  const seq = bumpView(view);
   const img = document.createElement('img');
   img.className = 'pv-bg';
   img.src = raster.dataUrl;
@@ -147,14 +158,16 @@ export async function swapPageRaster(view, raster) {
     // decode() can reject (or be unsupported) — proceed anyway; the swap
     // below is still correct, it just didn't get the pre-decode guarantee.
   }
+  if (viewSeq.get(view) !== seq) return; // a newer swap, or a release, owns this view now
+  const stale = view.querySelectorAll('.pv-bg, .pv-ph');
   view.insertBefore(img, view.firstChild);
-  old?.remove();
-  ph?.remove();
+  for (const el of stale) el.remove();
 }
 
 // Called when a page leaves the window — drop the image to free memory, restore
 // the placeholder. Scrolling back re-rasterizes it (a brief, bounded load).
 export function clearPageRaster(view) {
+  bumpView(view); // a swap still decoding must not re-attach to a released page
   view.querySelector('.pv-bg')?.remove();
   attachPlaceholder(view);
 }
