@@ -84,6 +84,58 @@ test('holdEditor: typed text in an open editor arms the leave guard, no history 
   assert.equal(calls.released, 1, 'the commit releases the hold');
 });
 
+// MOBILE: an Android app switch fires visibilitychange 'hidden', and a hidden
+// tab may be killed. Typed text is committed there so it is in the document
+// (and its history) rather than only in the editor. An EMPTY editor is not:
+// an empty commit DELETES a cleared Edit line, the bug this file fixes.
+function hide(doc, state = 'hidden') {
+  doc.visibilityState = state;
+  doc.dispatchEvent(new Event('visibilitychange'));
+}
+
+test('holdEditor: the page going hidden commits typed text', () => {
+  const { ed, doc, calls, commit, guard } = rig('');
+  editorBlur.holdEditor(ed, commit, { doc, guard });
+  ed.textContent = 'Nama Baru';
+  hide(doc, 'visible');
+  assert.equal(calls.commit, 0, 'visible again is not leaving');
+  hide(doc);
+  assert.equal(calls.commit, 1, 'typed draft committed on hidden');
+});
+
+test('holdEditor: hidden keeps an untouched or cleared editor open', () => {
+  const untouched = rig('Nama Lama');
+  editorBlur.holdEditor(untouched.ed, untouched.commit, { doc: untouched.doc, guard: untouched.guard });
+  hide(untouched.doc);
+  assert.equal(untouched.calls.commit, 0, 'nothing typed: nothing to keep');
+
+  const cleared = rig('Nama Lama'); // an Edit line, prefill cleared to paste over
+  editorBlur.holdEditor(cleared.ed, cleared.commit, { doc: cleared.doc, guard: cleared.guard });
+  cleared.ed.textContent = '';
+  hide(cleared.doc);
+  assert.equal(cleared.calls.commit, 0, 'an empty commit would delete the line');
+  cleared.ed.textContent = '   ';
+  hide(cleared.doc);
+  assert.equal(cleared.calls.commit, 0, 'blank is empty');
+});
+
+test('holdEditor: the release removes the document listener', () => {
+  const { ed, doc, calls, commit, guard } = rig('');
+  const release = editorBlur.holdEditor(ed, commit, { doc, guard });
+  release();
+  ed.textContent = 'abc';
+  hide(doc);
+  assert.equal(calls.commit, 0, 'a committed editor no longer listens on document');
+});
+
+test('hideCommits: non-empty text that differs from what the editor opened with', () => {
+  assert.equal(editorBlur.hideCommits('abc', ''), true);
+  assert.equal(editorBlur.hideCommits('Nama Baru', 'Nama Lama'), true);
+  assert.equal(editorBlur.hideCommits('Nama Lama', 'Nama Lama'), false);
+  assert.equal(editorBlur.hideCommits('', 'Nama Lama'), false);
+  assert.equal(editorBlur.hideCommits(' \n', ''), false);
+});
+
 // The function body of openTextEditor in the app as shipped, comments
 // stripped, so a call left behind in a comment cannot satisfy the match.
 function openTextEditorSource() {

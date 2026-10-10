@@ -32,9 +32,29 @@ export function blurLeavesEditor(activeElement, editorEl) {
 // differs from what it opened with counts as unsaved work (leave-guard.js
 // guardDraft), and no history step is recorded for it. The check is live:
 // an editor removed without its commit reads false.
+//
+// HIDDEN: an Android app switch (and a desktop tab switch) fires
+// visibilitychange 'hidden', and a hidden tab may be killed. Typed text is
+// committed there (hideCommits), so it is in the document and its history
+// rather than only in the editor.
 export function holdEditor(ed, commit, { doc = document, guard = guardDraft } = {}) {
   const opened = ed.textContent;
   ed.addEventListener('blur', () => { if (blurLeavesEditor(doc.activeElement, ed)) commit(); });
+  const onVisibility = () => {
+    if (doc.visibilityState === 'hidden' && hideCommits(ed.textContent, opened)) commit();
+  };
+  doc.addEventListener('visibilitychange', onVisibility);
   const releaseGuard = guard(() => ed.isConnected && ed.textContent !== opened);
-  return () => { releaseGuard(); };
+  return () => {
+    doc.removeEventListener('visibilitychange', onVisibility);
+    releaseGuard();
+  };
+}
+
+// Whether the page going hidden commits the editor: only when it holds typed,
+// non-blank text. An empty commit DELETES a cleared Edit line (app.js commit()),
+// which is the window-switch bug above arriving by another event; an untouched
+// editor has nothing to keep, and stays open for the person coming back.
+export function hideCommits(text, opened) {
+  return text !== opened && text.trim() !== '';
 }
