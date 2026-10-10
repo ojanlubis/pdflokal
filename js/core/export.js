@@ -542,12 +542,14 @@ function scalePageWithBoxes(pdfPage, k) {
 // parent); FileAttachment, Text (sticky note) and the media kinds, whose point
 // is a file, a comment or a player, not their icon; Hidden or NoView (pdf.js
 // does not paint them); NoRotate (it stays upright on a turned page, which
-// drawn content cannot); and anything without an /AP pdf.js would pick (it
-// may synthesize one we cannot see).
+// drawn content cannot); one without the Print flag (a reader shows it but
+// never prints it, and as content it would start printing); and anything
+// without an /AP pdf.js would pick (it may synthesize one we cannot see).
 const KEEP_AS_ANNOTATION = new Set([
   'Link', 'Popup', 'FileAttachment', 'Text', 'Sound', 'Movie', 'Screen', 'RichMedia', '3D',
 ]);
 const FLAG_HIDDEN = 1 << 1;
+const FLAG_PRINT = 1 << 2;
 const FLAG_NO_ROTATE = 1 << 4;
 const FLAG_NO_VIEW = 1 << 5;
 
@@ -560,6 +562,7 @@ function paintedAppearanceRef(annot, PDFLib) {
   const flags = annot.lookup(PDFName.of('F'));
   const f = flags instanceof PDFNumber ? flags.asNumber() : 0;
   if (f & (FLAG_HIDDEN | FLAG_NO_VIEW | FLAG_NO_ROTATE)) return null;
+  if (!(f & FLAG_PRINT)) return null;
   const ap = annot.lookup(PDFName.of('AP'));
   if (!(ap instanceof PDFDict)) return null;
   let raw = ap.get(PDFName.of('N'));
