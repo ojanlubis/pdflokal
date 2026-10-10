@@ -284,6 +284,44 @@ export function jpegExifOrientation(bytes) {
   return 1;
 }
 
+// iOS Safari gives no 2D context at all past ~16.7 MP (the same ceiling
+// js/render/sharpen.js budgets for); core does not import the render layer.
+const TRANSCODE_MAX_PIXELS = 16_777_216;
+
+// The bytes an image Source stores: the file itself when pdf-lib can embed it
+// as-is, else a transcode. Two reasons land here: a format pdf-lib cannot
+// embed (WEBP/GIF/BMP → PNG), or a JPEG whose EXIF Orientation disagrees with
+// its raw pixels (see jpegExifOrientation) → re-encoded as JPEG from the
+// ORIENTED bitmap, so a portrait phone photo stays portrait in the file and
+// not only in the preview. JPEG, not PNG, for the second case: a 12-megapixel
+// photo as PNG is tens of megabytes, and the source was lossy already.
+// Re-encoding also drops the EXIF block (camera model, timestamps, GPS), which
+// the file never needed to carry.
+//
+// CAPPED at TRANSCODE_MAX_PIXELS: an iPhone "HEIF Max" photo is 48.8 MP, so
+// the full-size canvas got no context and the import was refused as
+// unreadable (round-3 hunt, 2026-10-10). The stored image is downscaled; the
+// PAGE keeps the photo's size (export draws full-bleed), so nothing moves.
+async function storableImageBytes(bytes, type, bitmap, width, height) {
+  const isJpeg = type === 'image/jpeg' || type === 'image/jpg';
+  const turned = isJpeg && jpegExifOrientation(bytes) !== 1;
+  if (EMBEDDABLE_IMAGE_TYPES.has(type) && !turned) return bytes;
+  const k = Math.min(1, Math.sqrt(TRANSCODE_MAX_PIXELS / (width * height)));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.floor(width * k));
+  canvas.height = Math.max(1, Math.floor(height * k));
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('image transcode: no 2D canvas context');
+  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  const blobOut = await new Promise((resolve) => (turned
+    ? canvas.toBlob(resolve, 'image/jpeg', 0.92)
+    : canvas.toBlob(resolve, 'image/png')));
+  if (!blobOut) throw new Error('image transcode: the canvas could not be encoded');
+  const out = new Uint8Array(await blobOut.arrayBuffer());
+  canvas.width = 0; // release the backing store now, not at GC (iOS counts it)
+  return out;
+}
+
 // bytes (a raw image file) → append a Source + ONE image page to `doc`.
 // Sizing convention: the page's point size EQUALS the image's pixel dimensions,
 // and export draws the image full-bleed edge-to-edge. This matches BOTH the old
@@ -301,30 +339,13 @@ export async function importImage(doc, { name, bytes, mimeType }) {
   const width = bitmap.width;
   const height = bitmap.height;
 
-  let storeBytes = bytes;
-  const isJpeg = type === 'image/jpeg' || type === 'image/jpg';
-  const turned = isJpeg && jpegExifOrientation(bytes) !== 1;
-  if (!EMBEDDABLE_IMAGE_TYPES.has(type) || turned) {
-    // Transcode so export's embed always paints what the user saw. Two reasons
-    // land here: a format pdf-lib cannot embed (WEBP/GIF/BMP → PNG), or a JPEG
-    // whose EXIF Orientation disagrees with its raw pixels (see
-    // jpegExifOrientation) → re-encoded as JPEG from the ORIENTED bitmap, so a
-    // portrait phone photo stays portrait in the file and not only in the
-    // preview. JPEG, not PNG, for the second case: a 12-megapixel photo as PNG
-    // is tens of megabytes, and the source was lossy already. Re-encoding also
-    // drops the EXIF block — camera model, timestamps, GPS — which the file
-    // never needed to carry. We already have the decoded bitmap, so this is one
-    // canvas draw + toBlob.
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    canvas.getContext('2d').drawImage(bitmap, 0, 0);
-    const blobOut = await new Promise((resolve) => (turned
-      ? canvas.toBlob(resolve, 'image/jpeg', 0.92)
-      : canvas.toBlob(resolve, 'image/png')));
-    storeBytes = new Uint8Array(await blobOut.arrayBuffer());
+  let storeBytes;
+  try {
+    storeBytes = await storableImageBytes(bytes, type, bitmap, width, height);
+  } finally {
+    // In a finally: a transcode that throws must not strand a ~200 MB decode.
+    if (typeof bitmap.close === 'function') bitmap.close();
   }
-  if (typeof bitmap.close === 'function') bitmap.close();
 
   const source = addSource(doc, createSource({ name, bytes: storeBytes, numPages: 1 }));
   const page = createPage({
