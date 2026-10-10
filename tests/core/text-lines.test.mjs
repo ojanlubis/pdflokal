@@ -430,3 +430,21 @@ test('runsNotOwned drops exactly the runs a cover targets, by geometry', () => {
   // a target elsewhere (different baseline) owns nothing
   assert.deepEqual(runsNotOwned(runs, [{ ...b.pdf, y0: 600 }]), runs);
 });
+
+// A value overprinted on an underscore leader: sorted by start, the SHORT value
+// sits inside the long leader. Gaps were measured from the previous run's end,
+// i.e. the value's, so the next word after the leader looked a column away and
+// the row split in two. The gap is from the furthest end seen so far.
+test('overlap: a value printed over a leader does not make the next word look a column away', () => {
+  const runs = [
+    run('Nama', 0, 0, 30, 12),
+    run('______________________', 34, 0, 160, 12), // leader 34..194
+    run('Budi', 40, 0, 26, 12),                     // value over the leader 40..66
+    run('(L)', 198, 0, 18, 12),                     // 4pt after the LEADER's end
+  ];
+  const lines = groupRunsIntoLines(runs);
+  // Known-positive for the instrument: from Budi's end the gap is 132pt, far
+  // past the 1.5em column guard, so the old rule really did split here.
+  assert.ok(198 - 66 > 1.5 * 12);
+  assert.equal(lines.length, 1, `split into ${lines.length}: ${JSON.stringify(lines.map((l) => l.str))}`);
+});
