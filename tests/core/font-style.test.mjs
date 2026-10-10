@@ -121,3 +121,13 @@ test('getFontStyleInfo: unknown font name on the page declines honestly', async 
   const info = getFontStyleInfo(page, PDFLib, 'NopeNotAResource');
   assert.equal(info.ok, false);
 });
+
+// Adobe's abbreviated style suffix. Read as upright, the style source became a
+// confident 'pdf-name' italic:false and the clone ladder picked the upright face.
+test('parseStyleFromName: Adobe -It / -BoldIt suffixes are italic, "-Lit" is not', () => {
+  assert.deepEqual(parseStyleFromName('MinionPro-It'), { bold: false, italic: true });
+  assert.deepEqual(parseStyleFromName('ABCDEF+MyriadPro-BoldIt'), { bold: true, italic: true });
+  assert.equal(parseStyleFromName('MinionPro-SemiboldIt').italic, true);
+  assert.equal(parseStyleFromName('Foo-Lit').italic, false);
+  assert.equal(parseStyleFromName('MinionPro-Regular').italic, false);
+});

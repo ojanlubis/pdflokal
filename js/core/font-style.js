@@ -31,7 +31,10 @@ export function parseStyleFromName(name) {
   const s = String(name || '');
   return {
     bold: /bold/i.test(s),
-    italic: /italic|oblique/i.test(s),
+    // Adobe's own convention abbreviates: MinionPro-It, MyriadPro-BoldIt,
+    // -SemiboldIt. Case-SENSITIVE `It` at the end of the style suffix, so a
+    // name merely ending in "it" (…-Lit) is not italic.
+    italic: /italic|oblique/i.test(s) || /-[A-Za-z]*It(?:MT)?$/.test(s),
   };
 }
 
