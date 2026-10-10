@@ -30,7 +30,7 @@ import { setLeaveGuard } from './leave-guard.js';
 import { holdEditor } from './editor-blur.js';
 import { rasterFitsShape } from '../core/raster-key.js';
 import { baseNameOf } from '../core/file-kind.js';
-import { ZOOM_MAX, ZOOM_STEP, zoomFloor, clampZoom, openingZoom as coreOpeningZoom } from '../core/zoom.js';
+import { ZOOM_MAX, ZOOM_STEP, zoomFloor, clampZoom, openingZoom as coreOpeningZoom, zoomAfterLoad } from '../core/zoom.js';
 import { importPdf, importImage, createPageRasterizer, probeTextLayer, pdfLibLoadError } from '../core/import.js';
 import {
   pagesBucket, durationBucket, intentValue,
@@ -3067,6 +3067,9 @@ async function loadFilesInner(files, { replace = false } = {}) {
   const into = replace ? createDoc() : doc;
   const pagesBefore = into.pages.length;
   const firstLoad = pagesBefore === 0;
+  // Pages already on screen, to tell after normalising whether the merge resized
+  // any of them (zoomAfterLoad, core/zoom.js).
+  const idsBefore = new Set(into.pages.map((p) => p.id));
   // A staged replace names the file at the commit below: now it would rename
   // the document that is still open.
   if (firstLoad && !replace) baseName = baseNameOf(usable[0].name);
@@ -3257,7 +3260,7 @@ async function loadFilesInner(files, { replace = false } = {}) {
   // Placed BEFORE the rasterizer and rebuildStage below: both read page.width,
   // and a raster taken at the pre-normalisation size would have to be thrown
   // away immediately.
-  normalizePageWidths(doc);
+  const rescaled = normalizePageWidths(doc);
 
   if (!rasterizer) rasterizer = createPageRasterizer(doc, { editedPageProvider });
   emptyEl.style.display = 'none';
@@ -3274,9 +3277,16 @@ async function loadFilesInner(files, { replace = false } = {}) {
   // would orphan a second one. (A refused replace never leaves the editor.)
   if (wasEmpty && !window.history.state?.v2doc) pushEditorHistoryState();
 
-  if (firstLoad) {
-    zoom = openingZoom(doc.pages[0].width);
-  }
+  // Also on a merge that resized pages already on screen: see zoomAfterLoad.
+  zoom = zoomAfterLoad({
+    firstLoad,
+    existingRescaled: rescaled.some((p) => idsBefore.has(p.id)),
+    current: zoom,
+    viewport: scrollEl.clientWidth,
+    desktop: deviceClass() === 'desktop',
+    firstPageWidth: firstLoad ? doc.pages[0].width : pageDisplaySize(doc.pages[0]).width,
+    widestPageWidth: widestPageWidth(),
+  });
   rebuildStage(); // applies zoom + sizer at the end
   // A non-first load that actually grew the doc IS a merge (gabung). Fire at
   // COMPLETION so it counts real merges from EVERY entry point — the [+] tile,
