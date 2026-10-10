@@ -164,3 +164,19 @@ test('11 · ocrScaleFor targets ~1800px on the long edge and caps at 3', () => {
   assert.equal(ocrScaleFor(0), 2);                            // degenerate: a safe default
   assert.equal(ocrScaleFor(NaN), 2);
 });
+
+// The word-banding fallback (no data.lines) grew a line's box by moving x
+// BEFORE reading the old right edge from it: a later word further LEFT
+// (baseline jitter, sorted by y first) shrank the width and left the first
+// word's tail uncovered.
+test('word banding: a word sorted later but further left still widens the box to both words', () => {
+  // "Lengkap" sits 2px higher, so it sorts FIRST although "Nama" is left of it.
+  const out = ocrLinesToPageLines({
+    words: [word('Lengkap', 90, 100, 200, 120), word('Nama', 10, 102, 80, 122)],
+  }, 1);
+  assert.equal(out.length, 1, 'known-positive: the two words must band into one line');
+  assert.equal(out[0].str, 'Nama Lengkap');
+  assert.ok(out[0].x <= 10, `left edge ${out[0].x} misses "Nama"`);
+  assert.ok(out[0].x + out[0].w >= 200, `right edge ${out[0].x + out[0].w} misses "Lengkap"`);
+  assert.ok(out[0].y + out[0].h >= 122, `bottom edge ${out[0].y + out[0].h} misses "Nama"`);
+});
