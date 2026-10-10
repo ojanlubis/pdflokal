@@ -194,3 +194,16 @@ test('faceLadder: clone by name, substitute by evidence, never Helvetica', () =>
   assert.deepEqual(faceLadder(null), [{ path: 'substitute', face: 'Arimo', evidence: 'default' }]);
   assert.deepEqual(faceStyle('Carlito-BoldItalic'), { family: 'Carlito', bold: true, italic: true });
 });
+
+// A non-breaking space is what Word and web pages put in "Rp 1.000" and
+// "No. 10". It looks exactly like a space, but its glyph has no contours, so
+// glyphPaints (which exempts only U+0020) judged it unwritable in EVERY font:
+// a pasted "Rp 1.000" became "Rp1.000" with a refusal toast naming an
+// invisible character.
+test('decideLineFont: a pasted non-breaking space is a space, never a refused char', async () => {
+  const c = await realCandidates();
+  const d = decideLineFont('Rp 1.000', c);
+  assert.notEqual(d.path, 'none', `NBSP was refused: blocked=${JSON.stringify(d.blocked)}`);
+  const r = acceptLineInput('Rp', 'Rp 1.000', c);
+  assert.equal(r.refused ?? null, null);
+});
