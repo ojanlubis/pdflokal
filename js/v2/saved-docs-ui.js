@@ -217,7 +217,10 @@ export function createSavedUi({ store, presence, session, tel, isLanding, isInte
         });
         open.addEventListener('click', async () => {
           open.disabled = true;
-          if (await session.openEntry(candidate.id)) { accepted = true; ask.dlg.close(); } else open.disabled = false;
+          if (await session.openEntry(candidate.id)) { accepted = true; ask.dlg.close(); return; }
+          // Failed: openEntry has toasted "can't open". Close the ask so that toast is not
+          // painted over a dialog; retrying the same unreadable entry would only toast again.
+          ask.dlg.close();
         });
         ask.dlg.addEventListener('close', () => {
           tel('autosave_restore', { action: accepted ? 'accepted' : 'declined' });

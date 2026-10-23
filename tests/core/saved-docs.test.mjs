@@ -492,3 +492,10 @@ test('a first load dismisses the reopen ask before the autosave slot begins', ()
   assert.match(UI, /return \{[^}]*dismissAsk/);
   assert.match(APP, /if \(firstLoad\) \{\s*savedUi\?\.dismissAsk\(\);[\s\S]*?savedSession\?\.begin\(\);/);
 });
+
+// A failed reopen toasts "can't open" (saved-session openEntry). The toast is raised into the top
+// layer, so it must not land on a still-open ask: the ask closes on both outcomes of the open tap.
+test('a failed reopen closes the ask so the open-fail toast is not painted over it', () => {
+  const UI = fs.readFileSync(path.join(ROOT, 'js/v2/saved-docs-ui.js'), 'utf8');
+  assert.match(UI, /openEntry\(candidate\.id\)\) \{ accepted = true; ask\.dlg\.close\(\); return; \}\s*\/\/[^\n]*\n(?:\s*\/\/[^\n]*\n)*\s*ask\.dlg\.close\(\);/);
+});
