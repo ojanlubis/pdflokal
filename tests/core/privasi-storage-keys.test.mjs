@@ -102,8 +102,10 @@ export function storageProblems(sources, privasiHtml) {
   if (!table) return ['privasi.html has no #storage-ours table'];
   const problems = unresolved.map((u) => `cannot resolve the storage key passed in ${u}`);
   for (const k of keys) if (!table.has(k)) problems.push(`code writes "${k}" but privasi.html's table does not list it`);
+  // A database row (e.g. pdflokal-saved) has a writer too: its indexedDB.open, checked below.
+  const { names: databases } = indexedDbNames(sources);
   for (const k of table) {
-    if (/^pdflokal/.test(k) && !keys.has(k)) problems.push(`privasi.html lists "${k}" but no code writes it any more`);
+    if (/^pdflokal/.test(k) && !keys.has(k) && !databases.has(k)) problems.push(`privasi.html lists "${k}" but no code writes it any more`);
   }
   return problems;
 }
@@ -206,9 +208,7 @@ test('red on revert: new code opens a database /privasi has never heard of, or o
   assert.deepEqual(indexedDbProblems([{ file: 'a.js', text: "indexedDB.open('x-db')" }], '<td><code>x-db</code></td>'), []);
 });
 
-// OWED: /privasi IndexedDB disclosure (seat writes, founder approves). This is the visible debt, not a
-// silent one: `todo` runs the assertion and reports it as a known failure instead of failing the suite.
-// It goes green by itself the day privasi.html lists `pdflokal-saved`; then delete the `todo`.
-test('privasi.html lists every IndexedDB database the code opens', { todo: 'owed: /privasi IndexedDB disclosure (seat writes, founder approves)' }, () => {
+// The /privasi IndexedDB row, written by the seat 2026-10-23 (decisions 2026-10-23 13:20).
+test('privasi.html lists every IndexedDB database the code opens', () => {
   assert.deepEqual(indexedDbProblems(realSources(), privasi()), []);
 });

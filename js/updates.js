@@ -29,6 +29,13 @@ import { getLocale } from './lib/i18n.js';
 
 export const UPDATES = [
   {
+    id: '2026-10-23-simpan-editan',
+    date: '2026-10-23',
+    text: 'Editan sekarang tersimpan otomatis di browser ini. Tab ketutup? Buka lagi, lanjut.',
+    en: 'Your edits now save automatically in this browser. Closed the tab? Open it and carry on.',
+    approved: true, // his handover, decisions 2026-10-23 13:20
+  },
+  {
     id: '2026-10-11-unduh-sama-layar',
     date: '2026-10-11',
     text: 'Hasil Unduh sekarang sama kayak di layar, tulisan dan Tip-Ex nggak turun lagi.',

@@ -1201,7 +1201,7 @@
     ]
   },
   "saved.menuSaveTip": {
-    "text": "Simpan di browser ini supaya bisa dibuka lagi",
+    "text": "Simpan di browser ini, biar bisa dibuka lagi",
     "src": [
       "js/v2/saved-docs-ui.js"
     ]
@@ -1231,7 +1231,7 @@
     ]
   },
   "saved.updated": {
-    "text": "Simpanan diperbarui",
+    "text": "Perubahan tersimpan",
     "src": [
       "js/v2/saved-docs-ui.js"
     ]
@@ -1243,13 +1243,13 @@
     ]
   },
   "saved.failBlocked": {
-    "text": "Browser ini nggak mengizinkan penyimpanan (mode privat?)",
+    "text": "Browser ini menolak penyimpanan. Kalau lagi mode privat, coba di tab biasa.",
     "src": [
       "js/v2/saved-docs-ui.js"
     ]
   },
   "saved.failOther": {
-    "text": "Editan nggak bisa disimpan",
+    "text": "Editan nggak bisa disimpan. Coba lagi ya.",
     "src": [
       "js/v2/saved-docs-ui.js"
     ]
@@ -1267,7 +1267,7 @@
     ]
   },
   "saved.askBody": {
-    "text": "Editanmu tersimpan otomatis di browser ini. Nggak diupload ke mana-mana.",
+    "text": "Editanmu tersimpan otomatis di browser ini, nggak diupload.",
     "src": [
       "js/v2/saved-docs-ui.js"
     ]
@@ -1375,7 +1375,7 @@
     ]
   },
   "saved.listStorageNote": {
-    "text": "Ini penyimpanan browser-mu sendiri. Nggak ada yang diupload, dan browser boleh membersihkannya kapan saja.",
+    "text": "Nggak ada yang diupload. Browser bisa menghapusnya sendiri kapan saja.",
     "src": [
       "js/v2/saved-docs-ui.js"
     ]

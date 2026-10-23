@@ -361,41 +361,39 @@ export default {
   },
 
   // "Simpan editan" (js/v2/saved-docs-ui.js, js/v2/saved-session.js, app.js).
-  // DRAFT 2026-10-06: EVERY string in this block is a placeholder. The seat rewrites
-  // it through the copywriting skill and Fauzan approves it before anything ships
-  // (specs/spec-simpan-editan.md: "all user-facing strings are DRAFTS").
+  // Final 2026-10-23: the seat's copy pass under his handover (decisions 2026-10-23 13:20).
   saved: {
-    menuSave: 'Save edits', // DRAFT
-    menuSaveTip: 'Save in this browser so you can open it again', // DRAFT
-    menuList: 'Saved edits', // DRAFT
-    menuListTip: 'Open or delete the edits you saved', // DRAFT
-    saved: 'Saved in this browser', // DRAFT
-    savedSafari: 'Saved in this browser. Safari deletes it if you do not visit for 7 days.', // DRAFT
-    updated: 'Saved copy updated', // DRAFT
-    failQuota: 'Browser storage is full, your edits could not be saved', // DRAFT
-    failBlocked: 'This browser does not allow saving (private mode?)', // DRAFT
-    failOther: 'Your edits could not be saved', // DRAFT
-    openFail: 'That saved edit could not be opened', // DRAFT
-    askTitle: 'Continue your last edit?', // DRAFT
-    askBody: 'Your edits were saved automatically in this browser. Nothing is uploaded.', // DRAFT
-    askWhen: '{name}, edited {when}', // DRAFT
-    askOpen: 'Reopen', // DRAFT
-    askLater: 'Not now', // DRAFT
-    askAll: 'See all', // DRAFT
-    listTitle: 'Saved edits', // DRAFT
-    listClose: 'Close', // DRAFT
-    listEmpty: 'No saved edits yet.', // DRAFT
-    listManual: 'Saved by you', // DRAFT
-    listAuto: 'Recently opened', // DRAFT
-    listPages: { one: '{count} page', other: '{count} pages' }, // DRAFT
-    listOpen: 'Open', // DRAFT
-    listOpenCopy: 'Open a copy', // DRAFT
-    listDelete: 'Delete', // DRAFT
-    listDeleteSure: 'Really delete?', // DRAFT
-    listElsewhere: 'Open in another tab', // DRAFT
-    listHere: 'Open now', // DRAFT
-    listStorage: 'Your browser uses {size} for PDFLokal on this device.', // DRAFT
-    listStorageNote: 'This is your own browser storage. Nothing is uploaded, and the browser may clear it at any time.', // DRAFT
-    listSafari: 'Safari deletes site data after 7 days without a visit.', // DRAFT
+    menuSave: 'Save edits',
+    menuSaveTip: 'Save in this browser so you can open it again',
+    menuList: 'Saved edits',
+    menuListTip: 'Open or delete the edits you saved',
+    saved: 'Saved in this browser',
+    savedSafari: "Saved in this browser. Safari deletes it if you don't visit for 7 days.",
+    updated: 'Changes saved',
+    failQuota: 'Browser storage is full, your edits could not be saved',
+    failBlocked: 'This browser blocks saving. In a private window, try a normal one.',
+    failOther: 'Your edits could not be saved. Try again.',
+    openFail: 'That saved edit could not be opened',
+    askTitle: 'Continue your last edit?',
+    askBody: 'Your edits were saved automatically in this browser, not uploaded.',
+    askWhen: '{name}, edited {when}',
+    askOpen: 'Reopen',
+    askLater: 'Not now',
+    askAll: 'See all',
+    listTitle: 'Saved edits',
+    listClose: 'Close',
+    listEmpty: 'No saved edits yet.',
+    listManual: 'Saved by you',
+    listAuto: 'Recently opened',
+    listPages: { one: '{count} page', other: '{count} pages' },
+    listOpen: 'Open',
+    listOpenCopy: 'Open a copy',
+    listDelete: 'Delete',
+    listDeleteSure: 'Really delete?',
+    listElsewhere: 'Already open in another tab',
+    listHere: 'Open in this tab',
+    listStorage: 'Your browser uses {size} for PDFLokal on this device.',
+    listStorageNote: 'Nothing is uploaded. The browser may clear it on its own at any time.',
+    listSafari: 'Safari deletes site data after 7 days without a visit.',
   },
 };

@@ -482,7 +482,8 @@
         <h2>Yang tersimpan di browsermu</h2>
         <p>
           Preferensi kecil untuk kamu sendiri, di Local Storage (satu di Session Storage, hilang saat
-          tab ditutup). Semuanya tetap di browsermu, kecuali satu baris yang ditandai.
+          tab ditutup), dan dokumen yang kamu edit, di IndexedDB. Semuanya tetap di browsermu, kecuali
+          satu baris yang ditandai.
         </p>
         <table class="storage-table" id="storage-ours">
           <thead>
@@ -492,6 +493,10 @@
             </tr>
           </thead>
           <tbody>
+            <tr>
+              <td><code>pdflokal-saved</code> (IndexedDB)</td>
+              <td>Menyimpan dokumen yang kamu edit beserta editannya, di browser ini saja: 5 terakhir otomatis, plus yang kamu simpan lewat Simpan editan. Tidak pernah keluar dari browsermu. Hapus kapan saja di Editan tersimpan.</td>
+            </tr>
             <tr>
               <td><code>pdflokal_theme</code></td>
               <td>Menyimpan preferensi tema (light/dark)</td>
