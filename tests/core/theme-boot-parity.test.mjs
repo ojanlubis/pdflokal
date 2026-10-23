@@ -1,9 +1,9 @@
 /*
- * THE THEME BOOT SNIPPET: three copies, one behaviour.
+ * THE THEME BOOT SNIPPET: four copies, one behaviour.
  * ============================================================================
  * A four-line inline script in <head> applies an explicit theme choice before
  * first paint. It has to be inline (an external file cannot beat first paint)
- * and it has to be in three hand-maintained files — index.html, privasi.html,
+ * and it has to be in four hand-maintained files — index.html, privasi.html, qr.html,
  * dukung.html. The 12 SEO pages inherit index.html's copy through the
  * generator, so they are not a separate home.
  *
@@ -27,7 +27,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const PAGES = ['index.html', 'privasi.html', 'dukung.html'];
+const PAGES = ['index.html', 'privasi.html', 'dukung.html', 'qr.html'];
 
 // The boot snippet is the inline <script> that touches the theme key.
 const SNIPPET = /<script>(?![\s\S]{0,40}type=)[^<]*pdflokal_theme[^<]*<\/script>/g;
@@ -38,7 +38,7 @@ function bootOf(file) {
   return { file, hits };
 }
 
-test('1. all three pages carry exactly one boot snippet, byte-identical', () => {
+test('1. all four pages carry exactly one boot snippet, byte-identical', () => {
   const found = PAGES.map(bootOf);
 
   for (const { file, hits } of found) {
