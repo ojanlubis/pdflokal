@@ -1877,6 +1877,9 @@ const interaction = createInteraction({
     matchWhiteoutColor(anno, pageId, x, y); // async; colors the rect while drawing
     return anno;
   },
+  // The person is moving text, not writing: close the open box and leave Teks
+  // (tools are verbs). See interaction.js onPointerDown.
+  onGrabText: () => { closeOpenEditor(); if (tool === 'text') setTool('select'); },
   onEditText: (annoId) => {
     const found = findAnnotation(doc, annoId);
     if (found) {
