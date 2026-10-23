@@ -73,13 +73,14 @@ test("a tool returns home after its verb: the tap places, then setTool('select')
   assert.match(APP, /if \(next !== 'gambar'\) pendingGambar = null;/);
 });
 
-test('the toolbar words come from DRAFT locale keys, with no hard-coded label in the markup', () => {
+test('the toolbar words come from locale keys (final 2026-10-23), with no hard-coded label in the markup', () => {
   assert.match(INDEX, /<span data-gambar-label><\/span>/);
   assert.match(APP, /tr\('tools\.gambar'\)/);
   assert.match(APP, /tr\('tools\.gambarTip'\)/);
   for (const f of ['js/locales/id.js', 'js/locales/en.js']) {
     const src = read(f);
-    assert.match(src, /gambar: '[^']+', \/\/ DRAFT/, `${f} marks tools.gambar DRAFT`);
-    assert.match(src, /gambarTip: '[^']+', \/\/ DRAFT/, `${f} marks tools.gambarTip DRAFT`);
+    assert.match(src, /gambar: '[^']+',\n/, `${f} has tools.gambar`);
+    assert.match(src, /gambarTip: '[^']+',\n/, `${f} has tools.gambarTip`);
+    assert.ok(!/gambar(Tip)?: '[^']+', \/\/ DRAFT/.test(src), `${f} no longer marks Gambar copy DRAFT`);
   }
 });

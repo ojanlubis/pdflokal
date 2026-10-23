@@ -29,6 +29,13 @@ import { getLocale } from './lib/i18n.js';
 
 export const UPDATES = [
   {
+    id: '2026-10-23-gambar',
+    date: '2026-10-23',
+    text: 'Sekarang bisa tempel gambar di halaman, pilih file atau Ctrl+V.',
+    en: 'You can now put an image on the page: pick a file or press Ctrl+V.',
+    approved: true, // his handover, decisions 2026-10-23 13:20
+  },
+  {
     id: '2026-10-11-unduh-sama-layar',
     date: '2026-10-11',
     text: 'Hasil Unduh sekarang sama kayak di layar, tulisan dan Tip-Ex nggak turun lagi.',

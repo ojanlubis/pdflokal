@@ -257,7 +257,7 @@ export function createInteraction(ctx) {
       startGanti(e, pageView, page);
       return;
     }
-    if (((tool === 'text' && !grabsOwnText) || tool === 'signature' || tool === 'paraf' || tool === 'gambar')) {
+    if ((tool === 'text' && !grabsOwnText) || tool === 'signature' || tool === 'paraf' || tool === 'gambar') {
       // WHY preventDefault: onPlace may create + focus an inline editor NOW.
       // Canceling pointerdown suppresses the compatibility mousedown that
       // would otherwise fire right after and BLUR it (mouse only — touch

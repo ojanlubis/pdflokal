@@ -24,8 +24,9 @@ import {
   addAnnotation, removeAnnotation, updateAnnotation, clearSelection, selectAnnotation,
   moveAnnotation, resizeAnnotation, normalizePageWidths, duplicateAnnotation,
   copySignatureToAllPages, pagesMissingSignature, placeSignature, SIGNATURE_PLACE_WIDTH,
-  placeImage, imageBoxFor,
+  placeImage, imageBoxFor, isPicture,
 } from '../core/operations.js';
+import { sigBarState } from '../core/sig-bar.js';
 import { createHistory, record, undo, redo, canUndo, canRedo, markClean, markChanged, settle, isDirty } from '../core/history.js';
 import { setLeaveGuard } from './leave-guard.js';
 import { holdEditor } from './editor-blur.js';
@@ -2701,20 +2702,27 @@ function syncSigBar() {
   const found = selectedSignatureAnno();
   const armedSig = tool === 'signature' && !!storedSignature;
   const armedGambar = tool === 'gambar' && !!pendingGambar;
-  const armed = armedSig || armedGambar;
   const bar = document.getElementById('sig-bar');
   const allBtn = document.getElementById('btn-all-pages');
   const redrawBtn = document.getElementById('btn-redraw-sig');
   // Punch list #1: a SELECTED signature also offers Gambar Ulang — "it placed
-  // the old ttd" must be fixable right where the user is looking.
-  bar.classList.toggle('show', !!found || armed);
-  allBtn.style.display = found && doc.pages.length > 1 ? '' : 'none';
-  redrawBtn.style.display = (armedSig || found) ? '' : 'none'; // no TTD to redraw while a picture is armed
-  document.getElementById('sig-bar-label').textContent = found
-    ? tr('sigBar.signatureSelected')
-    : (armed ? tr('sigBar.armed') : '');
+  // the old ttd" must be fixable right where the user is looking. A selected
+  // PICTURE (Gambar) does not: see core/sig-bar.js.
+  const st = sigBarState({ selected: found?.anno ?? null, armedSig, armedGambar, pageCount: doc.pages.length });
+  bar.classList.toggle('show', st.show);
+  allBtn.style.display = st.showAllPages ? '' : 'none';
+  redrawBtn.style.display = st.showRedraw ? '' : 'none';
+  document.getElementById('sig-bar-label').textContent =
+    st.label === 'picture' ? tr('sigBar.pictureSelected')
+      : st.label === 'signature' ? tr('sigBar.signatureSelected')
+        : st.label === 'armed' ? tr('sigBar.armed') : '';
 }
-on('btn-redraw-sig', 'click', () => openSignatureModal(selectedSignatureAnno()?.anno.id ?? null));
+on('btn-redraw-sig', 'click', () => {
+  // Only a real signature is replaced in place; with a picture selected (TTD armed
+  // alongside) the sheet opens for a NEW signature and the picture is left alone.
+  const sel = selectedSignatureAnno();
+  openSignatureModal(sel && !isPicture(sel.anno) ? sel.anno.id : null);
+});
 
 on('btn-all-pages', 'click', () => {
   const found = selectedSignatureAnno();

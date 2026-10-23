@@ -24,6 +24,12 @@
       "js/v2/app.js"
     ]
   },
+  "sigBar.pictureSelected": {
+    "text": "Gambar terpilih",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
   "sigBar.armed": {
     "text": "Pilih tempat untuk menempatkan",
     "src": [

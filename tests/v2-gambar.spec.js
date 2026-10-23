@@ -52,7 +52,7 @@ async function tapPage(page, fx, fy) {
 }
 
 test.describe('Gambar', () => {
-  test('the button sits after TTD, carries the DRAFT label, and the picker is its own input', async ({ page }) => {
+  test('the button sits after TTD, carries a label, and the picker is its own input', async ({ page }) => {
     await openDoc(page);
     const order = await page.$$eval('#toolbar .tool[data-tool]', (els) => els.map((e) => e.dataset.tool));
     expect(order.indexOf('gambar')).toBe(order.indexOf('signature') + 1);
