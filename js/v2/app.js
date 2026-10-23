@@ -24,7 +24,9 @@ import {
   addAnnotation, removeAnnotation, updateAnnotation, clearSelection, selectAnnotation,
   moveAnnotation, resizeAnnotation, normalizePageWidths, duplicateAnnotation,
   copySignatureToAllPages, pagesMissingSignature, placeSignature, SIGNATURE_PLACE_WIDTH,
+  placeImage, imageBoxFor, isPicture,
 } from '../core/operations.js';
+import { sigBarState } from '../core/sig-bar.js';
 import { createHistory, record, undo, redo, canUndo, canRedo, markClean, markChanged, settle, isDirty } from '../core/history.js';
 import { setLeaveGuard } from './leave-guard.js';
 import { holdEditor } from './editor-blur.js';
@@ -49,6 +51,7 @@ import { resolveTap, draftFontSize } from '../core/text-lines.js';
 import { createPageManager } from './page-manager.js';
 import { createPageStrips } from './page-strip.js';
 import { createSignatureModal } from './signature-modal.js';
+import { decodeImageFile } from './image-decode.js';
 import { createDownloadSheet } from './download-sheet.js';
 import { track } from '../lib/analytics.js';
 import { t as tr } from '../lib/i18n.js';
@@ -68,6 +71,11 @@ import { initFeedbackForm } from './feedback-form.js';
 import { createCelebration } from './celebrate.js';
 import { initInstallPrompt, isStandalone } from './install-prompt.js';
 import { initMakerCard, initVisitorCount } from './maker-card.js';
+import { createSavedStore } from './saved-store.js';
+import { createPresence } from './doc-presence.js';
+import { createSavedSession } from './saved-session.js';
+import { createSavedUi } from './saved-docs-ui.js';
+import { needsSafariNote } from '../core/saved-docs.js';
 import { initH1Rotation } from './h1-rotation.js';
 import { applyIntentCopy } from './intent-copy.js';
 import { ensurePdfLib } from '../core/vendor.js';
@@ -79,7 +87,7 @@ import { ensurePdfLib } from '../core/vendor.js';
 // 'pages_open' opens a sheet. None of those is a commit, and counting them would
 // fire the prompt at someone who has not yet done anything they could find a bug
 // in. `ganti_commit` is its own event, not a tool_use, so it is named separately.
-const COMMIT_ACTIONS = new Set(['whiteout', 'text', 'text_inline', 'signature', 'paraf', 'delete', 'original_delete', 'merge']);
+const COMMIT_ACTIONS = new Set(['whiteout', 'text', 'text_inline', 'signature', 'paraf', 'delete', 'original_delete', 'merge', 'image', 'image_paste']);
 const bugPrompt = createBugReportPrompt();
 
 // Every existing `tel(...)` call site keeps working untouched — this is the one
@@ -132,12 +140,24 @@ function deviceClass() {
 
 // ---- state (ONE doc, ONE history — everything else is DOM or derived) -------
 let doc = createDoc(); // replaced wholesale by "Buka Baru" (File menu)
-const history = createHistory(undefined, { carryRaster: rasterFitsShape, onDirtyChange: setLeaveGuard });
+// "Simpan editan" (js/v2/saved-session.js), assigned further down. Declared HERE because the
+// history below calls it on every change, and `let` keeps that call safe before it exists.
+let savedSession = null;
+let savedUi = null; // same reason: loadFilesInner reaches for it
+const history = createHistory(undefined, {
+  carryRaster: rasterFitsShape,
+  onDirtyChange: setLeaveGuard,
+  onChange: () => savedSession?.touch(), // the autosave: debounced, reads the doc when it fires
+});
 let slots = [];
 let rasterizer = null;
 let zoom = 1;
 let tool = 'select';
 let storedSignature = null;   // { dataUrl, width, height } from the sig modal
+// Gambar: the picture the picker produced, waiting for the tap that drops it
+// ({ image, pxWidth, pxHeight }, js/v2/image-decode.js). Lives only while the
+// tool is armed: setTool clears it, so a tool that went home holds no picture.
+let pendingGambar = null;
 let baseName = 'dokumen';
 let editingAnno = null;       // text annotation currently in the inline editor
 let editingEl = null;         // its contenteditable (format bar restyles it live)
@@ -300,7 +320,12 @@ function download(blob, filename, { whole = false } = {}) {
 }
 const celebration = createCelebration({ toast });
 initInstallPrompt(); // homepage "install to home screen" chip + adaptive card (off the download moment)
-initMakerCard();    // homepage: Ojan + his last approved updates (js/updates.js)
+// The Ojan card waits for the reopen dialog to be decided or closed: the two never show together
+// (specs/spec-simpan-editan.md). `reopenSettled` is settled further down, where the dialog lives;
+// the try/finally there guarantees it settles even if that setup throws.
+let settleReopen = () => {};
+const reopenSettled = new Promise((resolve) => { settleReopen = resolve; });
+initMakerCard({ ready: reopenSettled }); // homepage: Ojan + his last approved updates (js/updates.js)
 initVisitorCount(); // header count, homepage + editor (api/visitors.js)
 initH1Rotation();   // homepage: the headline drifts for returning visitors (core/h1-rotation.js)
 // The general feedback channel: a footer link, never prompted. Separate from
@@ -1005,7 +1030,8 @@ function setTool(next) {
   // after a tool switch (e.g. Escape, or the on-off toggle) would show a
   // commit target for a gesture that no longer exists.
   if (next !== 'ganti') gantiSteer.clear();
-  if (next !== 'signature') {
+  if (next !== 'gambar') pendingGambar = null; // one picture per arming (tools are verbs)
+  if (next !== 'signature' && next !== 'gambar') {
     const g = document.getElementById('sig-ghost');
     if (g) g.style.display = 'none';
   }
@@ -1026,7 +1052,7 @@ function setTool(next) {
 // `tool` enum. They are deliberately not the same words (the markup is
 // English, the schema is the product's own Indonesian verbs), so the mapping
 // lives here, once, instead of at each emit site.
-const ARM_TOOL = { text: 'teks', whiteout: 'tipex', ganti: 'ganti', signature: 'ttd' };
+const ARM_TOOL = { text: 'teks', whiteout: 'tipex', ganti: 'ganti', signature: 'ttd', gambar: 'gambar' };
 for (const btn of document.querySelectorAll('#toolbar .tool[data-tool]')) {
   btn.addEventListener('click', () => {
     const t = btn.dataset.tool;
@@ -1044,6 +1070,11 @@ for (const btn of document.querySelectorAll('#toolbar .tool[data-tool]')) {
     // and that is precisely the path that was invisible.
     if (ARM_TOOL[t]) tel('tool_use', { tool: ARM_TOOL[t], action: 'arm' });
     if (t === 'signature' && !storedSignature) { openSignatureModal(); return; }
+    // Gambar is armed by the PICTURE, not by the press: the picker opens now (it
+    // needs this very user gesture) and the tool lights when a picture comes
+    // back, exactly as TTD above waits on its modal. Cancelling the picker
+    // leaves everything as it was.
+    if (t === 'gambar') { gambarInput.click(); return; }
     setTool(t);
     if (t === 'text') toast(tr('toast.armText'));
     if (t === 'whiteout') toast(tr('toast.armWhiteout'));
@@ -1540,13 +1571,26 @@ sigGhost.style.cssText =
 document.body.appendChild(sigGhost);
 const FINE_POINTER = window.matchMedia('(pointer: fine)').matches;
 
+// What rides the cursor for the armed placement tool: TTD's saved signature at
+// its fixed width, or Gambar's picture at the size placeImage will give it.
+function carriedPlacement() {
+  if (tool === 'signature' && storedSignature) {
+    return { src: storedSignature.dataUrl, w: SIGNATURE_PLACE_WIDTH, ratio: storedSignature.height / storedSignature.width };
+  }
+  const pg = tool === 'gambar' && pendingGambar && getPage(doc, focusedPageId || doc.pages[0]?.id);
+  if (!pg) return null;
+  const box = imageBoxFor(pg, pendingGambar.pxWidth, pendingGambar.pxHeight);
+  return { src: pendingGambar.image, w: box.width, ratio: box.height / box.width };
+}
+
 document.addEventListener('pointermove', (e) => {
-  if (FINE_POINTER && tool === 'signature' && storedSignature) {
-    const w = SIGNATURE_PLACE_WIDTH * zoom;
-    const h = w * (storedSignature.height / storedSignature.width);
-    if (sigGhost.dataset.sig !== storedSignature.dataUrl.slice(-40)) {
-      sigGhost.src = storedSignature.dataUrl;
-      sigGhost.dataset.sig = storedSignature.dataUrl.slice(-40);
+  const carried = FINE_POINTER ? carriedPlacement() : null;
+  if (carried) {
+    const w = carried.w * zoom;
+    const h = w * carried.ratio;
+    if (sigGhost.dataset.sig !== carried.src.slice(-40)) {
+      sigGhost.src = carried.src;
+      sigGhost.dataset.sig = carried.src.slice(-40);
     }
     sigGhost.style.width = w + 'px';
     sigGhost.style.height = h + 'px';
@@ -1867,6 +1911,17 @@ const interaction = createInteraction({
       selectAnnotation(doc, created.id); // selected → "Semua Hal." is one tap away
       syncPage(pageId);
       setTool('select'); // tools are verbs; back home
+    } else if (t === 'gambar' && pendingGambar) {
+      // Gambar: the picture the picker produced, centred on the tap. It is the
+      // signature object (core/operations.js placeImage), so it moves, resizes,
+      // turns with the page, copies, undoes and exports as one already does.
+      record(history, doc);
+      const created = placeImage(doc, pageId, pendingGambar, x, y);
+      if (!created) { setTool('select'); return; }
+      tel('tool_use', { tool: 'gambar', action: 'image' });
+      selectAnnotation(doc, created.id);
+      syncPage(pageId);
+      setTool('select'); // tools are verbs; back home (and the picture is released)
     }
   },
   onDrawStart: ({ pageId, x, y }) => {
@@ -2663,20 +2718,29 @@ function selectedSignatureAnno() {
 // armed TTD tool (→ Gambar Ulang, so the saved signature is never a trap).
 function syncSigBar() {
   const found = selectedSignatureAnno();
-  const armed = tool === 'signature' && !!storedSignature;
+  const armedSig = tool === 'signature' && !!storedSignature;
+  const armedGambar = tool === 'gambar' && !!pendingGambar;
   const bar = document.getElementById('sig-bar');
   const allBtn = document.getElementById('btn-all-pages');
   const redrawBtn = document.getElementById('btn-redraw-sig');
   // Punch list #1: a SELECTED signature also offers Gambar Ulang — "it placed
-  // the old ttd" must be fixable right where the user is looking.
-  bar.classList.toggle('show', !!found || armed);
-  allBtn.style.display = found && doc.pages.length > 1 ? '' : 'none';
-  redrawBtn.style.display = (armed || found) ? '' : 'none';
-  document.getElementById('sig-bar-label').textContent = found
-    ? tr('sigBar.signatureSelected')
-    : (armed ? tr('sigBar.armed') : '');
+  // the old ttd" must be fixable right where the user is looking. A selected
+  // PICTURE (Gambar) does not: see core/sig-bar.js.
+  const st = sigBarState({ selected: found?.anno ?? null, armedSig, armedGambar, pageCount: doc.pages.length });
+  bar.classList.toggle('show', st.show);
+  allBtn.style.display = st.showAllPages ? '' : 'none';
+  redrawBtn.style.display = st.showRedraw ? '' : 'none';
+  document.getElementById('sig-bar-label').textContent =
+    st.label === 'picture' ? tr('sigBar.pictureSelected')
+      : st.label === 'signature' ? tr('sigBar.signatureSelected')
+        : st.label === 'armed' ? tr('sigBar.armed') : '';
 }
-on('btn-redraw-sig', 'click', () => openSignatureModal(selectedSignatureAnno()?.anno.id ?? null));
+on('btn-redraw-sig', 'click', () => {
+  // Only a real signature is replaced in place; with a picture selected (TTD armed
+  // alongside) the sheet opens for a NEW signature and the picture is left alone.
+  const sel = selectedSignatureAnno();
+  openSignatureModal(sel && !isPicture(sel.anno) ? sel.anno.id : null);
+});
 
 on('btn-all-pages', 'click', () => {
   const found = selectedSignatureAnno();
@@ -2777,9 +2841,14 @@ function placeCopy(pageId, src, n) {
 // placeCopy's contract: ONE undo step, the new object selected, the pages involved
 // repainted, and the tool back to Pilih ("tools are verbs").
 function placePasted(pageId, type, props) {
+  return placePastedWith(pageId, () => addAnnotation(doc, pageId, createAnnotation(type, props)));
+}
+// `add` puts the new object on the page and returns it (addAnnotation, or
+// core's placeImage for a picture); this owns everything around it.
+function placePastedWith(pageId, add) {
   const prev = selectedFound();
   record(history, doc);
-  const created = addAnnotation(doc, pageId, createAnnotation(type, props));
+  const created = add();
   selectAnnotation(doc, created.id);
   if (prev && prev.page.id !== pageId) syncPage(prev.page.id);
   syncPage(pageId);
@@ -2802,39 +2871,54 @@ function visibleCentreOf(pageId) {
   return { x: ((left + right) / 2 - r.left) / zoom, y: ((top + bottom) / 2 - r.top) / zoom };
 }
 
-const PASTE_IMAGE_MAX_PX = 1200;  // longer side kept in the file; same cap as a drawn/uploaded signature
-const PASTE_IMAGE_PAGE_FRAC = 0.6; // an image never lands bigger than this share of the page's width or height
-
-// A pasted image becomes a signature-type object (movable, aspect-locked resize,
-// Semua Hal.) — the one image object the model and export already have. It is
-// decoded and re-drawn on a canvas, never uploaded: the bytes stay in this tab.
-// PNG unless the source is a JPEG, which export embeds as JPEG (a photo
-// re-encoded as PNG would bloat the file several times over).
+// A picture on the clipboard (Ctrl/Cmd+V) is Gambar's paste path: the same
+// object, the same size rule (core/operations.js placeImage), centred on what
+// the user can see of the page. It is decoded and re-drawn on a canvas, never
+// uploaded: the bytes stay in this tab (js/v2/image-decode.js for how and why).
 async function pasteImageFile(file) {
-  const img = new Image();
-  const url = URL.createObjectURL(file);
-  try {
-    await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; img.src = url; });
-  } catch { return; } finally { URL.revokeObjectURL(url); }
-  if (doc.pages.length === 0 || !img.naturalWidth || !img.naturalHeight) return;
-  const k = Math.min(1, PASTE_IMAGE_MAX_PX / Math.max(img.naturalWidth, img.naturalHeight));
-  const c = document.createElement('canvas');
-  c.width = Math.max(1, Math.round(img.naturalWidth * k));
-  c.height = Math.max(1, Math.round(img.naturalHeight * k));
-  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-  const image = file.type === 'image/jpeg' ? c.toDataURL('image/jpeg', 0.92) : c.toDataURL('image/png');
+  let picked;
+  try { picked = await decodeImageFile(file); } catch (err) {
+    console.warn('Gambar tempelan gagal dibaca', err);
+    toast(tr('toast.openFailedOne'));
+    return;
+  }
+  if (doc.pages.length === 0) return;
   const pageId = pasteTargetPageId();
   if (!pageId) return;
-  const pg = pageDisplaySize(getPage(doc, pageId));
-  const fit = Math.min(1, (pg.width * PASTE_IMAGE_PAGE_FRAC) / c.width, (pg.height * PASTE_IMAGE_PAGE_FRAC) / c.height);
-  const width = c.width * fit;
-  const height = c.height * fit;
   const mid = visibleCentreOf(pageId);
-  placePasted(pageId, 'signature', {
-    image, width, height,
-    x: Math.max(0, Math.min(pg.width - width, mid.x - width / 2)),
-    y: Math.max(0, Math.min(pg.height - height, mid.y - height / 2)),
-  });
+  placePastedWith(pageId, () => placeImage(doc, pageId, picked, mid.x, mid.y));
+  tel('tool_use', { tool: 'gambar', action: 'image_paste' });
+}
+
+// Gambar's picker: the chosen picture is decoded, then WAITS for the tap that
+// drops it (onPlace). Nothing is placed here and nothing is armed until the
+// decode succeeds, so a file the browser cannot read (HEIC on most Androids)
+// leaves the editor exactly as it was, with the existing "cannot open" toast.
+const gambarInput = document.getElementById('gambar-file');
+on(gambarInput, 'change', async () => {
+  const file = gambarInput.files && gambarInput.files[0];
+  gambarInput.value = ''; // the same file can be picked again
+  if (!file || doc.pages.length === 0) return;
+  let picked;
+  try { picked = await decodeImageFile(file); } catch (err) {
+    console.warn('Gambar gagal dibaca', err);
+    toast(tr('toast.openFailedOne'));
+    return;
+  }
+  if (doc.pages.length === 0) return; // the document went away while decoding
+  setTool('select'); // clears any earlier pending picture, then arm with this one
+  pendingGambar = picked;
+  setTool('gambar');
+  toast(tr('sigBar.armed'));
+});
+
+// The toolbar button's words come from the locale files (DRAFT, see
+// js/locales/id.js `tools`), so the label can be renamed without touching markup.
+{
+  const btn = document.querySelector('#toolbar .tool[data-tool="gambar"]');
+  const label = btn && btn.querySelector('[data-gambar-label]');
+  if (label) label.textContent = tr('tools.gambar');
+  if (btn) { btn.title = tr('tools.gambarTip'); btn.setAttribute('aria-label', tr('tools.gambarTip')); }
 }
 
 // Plain text becomes a text object in the bar's current style, exactly what the
@@ -3061,6 +3145,37 @@ async function firstUnrebuildableSource() {
     if (err) return err;
   }
   return null;
+}
+
+// The landing yields to the editor and the stage is built from `doc`. Shared by a file
+// load (loadFilesInner) and a restored saved document (adoptRestoredDoc).
+function showEditor({ firstLoad, existingRescaled = false }) {
+  if (!rasterizer) rasterizer = createPageRasterizer(doc, { editedPageProvider });
+  emptyEl.style.display = 'none';
+  // Capture BEFORE clearing: this is the real "editor becomes active" transition,
+  // and it must fire exactly once. `firstLoad` (pagesBefore === 0) is NOT the same
+  // signal — Buka Baru (resetDoc) also produces pagesBefore === 0 on the very next
+  // loadFilesInner call, but is-empty was already removed and never re-added, so
+  // gating on firstLoad here would push a second, orphaned back-button guard entry
+  // every time someone starts over. See wireDialogHistory below for the other half.
+  const wasEmpty = document.body.classList.contains('is-empty');
+  document.body.classList.remove('is-empty'); // landing yields, editor chrome returns
+  // An append onto an empty editor whose files all fail returns to the landing
+  // while still sitting on the guard entry it pushed earlier; pushing again
+  // would orphan a second one. (A refused replace never leaves the editor.)
+  if (wasEmpty && !window.history.state?.v2doc) pushEditorHistoryState();
+
+  // Also on a merge that resized pages already on screen: see zoomAfterLoad.
+  zoom = zoomAfterLoad({
+    firstLoad,
+    existingRescaled,
+    current: zoom,
+    viewport: scrollEl.clientWidth,
+    desktop: deviceClass() === 'desktop',
+    firstPageWidth: firstLoad ? doc.pages[0].width : pageDisplaySize(doc.pages[0]).width,
+    widestPageWidth: widestPageWidth(),
+  });
+  rebuildStage(); // applies zoom + sizer at the end
 }
 
 let loadingFiles = false; // re-entry guard: double-taps and rapid picks interleave imports
@@ -3301,32 +3416,11 @@ async function loadFilesInner(files, { replace = false } = {}) {
   // away immediately.
   const rescaled = normalizePageWidths(doc);
 
-  if (!rasterizer) rasterizer = createPageRasterizer(doc, { editedPageProvider });
-  emptyEl.style.display = 'none';
-  // Capture BEFORE clearing: this is the real "editor becomes active" transition,
-  // and it must fire exactly once. `firstLoad` (pagesBefore === 0) is NOT the same
-  // signal — Buka Baru (resetDoc) also produces pagesBefore === 0 on the very next
-  // loadFilesInner call, but is-empty was already removed and never re-added, so
-  // gating on firstLoad here would push a second, orphaned back-button guard entry
-  // every time someone starts over. See wireDialogHistory below for the other half.
-  const wasEmpty = document.body.classList.contains('is-empty');
-  document.body.classList.remove('is-empty'); // landing yields, editor chrome returns
-  // An append onto an empty editor whose files all fail returns to the landing
-  // while still sitting on the guard entry it pushed earlier; pushing again
-  // would orphan a second one. (A refused replace never leaves the editor.)
-  if (wasEmpty && !window.history.state?.v2doc) pushEditorHistoryState();
-
-  // Also on a merge that resized pages already on screen: see zoomAfterLoad.
-  zoom = zoomAfterLoad({
-    firstLoad,
-    existingRescaled: rescaled.some((p) => idsBefore.has(p.id)),
-    current: zoom,
-    viewport: scrollEl.clientWidth,
-    desktop: deviceClass() === 'desktop',
-    firstPageWidth: firstLoad ? doc.pages[0].width : pageDisplaySize(doc.pages[0]).width,
-    widestPageWidth: widestPageWidth(),
-  });
-  rebuildStage(); // applies zoom + sizer at the end
+  showEditor({ firstLoad, existingRescaled: rescaled.some((p) => idsBefore.has(p.id)) });
+  if (firstLoad) {
+    savedUi?.dismissAsk(); // a file opened under the reopen ask: the ask must not stay over the editor
+    savedSession?.begin(); // a new document: its autosave slot, and the lock that says it is ours
+  }
   // A non-first load that actually grew the doc IS a merge (gabung). Fire at
   // COMPLETION so it counts real merges from EVERY entry point — the [+] tile,
   // the File menu, dropping more files onto an open doc — not sheet-opens. GA4's
@@ -3557,11 +3651,102 @@ on('fm-pages', 'click', () => {
   openPagesSheet(); // the SAME opener the toolbar button uses — never a second one
 });
 
-// Start over: `next` (a fresh doc by default) + a fresh history. The signature
-// stays (it's the user's, not the document's). Only loadFilesInner calls it, at
-// the moment a staged replace has pages; cancelling the picker or a file that
-// does not open leaves everything untouched.
+// ---- Simpan editan: manual save, autosave, the saved list, the reopen ask -----------------------
+// BUILT, NOT RELEASED (specs/spec-simpan-editan.md: held for a user vote). The pure rules are
+// core/saved-docs.js, the I/O is saved-store.js, tab ownership is doc-presence.js, the
+// who-writes-what is saved-session.js, the two dialogs are saved-docs-ui.js. This is the glue.
+//
+// Restore puts a saved document on screen the way UNDO leaves a page whose raster no longer
+// fits: every page has `raster: null`, so the viewport stream renders it through
+// editedPageProvider, which RE-BAKES Ganti/OCR edits from the pristine source bytes plus the
+// annotations (core/page-surgery.js). Nothing here bakes anything itself.
+async function adoptRestoredDoc({ doc: restored, name }) {
+  showProcessing(1);
+  try {
+    // The restored Doc takes the old one's place through the one swap (a staged replace
+    // does the same): caches, rasterizer and fonts of the OLD doc go, and a reopened
+    // document starts with a clean undo stack and counts as NOT dirty, so the leave guard
+    // stays down until the first new edit (spec).
+    await resetDoc(restored);
+    resetEditFeedback();
+    baseName = name || 'dokumen';
+    showEditor({ firstLoad: true });
+  } finally {
+    hideProcessing();
+  }
+}
+
+const savedStore = createSavedStore();
+const savedPresence = createPresence();
+const savedSafari = needsSafariNote(globalThis.navigator?.userAgent);
+savedSession = createSavedSession({
+  store: savedStore,
+  presence: savedPresence,
+  getDoc: () => doc,
+  getName: () => baseName,
+  // An open inline editor means a Ganti cover may exist before its replacement does:
+  // saving then would restore a deleted line. The autosave waits for the editor to close.
+  isBusy: () => !!editingEl,
+  adopt: adoptRestoredDoc,
+  toast,
+  msg: (key) => ({
+    quota: tr('saved.failQuota'), blocked: tr('saved.failBlocked'),
+    other: tr('saved.failOther'), openFail: tr('saved.openFail'),
+  })[key],
+  tel,
+});
+savedUi = createSavedUi({
+  store: savedStore,
+  presence: savedPresence,
+  session: savedSession,
+  tel,
+  isLanding: () => document.body.classList.contains('is-empty'),
+  // The reopen ask is for the plain homepage. A page that already knows what the visitor came
+  // to do (?buat=, an SEO tool page's data-intent) is not interrupted.
+  isIntentPage: () => !!(document.body.dataset.intent || new URLSearchParams(window.location.search).get('buat')),
+});
+
+for (const [id, label, tip] of [
+  ['fm-save', tr('saved.menuSave'), tr('saved.menuSaveTip')],
+  ['fm-saved', tr('saved.menuList'), tr('saved.menuListTip')],
+]) {
+  const btn = document.getElementById(id);
+  if (!btn) continue; // a stale shell without the item: it costs the item, not the editor
+  const lab = btn.querySelector('.fm-label');
+  if (lab) lab.textContent = label;
+  btn.title = tip;
+}
+on('fm-save', 'click', async () => {
+  toggleFileMenu(false);
+  const res = await savedSession.saveManual(); // tells the user itself when it fails
+  if (res.ok) toast(res.update ? tr('saved.updated') : savedSafari ? tr('saved.savedSafari') : tr('saved.saved'));
+});
+on('fm-saved', 'click', () => {
+  toggleFileMenu(false);
+  savedUi.openList();
+});
+
+// The last change must not be lost to the debounce when the tab goes away.
+window.addEventListener('pagehide', () => savedSession.flush());
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') savedSession.flush(); });
+
+// The reopen ask, then the Ojan card (which waits on `reopenSettled`, set up near the top).
+try {
+  savedUi.maybeAskReopen().then(settleReopen, settleReopen);
+} catch {
+  settleReopen();
+}
+
+// Start over: a FRESH doc + history. The signature stays (it's the user's,
+// not the document's). Cancelling the picker leaves everything untouched.
 async function resetDoc(next = createDoc()) {
+  // The leave guard comes down at once, as it always did: the autosave below takes a moment and
+  // is no reason for the browser to still ask about a document being thrown away on purpose
+  // (tests/v2-leave-guard.spec.js reloads right after the swap).
+  markClean(history);
+  // The document going away is autosaved FIRST, and the swap waits for the write; then its slot
+  // and locks are released. Never throws: Buka Baru must not depend on storage.
+  await savedSession?.end();
   doc = next;
   history.undoStack.length = 0;
   history.redoStack.length = 0;
@@ -3695,6 +3880,7 @@ on('hc-cancel', 'click', () => {
   document.getElementById('home-confirm').close();
 });
 on('hc-go', 'click', () => {
+  savedSession?.flush(); // leaving: the debounce must not swallow the last change
   // The user was just asked (this dialog); the browser's own prompt would be a second ask.
   setLeaveGuard(false);
   // The wordmark's own href is this page's home ('/' or '/en'), so /en does not
@@ -3723,7 +3909,7 @@ function pushEditorHistoryState() {
 (function wireDialogHistory() {
   // NOTE: window.history everywhere — plain `history` is SHADOWED in this
   // module by the undo history (const history = createHistory()).
-  const dialogs = ['pm-sheet', 'sig-modal', 'dl-sheet', 'home-confirm', 'drop-choice', 'new-confirm'].map((id) => document.getElementById(id));
+  const dialogs = ['pm-sheet', 'sig-modal', 'dl-sheet', 'home-confirm', 'drop-choice', 'new-confirm', 'saved-list'].map((id) => document.getElementById(id)).filter(Boolean);
   const stack = []; // open dialogs in STACKING order (array order lies for nesting)
   let expectPop = false;
 
@@ -3731,6 +3917,10 @@ function pushEditorHistoryState() {
     const nativeShow = dlg.showModal.bind(dlg);
     dlg.showModal = () => {
       if (dlg.open) return; // double-tap/double-Ctrl+S: showModal throws on open dialogs
+      // The saved list also opens from the homepage's reopen ask, where no editor guard entry sits
+      // beneath it: a history entry pushed there would be left behind when a restored document
+      // pushes its own. On the homepage it opens as a plain dialog.
+      if (dlg.id === 'saved-list' && document.body.classList.contains('is-empty')) { nativeShow(); return; }
       nativeShow();
       window.history.pushState({ v2dlg: dlg.id }, '');
       stack.push(dlg);
@@ -3791,6 +3981,9 @@ window.v2 = {
   history,
   pageManager, // tests: force a grid re-render mid-drag (Sentry fee8a76e repro)
   getRasterizer: () => rasterizer, // tests: drive the real live-surgery raster path (tests/live-raster.spec.js)
+  // tests/saved-*.spec.js: the saved-docs pieces, so a spec can seed autosave slots and wait on the
+  // store without driving the UI six times.
+  saved: { session: savedSession, store: savedStore, presence: savedPresence, ui: savedUi },
   celebration, // tests: drive the post-download routing (install nudge vs share card)
   // tests/zoom-sharpen.spec.js. `superseded` is the honest one: it counts ONLY
   // renders that core/import.js's renderSeq guard threw away because a later

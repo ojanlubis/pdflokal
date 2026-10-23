@@ -25,9 +25,16 @@ export default {
   page: { short: 'Hal {n}' },
   loading: { count: '{n} dari {total} file' },
 
+  // Gambar (insert a picture) toolbar button. Final 2026-10-23, the seat's call under his handover (decisions 2026-10-23 13:20).
+  tools: {
+    gambar: 'Gambar',
+    gambarTip: 'Tambah gambar ke halaman',
+  },
+
   // Signature bar above the page
   sigBar: {
     signatureSelected: 'Tanda tangan terpilih',
+    pictureSelected: 'Gambar terpilih',
     armed: 'Pilih tempat untuk menempatkan',
   },
 
@@ -379,5 +386,42 @@ export default {
   theme: {
     toLight: 'Ganti ke mode terang',
     toDark: 'Ganti ke mode gelap',
+  },
+
+  // "Simpan editan" (js/v2/saved-docs-ui.js, js/v2/saved-session.js, app.js).
+  // Final 2026-10-23: the seat's copy pass under his handover (decisions 2026-10-23 13:20).
+  saved: {
+    menuSave: 'Simpan editan',
+    menuSaveTip: 'Simpan di browser ini, biar bisa dibuka lagi',
+    menuList: 'Editan tersimpan',
+    menuListTip: 'Buka atau hapus editan yang kamu simpan',
+    saved: 'Tersimpan di browser ini',
+    savedSafari: 'Tersimpan di browser ini. Safari menghapusnya kalau 7 hari nggak dibuka.',
+    updated: 'Perubahan tersimpan',
+    failQuota: 'Penyimpanan browser penuh, editan nggak bisa disimpan',
+    failBlocked: 'Browser ini menolak penyimpanan. Kalau lagi mode privat, coba di tab biasa.',
+    failOther: 'Editan nggak bisa disimpan. Coba lagi ya.',
+    openFail: 'Editan itu nggak bisa dibuka',
+    askTitle: 'Lanjutkan editan terakhir?',
+    askBody: 'Editanmu tersimpan otomatis di browser ini, nggak diupload.',
+    askWhen: '{name}, diedit {when}',
+    askOpen: 'Buka lagi',
+    askLater: 'Nanti aja',
+    askAll: 'Lihat semua',
+    listTitle: 'Editan tersimpan',
+    listClose: 'Tutup',
+    listEmpty: 'Belum ada editan tersimpan.',
+    listManual: 'Yang kamu simpan',
+    listAuto: 'Terakhir dibuka',
+    listPages: '{count} halaman',
+    listOpen: 'Buka',
+    listOpenCopy: 'Buka salinan',
+    listDelete: 'Hapus',
+    listDeleteSure: 'Yakin hapus?',
+    listElsewhere: 'Terbuka di tab lain',
+    listHere: 'Sedang dibuka',
+    listStorage: 'Browser memakai {size} untuk PDFLokal di perangkat ini.',
+    listStorageNote: 'Nggak ada yang diupload. Browser bisa menghapusnya sendiri kapan saja.',
+    listSafari: 'Safari menghapus data situs yang 7 hari nggak dibuka.',
   },
 };

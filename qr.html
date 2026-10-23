@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- LANGUAGE. Which language `/` opens in, and which choice sticks. FIRST in <head>
+       on purpose: before gtag and the Mixpanel recorder, so a visit that is about to
+       leave `/` is not counted as a visit to it (both check window.__pdlLeaving).
+       Two jobs, one script:
+       1. A click on any language link (.ld-lang-opt with an hreflang) writes
+          pdflokal_lang = that link's language. Without it an English-browser user who
+          picks "Bahasa Indonesia" on /en would be bounced straight back.
+       2. ONLY on the exact path `/`, in this order: a stored choice wins ('en' goes to
+          /en, 'id' stays); else a device whose time zone is Asia/Jakarta, Pontianak,
+          Makassar or Jayapura stays on `/`, whatever the browser language says; else a
+          browser whose first language is English goes to /en and anything else stays.
+          `location.replace`, so Back does not return to `/`; the query string and hash
+          travel with it. It never moves /en, a tool page or any other URL, and never an
+          Indonesian browser off `/en`.
+          WHY THE TIME ZONE (founder, 2026-10-06): 88% of one week's /en visitors were in
+          Indonesia. Indonesians often run an English browser, and the language alone
+          sent them to a page they did not want. The time zone is read from the browser
+          itself (Intl); no IP lookup, no request, nothing leaves the device. It is a
+          hint, not a border: Malaysia, Brunei and every other zone are unchanged (the
+          browser language decides), and a stored choice still beats it. A browser that
+          cannot report a time zone (try/catch) falls through to the language rule.
+       NEVER FOR A CRAWLER: Googlebot renders as en-US, and a bot sent to /en would
+       never index `/`. So a user agent that says bot, crawler, Lighthouse or headless
+       stays put. navigator.webdriver is deliberately NOT tested: it is true under
+       Playwright, and the specs have to exercise the redirect (they set a real UA).
+       Storage can throw (private modes); every access is in try/catch.
+       ONE URL, ONE LANGUAGE still holds: content never switches on a URL, this only
+       chooses between two URLs (js/lib/i18n.js).
+       ⚠️ Byte-identical in index.html, privasi.html and dukung.html (the redirect is
+       inert off `/`, the click part is the point there) —
+       tests/core/lang-boot-parity.test.mjs fails if they drift. index.html's head is
+       copied into /en and the 12 tool pages by the generators. -->
+  <script>
+  (function () {
+    var KEY = 'pdflokal_lang';
+    document.addEventListener('click', function (e) {
+      try {
+        var a = e.target && e.target.closest && e.target.closest('a.ld-lang-opt[hreflang]');
+        var l = a && a.getAttribute('hreflang');
+        if (l === 'id' || l === 'en') localStorage.setItem(KEY, l);
+      } catch (x) {}
+    });
+    if (location.pathname !== '/') return;
+    if (/bot|crawl|spider|slurp|lighthouse|headless|google-inspectiontool|chrome-lighthouse/i.test(navigator.userAgent || '')) return;
+    var saved = null;
+    try { saved = localStorage.getItem(KEY); } catch (x) {}
+    var first = (navigator.languages && navigator.languages[0]) || navigator.language || '';
+    var inIndonesia = false;
+    try { inIndonesia = /^Asia\/(Jakarta|Pontianak|Makassar|Jayapura)$/.test(Intl.DateTimeFormat().resolvedOptions().timeZone); } catch (x) {}
+    if (saved === 'en' || (saved !== 'id' && !inIndonesia && /^en/i.test(first))) {
+      window.__pdlLeaving = true;
+      // Nothing of the Indonesian page may show while /en loads; undone if the move never lands.
+      document.documentElement.style.visibility = 'hidden';
+      setTimeout(function () { document.documentElement.style.visibility = ''; }, 4000);
+      location.replace('/en' + location.search + location.hash);
+    }
+  })();
+  </script>
+
+  <!-- Google tag (gtag.js) -->
+  <!-- WHY G-7J8JF8XZ1Q: the old ID G-7J8JF8XZ1Q entered a state Google would not serve
+       (gtag/js?id=... -> HTTP 404), so GA4 never initialised and analytics were ~97% dead
+       Jul 7-11 2026. Stream recreated; this ID's container serves. See index.html for the
+       full note + the "is this ID alive?" curl check. NEVER attach a GA4 destination to the
+       shared Ads tag AW-17538923405 (mesindev loads it too -> rebuilds the property leak). -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-7J8JF8XZ1Q"></script>
+  <!-- No Google Ads tag and no session recorder on /qr (copied from /privasi's head): nothing typed on this page may ever land in a recording. -->
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    if (location.hostname === 'pdflokal.id' || location.hostname === 'www.pdflokal.id') {
+      gtag('config', 'G-7J8JF8XZ1Q');
+    }
+  </script>
+
+  <title>Bikin QR dari link: Gratis, Langsung Jadi</title>
+  <meta name="description" content="Bikin QR code dari link, gratis, tanpa daftar. Tempel link-nya, QR-nya jadi di browser kamu sendiri; unduh sebagai gambar atau salin.">
+  <link rel="canonical" href="https://www.pdflokal.id/qr">
+  <meta property="og:title" content="Bikin QR dari link: Gratis, Langsung Jadi">
+  <meta property="og:description" content="Bikin QR code dari link, gratis, tanpa daftar. Tempel link-nya, QR-nya jadi di browser kamu sendiri; unduh sebagai gambar atau salin.">
+  <meta property="og:url" content="https://www.pdflokal.id/qr">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="id_ID">
+  <meta property="og:image" content="https://www.pdflokal.id/images/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Bikin QR dari link: Gratis, Langsung Jadi">
+  <meta name="twitter:description" content="Bikin QR code dari link, gratis, tanpa daftar. Tempel link-nya, QR-nya jadi di browser kamu sendiri; unduh sebagai gambar atau salin.">
+  <meta name="twitter:image" content="https://www.pdflokal.id/images/og-image.png">
+
+  <!-- Fonts (self-hosted in css/page-base.css via @font-face) -->
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="/css/tokens.css">
+  <!-- Base typography (font-face, reset, body/h1-h3/p/a) on tokens — the last
+       tie to style.css, cut 2026-07-31. See the file header for what it
+       replaces and why. style.css and css/legacy-bridge.css no longer load
+       here; alat-gambar.html (the old wing) is the only remaining reader of
+       style.css. -->
+  <link rel="stylesheet" href="/css/page-base.css">
+  <!-- The ported landing navbar + footer chrome. See the file header for what
+       is and isn't ported, and why it lives here rather than in style.css or
+       css/page-base.css. -->
+  <link rel="stylesheet" href="/css/chrome.css">
+  <!-- THEME BOOT. Applies an EXPLICIT choice before first paint, so a user who
+       picked the theme opposite to their OS does not see a flash of the other
+       one. It deliberately does NOT resolve the system preference: that is
+       css/tokens.css's job, and a page with no stored choice must reach the
+       browser with no data-theme attribute at all so the media query can win.
+       Kept inline and tiny because an external file cannot beat first paint.
+       ⚠️ Byte-identical in index.html, privasi.html and dukung.html —
+       tests/core/theme-boot-parity.test.mjs fails if they drift. -->
+  <script>try{var t=localStorage.getItem('pdflokal_theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
+
+  <!-- Favicon -->
+  <link rel="icon" href="/images/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/images/apple-touch-icon.png">
+
+  <!-- Vercel Web Analytics -->
+  <script>
+    if (!window.vaq) { window.vaq = []; }
+    window.va = window.va || function () { window.vaq.push(arguments); };
+  </script>
+  <script defer src="/_vercel/insights/script.js"></script>
+
+  <style>
+    /* THE QR TOOL, PAGE mode (specs/design-system.md): a working column at the
+       shared 920, one reading and one action per viewport. Ported from the
+       founder's other site (template-lokal /qr); the layout is the same, the
+       skin is this product's tokens.
+       RED IS TOUCHABLE, ONLY: the one red thing is the download button. The
+       error line is ink, not red, for the same reason. */
+    .qr-page {
+      max-width: var(--column);
+      margin: 0 auto;
+      padding-bottom: var(--sp-64);
+    }
+
+    .qr-page h1 {
+      font-size: var(--fs-5);
+      line-height: 1.15;
+      text-wrap: balance;
+    }
+
+    .qr-lead {
+      margin-top: var(--sp-16);
+      max-width: 46ch;
+      font-size: var(--fs-1);
+      line-height: 1.5;
+    }
+
+    /* One DOM order serves both widths: phone reads input -> QR -> actions
+       (the QR is the point and must not sit below the fold); from 760px the QR
+       is pinned into a second column spanning all three rows. */
+    .qr-tool {
+      margin-top: var(--sp-48);
+      display: grid;
+      gap: var(--sp-32);
+    }
+
+    .qr-field label {
+      display: block;
+      font-size: var(--fs-n1);
+      font-weight: 600;
+      color: var(--ink);
+    }
+
+    .qr-field input {
+      display: block;
+      width: 100%;
+      margin-top: var(--sp-8);
+      min-height: 52px;
+      padding: var(--sp-8) var(--sp-16);
+      /* 16px, not a smaller step: iOS Safari zooms the page on focus below it. */
+      font: inherit;
+      font-size: var(--fs-0);
+      color: var(--ink);
+      background: var(--surface);
+      border: 1px solid var(--muted);
+      border-radius: var(--r-control);
+    }
+
+    .qr-field input:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    .qr-hint,
+    .qr-status,
+    .qr-note,
+    .qr-galat {
+      margin-top: var(--sp-8);
+      font-size: var(--fs-n1);
+      line-height: 1.5;
+    }
+
+    .qr-galat {
+      margin-top: var(--sp-12);
+      color: var(--ink);
+      font-weight: 600;
+    }
+
+    .qr-galat:empty {
+      display: none;
+    }
+
+    /* WHY THE TILE IS WHITE IN BOTH THEMES, with a literal #fff: a QR is dark
+       modules on a LIGHT quiet zone. --surface is #1f1f1f in dark mode, and a
+       scanner reading dark-on-dark finds nothing. The tile is the printed
+       object, not page chrome, so it does not follow the theme. */
+    .qr-tile {
+      width: 17rem;
+      height: 17rem;
+      padding: var(--sp-24);
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: var(--r-panel);
+      display: grid;
+      place-items: center;
+    }
+
+    #qr-img,
+    #qr-img svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* display:block above would beat the hidden attribute. */
+    #qr-img[hidden],
+    .qr-kosong[hidden] {
+      display: none;
+    }
+
+    .qr-kosong {
+      padding: 0 var(--sp-24);
+      text-align: center;
+      font-size: var(--fs-n1);
+      /* The tile stays white in dark mode, so its text cannot take --muted
+         (a light grey, built for the dark ground). */
+      color: #6b645e;
+    }
+
+    .qr-out { justify-self: start; }
+    .qr-note { max-width: 17rem; }
+
+    .qr-actions-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--sp-12);
+    }
+
+    .qr-btn {
+      font-family: inherit;
+      cursor: pointer;
+    }
+
+    button.pg-btn.qr-btn {
+      border: 0;
+      padding: var(--sp-12) var(--sp-24);
+      font-size: var(--fs-0);
+    }
+
+    .qr-btn-2 {
+      min-height: 44px;
+      padding: var(--sp-12) var(--sp-24);
+      font-size: var(--fs-0);
+      font-weight: 600;
+      color: var(--ink);
+      background: var(--surface);
+      border: 1px solid var(--muted);
+      border-radius: var(--r-button);
+    }
+
+    .qr-btn:disabled {
+      opacity: .4;
+      pointer-events: none;
+    }
+
+    .qr-btn:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    .qr-privat {
+      max-width: 44ch;
+      font-size: var(--fs-n1);
+      line-height: 1.6;
+      color: var(--ink);
+    }
+
+    @media (min-width: 480px) {
+      .qr-tile { width: 19rem; height: 19rem; }
+      .qr-note { max-width: 19rem; }
+    }
+
+    @media (min-width: 760px) {
+      .qr-tool {
+        grid-template-columns: 26rem auto;
+        /* the QR spans all three rows; its extra height must land on the last (empty) track, not spread the actions apart */
+        grid-template-rows: auto auto 1fr;
+        justify-content: start;
+        column-gap: var(--sp-48);
+        row-gap: var(--sp-24);
+        align-items: start;
+      }
+      .qr-field   { grid-column: 1; grid-row: 1; }
+      .qr-out     { grid-column: 2; grid-row: 1 / span 3; }
+      .qr-actions { grid-column: 1; grid-row: 2; }
+      .qr-privat  { grid-column: 1; grid-row: 3; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Header — ported from index.html's landing navbar (locked this session);
+       see css/chrome.css for the full note. -->
+  <div class="ld-hd">
+    <div class="ld-hd-left">
+      <!-- A link, not a span (founder, 2026-07-31) — from privasi/dukung
+           there was no way back to the homepage by clicking the logo. -->
+      <a class="ld-mark" href="/" aria-label="PDFLokal, ke beranda">PDF<em>Lokal</em></a>
+      <button class="ld-burger" id="ld-burger" type="button" aria-expanded="false" aria-controls="ld-burger-menu" aria-label="Buka menu navigasi">
+        <svg class="ld-burger-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+          <line class="ld-burger-l1" x1="3" y1="6" x2="21" y2="6"/>
+          <line class="ld-burger-l2" x1="3" y1="12" x2="21" y2="12"/>
+          <line class="ld-burger-l3" x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Desktop only (<900px hides this via the media query) — mobile's
+         equivalent is the burger + #ld-burger-menu below. -->
+    <nav class="ld-nav" aria-label="Navigasi utama">
+      <a href="https://github.com/ojanlubis/pdflokal" rel="noopener">Github</a>
+      <a href="/privasi">Privasi</a>
+      <a href="/dukung">Dukung</a>
+    </nav>
+
+    <div class="ld-hd-right">
+      <!-- Dark-mode toggle. #theme-toggle-checkbox and .theme-toggle are the
+           exact hooks js/theme.js already binds to. -->
+      <label class="ld-theme-toggle theme-toggle" for="theme-toggle-checkbox" aria-label="Ganti tema" title="Ganti tema">
+        <input type="checkbox" id="theme-toggle-checkbox" class="ld-theme-toggle-input">
+        <svg class="ld-theme-toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+      </label>
+
+      <!-- Mobile only — desktop hides this in favour of .ld-nav's Privasi link. -->
+      <a href="/privasi" class="ld-hd-privasi-mobile">Privasi</a>
+
+      <!-- Language control — PLACEHOLDER. Desktop only; mobile's equivalent
+           lives inside the burger drawer. Indonesia selected, English
+           disabled ("segera") and inert on purpose. -->
+      <details class="ld-lang">
+        <summary class="ld-lang-btn" aria-label="Pilih bahasa">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          <span>ID</span>
+          <svg class="ld-lang-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+        </summary>
+        <div class="ld-lang-menu">
+          <button type="button" class="ld-lang-opt is-active">Indonesia</button>
+          <button type="button" class="ld-lang-opt" disabled aria-disabled="true">English <span class="ld-lang-soon">segera</span></button>
+        </div>
+      </details>
+    </div>
+
+    <!-- Burger drawer — mobile only. Desktop force-hides it via CSS even
+         though JS never opens it there.
+         ⚠️ IT LIVES INSIDE .ld-hd ON PURPOSE. As a sibling of the header its
+         `top: 100%` resolved against the page's own scroll container, so the
+         overlay rendered one viewport below the fold — invisible, while
+         every other assertion about it still passed. .ld-hd is the
+         positioning context it needs (position:relative). Being absolute, it
+         is out of flow and does not disturb the header's flex layout. -->
+    <div class="ld-burger-menu" id="ld-burger-menu" hidden>
+      <a href="https://github.com/ojanlubis/pdflokal" rel="noopener">Github</a>
+      <a href="/dukung">Dukung</a>
+      <div class="ld-burger-lang">
+        <span class="ld-burger-lang-label">Bahasa</span>
+        <div class="ld-burger-lang-opts">
+          <span class="ld-lang-opt is-active">Indonesia</span>
+          <span class="ld-lang-opt" aria-disabled="true">English <span class="ld-lang-soon">segera</span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Main Content -->
+  <main class="pg-wrap">
+    <!-- COPY: every string on this page is carried over verbatim from the
+         founder's other site (template-lokal site/app/qr/page.tsx +
+         components/QrTool.tsx), where it is itself a draft. Nothing here was
+         written for pdflokal. -->
+    <div class="qr-page">
+      <h1>Tempel link. Ambil QR-nya.</h1>
+      <p class="qr-lead">Buat ditempel di kaca toko, dicetak di spanduk, atau dikirim di grup.</p>
+
+      <div class="qr-tool">
+        <div class="qr-field">
+          <label for="tautan">Link atau teks</label>
+          <input id="tautan" type="text" inputmode="url" autocomplete="off" spellcheck="false" value="https://pdflokal.id" placeholder="https://">
+          <p class="qr-hint">Ketik atau tempel, QR-nya ikut jalan.</p>
+          <p class="qr-galat" id="qr-galat" role="alert"></p>
+        </div>
+
+        <div class="qr-out">
+          <div class="qr-tile">
+            <div id="qr-img" role="img" hidden></div>
+            <p class="qr-kosong" id="qr-kosong">QR-nya muncul di sini.</p>
+          </div>
+          <p class="qr-note">Unduhannya 1024px, aman buat dicetak dan ditempel.</p>
+        </div>
+
+        <div class="qr-actions">
+          <div class="qr-actions-row">
+            <button type="button" class="pg-btn qr-btn" id="qr-unduh" disabled>Unduh PNG</button>
+            <button type="button" class="qr-btn qr-btn-2" id="qr-salin" disabled>Salin gambar</button>
+          </div>
+          <p class="qr-status" id="qr-status" role="status"></p>
+        </div>
+
+        <p class="qr-privat">
+          QR-nya dibentuk di browser-mu, isinya link kamu sendiri. Nggak lewat server kami,
+          jadi nggak bisa mati atau dialihkan belakangan.
+        </p>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer — ported from index.html's .ld-foot; see css/chrome.css. -->
+  <div class="pg-wrap">
+    <footer class="ld-foot">
+      <a href="/dukung">Dukung PDFLokal</a>
+      <a href="/privasi">Privasi</a>
+      <a href="https://github.com/ojanlubis/pdflokal" rel="noopener">GitHub</a>
+      <span>Dibuat di Indonesia</span>
+      <span>© 2026 PT Fauzan Karya Digital</span>
+    </footer>
+  </div>
+
+  <!-- Theme management -->
+  <script type="module" src="/js/theme.js"></script>
+  <script type="module" src="/js/chrome-nav.js"></script>
+
+  <!-- The QR library: vendored qrcode 1.5.4, a classic script that sets the
+       global QRCode (js/vendor/qrcode.min.js, header says how it was built). It
+       must precede the module below. No CDN, no network. -->
+  <script src="/js/vendor/qrcode.min.js"></script>
+  <script type="module" src="/js/qr.js"></script>
+
+</body>
+</html>

@@ -131,6 +131,18 @@ export function pagesBucket(n) {
   return '21+';
 }
 
+// How many documents the saved list held when it was opened (specs/spec-simpan-editan.md).
+// '0' exists on purpose: an EMPTY list opened is a finding (someone looked for
+// their work and it was not there), and collapsing it into '1-3' would hide it.
+const SAVED_COUNT_BUCKET = ['0', '1-3', '4-9', '10+'];
+export function savedCountBucket(n) {
+  const v = Number(n);
+  if (!Number.isFinite(v) || v <= 0) return '0';
+  if (v <= 3) return '1-3';
+  if (v <= 9) return '4-9';
+  return '10+';
+}
+
 // zoom (a multiplier, up to 3; the floor is 0.3 or lower for a page wider than
 // the screen at 0.3, js/core/zoom.js, since 2026-10-11) → a percent bucket.
 // Cuts are placed against the MEASURED opening zooms of 913eb38 (desktop fit-
@@ -421,9 +433,17 @@ export const SCHEMA = {
   // nothing printed to delete (paper, an image, a drawing, a scan nobody
   // recognised): the count of what people reach for that Hapus still cannot
   // remove. Additive: a cached client never sends either.
+  //
+  // 'gambar' (tool) with 'arm' and 'image' / 'image_paste' (2026-10-23): the
+  // insert-a-picture tool. 'arm' is the toolbar press; 'image' is a picture
+  // placed by the tap that follows the picker; 'image_paste' is one placed by
+  // Ctrl/Cmd+V. Two outcomes, not one, so the rail can tell the tool from the
+  // keyboard path; arm-minus-image is the picker/tap drop-off. CONTENT-BLIND:
+  // no file name, size, type or pixels travel. Enum ADDITIONS only: a cached
+  // client never sends them and every old value still validates.
   tool_use: {
-    tool: ['select', 'teks', 'tipex', 'ganti', 'ttd', 'hapus', 'halaman', 'gabung'],
-    action: ['select', 'whiteout', 'text', 'text_inline', 'signature', 'paraf', 'delete', 'pages_open', 'merge', 'arm', 'sig_modal_open', 'extract', 'original_delete', 'original_miss'],
+    tool: ['select', 'teks', 'tipex', 'ganti', 'ttd', 'hapus', 'halaman', 'gabung', 'gambar'],
+    action: ['select', 'whiteout', 'text', 'text_inline', 'signature', 'paraf', 'delete', 'pages_open', 'merge', 'arm', 'sig_modal_open', 'extract', 'original_delete', 'original_miss', 'image', 'image_paste'],
   },
   // THE OTHER HALF OF THE SAME BLIND SPOT (2026-09-10). `export` fires when a
   // file is actually produced, and `failure`/stage:export fires when the build
@@ -931,6 +951,17 @@ export const SCHEMA = {
     round: 'int',
   },
 
+  // THE QR PAGE (/qr, js/qr.js): the person took the code away. 'download' is the
+  // PNG, 'copy' the image to the clipboard; each fires on the tap, before the
+  // browser says whether it worked (the source site counted taps the same way).
+  // Content-blind by the only possible construction: an enum of two verbs. The
+  // link that was typed, and the code made from it, never ride this rail, and the
+  // page's own last paragraph promises exactly that. ADDITIVE: no existing event
+  // or prop changes, and a cached client simply never sends it.
+  qr_use: {
+    action: ['download', 'copy'],
+  },
+
   // core/visual-oracle.js's compareRegions() on the edited line's own region,
   // pristine (the rebake's PREVIOUS raster) vs stamped (the raster it just
   // produced). A separate event from commit_paint (not new fields riding on
@@ -957,6 +988,24 @@ export const SCHEMA = {
     // exact defect again.
     ink_ratio: RATIO_BUCKET,
   },
+
+  // ---- "Simpan editan" (2026-10-06, specs/spec-simpan-editan.md) — ALL ADDITIVE ----
+  // Content-blind like everything here: no file name, no content, no ids. A saved
+  // document is the user's; the rail learns only THAT the feature was used.
+  //   save_manual:      the File-menu "Simpan editan" succeeded. `update` is a
+  //                     second save of the same open document (an existing entry
+  //                     rewritten), as against a new entry. Failures are NOT an
+  //                     event: the user is told, and the number would only say
+  //                     the browser's storage was full.
+  //   autosave_restore: the reopen dialog on the homepage. offered = shown,
+  //                     accepted = "reopen", declined = closed any other way. The
+  //                     ratio accepted/offered is the whole question the dialog
+  //                     exists to answer (it also announces the feature).
+  //   saved_list_open:  the saved list was opened (from the File menu or from the
+  //                     dialog); `entries` is how many it held.
+  save_manual: { pages: PAGES_BUCKET, update: 'bool' },
+  autosave_restore: { action: ['offered', 'accepted', 'declined'] },
+  saved_list_open: { entries: SAVED_COUNT_BUCKET },
 };
 
 function validateProp(descriptor, value) {

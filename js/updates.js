@@ -29,6 +29,27 @@ import { getLocale } from './lib/i18n.js';
 
 export const UPDATES = [
   {
+    id: '2026-10-23-gambar',
+    date: '2026-10-23',
+    text: 'Di laptop/PC sekarang bisa tempel gambar di halaman (file atau Ctrl+V). Di HP menyusul.',
+    en: 'On a computer you can now put an image on the page (file or Ctrl+V). Phones next.',
+    approved: true, // his handover, decisions 2026-10-23 13:20
+  },
+  {
+    id: '2026-10-23-simpan-editan',
+    date: '2026-10-23',
+    text: 'Editan sekarang tersimpan otomatis di browser ini. Tab ketutup? Buka lagi, lanjut.',
+    en: 'Your edits now save automatically in this browser. Closed the tab? Open it and carry on.',
+    approved: true, // his handover, decisions 2026-10-23 13:20
+  },
+  {
+    id: '2026-10-23-bikin-qr',
+    date: '2026-10-23',
+    text: 'Baru: Bikin QR Code dari link, gratis. Tempel link-nya, unduh QR-nya.', // his ok 2026-10-23
+    en: 'New: make a QR Code from a link, free. Paste the link, download the QR.',
+    approved: true,
+  },
+  {
     id: '2026-10-11-unduh-sama-layar',
     date: '2026-10-11',
     text: 'Hasil Unduh sekarang sama kayak di layar, tulisan dan Tip-Ex nggak turun lagi.',

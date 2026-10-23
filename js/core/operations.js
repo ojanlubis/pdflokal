@@ -209,6 +209,47 @@ export function placeSignature(doc, pageId, { image, ratio }, cx, cy) {
   return addAnnotation(doc, pageId, anno);
 }
 
+// ---- Gambar: a picture the user brought (a photo, a logo, a KTP scan) ---------
+// SINGLE SOURCE OF TRUTH for "where and how big does a brought picture land".
+// It is the signature object (same type, so move, aspect-locked resize, turn
+// with the page, Ctrl+C/V, "Semua Hal.", undo and export all apply unchanged);
+// only the size rule differs: a picture is as big as its pixels up to
+// IMAGE_PAGE_FRAC of the page's width or height, never bigger, aspect kept.
+// 1 image px = 1 page point, the same convention the paste path always had.
+// Used by the Gambar tool (centred on the tap) and Ctrl+V (centred on what the
+// user can see of the page), so the two cannot drift apart.
+export const IMAGE_PAGE_FRAC = 0.6;
+
+// `kind` on a signature-type object: 'picture' = Gambar's, anything else (incl.
+// absent, every object saved before Gambar) = a drawn/uploaded signature. A plain
+// field on the object so history snapshots and any serializer carry it unasked.
+export const PICTURE_KIND = 'picture';
+export function isPicture(anno) {
+  return !!anno && anno.type === 'signature' && anno.kind === PICTURE_KIND;
+}
+
+// The size a pxW x pxH picture takes on `page`, in page points.
+export function imageBoxFor(page, pxW, pxH) {
+  const frame = displayedFrame(page);
+  const fit = Math.min(1, (frame.w * IMAGE_PAGE_FRAC) / pxW, (frame.h * IMAGE_PAGE_FRAC) / pxH);
+  return { width: pxW * fit, height: pxH * fit };
+}
+
+// Drop the picture centred on (cx, cy) in the page's DISPLAYED frame, held
+// whole inside the page. The caller records history first (one placement = one
+// undo step). Returns the new annotation, or null for a missing page or a
+// picture with no pixels.
+export function placeImage(doc, pageId, { image, pxWidth, pxHeight }, cx, cy) {
+  const pg = getPage(doc, pageId);
+  if (!pg || !image || !(pxWidth > 0) || !(pxHeight > 0)) return null;
+  const { width, height } = imageBoxFor(pg, pxWidth, pxHeight);
+  const anno = createAnnotation('signature', { image, kind: PICTURE_KIND, x: 0, y: 0, width, height });
+  const at = originInside(pg, anno, cx - width / 2, cy - height / 2);
+  anno.x = at.x;
+  anno.y = at.y;
+  return addAnnotation(doc, pageId, anno);
+}
+
 // The size `src` takes on `page`: its own, or scaled UNIFORMLY (the screen draws
 // a signature's height from the image ratio, so one axis alone would make screen
 // and file disagree) until its displayed box fits the page. originInside only
@@ -262,6 +303,7 @@ export function copySignatureToAllPages(doc, annotationId) {
     added.push(addAnnotation(doc, pg.id, createAnnotation('signature', {
       image: src.image, x: at.x, y: at.y, width: fit.width, height: fit.height,
       ...(src.turn ? { turn: src.turn } : {}),
+      ...(src.kind ? { kind: src.kind } : {}), // a picture stamped on every page stays a picture
     })));
   }
   return added;

@@ -27,6 +27,19 @@ export function nextId(prefix) {
 // Test-only: reset the counter so id assertions are deterministic per test.
 export function _resetIds() { _seq = 0; }
 
+// A document restored from the browser's saved copy (core/saved-docs.js) keeps
+// its ids verbatim: annotations reference each other by id (replaceCoverId,
+// ocrCoverId ...) and re-minting would mean rewriting every such field, one
+// forgotten reference away from a Ganti text that points at nothing. The cost
+// of keeping them is this: the counter must move past every id the restored
+// doc already holds, or the next createAnnotation in the session collides.
+export function reserveIds(ids) {
+  for (const id of ids) {
+    const n = Number(String(id).match(/_(\d+)$/)?.[1]);
+    if (Number.isFinite(n) && n > _seq) _seq = n;
+  }
+}
+
 // A source file — the ONLY place raw bytes live. Pages reference it by id.
 // `encrypted` — this source carries a PDF standard-security handler. PDF.js
 // decrypts for VIEWING, so these documents open and render perfectly; pdf-lib
@@ -71,6 +84,8 @@ export function createAnnotation(type, props = {}) {
 //                replaceTargets/replaceBox/ocrBox/paperImage) IS the binding.
 //   - signature: image (an immutable data-URL string, shared by reference as
 //                history snapshots and "Semua Hal." already do) + geometry.
+//                `kind` too: 'picture' (Gambar) must stay a picture when pasted;
+//                an object without it is a signature.
 //   - `turn` (text, signature): the quarter turn a page turn gave the object
 //                (core/annotation-geometry.js turnAnnotation). A paste reads
 //                the way its source does on screen.
@@ -78,7 +93,7 @@ export function createAnnotation(type, props = {}) {
 const COPY_FIELDS = {
   text: ['text', 'x', 'y', 'turn', 'fontSize', 'fontFamily', 'bold', 'italic', 'color'],
   whiteout: ['x', 'y', 'width', 'height', 'color'],
-  signature: ['image', 'x', 'y', 'turn', 'width', 'height'],
+  signature: ['image', 'kind', 'x', 'y', 'turn', 'width', 'height'],
 };
 const DOC_BOUND_COVER = ['replaceTargets', 'replaceBox', 'ocrBox', 'paperImage'];
 

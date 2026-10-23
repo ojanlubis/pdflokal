@@ -71,8 +71,9 @@ test.describe('system clipboard paste', () => {
     const px = await page.evaluate((src) => new Promise((r) => {
       const im = new Image(); im.onload = () => r({ w: im.naturalWidth, h: im.naturalHeight }); im.src = src;
     }), a.image);
-    expect(px.w).toBe(1200);
-    expect(px.h).toBe(600);
+    // The cap is Gambar's (js/v2/image-decode.js MAX_IMAGE_PX): 2000px on the long side.
+    expect(px.w).toBe(2000);
+    expect(px.h).toBe(1000);
     expect(await page.evaluate(() => window.v2.getDoc().selection.annotationId)).toBe(a.id);
     await expect(page.locator('.pv-anno')).toHaveCount(1);
     // One paste = one undo step.
@@ -175,26 +176,47 @@ test('TTD after pasting an image makes a NEW signature; the pasted image is unto
   expect(await page.evaluate(() => window.v2.getTool()), 'TTD must arm placement of the new signature').toBe('signature');
 });
 
-// The other half: Gambar Ulang with a signature-type object selected IS the
-// explicit "replace this one" (founder punch list #1), and must still swap it in
-// place, one object, one undo step.
-test('Gambar Ulang on the selected object replaces it in place', async ({ page }) => {
+// A pasted image is a PICTURE (kind:'picture'): the bar says "Gambar terpilih"
+// and offers no Gambar Ulang (that opens the signature sheet, wrong for a photo).
+test('a pasted picture is selected as a picture: its own label, no Gambar Ulang', async ({ page }) => {
   await openDoc(page);
   expect(await paste(page, { image: { w: 400, h: 200 } })).toBe(true);
   await expect.poll(async () => (await annos(page)).length).toBe(1);
   const [pasted] = await annos(page);
+  expect(pasted.kind).toBe('picture');
+  await expect(page.locator('#sig-bar')).toHaveClass(/show/);
+  await expect(page.locator('#sig-bar-label')).toHaveText('Gambar terpilih');
+  await expect(page.locator('#btn-redraw-sig')).toBeHidden();
+});
+
+// The other half: Gambar Ulang with a real SIGNATURE selected IS the explicit
+// "replace this one" (founder punch list #1), and must still swap it in place,
+// one object, one undo step.
+test('Gambar Ulang on the selected signature replaces it in place', async ({ page }) => {
+  await openDoc(page);
+  const drawAndUse = async () => {
+    await expect(page.locator('#sig-canvas')).toHaveAttribute('data-ready', 'true');
+    const box = await page.locator('#sig-canvas').boundingBox();
+    await page.mouse.move(box.x + 40, box.y + 60);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 160, box.y + 80, { steps: 8 });
+    await page.mouse.up();
+    await page.click('#sig-use');
+    await expect(page.locator('#sig-modal')).toBeHidden();
+  };
+  await page.click('[data-tool="signature"]');
+  await drawAndUse();
+  const pv = await page.locator('.pv-page').first().boundingBox();
+  await page.click('.pv-page >> nth=0', { position: { x: pv.width / 2, y: pv.height / 2 } });
+  await expect.poll(async () => (await annos(page)).length).toBe(1);
+  const [placed] = await annos(page);
+  expect(placed.kind, 'a drawn signature is not a picture').toBeUndefined();
+  await expect(page.locator('#sig-bar-label')).toHaveText('Tanda tangan terpilih');
   await expect(page.locator('#btn-redraw-sig')).toBeVisible();
   await page.click('#btn-redraw-sig');
-  await expect(page.locator('#sig-canvas')).toHaveAttribute('data-ready', 'true');
-  const box = await page.locator('#sig-canvas').boundingBox();
-  await page.mouse.move(box.x + 40, box.y + 60);
-  await page.mouse.down();
-  await page.mouse.move(box.x + 160, box.y + 80, { steps: 8 });
-  await page.mouse.up();
-  await page.click('#sig-use');
-  await expect(page.locator('#sig-modal')).toBeHidden();
+  await drawAndUse();
   const after = await annos(page);
   expect(after).toHaveLength(1);
-  expect(after[0].id).toBe(pasted.id);
-  expect(after[0].image).not.toBe(pasted.image);
+  expect(after[0].id).toBe(placed.id);
+  expect(after[0].image).not.toBe(placed.image);
 });

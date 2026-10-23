@@ -24,6 +24,12 @@
       "js/v2/app.js"
     ]
   },
+  "sigBar.pictureSelected": {
+    "text": "Gambar terpilih",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
   "sigBar.armed": {
     "text": "Pilih tempat untuk menempatkan",
     "src": [
@@ -1205,6 +1211,210 @@
     "text": "Done",
     "src": [
       "js/v2/feature-vote.js"
+    ]
+  },
+  "tools.gambar": {
+    "text": "Gambar",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
+  "tools.gambarTip": {
+    "text": "Tambah gambar ke halaman",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
+  "saved.menuSave": {
+    "text": "Simpan editan",
+    "src": [
+      "js/v2/saved-docs-ui.js"
+    ]
+  },
+  "saved.menuSaveTip": {
+    "text": "Simpan di browser ini, biar bisa dibuka lagi",
+    "src": [
+      "js/v2/saved-docs-ui.js"
+    ]
+  },
+  "saved.menuList": {
+    "text": "Editan tersimpan",
+    "src": [
+      "js/v2/saved-docs-ui.js"
+    ]
+  },
+  "saved.menuListTip": {
+    "text": "Buka atau hapus editan yang kamu simpan",
+    "src": [
+      "js/v2/saved-docs-ui.js"
+    ]
+  },
+  "saved.saved": {
+    "text": "Tersimpan di browser ini",
+    "src": [
+      "js/v2/saved-docs-ui.js"
+    ]
+  },
+  "saved.savedSafari": {
+    "text": "Tersimpan di browser ini. Safari menghapusnya kalau 7 hari nggak dibuka.",
+    "src": [
+      "js/v2/saved-docs-ui.js"
+    ]
+  },
+  "saved.updated": {
+    "text": "Perubahan tersimpan",
+    "src": [
+      "js/v2/saved-docs-ui.js"
+    ]
+  },
+  "saved.failQuota": {
+    "text": "Penyimpanan browser penuh, editan nggak bisa disimpan",
+    "src": [
+      "js/v2/saved-docs-ui.js"
+    ]
+  },
+  "saved.failBlocked": {
+    "text": "Browser ini menolak penyimpanan. Kalau lagi mode privat, coba di tab biasa.",
+    "src": [
+      "js/v2/saved-docs-ui.js"
+    ]
+  },
+  "saved.failOther": {
+    "text": "Editan nggak bisa disimpan. Coba lagi ya.",
+    "src": [
+      "js/v2/saved-docs-ui.js"
+    ]
+  },
+  "saved.openFail": {
+    "text": "Editan itu nggak bisa dibuka",
+    "src": [
+      "js/v2/saved-docs-ui.js"
+    ]
+  },
+  "saved.askTitle": {
+    "text": "Lanjutkan editan terakhir?",
+    "src": [
+      "js/v2/saved-docs-ui.js"
+    ]
+  },
+  "saved.askBody": {
+    "text": "Editanmu tersimpan otomatis di browser ini, nggak diupload.",
+    "src": [
+      "js/v2/saved-docs-ui.js"
+    ]
+  },
+  "saved.askWhen": {
+    "text": "{name}, diedit {when}",
+    "src": [
+      "js/v2/saved-docs-ui.js"
+    ]
+  },
+  "saved.askOpen": {
+    "text": "Buka lagi",
+    "src": [
+      "js/v2/saved-docs-ui.js"
+    ]
+  },
+  "saved.askLater": {
+    "text": "Nanti aja",
+    "src": [
+      "js/v2/saved-docs-ui.js"
+    ]
+  },
+  "saved.askAll": {
+    "text": "Lihat semua",
+    "src": [
+      "js/v2/saved-docs-ui.js"
+    ]
+  },
+  "saved.listTitle": {
+    "text": "Editan tersimpan",
+    "src": [
+      "js/v2/saved-docs-ui.js"
+    ]
+  },
+  "saved.listClose": {
+    "text": "Tutup",
+    "src": [
+      "js/v2/saved-docs-ui.js"
+    ]
+  },
+  "saved.listEmpty": {
+    "text": "Belum ada editan tersimpan.",
+    "src": [
+      "js/v2/saved-docs-ui.js"
+    ]
+  },
+  "saved.listManual": {
+    "text": "Yang kamu simpan",
+    "src": [
+      "js/v2/saved-docs-ui.js"
+    ]
+  },
+  "saved.listAuto": {
+    "text": "Terakhir dibuka",
+    "src": [
+      "js/v2/saved-docs-ui.js"
+    ]
+  },
+  "saved.listPages": {
+    "text": "{count} halaman",
+    "src": [
+      "js/v2/saved-docs-ui.js"
+    ]
+  },
+  "saved.listOpen": {
+    "text": "Buka",
+    "src": [
+      "js/v2/saved-docs-ui.js"
+    ]
+  },
+  "saved.listOpenCopy": {
+    "text": "Buka salinan",
+    "src": [
+      "js/v2/saved-docs-ui.js"
+    ]
+  },
+  "saved.listDelete": {
+    "text": "Hapus",
+    "src": [
+      "js/v2/saved-docs-ui.js"
+    ]
+  },
+  "saved.listDeleteSure": {
+    "text": "Yakin hapus?",
+    "src": [
+      "js/v2/saved-docs-ui.js"
+    ]
+  },
+  "saved.listElsewhere": {
+    "text": "Terbuka di tab lain",
+    "src": [
+      "js/v2/saved-docs-ui.js"
+    ]
+  },
+  "saved.listHere": {
+    "text": "Sedang dibuka",
+    "src": [
+      "js/v2/saved-docs-ui.js"
+    ]
+  },
+  "saved.listStorage": {
+    "text": "Browser memakai {size} untuk PDFLokal di perangkat ini.",
+    "src": [
+      "js/v2/saved-docs-ui.js"
+    ]
+  },
+  "saved.listStorageNote": {
+    "text": "Nggak ada yang diupload. Browser bisa menghapusnya sendiri kapan saja.",
+    "src": [
+      "js/v2/saved-docs-ui.js"
+    ]
+  },
+  "saved.listSafari": {
+    "text": "Safari menghapus data situs yang 7 hari nggak dibuka.",
+    "src": [
+      "js/v2/saved-docs-ui.js"
     ]
   }
 }

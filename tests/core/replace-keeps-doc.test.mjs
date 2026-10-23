@@ -258,7 +258,11 @@ test('appending a file that cannot be decoded still keeps the open document (the
   assert.equal(w.env.doc.pages.length, 2);
 });
 
-test('resetDoc is only awaited once, at the commit inside loadFilesInner', () => {
-  assert.equal([...APP.matchAll(/await resetDoc\(/g)].length, 1);
+// Two callers, both only after the new document exists: the commit inside loadFilesInner
+// (a staged replace with pages) and adoptRestoredDoc (Simpan editan, a restored document
+// that was read back from storage before anything is wiped).
+test('resetDoc is only awaited at a commit: loadFilesInner, and adoptRestoredDoc (Simpan editan)', () => {
+  assert.equal([...APP.matchAll(/await resetDoc\(/g)].length, 2);
   assert.match(cut('async function loadFilesInner(', '{', '}'), /await resetDoc\(/);
+  assert.match(cut('async function adoptRestoredDoc(', '{', '}'), /await resetDoc\(/);
 });

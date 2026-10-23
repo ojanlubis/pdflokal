@@ -18,8 +18,15 @@ export default {
   page: { short: 'Page {n}' },
   loading: { count: '{n} of {total} files' },
 
+  // Gambar (insert a picture) toolbar button. Final 2026-10-23, the seat's call under his handover (decisions 2026-10-23 13:20).
+  tools: {
+    gambar: 'Image',
+    gambarTip: 'Add an image to the page',
+  },
+
   sigBar: {
     signatureSelected: 'Signature selected',
+    pictureSelected: 'Image selected',
     armed: 'Pick a spot to place',
   },
 
@@ -361,5 +368,42 @@ export default {
   theme: {
     toLight: 'Switch to light mode',
     toDark: 'Switch to dark mode',
+  },
+
+  // "Simpan editan" (js/v2/saved-docs-ui.js, js/v2/saved-session.js, app.js).
+  // Final 2026-10-23: the seat's copy pass under his handover (decisions 2026-10-23 13:20).
+  saved: {
+    menuSave: 'Save edits',
+    menuSaveTip: 'Save in this browser so you can open it again',
+    menuList: 'Saved edits',
+    menuListTip: 'Open or delete the edits you saved',
+    saved: 'Saved in this browser',
+    savedSafari: "Saved in this browser. Safari deletes it if you don't visit for 7 days.",
+    updated: 'Changes saved',
+    failQuota: 'Browser storage is full, your edits could not be saved',
+    failBlocked: 'This browser blocks saving. In a private window, try a normal one.',
+    failOther: 'Your edits could not be saved. Try again.',
+    openFail: 'That saved edit could not be opened',
+    askTitle: 'Continue your last edit?',
+    askBody: 'Your edits were saved automatically in this browser, not uploaded.',
+    askWhen: '{name}, edited {when}',
+    askOpen: 'Reopen',
+    askLater: 'Not now',
+    askAll: 'See all',
+    listTitle: 'Saved edits',
+    listClose: 'Close',
+    listEmpty: 'No saved edits yet.',
+    listManual: 'Saved by you',
+    listAuto: 'Recently opened',
+    listPages: { one: '{count} page', other: '{count} pages' },
+    listOpen: 'Open',
+    listOpenCopy: 'Open a copy',
+    listDelete: 'Delete',
+    listDeleteSure: 'Really delete?',
+    listElsewhere: 'Already open in another tab',
+    listHere: 'Open in this tab',
+    listStorage: 'Your browser uses {size} for PDFLokal on this device.',
+    listStorageNote: 'Nothing is uploaded. The browser may clear it on its own at any time.',
+    listSafari: 'Safari deletes site data after 7 days without a visit.',
   },
 };
