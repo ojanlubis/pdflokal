@@ -34,6 +34,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const HTML = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
 const APP = fs.readFileSync(path.join(ROOT, 'js/v2/app.js'), 'utf8');
+const ID_LOCALE = (await import('../../js/locales/id.js')).default;
 
 // The menu block: from `<div id="file-menu"` to its closing tag. The block
 // contains no nested <div>, only <button> and <svg>, so the first `</div>`
@@ -65,7 +66,17 @@ const EXPECTED = [
   { id: 'fm-pages', label: 'Atur Halaman' },
 ];
 
-test('1. the File menu is exactly three items, in his order, with his labels', () => {
+// "Simpan editan" (2026-10-06, specs/spec-simpan-editan.md, BUILT NOT RELEASED) adds two items
+// AFTER his three, so his order and labels above are untouched. Their words are DRAFTS and live
+// in js/locales (saved.*), set by app.js at load: the markup carries an empty label span, and this
+// test asserts the dictionary has the words and app.js puts them there, instead of pinning
+// draft copy in the HTML the seat has not written yet.
+const SAVED_ITEMS = [
+  { id: 'fm-save', labelKey: 'saved.menuSave', tipKey: 'saved.menuSaveTip' },
+  { id: 'fm-saved', labelKey: 'saved.menuList', tipKey: 'saved.menuListTip' },
+];
+
+test('1. the File menu is his three items in his order with his labels, then the two Simpan editan items', () => {
   const block = fileMenuBlock();
 
   // VACUITY GUARD: an empty or mis-sliced block would make every `includes`
@@ -73,9 +84,21 @@ test('1. the File menu is exactly three items, in his order, with his labels', (
   assert.ok(block.length > 200, `menu block is ${block.length} chars — the slice is wrong`);
 
   const items = [...block.matchAll(/<button\b[^>]*\brole="menuitem"[^>]*>([\s\S]*?)<\/button>/g)];
-  assert.equal(items.length, 3, `expected 3 menu items, found ${items.length}`);
+  assert.equal(items.length, 5, `expected 5 menu items (his 3 + 2 saved), found ${items.length}`);
 
-  items.forEach((m, i) => {
+  items.slice(3).forEach((m, i) => {
+    const open = m[0].slice(0, m[0].indexOf('>') + 1);
+    assert.ok(open.includes(`id="${SAVED_ITEMS[i].id}"`), `menu item ${i + 4} is not #${SAVED_ITEMS[i].id}:\n${open}`);
+  });
+  for (const { labelKey, tipKey } of SAVED_ITEMS) {
+    const [group, name] = labelKey.split('.');
+    const [, tipName] = tipKey.split('.');
+    assert.ok(ID_LOCALE[group]?.[name]?.trim(), `${labelKey} has no label in id.js`);
+    assert.ok(ID_LOCALE[group]?.[tipName]?.trim(), `${tipKey} has no tooltip in id.js`);
+    assert.ok(APP_CODE.includes(`tr('${labelKey}')`) && APP_CODE.includes(`tr('${tipKey}')`), `app.js never sets the words of ${labelKey}`);
+  }
+
+  items.slice(0, 3).forEach((m, i) => {
     const open = m[0].slice(0, m[0].indexOf('>') + 1);
     const { id, label } = EXPECTED[i];
     assert.ok(open.includes(`id="${id}"`), `menu item ${i + 1} is not #${id} — order changed:\n${open}`);
@@ -125,7 +148,7 @@ test('4. the toolbar Halaman button SURVIVES — his N2(a) ruling, in a test', (
  * looked correct. `npm run seo:check` catches staleness; it does not describe
  * WHAT should be there.
  */
-test('5. all thirteen surfaces carry the same three-item menu', () => {
+test('5. all thirteen surfaces carry the same menu', () => {
   const pages = JSON.parse(fs.readFileSync(path.join(ROOT, 'seo/pages.json'), 'utf8'))
     .pages.map((p) => `${p.slug}.html`);
   assert.equal(pages.length, 12, `expected 12 generated pages, got ${pages.length} — vacuity guard`);
@@ -139,6 +162,7 @@ test('5. all thirteen surfaces carry the same three-item menu', () => {
       if (!html.includes(label)) wrong.push(`${page} → missing label "${label}"`);
     }
     if (!/id="fm-pages"[^>]*\btitle="[^"]+"/.test(html)) wrong.push(`${page} → #fm-pages has no tooltip`);
+    for (const { id } of SAVED_ITEMS) if (!html.includes(`id="${id}"`)) wrong.push(`${page} → missing #${id}`);
   }
   assert.deepEqual(wrong, [], `generated pages drifted from index.html:\n${wrong.join('\n')}`);
 });

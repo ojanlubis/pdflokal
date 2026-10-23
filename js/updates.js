@@ -29,6 +29,13 @@ import { getLocale } from './lib/i18n.js';
 
 export const UPDATES = [
   {
+    id: '2026-10-23-simpan-editan',
+    date: '2026-10-23',
+    text: 'Editan sekarang tersimpan otomatis di browser ini. Tab ketutup? Buka lagi, lanjut.',
+    en: 'Your edits now save automatically in this browser. Closed the tab? Open it and carry on.',
+    approved: true, // his handover, decisions 2026-10-23 13:20
+  },
+  {
     id: '2026-10-23-bikin-qr',
     date: '2026-10-23',
     text: 'Baru: Bikin QR Code dari link, gratis. Tempel link-nya, unduh QR-nya.', // his ok 2026-10-23

@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 
 import {
   SCHEMA, validateEvent, pagesBucket, durationBucket, intentValue, ratioBucket, inkRatioBucket,
-  ocrLinesBucket, zoomBucket,
+  ocrLinesBucket, zoomBucket, savedCountBucket,
 } from '../../js/core/telemetry-schema.js';
 
 // A minimal, schema-valid props object for each event — used to prove every
@@ -44,6 +44,10 @@ const VALID_PROPS = {
   // `lines` uses OCR_LINES_BUCKET, which has a '0' the page bucket does not:
   // "recognised nothing" is the outcome this event exists to be able to see.
   ocr_run: { lines: '6-20', duration: 1200, engine_cached: false },
+  // "Simpan editan" (2026-10-06): additive, content-blind.
+  save_manual: { pages: '2-5', update: false },
+  autosave_restore: { action: 'offered' },
+  saved_list_open: { entries: '1-3' },
   ganti_tap: { hit: true },
   ganti_commit: { outcome: 'commit', font_path: 'doc-font' },
   surgery: { matched: true, reason: 'clean' },
@@ -531,6 +535,29 @@ test('zoom_tap: dir and device are closed enums, level must be a bucket', () => 
   assert.equal(validateEvent('zoom_tap', { ...VALID_PROPS.zoom_tap, dir: 'up' }).ok, false);
   assert.equal(validateEvent('zoom_tap', { ...VALID_PROPS.zoom_tap, level: 2.38 }).ok, false); // a raw number is never speakable
   assert.equal(validateEvent('zoom_tap', { ...VALID_PROPS.zoom_tap, device: 'watch' }).ok, false);
+});
+
+// ---- Simpan editan events (specs/spec-simpan-editan.md) --------------------------------
+test('autosave_restore: offered/accepted/declined only; save_manual and saved_list_open refuse anything off-schema', () => {
+  for (const action of ['offered', 'accepted', 'declined']) assert.equal(validateEvent('autosave_restore', { action }).ok, true, action);
+  assert.equal(validateEvent('autosave_restore', { action: 'shown' }).ok, false);
+  assert.equal(validateEvent('autosave_restore', {}).ok, false);
+  // content-blind: a name or id riding along is an unknown prop, so the whole event is dropped
+  assert.equal(validateEvent('save_manual', { pages: '1', update: true, name: 'kontrak.pdf' }).ok, false);
+  assert.equal(validateEvent('save_manual', { pages: '1', update: 'yes' }).ok, false);
+  assert.equal(validateEvent('saved_list_open', { entries: '1-3', id: 'a-1' }).ok, false);
+  assert.equal(validateEvent('saved_list_open', { entries: '7' }).ok, false);
+});
+
+test('savedCountBucket: an EMPTY list is its own bucket, and garbage collapses to it', () => {
+  assert.equal(savedCountBucket(0), '0');
+  assert.equal(savedCountBucket(1), '1-3');
+  assert.equal(savedCountBucket(3), '1-3');
+  assert.equal(savedCountBucket(4), '4-9');
+  assert.equal(savedCountBucket(9), '4-9');
+  assert.equal(savedCountBucket(10), '10+');
+  for (const bad of [NaN, -1, undefined, null, 'x']) assert.equal(savedCountBucket(bad), '0');
+  for (const n of [0, 1, 5, 20]) assert.equal(validateEvent('saved_list_open', { entries: savedCountBucket(n) }).ok, true);
 });
 
 // qr_use (2026-10-23, the /qr page): the privacy claim on that page is that the link

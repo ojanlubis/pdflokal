@@ -131,6 +131,18 @@ export function pagesBucket(n) {
   return '21+';
 }
 
+// How many documents the saved list held when it was opened (specs/spec-simpan-editan.md).
+// '0' exists on purpose: an EMPTY list opened is a finding (someone looked for
+// their work and it was not there), and collapsing it into '1-3' would hide it.
+const SAVED_COUNT_BUCKET = ['0', '1-3', '4-9', '10+'];
+export function savedCountBucket(n) {
+  const v = Number(n);
+  if (!Number.isFinite(v) || v <= 0) return '0';
+  if (v <= 3) return '1-3';
+  if (v <= 9) return '4-9';
+  return '10+';
+}
+
 // zoom (a multiplier, up to 3; the floor is 0.3 or lower for a page wider than
 // the screen at 0.3, js/core/zoom.js, since 2026-10-11) → a percent bucket.
 // Cuts are placed against the MEASURED opening zooms of 913eb38 (desktop fit-
@@ -963,6 +975,24 @@ export const SCHEMA = {
     // exact defect again.
     ink_ratio: RATIO_BUCKET,
   },
+
+  // ---- "Simpan editan" (2026-10-06, specs/spec-simpan-editan.md) — ALL ADDITIVE ----
+  // Content-blind like everything here: no file name, no content, no ids. A saved
+  // document is the user's; the rail learns only THAT the feature was used.
+  //   save_manual:      the File-menu "Simpan editan" succeeded. `update` is a
+  //                     second save of the same open document (an existing entry
+  //                     rewritten), as against a new entry. Failures are NOT an
+  //                     event: the user is told, and the number would only say
+  //                     the browser's storage was full.
+  //   autosave_restore: the reopen dialog on the homepage. offered = shown,
+  //                     accepted = "reopen", declined = closed any other way. The
+  //                     ratio accepted/offered is the whole question the dialog
+  //                     exists to answer (it also announces the feature).
+  //   saved_list_open:  the saved list was opened (from the File menu or from the
+  //                     dialog); `entries` is how many it held.
+  save_manual: { pages: PAGES_BUCKET, update: 'bool' },
+  autosave_restore: { action: ['offered', 'accepted', 'declined'] },
+  saved_list_open: { entries: SAVED_COUNT_BUCKET },
 };
 
 function validateProp(descriptor, value) {
