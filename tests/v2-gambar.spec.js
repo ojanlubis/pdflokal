@@ -249,3 +249,41 @@ test.describe('Gambar: Ctrl/Cmd+V', () => {
     expect(list[2].image, 'stale in-app copy: the clipboard image wins').not.toBe(first.image);
   });
 });
+
+// Below 900px the Gambar button is hidden (a 375px row cannot hold seven tools).
+// Nobody may be stranded by that: a picture that is already on the page (Ctrl+V
+// with a hardware keyboard, a restored doc) is still a first-class object.
+test.describe('Gambar on a phone-width viewport', () => {
+  test.use({ viewport: { width: 375, height: 812 } });
+
+  test('button hidden; a pasted picture is selected with the picture bar and Delete removes it', async ({ page }) => {
+    await openDoc(page);
+    await expect(page.locator('#toolbar [data-tool="gambar"]')).toBeHidden();
+    const toolbarFits = await page.evaluate(() => { const t = document.getElementById('toolbar'); return t.scrollWidth <= t.clientWidth; });
+    expect(toolbarFits, 'the phone toolbar row must not overflow').toBe(true);
+
+    const placed = await page.evaluate(async () => {
+      const c = document.createElement('canvas');
+      c.width = 400; c.height = 200;
+      c.getContext('2d').fillRect(0, 0, 400, 200);
+      const blob = await new Promise((r) => c.toBlob(r, 'image/png'));
+      const dt = new DataTransfer();
+      dt.items.add(new File([blob], 'x.png', { type: 'image/png' }));
+      const ev = new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true });
+      document.body.dispatchEvent(ev);
+      return ev.defaultPrevented;
+    });
+    expect(placed, 'Ctrl+V of an image is handled at every width').toBe(true);
+
+    await expect.poll(async () => (await annos(page)).length).toBe(1);
+    const [pic] = await annos(page);
+    expect(pic.kind).toBe('picture');
+    expect(await page.evaluate(() => window.v2.getDoc().selection.annotationId)).toBe(pic.id);
+    await expect(page.locator('#sig-bar')).toHaveClass(/show/);
+    await expect(page.locator('#sig-bar-label')).toHaveText('Gambar terpilih');
+    await expect(page.locator('#btn-redraw-sig')).toBeHidden();
+
+    await page.keyboard.press('Delete');
+    await expect.poll(async () => (await annos(page)).length).toBe(0);
+  });
+});

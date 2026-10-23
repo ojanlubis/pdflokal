@@ -614,6 +614,12 @@
     @media (max-width: 899px) {
       :root { --hdr-top: max(10px, env(safe-area-inset-top, 0px)); }
       header { padding-top: var(--hdr-top); }
+      /* GAMBAR below the desktop breakpoint: seven 56px tools overflow a 375px
+         row (clipped Teks/Halaman, 29px over), so the button waits for a [more]
+         overflow (decision 2026-10-23). Ctrl+V still places a picture at every
+         width, and a picture already on the page stays selectable, movable,
+         resizable and deletable: none of that reads this button. */
+      #toolbar .tool[data-tool="gambar"] { display: none; }
     }
     /* Narrow: the toolbar is a row of its own and carries the bottom edge, so
        the header must NOT also draw one — two borders read as a seam. */
