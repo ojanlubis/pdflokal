@@ -45,7 +45,9 @@ export const CURRENT_ROUND = 2;
 // An id with no entry is a normal, selectable option.
 export const FEATURE_STATUS = Object.freeze({
   'pdf-word': 'wip',
-  'canvas-image': 'shipped',
+  // Seat call 2026-10-23: Gambar is desktop-only until the toolbar overflow exists, and most
+  // voters are on phones, so 'Done' would be false for them. Flip when it lands on phones.
+  'canvas-image': 'wip',
   'save-edits': 'shipped',
 });
 export const BADGE_STATUSES = Object.freeze(['wip', 'shipped']);

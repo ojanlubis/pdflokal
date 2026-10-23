@@ -27,7 +27,7 @@ const FIXTURE = path.join(__dirname, '..', 'fixtures', 'sample-2pages.pdf');
 const SHOWS_WITHIN = 1_500;
 const NOT_BY = 5_000;
 
-// ROUND 2 (2026-10-23): pdf-word ("Lagi dikerjakan"), save-edits and canvas-image ("Done") are status
+// ROUND 2 (2026-10-23): pdf-word and canvas-image ("Lagi dikerjakan"; Gambar is desktop-only for now), save-edits ("Done") are status
 // rows: small, a DISABLED checkbox (ticked when done), listed AFTER the six real options.
 const TOP = { voters: 40, counts: { batch: 22, watermark: 14, 'form-fill': 9, 'lock-unlock': 4 } };
 const IDS = ['pdf-excel', 'lock-unlock', 'form-fill', 'camera-scan', 'watermark', 'batch', 'pdf-word', 'save-edits', 'canvas-image']; // card order
@@ -151,7 +151,7 @@ export function defineFeatureVoteSuite({ door }) {
         'Tambah watermark', 'Proses banyak file sekaligus',
       ]);
       await expect(page.locator('#fv-form .fv-static .fv-opt-name')).toHaveText(['PDF ke Word', 'Simpan editan buat dilanjut nanti', 'Tempel gambar atau logo']);
-      await expect(page.locator('#fv-form .fv-static .fv-badge')).toHaveText(['Lagi dikerjakan', 'Done', 'Done']);
+      await expect(page.locator('#fv-form .fv-static .fv-badge')).toHaveText(['Lagi dikerjakan', 'Done', 'Lagi dikerjakan']);
       const order = await page.locator('#fv-form .fv-opt').evaluateAll((els) => els.map((el) => el.classList.contains('fv-static')));
       expect(order, 'status rows come after every selectable option').toEqual([false, false, false, false, false, false, true, true, true]);
       await expect(step(page, 'choose').getByRole('checkbox')).toHaveCount(9);
@@ -159,7 +159,7 @@ export function defineFeatureVoteSuite({ door }) {
       const statics = page.locator('#fv-form .fv-static input[type="checkbox"]');
       await expect(statics).toHaveCount(3);
       for (const b of await statics.all()) await expect(b).toBeDisabled();
-      expect(await statics.evaluateAll((els) => els.map((el) => el.checked))).toEqual([false, true, true]);
+      expect(await statics.evaluateAll((els) => els.map((el) => el.checked))).toEqual([false, true, false]);
       for (const id of BADGED) await expect(box(page, id)).toHaveCount(0); // no voting box exists for them
       // quiet: no tint, and a status row is smaller than a tap-target row
       const bg = (sel) => page.locator(sel).first().evaluate((el) => getComputedStyle(el).backgroundColor);
@@ -651,7 +651,7 @@ export function defineFeatureVoteSuite({ door }) {
       await expect(page.locator('#fv-title')).toHaveText('Which features do you need?');
       await expect(page.locator('#fv-form .fv-hint')).toHaveText('Pick up to 3');
       await expect(page.locator('#fv-form .fv-static .fv-opt-name')).toHaveText(['PDF to Word', 'Save your edits to continue later', 'Add an image or logo']);
-      await expect(page.locator('#fv-form .fv-static .fv-badge')).toHaveText(['In the works', 'Done', 'Done']);
+      await expect(page.locator('#fv-form .fv-static .fv-badge')).toHaveText(['In the works', 'Done', 'In the works']);
       await expect(page.locator('#fv-form label.fv-opt')).toHaveText([
         'PDF to Excel', 'Lock and unlock password-protected PDFs', 'Fill in PDF forms', 'Scan documents with your phone camera',
         'Add a watermark', 'Process many files at once',

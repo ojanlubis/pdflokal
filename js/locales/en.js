@@ -336,7 +336,7 @@ export default {
     thanks: "Thanks for votingg. When it's done I'll tell you here ok",
     top: 'Most picked so far:',
     close: 'Close',
-    badgeWip: 'In the works', // DRAFT: the founder's id words are 'Lagi dikerjakan'; this English line is the seat's
+    badgeWip: 'In the works', // the seat's English for his 'Lagi dikerjakan', final 2026-10-23 (his handover)
     badgeShipped: 'Done', // his word, 2026-10-23 (same in both languages)
     shipped: "{feature} is done. You're one of the people who picked it, thankss",
     labels: [
@@ -348,7 +348,7 @@ export default {
       'Scan documents with your phone camera',
       'Add an image or logo',
       'Add a watermark',
-      'Process many files at once', // DRAFT (round 2)
+      'Process many files at once', // final 2026-10-23, the seat under his handover
     ],
   },
 

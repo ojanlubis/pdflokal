@@ -363,7 +363,7 @@ export default {
       'Scan dokumen pakai kamera HP',
       'Tempel gambar atau logo',
       'Tambah watermark',
-      'Proses banyak file sekaligus', // DRAFT (round 2)
+      'Proses banyak file sekaligus', // final 2026-10-23, the seat under his handover
     ],
   },
 

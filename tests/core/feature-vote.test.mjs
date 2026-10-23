@@ -90,10 +90,10 @@ test('his own words are verbatim (spelling and line breaks are his: do not fix t
   assert.match(src, /later: 'Nanti aja', \/\/ DRAFT/);
   // round 2's new strings are DRAFT-marked at their own line (the seat lists them for him)
   assert.match(src, /DRAFT-APPROVED-BY-HIM[^\n]*done[^\n]*\n\s*badgeShipped: 'Done',/, 'his word, marked approved, not DRAFT');
-  assert.match(src, /'Proses banyak file sekaligus', \/\/ DRAFT/);
+  assert.match(src, /'Proses banyak file sekaligus', \/\/ final/);
   assert.equal(ID.featureVote.badgeShipped, 'Done');
   assert.equal(EN.featureVote.badgeShipped, 'Done');
-  assert.match(read('js/locales/en.js'), /badgeWip: '[^']+', \/\/ DRAFT/);
+  assert.doesNotMatch(read('js/locales/en.js'), /badgeWip: '[^']+', \/\/ DRAFT/);
 });
 
 test('the card is a skeleton in index.html (no hard-coded option labels) and the menu link is in the nav and the drawer, / and /en', () => {
@@ -129,9 +129,9 @@ test('cleanVote: a valid vote passes; empty is allowed (a text-only idea)', () =
 
 // ---- round 2 (2026-10-23): badged options, the per-option status map ---------------
 
-test('ROUND 2: the current round is 2; pdf-word is "wip", save-edits and canvas-image are "shipped" (his call 2026-10-23)', () => {
+test('ROUND 2: the current round is 2; pdf-word and canvas-image are "wip", save-edits is "shipped" (seat call 2026-10-23: Gambar is desktop-only for now)', () => {
   assert.equal(CURRENT_ROUND, 2);
-  assert.deepEqual({ ...FEATURE_STATUS }, { 'pdf-word': 'wip', 'canvas-image': 'shipped', 'save-edits': 'shipped' });
+  assert.deepEqual({ ...FEATURE_STATUS }, { 'pdf-word': 'wip', 'canvas-image': 'wip', 'save-edits': 'shipped' });
   assert.ok(Object.isFrozen(FEATURE_STATUS), 'the status map cannot be bent at runtime');
   for (const id of ['pdf-word', 'canvas-image', 'save-edits']) assert.equal(isSelectable(id), false, `${id} is not pickable`);
   for (const id of ['form-fill', 'pdf-excel', 'camera-scan', 'lock-unlock', 'watermark', 'batch']) assert.equal(isSelectable(id), true, `${id} is pickable`);
