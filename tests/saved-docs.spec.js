@@ -81,6 +81,11 @@ async function bukaBaru(page) {
   const before = await page.evaluate(() => window.v2.getDoc().pages[0]?.id ?? null);
   await page.click('#btn-file');
   await page.click('#fm-new');
+  // Main asks first when the open document has edits nobody downloaded (d53cc95, 2026-10-09,
+  // #new-confirm); a saved document is still not a downloaded one. A clean one opens the picker
+  // straight away, so the confirm is only answered when it is up (the click handler shows it
+  // synchronously).
+  if (await page.locator('#new-confirm').evaluate((d) => d.open)) await page.click('#nc-go');
   await page.setInputFiles('#file-input', FIXTURE);
   await expect.poll(() => page.evaluate((old) => {
     const first = window.v2.getDoc().pages[0];
