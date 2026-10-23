@@ -237,8 +237,8 @@ test('SCHEDULE, a simulated week: offered each time until Nanti; quiet that day;
 
 // ---- "nanti saya kabari di sini" (pure) -------------------------------------
 
-test('SHIPPED is empty today (nothing is released, so nobody is told anything)', () => {
-  assert.deepEqual([...SHIPPED], []);
+test('SHIPPED holds save-edits only (canvas-image waits for Gambar on phones, seat call 2026-10-23)', () => {
+  assert.deepEqual([...SHIPPED], ['save-edits']);
   assert.deepEqual(untoldShipped(['pdf-word'], []), []);
 });
 

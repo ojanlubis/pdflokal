@@ -86,10 +86,11 @@ export const FEATURES = Object.freeze([
   { id: 'batch' }, // round 2 (2026-10-23): appended, so every label above keeps its index
 ].map((f) => Object.freeze(f)));
 
-// Features that are BUILT AND RELEASED, by id. Empty today. When one ships, add its
+// Features that are BUILT AND RELEASED, by id. When one ships, add its
 // id here: anyone whose stored vote holds it is told once, by the maker card
 // ("<feature> sudah jadi. Kamu salah satu yang milih ini."), and never again.
-export const SHIPPED = Object.freeze([]);
+// save-edits: live 2026-10-23 (#185). canvas-image waits until phones have Gambar.
+export const SHIPPED = Object.freeze(['save-edits']);
 
 export const FEATURE_IDS = Object.freeze(FEATURES.map((f) => f.id));
 
