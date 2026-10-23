@@ -49,12 +49,24 @@ export function paperPoints(line, s) {
   }
   return pts;
 }
-export function inkPoints(line, s) {
-  const pts = [];
-  for (let ix = 1; ix <= 8; ix += 1) {
-    for (let iy = 1; iy <= 3; iy += 1) pts.push([(line.x + (line.w * ix) / 9) * s, (line.y + (line.h * iy) / 4) * s]);
-  }
-  return pts;
+// The line's whole box as an integer raster rect, clamped to a w x h raster, or
+// null when none of it lands there. The ink is read from EVERY pixel in it (see
+// inkColorFrom): a 24-point grid mostly misses the stems of regular-weight text.
+export function inkBoxRect(line, s, w, h) {
+  const x0 = Math.max(0, Math.floor(line.x * s));
+  const y0 = Math.max(0, Math.floor(line.y * s));
+  const x1 = Math.min(w, Math.ceil((line.x + line.w) * s));
+  const y1 = Math.min(h, Math.ceil((line.y + line.h) * s));
+  return x1 > x0 && y1 > y0 ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : null;
+}
+// Every pixel of an RGBA buffer (getImageData's .data) as [r, g, b] samples,
+// strided down to at most ~maxSamples so a poster-sized line stays cheap.
+export function rgbaSamples(data, maxSamples = 60000) {
+  const n = data.length >> 2;
+  const step = Math.max(1, Math.ceil(n / maxSamples));
+  const out = [];
+  for (let i = 0; i < n; i += step) out.push([data[i * 4], data[i * 4 + 1], data[i * 4 + 2]]);
+  return out;
 }
 // The cover colour, or null when too few paper samples landed on the raster.
 export function coverColorFrom(paper) {
@@ -70,14 +82,24 @@ export function coverColorFrom(paper) {
 // are its ANTI-ALIASED EDGE, and the median of a quartile full of edge pixels
 // is literal gray. So: find the most ink-like sample actually seen, keep only
 // samples within a tight band of THAT extreme (the ink CORE), median those.
+//
+// SECOND FIX (2026-10-23, feedback 100356 "ngga hitam, abu2", 100108 "warna
+// font"): the 24-point grid was the other half of the same gray. Regular-weight
+// 8-12pt text has stems ~1.5 raster px wide, so the grid often never lands on a
+// core pixel and the "extreme seen" is already an edge blend. Measured on pure
+// black Helvetica, 200 random box placements per size: the gray came back as
+// #1b-#6b typical, up to #d4 worst case. Callers now pass EVERY pixel of the
+// box (inkBoxRect + rgbaSamples), where the extreme is the true core, and the
+// band is 10%, not 25%, so a few dark edge blends cannot drag the median.
 export function inkColorFrom(inside, paper) {
   if (!inside.length || !paper.length) return null;
   const paperLum = lumOf(paper.map((p) => [p[0], p[1], p[2]])
     .reduce((a, b) => [a[0] + b[0] / paper.length, a[1] + b[1] / paper.length, a[2] + b[2] / paper.length], [0, 0, 0]));
   const dists = inside.map((p) => Math.abs(lumOf(p) - paperLum));
-  const maxDist = Math.max(...dists);
+  let maxDist = 0;
+  for (const d of dists) if (d > maxDist) maxDist = d; // not Math.max(...): box samples run to tens of thousands
   if (!(maxDist > 40)) return null;
-  const CORE_BAND = 0.75; // keep samples within 25% of the extreme seen
+  const CORE_BAND = 0.9; // keep samples within 10% of the extreme seen
   const core = inside.filter((_, i) => dists[i] >= maxDist * CORE_BAND);
   return medColor(core);
 }
