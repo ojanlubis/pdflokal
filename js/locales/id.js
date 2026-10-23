@@ -95,7 +95,7 @@ export default {
     // to a cover) is painted over text that stays in the PDF. PDF format only.
     coveredNote: 'Yang ditutup masih ada di file. Buat isi rahasia, unduh sebagai Gambar.',
     auto: 'Otomatis',
-    compressFailed: 'Kompres gagal, saya pakai ukuran asli ya',
+    compressFailed: 'Kompres gagal, pakai ukuran asli ya',
     meta: '{name}.pdf · {count} hal',
     pagesAll: '{count} halaman',
     pagesPicked: '{count} dipilih',
@@ -156,7 +156,7 @@ export default {
     },
     kompres: {
       dzTitle: 'Seret PDF yang mau dikompres',
-      dzHint: 'Ukuran hasilnya saya tunjukkan sebelum kamu unduh',
+      dzHint: 'Ukuran hasilnya kelihatan dulu sebelum kamu unduh',
     },
     ttd: {
       dzTitle: 'Seret PDF yang mau ditandatangani',
@@ -256,12 +256,12 @@ export default {
     ask: 'Gimana hasil editnya?',
     up: 'Bagus',
     down: 'Kurang pas',
-    thanks: 'Makasih, masukanmu ngebantu saya 🙏',
+    thanks: 'Makasi masukannyaa, ngebantu banget 🙏',
     noteQuestion: 'Apa yang kurang pas?',
     notePlaceholder: 'isi feedback biar kita bisa improve',
     noteLabel: 'Ceritakan apa yang kurang pas',
-    askTitle: 'Boleh saya minta dua potongan ini?',
-    askSub: 'Sebelum dan sesudahnya, biar saya bisa analisis fiturnya kurang di mana. Nggak ada isi file lain.',
+    askTitle: 'Boleh minta dua potongan ini?',
+    askSub: 'Sebelum dan sesudahnya, biar bisa dicek fiturnya kurang di mana. Nggak ada isi file lain.',
     cropBefore: 'Asli',
     cropAfter: 'Hasil',
     skip: 'Nggak usah',
@@ -314,13 +314,52 @@ export default {
     delete: 'Hapus Halaman',
     use: 'Pakai ({n})',
     selected: '{count} dipilih',
+    // The [+] tile at the end of the grid (merge more files from the sheet).
+    add: 'Tambah PDF',
     deleted: '{count} halaman dihapus. Salah? Tinggal Undo',
   },
 
   // The bug-report card (js/v2/bug-report-prompt.js): the founder's own words
   bugPrompt: {
     small: 'Halo user PDFLokal',
-    big: 'Mohon kabarin saya ya kalo ada bug, di sini',
+    big: 'Kabarin kalo ada bug yaa, di sini',
+  },
+
+  // The feature vote card (js/v2/feature-vote.js, v2 2026-10-06). Every word on it
+  // is here; the markup in index.html is a skeleton. Strings marked
+  // DRAFT-APPROVED-BY-HIM are his, verbatim (his spelling and line breaks, do not
+  // "fix"). Every other string is a DRAFT: the seat wrote it through the
+  // copywriting skill, reference/vote-v2-copy-draft-2026-10-06.md, and he edits.
+  featureVote: {
+    // DRAFT-APPROVED-BY-HIM (step 1, his words verbatim, 2026-10-06 evening: spelling and
+    // lowercase are his; the header he typed "PDF Lokal", the brand is written PDFLokal)
+    inviteTitle: 'Voting Fitur PDFLokal',
+    invite: 'Halo guyss. Mau bikin fitur baru tp bingung apaan. Bantu voting doong. terimakasii',
+    start: 'Pilih fitur', // DRAFT
+    later: 'Nanti aja', // DRAFT
+    title: 'Fitur apa yang kamu butuh?', // DRAFT
+    hint: 'Pilih maksimal 3', // DRAFT
+    picked: '{n} dari {max} dipilih', // DRAFT
+    idea: 'Belum ada di sini? Tulis aja', // DRAFT
+    send: 'Kirim pilihan', // DRAFT
+    failed: 'Pilihanmu belum terkirim. Coba lagi ya.', // DRAFT: shown when the ballot was refused or could not reach the server
+    // DRAFT-APPROVED-BY-HIM (the after-vote line: thanks AND the promise to tell them here)
+    thanks: 'Makasi votingnyaa. Kalo udah jadi nnti dikabarin di sini yaa',
+    top: 'Paling banyak dipilih:', // DRAFT
+    close: 'Tutup', // DRAFT
+    // DRAFT: the maker card's one line when a feature this person voted for has shipped (js/core/features.js SHIPPED); the wording is the one he gave the seat on 2026-10-06, not yet read as a card
+    shipped: '{feature} udah jadi nih. Kamu salah satu yang milih ini, makasii',
+    // DRAFT: one label per feature, IN THE ORDER of FEATURES (js/core/features.js)
+    labels: [
+      'PDF ke Word',
+      'PDF ke Excel',
+      'Simpan editan buat dilanjut nanti',
+      'Kunci dan buka PDF yang pakai password',
+      'Isi formulir PDF',
+      'Scan dokumen pakai kamera HP',
+      'Tempel gambar atau logo',
+      'Tambah watermark',
+    ],
   },
 
   // Page placeholder before a page is rendered (js/render/page-view.js)

@@ -76,7 +76,6 @@ test.describe('editor v2 — mobile', () => {
           window.dispatchEvent(new Event('resize'));
         }));
     });
-    await page.reloadStageForTest?.();
     await page.evaluate(() => {
       // Re-sync the stage after the direct model poke.
       const doc = window.v2.getDoc();
@@ -96,19 +95,38 @@ test.describe('editor v2 — mobile', () => {
     expect(await page.evaluate(() => window.v2.getDoc().selection.annotationId)).toBeTruthy();
 
     // …then a drag on the SELECTED object moves it.
-    const box = await anno.boundingBox();
-    const cx = box.x + box.width / 2;
-    const cy = box.y + box.height / 2;
-    await anno.dispatchEvent('pointerdown', { pointerId: 1, clientX: cx, clientY: cy, bubbles: true, isPrimary: true });
-    await page.locator('#v2-stage').dispatchEvent('pointermove', { pointerId: 1, clientX: cx + 60, clientY: cy + 40, bubbles: true });
-    await page.locator('#v2-stage').dispatchEvent('pointerup', { pointerId: 1, clientX: cx + 60, clientY: cy + 40, bubbles: true });
-
-    const after = await page.evaluate(() => {
-      const a = window.v2.getDoc().pages[0].annotations[0];
-      return { x: a.x, y: a.y };
+    // One drag gesture on the selected annotation, by (dx, dy) screen px.
+    const dragBy = async (dx, dy, pointerId) => {
+      const box = await anno.boundingBox();
+      const cx = box.x + box.width / 2;
+      const cy = box.y + box.height / 2;
+      await anno.dispatchEvent('pointerdown', { pointerId, clientX: cx, clientY: cy, bubbles: true, isPrimary: true });
+      await page.locator('#v2-stage').dispatchEvent('pointermove', { pointerId, clientX: cx + dx, clientY: cy + dy, bubbles: true });
+      await page.locator('#v2-stage').dispatchEvent('pointerup', { pointerId, clientX: cx + dx, clientY: cy + dy, bubbles: true });
+    };
+    const pos = () => page.evaluate(() => {
+      const pg = window.v2.getDoc().pages[0];
+      const a = pg.annotations[0];
+      return { x: a.x, y: a.y, w: pg.width, h: pg.height };
     });
+
+    await dragBy(60, 40, 1);
+    const after = await pos();
     expect(after.x).toBeGreaterThan(before.x);
     expect(after.y).toBeGreaterThan(before.y);
+
+    // THE CLAMP the title promises, through the same real pointer path: a drag
+    // far off the top-left edge pins the object AT the page origin, and one far
+    // off the bottom-right keeps it inside the page. Catches: moveAnnotation's
+    // clamp removed (the object would land at negative / off-page coordinates).
+    await dragBy(-5000, -5000, 2);
+    expect(await pos(), 'dragged off the top-left: must stop at the page edge').toMatchObject({ x: 0, y: 0 });
+    await dragBy(5000, 5000, 3);
+    const far = await pos();
+    expect(far.x, 'dragged off the right: must stay inside the page').toBeLessThanOrEqual(far.w);
+    expect(far.y, 'dragged off the bottom: must stay inside the page').toBeLessThanOrEqual(far.h);
+    expect(far.x, 'the bottom-right drag did not move it at all').toBeGreaterThan(far.w / 2);
+    expect(far.y, 'the bottom-right drag did not move it at all').toBeGreaterThan(far.h / 2);
   });
 
   test('merge: adding a second PDF appends its pages', async ({ page }) => {

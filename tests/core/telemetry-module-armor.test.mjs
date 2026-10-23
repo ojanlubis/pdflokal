@@ -56,11 +56,35 @@ test('telemetry.js imports on a browser without crypto.randomUUID', async () => 
   assert.equal(typeof mod.tel, 'function', 'telemetry.js loaded but exported no tel()');
 });
 
+// "Still works" means the event reaches the wire. This used to send 'open',
+// which is not in SCHEMA (dropped before anything happens), under
+// doesNotThrow, which tel()'s own try/catch makes unfailable: an immediate
+// `return` at the top of tel() stayed green. Now a valid doc_open is sent
+// FLUSH_AT times and the beacon payload is read back.
+// Catches: tel() returning early, or dropping/mangling a valid event.
 test('tel() still works with a degraded session id', async () => {
   const mod = await import('../../js/v2/telemetry.js');
-  // tel() is fire-and-forget and try/catch-armored; what matters is that
-  // calling it does not throw into app code.
-  assert.doesNotThrow(() => mod.tel('open', { pages: 1 }));
+  const sent = [];
+  Object.defineProperty(globalThis, 'navigator', {
+    value: { sendBeacon: (url, blob) => { sent.push(blob); return true; } },
+    configurable: true,
+    writable: true,
+  });
+  const props = { text_layer: true, signed: false, pages: '2-5', device: 'phone', intent: 'none', display_mode: 'browser' };
+  // Instrument check: an off-schema fixture would be dropped by design and make
+  // the beacon assertion below fail for the wrong reason.
+  const { validateEvent } = await import('../../js/core/telemetry-schema.js');
+  assert.equal(validateEvent('doc_open', props).ok, true, 'the fixture itself is off-schema');
+  // FLUSH_AT is 10 in js/v2/telemetry.js — the 10th call flushes synchronously.
+  for (let i = 0; i < 10; i += 1) assert.doesNotThrow(() => mod.tel('doc_open', props));
+
+  assert.equal(sent.length, 1, `expected one beacon after 10 valid events, got ${sent.length}`);
+  const envelope = JSON.parse(await sent[0].text());
+  assert.equal(envelope.events.length, 10, 'the beacon did not carry every queued event');
+  for (const e of envelope.events) {
+    assert.equal(e.event, 'doc_open');
+    assert.deepEqual(e.props, props, 'a valid event\'s props did not survive to the wire');
+  }
 });
 
 // WHY THIS TEST EXISTS ON TOP OF THE TWO ABOVE: "does not throw" was the

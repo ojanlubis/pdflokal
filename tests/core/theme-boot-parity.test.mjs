@@ -123,3 +123,58 @@ test('3. theme.js never persists a resolved system value, and clears by REMOVING
     + 'demolition; index.html loads this module, so the import would pull the old wing into v2.',
   );
 });
+
+// BEHAVIOUR, NOT VOCABULARY. Test 3 reads theme.js's source for `|| 'light'`
+// and `removeAttribute(THEME_ATTR)`; both survive `applyTheme(storedChoice() ??
+// 'light')` in initTheme, which pins every first visit to light. So this runs
+// the real module against a stubbed document/localStorage/matchMedia — with
+// the OS set to DARK, the case where a stamped value does the most harm.
+// Catches: initTheme applying any value (light, or the resolved OS) when
+// nothing is stored, or writing to storage on load.
+test('4. theme.js at runtime: no stored choice leaves NO attribute and writes nothing; a stored choice is applied', async () => {
+  const attrs = new Map();
+  const store = new Map();
+  const writes = [];
+  const set = (name, value) => Object.defineProperty(globalThis, name, { value, configurable: true, writable: true });
+  set('localStorage', {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => { writes.push([k, v]); store.set(k, String(v)); },
+    removeItem: (k) => { store.delete(k); },
+  });
+  set('document', {
+    readyState: 'complete',
+    documentElement: {
+      setAttribute: (n, v) => { attrs.set(n, String(v)); },
+      removeAttribute: (n) => { attrs.delete(n); },
+    },
+    head: { appendChild() {} },
+    querySelector: () => ({}),
+    createElement: () => ({}),
+    getElementById: () => null,
+    addEventListener() {},
+  });
+  set('window', { matchMedia: () => ({ matches: true, addEventListener() {} }) });
+  set('getComputedStyle', () => ({ getPropertyValue: () => '' }));
+
+  // Importing runs initTheme() (readyState is 'complete'), with storage empty.
+  await import('../../js/theme.js');
+  assert.equal(typeof globalThis.window.themeAPI?.init, 'function', 'theme.js did not load — nothing below would mean anything');
+  assert.equal(attrs.has('data-theme'), false,
+    `with nothing stored, initTheme set data-theme="${attrs.get('data-theme')}". That suppresses tokens.css's `
+    + 'prefers-color-scheme rule and pins a first-time visitor to a theme they never chose.');
+  assert.deepEqual(writes, [], 'initTheme wrote to localStorage on a first visit');
+
+  // Known-positive for the same instrument: a stored choice IS applied.
+  for (const choice of ['dark', 'light']) {
+    store.set('pdflokal_theme', choice);
+    attrs.clear();
+    globalThis.window.themeAPI.init();
+    assert.equal(attrs.get('data-theme'), choice, `a stored "${choice}" was not applied by initTheme`);
+  }
+  // Junk in storage is not an expressed choice.
+  store.set('pdflokal_theme', 'blue');
+  attrs.set('data-theme', 'dark');
+  globalThis.window.themeAPI.init();
+  assert.equal(attrs.has('data-theme'), false, 'junk in localStorage reached the data-theme attribute');
+  assert.deepEqual(writes, [], 'initTheme wrote to localStorage');
+});

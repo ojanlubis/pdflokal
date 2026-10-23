@@ -118,3 +118,29 @@ export function sharpenScale({ pageWidth, pageHeight, zoom = 1, dpr = 1, maxPixe
   // not this module's call to change.
   return scale > RASTER_BASE ? scale : RASTER_BASE;
 }
+
+/**
+ * The largest raster scale an IMAGE page can honestly use, or Infinity for a
+ * PDF page (vector content sharpens without limit; sharpenScale's budget and
+ * floor govern those).
+ *
+ * WHY (bug found 2026-10-10): image pages are sized one point per source
+ * pixel (core/import.js), and every raster was asked for at RASTER_BASE = 2 or
+ * more, so a 4032×3024 phone photo became an 8064×6048 canvas: 48.8MP, pure
+ * upsampling, ~195MB of canvas, and over iOS Safari's ~16.7MP canvas ceiling,
+ * where a canvas comes back BLANK. An image page is capped at its own pixel
+ * density (baseWidth / width: 1 for an unmerged photo, higher once a merge
+ * shrank it) AND at the device's pixel budget. Unlike sharpenScale this may
+ * return LESS than RASTER_BASE: that is the point. rasterScaleFor (app.js) is
+ * the one door every main-view rasterize goes through, so raster.scale stays
+ * truthful for the sharpen pass and the crop sampler.
+ */
+export function imageScaleCap(page, maxPixels = MAX_PIXELS.phone) {
+  if (!page || !page.isFromImage) return Infinity;
+  const w = Number(page.width) || 0;
+  const h = Number(page.height) || 0;
+  if (!(w > 0 && h > 0)) return Infinity;
+  const native = page.baseWidth > 0 ? page.baseWidth / w : 1;
+  const budget = Number.isFinite(maxPixels) && maxPixels > 0 ? Math.sqrt(maxPixels / (w * h)) : Infinity;
+  return Math.min(native, budget);
+}

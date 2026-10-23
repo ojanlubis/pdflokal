@@ -197,18 +197,25 @@ function splitAlongBaseline(items) {
   const byA0 = [...items].sort((a, b) => a.a0 - b.a0);
   const segments = [];
   let segment = [];
+  // WHY the furthest end, not the previous run's: runs can OVERLAP (a value
+  // overprinted on an underscore leader). Sorted by start, the short value
+  // follows the long leader, and measuring from ITS end made the next word
+  // after the leader look a column away, splitting a form row in two.
+  let reach = -Infinity;
 
   for (const item of byA0) {
     if (segment.length > 0) {
       const prev = segment[segment.length - 1];
-      const gap = item.a0 - prev.a1;
+      const gap = item.a0 - reach;
       const guard = COLUMN_GAP_FACTOR * Math.max(prev.run.pdf.size, item.run.pdf.size);
       if (gap > guard) {
         segments.push(segment);
         segment = [];
+        reach = -Infinity;
       }
     }
     segment.push(item);
+    reach = Math.max(reach, item.a1);
   }
   if (segment.length > 0) segments.push(segment);
 
@@ -229,10 +236,11 @@ function softSplitSegment(segment, rule, columnCount, leftmost) {
   const pieces = [];
   let piece = [];
   let reason = null;
+  let reach = -Infinity; // furthest end so far: see splitAlongBaseline's WHY
   for (const item of segment) {
     if (piece.length > 0) {
       const prev = piece[piece.length - 1];
-      const gap = item.a0 - prev.a1;
+      const gap = item.a0 - reach;
       const em = Math.max(prev.run.pdf.size, item.run.pdf.size);
       if (gap > rule.gapEm * em) {
         const left = squash(piece.map((g) => g.run.str).join(' '));
@@ -249,6 +257,7 @@ function softSplitSegment(segment, rule, columnCount, leftmost) {
       }
     }
     piece.push(item);
+    reach = Math.max(reach, item.a1);
   }
   if (piece.length > 0) pieces.push({ items: piece, reason });
   return pieces;

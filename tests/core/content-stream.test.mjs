@@ -133,3 +133,28 @@ test('BI record carries an empty tokens array (payload is raw-skipped, not parse
   assert.deepEqual(ops[0].tokens, []);
   assert.deepEqual(ops[1].tokens, [{ t: 'str', v: 'after' }]);
 });
+
+// A backslash before an end-of-line is a line CONTINUATION: it contributes
+// nothing to the string. Keeping the EOL added a code, so the walk's advance
+// for that op came out one glyph too wide and every later op was misplaced.
+test('literal string: backslash-EOL continuations add nothing (\\n, \\r, \\r\\n)', () => {
+  assert.equal(decodeLiteralString('AB\\\nCD'), 'ABCD');
+  assert.equal(decodeLiteralString('AB\\\rCD'), 'ABCD');
+  assert.equal(decodeLiteralString('AB\\\r\nCD'), 'ABCD');
+  assert.equal(decodeLiteralString('A\\nB'), 'A\nB', 'known-positive: an escaped n is still a newline');
+});
+
+// Inline image data is binary and can contain the bytes "EI" anywhere. Taking
+// the first one ended the image early and tokenised the rest of its bytes as
+// operators (a stray `(` could swallow real show ops). EI ends the image only
+// as a token: whitespace before it, whitespace/delimiter/end after it.
+test('inline image: an "EI" byte pair inside the image data does not end it', () => {
+  const src = 'BI /W 2 /H 1 /BPC 8 /CS /G ID xEIy(z EI BT /F1 12 Tf (Hi) Tj ET';
+  const ops = tokenizeOps(src);
+  const bi = ops.find((o) => o.op === 'BI');
+  assert.ok(bi, 'known-positive: the BI op must be found');
+  assert.equal(src.slice(bi.end - 2, bi.end), 'EI');
+  assert.ok(bi.end > src.indexOf('(z'), 'the image ended at the EI inside its own data');
+  const tj = ops.find((o) => o.op === 'Tj');
+  assert.ok(tj, 'the show op after the image was swallowed');
+});

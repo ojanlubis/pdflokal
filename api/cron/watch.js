@@ -92,6 +92,17 @@ export async function measure(now = new Date()) {
   const [[a5total, a5down]] = await one(fb,
     `select count(*), coalesce(sum(rating = 'down'),0) from feedback where ts > ?`,
     [ago(now, 7 * DAY_MS)]);
+  // THE FEATURE VOTE'S IDEAS live in their OWN table, `feature_requests`
+  // (scripts/turso-feedback-migration.sql), so A4 and A5 above never see them: no
+  // email per idea, no idea inside the thumbs ratio. Counted here, as a number in
+  // the row, never emailed. ⚠️ A SEPARATE, FORGIVING READ: until the migration is
+  // applied the table does not exist, and that must read as "not counted" (null),
+  // never as an unreadable rail, which would email him a false alarm every morning.
+  let featureRequests = null;
+  try {
+    const [[n]] = await one(fb, `select count(*) from feature_requests where ts > ?`, [ago(now, DAY_MS)]);
+    featureRequests = Number(n);
+  } catch { /* table not there yet */ }
 
   return {
     floor,
@@ -103,6 +114,7 @@ export async function measure(now = new Date()) {
     a5: { total: Number(a5total), down: Number(a5down) },
     a6: Number(a6),
     rejects,
+    feature_requests: featureRequests,
     notes,
   };
 }

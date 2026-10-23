@@ -22,7 +22,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
-  decideLineFont, acceptLineInput, storedDecision, faceLadder, faceStyle, isWritableCodePoint,
+  decideLineFont, acceptLineInput, storedDecision, faceLadder, faceStyle, isWritableCodePoint, textCoveredBy, countMissingGlyphs,
 } from '../../js/core/line-font.js';
 import { extractFontProgram } from '../../js/core/doc-fonts.js';
 
@@ -193,4 +193,28 @@ test('faceLadder: clone by name, substitute by evidence, never Helvetica', () =>
   ]);
   assert.deepEqual(faceLadder(null), [{ path: 'substitute', face: 'Arimo', evidence: 'default' }]);
   assert.deepEqual(faceStyle('Carlito-BoldItalic'), { family: 'Carlito', bold: true, italic: true });
+});
+
+// A non-breaking space is what Word and web pages put in "Rp 1.000" and
+// "No. 10". It looks exactly like a space, but its glyph has no contours, so
+// glyphPaints (which exempts only U+0020) judged it unwritable in EVERY font:
+// a pasted "Rp 1.000" became "Rp1.000" with a refusal toast naming an
+// invisible character.
+test('decideLineFont: a pasted non-breaking space is a space, never a refused char', async () => {
+  const c = await realCandidates();
+  const d = decideLineFont('Rp 1.000', c);
+  assert.notEqual(d.path, 'none', `NBSP was refused: blocked=${JSON.stringify(d.blocked)}`);
+  const r = acceptLineInput('Rp', 'Rp 1.000', c);
+  assert.equal(r.refused ?? null, null);
+});
+
+// The stamp draws toStandardFontSafe(text): U+2212 MINUS is drawn as '-'. A
+// subset that holds the minus glyph but no ASCII hyphen passed the coverage
+// check on the raw text and then painted .notdef where the minus should be.
+test('textCoveredBy judges the string the stamp DRAWS (U+2212 is drawn as "-")', () => {
+  const minusOnly = paintsOnly(['5', '3', '−']);
+  const hyphenOnly = paintsOnly(['5', '3', '-']);
+  assert.equal(textCoveredBy(minusOnly, '5−3'), false, 'covered on the raw minus, but the stamp draws "-"');
+  assert.equal(textCoveredBy(hyphenOnly, '5−3'), true, 'known-positive: the drawn form IS covered');
+  assert.equal(countMissingGlyphs(minusOnly, '5−3'), 1);
 });

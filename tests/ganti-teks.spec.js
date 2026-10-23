@@ -82,6 +82,10 @@ test.describe('ganti teks — happy path (tame fixture)', () => {
     await openDoc(page, FX('sample-2pages.pdf'));
     await armGanti(page);
     await tapLine(page, { str: 'Test Page 1' });
+    // Known-positive: the cover exists while the editor is open. Catches a cover
+    // that was never placed, under which "Escape takes it away" passed for free.
+    expect(await page.evaluate(() => window.v2.getDoc().pages[0].annotations
+      .filter((a) => a.type === 'whiteout' && a.replaceTargets?.length).length), 'no cover while editing').toBe(1);
     await page.keyboard.press('Escape');
     expect(await page.evaluate(() => window.v2.getDoc().pages[0].annotations.length)).toBe(0);
   });

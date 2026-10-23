@@ -162,14 +162,24 @@ test.describe('edit beta: rename + first-commit feedback', () => {
   });
 
   test('asks only ONCE — a second commit does not re-open the pill', async ({ page }) => {
+    await captureFeedbackSends(page);
     await openDoc(page, NASTY('undangan-cid.pdf'));
     await editMiddleLine(page, 'Rapat Baru');
     await expect(page.locator('#edit-feedback')).toHaveClass(/show/);
-    // answer + let it fade, then edit again
+    // answer + let it fade (positively: the pill really closed), then edit again
     await page.locator('#edit-feedback [aria-label="Bagus"]').click();
-    await page.waitForTimeout(300);
+    await expect(page.locator('#edit-feedback')).not.toHaveClass(/show/);
     await editMiddleLine(page, 'Rapat Lagi');
-    await page.waitForTimeout(300);
+    // Wait for the SECOND commit's bake to land: commit_paint fires in the same
+    // rebake .then() that calls showEditFeedback(), so after two of them the pill
+    // has had its chance. Catches: a pill that re-opens only once the second bake
+    // lands — the old fixed 300ms sleep checked before that and passed for free.
+    const commitPaints = async () => {
+      await fakeTabHidden(page);
+      return (await beacons(page)).filter((b) => b.url.includes('/api/t'))
+        .flatMap((b) => b.body.events || []).filter((e) => e.event === 'commit_paint').length;
+    };
+    await expect.poll(commitPaints, { message: 'the second commit never baked, so the pill check proves nothing' }).toBe(2);
     await expect(page.locator('#edit-feedback')).not.toHaveClass(/show/);
   });
 
@@ -193,7 +203,7 @@ test.describe('edit beta: rename + first-commit feedback', () => {
     expect(evs.find((e) => e.event === 'surgery').props).toEqual({ matched: true, reason: 'clean' });
     // style_source (spec-edit-fidelity-instrumentation.md Increment B; FIXED
     // 2026-07-26, founder-flagged correctness bug): used to ride on js/v2/
-    // app.js's prepareDocFont's async race and flake under full-suite load.
+    // doc-font-live.js's prepareDocFont async race and flake under full-suite load.
     // core/stamp.js's resolveStampFont now resolves AUTHORITATIVELY against
     // the real document on every path — undangan-cid.pdf's Montserrat font
     // has an informative /BaseFont, so this resolves cleanly to 'pdf-name'
@@ -234,9 +244,9 @@ test.describe('edit beta: Increment D consent-gated sample', () => {
 
     // Capture is deferred (requestIdleCallback) — poll for the ask block.
     await expect.poll(() => pill.locator('.ef-crop-item').count(), { timeout: 5000 }).toBe(2);
-    await expect(pill.locator('.ef-ask-q')).toHaveText('Boleh saya minta dua potongan ini?');
+    await expect(pill.locator('.ef-ask-q')).toHaveText('Boleh minta dua potongan ini?');
     await expect(pill.locator('.ef-ask-sub')).toHaveText(
-      'Sebelum dan sesudahnya, biar saya bisa analisis fiturnya kurang di mana. Nggak ada isi file lain.',
+      'Sebelum dan sesudahnya, biar bisa dicek fiturnya kurang di mana. Nggak ada isi file lain.',
     );
     await expect(pill.locator('.ef-crop-label').nth(0)).toHaveText('Asli');
     await expect(pill.locator('.ef-crop-label').nth(1)).toHaveText('Hasil');
@@ -331,12 +341,14 @@ test.describe('edit beta: Increment D consent-gated sample', () => {
     // Don't wait for the ask block on purpose — this pins the abandon path
     // regardless of whether capture had landed yet.
 
-    // "Buka Baru": File menu -> Buka Baru -> pick a new file. resetDoc() zeroes
-    // doc.pages BEFORE loadFiles() runs, so loadFiles's own `doc.pages.length
-    // === 0` check fires resetEditFeedback() -> dismissEditFeedback() ->
-    // finish(), which records the still-open 👎 note-less, sample-less.
+    // "Buka Baru": File menu -> Buka Baru -> pick a new file. The replace is
+    // staged: the new file opens into a fresh Doc and, at the commit in
+    // loadFilesInner (after resetDoc(staged)), resetEditFeedback() ->
+    // dismissEditFeedback() -> finish() records the still-open 👎 note-less,
+    // sample-less.
     await page.click('#btn-file');
     await page.click('#fm-new');
+    await page.click('#nc-go'); // edits not downloaded -> #new-confirm asks first
     await page.setInputFiles('#file-input', NASTY('undangan-cid.pdf'));
     await expectFirstPage(page);
 
@@ -377,31 +389,29 @@ test.describe('edit beta: BUG 1 — stale rebake must never compare pristine-vs-
 
     // Delay ONLY the rasterize() call this commit's own rebakePage() makes,
     // just long enough to fire a real undo while it's still in flight.
-    await page.evaluate(() => {
-      const raz = window.v2.getRasterizer();
-      const orig = raz.rasterize.bind(raz);
-      let armed = true;
-      raz.rasterize = (...args) => {
-        if (armed) {
-          armed = false;
-          window.__raceStarted = true;
-          return new Promise((resolve) => { setTimeout(() => resolve(orig(...args)), 500); });
-        }
-        return orig(...args);
-      };
-    });
+    await delayFirstRasterize(page);
 
     await editMiddleLine(page, 'Rapat Baru');
     await page.waitForFunction(() => window.__raceStarted === true);
     await page.keyboard.press('Control+z'); // races the still-in-flight rebake
-    await page.waitForTimeout(900); // let the delayed rebake resolve well after the undo
+
+    // POSITIVE SIGNAL, not a sleep: the delayed rasterize really resolved AFTER
+    // the undo, and the rebake's .then() ran (commit_paint fires in it, in the
+    // same tick the oracle/sample would be scheduled). Catches: an absence read
+    // before the bake ever landed, which the old fixed 900ms could not tell apart.
+    await expect.poll(() => page.evaluate(() => window.__raceLanded === true),
+      { message: 'the delayed rebake never resolved' }).toBe(true);
+    await expect.poll(async () => (await railNames(page)).includes('commit_paint'),
+      { message: 'the rebake .then() never ran, so "no oracle" proves nothing' }).toBe(true);
+    // Anything the .then() deferred via runWhenIdle is queued BEFORE these idle
+    // turns (idle callbacks run FIFO), so it has run once they have.
+    await idleTurns(page);
 
     // No visual_oracle event — the bake it would have to compare against
     // never actually landed for this generation. (Sanity: a real commit DID
     // happen — this must be a TARGETED decline, not "nothing ran at all".)
-    await fakeTabHidden(page);
-    const evs = (await beacons(page)).filter((b) => b.url.includes('/api/t')).flatMap((b) => b.body.events || []);
-    const names = evs.map((e) => e.event);
+    // The CONTROL below proves the same wait DOES see visual_oracle without the undo.
+    const names = await railNames(page);
     expect(names).toContain('ganti_commit');
     expect(names).toContain('commit_paint');
     expect(names).not.toContain('visual_oracle');
@@ -413,7 +423,62 @@ test.describe('edit beta: BUG 1 — stale rebake must never compare pristine-vs-
     await expect(pill).toHaveClass(/show/);
     await pill.locator('[aria-label="Kurang pas"]').click();
     await expect(pill.locator('.ef-note')).toBeVisible();
-    await page.waitForTimeout(600); // idle-deferred capture would have landed by now if it ran at all
+    await idleTurns(page); // idle-deferred capture would have landed by now if it ran at all
     expect(await pill.locator('.ef-crop-item').count()).toBe(0);
+    // Re-read once more, now that every idle turn above has passed.
+    expect(await railNames(page)).not.toContain('visual_oracle');
+  });
+
+  // The known-positive for the absence above: the SAME delayed bake with NO undo
+  // does produce visual_oracle within the same idle-turn wait. Without this, a
+  // dead oracle (or a wait too short to ever see one) made BUG 1's absence free.
+  test('CONTROL: the same delayed bake WITHOUT the undo does fire visual_oracle', async ({ page }) => {
+    await captureFeedbackSends(page);
+    await openDoc(page, NASTY('undangan-cid.pdf'));
+    await delayFirstRasterize(page);
+
+    await editMiddleLine(page, 'Rapat Baru');
+    await expect.poll(() => page.evaluate(() => window.__raceLanded === true)).toBe(true);
+    await expect.poll(async () => (await railNames(page)).includes('commit_paint')).toBe(true);
+    await idleTurns(page);
+    await expect.poll(async () => (await railNames(page)).includes('visual_oracle'),
+      { message: 'no visual_oracle even without the race: the absence in BUG 1 is not evidence', timeout: 5000 }).toBe(true);
   });
 });
+
+// Delay ONLY the first rasterize() (this commit's own rebakePage()), just long
+// enough to fire a real undo while it is still in flight. __raceLanded flips
+// when that delayed render has actually resolved.
+async function delayFirstRasterize(page) {
+  await page.evaluate(() => {
+    const raz = window.v2.getRasterizer();
+    const orig = raz.rasterize.bind(raz);
+    let armed = true;
+    raz.rasterize = (...args) => {
+      if (armed) {
+        armed = false;
+        window.__raceStarted = true;
+        return new Promise((resolve) => { setTimeout(() => resolve(orig(...args)), 500); })
+          .finally(() => { window.__raceLanded = true; });
+      }
+      return orig(...args);
+    };
+  });
+}
+
+// Every rail event name so far (flushes first).
+async function railNames(page) {
+  await fakeTabHidden(page);
+  return (await beacons(page)).filter((b) => b.url.includes('/api/t')).flatMap((b) => (b.body.events || []).map((e) => e.event));
+}
+
+// Two idle turns plus a task each: runWhenIdle work queued earlier runs first,
+// and its short async tail (crop decode -> tel / setFeedbackSample) gets a turn.
+async function idleTurns(page) {
+  for (let i = 0; i < 2; i++) {
+    await page.evaluate(() => new Promise((r) => {
+      const ric = window.requestIdleCallback || ((fn) => setTimeout(fn, 0));
+      ric(() => setTimeout(r, 100), { timeout: 3000 });
+    }));
+  }
+}

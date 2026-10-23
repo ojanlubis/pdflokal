@@ -54,7 +54,8 @@
 // first place. Writing this file the obvious way mangled it twice before it
 // was written this way. Numbers cannot be normalised.
 //
-// Each entry: a codepoint WinAnsi cannot encode -> what it already looks like.
+// Each entry: a codepoint WinAnsi cannot encode (one exception, NBSP, noted at
+// its row) -> what it already looks like.
 // tests/core/text-encode.test.mjs re-derives the throwing set from the REAL
 // vendored pdf-lib on every run, so this table cannot silently fall behind.
 const LOOKALIKES = new Map([
@@ -65,6 +66,10 @@ const LOOKALIKES = new Map([
   [0x2060, ''],  // WORD JOINER
   [0xfeff, ''],  // BYTE ORDER MARK         (pasted from a file)
   // Fixed-width and typographic spaces -> an ordinary space.
+  // NBSP is the one entry WinAnsi CAN encode. It is here anyway because its
+  // glyph has no contours, so line-font.js's glyphPaints judged it unwritable
+  // in every font and the editor refused a pasted "Rp 1.000" (Word, the web).
+  [0x00a0, ' '],  // NO-BREAK SPACE
   [0x2000, ' '], [0x2001, ' '], [0x2002, ' '], [0x2003, ' '], [0x2004, ' '],
   [0x2005, ' '], [0x2006, ' '], [0x2007, ' '], [0x2008, ' '],
   [0x2009, ' '],  // THIN SPACE             (currency formatting out of Word)
@@ -76,9 +81,36 @@ const LOOKALIKES = new Map([
   [0x2212, '-'],  // MINUS SIGN             (Word/Excel)
   // Primes -> the quotes they are mistaken for.
   [0x2032, "'"], [0x2033, '"'],
-  // Line/paragraph separators -> a plain newline, which the caller splits on.
-  [0x2028, '\n'], [0x2029, '\n'],
 ].map(([cp, to]) => [String.fromCodePoint(cp), to]));
+
+// Whitespace the FILE draws differently from the SCREEN. The editor shows text
+// with `white-space: pre`, so a TAB there is a tab-stop gap while the export
+// draws one space: the words after it sat further right on screen than in the
+// download. These are therefore normalised when text ENTERS the model
+// (normaliseEnteredText), not only at export, so both read the same string.
+// Only these: every other lookalike above is something the user can see, and
+// the model keeps what they see (see the header).
+//   - TAB from Excel/Word -> the space it reads as. Refused, it sent the whole
+//     annotation to drawTextAsImage over one invisible character.
+//   - VT/FF break the line, which is what they meant; LS/PS likewise (the
+//     caller splits on the newline).
+const LAYOUT_CONTROLS = new Map([
+  [0x0009, ' '], [0x000b, '\n'], [0x000c, '\n'], [0x2028, '\n'], [0x2029, '\n'],
+].map(([cp, to]) => [String.fromCodePoint(cp), to]));
+for (const [ch, to] of LAYOUT_CONTROLS) LOOKALIKES.set(ch, to);
+
+/**
+ * The text an annotation should HOLD: layout controls resolved to what the
+ * export will draw, everything else untouched. Call where text enters the model.
+ * @param {string} text
+ * @returns {string}
+ */
+export function normaliseEnteredText(text) {
+  const s = String(text ?? '');
+  let out = '';
+  for (const ch of s) out += LAYOUT_CONTROLS.has(ch) ? LAYOUT_CONTROLS.get(ch) : ch;
+  return out;
+}
 
 /**
  * Normalise text so a WinAnsi standard font can encode it, WITHOUT changing

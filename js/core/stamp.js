@@ -310,7 +310,7 @@ async function fetchCloneFontBytes(fontName) {
 
 // AUTHORITATIVE bold/italic/family-source resolution — CORRECTNESS, not a
 // telemetry nicety (founder-flagged 2026-07-26, spec-edit-fidelity-
-// instrumentation.md). js/v2/app.js's prepareDocFont computes this SAME
+// instrumentation.md). js/v2/doc-font-live.js's prepareDocFont computes this SAME
 // style/family ladder (core/font-fingerprint.js) asynchronously and
 // UNAWAITED at draft-open time — a slow device or a fast typist can commit
 // before it resolves, leaving the annotation's own bold/italic at the format
@@ -422,7 +422,7 @@ async function tryClone(pdfPage, PDFLib, fontkit, insert, text, resolvedStyle, c
 // styleSource} — the replacement annotation's OWN draft-time HINT, not
 // necessarily authoritative: resolveAuthoritativeStyle re-derives it against
 // the real document whenever styleSource is absent/'none', so a lost
-// draft-time race (js/v2/app.js's prepareDocFont, unawaited) can never pick
+// draft-time race (js/v2/doc-font-live.js's prepareDocFont, unawaited) can never pick
 // the wrong clone weight file), decision (the annotation's fontDecision from
 // core/line-font.js, or null for an edit committed before decisions existed
 // or before the editor's fonts loaded).

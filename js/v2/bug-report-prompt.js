@@ -1,5 +1,5 @@
 /*
- * PDFLokal — v2/bug-report-prompt.js  (the "kabarin saya kalo ada bug" nudge)
+ * PDFLokal — v2/bug-report-prompt.js  (the "kabarin kalo ada bug" nudge)
  * ============================================================================
  * Founder ask, 2026-09-16, verbatim: "masalah utama kita, ada banyak bug tapi
  * silent, dicatch sama user langsung, jd kita minta tolong ke user, kalo ada bug
@@ -27,9 +27,10 @@
  * COPY IS THE FOUNDER'S, VERBATIM (EXCLUDE 2 — he waived looking at surfaces,
  * never writing them). Do not edit these two strings:
  *   small : "Halo user PDFLokal"
- *   big   : "Mohon kabarin saya ya kalo ada bug, di sini"
- * Note the FIRST PERSON: "kabarin saya", not "kami". A person is asking, which is
- * the same voice as the Ojan / mesindev.com byline inside the dialog itself.
+ *   big   : "Kabarin kalo ada bug yaa, di sini"
+ * A person is asking, in his texting voice, which is the same voice as the Ojan
+ * / mesindev.com byline inside the dialog itself. (Until 2026-10-06 it read
+ * "Mohon kabarin saya ya kalo ada bug, di sini"; the voice sweep dropped "saya".)
  *
  * TRIGGERS, his call: the first successful DOWNLOAD or the first committed EDIT
  * of the day, whichever lands first. Once per calendar day either way.
@@ -182,7 +183,8 @@ export function createBugReportPrompt() {
   // first commit — arm, then drag — so on the EDIT trigger this was the common
   // case, not a corner. A toast always self-clears after 2.6s (app.js toast()),
   // so waiting on it is short and bounded.
-  const OCCUPANTS = ['#support-card.show', '#vote-card.show', '#toast.show'];
+  // `dialog[open]` joined 2026-10-06 with the feature vote, a modal that must never share the screen with this card.
+  const OCCUPANTS = ['#support-card.show', '#vote-card.show', '#toast.show', 'dialog[open]'];
   const SETTLE_MS = 450; // celebrate's own card appears 200ms after the download
   const POLL_MS = 400;
   // The celebrate card waits on the USER to close it, who may never do so. After

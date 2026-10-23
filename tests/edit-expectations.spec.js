@@ -78,6 +78,10 @@ test.describe('Unduh: covered text is still in the file', () => {
   test('undo leaves no stale note', async ({ page }) => {
     await openDoc(page);
     await drawTipEx(page);
+    // Known-positive: the Tip-Ex really landed before we undo it. Catches: a draw
+    // that never committed, under which "undo leaves no note" passed for free.
+    await expect.poll(async () => (await annos(page)).filter((a) => a.t === 'whiteout').length,
+      { message: 'the Tip-Ex never landed, so the undo below proves nothing' }).toBe(1);
     await page.click('#btn-undo');
     expect(await annos(page)).toEqual([]);
     await openSheet(page);

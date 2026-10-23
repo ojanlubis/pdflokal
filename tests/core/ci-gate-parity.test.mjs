@@ -11,6 +11,20 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const WORKFLOW = fs.readFileSync(path.join(ROOT, '.github/workflows/e2e.yml'), 'utf8');
+const GATE = fs.readFileSync(path.join(ROOT, 'scripts/qa-gate.mjs'), 'utf8');
+
+// A command's identity is the program plus its leading non-flag words
+// (`npm run seo:check`, `npx playwright test`); flags after it are tuning, not
+// a different stage, so `npx playwright test --forbid-only` is still the
+// Playwright stage.
+const identity = (words) => {
+  const out = [];
+  for (const w of words) { if (w.startsWith('-')) break; out.push(w); }
+  return out.join(' ');
+};
+
+// CI steps that install the runner, not stages that judge the tree.
+const isSetup = (command) => /^npm ci$|^npx playwright install(-deps)?\b/.test(command);
 
 test('CI runs every stage in the authoritative local gate, in order', () => {
   const commands = [...WORKFLOW.matchAll(/^\s*-\s+run:\s+(.+)$/gm)].map((match) => match[1].trim());
@@ -23,8 +37,34 @@ test('CI runs every stage in the authoritative local gate, in order', () => {
     'CI must preserve the gate order: lint, SEO, core, Playwright');
 });
 
+// The test above pins CI against a HARD-CODED list, so deleting a stage from
+// scripts/qa-gate.mjs (e.g. the seo:check stage) left it green: the gate
+// silently stopped mirroring CI. This one reads the stage commands out of the
+// gate itself and demands the same ordered list as CI's run steps, both ways:
+// a stage only CI runs, or only the gate runs, is red.
+test('the gate\'s stages and CI\'s run steps are the same commands, in the same order', () => {
+  const gateCalls = [...GATE.matchAll(/\bstage\(\s*'([A-Z]+)'\s*,\s*'([\w-]+)'\s*,\s*\[([^\]]*)\]/g)]
+    .map((m) => ({ name: m[1], cmd: m[2], args: [...m[3].matchAll(/'([^']*)'/g)].map((a) => a[1]) }));
+  const gate = gateCalls.map((c) => identity([c.cmd, ...c.args]));
+  const ci = [...WORKFLOW.matchAll(/^\s*(?:-\s+)?run:\s+(.+)$/gm)]
+    .map((m) => identity(m[1].trim().split(/\s+/)))
+    .filter((command) => !isSetup(command));
+
+  // VACUITY: a parser that finds nothing on both sides agrees with itself.
+  assert.ok(gate.length >= 4, `parsed only ${JSON.stringify(gate)} out of scripts/qa-gate.mjs; repoint the parser`);
+  assert.ok(gate.includes('npm run seo:check'), 'the gate must run seo:check (CI does)');
+  assert.deepEqual(ci, gate, 'CI run steps and qa-gate.mjs stages must be the same commands in the same order');
+
+  // A stray test.only must fail the gate exactly as it fails CI.
+  const pw = gateCalls.find((c) => identity([c.cmd, ...c.args]) === 'npx playwright test');
+  assert.ok(pw?.args.includes('--forbid-only'), 'the gate\'s Playwright stage must pass --forbid-only');
+});
+
 test('CI wakes for every source family that can affect a gate result', () => {
-  for (const pattern of ['*.html', 'css/**', 'js/**', 'api/**', 'seo/**', 'scripts/**', 'tests/**']) {
+  // en/**, i18n/** and sitemap.xml: core tests read the generated /en pages,
+  // their i18n sources and the sitemap; a PR touching only them once skipped
+  // every test and stayed green until the nightly run after merge.
+  for (const pattern of ['*.html', 'css/**', 'js/**', 'api/**', 'seo/**', 'scripts/**', 'tests/**', 'en/**', 'i18n/**', 'sitemap.xml']) {
     assert.match(WORKFLOW, new RegExp(`['\"]${pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}['\"]`),
       `paths filter must include ${pattern}`);
   }

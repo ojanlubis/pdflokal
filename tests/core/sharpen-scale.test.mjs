@@ -173,3 +173,20 @@ test('scale is non-decreasing in zoom', () => {
     prev = s;
   }
 });
+
+// Image pages are one point per source pixel. Asking a phone photo for the
+// fleet's scale 2 built a 48.8MP canvas (blank on iOS Safari, ~195MB anywhere).
+test('imageScaleCap: a phone photo is never rastered past its own pixels or the budget', async () => {
+  const { imageScaleCap, MAX_PIXELS } = await import('../../js/render/sharpen.js');
+  const photo = { isFromImage: true, width: 4032, height: 3024, baseWidth: 4032 };
+  const cap = imageScaleCap(photo, MAX_PIXELS.phone);
+  assert.ok(cap <= 1, `cap ${cap} upsamples the photo`);
+  assert.ok(4032 * cap * 3024 * cap <= MAX_PIXELS.phone + 1, 'the capped canvas is over the phone budget');
+  assert.ok(cap > 0.5, `cap ${cap} throws away more than the budget requires`);
+  // A merge that shrank the photo to A4 width leaves it plenty of real pixels.
+  const shrunk = { isFromImage: true, width: 595, height: 446, baseWidth: 4032 };
+  assert.ok(imageScaleCap(shrunk, MAX_PIXELS.desktop) > 2, 'a shrunk photo must still be allowed the fleet scale');
+  // PDF pages are not this function's business.
+  assert.equal(imageScaleCap({ isFromImage: false, width: 595, height: 842 }), Infinity);
+  assert.equal(imageScaleCap(null), Infinity);
+});

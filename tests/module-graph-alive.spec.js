@@ -41,7 +41,7 @@
  * ============================================================================
  */
 import { test, expect } from '@playwright/test';
-import { readdirSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
@@ -53,20 +53,52 @@ const PAGES = readdirSync(APP_ROOT)
   .filter((f) => f.endsWith('.html'))
   .sort();
 
+// Pages whose module graph ends in js/v2/app.js — read from the markup, not
+// hand-listed. On these, `window.v2` is the positive proof the graph finished
+// evaluating (app.js assigns it after all its top-level wiring).
+const APP_PAGES = new Set(
+  PAGES.filter((f) => /src="\/?js\/v2\/app\.js"/.test(readFileSync(resolve(APP_ROOT, f), 'utf8'))),
+);
+
 test('the page set is non-empty and was read from disk', () => {
   // Guards the guard: if the glob ever returns [], every test below would
   // vacuously pass and this suite would become decoration.
   expect(PAGES.length).toBeGreaterThan(10);
+  // Same guard for the window.v2 positive check: an empty APP_PAGES would skip it everywhere.
+  expect(APP_PAGES.size).toBeGreaterThan(10);
 });
 
 for (const page of PAGES) {
   test(`${page} evaluates its modules with no top-level throw`, async ({ page: p }) => {
     const errors = [];
     p.on('pageerror', (e) => errors.push(e.message));
+    // A 404'd (or failed) static import kills the graph WITHOUT a pageerror:
+    // the browser just never evaluates it. Catch those on the wire.
+    // Catches: a renamed/deleted module file that a static import still names.
+    const origin = new URL(test.info().project.use.baseURL).origin;
+    const badJs = [];
+    const isOurJs = (url) => {
+      const u = new URL(url);
+      // Vercel serves /_vercel/ and /api/ in production; `npx serve` has neither.
+      return u.origin === origin && u.pathname.endsWith('.js') &&
+        !u.pathname.startsWith('/_vercel/') && !u.pathname.startsWith('/api/');
+    };
+    p.on('response', (r) => { if (isOurJs(r.url()) && r.status() >= 400) badJs.push(`${r.status()} ${new URL(r.url()).pathname}`); });
+    p.on('requestfailed', (r) => { if (isOurJs(r.url())) badJs.push(`FAILED ${new URL(r.url()).pathname} (${r.failure()?.errorText})`); });
 
     await p.goto(`/${page}`);
     // Module evaluation is not tied to load; give the graph a beat to run.
     await p.waitForLoadState('networkidle');
+
+    expect(badJs, `${page} requested same-origin JS that did not arrive — a dead import kills the graph silently`).toEqual([]);
+
+    if (APP_PAGES.has(page)) {
+      // Catches: a graph that died without throwing — window.v2 is assigned after app.js's top-level wiring.
+      await expect.poll(
+        () => p.evaluate(() => typeof window.v2 === 'object' && window.v2 !== null),
+        { message: `${page} loads app.js but window.v2 never appeared — the module graph did not finish` },
+      ).toBe(true);
+    }
 
     expect(
       errors,

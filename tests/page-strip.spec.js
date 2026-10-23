@@ -213,6 +213,7 @@ test.describe('page strip on a touch screen', () => {
       const s = document.querySelector('.pv-strip');
       const bs = [...s.querySelectorAll('button')].map((b) => b.getBoundingClientRect());
       return {
+        n: bs.length,
         coarse: matchMedia('(pointer: coarse)').matches,
         min: Math.round(Math.min(...bs.map((r) => Math.min(r.width, r.height)))),
         right: Math.max(...bs.map((r) => r.right)),
@@ -220,6 +221,9 @@ test.describe('page strip on a touch screen', () => {
         scrollW: document.documentElement.scrollWidth,
       };
     });
+    // Count guard: Math.min/max over an empty set is +/-Infinity and every bound
+    // below would pass. Catches a strip that rendered with no buttons (or renamed).
+    expect(m.n, 'the strip has up/down/rotate/delete').toBe(4);
     expect(m.coarse).toBe(true);
     expect(m.min).toBeGreaterThanOrEqual(44);
     expect(m.right).toBeLessThanOrEqual(m.vw);

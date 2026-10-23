@@ -15,11 +15,20 @@
        1. A click on any language link (.ld-lang-opt with an hreflang) writes
           pdflokal_lang = that link's language. Without it an English-browser user who
           picks "Bahasa Indonesia" on /en would be bounced straight back.
-       2. ONLY on the exact path `/`: a stored choice wins ('en' goes to /en, 'id'
-          stays); with none, a browser whose first language is English goes to /en and
-          anything else stays. `location.replace`, so Back does not return to `/`; the
-          query string and hash travel with it. It never moves /en, a tool page or any
-          other URL, and never an Indonesian browser off `/en`.
+       2. ONLY on the exact path `/`, in this order: a stored choice wins ('en' goes to
+          /en, 'id' stays); else a device whose time zone is Asia/Jakarta, Pontianak,
+          Makassar or Jayapura stays on `/`, whatever the browser language says; else a
+          browser whose first language is English goes to /en and anything else stays.
+          `location.replace`, so Back does not return to `/`; the query string and hash
+          travel with it. It never moves /en, a tool page or any other URL, and never an
+          Indonesian browser off `/en`.
+          WHY THE TIME ZONE (founder, 2026-10-06): 88% of one week's /en visitors were in
+          Indonesia. Indonesians often run an English browser, and the language alone
+          sent them to a page they did not want. The time zone is read from the browser
+          itself (Intl); no IP lookup, no request, nothing leaves the device. It is a
+          hint, not a border: Malaysia, Brunei and every other zone are unchanged (the
+          browser language decides), and a stored choice still beats it. A browser that
+          cannot report a time zone (try/catch) falls through to the language rule.
        NEVER FOR A CRAWLER: Googlebot renders as en-US, and a bot sent to /en would
        never index `/`. So a user agent that says bot, crawler, Lighthouse or headless
        stays put. navigator.webdriver is deliberately NOT tested: it is true under
@@ -46,7 +55,9 @@
     var saved = null;
     try { saved = localStorage.getItem(KEY); } catch (x) {}
     var first = (navigator.languages && navigator.languages[0]) || navigator.language || '';
-    if (saved === 'en' || (saved !== 'id' && /^en/i.test(first))) {
+    var inIndonesia = false;
+    try { inIndonesia = /^Asia\/(Jakarta|Pontianak|Makassar|Jayapura)$/.test(Intl.DateTimeFormat().resolvedOptions().timeZone); } catch (x) {}
+    if (saved === 'en' || (saved !== 'id' && !inIndonesia && /^en/i.test(first))) {
       window.__pdlLeaving = true;
       // Nothing of the Indonesian page may show while /en loads; undone if the move never lands.
       document.documentElement.style.visibility = 'hidden';
@@ -221,7 +232,8 @@
           touches. Blocking the node is what stops it, and the
           selector is by TYPE rather than by id (`#file-input`, `#sig-file`) so a
           file input added later is covered the day it is added.
-        - `#toast`, `#fb-form` and `#edit-feedback` are BLOCKED, not merely masked.
+        - `#toast`, `#fb-form`, `#fv-form` and `#edit-feedback` are BLOCKED, not merely masked.
+          (`#fv-form` is the feature vote card, whose free-text idea is a user-authored note.)
           The toast is the other place a real filename is ever painted; the other
           two are user-authored notes and consent-gated document crops. Blocking
           means they survive somebody later flipping a mask flag off.
@@ -285,7 +297,7 @@
       record_mask_all_text: true,
       record_mask_all_inputs: true,
       record_canvas: false,
-      record_block_selector: 'img, video, canvas, input[type="file"], #toast, #fb-form, #edit-feedback',
+      record_block_selector: 'img, video, canvas, input[type="file"], #toast, #fb-form, #fv-form, #edit-feedback',
       // THE ALLOWLIST. Masking stays deny-by-default above; these are the only
       // nodes carved out of it, and each one's WHOLE SUBTREE is static markup
       // shipped identically to every visitor. See the head comment for why a
@@ -302,7 +314,7 @@
                            // dropzone copy, footer. Static HTML; js only toggles display.
         '#zoom-ctl',       // + / −
         '#contact-tab-btn',// "Ada masukan?" (the dialog it opens, #fb-form, stays BLOCKED)
-        '#bug-prompt',     // the once-a-day "kabarin saya kalo ada bug" card. TWO FIXED
+        '#bug-prompt',     // the once-a-day "kabarin kalo ada bug" card. TWO FIXED
                            // STRINGS, built in js/v2/bug-report-prompt.js and identical for
                            // every visitor — no user text can reach it. Unmasked ON PURPOSE:
                            // masked it is a grey rectangle, and "did anyone notice this?" is
@@ -485,7 +497,11 @@
          spelled `calc(var(--header-h) + var(--toolbar-h))` at each use site,
          which stopped being true the moment the two could share a row. One
          name, redefined once per breakpoint. */
-      --chrome-h: calc(var(--header-h) + var(--toolbar-h));
+      /* Top breathing room of the header row, phone only (set in the max-width:899px
+         block below; 0 on the merged row). It is part of the chrome's height, so
+         it is part of --chrome-h: the format and signature bars sit at that line. */
+      --hdr-top: 0px;
+      --chrome-h: calc(var(--header-h) + var(--toolbar-h) + var(--hdr-top));
       --header-merged-h: 52px;   /* the single-row height (tools are 36px + padding) */
     }
     /* Self-hosted fonts (preview parity with the PDF export) */
@@ -543,6 +559,13 @@
          row of its own; above it, everything stays on one line. No JS, no
          second element, no duplicated tool buttons to keep in sync. */
       flex-wrap: wrap;
+    }
+    /* Phone: Unduh, the logo and File sat flush against the top edge of the screen.
+       Same 10px as the side gutter, or the notch inset when that is larger (an
+       installed PWA on a notched phone). Desktop is the merged row and is untouched. */
+    @media (max-width: 899px) {
+      :root { --hdr-top: max(10px, env(safe-area-inset-top, 0px)); }
+      header { padding-top: var(--hdr-top); }
     }
     /* Narrow: the toolbar is a row of its own and carries the bottom edge, so
        the header must NOT also draw one — two borders read as a seam. */
@@ -644,6 +667,86 @@
       display: flex; flex-direction: column; gap: var(--sp-12);
     }
 
+    /* ---- the feature vote card, v2 (js/v2/feature-vote.js, js/core/features.js) ----
+     * One native dialog element in the middle of the screen (the global `dialog` rule IS the
+     * overlay and centres it; never the bottom-right corner, which is the maker card's).
+     * Three steps in one .sheet: invite (his words, his photo and hat below them),
+     * choose (no photo, real checkboxes), done. EDITOR / console mode
+     * (specs/design-system.md): nothing above --fs-1 here, hairlines and ground, no
+     * shadow. RED IS TOUCHABLE ONLY: the buttons and the checkbox tick are the only red.
+     * Every word is a featureVote.* key (js/locales); the markup below is a skeleton. */
+    .fv-sheet { max-width: 420px; max-height: calc(100dvh - 32px); overflow: hidden; padding: var(--sp-24); gap: 0; }
+    /* ⚠️ `:not([hidden])`, same trap as .fb-body: a bare display:flex beats [hidden]. */
+    .fv-step:not([hidden]) { display: flex; flex-direction: column; gap: var(--sp-16); min-height: 0; }
+    /* step 1: the invitation */
+    .fv-invite-text { display: flex; flex-direction: column; gap: var(--sp-12); }
+    .fv-invite-text p { margin: 0; font-size: var(--fs-1); line-height: 1.4; color: var(--ink); }
+    /* His photo, with the engraved top hat (images/topi.svg, images/ojan.jpg) exactly
+       as the maker card wears it, only larger. The padding is room for the hat INSIDE
+       the box: the sheet clips overflow, so a hat above this box would be cut off. */
+    .fv-kepala { position: relative; align-self: center; padding-top: 32px; margin-top: var(--sp-8); }
+    .fv-face { width: 96px; height: 96px; border-radius: 50%; object-fit: cover; border: 2px solid var(--line); display: block; }
+    .fv-topi { position: absolute; top: 0; left: 50%; transform: translateX(-50%) rotate(-12deg); width: 52px; height: auto; pointer-events: none; }
+    .fv-actions { display: flex; flex-direction: column; gap: var(--sp-8); }
+    .fv-primary, .fv-quiet, #fv-send {
+      min-height: 48px; padding: 0 var(--sp-16); border-radius: var(--r-control);
+      font: inherit; font-size: var(--fs-0); cursor: pointer; border: 1px solid var(--line);
+      background: var(--bg); color: var(--ink);
+    }
+    .fv-primary, #fv-send { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
+    .fv-quiet { border-color: transparent; background: transparent; color: var(--muted); }
+    .fv-primary:focus-visible, .fv-quiet:focus-visible, #fv-send:focus-visible, .fv-x:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    #fv-send:disabled { opacity: .45; cursor: not-allowed; }
+    @media (hover: hover) {
+      .fv-primary:hover, #fv-send:not(:disabled):hover { background: var(--accent-down); border-color: var(--accent-down); }
+      .fv-quiet:hover { color: var(--ink); }
+    }
+    /* step 2: the choices */
+    .fv-head { display: flex; align-items: flex-start; gap: var(--sp-8); }
+    .fv-head > div { flex: 1; }
+    /* `.sheet h2` (15.5px) outranks a bare class; these are scoped so the heading really is larger. */
+    .fv-sheet .fv-title { font-size: var(--fs-1); line-height: 1.25; }
+    .fv-title:focus, .fv-done-head:focus { outline: none; }
+    /* "Pilih maksimal 3" is the rule of the card, so it is ink and bold, not a grey subtitle. */
+    .fv-hint { margin: var(--sp-4) 0 0; font-size: var(--fs-0); font-weight: 700; color: var(--ink); }
+    .fv-x { flex: none; width: 44px; height: 44px; margin: -6px -8px 0 0; padding: 0; display: grid; place-items: center; }
+    .fv-x svg { width: 16px; height: 16px; }
+    /* The 4px pad (undone by the margin) is room for the focus ring: an overflow container clips it. */
+    .fv-scroll { overflow-y: auto; min-height: 0; display: flex; flex-direction: column; gap: var(--sp-16); padding: 4px; margin: -4px; }
+    .fv-list { list-style: none; margin: 0; padding: 0; }
+    .fv-list li + li { border-top: 1px solid var(--line); }
+    /* The whole row is the tap target (>= 44px); the checkbox is the real, visible one. */
+    .fv-opt { display: flex; align-items: center; gap: var(--sp-12); min-height: 48px; padding: var(--sp-8) var(--sp-4); cursor: pointer; font-size: var(--fs-0); line-height: 1.3; color: var(--ink); }
+    .fv-opt input { flex: none; width: 22px; height: 22px; margin: 0; accent-color: var(--accent); cursor: inherit; }
+    .fv-opt:has(input:checked) { font-weight: 600; }
+    .fv-opt:has(input:disabled:not(:checked)) { opacity: .45; cursor: not-allowed; }
+    .fv-opt:has(input:focus-visible) { outline: 3px solid var(--accent); outline-offset: -3px; border-radius: var(--r-control); }
+    @media (hover: hover) {
+      .fv-opt:has(input:not(:disabled)):hover { background: var(--dzfill); }
+    }
+    .fv-idea-label { display: block; margin-bottom: var(--sp-8); font-size: var(--fs-n1); color: var(--ink); }
+    #fv-idea {
+      width: 100%; resize: vertical; min-height: 56px;
+      padding: var(--sp-8) var(--sp-12);
+      border: 1px solid var(--line); border-radius: var(--r-control);
+      background: var(--bg); color: var(--ink);
+      font: inherit; font-size: var(--fs-n1); line-height: 1.5;
+    }
+    #fv-idea:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    .fv-row { display: flex; align-items: center; gap: var(--sp-12); justify-content: flex-end; }
+    .fv-error { margin: 0; font-size: var(--fs-n1); color: var(--ink); font-weight: 600; }
+    .fv-error[hidden] { display: none; }
+    .fv-count { flex: 1; margin: 0; font-size: var(--fs-n1); color: var(--muted); font-variant-numeric: tabular-nums; }
+    /* step 3: thanks, the top 3, the coffee ask (the support card's own content, cloned) */
+    .fv-sheet .fv-done-head { font-size: var(--fs-1); line-height: 1.35; font-weight: 600; }
+    .fv-top-wrap[hidden] { display: none; }
+    .fv-top-label { margin: 0 0 var(--sp-4); font-size: var(--fs-n1); color: var(--muted); }
+    .fv-top { margin: 0; padding-left: var(--sp-24); font-size: var(--fs-0); line-height: 1.7; color: var(--ink); }
+    .fv-coffee { border-top: 1px solid var(--line); padding-top: var(--sp-16); }
+    .fv-coffee:empty { display: none; }
+    .fv-coffee.qr-open .sc-qr { display: block; }
+    .fv-coffee.qr-open .sc-actions button { border-color: var(--accent); color: var(--accent); }
+
     .hc-sheet { max-width: 340px; }
     .hc-sheet p { font-size: 13px; color: var(--muted); margin: -6px 0 2px; }
     .hc-row { display: flex; gap: 8px; }
@@ -653,11 +756,11 @@
     }
     /* The scan sheet's primary action. Same accent treatment as #hc-go — one
        grammar for "this is the button the sheet is about", never a second. */
-    #hc-go, #so-ocr { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 2px 0 var(--accent-down); }
+    #hc-go, #so-ocr, #dc-add, #nc-go { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 2px 0 var(--accent-down); }
     #so-ocr:active { transform: translateY(1px); box-shadow: 0 1px 0 var(--accent-down); }
     /* The primary action needs air above the row of alternatives under it. */
     #scan-offer .hc-row + .hc-row { margin-top: 2px; }
-    #hc-go:active { transform: translateY(1px); box-shadow: 0 1px 0 var(--accent-down); }
+    #hc-go:active, #dc-add:active, #nc-go:active { transform: translateY(1px); box-shadow: 0 1px 0 var(--accent-down); }
     /* ---- Simpan editan: the reopen ask + the saved list (js/v2/saved-docs-ui.js) ----
        DRAFT 2026-10-06, BUILT NOT RELEASED (specs/spec-simpan-editan.md). Both are
        plain dialogs on the standard .sheet system; nothing here is positioned in
@@ -952,8 +1055,12 @@
        (contact-form feedback, Jul 2026). This covers that exact surface and shows
        honest, advancing progress. General word "Memproses" on purpose (founder
        ruling): comprehension of THIS step beats the "menjepit" metaphor. */
+    /* popover="manual" puts it in the TOP LAYER so it paints above an open modal
+       sheet (js/v2/top-layer.js). [popover]'s UA defaults (fit-content size,
+       auto margin, border) would shrink it off the full-screen cover, so reset them. */
     #v2-loading {
       position: fixed; inset: 0; z-index: 60;
+      width: auto; height: auto; margin: 0; border: 0; overflow: visible;
       display: flex; align-items: center; justify-content: center; padding: 24px;
       background: rgba(241,237,231,.94);
       -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
@@ -1952,6 +2059,8 @@
       transform: translateX(-50%) rotate(-12deg);
       width: 26px; height: auto; pointer-events: none;
     }
+    /* `.sc-qr img` (0,1,1) outranks `.sc-hat` (0,1,0) and blew the hat up to the QR's width, in the share card as much as in the vote's coffee step. */
+    .sc-qr .sc-hat { width: 26px; border: 0; border-radius: 0; }
     .sc-performer b { display: block; font-size: 13px; color: var(--ink); line-height: 1.25; margin-top: 6px; }
     .sc-performer span { display: block; font-size: 11.5px; color: var(--muted); }
     /* The QRIS mark, above every QR code in the product. Self-hosted. */
@@ -2014,8 +2123,13 @@
       text-decoration: underline; min-height: 32px; padding: 0 8px;
     }
 
+    /* popover="manual": top layer, so it paints above an open modal sheet
+       (js/v2/top-layer.js). The reset undoes [popover]'s UA inset:0 + margin:auto,
+       which would centre it on screen; display:block keeps the fade-in, since the
+       UA would otherwise hide it (display:none) until its first showPopover(). */
     #toast {
       position: fixed; left: 50%; transform: translateX(-50%); bottom: 130px; z-index: 40;
+      top: auto; right: auto; margin: 0; border: 0; overflow: visible; display: block;
       background: rgba(26,29,33,.9); color: #fff; font-size: 13px;
       padding: 9px 16px; border-radius: 10px; opacity: 0; transition: opacity .2s;
       pointer-events: none; max-width: 88vw; text-align: center;
@@ -2037,11 +2151,24 @@
     #maker-card[hidden] { display: none; }
     @keyframes mk-in { from { opacity: 0; transform: translateY(8px); } }
     @media (prefers-reduced-motion: reduce) { #maker-card { animation: none; } }
+    /* A TRUE CIRCLE. The global `button { min-height: 36px }` beat the 32px height,
+       so a 32 x 36 box drew a vertical oval at every width. The box is now square
+       (width = height = min-height, aspect-ratio 1) and the visible disc is a
+       ::before, so a coarse pointer can get a 44px hit area around the same 32px
+       disc. The x is centred by grid, nudged up for the glyph's low baseline. */
     .mk-close {
       position: absolute; top: var(--sp-8); right: var(--sp-8);
-      width: 32px; height: 32px; border-radius: var(--r-pill);
-      border: 0; background: var(--dzbg); color: var(--muted);
-      font-size: 18px; line-height: 32px; cursor: pointer;
+      width: 32px; height: 32px; min-width: 0; min-height: 32px; aspect-ratio: 1; flex-shrink: 0;
+      display: grid; place-items: center; padding: 0 0 5px; isolation: isolate; /* the x glyph sits low in its em box */
+      border: 0; border-radius: 50%; background: none; color: var(--muted);
+      font-size: 18px; line-height: 1; cursor: pointer;
+    }
+    .mk-close::before {
+      content: ""; position: absolute; z-index: -1; width: 32px; height: 32px;
+      border-radius: 50%; background: var(--dzbg);
+    }
+    @media (pointer: coarse) {
+      .mk-close { width: 44px; height: 44px; min-height: 44px; top: calc(var(--sp-8) - 6px); right: calc(var(--sp-8) - 6px); }
     }
     .mk-id { display: flex; align-items: center; gap: var(--sp-12); padding-right: 36px; }
     .mk-kepala { position: relative; flex: none; padding-top: 17px; } /* room for the hat INSIDE the card: its body scrolls (overflow:auto), so a hat above this box is cut off */
@@ -2049,6 +2176,8 @@
     .mk-topi { position: absolute; top: 0; left: 50%; transform: translateX(-50%) rotate(-12deg); width: 26px; height: auto; pointer-events: none; } /* the engraved cut-out, images/topi.svg (his pick "S", 2026-10-03) */
     .mk-name { font-weight: 700; font-size: var(--fs-0); line-height: 1.2; }
     .mk-real { font-size: var(--fs-n1); color: var(--muted); }
+    .mk-notice { margin-top: var(--sp-12); display: grid; gap: var(--sp-4); font-size: var(--fs-0); line-height: 1.35; font-weight: 600; }
+    .mk-notice p { margin: 0; }
     .mk-label { margin: var(--sp-16) 0 var(--sp-8); font-size: var(--fs-n1); color: var(--muted); }
     .mk-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-8); }
     .mk-list li { display: grid; grid-template-columns: 48px 1fr; gap: var(--sp-8); font-size: var(--fs-n1); line-height: 1.4; }
@@ -2093,19 +2222,21 @@
     @media (prefers-reduced-motion: reduce) { .vc-pulse::after { animation: none; opacity: 0; } }
     .visitor-count b { color: var(--ink); font-weight: 600; }
     .visitor-count[hidden] { display: none; }
-    /* Homepage: beside the wordmark, only where the centred nav leaves room.
-       First thing to go (his ruling), so it leaves before the nav does. */
-    /* 24px off the wordmark (his call 2026-09-24: "kurang ketengah", horizontal):
-       at the flex gap's 8px it read as part of the logo. */
-    .ld-hd .visitor-count { display: none; margin-left: var(--sp-16); }
-    @media (min-width: 1100px) { .ld-hd .visitor-count:not([hidden]) { display: inline-flex; } }
+    /* Homepage: one centred line under the dropzone, above the install chip.
+       margin-top matches .ip-chip-wrap's, so the two read as one quiet strip. */
+    .vc-wrap { display: flex; justify-content: center; margin-top: var(--sp-16); }
+    .vc-wrap:has(> .visitor-count[hidden]) { display: none; }
+    .vc-wrap + .ip-chip-wrap { margin-top: var(--sp-16); }
     /* Editor: between File and the tools; measured out when crowded. */
     /* flex-shrink 1000: when the row gets tight the count gives up its room
        before File or a tool label does; maker-card.js hides it the moment its
        text would be clipped. */
     header > .visitor-count { order: 2; padding: 0 var(--sp-8); flex: 0 1000 auto; min-width: 0; overflow: hidden; }
     header > .visitor-count.is-crowded { display: none; }
-    @media (max-width: 899px) { header > .visitor-count { display: none; } }
+    /* Narrow: the editor never gives the count a row of its own. This must beat
+       `.visitor-count:not([hidden])` (0,2,0), which a bare `header > .visitor-count`
+       (0,1,1) did not, so at phone width the count wrapped onto its own row. */
+    @media (max-width: 899px) { header > .visitor-count:not([hidden]) { display: none; } }
   </style>
 </head>
 <body class="is-empty" data-intent="ttd">
@@ -2175,7 +2306,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="8" rx="1"/></svg>
       Tip-Ex
     </button>
-    <button class="tool" data-tool="ganti" aria-pressed="false" aria-label="Edit teks asli yang sudah tercetak di PDF" title="Edit teks asli di PDF, masih beta, kabari saya kalau ada yang aneh">
+    <button class="tool" data-tool="ganti" aria-pressed="false" aria-label="Edit teks asli yang sudah tercetak di PDF" title="Edit teks asli di PDF, masih beta, kabarin kalo ada yang aneh yaa">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
       Edit<span class="beta-tag">beta</span>
     </button>
@@ -2225,7 +2356,6 @@
                obvious thing a stranger will try. Same defect the founder found
                on privasi/dukung, one layer upstream and twelve times over. -->
           <a class="ld-mark" href="/" aria-label="PDFLokal, ke beranda">PDF<em>Lokal</em></a>
-          <span class="visitor-count" data-visitor-count hidden title="Jumlah browser yang membuka PDFLokal hari ini"><span class="vc-pulse" aria-hidden="true"></span><span><b class="vc-n"></b> visitor hari ini</span></span>
           <button class="ld-burger" id="ld-burger" type="button" aria-expanded="false" aria-controls="ld-burger-menu" aria-label="Buka menu navigasi">
             <svg class="ld-burger-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
               <line class="ld-burger-l1" x1="3" y1="6" x2="21" y2="6"/>
@@ -2240,6 +2370,7 @@
         <nav class="ld-nav" aria-label="Navigasi utama">
           <a href="https://github.com/ojanlubis/pdflokal" rel="noopener">Github</a>
           <a href="/privasi">Privasi</a>
+          <a href="#usulkan-fitur" data-feature-vote-open>Usulkan fitur</a>
           <a href="/dukung">Dukung</a>
         </nav>
 
@@ -2287,6 +2418,7 @@
            of flow and does not disturb the header's flex layout. -->
       <div class="ld-burger-menu" id="ld-burger-menu" hidden>
         <a href="https://github.com/ojanlubis/pdflokal" rel="noopener">Github</a>
+        <a href="#usulkan-fitur" data-feature-vote-open>Usulkan fitur</a>
         <a href="/dukung">Dukung</a>
         <div class="ld-burger-lang">
           <span class="ld-burger-lang-label">Bahasa</span>
@@ -2323,6 +2455,12 @@
           <span class="dz-buka">Buka File</span>
           <span class="dz-hint">PDF atau foto, boleh banyak sekaligus</span>
         </button>
+        </div>
+        <!-- The visitor count: one line under the dropzone, above the install chip,
+             centred at every width (his ruling 2026-10-06). js/v2/maker-card.js
+             fills it and unhides it only when /api/visitors answered. -->
+        <div class="vc-wrap">
+          <span class="visitor-count" data-visitor-count hidden title="Jumlah browser yang membuka PDFLokal hari ini"><span class="vc-pulse" aria-hidden="true"></span><span><b class="vc-n"></b> visitor hari ini</span></span>
         </div>
         <!-- Install chip: quiet, below the dropzone. Shown only to RETURNING users
              (js/v2/install-prompt.js); tap opens the adaptive install card. Never
@@ -2463,7 +2601,7 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
           <div>
             <b>Filemu nggak pernah ninggalin perangkatmu.</b>
-            <p>Ijazah, KTP, kontrak. Semua diproses di browser-mu sendiri, bukan di server orang. <a href="/privasi">Baca janji privasi saya</a></p>
+            <p>Ijazah, KTP, kontrak. Semua diproses di browser-mu sendiri, bukan di server orang. <a href="/privasi">Baca janji privasinya</a></p>
           </div>
         </div>
         <div class="ld-copy">
@@ -2481,16 +2619,16 @@
           <p>Dokumen resmi di Indonesia sering minta paraf di setiap halaman, bukan cuma tanda tangan di halaman terakhir. PDFLokal punya alat paraf tersendiri, ukurannya lebih kecil, dan ada tombol <strong>Semua Halaman</strong> yang menyalin parafmu ke posisi yang sama di seluruh halaman sekaligus.</p>
           <h2>Ini sah nggak?</h2>
           <p>PDFLokal menempelkan gambar tanda tanganmu ke dalam dokumen, sama seperti menandatangani hasil print lalu men-scan-nya, dan diterima di sebagian besar keperluan sehari-hari: surat pernyataan, formulir, kontrak kerja.</p>
-          <p>Yang PDFLokal <strong>tidak</strong> lakukan adalah tanda tangan digital bersertifikat (yang terikat identitas digital resmi). Kalau instansimu memintanya secara khusus, kamu butuh penyedia tersertifikasi. Saya lebih baik jujur soal ini daripada membiarkanmu salah kira.</p>
+          <p>Yang PDFLokal <strong>tidak</strong> lakukan adalah tanda tangan digital bersertifikat (yang terikat identitas digital resmi). Kalau instansimu memintanya secara khusus, kamu butuh penyedia tersertifikasi. Lebih baik jujur soal ini daripada membiarkanmu salah kira.</p>
           <h2>Tanda tangan pakai jari di HP</h2>
           <p>Menggambar tanda tangan dengan jari di layar HP hasilnya sering terlihat kaku dan gemetar. PDFLokal menghaluskan goresanmu dan menyesuaikan ketebalannya dengan kecepatan gerakan, sama seperti pena betulan, yang menipis saat digerakkan cepat.</p>
           <p>Kalau hasilnya tetap kurang mirip, pakai saja tab Upload dan foto tanda tanganmu di atas kertas putih. Buat kebanyakan orang, hasilnya jauh lebih rapi dan lebih menyerupai tanda tangan asli.</p>
           <h2>Soal materai</h2>
           <p>Beberapa dokumen di Indonesia meminta e-meterai. PDFLokal tidak menerbitkan e-meterai, itu diterbitkan lewat kanal resmi Peruri, dan siapa pun yang menawarkannya secara gratis lewat situs biasa patut kamu curigai.</p>
-          <p>Yang perlu kamu tahu: menempelkan gambar meterai lewat Upload itu cuma gambar, bukan meterai yang sah. Untuk dokumen elektronik, yang sah cuma e-meterai dari Peruri. Saya lebih memilih menjelaskan batasannya daripada membiarkanmu mengira sudah beres padahal belum.</p>
-          <h2>Tanda tanganmu tidak saya simpan</h2>
+          <p>Yang perlu kamu tahu: menempelkan gambar meterai lewat Upload itu cuma gambar, bukan meterai yang sah. Untuk dokumen elektronik, yang sah cuma e-meterai dari Peruri. Lebih baik batasannya dijelaskan daripada membiarkanmu mengira sudah beres padahal belum.</p>
+          <h2>Tanda tanganmu tidak disimpan kecuali kamu minta</h2>
           <p>Tanda tangan adalah data yang paling sensitif di dokumenmu, dan situs lain memintamu mengunggahnya. Beberapa bahkan menyimpannya di akunmu "supaya praktis dipakai lagi", artinya, tanda tanganmu duduk di server orang.</p>
-          <p>Di PDFLokal, tanda tanganmu ada di dalam browser selama kamu mengerjakan dokumen, dan lenyap saat kamu menutup tab. Tidak ada akun, jadi tidak ada tempat untuk menyimpannya.</p>
+          <p>Di PDFLokal, tanda tanganmu ada di dalam browser selama kamu mengerjakan dokumen, dan tidak disimpan kecuali kamu mencentang "Simpan tanda tangan". Kalau dicentang, tanda tangan itu tetap di browser ini saja, tidak pernah ke server.</p>
         </div>
         <section class="ld-faq">
           <h2>Sering ditanya</h2>
@@ -2508,7 +2646,7 @@
           </details>
           <details>
             <summary>Tanda tanganku disimpan di server kalian?</summary>
-            <p>Tidak. Tidak ada yang dikirim ke mana pun. Tanda tanganmu ada di browser-mu selama kamu mengerjakan dokumen, dan hilang saat kamu menutup halaman.</p>
+            <p>Tidak. Tidak ada yang dikirim ke mana pun. Tanda tanganmu ada di browser-mu selama kamu mengerjakan dokumen, dan tidak disimpan kecuali kamu mencentang &quot;Simpan tanda tangan&quot;. Kalau dicentang, tetap di browser ini saja.</p>
           </details>
           <details>
             <summary>Harus bikin akun?</summary>
@@ -2547,7 +2685,7 @@
           </nav>
         </div>
         <footer class="ld-foot">
-          <a href="/dukung">Dukung Saya</a>
+          <a href="/dukung">Dukung PDFLokal</a>
           <a href="/privasi">Privasi</a>
           <!-- "Github", not "GitHub" — the founder ruled the capitalization for
                the navbar (2026-07-29) and the footer said the other thing, so one
@@ -2568,7 +2706,7 @@
   </main>
 
   <div id="v2-pill" aria-hidden="true"></div>
-  <div id="v2-loading" hidden>
+  <div id="v2-loading" popover="manual" hidden>
     <div class="lp-box" role="status" aria-live="polite">
       <div class="lp-track"><div class="lp-fill"></div></div>
       <div class="lp-title">Memproses…</div>
@@ -2594,7 +2732,7 @@
        Wired by js/v2/feedback-form.js, alongside the footer's own link — one
        dialog, one code path, two doors. -->
   <button id="contact-tab-btn">Ada masukan?</button>
-  <div id="toast" role="status" aria-live="polite"></div>
+  <div id="toast" popover="manual" role="status" aria-live="polite"></div>
 
   <!-- The general feedback channel, opened from the footer's "Ada masukan?".
        Mirrors #home-confirm: a dialog with a .sheet child, because the global
@@ -2664,6 +2802,69 @@
   <dialog id="saved-ask"><div class="sheet hc-sheet sv-ask"></div></dialog>
   <dialog id="saved-list"><div class="sheet sv-sheet"></div></dialog>
 
+  <!-- The feature vote, v2 (founder rulings 2026-10-02 and 2026-10-06: users vote on
+       the planned features, at most 3, and may write an idea; we build everything,
+       the RELEASE order follows the vote). A SKELETON: js/v2/feature-vote.js fills every
+       word (featureVote.* in js/locales) and builds the option rows from the ONE list,
+       js/core/features.js. Step 1 is his invitation with his photo and top hat
+       (the maker card's own assets); step 2 the choices; step 3 thanks, the top 3 and
+       the coffee ask cloned from #support-card. Offered after every whole-document
+       download until "Nanti aja", then at most daily; never after voting; always from
+       the "Usulkan fitur" nav / drawer link. #fv-form is BLOCKED in session replay
+       (the idea is a user-typed note). -->
+  <dialog id="fv-form" aria-labelledby="fv-invite-title">
+    <div class="sheet fv-sheet">
+      <div class="fv-step fv-invite" data-fv-step="invite">
+        <div class="fv-invite-text">
+          <h2 id="fv-invite-title" class="fv-title" tabindex="-1"></h2>
+          <p id="fv-invite-text"></p>
+        </div>
+        <div class="fv-kepala">
+          <img class="fv-topi" src="/images/topi.svg" alt="" aria-hidden="true" width="26" height="23">
+          <img src="/images/ojan.jpg" alt="Foto Fauzan Ahladzikri (Ojan)" class="fv-face" width="96" height="96">
+        </div>
+        <div class="fv-actions">
+          <button type="button" class="fv-primary fv-start"></button>
+          <button type="button" class="fv-quiet" data-fv-later></button>
+        </div>
+      </div>
+      <div class="fv-step fv-choose" data-fv-step="choose" hidden>
+        <div class="fv-head">
+          <div>
+            <h2 id="fv-title" class="fv-title" tabindex="-1"></h2>
+            <p class="fv-hint"></p>
+          </div>
+          <button type="button" class="btn-ghost fv-x" data-fv-close aria-label="Tutup"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+        </div>
+        <div class="fv-scroll">
+          <ul class="fv-list"></ul>
+          <div>
+            <label class="fv-idea-label" for="fv-idea"></label>
+            <textarea id="fv-idea" rows="2"></textarea>
+          </div>
+        </div>
+        <p class="fv-error" id="fv-error" role="alert" hidden></p>
+        <div class="fv-row">
+          <p class="fv-count" id="fv-count" aria-live="polite"></p>
+          <button type="button" id="fv-send" disabled></button>
+        </div>
+      </div>
+      <div class="fv-step fv-done" data-fv-step="done" hidden>
+        <div class="fv-scroll">
+          <h2 id="fv-done-head" class="fv-done-head" tabindex="-1"></h2>
+          <div class="fv-top-wrap" hidden>
+            <p class="fv-top-label"></p>
+            <ol class="fv-top"></ol>
+          </div>
+          <div class="fv-coffee"></div>
+        </div>
+        <div class="fv-row">
+          <button type="button" class="fv-quiet" data-fv-close></button>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
   <dialog id="home-confirm" aria-label="Kembali ke beranda">
     <div class="sheet hc-sheet">
       <h2>Kembali ke beranda?</h2>
@@ -2671,6 +2872,36 @@
       <div class="hc-row">
         <button id="hc-cancel">Batal</button>
         <button id="hc-go">Ke Beranda</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- A file dropped onto an OPEN document: add its pages, or replace the doc.
+       Before this the drop always appended, silently. On an empty canvas the
+       drop just opens, no question. Same grammar as #home-confirm. Copy is his
+       (2026-10-09: buttons "max 2 kata. ini tools"). -->
+  <dialog id="drop-choice" aria-label="Tambahin atau ganti">
+    <div class="sheet hc-sheet">
+      <h2>Tambahin atau ganti?</h2>
+      <p>Halaman dari file baru mau ditaruh di belakang, atau gantiin dokumen ini? Kalau diganti, editanmu bakal hilang kalau belum kamu unduh.</p>
+      <div class="hc-row">
+        <button id="dc-add">Tambah</button>
+        <button id="dc-replace">Ganti</button>
+        <button id="dc-cancel">Batal</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- File > Buka Baru with edits not yet downloaded. Before this the picker
+       opened straight away and choosing a file wiped the doc AND its undo
+       history: the one silent, unrecoverable loss in the editor. -->
+  <dialog id="new-confirm" aria-label="Buka file baru">
+    <div class="sheet hc-sheet">
+      <h2>Buka file baru?</h2>
+      <p>Dokumen ini bakal ditutup. Editanmu bakal hilang kalau belum kamu unduh.</p>
+      <div class="hc-row">
+        <button id="nc-cancel">Batal</button>
+        <button id="nc-go">Buka Baru</button>
       </div>
     </div>
   </dialog>
@@ -2717,7 +2948,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     </button>
     <div class="sc-head">Selesai, filemu udah jadi!</div>
-    <p class="sc-sub">PDFLokal gratis dan bakal terus gratis. Kalau kepakai, bantu saya sedikit ya:</p>
+    <p class="sc-sub">PDFLokal gratis dan bakal terus gratis. Kalo kepakai, bantuin dikit yaa:</p>
     <div class="sc-actions">
       <button id="sc-share">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></svg>

@@ -22,6 +22,7 @@
  */
 
 import { buildExportPlan } from './operations.js';
+import { fenceUnkeptPages, landPageRefs, pagePlaceholder } from './page-fence.js';
 import { applyPageSurgery } from './page-surgery.js';
 import { resolveDecidedFont, blockText } from './stamp.js';
 import { placeBlockLines } from './block-edit.js';
@@ -29,6 +30,8 @@ import { CLONE_FONT_VARIANTS, CLONE_FONT_URLS, isSfntFontProgram } from './clone
 import { toStandardFontSafe, drawTextSafe, unencodableInStandardFont } from './text-encode.js';
 import { totalPageRotation } from './page-rotation.js';
 import { orderedForPaint } from './annotation-order.js';
+import { scaleAnnotationGeometry, extentOf, displayedBox, turnOf, turnVector } from './annotation-geometry.js';
+import { sniffImageFormat } from './image-format.js';
 
 // ---- fonts ------------------------------------------------------------------
 
@@ -147,14 +150,59 @@ async function getFont(env, fontFamily, bold, italic) {
 // the old editor export (golden-tested there) minus the canvas scale factors.
 // Pair with `rotate: degrees(rotation)` on drawText/drawImage so glyphs/images
 // are oriented correctly after the page is /Rotate'd. wU/hU are the UNROTATED
-// page dims from page.getSize() (the MediaBox).
-function transformAnnotationCoords(rotation, xV, yV, wU, hU) {
+// dims of the VISIBLE box and (x0, y0) its origin: see visibleBox below.
+function transformAnnotationCoords(rotation, xV, yV, wU, hU, x0 = 0, y0 = 0) {
   switch (rotation) {
-    case 90:  return { x: yV,      y: xV };
-    case 180: return { x: wU - xV, y: yV };
-    case 270: return { x: wU - yV, y: hU - xV };
-    default:  return { x: xV,      y: hU - yV };
+    case 90:  return { x: x0 + yV,      y: y0 + xV };
+    case 180: return { x: x0 + wU - xV, y: y0 + yV };
+    case 270: return { x: x0 + wU - yV, y: y0 + hU - xV };
+    default:  return { x: x0 + xV,      y: y0 + hU - yV };
   }
+}
+
+// A TURNED OBJECT (founder ruling 2026-10-11, "semua harus ngikut rotasi"):
+// text and signatures carry `turn`, the quarter turns their page made under
+// them (core/annotation-geometry.js turnAnnotation), and (x, y) is their
+// ORIGIN, the point the screen rotates them about (render/page-view.js
+// applyTurn). pdf-lib rotates a drawing about its own anchor (a text's
+// baseline-left, an image's bottom-left), so every drawer names that anchor
+// as an offset (px, py) in the object's OWN unturned frame, objectPoint turns
+// the offset with the object and maps it into PDF space, and objectRotate
+// gives the angle: pdf-lib's rotate is counter-clockwise in PDF space, the
+// reader's /Rotate and `turn` are clockwise on screen, so the page's R minus
+// the object's turn. Unturned (turn 0) both reduce to the old calls exactly.
+function objectPoint(anno, px, py, frame) {
+  const v = turnVector(turnOf(anno), px, py);
+  return transformAnnotationCoords(frame.rotation, (anno.x || 0) + v.x, (anno.y || 0) + v.y,
+    frame.wU, frame.hU, frame.x0, frame.y0);
+}
+function objectRotate(anno, frame, PDFLib) {
+  return PDFLib.degrees((((frame.rotation - turnOf(anno)) % 360) + 360) % 360);
+}
+
+// SINGLE SOURCE OF TRUTH for the box annotations are drawn into: the CropBox
+// clipped to the MediaBox, which is exactly the viewport PDF.js gave the
+// editor (the frame every annotation coordinate was measured in). Using the
+// MediaBox from (0,0) shifted every annotation on a cropped page by the crop
+// origin: a Tip-Ex at the visible top-left landed outside the visible area
+// (round-3 hunt, 2026-10-10; tests/core/export-cropbox.test.mjs).
+function visibleBox(pdfPage) {
+  const m = normalizedBox(pdfPage.getMediaBox());
+  const c = normalizedBox(pdfPage.getCropBox());
+  const x0 = Math.max(m.x, c.x);
+  const y0 = Math.max(m.y, c.y);
+  const x1 = Math.min(m.x + m.width, c.x + c.width);
+  const y1 = Math.min(m.y + m.height, c.y + c.height);
+  if (!(x1 > x0 && y1 > y0)) return { x0: m.x, y0: m.y, wU: m.width, hU: m.height }; // degenerate crop: PDF.js falls back too
+  return { x0, y0, wU: x1 - x0, hU: y1 - y0 };
+}
+
+// A PDF rectangle may list its corners in any order ([0 792 612 0] is legal)
+// and PDF.js takes min/max, so the editor showed the page upright. pdf-lib's
+// getMediaBox/getCropBox return the raw numbers (negative height), the
+// intersection above came out empty, and every edit was drawn off the page.
+function normalizedBox({ x, y, width, height }) {
+  return { x: Math.min(x, x + width), y: Math.min(y, y + height), width: Math.abs(width), height: Math.abs(height) };
 }
 
 // Whiteout: pdf-lib drawRectangle is axis-aligned in the unrotated page frame.
@@ -163,23 +211,23 @@ function transformAnnotationCoords(rotation, xV, yV, wU, hU) {
 // view-space rect that becomes the bottom-left of the unrotated PDF rect
 // after the rotation transform (verify each case by hand against
 // transformAnnotationCoords).
-function whiteoutCornerAndDims(rotation, anno, wU, hU) {
+function whiteoutCornerAndDims(rotation, anno, wU, hU, x0 = 0, y0 = 0) {
   const { x: xC, y: yC, width: wC, height: hC } = anno;
   switch (rotation) {
     case 90: {  // view TL → PDF bottom-left
-      const { x, y } = transformAnnotationCoords(90, xC, yC, wU, hU);
+      const { x, y } = transformAnnotationCoords(90, xC, yC, wU, hU, x0, y0);
       return { x, y, width: hC, height: wC };
     }
     case 180: {  // view TR → PDF bottom-left
-      const { x, y } = transformAnnotationCoords(180, xC + wC, yC, wU, hU);
+      const { x, y } = transformAnnotationCoords(180, xC + wC, yC, wU, hU, x0, y0);
       return { x, y, width: wC, height: hC };
     }
     case 270: {  // view BR → PDF bottom-left
-      const { x, y } = transformAnnotationCoords(270, xC + wC, yC + hC, wU, hU);
+      const { x, y } = transformAnnotationCoords(270, xC + wC, yC + hC, wU, hU, x0, y0);
       return { x, y, width: hC, height: wC };
     }
     default: {  // rotation 0: view BL → PDF bottom-left
-      const { x, y } = transformAnnotationCoords(0, xC, yC + hC, wU, hU);
+      const { x, y } = transformAnnotationCoords(0, xC, yC + hC, wU, hU, x0, y0);
       return { x, y, width: wC, height: hC };
     }
   }
@@ -223,7 +271,7 @@ async function drawWhiteout(pdfPage, anno, frame, env) {
     await drawSignature(pdfPage, { ...anno, image: anno.paperImage }, frame, env);
     return;
   }
-  const r = whiteoutCornerAndDims(frame.rotation, anno, frame.wU, frame.hU);
+  const r = whiteoutCornerAndDims(frame.rotation, anno, frame.wU, frame.hU, frame.x0, frame.y0);
   // Color-matched Tip-Ex: anno.color is sampled from the page background at
   // draw time (app layer). White stays the default for plain documents.
   const color = anno.color ? parseHexColor(env.PDFLib, anno.color) : env.PDFLib.rgb(1, 1, 1);
@@ -275,11 +323,10 @@ async function drawTextAsImage(pdfPage, anno, frame, env, text) {
   }
   if (!raster || !raster.png || !(raster.width > 0) || !(raster.height > 0)) return false;
   const img = await env.newDoc.embedPng(raster.png);
-  // Anchor at the view-space BOTTOM-LEFT of the block, exactly like drawSignature.
-  const yV = anno.y + raster.height;
-  const { x, y } = transformAnnotationCoords(frame.rotation, anno.x, yV, frame.wU, frame.hU);
+  // Anchor at the BOTTOM-LEFT of the block in its own frame, exactly like drawSignature.
+  const { x, y } = objectPoint(anno, 0, raster.height, frame);
   pdfPage.drawImage(img, {
-    x, y, width: raster.width, height: raster.height, rotate: env.PDFLib.degrees(frame.rotation),
+    x, y, width: raster.width, height: raster.height, rotate: objectRotate(anno, frame, env.PDFLib),
   });
   return true;
 }
@@ -299,12 +346,18 @@ async function decidedFontFor(pdfPage, anno, env, text) {
 
 // RUNG D: a whole-paragraph edit whose stamp did not bake (its cover's
 // surgery declined) still draws its painted lines at the block's own leading
-// and alignment, in PDF user space — never at the twin's 1.2 line height from
-// `anno.y`. Same placement function the stamp uses (core/block-edit.js), with
-// this font's widths. The block's coordinates are the SOURCE page's user
-// space, which is the frame annotations are drawn in here (rotation is /Rotate
-// metadata; a merged page is drawn at native scale and scaled afterwards), so
-// they are neither transformed nor scaled.
+// and alignment — never at the twin's 1.2 line height from `anno.y`. Same
+// placement function the stamp uses (core/block-edit.js), with this font's
+// widths, laid out in the block's own PDF units.
+//
+// It is DRAWN where the overlay rows paint (render/page-view.js
+// renderBlockRows): that overlay is the user's to drag, resize and turn the
+// page under, so the lines go through the displayed frame like every other
+// annotation, anchored at block.disp (the first baseline, carried by every
+// move, turn and rescale, core/annotation-geometry.js), at the annotation's
+// fontSize, turned with its page (objectPoint, since 2026-10-11). Drawing
+// them at block.origin, as this did until
+// 2026-10-10, threw all three away on download. Unmoved, the two agree.
 async function drawBlockText(pdfPage, anno, env) {
   const block = anno.block;
   const joined = toStandardFontSafe(blockText(block));
@@ -315,10 +368,32 @@ async function drawBlockText(pdfPage, anno, env) {
     const asLines = block.lines.map((l) => l.text).join('\n');
     if (await drawTextAsImage(pdfPage, { ...anno, fontSize: anno.fontSize || DEFAULT_FONT_SIZE.text }, env.frame, env, asLines)) return;
   }
-  const size = block.size;
+  // A block with no display anchor cannot have been moved by the user; one
+  // missing field must not abort the whole export, so it keeps its birth spot.
+  if (!block.disp) {
+    const widthOf = (str) => font.widthOfTextAtSize(toStandardFontSafe(str), block.size);
+    for (const line of placeBlockLines(block, widthOf)) {
+      for (const seg of line.segments) drawTextSafe(pdfPage, seg.text, { x: seg.x, y: line.y, size: block.size, font, color });
+    }
+    return;
+  }
+  const { frame } = env;
+  const k = block.k > 0 ? block.k : 1;
+  // The size the overlay paints, in the block's PDF units: block.size until
+  // a resize (commit sets fontSize = k * size, js/v2/app.js).
+  const size = (anno.fontSize > 0 ? anno.fontSize : k * block.size) / k;
   const widthOf = (str) => font.widthOfTextAtSize(toStandardFontSafe(str), size);
+  const rotate = objectRotate(anno, frame, env.PDFLib);
+  // disp - (x, y) is the first baseline's offset in the block's OWN frame
+  // (core/annotation-geometry.js withBlockFollowing), so each segment is an
+  // own-frame offset from the origin, turned by objectPoint.
+  const ox = block.disp.x - (anno.x || 0);
+  const oy = block.disp.y - (anno.y || 0);
   for (const line of placeBlockLines(block, widthOf)) {
-    for (const seg of line.segments) drawTextSafe(pdfPage, seg.text, { x: seg.x, y: line.y, size, font, color });
+    for (const seg of line.segments) {
+      const { x, y } = objectPoint(anno, ox + k * (seg.x - block.origin.x), oy + k * (block.origin.y - line.y), frame);
+      drawTextSafe(pdfPage, seg.text, { x, y, size: size * k, font, color, rotate });
+    }
   }
 }
 
@@ -330,7 +405,7 @@ async function drawText(pdfPage, anno, frame, env) {
   const font = await decidedFontFor(pdfPage, anno, env, toStandardFontSafe(anno.text))
     || await env.getFont(anno.fontFamily, anno.bold, anno.italic);
   const color = parseHexColor(env.PDFLib, anno.color);
-  const rotate = env.PDFLib.degrees(frame.rotation);
+  const rotate = objectRotate(anno, frame, env.PDFLib);
   const size = anno.fontSize || DEFAULT_FONT_SIZE.text;
   // Normalise the invisible half of pasted text BEFORE pdf-lib sees it. A
   // standard font encodes through WinAnsi, and one codepoint outside it throws
@@ -345,8 +420,7 @@ async function drawText(pdfPage, anno, frame, env) {
   }
   const lines = safeText.split('\n');
   for (let i = 0; i < lines.length; i += 1) {
-    const yV = anno.y + size * TEXT_BASELINE_RATIO + i * size * TEXT_LINE_HEIGHT;
-    const { x, y } = transformAnnotationCoords(frame.rotation, anno.x, yV, frame.wU, frame.hU);
+    const { x, y } = objectPoint(anno, 0, size * TEXT_BASELINE_RATIO + i * size * TEXT_LINE_HEIGHT, frame);
     drawTextSafe(pdfPage, lines[i], { x, y, size, font, color, rotate });
   }
 }
@@ -367,12 +441,12 @@ async function drawSignature(pdfPage, anno, frame, env) {
   // absent on the annotation. Derive it from the embedded image's intrinsic
   // aspect ratio so the export never distorts the signature.
   const height = anno.height || width * (img.height / img.width);
-  // Anchor pdf-lib drawImage at the view-space BOTTOM-LEFT of the image:
-  // transformed through the page rotation, this lands the visible image
-  // exactly where the user placed it in the rotated view.
-  const yV = anno.y + height;
-  const { x, y } = transformAnnotationCoords(frame.rotation, anno.x, yV, frame.wU, frame.hU);
-  pdfPage.drawImage(img, { x, y, width, height, rotate: env.PDFLib.degrees(frame.rotation) });
+  // Anchor pdf-lib drawImage at the BOTTOM-LEFT of the image in its own
+  // frame: turned with the object and transformed through the page rotation,
+  // this lands the visible image exactly where the user sees it. (A scan
+  // cover's paper patch comes through here too; a whiteout has no turn.)
+  const { x, y } = objectPoint(anno, 0, height, frame);
+  pdfPage.drawImage(img, { x, y, width, height, rotate: objectRotate(anno, frame, env.PDFLib) });
 }
 
 async function drawWatermark(pdfPage, anno, frame, env) {
@@ -389,7 +463,7 @@ async function drawWatermark(pdfPage, anno, frame, env) {
   // 0.35em ≈ cap-height/2 (baseline→optical-center distance).
   const halfW = font.widthOfTextAtSize(anno.text || '', size) / 2;
   const halfCap = size * 0.35;
-  const { x: cx, y: cy } = transformAnnotationCoords(frame.rotation, anno.x, anno.y, frame.wU, frame.hU);
+  const { x: cx, y: cy } = transformAnnotationCoords(frame.rotation, anno.x, anno.y, frame.wU, frame.hU, frame.x0, frame.y0);
   drawTextSafe(pdfPage, anno.text || '', {
     x: cx - halfW * Math.cos(rad) + halfCap * Math.sin(rad),
     y: cy - halfW * Math.sin(rad) - halfCap * Math.cos(rad),
@@ -408,7 +482,7 @@ async function drawPageNumber(pdfPage, anno, frame, env) {
   const font = await env.getFont('Helvetica', false, false);
   const size = anno.fontSize || DEFAULT_FONT_SIZE.pageNumber;
   const yV = anno.y + size * TEXT_BASELINE_RATIO;
-  const { x, y } = transformAnnotationCoords(frame.rotation, anno.x, yV, frame.wU, frame.hU);
+  const { x, y } = transformAnnotationCoords(frame.rotation, anno.x, yV, frame.wU, frame.hU, frame.x0, frame.y0);
   drawTextSafe(pdfPage, anno.text || '', {
     x, y, size, font,
     color: parseHexColor(env.PDFLib, anno.color),
@@ -429,12 +503,6 @@ const ANNOTATION_DRAWERS = {
 
 // ---- image pages -------------------------------------------------------------
 
-function sniffImageFormat(bytes) {
-  if (bytes.length > 3 && bytes[0] === 0xff && bytes[1] === 0xd8) return 'jpg';
-  if (bytes.length > 3 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return 'png';
-  return null;
-}
-
 // A page whose source is an IMAGE file: create a blank PDF page at the page's
 // point size and draw the image edge-to-edge.
 async function addImagePage(env, page, source) {
@@ -452,27 +520,223 @@ async function addImagePage(env, page, source) {
 
 // ---- merge width normalisation ------------------------------------------------
 
-// The geometric fields every drawer above reads, scaled by `k`. Used to express
-// annotation coordinates — which live in the page's NORMALISED display frame —
-// back in the source page's NATIVE frame, so they can be drawn alongside the
-// original content and then scaled up with it in one uniform move (see the
-// ordering argument in buildPdfBytes).
+// Annotation coordinates live in the page's NORMALISED display frame; the
+// drawers express them back in the source page's NATIVE frame by scaling with
+// 1 / pageScale, drawing alongside the original content, and then scaling the
+// finished page up in one uniform move (see the ordering argument in
+// buildPdfBytes). The scaling itself is core/annotation-geometry.js's, the one
+// home of that frame contract. Surgery inputs (replaceBox/replaceTargets) are
+// native already and are never scaled: applyPageSurgery reads the untouched list.
+
+// pdf-lib's page.scale() resizes the MediaBox from ITS ORIGIN (the origin
+// itself is not scaled, though the content is, about 0,0) and only moves a
+// Crop/Bleed/Trim/ArtBox that equals the MediaBox. A distinct CropBox stayed
+// at native size, so a merge-rescaled cropped page showed a shifted, zoomed-in
+// piece of itself. Every box present is scaled about 0,0, with the content.
+const PAGE_BOXES = ['MediaBox', 'CropBox', 'BleedBox', 'TrimBox', 'ArtBox'];
+function scalePageWithBoxes(pdfPage, k) {
+  const before = PAGE_BOXES
+    .filter((name) => name === 'MediaBox' || pdfPage.node[name]?.())
+    .map((name) => [name, pdfPage[`get${name}`]()]);
+  pdfPage.scale(k, k);
+  for (const [name, b] of before) pdfPage[`set${name}`](b.x * k, b.y * k, b.width * k, b.height * k);
+}
+
+// ---- the source's own annotations, under the user's objects -----------------
+
+// WHY: the screen and the file paint a source annotation in different places.
+// import.js rasterizes with pdf.js's default annotationMode, which paints every
+// viewable annotation's /AP INTO the page image, and the user's objects sit in
+// an overlay above it. The export draws the user's objects into the page
+// CONTENT, and a reader paints /Annots AFTER the content: a filled form field
+// copied across verbatim landed ON TOP of the Tip-Ex meant to hide it, and the
+// correction typed over it disappeared under the field's box
+// (tests/core/export-annots-under-cover.test.mjs). So each annotation pdf.js
+// painted whose /Rect meets a user object's drawn rect (userObjectRects) is
+// drawn into the content first, from its OWN appearance (never regenerated:
+// that would change how it looks), and taken out of /Annots. Everything else
+// stays live, on this page and on every page without user objects: flattening
+// costs an annotation its interaction, so it is spent only where the cover
+// needs it. The output never had the source's /AcroForm (newDoc is created
+// empty), so a flattened widget loses no fillability it still had.
 //
-// ⚠️ Deliberately NOT applied to `replaceBox`/`replaceTargets`. Those are
-// surgery inputs, and surgery reads content-stream geometry, which is native
-// already — applyPageSurgery runs on the untouched annotation list, before any
-// of this. Scaling them here would send a doubly-transformed target into
-// text-walk.js and silently lose the match.
-//
-// Undefined fields stay undefined: drawSignature derives a missing `height`
-// from the embedded image's own ratio, and multiplying `undefined` would turn
-// that into NaN and drop the signature off the page.
-function scaleAnnotationGeometry(anno, k) {
-  const out = { ...anno };
-  for (const key of ['x', 'y', 'width', 'height', 'fontSize']) {
-    if (Number.isFinite(out[key])) out[key] *= k;
+// Not flattened, so left exactly as before, even under a cover: Link and
+// Popup (interaction, not paint; a Popup leaves only with its flattened
+// parent); FileAttachment, Text (sticky note) and the media kinds, whose point
+// is a file, a comment or a player, not their icon; Hidden or NoView (pdf.js
+// does not paint them); NoRotate (it stays upright on a turned page, which
+// drawn content cannot); one without the Print flag (a reader shows it but
+// never prints it, and as content it would start printing); and anything
+// without an /AP pdf.js would pick (it may synthesize one we cannot see).
+const KEEP_AS_ANNOTATION = new Set([
+  'Link', 'Popup', 'FileAttachment', 'Text', 'Sound', 'Movie', 'Screen', 'RichMedia', '3D',
+]);
+const FLAG_HIDDEN = 1 << 1;
+const FLAG_PRINT = 1 << 2;
+const FLAG_NO_ROTATE = 1 << 4;
+const FLAG_NO_VIEW = 1 << 5;
+
+// The ref of the appearance stream pdf.js would paint, or null. A /N that is a
+// dict of states is chosen by /AS, and no /AS means no appearance (pdf.js's
+// own rule, so screen and file agree on checkboxes and radios).
+function paintedAppearanceRef(annot, PDFLib) {
+  const { PDFName, PDFDict, PDFStream, PDFRef, PDFNumber } = PDFLib;
+  if (KEEP_AS_ANNOTATION.has(annot.lookup(PDFName.of('Subtype'))?.decodeText?.())) return null;
+  const flags = annot.lookup(PDFName.of('F'));
+  const f = flags instanceof PDFNumber ? flags.asNumber() : 0;
+  if (f & (FLAG_HIDDEN | FLAG_NO_VIEW | FLAG_NO_ROTATE)) return null;
+  if (!(f & FLAG_PRINT)) return null;
+  const ap = annot.lookup(PDFName.of('AP'));
+  if (!(ap instanceof PDFDict)) return null;
+  let raw = ap.get(PDFName.of('N'));
+  const n = annot.context.lookup(raw);
+  if (n instanceof PDFDict && !(n instanceof PDFStream)) {
+    const state = annot.lookup(PDFName.of('AS'));
+    if (!(state instanceof PDFName)) return null;
+    raw = n.get(state);
   }
-  return out;
+  if (!(annot.context.lookup(raw) instanceof PDFStream)) return null;
+  return raw instanceof PDFRef ? raw : annot.context.register(annot.context.lookup(raw));
+}
+
+// A reader paints an annotation's appearance without asking its /Subtype,
+// but a content Do needs a Form XObject (pdf.js drops anything else: "XObject
+// should have a Name subtype"), so an appearance that omits it would vanish
+// once flattened. A missing /Subtype is supplied (this is newDoc's copy, never
+// the source); one naming something else is not a form at all, so the
+// annotation stays live. False = do not flatten.
+function asFormXObject(stream, PDFLib) {
+  const { PDFName } = PDFLib;
+  const sub = stream.dict.get(PDFName.of('Subtype'));
+  if (sub === undefined) {
+    stream.dict.set(PDFName.of('Type'), PDFName.of('XObject'));
+    stream.dict.set(PDFName.of('Subtype'), PDFName.of('Form'));
+    return true;
+  }
+  return sub === PDFName.of('Form');
+}
+
+// ISO 32000 §12.5.5: the appearance's BBox, carried through its own /Matrix,
+// is scaled and translated onto /Rect. Do applies the form's /Matrix itself,
+// so the cm is that fit alone. Null for a degenerate box.
+function appearanceFit(annot, stream, PDFLib) {
+  const { PDFName, PDFArray, PDFNumber } = PDFLib;
+  const nums = (arr, n) => {
+    if (!(arr instanceof PDFArray) || arr.size() !== n) return null;
+    const out = arr.asArray().map((v) => annot.context.lookup(v)).map((v) => (v instanceof PDFNumber ? v.asNumber() : NaN));
+    return out.every(Number.isFinite) ? out : null;
+  };
+  const rect = nums(annot.lookup(PDFName.of('Rect')), 4);
+  const bbox = nums(stream.dict.lookup(PDFName.of('BBox')), 4);
+  if (!rect || !bbox) return null;
+  const [a, b, c, d, e, f] = nums(stream.dict.lookup(PDFName.of('Matrix')), 6) || [1, 0, 0, 1, 0, 0];
+  const corners = [[bbox[0], bbox[1]], [bbox[2], bbox[1]], [bbox[0], bbox[3]], [bbox[2], bbox[3]]]
+    .map(([x, y]) => [a * x + c * y + e, b * x + d * y + f]);
+  const xs = corners.map((p) => p[0]);
+  const ys = corners.map((p) => p[1]);
+  const [tx0, tx1, ty0, ty1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  const [rx0, rx1] = [Math.min(rect[0], rect[2]), Math.max(rect[0], rect[2])];
+  const [ry0, ry1] = [Math.min(rect[1], rect[3]), Math.max(rect[1], rect[3])];
+  if (!(tx1 > tx0 && ty1 > ty0)) return null;
+  const sx = (rx1 - rx0) / (tx1 - tx0);
+  const sy = (ry1 - ry0) / (ty1 - ty0);
+  return [sx, 0, 0, sy, rx0 - tx0 * sx, ry0 - ty0 * sy];
+}
+
+// The PDF-space box [x0, y0, x1, y1] each user object paints, in the frame
+// the drawers use (transformAnnotationCoords, visibleBox), so a turned or
+// cropped page is measured where the drawing lands. Each corner of the
+// view-space box goes through the transform: on a quarter-turned page width
+// and height trade axes. Text stores no extent; extentOf's 0.6em estimate is
+// the one rotation already uses, and erring wide errs toward covering. A
+// watermark (unreachable from v2) is bounded by the circle its tilt sweeps.
+function userObjectRects(annos, frame) {
+  const rects = [];
+  for (const anno of annos) {
+    let box;
+    if (anno.type === 'watermark') {
+      const size = anno.fontSize || DEFAULT_FONT_SIZE.watermark;
+      const r = Math.hypot(((anno.text || '').length * size * 0.6) / 2, size / 2);
+      box = { x: anno.x - r, y: anno.y - r, w: 2 * r, h: 2 * r };
+    } else {
+      const asText = anno.type === 'pageNumber'
+        ? { ...anno, type: 'text', fontSize: anno.fontSize || DEFAULT_FONT_SIZE.pageNumber }
+        : anno;
+      // A turned object's box trades axes about its origin (displayedBox).
+      box = displayedBox(anno, extentOf(asText));
+    }
+    if (![box.x, box.y, box.w, box.h].every(Number.isFinite) || !(box.w > 0 && box.h > 0)) continue;
+    const pts = [[box.x, box.y], [box.x + box.w, box.y], [box.x, box.y + box.h], [box.x + box.w, box.y + box.h]]
+      .map(([x, y]) => transformAnnotationCoords(frame.rotation, x, y, frame.wU, frame.hU, frame.x0, frame.y0));
+    const xs = pts.map((p) => p.x);
+    const ys = pts.map((p) => p.y);
+    rects.push([Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]);
+  }
+  return rects;
+}
+
+// Does the annotation's /Rect share area with any of `rects`? Touching edges
+// do not count. /Rect corners are not guaranteed to be ordered.
+function meetsAny(annot, rects, PDFLib) {
+  const { PDFName, PDFArray, PDFNumber } = PDFLib;
+  const arr = annot.lookup(PDFName.of('Rect'));
+  if (!(arr instanceof PDFArray) || arr.size() !== 4) return false;
+  const r = arr.asArray().map((v) => annot.context.lookup(v)).map((v) => (v instanceof PDFNumber ? v.asNumber() : NaN));
+  if (!r.every(Number.isFinite)) return false;
+  const [ax0, ax1] = [Math.min(r[0], r[2]), Math.max(r[0], r[2])];
+  const [ay0, ay1] = [Math.min(r[1], r[3]), Math.max(r[1], r[3])];
+  return rects.some(([x0, y0, x1, y1]) => ax0 < x1 && x0 < ax1 && ay0 < y1 && y0 < ay1);
+}
+
+// The annotation's own opacity as [stroke, fill], or null when it is opaque.
+// A reader applies a live annotation's /CA to its appearance; drawn bare, a
+// translucent highlight would turn opaque and hide the text under it. PDF 1.x
+// /CA covers both; PDF 2.0's /ca, when present, is the fill's own. (pdf.js
+// 3.11 ignores both on screen, so this follows Acrobat and Preview, not the
+// raster.)
+function annotationOpacity(annot, PDFLib) {
+  const { PDFName, PDFNumber } = PDFLib;
+  const num = (key) => {
+    const v = annot.lookup(PDFName.of(key));
+    return v instanceof PDFNumber && Number.isFinite(v.asNumber()) ? Math.min(Math.max(v.asNumber(), 0), 1) : null;
+  };
+  const stroke = num('CA') ?? 1;
+  const fill = num('ca') ?? stroke;
+  return stroke < 1 || fill < 1 ? [stroke, fill] : null;
+}
+
+// In /Annots order, the order a reader (and pdf.js) paints them. `rects`:
+// userObjectRects for the objects about to be drawn on this page.
+function flattenPaintedAnnotations(pdfPage, PDFLib, rects) {
+  const { PDFName, PDFArray, PDFDict } = PDFLib;
+  const annots = pdfPage.node.lookup(PDFName.of('Annots'));
+  if (!(annots instanceof PDFArray) || rects.length === 0) return;
+  const ctx = pdfPage.doc.context;
+  const gone = new Set();
+  for (const entry of annots.asArray()) {
+    const annot = ctx.lookup(entry);
+    if (!(annot instanceof PDFDict) || !meetsAny(annot, rects, PDFLib)) continue;
+    const ref = paintedAppearanceRef(annot, PDFLib);
+    const fit = ref && appearanceFit(annot, ctx.lookup(ref), PDFLib);
+    if (!fit || !asFormXObject(ctx.lookup(ref), PDFLib)) continue;
+    const name = pdfPage.node.newXObject('FlatAnnot', ref);
+    const alpha = annotationOpacity(annot, PDFLib);
+    const gs = alpha && pdfPage.node.newExtGState('FlatAnnotGS', ctx.obj({ Type: 'ExtGState', CA: alpha[0], ca: alpha[1] }));
+    pdfPage.pushOperators(
+      PDFLib.pushGraphicsState(),
+      ...(gs ? [PDFLib.setGraphicsState(gs)] : []),
+      PDFLib.concatTransformationMatrix(...fit),
+      PDFLib.drawObject(name),
+      PDFLib.popGraphicsState(),
+    );
+    gone.add(entry);
+    // Its comment window would be left pointing at nothing.
+    const popup = annot.get(PDFName.of('Popup'));
+    if (popup) gone.add(popup);
+  }
+  if (gone.size === 0) return;
+  const kept = annots.asArray().filter((entry) => !gone.has(entry));
+  pdfPage.node.set(PDFName.of('Annots'), ctx.obj(kept));
 }
 
 // ---- pass-through: the untouched document -----------------------------------
@@ -572,22 +836,66 @@ export async function buildPdfBytes(doc, deps = {}) {
 
   // WHY cache: the old exporter re-parsed the source PDF for EVERY page
   // (O(pages × parse)). One pdf-lib load per source is strictly better.
+  //
+  // The load and the fence are ONE step (core/page-fence.js), so no copy can
+  // ever read a source whose unkept pages are still reachable. The fence
+  // rewrites this private load only; `batched` (below) is the kept set.
   const srcDocCache = new Map(); // sourceId → Promise<PDFDocument>
+  const fenceTags = new Map();   // sourceId → placeholder tag
+  let placedPageRefs = false;
   function getSrcDoc(source) {
-    if (!srcDocCache.has(source.id)) srcDocCache.set(source.id, PDFLib.PDFDocument.load(source.bytes));
+    if (!srcDocCache.has(source.id)) {
+      const tag = `PDFLokalPage${srcDocCache.size}n`;
+      fenceTags.set(source.id, tag);
+      srcDocCache.set(source.id, PDFLib.PDFDocument.load(source.bytes).then((srcDoc) => {
+        const kept = new Set(batched.get(source.id)?.keys() || []);
+        if (fenceUnkeptPages(srcDoc, kept, tag, PDFLib)) placedPageRefs = true;
+        return srcDoc;
+      }));
+    }
     return srcDocCache.get(source.id);
   }
 
-  for (const { page, source, annotations } of buildExportPlan(doc)) {
+  // WHY one copyPages per SOURCE, not per page: every copyPages call is a
+  // fresh object copier, so a font or logo shared by all pages of a Word PDF
+  // was written into the output once PER PAGE (a 20-page letter with one
+  // Tip-Ex grew from ~20 KB to ~320 KB; tests/core/export-shared-resources).
+  // One batched call per source shares them. Only a page's FIRST occurrence is
+  // batched: a repeated source page takes its own copy below, exactly as
+  // before, so two plan slots never share one page object. Surgery is safe on
+  // a batched copy: redact.js writes a NEW content stream, never the shared one.
+  const plan = buildExportPlan(doc);
+  const batched = new Map(); // sourceId → Map(sourcePageNum → copied PDFPage)
+  for (const { page, source } of plan) {
+    if (!source || page.isFromImage) continue;
+    if (!batched.has(source.id)) batched.set(source.id, new Map());
+    batched.get(source.id).set(page.sourcePageNum, null);
+  }
+  for (const [sourceId, byNum] of batched) {
+    const source = plan.find((e) => e.source?.id === sourceId).source;
+    const nums = [...byNum.keys()];
+    const copies = await newDoc.copyPages(await getSrcDoc(source), nums);
+    nums.forEach((n, i) => byNum.set(n, copies[i]));
+  }
+
+  const copiedPages = [];
+  const landing = new Map(); // placeholder PDFName → output page ref (core/page-fence.js)
+  for (const { page, source, annotations } of plan) {
     if (!source) throw new Error(`buildPdfBytes: page ${page.id} references missing source ${page.sourceId}`);
 
     let pdfPage;
     if (page.isFromImage) {
       pdfPage = await addImagePage(env, page, source);
     } else {
-      const srcDoc = await getSrcDoc(source);
-      const [copied] = await newDoc.copyPages(srcDoc, [page.sourcePageNum]);
+      const byNum = batched.get(source.id);
+      let copied = byNum.get(page.sourcePageNum);
+      if (copied) byNum.set(page.sourcePageNum, null); // first occurrence takes the batched copy
+      else [copied] = await newDoc.copyPages(await getSrcDoc(source), [page.sourcePageNum]);
       pdfPage = newDoc.addPage(copied);
+      copiedPages.push(pdfPage);
+      // A link to a repeated page lands on its first copy.
+      const placeholder = pagePlaceholder(PDFLib, fenceTags.get(source.id), page.sourcePageNum);
+      if (!landing.has(placeholder)) landing.set(placeholder, pdfPage.ref);
     }
     // /Rotate — SINGLE SOURCE OF TRUTH for "how is this page turned"
     // (core/page-rotation.js). This used to be `setRotation(page.rotation)`,
@@ -648,11 +956,11 @@ export async function buildPdfBytes(doc, deps = {}) {
     const needsScale = !page.isFromImage && Number.isFinite(pageScale) && pageScale !== 1;
 
     if (annotations.length > 0) {
-      // wU/hU: UNROTATED page dims (MediaBox) — setRotation is metadata only,
-      // drawing happens in this frame. See transformAnnotationCoords. Read
-      // BEFORE the scale below, so it is the native frame the annotations are
-      // being expressed in.
-      const { width: wU, height: hU } = pdfPage.getSize();
+      // wU/hU: UNROTATED dims of the visible box (visibleBox above), x0/y0 its
+      // origin — setRotation is metadata only, drawing happens in this frame.
+      // See transformAnnotationCoords. Read BEFORE the scale below, so it is
+      // the native frame the annotations are being expressed in.
+      const { x0, y0, wU, hU } = visibleBox(pdfPage);
       // base + user, the SAME sum written to /Rotate above (core/page-rotation.js)
       // — not page.rotation alone. The page and its annotations must be
       // expressed in ONE frame: the reader applies /Rotate to the whole page,
@@ -661,7 +969,21 @@ export async function buildPdfBytes(doc, deps = {}) {
       // source carrying an inherited /Rotate 90 that put a 40x20 bar drawn at
       // (10,10) into the file as 20x40 at x=812 — the far edge, turned. The
       // 2026-08-09 /Rotate fix corrected the line above and stopped here.
-      const frame = { rotation: totalRotation, wU, hU };
+      const frame = { rotation: totalRotation, wU, hU, x0, y0 };
+      // The source annotations under what the loop below will draw go into
+      // the content first. After surgery (it must see the original stream),
+      // before the loop (so the user's objects paint over them), before the
+      // merge scale (so they scale with the page). NOT before Rung C's native
+      // text: surgery already wrote that, so objects surgery handled
+      // (skipCovers, skipDraw) are left out of the rects; flattening an
+      // annotation there would still paint it over the new text, and only
+      // cost it its interaction. See flattenPaintedAnnotations.
+      if (!page.isFromImage) {
+        const drawn = annotations
+          .filter((a) => !skipCovers.has(a.id) && !skipDraw.has(a.id))
+          .map((a) => (needsScale ? scaleAnnotationGeometry(a, 1 / pageScale) : a));
+        flattenPaintedAnnotations(pdfPage, PDFLib, userObjectRects(drawn, frame));
+      }
       // PAINT ORDER (core/annotation-order.js, founder ruling 2026-08-09):
       // Tip-Ex is a GROUND, not a layer. The SAME helper the screen uses, so
       // the two can't drift. It returns a COPY — `annotations` itself must
@@ -687,8 +1009,12 @@ export async function buildPdfBytes(doc, deps = {}) {
       }
     }
 
-    if (needsScale) pdfPage.scale(pageScale, pageScale);
+    if (needsScale) scalePageWithBoxes(pdfPage, pageScale);
   }
+
+  // Only a source that actually linked to a kept page wrote a placeholder;
+  // every other export skips the walk.
+  if (placedPageRefs) landPageRefs(newDoc, copiedPages, landing, PDFLib);
 
   return newDoc.save({ useObjectStreams: true, addDefaultPage: false });
 }

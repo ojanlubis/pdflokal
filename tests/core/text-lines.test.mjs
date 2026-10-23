@@ -335,7 +335,11 @@ test('16. dense stack: clamp keeps inflated boxes from overlapping across the wh
     const distTo2 = distToRange(y, 16, 28);
     const nearer = distTo1 <= distTo2 ? line1 : line2;
     const got = resolveTap(lines, 50, y, minHit);
-    if (got !== null) assert.equal(got, nearer, `y=${y}`);
+    // NOT `if (got !== null)`: the clamped boxes meet at y=14, so every sample
+    // in 10..18 is inside one of them and a null is a dead zone, not a skip.
+    // Catches: over-clamping the vertical growth (e.g. gap/4) leaving 13..15 untappable.
+    assert.notEqual(got, null, `y=${y} hit nothing — a dead zone between two adjacent lines`);
+    assert.equal(got, nearer, `y=${y}`);
   }
 
   // The isolated side (line1's top — no neighbor above) keeps the FULL 5px
@@ -409,8 +413,25 @@ test('smartReplace builds its draft size through draftFontSize, never a whole-po
   // one place a Ganti Teks draft takes its size from the replaced line.
   const { readFileSync } = await import('node:fs');
   const app = readFileSync(new URL('../../js/v2/app.js', import.meta.url), 'utf8');
-  assert.match(app, /fontSize: draftFontSize\(line\.size\)/);
   assert.doesNotMatch(app, /Math\.round\(line\.size\)/);
+  // The WHOLE property, ending at its comma, inside smartReplace's own body,
+  // comments stripped. A bare prefix match passed `draftFontSize(line.size) | 0`
+  // (a whole-point truncation behind the right name), and a whole-file match
+  // could be satisfied by a comment or another function.
+  // Catches: any suffix on the value (`| 0`, `* 1`, `|| 12`), or the line moving out of smartReplace.
+  const code = app.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  const at = code.indexOf('async function smartReplace(');
+  assert.ok(at >= 0, 'smartReplace is gone from js/v2/app.js — re-aim this test');
+  const open = code.indexOf('{', code.indexOf(')', at));
+  let depth = 0; let end = open;
+  for (; end < code.length; end++) {
+    if (code[end] === '{') depth++;
+    else if (code[end] === '}' && --depth === 0) break;
+  }
+  const body = code.slice(open, end + 1);
+  assert.ok(body.length > 500, `smartReplace's body parsed as ${body.length} chars — the brace scan is broken`);
+  assert.match(body, /^\s*fontSize:\s*draftFontSize\(line\.size\),\s*$/m,
+    'smartReplace no longer sets the draft size to exactly draftFontSize(line.size)');
 });
 
 // A line Hapus deleted (or Edit owns) must not be in the index a paragraph edit
@@ -429,4 +450,22 @@ test('runsNotOwned drops exactly the runs a cover targets, by geometry', () => {
   assert.equal(runsNotOwned(runs, undefined), runs);
   // a target elsewhere (different baseline) owns nothing
   assert.deepEqual(runsNotOwned(runs, [{ ...b.pdf, y0: 600 }]), runs);
+});
+
+// A value overprinted on an underscore leader: sorted by start, the SHORT value
+// sits inside the long leader. Gaps were measured from the previous run's end,
+// i.e. the value's, so the next word after the leader looked a column away and
+// the row split in two. The gap is from the furthest end seen so far.
+test('overlap: a value printed over a leader does not make the next word look a column away', () => {
+  const runs = [
+    run('Nama', 0, 0, 30, 12),
+    run('______________________', 34, 0, 160, 12), // leader 34..194
+    run('Budi', 40, 0, 26, 12),                     // value over the leader 40..66
+    run('(L)', 198, 0, 18, 12),                     // 4pt after the LEADER's end
+  ];
+  const lines = groupRunsIntoLines(runs);
+  // Known-positive for the instrument: from Budi's end the gap is 132pt, far
+  // past the 1.5em column guard, so the old rule really did split here.
+  assert.ok(198 - 66 > 1.5 * 12);
+  assert.equal(lines.length, 1, `split into ${lines.length}: ${JSON.stringify(lines.map((l) => l.str))}`);
 });

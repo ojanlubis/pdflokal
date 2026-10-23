@@ -18,6 +18,7 @@ import assert from 'node:assert/strict';
 import { createEditedPageProvider } from '../../js/v2/edited-page-provider.js';
 import { createBakeFailureReporter, scrubbedError, safeErrorMessage, BAKE_FAILURE_CAP } from '../../js/v2/bake-failure.js';
 import { validateEvent } from '../../js/core/telemetry-schema.js';
+import handler, { __setQueryForTests } from '../../api/t.js';
 
 // A page carrying one committed Ganti pair — the same shape page-surgery.js's
 // pageEdits filter counts as an edit, so editSignature(page) is non-empty and
@@ -95,10 +96,10 @@ test('the same bake throw reaches Sentry, scrubbed, tagged, with no breadcrumbs'
 
   // And nothing on the rail carries a string.
   assert.ok(!JSON.stringify(events).includes(SECRET));
-  // A `cannot encode` throw is failureReason's 'unsupported' — but commit/
-  // unsupported already MEANS "an unencodable character was committed"
-  // (js/v2/app.js). It must not be redefined (EXCLUDE 4).
-  assert.equal(events[0][1].reason, 'unknown');
+  // A `cannot encode` throw is failureReason's 'unsupported', and the rail
+  // records it as 'unsupported' (founder ruling 2026-10-11, replacing the
+  // 2026-10-01 'unknown' rewrite): the classifier's answer is not overwritten.
+  assert.equal(events[0][1].reason, 'unsupported');
   assert.deepEqual(events[1][1], { stage: 'commit', name: 'Error', hint: 'encode' });
 });
 
@@ -176,17 +177,70 @@ test('scrubbedError keeps an identifier-shaped constructor name, never a message
   assert.equal(scrubbedError(odd).name, 'Error');
 });
 
-// The provider is driven above; this pins that app.js actually HANDS it the
+// The provider is driven above; this pins that the app actually HANDS it the
 // reporter. Same source-scan precedent as pdf-builder-wiring.test.mjs: the
-// wiring lives in a module that cannot load under node.
-test('app.js wires the bake-failure reporter into the edited-page provider', async () => {
+// wiring lives in modules that cannot load under node. Since 2026-10-10 the
+// provider is built in js/v2/edit-bake.js and app.js hands its instance to the
+// rasterizer; both halves are pinned, and the VACUITY guard below fails loudly
+// if the provider call moves again rather than letting a slice of '' pass.
+test('the bake-failure reporter is wired into the edited-page provider the rasterizer uses', async () => {
   const fs = await import('node:fs');
-  const src = fs.readFileSync(new URL('../../js/v2/app.js', import.meta.url), 'utf8');
-  const call = src.slice(src.indexOf('createEditedPageProvider({'));
+  const bake = fs.readFileSync(new URL('../../js/v2/edit-bake.js', import.meta.url), 'utf8');
+  const app = fs.readFileSync(new URL('../../js/v2/app.js', import.meta.url), 'utf8');
+  const at = bake.indexOf('createEditedPageProvider({');
+  assert.ok(at >= 0, 'VACUITY: js/v2/edit-bake.js no longer builds the provider; repoint this test');
+  const call = bake.slice(at);
   const body = call.slice(0, call.indexOf('});'));
   assert.match(body, /onBakeFailure:/, 'createEditedPageProvider must receive onBakeFailure');
   assert.match(body, /reportBakeFailure\(err,/, 'onBakeFailure must call the reporter');
-  assert.match(src, /createPageRasterizer\(doc, \{ editedPageProvider \}\)/, 'the rasterizer must use this provider');
+  assert.match(app, /const \{ editedPageProvider[^}]*\} = editBake;/, 'app.js must take the provider from edit-bake.js');
+  assert.match(app, /createPageRasterizer\(doc, \{ editedPageProvider \}\)/, 'the rasterizer must use this provider');
+});
+
+// The harness above hand-builds onBakeFailure, so it proves the provider and
+// the reporter, not the KEY or the console.warn edit-bake.js actually wires.
+// This drives the REAL createEditBake (it loads under node: nothing DOM-bound
+// runs at construction). getDoc's sources throw with document text in the
+// message, so getSource fails inside the provider's try and reaches the real
+// onBakeFailure. Catches: a constant key (`reportBakeFailure(err, "k")`), a key
+// that drops the edit signature, and console.warn handed the raw
+// `err` instead of scrubbedError(err).
+test('createEditBake: the real onBakeFailure keys per page + edit state and warns only the scrubbed error', async () => {
+  const { createEditBake } = await import('../../js/v2/edit-bake.js');
+  const captures = [];
+  const sentry = {
+    withScope(fn) { fn({ addEventProcessor() {} }); },
+    captureException(err, ctx) { captures.push({ err, ctx }); },
+  };
+  const thrown = new Error(`WinAnsi cannot encode "${SECRET}"`);
+  const doc = { sources: { find() { throw thrown; } }, pages: [] };
+  const bake = createEditBake({
+    getDoc: () => doc, getSlots: () => new Map(), getRasterizer: () => null,
+    rasterScaleFor: () => 1, tel: () => {}, getSentry: () => sentry,
+  });
+  const warns = [];
+  const origWarn = console.warn;
+  console.warn = (...args) => warns.push(args);
+  try {
+    const page = editedPage('p1', 'satu');
+    assert.equal(await bake.editedPageProvider(page), null, 'the fallback is the plain source render');
+    assert.equal(captures.length, 1, 'VACUITY: the real onBakeFailure must have reported');
+    await bake.editedPageProvider(page);
+    assert.equal(captures.length, 1, 'the same edit state reports once');
+    await bake.editedPageProvider(editedPage('p1', 'dua'));
+    assert.equal(captures.length, 2, 'a new edit state on the same page is a new key (constant-key mutation)');
+    await bake.editedPageProvider(editedPage('p2', 'dua'));
+    assert.equal(captures.length, 3, 'the same edit on another page is a new key');
+  } finally {
+    console.warn = origWarn;
+  }
+  const bakeWarns = warns.filter((a) => String(a[0]).startsWith('editedPageProvider gagal'));
+  assert.equal(bakeWarns.length, 4, 'every failed bake warns once');
+  for (const args of bakeWarns) {
+    assert.notEqual(args[1], thrown, 'console.warn must never get the raw error (Sentry breadcrumbs it)');
+    assert.equal(args[1].message, '[scrubbed]');
+    assert.ok(!args.map((a) => `${a} ${a?.stack ?? ''}`).join(' ').includes(SECRET), 'no document text in the warning');
+  }
 });
 
 // Seat ruling 2026-10-01: a commit-bake capture must NOT trigger the on-error
@@ -271,4 +325,40 @@ test('sentry-init: a console breadcrumb leaves the device content-free; other br
 
   const html = fs.readFileSync(new URL('../../alat-gambar.html', import.meta.url), 'utf8');
   assert.match(html, /beforeBreadcrumb:\s*\(b\)\s*=>[^\n]*category === 'console'/, 'the old wing carries the same hook');
+});
+
+// FOUNDER RULING 2026-10-11: a classified 'unsupported' bake failure is recorded
+// as 'unsupported', not rewritten to 'unknown'. Both classifier routes into it
+// (a `cannot encode` throw, a blown stack) must reach the server's validator
+// and the events insert with that exact value.
+test('a classified unsupported bake failure reaches the server as reason "unsupported"', async () => {
+  const stack = new RangeError('Maximum call stack size exceeded');
+  for (const thrown of [new Error('WinAnsi cannot encode "x" (0x2009)'), stack]) {
+    const { events, provider } = harness(async () => { throw thrown; });
+    await provider(editedPage());
+    const [name, props] = events[0];
+    assert.equal(name, 'failure');
+    assert.deepEqual(props, { stage: 'commit', reason: 'unsupported', class: 'none', blocked: false });
+    assert.equal(validateEvent(name, props).ok, true, 'the shared validator accepts it');
+
+    // The real endpoint: not dropped, and the written row carries the value.
+    const writes = [];
+    __setQueryForTests(async (text, params) => {
+      if (/telemetry_rejects/.test(String(text))) return { rowCount: params.length / 5 };
+      writes.push(params);
+      return { rowCount: params.length / 6 };
+    });
+    const chunks = [Buffer.from(JSON.stringify({
+      session_id: '3f1c9a52-0b6e-4a7d-9c11-2f7e5d8a4b30', app_version: 'abc1234',
+      events: events.map(([event, p]) => ({ event, props: p })),
+    }), 'utf8')];
+    const req = { method: 'POST', headers: { 'content-type': 'application/json' },
+      on(evt, cb) { if (evt === 'data') chunks.forEach((c) => cb(c)); if (evt === 'end') cb(); return this; } };
+    const res = { status() { return res; }, end() { return res; } };
+    try { await handler(req, res); } finally { __setQueryForTests(null); }
+    const rows = writes.flatMap((params) => params).filter((v) => typeof v === 'string' && v.startsWith('{'));
+    const failure = rows.map((r) => JSON.parse(r)).find((r) => r.stage === 'commit' && 'reason' in r);
+    assert.ok(failure, 'the failure event was written, not dropped at the edge');
+    assert.equal(failure.reason, 'unsupported');
+  }
 });

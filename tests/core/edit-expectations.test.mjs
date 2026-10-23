@@ -30,9 +30,14 @@ test('short text keeps 2600 ms; longer text scales at 900 + 330 per word', () =>
 
 test('the real app toast() uses the duration function, not a literal', () => {
   const src = fs.readFileSync(path.join(ROOT, 'js/v2/app.js'), 'utf8');
-  const fn = src.match(/function toast\(msg\) \{[\s\S]*?\n\}/)?.[0] || '';
-  assert.match(fn, /toastDurationMs\(msg\)/);
-  assert.doesNotMatch(fn, /\b2600\b/);
+  // The duration now lives in the toast controller (js/v2/toast-layer.js), which
+  // app.js builds with durationMs: toastDurationMs; the controller calls it per msg.
+  const ctl = src.match(/createToast\(\{[\s\S]*?\}\);/)?.[0] || '';
+  assert.match(ctl, /durationMs: toastDurationMs\b/);
+  assert.doesNotMatch(ctl, /\b2600\b/);
+  const layer = fs.readFileSync(path.join(ROOT, 'js/v2/toast-layer.js'), 'utf8');
+  assert.match(layer, /durationMs\(msg\)/);
+  assert.doesNotMatch(layer, /\b2600\b/);
 });
 
 // ---- once per document -------------------------------------------------------------
@@ -122,4 +127,13 @@ test('the sheet renders the note from the build\'s count, in the PDF format only
   const src = fs.readFileSync(path.join(ROOT, 'js/v2/download-sheet.js'), 'utf8');
   assert.match(src, /state\.base = \{[^}]*covered[^}]*\}/);
   assert.match(src, /coveredNoteShows\(\{[\s\S]*?format: state\.format/);
+  // The note must read the BUILD's count. The two checks above stayed green
+  // with the call hard-wired to `covered: 0` (the note never shows): pin every
+  // field of the call's argument to the state it must come from.
+  const call = src.match(/coveredNoteShows\(\{([\s\S]*?)\}\);/);
+  assert.ok(call, 'VACUITY: download-sheet.js no longer calls coveredNoteShows({ ... }); repoint this test');
+  assert.match(call[1], /(^|[\s,])covered: state\.base\?\.covered\s*,/, 'covered comes from state.base, the build\'s count');
+  assert.match(call[1], /(^|[\s,])format: state\.format\s*,/);
+  assert.match(call[1], /(^|[\s,])size: state\.size\s*,/);
+  assert.match(call[1], /(^|[\s,])compressedUnchanged: !!state\.compressed\?\.unchanged\s*,/);
 });

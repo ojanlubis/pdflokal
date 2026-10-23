@@ -41,25 +41,47 @@ async function rows(db, sql, args = []) {
 const num = (v) => (v == null ? null : Number(v));
 const parse = (s) => { try { return JSON.parse(s); } catch { return null; } };
 
-export async function digest(since, now = new Date()) {
-  const until = now.toISOString();
-  const span = now.getTime() - Date.parse(since);
-  const prevSince = new Date(Date.parse(since) - span).toISOString();
+// The routine's own previous row and the daily watch's last 8: two reads of
+// routine_runs (a few dozen rows). Brief §1.1 needs `last_run.ts` BEFORE it can
+// say which window to ask for, and used to fetch the whole digest (the default
+// 72 h of events, ~1M rows read) just to learn one timestamp. `?last=1` is that
+// timestamp without the digest.
+export async function lastRuns() {
   const E = ev();
-
   const [lastRun] = await rows(E,
     `select id, ts, status, window_hours, findings from routine_runs
      where routine = 'cloud-maintenance' order by id desc limit 1`);
   const watch = await rows(E,
     `select ts, status, findings, note from routine_runs
      where routine = 'vercel-watch' order by id desc limit 8`);
+  return {
+    lastRun: lastRun ? { ...lastRun, findings: parse(lastRun.findings) } : null,
+    watch: watch.map((w) => ({ ...w, findings: parse(w.findings) })),
+  };
+}
 
-  const [alive] = await rows(E,
+export async function digest(since, now = new Date()) {
+  const until = now.toISOString();
+  const span = now.getTime() - Date.parse(since);
+  const prevSince = new Date(Date.parse(since) - span).toISOString();
+  const E = ev();
+
+  const { lastRun, watch } = await lastRuns();
+
+  // ONE pass over [prevSince, until) answers the liveness line, this window's
+  // totals and the previous window's session count. They were three queries
+  // (2x + 1x + 1x the window) and Turso bills rows read, so each scanned row cost
+  // twice over; the conditional aggregates read every row once. Same numbers.
+  const [tot] = await rows(E,
     `select max(ts) as last_event,
             sum(ts >= ?) as n_window,
-            sum(ts < ?) as n_prev
+            sum(ts < ?) as n_prev,
+            count(distinct case when ts >= ? then session_id end) as sessions,
+            count(distinct case when ts >= ? and event = 'doc_open' then session_id end) as opened,
+            count(distinct case when ts >= ? and event = 'export' then session_id end) as exported,
+            count(distinct case when ts < ? then session_id end) as prev_sessions
      from events where ts >= ? and ts < ? and session_id <> ?`,
-    [since, since, prevSince, until, MARKER]);
+    [since, since, since, since, since, since, prevSince, until, MARKER]);
 
   const sessionsByDay = await rows(E,
     `select substr(datetime(ts, '+7 hours'), 1, 10) as day_wib,
@@ -67,17 +89,6 @@ export async function digest(since, now = new Date()) {
             count(distinct visitor_id) as browsers
      from events where ts >= ? and ts < ? and session_id <> ? group by day_wib order by day_wib`,
     [prevSince, until, MARKER]);
-
-  const [windowTotals] = await rows(E,
-    `select count(distinct session_id) as sessions,
-            count(distinct case when event = 'doc_open' then session_id end) as opened,
-            count(distinct case when event = 'export' then session_id end) as exported
-     from events where ts >= ? and ts < ? and session_id <> ?`,
-    [since, until, MARKER]);
-  const [prevTotals] = await rows(E,
-    `select count(distinct session_id) as sessions
-     from events where ts >= ? and ts < ? and session_id <> ?`,
-    [prevSince, since, MARKER]);
 
   const tools = await rows(E,
     `select json_extract(props,'$.tool') as tool, json_extract(props,'$.action') as action,
@@ -110,21 +121,29 @@ export async function digest(since, now = new Date()) {
   const feedback = await rows(fb(),
     `select ts, rating, note from feedback where ts >= ? and ts < ? order by ts desc`,
     [since, until]);
+  // Feature-vote ideas have their own table (scripts/turso-feedback-migration.sql):
+  // counted, never listed. A missing table (migration not applied yet) is null, not a failure.
+  let featureRequests = null;
+  try {
+    const [r] = await rows(fb(), `select count(*) as n from feature_requests where ts >= ? and ts < ?`, [since, until]);
+    featureRequests = num(r?.n);
+  } catch { /* table not there yet */ }
 
   return {
     now: until,
     window: { since, hours: Math.round((span / 3600000) * 10) / 10, prev_since: prevSince },
-    last_run: lastRun ? { ...lastRun, findings: parse(lastRun.findings) } : null,
-    watch: watch.map((w) => ({ ...w, findings: parse(w.findings) })),
-    alive: { last_event: alive?.last_event ?? null, n_window: num(alive?.n_window) ?? 0, n_prev: num(alive?.n_prev) ?? 0 },
-    sessions: { window: num(windowTotals?.sessions), prev: num(prevTotals?.sessions) },
+    last_run: lastRun,
+    watch,
+    alive: { last_event: tot?.last_event ?? null, n_window: num(tot?.n_window) ?? 0, n_prev: num(tot?.n_prev) ?? 0 },
+    sessions: { window: num(tot?.sessions), prev: num(tot?.prev_sessions) },
     sessions_by_day: sessionsByDay.map((d) => ({ ...d, sessions: num(d.sessions), events: num(d.events), browsers: num(d.browsers) })),
-    opened: num(windowTotals?.opened),
-    exported: num(windowTotals?.exported),
+    opened: num(tot?.opened),
+    exported: num(tot?.exported),
     tools: tools.map((t) => ({ ...t, n: num(t.n), sessions: num(t.sessions) })),
     arrivals: arrivals.map((a) => ({ ...a, n: num(a.n) })),
     failures: failures.map((f) => ({ ...f, n: num(f.n), sessions: num(f.sessions) })),
     feedback,
+    feature_requests: featureRequests,
   };
 }
 
@@ -145,6 +164,15 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     const url = new URL(req.url, 'http://x');
     const now = new Date();
+    if (url.searchParams.get('last') === '1') {
+      try {
+        const { lastRun, watch } = await lastRuns();
+        res.status(200).json({ now: now.toISOString(), last_run: lastRun, watch });
+      } catch (err) {
+        res.status(503).json({ error: 'rail_unreadable', reason: String(err?.message ?? 'unknown').slice(0, 60) });
+      }
+      return;
+    }
     let since = url.searchParams.get('since');
     // Default window: since the routine's own last run (brief §1.1), capped.
     if (!since || Number.isNaN(Date.parse(since))) since = new Date(now.getTime() - 72 * 3600000).toISOString();

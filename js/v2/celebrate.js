@@ -14,6 +14,7 @@
  */
 
 import { createPlaystoreVote } from './playstore-vote.js';
+import { createFeatureVote } from './feature-vote.js';
 import { track } from '../lib/analytics.js';
 import { t as tr } from '../lib/i18n.js';
 
@@ -119,6 +120,11 @@ export function createCelebration(deps) {
   // The temporary Play Store vote — owns its own gating; celebrate.js only asks
   // it to try, and skips the share/tip card when it takes the moment.
   const vote = createPlaystoreVote({ toast: deps.toast });
+  // The feature vote (founder ruling 2026-10-02). Owns its own gating;
+  // celebrate.js tells it whether the share/tip card has already spoken this
+  // session, and when it takes the moment, withholds the share/tip card from the
+  // rest of the session. One invitation per session.
+  const featureVote = createFeatureVote();
 
   // TETAP JALAN: connection dies, PDFLokal doesn't (no server in the loop).
   // The moat made visible — once per session, only while a page is open.
@@ -192,13 +198,16 @@ export function createCelebration(deps) {
   // the founder's ruling 2026-10-02). Optional chaining anyway, so a page whose
   // markup omits the button does not break the share card.
   card.querySelector('#sc-donate')?.addEventListener('click', () => {
+    track('donate_tap', { surface: 'share-card' }); // the same event the vote's coffee step sends (surface:'vote')
     // Reveal the QR INLINE, never leave the editor (founder-locked).
     card.classList.add('qr-open');
   });
 
   return {
     // The one hook: called by the app's shared download chokepoint.
-    onDownloadSuccess() {
+    // `whole`: this download was the WHOLE document (not a picked subset), which is
+    // the only kind the feature vote follows. Everything else here is unchanged.
+    onDownloadSuccess({ whole = false } = {}) {
       // Big, and ~1.2s late on purpose: Android Chrome's download dialog +
       // notification own the first second; we celebrate once the stage clears.
       showStamp(tr('celebrate.stampDone'), { big: true, delay: 1200, duration: 3000 });
@@ -206,6 +215,15 @@ export function createCelebration(deps) {
       // we stop here; if it declines (already voted / dismissed today), the
       // share/tip card runs as usual — so voters still get the normal invite.
       if (PLAYSTORE_CAMPAIGN && vote.maybeShow()) return;
+      // The feature vote follows EVERY whole-document download until "Nanti aja",
+      // then at most once a day, never after a vote (core/features.js). When it is
+      // offered it opens AT ONCE and REPLACES the share/tip card for this download
+      // (his ruling 2026-10-06); its last step carries the coffee ask. When it is not
+      // offered (voted, "Nanti aja" today, no visitor_id, a partial download, another
+      // card up) this falls through and the share/tip card runs exactly as before.
+      if (featureVote.maybeShow({ whole, supportShownThisSession: shownThisSession })) {
+        return; // the share/tip card does not show for THIS download; its daily cap is untouched
+      }
       // The share/tip invite, once per CALENDAR DAY (founder call, Jul 3) — a gentle
       // reminder that free has a sponsor, never a toll booth per file. (Install lives
       // on the homepage now, off this moment — see install-prompt.js.) shownThisSession

@@ -19,6 +19,7 @@
 
 import { removePage, reorderPage, rotatePage } from '../core/operations.js';
 import { record } from '../core/history.js';
+import { rasterKey } from '../core/raster-key.js';
 import { track } from '../lib/analytics.js';
 import { t as tr } from '../lib/i18n.js';
 
@@ -47,7 +48,11 @@ const DRAG_SLOP = 8; // px of movement that cancels a pending long-press
 export function createPageManager(deps) {
   const { sheet, grid, bulkBar } = deps;
   const selected = new Set();          // page ids (UI-transient, not core state)
-  const thumbs = new Map();            // page.id -> dataUrl (invalidated on rotate)
+  // page.id -> { key, dataUrl }. WHY keyed by rasterKey too: the thumb shows the
+  // page as the rasterizer draws it (edits included), and a Ganti/Hapus commit
+  // changes that picture without touching the page's id, so an id-only cache
+  // kept showing the pre-edit page. A key mismatch is a miss (core/raster-key.js).
+  const thumbs = new Map();
   let thumbQueue = Promise.resolve();  // serialize thumb renders (keep UI smooth)
   let pickResolve = null;              // non-null = PICK MODE (Unduh sheet asked)
 
@@ -109,7 +114,9 @@ export function createPageManager(deps) {
     if (!pickResolve) {
       const add = document.createElement('button');
       add.className = 'pm-tile pm-add';
-      add.innerHTML = '<span>+</span>Tambah PDF';
+      const plus = document.createElement('span');
+      plus.textContent = '+';
+      add.append(plus, tr('pm.add')); // was hard-coded Indonesian: /en showed 'Tambah PDF'
       add.addEventListener('click', () => deps.onAddFiles());
       grid.appendChild(add);
     }
@@ -150,7 +157,7 @@ export function createPageManager(deps) {
     const im = document.createElement('div');
     im.className = 'pm-thumb';
     const cached = thumbs.get(page.id);
-    if (cached) im.style.backgroundImage = `url(${cached})`;
+    if (cached && cached.key === rasterKey(page)) im.style.backgroundImage = `url(${cached.dataUrl})`;
     else queueThumb(page, im);
     tile.appendChild(im);
 
@@ -168,14 +175,37 @@ export function createPageManager(deps) {
     return tile;
   }
 
+  // WHY one job per (page, picture) with a SET of tiles waiting on it: every grid
+  // rebuild (reorder, delete, undo) re-runs renderTile, and a thumb that has not
+  // landed yet is still a cache miss, so each rebuild used to queue another full
+  // render of the same page (2-3x on a long PDF) while the older jobs painted
+  // tiles that were already out of the grid. A rebuild now joins the job already
+  // in flight, and the job paints only tiles that are still in the grid.
+  const inflight = new Map(); // `${page.id}\n${rasterKey}` -> Set of waiting tile elements
   function queueThumb(page, el) {
+    const key = rasterKey(page);
+    const flightKey = page.id + '\n' + key;
+    const waiting = inflight.get(flightKey);
+    if (waiting) { waiting.add(el); return; }
+    const targets = new Set([el]);
+    inflight.set(flightKey, targets);
     thumbQueue = thumbQueue.then(async () => {
-      if (!sheet.open) return; // sheet closed mid-queue; skip quietly
       try {
-        const t = await deps.getRasterizer().rasterizeThumb(page, { width: 150 });
-        thumbs.set(page.id, t.dataUrl);
-        el.style.backgroundImage = `url(${t.dataUrl})`;
-      } catch { /* tile keeps its blank placeholder */ }
+        if (!sheet.open) return; // sheet closed mid-queue; skip quietly
+        let hit = thumbs.get(page.id);
+        if (!hit || hit.key !== key) {
+          // Every tile that asked is gone (deleted, or rebuilt under a newer job):
+          // rendering would be work nobody sees.
+          if (![...targets].some((t) => t.isConnected)) return;
+          const issuedKey = rasterKey(page); // read when issued, like rasterize() does
+          const t = await deps.getRasterizer().rasterizeThumb(page, { width: 150 });
+          hit = { key: issuedKey, dataUrl: t.dataUrl };
+          thumbs.set(page.id, hit);
+        }
+        for (const t of targets) if (t.isConnected) t.style.backgroundImage = `url(${hit.dataUrl})`;
+      } catch { /* tile keeps its blank placeholder */ } finally {
+        inflight.delete(flightKey);
+      }
     });
   }
 
@@ -507,6 +537,11 @@ export function createPageManager(deps) {
     if (!act || selected.size === 0 || btn.getAttribute('aria-disabled') === 'true') return;
     const doc = deps.getDoc();
     const pages = doc.pages.filter((p) => selected.has(p.id));
+    // 'clear' acts on the selection itself, so it runs even when no chosen id is
+    // in the document any more. Every other action needs real pages: a stale
+    // selection (ids of a document that was replaced) must never reach
+    // Ekstrak, which would download a 0-page file and toast success.
+    if (act !== 'clear' && pages.length === 0) return;
 
     if (act === 'rotate') {
       rotatePages(pages.map((p) => p.id));
@@ -521,9 +556,13 @@ export function createPageManager(deps) {
     }
   });
 
-  // Undo/redo can revert rotations the thumb cache baked in (review M4) — the
-  // caller flushes us wholesale; thumbs regenerate lazily on next open.
-  function invalidateThumbs() { thumbs.clear(); }
+  // Wholesale flush, for a document that is GONE (Buka Baru). Undo/redo does not
+  // call it: an entry carries its rasterKey, so a restored rotation or edit is a
+  // key mismatch (a miss) on its own, and flushing re-rendered every page for nothing.
+  // The selection goes with it: its ids belong to the document that is gone, and
+  // left behind it kept saying "2 dipilih" over a new file whose Ekstrak then
+  // filtered to zero pages.
+  function invalidateThumbs() { thumbs.clear(); selected.clear(); }
 
   return {
     open,

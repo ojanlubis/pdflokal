@@ -39,10 +39,14 @@ test('Buka Baru clears the page-manager thumbnail cache', async ({ page }) => {
   // Buka Baru: File menu → Buka Baru → pick a new file. The picker click on
   // the hidden input is a no-op headless; setInputFiles fires the same
   // change event the real picker would, with pendingReplace armed.
+  const oldFirstId = await page.evaluate(() => window.v2.getDoc().pages[0].id);
   await page.click('#btn-file');
   await page.click('#fm-new');
   await page.setInputFiles('#file-input', NASTY('lorem-full.pdf'));
   await expectFirstPage(page);
+  // A replace keeps the old document on screen until the new file opens, so
+  // expectFirstPage alone can pass on the OLD page: wait for the swap.
+  await expect.poll(() => page.evaluate(() => window.v2.getDoc().pages[0]?.id)).not.toBe(oldFirstId);
 
   // The new doc has fresh ids and its sheet has not been opened — a clean
   // cache is EMPTY. Pre-fix, the old doc's unreachable entries survived here.

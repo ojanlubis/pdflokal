@@ -101,7 +101,7 @@ export function fmtMB(bytes) {
 // deps = {
 //   modal, getDoc, getBaseName,
 //   pickPages: () => Promise<pageIds[]|null>   — opens Kelola Halaman in pick mode
-//   download: (blob, filename) => void
+//   download: (blob, filename, { whole }) => void   — whole: all pages, not a picked subset
 //   onWholeDocExported?: () => void  — a download of ALL pages finished (never a picked subset)
 //   toast: (msg) => void
 // }
@@ -302,6 +302,7 @@ export function createDownloadSheet(deps) {
   async function buildCompressed() {
     if (state.compressed || state.compressing) return;
     const seq = state.seq;
+    let capChanged = false; // see the target check below
     state.compressing = true;
     render();
     try {
@@ -333,6 +334,11 @@ export function createDownloadSheet(deps) {
           quality: COMPRESS_QUALITY, maxDim: COMPRESS_MAXDIM,
         });
       if (seq !== state.seq) return;
+      // WHY: a cap tap while this run was in flight set compressed=null and
+      // called us, but the single-flight guard above returned at once. Storing
+      // this result would hand Unduh a file built for the OLD cap (Otomatis
+      // bytes for a 500 KB portal). Drop it; finally restarts for the new cap.
+      if (target !== state.target) { capChanged = true; return; }
       // reachedTarget is carried through so the UI can be HONEST when we couldn't
       // make the cap. A berkas the user believes is 500 KB but isn't gets silently
       // rejected by the portal — worse than one they know is too big. It is
@@ -358,11 +364,12 @@ export function createDownloadSheet(deps) {
       // makes the unconditional clear safe: the guard prevents a second run
       // while this one is alive.
       state.compressing = false;
-      if (seq === state.seq) {
+      if (seq === state.seq && !capChanged) {
         render();
       } else if (state.format === 'pdf' && state.size === 'kompres' && !state.compressed) {
         // Superseded while Compress is still what the user wants → restart
-        // for the NEW selection (this run's result was for stale pages).
+        // for the NEW selection (this run's result was for stale pages, or
+        // for a cap the user has since changed).
         buildCompressed();
       }
     }
@@ -598,7 +605,11 @@ export function createDownloadSheet(deps) {
         buildCompressed();
       }
       // Any in-flight build: the tap means "when it's ready".
-      while ((state.building || (state.format === 'pdf' && state.size === 'kompres' && (state.compressing || !state.compressed))) && seq === state.seq) {
+      // `!state.compressed` only counts while a base exists to compress: with
+      // no base (a build that failed, e.g. an owner-locked PDF opened on
+      // /kompres-pdf) nothing will ever fill it, and the CTA spun forever with
+      // no failure event. Falling through reaches the rethrow of buildError.
+      while ((state.building || (state.format === 'pdf' && state.size === 'kompres' && (state.compressing || (!state.compressed && state.base)))) && seq === state.seq) {
         await new Promise((r) => setTimeout(r, 120));
       }
       if (seq !== state.seq) return;
@@ -613,7 +624,7 @@ export function createDownloadSheet(deps) {
         // classify our own placeholder, which names nothing.
         if (!src) throw state.buildError || new Error('build missing');
         // No success toast: the BERES stamp (download chokepoint) is the one voice.
-        deps.download(new Blob([src.bytes], { type: 'application/pdf' }), `${baseName}-pdflokal.pdf`);
+        deps.download(new Blob([src.bytes], { type: 'application/pdf' }), `${baseName}-pdflokal.pdf`, { whole: !state.picked });
       } else {
         // The built PDF when we have it (it carries the annotations); the raw
         // source otherwise, but only where that is provably the whole truth —
@@ -653,12 +664,12 @@ export function createDownloadSheet(deps) {
         }
         if (files.length === 1) {
           const mime = state.imgfmt === 'png' ? 'image/png' : 'image/jpeg';
-          deps.download(new Blob([files[0].bytes], { type: mime }), files[0].name);
+          deps.download(new Blob([files[0].bytes], { type: mime }), files[0].name, { whole: !state.picked });
         } else {
           main.textContent = tr('sheet.progress.zip');
           await new Promise((r) => setTimeout(r, 30)); // let the label paint before the sync zip
           const zip = zipFiles(files);
-          deps.download(new Blob([zip], { type: 'application/zip' }), `${baseName}-gambar.zip`);
+          deps.download(new Blob([zip], { type: 'application/zip' }), `${baseName}-gambar.zip`, { whole: !state.picked });
           deps.toast(tr('sheet.toast.zipDone', { count: n }));
         }
       }

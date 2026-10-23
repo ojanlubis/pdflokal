@@ -112,45 +112,51 @@ async function compressOnce(input, { PDFLib, pdfjsLib, quality, maxDim, onProgre
   const pdf = await pdfjsLib.getDocument({ data: input.slice() }).promise;
   const total = pdf.numPages;
 
-  const newDoc = await PDFLib.PDFDocument.create();
+  // try/finally: a page that throws (corrupt page, an out-of-memory canvas
+  // on a phone) must not strand the PDF.js document; the ladder runs several
+  // rungs per Unduh, so one bad page could strand it several times.
+  let newDoc;
+  try {
+    newDoc = await PDFLib.PDFDocument.create();
 
-  for (let n = 1; n <= total; n += 1) {
-    const pdfPage = await pdf.getPage(n);
-    // scale:1 viewport already honors the page's intrinsic /Rotate (same as
-    // import.js) — width/height are the UPRIGHT point dims the viewer shows.
-    const base = pdfPage.getViewport({ scale: 1 });
-    const pointW = base.width;
-    const pointH = base.height;
+    for (let n = 1; n <= total; n += 1) {
+      const pdfPage = await pdf.getPage(n);
+      // scale:1 viewport already honors the page's intrinsic /Rotate (same as
+      // import.js) — width/height are the UPRIGHT point dims the viewer shows.
+      const base = pdfPage.getViewport({ scale: 1 });
+      const pointW = base.width;
+      const pointH = base.height;
 
-    const longEdge = Math.max(pointW, pointH);
-    const renderScale = Math.min(maxDim / longEdge, MAX_UPSCALE);
-    const vp = pdfPage.getViewport({ scale: renderScale });
+      const longEdge = Math.max(pointW, pointH);
+      const renderScale = Math.min(maxDim / longEdge, MAX_UPSCALE);
+      const vp = pdfPage.getViewport({ scale: renderScale });
 
-    const canvas = makeCanvas(Math.max(1, Math.ceil(vp.width)), Math.max(1, Math.ceil(vp.height)));
-    const ctx = canvas.getContext('2d');
-    // Flatten transparency onto white — JPEG has no alpha, and a scan's
-    // background should be paper-white, not black.
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    await pdfPage.render({ canvasContext: ctx, viewport: vp }).promise;
+      const canvas = makeCanvas(Math.max(1, Math.ceil(vp.width)), Math.max(1, Math.ceil(vp.height)));
+      const ctx = canvas.getContext('2d');
+      // Flatten transparency onto white — JPEG has no alpha, and a scan's
+      // background should be paper-white, not black.
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      await pdfPage.render({ canvasContext: ctx, viewport: vp }).promise;
 
-    const jpegBytes = await canvasToJpegBytes(canvas, quality);
-    const img = await newDoc.embedJpg(jpegBytes);
-    // New page carries NO /Rotate — the pixels are already upright, so a
-    // rotation flag would double-rotate them. Size follows the rotated view.
-    const outPage = newDoc.addPage([pointW, pointH]);
-    outPage.drawImage(img, { x: 0, y: 0, width: pointW, height: pointH });
+      const jpegBytes = await canvasToJpegBytes(canvas, quality);
+      const img = await newDoc.embedJpg(jpegBytes);
+      // New page carries NO /Rotate — the pixels are already upright, so a
+      // rotation flag would double-rotate them. Size follows the rotated view.
+      const outPage = newDoc.addPage([pointW, pointH]);
+      outPage.drawImage(img, { x: 0, y: 0, width: pointW, height: pointH });
 
-    // Free per-page memory eagerly — big docs on 1-juta phones can't hold every
-    // page's canvas + PDF.js operator list at once.
-    pdfPage.cleanup();
-    canvas.width = 0;
-    canvas.height = 0;
+      // Free per-page memory eagerly — big docs on 1-juta phones can't hold every
+      // page's canvas + PDF.js operator list at once.
+      pdfPage.cleanup();
+      canvas.width = 0;
+      canvas.height = 0;
 
-    if (onProgress) onProgress(n, total);
+      if (onProgress) onProgress(n, total);
+    }
+  } finally {
+    await pdf.destroy();
   }
-
-  await pdf.destroy();
 
   const rebuilt = await newDoc.save({ useObjectStreams: true, addDefaultPage: false });
 

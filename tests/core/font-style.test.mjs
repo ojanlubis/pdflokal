@@ -51,7 +51,7 @@ test('parseStyleFromName: never throws on undefined/null/empty', () => {
 // indirect object into the context lazily, at save time — calling
 // context.lookup() on a freshly-embedded (not yet saved) font's ref returns
 // undefined. Every REAL caller of this adapter (core/redact.js,
-// core/doc-fonts.js, js/v2/app.js's prepareDocFont) only ever runs against an
+// core/doc-fonts.js, js/v2/doc-font-live.js's prepareDocFont) only ever runs against an
 // ALREADY-LOADED document (PDFLib.PDFDocument.load(source.bytes)) — so
 // round-tripping here isn't a workaround, it's matching production's actual
 // input shape.
@@ -120,4 +120,14 @@ test('getFontStyleInfo: unknown font name on the page declines honestly', async 
   const page = await buildAndReload(PDFLib, async () => {});
   const info = getFontStyleInfo(page, PDFLib, 'NopeNotAResource');
   assert.equal(info.ok, false);
+});
+
+// Adobe's abbreviated style suffix. Read as upright, the style source became a
+// confident 'pdf-name' italic:false and the clone ladder picked the upright face.
+test('parseStyleFromName: Adobe -It / -BoldIt suffixes are italic, "-Lit" is not', () => {
+  assert.deepEqual(parseStyleFromName('MinionPro-It'), { bold: false, italic: true });
+  assert.deepEqual(parseStyleFromName('ABCDEF+MyriadPro-BoldIt'), { bold: true, italic: true });
+  assert.equal(parseStyleFromName('MinionPro-SemiboldIt').italic, true);
+  assert.equal(parseStyleFromName('Foo-Lit').italic, false);
+  assert.equal(parseStyleFromName('MinionPro-Regular').italic, false);
 });

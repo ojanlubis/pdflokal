@@ -296,7 +296,7 @@
     ]
   },
   "sheet.compressFailed": {
-    "text": "Kompres gagal, saya pakai ukuran asli ya",
+    "text": "Kompres gagal, pakai ukuran asli ya",
     "src": [
       "js/v2/download-sheet.js"
     ]
@@ -543,7 +543,7 @@
     ]
   },
   "intent.kompres.dzHint": {
-    "text": "Ukuran hasilnya saya tunjukkan sebelum kamu unduh",
+    "text": "Ukuran hasilnya kelihatan dulu sebelum kamu unduh",
     "src": [
       "js/v2/intent-copy.js"
     ]
@@ -808,7 +808,7 @@
     ]
   },
   "editFeedback.thanks": {
-    "text": "Makasih, masukanmu ngebantu saya 🙏",
+    "text": "Makasi masukannyaa, ngebantu banget 🙏",
     "src": [
       "js/v2/edit-feedback.js"
     ]
@@ -832,13 +832,13 @@
     ]
   },
   "editFeedback.askTitle": {
-    "text": "Boleh saya minta dua potongan ini?",
+    "text": "Boleh minta dua potongan ini?",
     "src": [
       "js/v2/edit-feedback.js"
     ]
   },
   "editFeedback.askSub": {
-    "text": "Sebelum dan sesudahnya, biar saya bisa analisis fiturnya kurang di mana. Nggak ada isi file lain.",
+    "text": "Sebelum dan sesudahnya, biar bisa dicek fiturnya kurang di mana. Nggak ada isi file lain.",
     "src": [
       "js/v2/edit-feedback.js"
     ]
@@ -1027,6 +1027,12 @@
       "js/v2/page-manager.js"
     ]
   },
+  "pm.add": {
+    "text": "Tambah PDF",
+    "src": [
+      "js/v2/page-manager.js"
+    ]
+  },
   "pm.deleted": {
     "text": "{count} halaman dihapus. Salah? Tinggal Undo",
     "src": [
@@ -1040,7 +1046,7 @@
     ]
   },
   "bugPrompt.big": {
-    "text": "Mohon kabarin saya ya kalo ada bug, di sini",
+    "text": "Kabarin kalo ada bug yaa, di sini",
     "src": [
       "js/v2/bug-report-prompt.js"
     ]
@@ -1086,6 +1092,106 @@
     ],
     "src": [
       "js/v2/maker-card.js"
+    ]
+  },
+  "featureVote.invite": {
+    "text": "Halo guyss. Mau bikin fitur baru tp bingung apaan. Bantu voting doong. terimakasii",
+    "src": [
+      "js/v2/feature-vote.js"
+    ]
+  },
+  "featureVote.start": {
+    "text": "Pilih fitur",
+    "src": [
+      "js/v2/feature-vote.js"
+    ]
+  },
+  "featureVote.later": {
+    "text": "Nanti aja",
+    "src": [
+      "js/v2/feature-vote.js"
+    ]
+  },
+  "featureVote.title": {
+    "text": "Fitur apa yang kamu butuh?",
+    "src": [
+      "js/v2/feature-vote.js"
+    ]
+  },
+  "featureVote.hint": {
+    "text": "Pilih maksimal 3",
+    "src": [
+      "js/v2/feature-vote.js"
+    ]
+  },
+  "featureVote.picked": {
+    "text": "{n} dari {max} dipilih",
+    "src": [
+      "js/v2/feature-vote.js"
+    ]
+  },
+  "featureVote.idea": {
+    "text": "Belum ada di sini? Tulis aja",
+    "src": [
+      "js/v2/feature-vote.js"
+    ]
+  },
+  "featureVote.send": {
+    "text": "Kirim pilihan",
+    "src": [
+      "js/v2/feature-vote.js"
+    ]
+  },
+  "featureVote.failed": {
+    "text": "Pilihanmu belum terkirim. Coba lagi ya.",
+    "src": [
+      "js/v2/feature-vote.js"
+    ]
+  },
+  "featureVote.thanks": {
+    "text": "Makasi votingnyaa. Kalo udah jadi nnti dikabarin di sini yaa",
+    "src": [
+      "js/v2/feature-vote.js"
+    ]
+  },
+  "featureVote.top": {
+    "text": "Paling banyak dipilih:",
+    "src": [
+      "js/v2/feature-vote.js"
+    ]
+  },
+  "featureVote.close": {
+    "text": "Tutup",
+    "src": [
+      "js/v2/feature-vote.js"
+    ]
+  },
+  "featureVote.shipped": {
+    "text": "{feature} udah jadi nih. Kamu salah satu yang milih ini, makasii",
+    "src": [
+      "js/v2/maker-card.js"
+    ]
+  },
+  "featureVote.labels": {
+    "text": [
+      "PDF ke Word",
+      "PDF ke Excel",
+      "Simpan editan buat dilanjut nanti",
+      "Kunci dan buka PDF yang pakai password",
+      "Isi formulir PDF",
+      "Scan dokumen pakai kamera HP",
+      "Tempel gambar atau logo",
+      "Tambah watermark"
+    ],
+    "src": [
+      "js/v2/feature-vote.js",
+      "js/v2/maker-card.js"
+    ]
+  },
+  "featureVote.inviteTitle": {
+    "text": "Voting Fitur PDFLokal",
+    "src": [
+      "js/v2/feature-vote.js"
     ]
   },
   "saved.menuSave": {

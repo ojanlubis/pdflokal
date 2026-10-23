@@ -184,7 +184,7 @@ test.describe('signature paste — v2', () => {
     await expect(page.locator('#sig-modal')).toBeVisible();
   });
 
-  test('paste does NOT hijack the clipboard when the sheet is closed', async ({ page }) => {
+  test('paste is NOT consumed by the signature sheet when it is closed (the page takes it)', async ({ page }) => {
     await page.goto('/');
     await page.setInputFiles('#file-input', FIXTURE);
     await expectFirstPage(page);
@@ -206,8 +206,12 @@ test.describe('signature paste — v2', () => {
         sheetOpen: document.getElementById('sig-modal').open,
       };
     });
-    expect(r.prevented, 'the signature sheet consumed a paste while closed').toBe(false);
+    // Until system-clipboard paste onto the page (tests/v2-system-paste.spec.js) this
+    // asserted `prevented === false`: nobody took a closed-sheet paste. The PAGE now
+    // does, and places the image as an object. What must still hold is that the SHEET
+    // did not consume it: no preview, still closed.
     expect(r.previewCanvases).toBe(0);
     expect(r.sheetOpen).toBe(false);
+    expect(r.prevented, 'the page should take an image paste while no sheet is open').toBe(true);
   });
 });

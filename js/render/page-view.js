@@ -27,6 +27,7 @@
  * (Decision 2).
  */
 import { orderedForPaint, annotationZIndex } from '../core/annotation-order.js';
+import { turnOf } from '../core/annotation-geometry.js';
 import { t as tr } from '../lib/i18n.js';
 
 // SINGLE SOURCE OF TRUTH for a page's displayed size, in page-space px. It
@@ -131,9 +132,20 @@ export function setPageRaster(view, raster) {
 // and removal of the old one happen in the SAME synchronous tick (no
 // `await` between them), so the browser can only ever paint the FINAL state;
 // there is no frame where neither image (or a blank view) is on screen.
+//
+// WHY a per-view sequence (found 2026-10-10): what to remove used to be read
+// BEFORE the decode await. Two overlapping swaps (a sharpen and a re-bake on the
+// same page) both captured the same old image and both inserted theirs, so the
+// one that finished FIRST could end up painted on top (stale picture, leaked
+// <img>); a release during the decode left the new image under a placeholder
+// that nothing removed. Last ISSUED wins, as in core/import.js's renderSeq:
+// a swap that is no longer the newest for this view, or whose view was released
+// meanwhile, stands down, and the winner clears every old layer it finds.
+const viewSeq = new WeakMap();
+const bumpView = (view) => { const n = (viewSeq.get(view) || 0) + 1; viewSeq.set(view, n); return n; };
+
 export async function swapPageRaster(view, raster) {
-  const old = view.querySelector('.pv-bg');
-  const ph = view.querySelector('.pv-ph');
+  const seq = bumpView(view);
   const img = document.createElement('img');
   img.className = 'pv-bg';
   img.src = raster.dataUrl;
@@ -147,14 +159,16 @@ export async function swapPageRaster(view, raster) {
     // decode() can reject (or be unsupported) — proceed anyway; the swap
     // below is still correct, it just didn't get the pre-decode guarantee.
   }
+  if (viewSeq.get(view) !== seq) return; // a newer swap, or a release, owns this view now
+  const stale = view.querySelectorAll('.pv-bg, .pv-ph');
   view.insertBefore(img, view.firstChild);
-  old?.remove();
-  ph?.remove();
+  for (const el of stale) el.remove();
 }
 
 // Called when a page leaves the window — drop the image to free memory, restore
 // the placeholder. Scrolling back re-rasterizes it (a brief, bounded load).
 export function clearPageRaster(view) {
+  bumpView(view); // a swap still decoding must not re-attach to a released page
   view.querySelector('.pv-bg')?.remove();
   attachPlaceholder(view);
 }
@@ -298,6 +312,29 @@ export function measureTextAnnoWidth(anno) {
   return measureCtx.measureText(anno.text).width;
 }
 
+// A TURNED OBJECT on screen (founder ruling 2026-10-11, "semua harus ngikut
+// rotasi"): text and signatures carry `turn`, the quarter turns their page
+// made under them, and x/y is their ORIGIN (core/annotation-geometry.js
+// turnAnnotation). Drawn as a CSS rotate about that origin, which is the same
+// clockwise matrix the model and the file use (turnVector; export.js
+// objectPoint), so screen and download agree. `origin` is where x/y sits
+// inside the element: '10px 10px' for a plain text overlay (its padding ring),
+// '0 0' for everything else. The browser hit-tests the rotated box, so
+// selection, drag and delete need nothing more. data-turn is for the specs.
+// Exported: the inline editor (js/v2/app.js openTextEditor) opens turned too.
+export function applyTurn(el, anno, origin = '0 0') {
+  const turn = turnOf(anno);
+  if (!turn) {
+    el.style.transform = '';
+    el.style.transformOrigin = '';
+    delete el.dataset.turn;
+    return;
+  }
+  el.style.transformOrigin = origin;
+  el.style.transform = `rotate(${turn}deg)`;
+  el.dataset.turn = String(turn);
+}
+
 // One annotation as a positioned DOM element (page-space px).
 export function renderAnnotationEl(anno) {
   const el = document.createElement('div');
@@ -312,6 +349,7 @@ export function renderAnnotationEl(anno) {
   if (anno.type === 'text' && anno.block && Array.isArray(anno.block.lines)) {
     el.style.color = anno.color || '#000';
     renderBlockRows(el, anno);
+    applyTurn(el, anno);
   } else if (anno.type === 'text') {
     el.textContent = anno.text || '';
     applyTextFont(el, anno);
@@ -323,6 +361,7 @@ export function renderAnnotationEl(anno) {
     // negative margin cancels the layout shift. (≥44px rule, product def §6.5.)
     el.style.padding = '10px';
     el.style.margin = '-10px';
+    applyTurn(el, anno, '10px 10px');
   } else if (anno.type === 'whiteout') {
     el.style.width = (anno.width || 0) + 'px';
     el.style.height = (anno.height || 0) + 'px';
@@ -337,6 +376,7 @@ export function renderAnnotationEl(anno) {
     im.draggable = false;
     im.style.cssText = `display:block;width:${anno.width || 150}px;height:auto;pointer-events:none;user-select:none`;
     el.appendChild(im);
+    applyTurn(el, anno);
   } else if (anno.type === 'watermark') {
     el.textContent = anno.text || '';
     el.style.font = `700 ${anno.fontSize || 48}px Helvetica, Arial, sans-serif`;

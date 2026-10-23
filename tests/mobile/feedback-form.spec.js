@@ -125,16 +125,32 @@ test.describe('general feedback form — mobile', () => {
 
   test('⭐ NO DOCUMENT CONTENT CAN RIDE THIS PATH, over a full open-edit-send cycle', async ({ page }) => {
     const sent = await captureFeedback(page);
-    // Load a real document and touch it, so anything that COULD leak content
-    // has content to leak. Without this the assertion passes for free.
+    // Load a real document and EDIT it, then open the form IN THE SAME PAGE
+    // (the editor's own "Ada masukan?" tab) — no reload. The old version went
+    // back to '/' before sending, which threw the document away, so nothing
+    // could leak and every absence below passed for free.
+    // Catches: the form carrying the filename, typed text or page pixels.
+    const SECRET_TYPED = 'RAHASIAKTP3174ZZ';
     await page.goto('/');
     await page.setInputFiles('#file-input', 'tests/fixtures/sample-2pages.pdf');
     await expect(page.locator('.pv-page').first()).toBeVisible();
+    await page.tap('[data-tool="text"]');
+    await page.tap('.pv-page >> nth=0', { position: { x: 150, y: 200 } });
+    await expect(page.locator('.v2-text-edit')).toBeVisible();
+    await page.keyboard.type(SECRET_TYPED);
+    await page.keyboard.press('Enter');
+    // Known-positive: the content a leak would carry is live in THIS page.
+    const live = await page.evaluate(() => ({
+      name: window.v2.getDoc().sources[0]?.name,
+      texts: window.v2.getDoc().pages[0].annotations.map((a) => a.text),
+    }));
+    expect(live.name).toBe('sample-2pages.pdf');
+    expect(live.texts).toContain(SECRET_TYPED);
+    await expect.poll(() => page.evaluate(() => (window.v2.getDoc().pages[0].raster?.dataUrl || '').slice(0, 22)))
+      .toBe('data:image/png;base64,');
 
-    // Back to the landing so the footer link exists, then send feedback.
-    await page.goto('/');
-    await page.locator('#fb-open').scrollIntoViewIfNeeded();
-    await page.tap('#fb-open');
+    await page.tap('#contact-tab-btn');
+    await expect(page.locator('#fb-form')).toBeVisible();
     await page.tap('#fb-down');
     await page.fill('#fb-note', 'ada bug pas edit');
     await page.tap('#fb-send');
@@ -142,6 +158,9 @@ test.describe('general feedback form — mobile', () => {
 
     // Assert over the WHOLE body, not a field list.
     const raw = sent[0];
+    expect(raw, 'the filename rode the feedback path').not.toContain('sample-2pages');
+    expect(raw, 'typed document text rode the feedback path').not.toContain(SECRET_TYPED);
+    expect(raw, 'the document\'s own text rode the feedback path').not.toContain('Test Page');
     expect(raw).not.toContain('data:image');
     expect(raw).not.toContain('sample_before');
     expect(raw).not.toContain('sample_after');

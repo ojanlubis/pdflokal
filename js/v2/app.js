@@ -16,31 +16,35 @@
  *   - nothing hover-only; touch targets ≥44px
  */
 
-import { createDoc, createAnnotation, getPage, getSource, findAnnotation, isCopyable, cloneForPaste } from '../core/model.js';
+import { createDoc, createAnnotation, getPage, findAnnotation, isCopyable, cloneForPaste } from '../core/model.js';
 import { failureReason, failureCause } from '../core/failure-reason.js';
+import { checkIncoming, replaceRefusal } from '../core/incoming-files.js';
 import { isStandardFamily, unencodableInStandardFont } from '../core/text-encode.js';
 import {
   addAnnotation, removeAnnotation, updateAnnotation, clearSelection, selectAnnotation,
-  moveAnnotation, normalizePageWidths, duplicateAnnotation,
+  moveAnnotation, resizeAnnotation, normalizePageWidths, duplicateAnnotation,
+  copySignatureToAllPages, pagesMissingSignature, placeSignature, SIGNATURE_PLACE_WIDTH,
 } from '../core/operations.js';
-import { createHistory, record, undo, redo, canUndo, canRedo, markClean, markChanged, settle } from '../core/history.js';
+import { createHistory, record, undo, redo, canUndo, canRedo, markClean, markChanged, settle, isDirty } from '../core/history.js';
 import { setLeaveGuard } from './leave-guard.js';
-import { rasterFitsShape, rasterIsCurrent } from '../core/raster-key.js';
+import { holdEditor } from './editor-blur.js';
+import { rasterFitsShape } from '../core/raster-key.js';
+import { baseNameOf } from '../core/file-kind.js';
+import { ZOOM_MAX, ZOOM_STEP, zoomFloor, clampZoom, openingZoom as coreOpeningZoom, zoomAfterLoad } from '../core/zoom.js';
 import { importPdf, importImage, createPageRasterizer, probeTextLayer, pdfLibLoadError } from '../core/import.js';
 import {
-  pagesBucket, durationBucket, ratioBucket, inkRatioBucket, intentValue,
+  pagesBucket, durationBucket, intentValue,
   unsupportedCharClass, ocrLinesBucket, zoomBucket,
 } from '../core/telemetry-schema.js';
-import { compareRegions } from '../core/visual-oracle.js';
 import { createOcrIndex, ocrEngineLoaded } from './ocr-runs.js';
 import { scanAppearance, scanPaper } from './scan-appearance.js';
-import { validateSample } from '../core/feedback-sample.js';
-import { createPageSlot, syncOverlay, textFontCss, applyTextFont, measureTextAnnoWidth } from '../render/page-view.js';
+import { createPageSlot, pageDisplaySize, syncOverlay, textFontCss, applyTextFont, measureTextAnnoWidth, applyTurn } from '../render/page-view.js';
 import { createViewportStream } from '../render/viewport.js';
-import { RASTER_BASE, sharpenScale, maxPixelsFor } from '../render/sharpen.js';
+import { RASTER_BASE, sharpenScale, maxPixelsFor, imageScaleCap } from '../render/sharpen.js';
 import { createInteraction } from '../render/interaction.js';
-import { createFormatBar } from './format-bar.js';
+import { createFormatBar, formatTarget, blurCommitsDraft } from './format-bar.js';
 import { createTextRunIndex, mapRunFont, MIN_HIT } from './text-runs.js';
+import { createGantiSteer } from './ganti-steer.js';
 import { resolveTap, draftFontSize } from '../core/text-lines.js';
 import { createPageManager } from './page-manager.js';
 import { createPageStrips } from './page-strip.js';
@@ -69,9 +73,9 @@ import { createPresence } from './doc-presence.js';
 import { createSavedSession } from './saved-session.js';
 import { createSavedUi } from './saved-docs-ui.js';
 import { needsSafariNote } from '../core/saved-docs.js';
+import { initH1Rotation } from './h1-rotation.js';
 import { applyIntentCopy } from './intent-copy.js';
 import { ensurePdfLib } from '../core/vendor.js';
-import { readPageContents, extractFontMetrics } from '../core/redact.js';
 
 // ---- the bug-report prompt's edit trigger -------------------------------------
 // The actions on `tool_use` that mean AN EDIT WAS APPLIED TO THE DOCUMENT.
@@ -97,22 +101,22 @@ function tel(event, props) {
     }
   } catch { /* a prompt may never break the rail */ }
 }
-import { planRunRemoval } from '../core/text-walk.js';
-import { extractFontProgram, lookupFontObject } from '../core/doc-fonts.js';
-import { textCoveredBy, nativeCandidate } from '../core/stamp.js';
-import { faceLadder, faceStyle } from '../core/line-font.js';
-import { loadFaceFont, startLineFont, refusalNote } from './line-font-live.js';
+import { textCoveredBy } from '../core/stamp.js';
+import { faceStyle } from '../core/line-font.js';
 import {
   toastDurationMs, firstTimeForDoc, alreadyShownForDoc, armEditNoticeKey, lineOutgrew,
 } from './edit-expectations.js';
-import { planBlockEdit, blockOfLine, blockAnnotation, blockExtent, logicalTextOf } from '../core/block-edit.js';
+import { planBlockEdit, blockOfLine, blockAnnotation, editorCommit } from '../core/block-edit.js';
 import { totalPageRotation } from '../core/page-rotation.js';
 import { styleBlockEditor, placeBlockEditor, readEditorLines } from './block-editor.js';
-import { resolveFontFingerprint, docFontFaceDescriptors, FAMILY_BUCKET_TO_CLONE, isInformativeBaseFont } from '../core/font-fingerprint.js';
-import { cloneFamilyFor } from '../core/font-decide.js';
-import { editSignature, pageEdits } from '../core/page-surgery.js';
-import { createEditedPageProvider } from './edited-page-provider.js';
-import { createBakeFailureReporter, scrubbedError } from './bake-failure.js';
+import { pageEdits } from '../core/page-surgery.js';
+import { whiteoutRingPoints, whiteoutColorFrom, paperPoints, inkPoints, coverColorFrom, inkColorFrom } from '../core/color-sample.js';
+import { hitTestEditedLine, hitTestOcrEdit, editOwningLine } from '../core/edit-hit.js';
+import { createEditBake, runWhenIdle } from './edit-bake.js';
+import { createDocFontLive } from './doc-font-live.js';
+import { raiseToTopLayer, dropFromTopLayer, openModalDialogs, shouldRaiseOverlay } from './top-layer.js';
+import { createToast } from './toast-layer.js';
+import { singleFlight } from './single-flight.js';
 
 // WHY there is no `window.pdfjsLib.…workerSrc = …` line here any more: pdf.js is
 // loaded on demand now (core/vendor.js), so touching it at module top-level
@@ -150,6 +154,8 @@ let baseName = 'dokumen';
 let editingAnno = null;       // text annotation currently in the inline editor
 let editingEl = null;         // its contenteditable (format bar restyles it live)
 let editingIsReplace = false; // Ganti Teks draft open → NO format bar (see below)
+let heldDraft = null;         // { resume, commit } while an empty draft waits on a format-bar control (blurCommitsDraft)
+let openEditorCommit = null;  // the open inline editor's commit, while one is open (closeOpenEditor)
 
 // ---- BETA edit-feedback (founder ruling 2026-07-22, SIMPLIFIED) -----------------
 // Ask 👍/👎 ONCE, on the FIRST successful commit of a document. The founder
@@ -212,14 +218,15 @@ function displayMode() {
 // throws plain `Error` for everything, so a name-only classifier reports
 // 'unknown' for every export failure there is.
 
-let toastTimer = null;
+// In the top layer only while visible (js/v2/toast-layer.js): a toast left open
+// would paint above the support/install/maker/vote cards for the whole session.
+const toastCtl = createToast({
+  el: toastEl, durationMs: toastDurationMs, raise: raiseToTopLayer, drop: dropFromTopLayer,
+});
 function toast(msg) {
-  toastEl.textContent = msg;
-  toastEl.classList.add('show');
-  clearTimeout(toastTimer);
   // Scales with length (edit-expectations.js): a sentence of a dozen words is
   // not readable in 2.6 s. Short text keeps the old 2.6 s.
-  toastTimer = setTimeout(() => toastEl.classList.remove('show'), toastDurationMs(msg));
+  toastCtl.show(msg);
 }
 
 // Pull a toast down early. Needed when a dialog opens on top of one: a toast
@@ -228,8 +235,7 @@ function toast(msg) {
 // arm-toast ("Tap tulisan yang mau kamu ubah") was sitting under a sheet whose
 // whole point is that there IS no tulisan to tap. No test could have seen that.
 function hideToast() {
-  clearTimeout(toastTimer);
-  toastEl.classList.remove('show');
+  toastCtl.hide();
 }
 
 // ---- processing telegraph ----------------------------------------------------
@@ -252,7 +258,12 @@ function showProcessing(total) {
   if (!loadingOverlay) return;
   clearTimeout(processingTimer);
   updateProcessing(0, total);
-  processingTimer = setTimeout(() => { loadingOverlay.hidden = false; }, 180);
+  // Dialogs open NOW: one opened before the timer fires must stay above the cover.
+  const openAtStart = openModalDialogs(document);
+  processingTimer = setTimeout(() => {
+    loadingOverlay.hidden = false;
+    if (shouldRaiseOverlay(openAtStart, openModalDialogs(document))) raiseToTopLayer(loadingOverlay);
+  }, 180);
 }
 function updateProcessing(done, total) {
   if (!loadingOverlay) return;
@@ -273,11 +284,14 @@ function hideProcessing() {
   if (!loadingOverlay) return;
   clearTimeout(processingTimer);
   loadingOverlay.hidden = true;
+  dropFromTopLayer(loadingOverlay);
   lpFill.style.width = '0';
   lpFill.classList.remove('lp-indet');
 }
 
-function download(blob, filename) {
+// `whole`: the file is the whole document, not a picked subset (Ekstrak, or the
+// Unduh sheet's chosen pages). The feature vote follows only whole-document downloads.
+function download(blob, filename, { whole = false } = {}) {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = filename;
@@ -285,7 +299,7 @@ function download(blob, filename) {
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
   // The chokepoint every export path funnels through — celebrate here, AFTER
   // the save was triggered. (Wave 5: reward the "I got my file" moment.)
-  celebration.onDownloadSuccess();
+  celebration.onDownloadSuccess({ whole });
   // The bug-report prompt's OTHER trigger (founder, 2026-09-16: "pertamakali
   // berhasil download sama pertamakali commit editan di hari itu"). Both call the
   // same capped entry point, so "whichever happens first" falls out of the cap
@@ -305,6 +319,7 @@ let settleReopen = () => {};
 const reopenSettled = new Promise((resolve) => { settleReopen = resolve; });
 initMakerCard({ ready: reopenSettled }); // homepage: Ojan + his last approved updates (js/updates.js)
 initVisitorCount(); // header count, homepage + editor (api/visitors.js)
+initH1Rotation();   // homepage: the headline drifts for returning visitors (core/h1-rotation.js)
 // The general feedback channel: a footer link, never prompted. Separate from
 // edit-feedback.js on purpose — that module owns the consent-gated image path
 // and must keep a single door. See feedback-form.js's header.
@@ -353,27 +368,41 @@ function applyZoom() {
 // now always is. Measuring clientWidth before that scrollbar exists and then
 // filling to the last pixel would hand every desktop user a horizontal
 // scrollbar on open.
-const OPENING_GUTTER_DESKTOP = 96; // 48 a side
-const OPENING_GUTTER_TOUCH = 16;
+// The numbers and the floor's rule live in core/zoom.js (a node test holds them).
+// This wrapper only reads the live viewport and document.
+function widestPageWidth() {
+  let w = 0;
+  for (const pg of doc.pages) w = Math.max(w, pageDisplaySize(pg).width);
+  return w;
+}
+function currentZoomFloor() {
+  return zoomFloor({
+    viewport: scrollEl.clientWidth,
+    widestPageWidth: widestPageWidth(),
+    desktop: deviceClass() === 'desktop',
+  });
+}
 function openingZoom(pageWidth) {
-  if (!(pageWidth > 0)) return 1;
-  const desktop = deviceClass() === 'desktop';
-  const gutter = desktop ? OPENING_GUTTER_DESKTOP : OPENING_GUTTER_TOUCH;
-  const fit = (scrollEl.clientWidth - gutter) / pageWidth;
-  // Same clamps the +/- buttons obey, so the opening view is always a zoom the
-  // user could have reached by hand.
-  return Math.max(0.3, Math.min(fit, desktop ? 3 : 1));
+  return coreOpeningZoom({
+    viewport: scrollEl.clientWidth,
+    pageWidth,
+    desktop: deviceClass() === 'desktop',
+    widestPageWidth: widestPageWidth(),
+  });
 }
 // zoom_tap reports the zoom BEFORE the press (core/telemetry-schema.js says why).
 // Emitted ahead of the change so `zoom` is still the view being rejected; the
 // tel() call is try/catch-armoured, so it can never stop the zoom from happening.
+// SINGLE SOURCE OF TRUTH for how far and how finely the view zooms: core/zoom.js.
+// The +/- buttons, setZoomAnchored (pinch, wheel, keys) and the zoom keys all
+// read it; the floor follows the document's widest page (see that file's header).
 on('z-in', 'click', () => {
   tel('zoom_tap', { dir: 'in', level: zoomBucket(zoom), device: deviceClass() });
-  zoom = Math.min(zoom + 0.25, 3); applyZoom();
+  zoom = Math.min(zoom + ZOOM_STEP, ZOOM_MAX); applyZoom();
 });
 on('z-out', 'click', () => {
   tel('zoom_tap', { dir: 'out', level: zoomBucket(zoom), device: deviceClass() });
-  zoom = Math.max(zoom - 0.25, 0.3); applyZoom();
+  zoom = clampZoom(zoom - ZOOM_STEP, { floor: currentZoomFloor(), current: zoom }); applyZoom();
 });
 
 // ---- contact bookmark: tap the tab, the panel slides up; tap again or tap
@@ -406,7 +435,7 @@ on('z-out', 'click', () => {
 // 2-touch touchstart keeps the browser from claiming the gesture, zoom anchors
 // on the pinch midpoint so the paper under your fingers stays put.
 function setZoomAnchored(next, midX, midY) {
-  const clamped = Math.min(3, Math.max(0.3, next));
+  const clamped = clampZoom(next, { floor: currentZoomFloor(), current: zoom });
   if (clamped === zoom) return;
   const rect = scrollEl.getBoundingClientRect();
   const mx = midX - rect.left;
@@ -539,8 +568,125 @@ on(scrollEl, 'touchcancel', endPinch);
 on(scrollEl, 'wheel', (e) => {
   if (!(e.ctrlKey || e.metaKey)) return;
   e.preventDefault();
-  setZoomAnchored(zoom * (e.deltaY < 0 ? 1.1 : 0.9), e.clientX, e.clientY);
+  if (gestureZoom0 !== null) return; // a Safari pinch is already driving the zoom
+  // WHY proportional to deltaY: a trackpad pinch arrives as MANY small-delta
+  // events, and a fixed 1.1 per event crossed the whole zoom range in ~25 of
+  // them (a light pinch snapped to a clamp). deltaY 0 is a ctrl+sideways swipe,
+  // not a zoom. Lines/pages (deltaMode 1/2) are scaled to pixels; one mouse
+  // notch (~100px) stays a ~16% step, capped so no single event jumps.
+  const px = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1);
+  if (!px) return;
+  const factor = Math.min(1.25, Math.max(0.8, Math.exp(-px * 0.0015)));
+  setZoomAnchored(zoom * factor, e.clientX, e.clientY);
 }, { passive: false });
+
+// Keyboard zoom: Ctrl/Cmd + = / + / - / 0, the keys every editor and browser taught.
+// Without this they zoomed the BROWSER's UI (toolbar, sheets and all) while the
+// page stayed the same size relative to it. Same step and clamps as the +/-
+// buttons; 0 = fit the focused page to the width, the same fit a document opens
+// at (openingZoom). CAPTURE phase so it also works inside the inline text editor,
+// which stops propagation of every keydown. Anchored on the viewport centre, so
+// the paper under your eyes stays put. NOT telemetered: `zoom_tap` means a press
+// of the on-screen pill (core/telemetry-schema.js) and a keypress would change
+// what that field counts. No document, or a sheet open: the browser keeps its keys.
+function fitWidthZoom() {
+  const pg = getPage(doc, focusedPageId) || doc.pages[0];
+  return openingZoom(pageDisplaySize(pg).width);
+}
+document.addEventListener('keydown', (e) => {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey || doc.pages.length === 0) return;
+  if (document.querySelector('dialog[open]')) return;
+  let next;
+  if (e.key === '=' || e.key === '+' || e.code === 'NumpadAdd') next = zoom + ZOOM_STEP;
+  else if (e.key === '-' || e.key === '_' || e.code === 'NumpadSubtract') next = zoom - ZOOM_STEP;
+  else if (e.key === '0' || e.code === 'Numpad0') next = fitWidthZoom();
+  else return;
+  e.preventDefault();
+  const r = scrollEl.getBoundingClientRect();
+  setZoomAnchored(next, r.left + r.width / 2, r.top + r.height / 2);
+}, true);
+
+// Hold Space and drag = pan (grab cursor), the hand every canvas editor has. The
+// tool in use is irrelevant: while Space is down the press belongs to the camera,
+// so it never starts a move, a Tip-Ex stroke or a selection. The capture-phase
+// pointerdown on scrollEl runs BEFORE interaction.js's listener on the stage and
+// stops it there, which also covers the grey margin around the pages. Mouse and
+// pen only: touch already pans natively. Space is left alone in any field, on a
+// button or link (it activates those), with a sheet open, and with a modifier.
+// preventDefault on the keydown, or the browser scrolls a page down per press.
+let spaceHeld = false;
+let panDrag = null;
+const panStyle = document.createElement('style');
+panStyle.textContent = '.space-pan, .space-pan * { cursor: grab !important }'
+  + ' .space-pan.panning, .space-pan.panning * { cursor: grabbing !important }';
+document.head.appendChild(panStyle);
+function endSpacePan() {
+  spaceHeld = false;
+  panDrag = null;
+  scrollEl.classList.remove('space-pan', 'panning');
+}
+document.addEventListener('keydown', (e) => {
+  if (e.code !== 'Space' || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (doc.pages.length === 0 || document.querySelector('dialog[open]')) return;
+  if (e.target.isContentEditable || e.target.closest?.('input, select, textarea')) return;
+  // A button or link keeps Space only when the KEYBOARD focused it. Chrome and
+  // Firefox also focus a button on mouse click, so after a click on a zoom or
+  // tool button Space-pan never armed and the Space release clicked it again.
+  // preventDefault on the keydown stops that activation; blur moves focus off.
+  if (e.target.closest?.('button, a')) {
+    let keyboardFocus = true;
+    try { keyboardFocus = e.target.matches(':focus-visible'); } catch { /* old engine: keep Space for the control */ }
+    if (keyboardFocus) return;
+    e.target.blur();
+  }
+  e.preventDefault();
+  spaceHeld = true;
+  scrollEl.classList.add('space-pan');
+});
+// Meta too: macOS sends no keyup for a key released while Cmd is held, so
+// Space up during a Cmd+wheel zoom would leave pan mode stuck on.
+document.addEventListener('keyup', (e) => { if (e.code === 'Space' || e.key === 'Meta') endSpacePan(); });
+window.addEventListener('blur', endSpacePan); // alt-tab with Space down: keyup never arrives
+on(scrollEl, 'pointerdown', (e) => {
+  if (!spaceHeld || e.pointerType === 'touch' || e.button !== 0) return;
+  e.preventDefault();
+  e.stopPropagation(); // interaction.js never sees this press
+  panDrag = { id: e.pointerId, x: e.clientX, y: e.clientY, left: scrollEl.scrollLeft, top: scrollEl.scrollTop };
+  scrollEl.setPointerCapture(e.pointerId);
+  scrollEl.classList.add('panning');
+}, true);
+on(scrollEl, 'pointermove', (e) => {
+  if (!panDrag || e.pointerId !== panDrag.id) return;
+  scrollEl.scrollLeft = panDrag.left - (e.clientX - panDrag.x);
+  scrollEl.scrollTop = panDrag.top - (e.clientY - panDrag.y);
+});
+const endPan = (e) => {
+  if (!panDrag || e.pointerId !== panDrag.id) return;
+  panDrag = null;
+  scrollEl.classList.remove('panning');
+};
+on(scrollEl, 'pointerup', endPan);
+on(scrollEl, 'pointercancel', endPan);
+
+// Safari trackpad pinch: WebKit does NOT send ctrl+wheel for it (Chrome and
+// Firefox do, handled above); it sends gesture events whose `scale` runs from 1
+// at the start of the pinch. Same anchored zoom as every other path. Stands down
+// while a touch pinch is live (iOS can send both for one gesture), and the wheel
+// handler stands down while a gesture is, so one pinch is never applied twice.
+// Not testable in Chromium: tests/v2-zoom-keys.spec.js drives it with synthetic events.
+let gestureZoom0 = null;
+on(scrollEl, 'gesturestart', (e) => {
+  if (pinch) return;
+  e.preventDefault();
+  gestureZoom0 = zoom;
+}, { passive: false });
+on(scrollEl, 'gesturechange', (e) => {
+  if (pinch || gestureZoom0 === null) return;
+  e.preventDefault();
+  const r = scrollEl.getBoundingClientRect();
+  setZoomAnchored(gestureZoom0 * e.scale, e.clientX ?? r.left + r.width / 2, e.clientY ?? r.top + r.height / 2);
+}, { passive: false });
+on(scrollEl, 'gestureend', (e) => { e.preventDefault(); gestureZoom0 = null; }, { passive: false });
 
 // ---- streaming viewport --------------------------------------------------------
 let pillTimer = null;
@@ -673,14 +819,17 @@ function focusedSlot() {
 // replaced are exactly how the softness survived: the streaming entry path and
 // the Ganti re-bake path each had their own copy of the number.
 function rasterScaleFor(page) {
-  if (page.id !== focusedPageId) return RASTER_BASE;
-  return sharpenScale({
+  const budget = maxPixelsFor(deviceClass());
+  const scale = page.id !== focusedPageId ? RASTER_BASE : sharpenScale({
     pageWidth: page.width,
     pageHeight: page.height,
     zoom,
     dpr: window.devicePixelRatio,
-    maxPixels: maxPixelsFor(deviceClass()),
+    maxPixels: budget,
   });
+  // An image page never past its own pixels or the budget (render/sharpen.js
+  // imageScaleCap: a phone photo at scale 2 was a blank 48MP canvas on iOS).
+  return Math.min(scale, imageScaleCap(page, budget));
 }
 
 function scheduleSharpen() {
@@ -760,8 +909,8 @@ function runSharpen() {
 // (shared through history snapshots), so undo/redo re-shows pages instantly —
 // no PDF.js work. Per-gesture hot paths never come through here.
 function rebuildStage() {
-  stage.innerHTML = ''; // detaches gantiGlowEl too — drop the stale reference
-  clearGantiGlow();
+  stage.innerHTML = ''; // detaches the steering glow too — drop the stale reference
+  gantiSteer.clear();
   slots = doc.pages.map((page, i) => {
     const slot = createPageSlot(page, {
       activeId: doc.selection.annotationId,
@@ -778,12 +927,31 @@ function rebuildStage() {
 }
 
 // Re-render one page's overlay after a structural annotation change.
+// WHY deferred while an editor is open on the page (found 2026-10-10): every
+// bake ends in syncPage (Hapus's bakeAfterEditChange, Edit's commit), and
+// syncOverlay empties the overlay, the open inline editor included. Hapus a
+// line, tap Edit on the next one before the bake lands, and the editor vanished
+// mid-word: the typed text was lost and the following keystrokes hit the tool
+// keys (an "s" opened the signature sheet). The page re-syncs the moment that
+// editor closes (flushDeferredSync, from commit()).
+const deferredSync = new Set();
+function flushDeferredSync() {
+  const ids = [...deferredSync];
+  deferredSync.clear();
+  for (const id of ids) syncPage(id);
+}
+
 function syncPage(pageId) {
   const slot = slots.find((s) => s.page.id === pageId);
-  // syncOverlay does overlay.innerHTML = '' — that would silently detach
-  // gantiGlowEl if it happened to be riding THIS page's overlay; drop the
+  if (editingEl && slot?.view.contains(editingEl)) {
+    deferredSync.add(pageId);
+    refreshChrome();
+    return;
+  }
+  // syncOverlay does overlay.innerHTML = '' — that would silently detach the
+  // steering glow if it happened to be riding THIS page's overlay; drop the
   // reference rather than leave it dangling (see rebuildStage).
-  if (gantiGlowEl && slot?.view.contains(gantiGlowEl)) clearGantiGlow();
+  gantiSteer.detachIfIn(slot?.view);
   if (slot) syncOverlay(slot.page, slot.view, { activeId: doc.selection.annotationId });
   interaction.refreshSelection();
   refreshChrome();
@@ -810,11 +978,12 @@ function selectedTextAnno() {
   return found && found.annotation.type === 'text' ? found.annotation : null;
 }
 
+const formatBarEl = document.getElementById('format-bar');
 const formatBar = createFormatBar({
-  el: document.getElementById('format-bar'),
+  el: formatBarEl,
   getDoc: () => doc,
   history,
-  getTarget: () => editingAnno || selectedTextAnno(),
+  getTarget: () => formatTarget({ editingAnno, editingEl, selected: selectedTextAnno() }),
   onStyled: (anno) => {
     // Restyle the open inline editor live; re-render the committed element.
     if (editingEl && editingAnno && anno.id === editingAnno.id) {
@@ -832,6 +1001,7 @@ const formatBar = createFormatBar({
       editingEl.style.color = d.color || '#000';
     }
   },
+  onControlDone: () => heldDraft?.resume(),
 });
 
 function syncFormatBar() {
@@ -851,7 +1021,7 @@ function setTool(next) {
   // The steering highlight belongs to the 'ganti' tool only — leaving it lit
   // after a tool switch (e.g. Escape, or the on-off toggle) would show a
   // commit target for a gesture that no longer exists.
-  if (next !== 'ganti') clearGantiGlow();
+  if (next !== 'ganti') gantiSteer.clear();
   if (next !== 'signature') {
     const g = document.getElementById('sig-ghost');
     if (g) g.style.display = 'none';
@@ -890,7 +1060,7 @@ for (const btn of document.querySelectorAll('#toolbar .tool[data-tool]')) {
     // on purpose: pressing TTD with no saved signature never reaches setTool,
     // and that is precisely the path that was invisible.
     if (ARM_TOOL[t]) tel('tool_use', { tool: ARM_TOOL[t], action: 'arm' });
-    if (t === 'signature' && !storedSignature) { signatureModal.open(); return; }
+    if (t === 'signature' && !storedSignature) { openSignatureModal(); return; }
     setTool(t);
     if (t === 'text') toast(tr('toast.armText'));
     if (t === 'whiteout') toast(tr('toast.armWhiteout'));
@@ -911,6 +1081,10 @@ for (const btn of document.querySelectorAll('#toolbar .tool[data-tool]')) {
     }
   });
 }
+
+// The two injected halves of core/edit-hit.js: the overlay's own measurer and
+// the editor's one finger-sized hit law.
+const EDIT_HIT = { measure: measureTextAnnoWidth, minHit: MIN_HIT };
 
 // ---- Ganti Teks (Edit Teks Asli, Rung A — seat spec-edit-teks-asli.md) -----------
 // Tap a PRINTED run → cover it with a color-matched Tip-Ex + reopen the same
@@ -939,696 +1113,23 @@ const ocrIndex = createOcrIndex({ getDoc: () => doc, rasterizer: { renderCanvas:
 // later-typed char isn't in the doc font, the browser's own fallback to the
 // twin IS the preview of exactly what export's coverage check will do.
 
-// pdf-lib load of a SOURCE's bytes, cached per sourceId — a throwaway dry-run
-// doc, never mutated or saved, shared across every line tapped on that source
-// so re-tapping the same page doesn't re-parse the PDF each time.
-const pdfLibDocCache = new Map(); // sourceId -> Promise<PDFLib PDFDocument>
-function getDryRunDoc(PDFLib, source) {
-  if (!pdfLibDocCache.has(source.id)) {
-    pdfLibDocCache.set(source.id, PDFLib.PDFDocument.load(source.bytes));
-  }
-  return pdfLibDocCache.get(source.id);
-}
-
-// The rasterizer's door onto a page's committed edits — js/v2/edited-page-provider.js
-// holds the body and its WHY (moved 2026-10-01 so the failure report below is
-// testable against the real provider). A bake that throws still falls back to
-// the plain source render; what changed is that it now SAYS so, on the rail
-// and in Sentry (js/v2/bake-failure.js — seat ruling 2026-10-01).
-const reportBakeFailure = createBakeFailureReporter({ tel, getSentry: () => window.Sentry || null });
-const editedPageProvider = createEditedPageProvider({
-  getSource: (sourceId) => getSource(doc, sourceId),
-  loadPdfLib: ensurePdfLib,
-  getSrcDoc: getDryRunDoc,
-  onBakeFailure: (err, page) => {
-    // The SCRUBBED error, not `err`: Sentry turns console calls into
-    // breadcrumbs, and a raw message can quote the document (bake-failure.js).
-    console.warn('editedPageProvider gagal, pakai raster asli:', scrubbedError(err));
-    // The key must not throw: the page that broke the build may be the very
-    // thing editSignature cannot read.
-    let sig = '?';
-    try { sig = editSignature(page); } catch { /* keep '?' */ }
-    reportBakeFailure(err, `${page.id}:${sig}`);
-  },
+// The bake pipeline (edited-page provider, re-bake, undo/redo re-sync, visual
+// oracle, feedback sample) lives in js/v2/edit-bake.js with its WHYs. The names
+// below are its functions, so every call site in this file reads as before.
+const editBake = createEditBake({
+  getDoc: () => doc,
+  getSlots: () => slots,
+  getRasterizer: () => rasterizer,
+  rasterScaleFor,
+  tel,
+  getSentry: () => window.Sentry || null,
 });
+const { editedPageProvider, getDryRunDoc, rebakePage, syncEditedRasters, runVisualOracle, captureFeedbackSample } = editBake;
 
-// spec-live-surgery.md §5/§8.3 (increment 3): re-render `pageId`'s background
-// raster from its CURRENT edit set and swap it in with no blank frame
-// (page-view.js's swapPageRaster — holds the old raster until the new
-// dataUrl's img.decode() resolves). Called right after a Ganti commit touches
-// a page's edit set, and after any undo/redo whose edit-signature changed
-// (see syncEditedRasters below). editedPageProvider (above) is what actually
-// determines the applied/declined outcome, as a side effect of the SAME
-// buildEditedPageBytes call the raster is built from — this function never
-// re-derives that outcome itself.
-//
-// RETURN CONTRACT (fixed 2026-07-27, bug 1 — founder field test, 444-page
-// doc): returns the raster THIS call actually attached, or a falsy value
-// when it stood down. Confirmed empirically (not the originally-suspected
-// mechanism — see decisions.md): calling rebuildStage() alone mid-flight
-// does NOT corrupt page.raster, because rasterizer.rasterize() (core/
-// import.js) writes page.raster itself as a side effect, independent of
-// THIS function's own slot-identity check — that check only gates the DOM
-// swap (slot.reattach), so a stood-down bake used to leave page.raster
-// correct but the on-screen pixels stale. The confirmed data-corrupting path
-// is undo/redo: history.js's restore() SPREAD-COPIES doc.pages into fresh
-// objects (`{...p}`), so a rebakePage() in flight when that happens writes
-// its result onto the now-orphaned OLD page object — invisible to anyone
-// who re-reads `getPage(doc, pageId).raster` afterward, which instead sees
-// whatever the POST-undo page object's raster is. On a 444-page doc the
-// rasterize() await is slow enough to widen this window a lot. The caller
-// (this commit's own .then()) must use THIS return value as the after-
-// raster and decline entirely when it's falsy — never re-derive from
-// page.raster, which may have moved on to a different object by the time
-// the caller reads it. Same law as the style-race fix (stamp.js): derive
-// from what was actually produced, never inherit from shared state that may
-// not reflect it anymore.
-async function rebakePage(pageId) {
-  if (!rasterizer) return null;
-  const slot = slots.find((s) => s.page.id === pageId);
-  if (!slot) return null;
-  const page = slot.page;
-  rasterizer.invalidateEditedPage(page.id); // reuse inc.2's invalidate (spec §8.2)
-  if (!editSignature(page)) page.editApplied = null; // no edits left — nothing to suppress
-  // rasterScaleFor, not a hardcoded 2: committing a Ganti edit on the page you
-  // are zoomed into must not SOFTEN it. Baking at the baseline here would undo
-  // the sharpen at exactly the moment the user is staring at the result.
-  const raster = await rasterizer.rasterize(page, { scale: rasterScaleFor(page) });
-  // Stale guard: a fast undo/redo (or page delete) may have rebuilt the stage
-  // while this rasterize() was in flight — only swap if this slot is still
-  // the page's current, live one. syncEditedRasters below re-derives from
-  // scratch for whatever page set actually ends up live, so this rebake
-  // simply stands down rather than clobbering newer state.
-  if (slots.find((s) => s.page.id === pageId) !== slot) return null;
-  await slot.reattach(raster);
-  return raster;
-}
-
-// spec-edit-fidelity-instrumentation.md Increment C: crops ONE box (page-
-// space points, top-left frame — same convention as annotation x/y/w/h and
-// replaceBox) out of an already-rasterized {dataUrl,width,height,scale} and
-// returns it as ImageData.
-//
-// PM-flagged 2026-07-26: the original version of this function did a plain
-// `new Image()` + drawImage, which decodes the ENTIRE page PNG synchronously
-// on the main thread — twice (pristine + stamped), right when the bake
-// resolves and the user is looking at their fresh edit. On a low-end phone
-// with a large page that's plausibly 100-300ms of jank landing at exactly
-// the wrong moment. Preferred path now: `createImageBitmap(blob, sx, sy, sw,
-// sh)` decodes OFF the main thread and only the requested region — precisely
-// this use case. `img.decode()`+drawImage is kept as a FALLBACK (never worse
-// than before this fix) for any engine/shape where the bitmap path throws.
-function boxToRasterPx(raster, box) {
-  const s = raster.scale;
-  return {
-    cx: Math.round(box.x * s),
-    cy: Math.round(box.y * s),
-    cw: Math.max(1, Math.round(box.w * s)),
-    ch: Math.max(1, Math.round(box.h * s)),
-  };
-}
-
-// PM question, 2026-07-26: should a crop that spills past its raster's own
-// edge decline outright, rather than trust ALPHA_MIN alone to neutralize the
-// padding? Yes — this is the layer that CAN answer it (core/visual-oracle.js
-// only ever sees already-cropped ImageData, no raster dimensions to compare
-// against, see that module's own header note). A box whose requested pixels
-// spill outside [0,raster.width) x [0,raster.height) means the geometry
-// itself doesn't fit what's being measured against — decline before even
-// fetching/decoding, rather than return a technically-alpha-correct but
-// still partially-fabricated comparison.
-function boxFitsRaster(raster, box) {
-  const { cx, cy, cw, ch } = boxToRasterPx(raster, box);
-  return cx >= 0 && cy >= 0 && cx + cw <= raster.width && cy + ch <= raster.height;
-}
-
-async function cropRasterRegion(raster, box) {
-  const { cx, cy, cw, ch } = boxToRasterPx(raster, box);
-
-  try {
-    const blob = await (await fetch(raster.dataUrl)).blob();
-    const bitmap = await createImageBitmap(blob, cx, cy, cw, ch);
-    const canvas = document.createElement('canvas');
-    canvas.width = cw; canvas.height = ch;
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    ctx.drawImage(bitmap, 0, 0);
-    bitmap.close();
-    return ctx.getImageData(0, 0, cw, ch);
-  } catch {
-    // Fallback: the original main-thread Image decode. Still correct, just
-    // not off-thread — covers any browser/shape that declines the bitmap
-    // crop overload above.
-    const img = new Image();
-    await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = raster.dataUrl; });
-    const canvas = document.createElement('canvas');
-    canvas.width = cw; canvas.height = ch;
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    ctx.drawImage(img, -cx, -cy);
-    return ctx.getImageData(0, 0, cw, ch);
-  }
-}
-
-// WHY requestIdleCallback (setTimeout fallback for Safari, which still
-// doesn't ship it): measuring must not disturb what it measures. Even the
-// off-thread createImageBitmap path above still ends in a main-thread canvas
-// draw + getImageData — running that right when the bake resolves competes
-// with the commit paint the user is watching. A telemetry number arriving
-// ~200ms late costs nothing; a stutter at the commit moment costs the exact
-// thing this instrument exists to protect against. Do NOT move this back
-// onto the commit path as an "optimization" — that reintroduces the jank
-// risk this fix removes.
-function runWhenIdle(fn) {
-  if (typeof requestIdleCallback === 'function') requestIdleCallback(fn, { timeout: 2000 });
-  else setTimeout(fn, 0);
-}
-
-// spec-edit-fidelity-instrumentation.md Increment C: the visual oracle. Crops
-// the edited line's OWN region (the cover's replaceBox — the birth-time rect
-// that already bounds the ORIGINAL text, the same box surgery/insert use) out
-// of the PRISTINE raster (the page as it looked right before this commit's
-// bake — `prevRaster`, captured by the caller before rebakePage overwrote
-// page.raster) and the STAMPED one (the raster rebakePage just produced),
-// then fires content-blind ink-shape ratios. Wrapped whole and never awaited
-// by its caller (fire-and-forget past that point too) — a crop/decode
-// failure, a scale mismatch, or a declined compareRegions() (no ink on one
-// side, e.g. a pure-deletion edit with nothing painted back) just means no
-// event fires. NEVER blocks or fails the commit — same discipline as every
-// other ladder event on this path (surgery/insert already follow it).
-async function runVisualOracle(prevRaster, newRaster, box) {
-  try {
-    if (!prevRaster || !newRaster || !box) return;
-    if (prevRaster.scale !== newRaster.scale) return; // different render generations — not comparable
-    // Decline before ever fetching/decoding when the box would spill past
-    // EITHER raster's own edge (boxFitsRaster's own WHY comment) — a line
-    // near a page border, or a replaceBox wider than the remaining margin.
-    if (!boxFitsRaster(prevRaster, box) || !boxFitsRaster(newRaster, box)) return;
-    const [pristineImg, stampedImg] = await Promise.all([
-      cropRasterRegion(prevRaster, box),
-      cropRasterRegion(newRaster, box),
-    ]);
-    const result = compareRegions(pristineImg, stampedImg);
-    if (!result) return;
-    tel('visual_oracle', {
-      weight_ratio: ratioBucket(result.weightRatio),
-      height_ratio: ratioBucket(result.heightRatio),
-      // ink_ratio (2026-07-28 incident fix): a DIFFERENT bucketer than
-      // weight_ratio/height_ratio on purpose — see inkRatioBucket's own
-      // header comment in core/telemetry-schema.js for why reusing
-      // ratioBucket()'s cuts here would silently hide the exact defect this
-      // field exists to catch.
-      ink_ratio: inkRatioBucket(result.inkRatio),
-      overflow: result.overflow,
-    });
-  } catch (err) {
-    console.warn('[v2/app] visual oracle gagal (skip):', err);
-  }
-}
-
-// spec-edit-fidelity-instrumentation.md Increment D: encodes ONE already-
-// cropped ImageData region (the SAME crop cropRasterRegion produces for the
-// oracle above — no second cropper) down to a bounded PNG data URL for the
-// consent-gated feedback sample. PNG, not JPEG: these crops are a single
-// text line on a flat page background — overwhelmingly solid colour with
-// sharp glyph edges, exactly the content PNG's lossless compression handles
-// well, while JPEG's block-DCT would blur the very glyph edges the
-// founder's own bug is about ("thin vs bold") without reliably beating PNG's
-// size on this content. SAMPLE_MAX_WIDTH matches the spec's "~600px wide".
-const SAMPLE_MAX_WIDTH = 600;
-function imageDataToSampleDataUrl(imageData) {
-  const canvas = document.createElement('canvas');
-  canvas.width = imageData.width;
-  canvas.height = imageData.height;
-  canvas.getContext('2d').putImageData(imageData, 0, 0);
-  if (imageData.width <= SAMPLE_MAX_WIDTH) return canvas.toDataURL('image/png');
-  const scale = SAMPLE_MAX_WIDTH / imageData.width;
-  const small = document.createElement('canvas');
-  small.width = SAMPLE_MAX_WIDTH;
-  small.height = Math.max(1, Math.round(imageData.height * scale));
-  small.getContext('2d').drawImage(canvas, 0, 0, small.width, small.height);
-  return small.toDataURL('image/png');
-}
-
-// spec-edit-fidelity-instrumentation.md Increment D: the consent-gated
-// sample. Reuses Increment C's own crop path (boxFitsRaster/cropRasterRegion)
-// rather than a second cropper — same box, same decline discipline: a box
-// that doesn't fit either raster means no sample, exactly like the oracle
-// above declines a comparison it can't trust. Returns null (never throws) on
-// ANY decline — a missing raster, a box that doesn't fit, or either encoded
-// crop landing over its byte cap after downsampling (validateSample, shared
-// with js/v2/telemetry.js and mirrored server-side in api/feedback.js).
-// The caller only ever gets back a sample that's already safe to render and
-// send, never a partial one.
-async function captureFeedbackSample(prevRaster, newRaster, box) {
-  try {
-    if (!prevRaster || !newRaster || !box) return null;
-    if (prevRaster.scale !== newRaster.scale) return null;
-    if (!boxFitsRaster(prevRaster, box) || !boxFitsRaster(newRaster, box)) return null;
-    const [beforeImg, afterImg] = await Promise.all([
-      cropRasterRegion(prevRaster, box),
-      cropRasterRegion(newRaster, box),
-    ]);
-    const sample = {
-      before: imageDataToSampleDataUrl(beforeImg),
-      after: imageDataToSampleDataUrl(afterImg),
-    };
-    return validateSample(sample); // enforces the byte caps; null if either/both over
-  } catch (err) {
-    console.warn('[v2/app] feedback sample gagal (skip):', err);
-    return null;
-  }
-}
-
-// spec-live-surgery.md §5/§8.3 (increment 3): after undo/redo swaps in a new
-// set of pages, any page whose edit-signature actually CHANGED needs its
-// raster re-baked — a page that lost its last edit must revert to the plain
-// source render, a page whose edits came back (redo) must re-bake. Diffed by
-// page.id against the PRE-history-op pages (ids are stable across undo/redo —
-// history.js's snapshot/restore both spread-copy the same id onto a fresh
-// object), so this is a plain signature comparison, never a re-derivation of
-// WHAT changed. Pages whose signature is unchanged are left alone — undo/redo
-// elsewhere in the doc must not pay for a re-bake it didn't cause.
-function syncEditedRasters(prevPages) {
-  const prevSig = new Map(prevPages.map((p) => [p.id, editSignature(p)]));
-  for (const page of doc.pages) {
-    // history.js no longer snapshots rasters: restore() carries the LIVE raster
-    // when it still fits the page's shape, which may be stale in content (core/
-    // raster-key.js). So the test is no longer only "signature moved vs the
-    // pre-op page" but also "does the raster it now holds show THIS page's
-    // edits" — the second catches a bake that was still in flight at undo time,
-    // where both pages share a signature but the picture predates it. A page
-    // with NO raster (rotated, resized, or restored from a delete) is skipped:
-    // the viewport stream renders it, and the rasterizer's edited-doc cache is
-    // keyed by signature, so that render is already the right bake; a rebake
-    // here would invalidate the build the stream just started and bake twice.
-    const sigMoved = editSignature(page) !== (prevSig.get(page.id) ?? '');
-    if (!page.raster) {
-      if (!editSignature(page)) page.editApplied = null; // same as rebakePage: no edits left
-      continue;
-    }
-    if (sigMoved || !rasterIsCurrent(page.raster, page)) {
-      rebakePage(page.id).catch((err) => console.warn('rebakePage (undo/redo) gagal:', err));
-    }
-  }
-}
-
-// Outcome cache, keyed by sourceId + RESOURCE font name (not by line — many
-// lines on a page share one font resource): { cssFamily, fontkitFont } once
-// the FontFace has actually loaded, or null once we've tried and it failed
-// (missing program / FontFace refused the bytes / standard-14 with nothing to
-// load) — null is remembered so a failed font isn't re-attempted on every tap.
-const docFontCache = new Map(); // `${sourceId}:${fontName}` -> Promise<{cssFamily, fontkitFont}|null>
-const addedFontFaces = new Set(); // live FontFace objects on document.fonts — swept on Buka Baru
-
-// A resource font name can carry PDF name-escape bytes (#xx) or characters
-// invalid in a CSS custom ident — collapse to a safe, still-unique token.
-function sanitizeForCssIdent(s) {
-  return String(s).replace(/[^a-zA-Z0-9_-]/g, '_');
-}
-
-// Load (or reuse) the doc font for one resource font name on one source.
-// Returns null on ANY decline (never throws into the caller) — extraction
-// failure, fontkit parse failure, or the FontFace API itself refusing the
-// bytes are all the same honest "no live preview for this line", the twin
-// stays exactly as it already was.
-function loadDocFont(sourceId, fontName, pdfPage, PDFLib, fontkit, facts) {
-  const key = `${sourceId}:${fontName}`;
-  if (!docFontCache.has(key)) {
-    docFontCache.set(key, (async () => {
-      let extracted;
-      try {
-        extracted = extractFontProgram(pdfPage, PDFLib, fontName);
-      } catch {
-        return null;
-      }
-      if (!extracted.ok) return null;
-      let fontkitFont;
-      try {
-        fontkitFont = fontkit.create(extracted.bytes);
-      } catch {
-        return null; // decline, never guess — same law as stamp.js's resolveStampFont
-      }
-      // Font shape, for font_seen telemetry's FLAVOR enum (spec-telemetry.md
-      // §3) — the doc-subset ladder rung itself is shape-agnostic (fontkit
-      // reads any program by codepoint); this is purely a reporting signal.
-      let flavor = 'other';
-      try {
-        const { PDFName, PDFRef } = PDFLib;
-        const fontObj = lookupFontObject(pdfPage, PDFLib, fontName);
-        const stRaw = fontObj && fontObj.get(PDFName.of('Subtype'));
-        const st = stRaw instanceof PDFRef ? pdfPage.doc.context.lookup(stRaw) : stRaw;
-        if (st instanceof PDFName) flavor = st.toString() === '/Type0' ? 'type0' : st.toString() === '/TrueType' ? 'truetype' : 'other';
-      } catch { /* flavor stays 'other' — telemetry just reports 'other' */ }
-      const cssFamily = `pdflokal-doc-${sanitizeForCssIdent(sourceId)}-${sanitizeForCssIdent(fontName)}`;
-      let face;
-      try {
-        // Descriptors from the font's own facts, or a bold program is faux-bolded
-        // again by CSS font-weight:700 (see core/font-fingerprint.js).
-        face = new FontFace(cssFamily, extracted.bytes, docFontFaceDescriptors(facts));
-        await face.load();
-      } catch (_err) {
-        // Some CFF shapes need an explicit sfnt/OpenType wrap the FontFace
-        // constructor won't infer from raw bytes alone — decline rather than
-        // throw; the twin (already showing) is the honest fallback.
-        return null;
-      }
-      document.fonts.add(face);
-      addedFontFaces.add(face);
-      // bytes ride along for core/stamp.js's nativeCandidate gates (sfnt +
-      // save-time readiness) — the editor may only offer the doc font if the
-      // stamp would embed these exact bytes.
-      // bold/italic: the descriptors this FontFace was REGISTERED with, so a
-      // decided line can ask CSS for exactly that face (render/page-view.js).
-      const descriptors = docFontFaceDescriptors(facts);
-      return {
-        cssFamily, fontkitFont, flavor, bytes: extracted.bytes,
-        bold: descriptors.weight === '700', italic: descriptors.style === 'italic',
-      };
-    })().catch(() => null));
-  }
-  return docFontCache.get(key);
-}
-
-// Which /Font resource paints this line (its DOMINANT run), and does the line
-// mix resources? A dry run against the SOURCE page. Moved out of prepareDocFont
-// unchanged (2026-10-01) so the re-edit path can skip it and seed from the
-// stored decision instead.
-function dominantLineFont(pdfPage, PDFLib, line) {
-  // DRY RUN ONLY: learns the resource font name painting this line on the
-  // SOURCE page. Nothing here is written back anywhere — same throwaway
-  // read core/redact.js's own removeRunsFromPdfPage performs for real at
-  // export time, run here purely to look.
-  const joined = readPageContents(pdfPage, PDFLib);
-  const fonts = extractFontMetrics(pdfPage, PDFLib);
-  // ONE TARGET PER CONSTITUENT RUN, not one blended target — the same
-  // correction 39e0b9f made to smartReplace's surgery geometry at the
-  // bottom of this file. This call site was missed by that fix.
-  //
-  // WHY it matters here: a blended target takes its `size` from the LINE
-  // (text-lines.js's dominant run), so planRunRemoval's per-target sizeOk
-  // gate silently rejects any run painted at a materially different size,
-  // and `insert` then describes only whichever ops survived that filter.
-  // With per-run targets each run keeps its own size and is matched on its
-  // own terms, so the answer is correct BY CONSTRUCTION rather than by
-  // luck — and, just as importantly, the per-run results make a
-  // multi-font line VISIBLE instead of collapsing it to one blended guess.
-  //
-  // Byte-identical no-op on a single-run line (the overwhelming common
-  // case): `line.runs` has one entry whose `.pdf` IS `line.pdf`.
-  const targets = line.runs?.length ? line.runs.map((r) => r.pdf) : [line.pdf];
-  const { results } = planRunRemoval(joined, fonts, targets);
-  const names = results.map((r) => r.insert?.fontName || null);
-
-  // WHICH run's font represents the line — and what that entitles us to say
-  // about it. Seat ruling 2026-07-28 (option C): the two halves of "the
-  // line's font" have DIFFERENT epistemic status, so they get different
-  // policies.
-  //
-  // FAMILY is answerable. The draft has to render in something, and the
-  // DOMINANT run (widest by pdf.len) is defensible: it is already what
-  // core/text-lines.js calls this line's font, it is what the hover glow
-  // implies, and it is most of the glyphs. Note it is a proxy — a dash
-  // leader can out-width the text it trails — but it is the same proxy the
-  // rest of the system already uses, so this stays consistent rather than
-  // inventing a third answer to a question that already had two.
-  //
-  // WEIGHT is NOT answerable on a line whose runs use different fonts. It
-  // was being taken from planRunRemoval's `insert`, which reports the FIRST
-  // run BY CONTENT-STREAM POSITION — a different selector from the dominant
-  // one, so on `Nama : Budi` (bold label painted first, regular value wider)
-  // the two disagreed and `draft.bold = draft.bold || fp.bold` bolded the
-  // ENTIRE replacement, value included. Since a mixed-font line also makes
-  // the native stamp decline, the twin fallback then RENDERED that wrong
-  // flag — a visible defect, not just a telemetry one.
-  //
-  // So: answer what's answerable, decline what isn't. One policy for both is
-  // what produced the defect.
-  let domIdx = 0;
-  for (let i = 1; i < targets.length; i += 1) {
-    if ((targets[i]?.len ?? 0) > (targets[domIdx]?.len ?? 0)) domIdx = i;
-  }
-  return {
-    fontName: names[domIdx] || names.find(Boolean) || null,
-    mixedFonts: new Set(names.filter(Boolean)).size > 1,
-  };
-}
-
-// Fire-and-forget from smartReplace: never blocks the editor opening (the
-// twin shows immediately, same as before this feature existed). `draft` is
-// the SAME object handed to openTextEditor — mutated in place once the doc
-// font lands, so the commit path (reading draft fields at blur/Enter time)
-// picks it up for free if it arrives before the user finishes typing.
-//
-// ONE FONT PER LINE (2026-10-01, the founder's edit principle): this used to
-// end by PREPENDING the doc font to the twin's CSS stack, so a char the doc
-// subset lacked painted in the twin — one letter in another font while
-// typing, then the whole line in the clone after the bake. Now it loads every
-// candidate (doc font, clone, substitute) from the bytes the stamp embeds and
-// hands them to js/v2/line-font-live.js, which renders ONE face per decision.
-//
-// `seed` is a committed edit's stored fontDecision (re-edit): the line's
-// resource key and its bundled faces come from it instead of being re-derived.
-async function prepareDocFont(pageId, line, draft, seed = null) {
-  try {
-    const page = getPage(doc, pageId);
-    const source = page && getSource(doc, page.sourceId);
-    if (!source) return;
-    const { PDFLib, fontkit } = await ensurePdfLib();
-    const srcDoc = await getDryRunDoc(PDFLib, source);
-    const pdfPage = srcDoc.getPages()[page.sourcePageNum];
-    if (!pdfPage) return;
-    let fontName = null;
-    let mixedFonts = false;
-    if (seed) {
-      // RE-EDIT, seeded from the stored decision. Before 2026-10-01 a re-edit
-      // re-ran the dry run below on cover.replaceTargets[0] alone — on a
-      // multi-run line that is the first-painted run, not the dominant one,
-      // so a re-edit could load a different font than the edit was made in.
-      fontName = seed.lineKey ?? seed.ladder?.find((c) => c.path === 'native')?.key ?? null;
-    } else {
-      ({ fontName, mixedFonts } = dominantLineFont(pdfPage, PDFLib, line));
-    }
-    // An unmatched line has no font of its own to learn — it still gets a
-    // decision (the default substitute below), never the twin's stack.
-    const fp = fontName
-      ? resolveFontFingerprint(pdfPage, PDFLib, fontkit, fontName)
-      : { ok: false };
-
-    // BUG FIX (founder field test, 2026-07-19, bold Arial headings): pdf.js's
-    // OWN getTextContent() never exposes the real font name to the main
-    // thread — text-runs.js's `fontFamily` is pdf.js's generic CSS collapse
-    // ('serif'/'sans-serif'/'monospace'), not the ascii PostScript name (see
-    // js/core/font-style.js's header for how this was verified against the
-    // vendored pdf.worker.min.js). The document's own /Font resource dict
-    // has the real name — read INDEPENDENTLY of whether the font PROGRAM
-    // below loads: a bold heading whose program we decline to extract (e.g.
-    // a simple TrueType font outside loadDocFont's Type0/Identity-H scope)
-    // still has a /BaseFont worth parsing for "Bold"/"Italic".
-    //
-    // spec-edit-fidelity-instrumentation.md Increment A (founder phone-gate,
-    // org-structure.pdf's "T & PPGA" -> thin, 2026-07-23): resolveFontFingerprint
-    // is the FULL ladder — rung 1 (font-style.js's /BaseFont+Flags read,
-    // exactly what used to happen here) first, then rung 2 (the EMBEDDED
-    // PROGRAM's own name table/OS-2/PANOSE, core/font-fingerprint.js) only
-    // when rung 1 is genuinely uninformative (an 'CIDFont+F1'-shaped wrapper
-    // name with no corroborating Flags/FontWeight) — never guessing "regular"
-    // just because the WRAPPER stayed silent.
-    if (fp.ok && !mixedFonts && (fp.bold || fp.italic)) {
-      draft.bold = draft.bold || fp.bold;
-      draft.italic = draft.italic || fp.italic;
-      // Live-restyle the open draft the same way docFontFamily does below —
-      // the twin font stays, only weight/style changes, so this is safe to
-      // apply even if the doc-font FontFace load (next) ultimately declines.
-      if (draft.editorEl && draft.editorEl.isConnected) applyTextFont(draft.editorEl, draft);
-    }
-    if (fp.ok) {
-      // styleSource rides the draft -> the committed text annotation's own
-      // field (see commit() below) so stamp.js's clone rung can report WHICH
-      // rung decided the weight it embeds, at commit time, without ever
-      // re-deriving it (Increment B's `insert.style_source`).
-      //
-      // On a mixed-font line we declined to decide a weight, so the honest
-      // value is 'none' — NOT the rung that would have decided it. 'none' is
-      // already in the schema's STYLE_SOURCE enum, so this needs no schema
-      // change and no migration, and from the first event the rail can tell
-      // "we read bold off the /BaseFont" apart from "we declined to guess".
-      // That distinction is also the only way we will ever learn how common
-      // mixed lines actually are in real documents — nothing measures it today.
-      draft.styleSource = mixedFonts ? 'none' : fp.styleSource;
-    }
-    // Font-fidelity tier 1 (core/font-decide.js, founder-ratified 2026-07-20):
-    // the real /BaseFont routes the SUBSTITUTE tier to a metric-identical
-    // clone (Calibri→Carlito, Arial→Arimo, …) instead of mapRunFont's generic
-    // bucket — same widths by construction, so the replacement occupies
-    // exactly the original's space. Applied to the draft (and live-restyled)
-    // BEFORE the doc-font load below: if that load succeeds, the doc font
-    // still renders in front and this clone is the per-glyph fallback; if it
-    // declines, the clone IS the committed family. Honesty unchanged: a clone
-    // is still a substitute — the commit toast keeps firing (one grammar).
-    if (fp.ok) {
-      // Exact name routing stays FIRST (stronger signal than any
-      // measurement) — tried against the WRAPPER's /BaseFont, same as
-      // before. Increment A's "twin selection" ruling: when that declines,
-      // fall to the fingerprint's own MEASURED family bucket (serif->Tinos,
-      // mono->Cousine, sans->Arimo) instead of leaving the draft on
-      // mapRunFont's generic Helvetica guess — a real bundled font with real
-      // outlines beats a standard-14 name with none. This bucket fallback
-      // NEVER sets cloneRouted (below) — only an EXACT name match earns the
-      // silent name-only carve-out (founder ruling 2026-07-20), a measured
-      // bucket is still an honest substitute worth the commit toast.
-      const clone = cloneFamilyFor(fp.baseFont) || FAMILY_BUCKET_TO_CLONE[fp.family] || null;
-      if (clone) {
-        draft.fontFamily = clone;
-        if (draft.editorEl && draft.editorEl.isConnected) applyTextFont(draft.editorEl, draft);
-      }
-      // Name-only ruling (founder, 2026-07-20 evening — the e-AHU case): a
-      // font that provably embeds NO program has no outlines of its own —
-      // every viewer already substitutes for it. When the exact-match clone
-      // fired on top of that, the commit stays SILENT: a notice would compare
-      // our substitute against an original that never existed. Both facts
-      // ride the draft so commit() can apply the ruling without re-reading
-      // the PDF. Absent fields (async race lost) → conservative toast, same
-      // as every other race here.
-      draft.fontUnembedded = !fp.embedded;
-      draft.cloneRouted = !!cloneFamilyFor(fp.baseFont);
-    }
-
-    // The line's bundled faces (clone by name, substitute by evidence), loading
-    // in parallel with the doc font — from the stored ladder on a re-edit.
-    const faces = seed?.ladder
-      ? seed.ladder.filter((c) => c.path === 'clone' || c.path === 'substitute')
-      : faceLadder(fp.ok ? fp : null);
-    const facesLoading = Promise.all(faces.map((f) => loadFaceFont(f.face, fontkit)
-      .then((r) => (r ? {
-        path: f.path, face: f.face, evidence: f.evidence, css: r.css, parsed: r.parsed, bold: r.bold, italic: r.italic,
-      } : null))));
-
-    const result = fontName ? await loadDocFont(page.sourceId, fontName, pdfPage, PDFLib, fontkit, fp) : null;
-    // font_seen (spec-telemetry.md §3, widened spec-edit-fidelity-
-    // instrumentation.md Increment B): the doc font we tried to load for this
-    // edit, PLUS the font-fact fields the fingerprint ladder above already
-    // computed — content-blind (enums/bools), never the font's own name.
-    // flavor maps loadDocFont's own shape read to the schema's FLAVOR list;
-    // extract is 'ok' when the FontFace loaded, else 'declined'. NOTE: on a
-    // decline the flavor isn't recomputed here (loadDocFont only returns it
-    // on success) — collapsed to 'other', a conscious v1 simplification (the
-    // primary signal is the ok-rate + the flavor of docs that DO load). A
-    // finer failed/declined split is an easy follow-up if the data warrants it.
-    if (fontName) {
-      tel('font_seen', {
-        flavor: result?.flavor === 'type0' ? 'type0-identity-h'
-          : result?.flavor === 'truetype' ? 'truetype-simple' : 'other',
-        extract: result ? 'ok' : 'declined',
-        embedded: fp.ok ? fp.embedded : false,
-        subtype: fp.ok ? fp.subtype : 'other',
-        name_informative: fp.ok ? isInformativeBaseFont(fp.baseFont) : false,
-        bold: fp.ok ? fp.bold : false,
-        style_source: fp.ok ? fp.styleSource : 'none',
-      });
-    }
-    if (result) {
-      draft.docFontFamily = result.cssFamily;
-      draft.docFontkitFont = result.fontkitFont; // commit-time coverage check (see commit())
-    }
-    // The doc font is a candidate only behind the stamp's OWN embed gates —
-    // offering one the stamp would refuse is seeing ≠ file again.
-    const native = result
-      ? nativeCandidate({ parsed: result.fontkitFont, bytes: result.bytes, key: fontName, css: result.cssFamily })
-      : null;
-    if (native) Object.assign(native, { bold: result.bold, italic: result.italic });
-    const faceCandidates = await facesLoading;
-    // Guard: the draft may have been cancelled/committed already, or a NEWER
-    // tap may have replaced it — startLineFont declines a detached editor.
-    draft.lineFont = startLineFont({
-      draft,
-      candidates: [native, ...faceCandidates],
-      lineKey: fontName,
-      onRefuse: (ch) => toast(refusalNote(ch)),
-      // Rung D: a paragraph editor re-seats its first baseline on every face.
-      onShow: () => draft.onFontShown?.(),
-    });
-  } catch (err) {
-    console.warn('prepareDocFont gagal:', err);
-  } finally {
-    // WHY this exists: prepareDocFont is fire-and-forget, and until now it had
-    // NO observable completion — which is precisely why the 2026-07-23 defect
-    // (an unawaited call baking thin on a lost race, decisions.md) was so hard
-    // to pin. A test could only budget a timeout and hope.
-    //
-    // This flag says "finished DECIDING", never "decided bold" — deliberately,
-    // so it stays true under any styling policy (apply / decline / defer) and
-    // a test waiting on it can't pass or hang because the policy changed. Set
-    // in `finally` so every early return and every throw still resolves it;
-    // a signal that only fires on the happy path is the kind of green that
-    // can't go red.
-    if (draft?.editorEl?.isConnected) {
-      // A paragraph editor's face may have changed above without a decision
-      // (no candidate loaded): re-seat its baseline on whatever it paints now.
-      draft.onFontShown?.();
-      draft.editorEl.dataset.stylePrepared = '1';
-    }
-  }
-}
-
-// spec-live-surgery.md §5 Decision 3 (increment 4 — re-edit): does `x, y`
-// land inside a committed edit's OWN box? Scoped to page.annotations (the
-// live model — never the pristine source), so this is orthogonal to
-// textRuns.hitTest, which only ever knows about the ORIGINAL bytes and would
-// have no idea an edit exists at all. Boxes come from each edit's cover's
-// replaceBox — the pristine-source line geometry captured at the edit's
-// BIRTH, not the cover's current x/y/width/height — because that birth box
-// is the one guaranteed to still be the honest target (a committed edit
-// never drags, spec Decision 1, but anchoring to replaceBox rather than
-// "wherever the cover currently sits" is the same defensive discipline
-// core/page-surgery.js's own overlapsBirthBox already applies at export/bake
-// time). Reuses core/text-lines.js's resolveTap (same clamped, finger-sized
-// inflation as every other tap) scoped to just this page's edited lines, so
-// a tap that's a few px off a small edited line still resolves the same way
-// a fresh line tap would.
-function hitTestEditedLine(page, x, y) {
-  const edits = pageEdits(page);
-  if (edits.length === 0) return null;
-  const boxes = edits.map((edit) => {
-    const b = edit.cover.replaceBox;
-    // RUNG D: a committed paragraph paints as its block — box width, one
-    // leading per painted line — not as one long line of its whole text.
-    const blk = edit.replacement?.block;
-    if (blk && Array.isArray(blk.lines)) {
-      const e = blockExtent(blk, edit.replacement.y);
-      const x0 = Math.min(b.x, e.x);
-      const y0 = Math.min(b.y, e.y);
-      return { x: x0, y: y0, w: Math.max(b.x + b.w, e.x + e.w) - x0, h: Math.max(b.y + b.h, e.y + e.h) - y0, edit };
-    }
-    // FIELD REPORT 2026-08-26: the birth box ALONE is not the whole target.
-    // Everything above is still true — the box is the honest ANCHOR, and a
-    // committed edit never drags — but the REPLACEMENT is free to be longer
-    // than the words it replaced, and then it paints past the box that
-    // birthed it. Hit-testing the anchor alone left the visible overflow
-    // dead: a tap there missed here, then fell through to the fresh
-    // textRuns.hitTest against the PRISTINE source, where the original line
-    // had already ended — so neither branch matched and the tap did nothing
-    // at all. A user with a replacement wider than its original simply could
-    // not reopen their own edit ("tidak bisa di edit lagi"), with no toast
-    // and nothing in the rail to say so.
-    //
-    // So: anchor UNION painted extent. Union, never replace — the box stays
-    // the floor, so this can only ever grow the target, never move or shrink
-    // one that already worked. Width comes from render/page-view.js's own
-    // measurer, i.e. the same font stack the overlay paints with, because the
-    // region has to match what the user SEES to be worth tapping.
-    const painted = measureTextAnnoWidth(edit.replacement);
-    if (!painted) return { x: b.x, y: b.y, w: b.w, h: b.h, edit };
-    const r = edit.replacement;
-    // 1.2 is renderAnnotationEl's own line-height for a text annotation.
-    const rh = (r.fontSize || 24) * 1.2;
-    const x0 = Math.min(b.x, r.x);
-    const y0 = Math.min(b.y, r.y);
-    const x1 = Math.max(b.x + b.w, r.x + painted);
-    const y1 = Math.max(b.y + b.h, r.y + rh);
-    return { x: x0, y: y0, w: x1 - x0, h: y1 - y0, edit };
-  });
-  const hit = resolveTap(boxes, x, y, MIN_HIT);
-  return hit ? hit.edit : null;
-}
+// Rung C's live doc-font preview (loadDocFont / prepareDocFont and their
+// caches) lives in js/v2/doc-font-live.js with its WHYs.
+const docFontLive = createDocFontLive({ getDoc: () => doc, getDryRunDoc, tel, toast });
+const { prepareDocFont } = docFontLive;
 
 // spec-live-surgery.md §5 Decision 3 (increment 4): reopen Ganti Teks on an
 // ALREADY-EDITED line. Prefills with the edit's CURRENT text (the paired
@@ -1666,6 +1167,10 @@ function reEditLine(pageId, cover, replacement) {
     // geometry IS the plan (core/block-edit.js blockAnnotation), and the box
     // is the cover's birth box.
     ...(replacement?.block ? { block: { ...replacement.block, box: { ...box } } } : {}),
+    // A page turned since the commit turned the replacement with it (founder
+    // ruling 2026-10-11): the editor reopens turned, at the replacement's own
+    // origin, and the fresh text the commit creates keeps the turn.
+    ...(replacement?.turn ? { turn: replacement.turn } : {}),
     // Everything commit's `draft.reEdit` branch needs to remove the PREVIOUS
     // edit and reapply a fresh one against the SAME pristine-source target
     // (Decision 3: drop-and-reapply, never surgery-on-surgery).
@@ -1677,9 +1182,10 @@ function reEditLine(pageId, cover, replacement) {
       coverColor: cover.color,
     },
   };
-  openTextEditor({ pageId, x: draft.block ? draft.block.disp.x : box.x, y: box.y, anno: null, draft });
+  const at = draft.turn ? { x: replacement.x, y: replacement.y } : { x: box.x, y: box.y };
+  openTextEditor({ pageId, x: draft.block ? draft.block.disp.x : at.x, y: at.y, anno: null, draft });
   setTool('select');
-  toastEl.classList.remove('show');
+  hideToast();
   // Seed font preparation from the STORED decision (edit font design, Gaps):
   // it names the line's own resource and the bundled faces the edit was made
   // with. An edit committed before decisions existed has none — then the
@@ -1702,7 +1208,7 @@ async function smartReplace(pageId, x, y) {
   // increment exists to fix).
   const page = getPage(doc, pageId);
   if (page) {
-    const hit = hitTestEditedLine(page, x, y);
+    const hit = hitTestEditedLine(page, x, y, EDIT_HIT);
     if (hit) { tel('ganti_tap', { hit: true }); reEditLine(pageId, hit.cover, hit.replacement); return; }
     // RUNG S2, same guard one ladder over, and it is NOT optional here: OCR
     // reads the PRISTINE pixels, so a word already covered still recognises
@@ -1711,7 +1217,7 @@ async function smartReplace(pageId, x, y) {
     // two replacements painted over each other, which is worse than the
     // born-digital version of this bug because nothing on a scan visually
     // says an edit is already there.
-    const ocrHit = hitTestOcrEdit(page, x, y);
+    const ocrHit = hitTestOcrEdit(page, x, y, MIN_HIT);
     if (ocrHit) { tel('ganti_tap', { hit: true }); reEditOcrLine(pageId, ocrHit.cover, ocrHit.replacement); return; }
   }
   // A page that has been recognised is a SCAN, and its tap targets are OCR
@@ -1837,7 +1343,7 @@ async function smartReplace(pageId, x, y) {
   setTool('select');
   // The arm toast ("Tap tulisan…") must not outlive its own step — with the
   // editor open it instructs a thing already done (taste-judge, path law).
-  toastEl.classList.remove('show');
+  hideToast();
   matchReplaceColors(cover, draft, pageId, line); // async; colors land live
   prepareDocFont(pageId, line, draft); // async; never blocks the editor opening
 }
@@ -1867,7 +1373,7 @@ function openBlockReplace(pageId, line, plan) {
   };
   openTextEditor({ pageId, x: plan.disp.x, y: plan.box.y, anno: null, draft });
   setTool('select');
-  toastEl.classList.remove('show');
+  hideToast();
   matchReplaceColors(cover, draft, pageId, line); // async; colors land live
   // The font is decided over the WHOLE paragraph: every run of every line goes
   // to the dry run, so its dominant run is the paragraph's, not the tapped line's.
@@ -1893,23 +1399,6 @@ function openBlockReplace(pageId, line, plan) {
 // it. Naming the fields differently means the export path cannot see an S2
 // pair at all: it exports as what it is, a filled rect and a text object.
 
-// A tap inside an already-committed S2 edit. Mirrors hitTestEditedLine one
-// ladder over, including anchoring to the BIRTH box rather than to wherever
-// the cover currently sits.
-function hitTestOcrEdit(page, x, y) {
-  const covers = page.annotations.filter((a) => a.type === 'whiteout' && a.ocrBox);
-  if (covers.length === 0) return null;
-  const hit = resolveTap(
-    covers.map((c) => ({ x: c.ocrBox.x, y: c.ocrBox.y, w: c.ocrBox.w, h: c.ocrBox.h, cover: c })),
-    x, y, MIN_HIT,
-  );
-  if (!hit) return null;
-  return {
-    cover: hit.cover,
-    replacement: page.annotations.find((a) => a.type === 'text' && a.ocrCoverId === hit.cover.id) || null,
-  };
-}
-
 // Tap a recognised line → cover it → reopen its words as an editable draft.
 function ocrReplace(pageId, line) {
   record(history, doc);
@@ -1934,7 +1423,7 @@ function ocrReplace(pageId, line) {
   };
   openTextEditor({ pageId, x: line.x, y: line.y, anno: null, draft });
   setTool('select'); // disarm now, not at commit — same founder ruling as smartReplace
-  toastEl.classList.remove('show');
+  hideToast();
   // Paper and ink sampled off the raster. This matters MORE on a scan than on
   // a born-digital page: paper in a photograph is never #fff, and a pure-white
   // cover on a grey-white scan is a visible patch.
@@ -1980,6 +1469,7 @@ function reEditOcrLine(pageId, cover, replacement) {
     bold: !!replacement?.bold,
     italic: !!replacement?.italic,
     color: replacement?.color,
+    ...(replacement?.turn ? { turn: replacement.turn } : {}), // see reEditLine
     ocrReEdit: {
       coverId: cover.id,
       textId: replacement?.id ?? null,
@@ -1990,7 +1480,7 @@ function reEditOcrLine(pageId, cover, replacement) {
   };
   openTextEditor({ pageId, x: replacement?.x ?? box.x, y: replacement?.y ?? box.y, anno: null, draft });
   setTool('select');
-  toastEl.classList.remove('show');
+  hideToast();
 }
 
 // Recognise a page, then hand it to the tap gesture. The 5 MB engine is
@@ -2047,55 +1537,12 @@ function armOcrTap() {
 }
 
 // ---- Ganti Teks steering highlight (press→steer→release-commit, 2026-07-19) ------
-// FOUNDER RULING (2026-07-19, "mending opsi a" — QUIET PAGE): when Ganti Teks
-// is armed the page shows NO per-line hint boxes. On a dense document
-// everything is tappable, so marking everything marks nothing. The armed-mode
-// affordance is now ONLY: the arm toast + this glow (hover on fine pointers,
-// press-steer on touch) — one reusable div, moved (not recreated) between page
-// overlays as the press/drag/hover resolves to different lines. Solid
-// chrome-red, matches the founder's camera-first release-commit law: nothing
-// is true until the finger lifts, but the user must see what WOULD happen.
-let gantiGlowEl = null;
-let gantiSteerSeq = 0;    // guards against a late hitTest landing after a newer one
-let gantiSteerRaf = null;
-let gantiSteerPending;    // undefined = nothing queued (null is a valid "clear" value)
-
-function clearGantiGlow() {
-  if (gantiGlowEl) { gantiGlowEl.remove(); gantiGlowEl = null; }
-}
-
-async function applyGantiSteer(pt) {
-  const seq = (gantiSteerSeq += 1);
-  if (!pt) { clearGantiGlow(); return; }
-  const line = await textRuns.hitTest(pt.pageId, pt.x, pt.y);
-  // Stale guard: a newer steer landed first, or the tool moved on while this
-  // hitTest (async — first call per page extracts text) was in flight.
-  if (seq !== gantiSteerSeq || tool !== 'ganti') return;
-  if (!line) { clearGantiGlow(); return; }
-  const slot = slots.find((s) => s.page.id === pt.pageId);
-  const overlay = slot?.view.querySelector('.pv-overlay');
-  if (!overlay) { clearGantiGlow(); return; }
-  if (!gantiGlowEl) {
-    gantiGlowEl = document.createElement('div');
-    gantiGlowEl.className = 'pv-ganti-glow';
-  }
-  gantiGlowEl.style.cssText =
-    `position:absolute;left:${line.x}px;top:${line.y}px;width:${line.w}px;height:${line.h}px;` +
-    'pointer-events:none;border:1.5px solid rgba(220,38,38,.8);background:rgba(220,38,38,.08);border-radius:2px;';
-  if (gantiGlowEl.parentElement !== overlay) overlay.appendChild(gantiGlowEl);
-}
-
-// rAF-throttled: interaction.js forwards a raw pointermove stream (steering +
-// fine-pointer hover) — coalesce to one hitTest per frame instead of one per
-// event.
-function onGantiSteer(pt) {
-  gantiSteerPending = pt;
-  if (gantiSteerRaf) return;
-  gantiSteerRaf = requestAnimationFrame(() => {
-    gantiSteerRaf = null;
-    applyGantiSteer(gantiSteerPending);
-  });
-}
+// The quiet-page glow lives in js/v2/ganti-steer.js (the founder's ruling with it).
+const gantiSteer = createGantiSteer({
+  hitTest: (pageId, x, y) => textRuns.hitTest(pageId, x, y),
+  getTool: () => tool,
+  getSlots: () => slots,
+});
 
 // ---- carried-signature ghost (desktop telegraph, founder Jul 3) -------------------
 // After drawing a TTD, the "place it" state must be visible: on fine pointers
@@ -2112,7 +1559,7 @@ const FINE_POINTER = window.matchMedia('(pointer: fine)').matches;
 
 document.addEventListener('pointermove', (e) => {
   if (FINE_POINTER && tool === 'signature' && storedSignature) {
-    const w = 150 * zoom;
+    const w = SIGNATURE_PLACE_WIDTH * zoom;
     const h = w * (storedSignature.height / storedSignature.width);
     if (sigGhost.dataset.sig !== storedSignature.dataUrl.slice(-40)) {
       sigGhost.src = storedSignature.dataUrl;
@@ -2160,30 +1607,24 @@ async function withPageRasterCtx(pageId) {
   const frameW = rotated ? page.height : page.width;
   return { cx, w: c.width, h: c.height, s: img.width / frameW }; // s = raster px per page point
 }
-const medOf = (arr) => arr.sort((a, b) => a - b)[Math.floor(arr.length / 2)];
-const medColor = (px) =>
-  `#${[0, 1, 2].map((ch) => medOf(px.map((p) => p[ch])).toString(16).padStart(2, '0')).join('')}`;
-const lumOf = (p) => 0.299 * p[0] + 0.587 * p[1] + 0.114 * p[2];
-
-function takeSample(r, x, y, into) {
-  if (x < 0 || y < 0 || x >= r.w || y >= r.h) return;
-  const px = r.cx.getImageData(Math.round(x), Math.round(y), 1, 1).data;
-  into.push([px[0], px[1], px[2]]);
+// Read the raster at `pts` (raster px); points off the raster are skipped.
+// The arithmetic on the samples is core/color-sample.js's.
+function sampleAt(r, pts) {
+  const out = [];
+  for (const [x, y] of pts) {
+    if (x < 0 || y < 0 || x >= r.w || y >= r.h) continue;
+    const px = r.cx.getImageData(Math.round(x), Math.round(y), 1, 1).data;
+    out.push([px[0], px[1], px[2]]);
+  }
+  return out;
 }
 
 async function matchWhiteoutColor(anno, pageId, ox, oy) {
   try {
     const r = await withPageRasterCtx(pageId);
     if (!r) return;
-    const samples = [];
-    for (const radius of [6 * r.s, 12 * r.s]) {
-      for (let i = 0; i < 10; i += 1) {
-        const ang = (Math.PI * 2 * i) / 10;
-        takeSample(r, ox * r.s + radius * Math.cos(ang), oy * r.s + radius * Math.sin(ang), samples);
-      }
-    }
-    if (samples.length < 8) return;
-    const color = medColor(samples);
+    const color = whiteoutColorFrom(sampleAt(r, whiteoutRingPoints(ox, oy, r.s)));
+    if (!color) return;
     updateAnnotation(doc, anno.id, { color });
     // Mid-gesture: update the LIVE element directly — rebuilding the overlay
     // here would destroy the element holding the pointer capture.
@@ -2206,55 +1647,17 @@ async function matchReplaceColors(cover, draft, pageId, line) {
     if (!r) return;
     if (cover.ocrBox && (findAnnotation(doc, cover.id)?.annotation !== cover
       || draft.appearanceLocked || editingEl !== draft.editorEl)) return;
-    const o = 3 * r.s;
-    const paper = [];
-    for (let i = 0; i <= 4; i += 1) {
-      const x = (line.x + (line.w * i) / 4) * r.s;
-      takeSample(r, x, line.y * r.s - o, paper);
-      takeSample(r, x, (line.y + line.h) * r.s + o, paper);
-    }
-    for (const fy of [0.25, 0.75]) {
-      takeSample(r, line.x * r.s - o, (line.y + line.h * fy) * r.s, paper);
-      takeSample(r, (line.x + line.w) * r.s + o, (line.y + line.h * fy) * r.s, paper);
-    }
-    if (paper.length < 6) return;
-    const coverColor = medColor(paper);
+    const paper = sampleAt(r, paperPoints(line, r.s));
+    const coverColor = coverColorFrom(paper);
+    if (!coverColor) return;
     updateAnnotation(doc, cover.id, { color: coverColor });
     const el = stage.querySelector(`[data-anno-id="${cover.id}"]`);
     if (el) el.style.backgroundColor = coverColor;
-
-    const paperLum = lumOf(paper.map((p) => [p[0], p[1], p[2]])
-      .reduce((a, b) => [a[0] + b[0] / paper.length, a[1] + b[1] / paper.length, a[2] + b[2] / paper.length], [0, 0, 0]));
-    const inside = [];
-    for (let ix = 1; ix <= 8; ix += 1) {
-      for (let iy = 1; iy <= 3; iy += 1) {
-        takeSample(r, (line.x + (line.w * ix) / 9) * r.s, (line.y + (line.h * iy) / 4) * r.s, inside);
-      }
-    }
-    // BUG FIX (founder phone test, 2026-07-19): solid BLACK bold text was
-    // coming back visibly GRAY. Root cause — the old code ranked all 24
-    // interior samples by |luminance - paper|, took the top QUARTILE (up to
-    // 6 points), then took the MEDIAN of that quartile. A glyph's bounding
-    // box is mostly background even for bold text (strokes cover maybe a
-    // third of their own box), so most "farthest from paper" samples that
-    // land near a stroke land on its ANTI-ALIASED EDGE (a partial ink/paper
-    // blend), not its solid interior — genuinely solid-black pixels are rare
-    // in a sparse grid. The median of a quartile stuffed with edge pixels
-    // lands in the middle of the ink<->paper range: literal gray, not a
-    // sampling fluke. Fix: find the single most extreme (most ink-like)
-    // sample actually seen, then keep only samples within a tight band of
-    // THAT extreme — the genuine ink-CORE cluster — and median only those.
-    // A real solid-ink glyph always has a few pixels near its own extreme;
-    // partial-coverage edge pixels fall well short of it and get excluded
-    // instead of diluting the result toward gray.
-    const dists = inside.map((p) => Math.abs(lumOf(p) - paperLum));
-    const maxDist = inside.length ? Math.max(...dists) : 0;
-    // Anti-aliased gray on plain paper must NOT tint the text — only adopt
-    // the ink color when SOMETHING in the box clearly separates from paper.
-    if (maxDist > 40) {
-      const CORE_BAND = 0.75; // keep samples within 25% of the extreme seen
-      const core = inside.filter((_, i) => dists[i] >= maxDist * CORE_BAND);
-      draft.color = medColor(core);
+    // The ink-core rule (and why it is not a quartile median) is
+    // core/color-sample.js inkColorFrom's.
+    const ink = inkColorFrom(sampleAt(r, inkPoints(line, r.s)), paper);
+    if (ink) {
+      draft.color = ink;
       if (editingEl && !editingAnno) editingEl.style.color = draft.color;
     }
   } catch { /* best-effort; white cover + default ink stand */ }
@@ -2399,7 +1802,7 @@ async function deleteOriginalAt(pageId, x, y) {
     // Not over any printed line, but a replacement longer than the words it
     // replaced paints past its birth box (field report 2026-08-26): that overflow
     // is visible, so it is tappable.
-    const hit = hitTestEditedLine(page, x, y);
+    const hit = hitTestEditedLine(page, x, y, EDIT_HIT);
     if (hit?.replacement) deleteEditedReplacement(pageId, hit); else missOriginal();
     return;
   }
@@ -2407,12 +1810,7 @@ async function deleteOriginalAt(pageId, x, y) {
   // edit's box toward a finger-sized target, and a deleted line has no ink to
   // show where its box ends, so it would swallow taps meant for the line beside it.
   // Ownership is geometric: an edit owns the line whose centre is in its birth box.
-  const cx = line.x + line.w / 2;
-  const cy = line.y + line.h / 2;
-  const owner = pageEdits(page).find(({ cover }) => {
-    const b = cover.replaceBox;
-    return cx >= b.x && cx <= b.x + b.w && cy >= b.y && cy <= b.y + b.h;
-  });
+  const owner = editOwningLine(page, line);
   if (owner) { deleteEditedReplacement(pageId, owner); return; }
   await deleteOriginalLine(pageId, line);
 }
@@ -2476,12 +1874,10 @@ const interaction = createInteraction({
       smartReplace(pageId, x, y); // async: extraction may need a moment on first tap
     } else if (t === 'signature' && storedSignature) {
       record(history, doc);
-      const w = 150; // signature at document scale
-      const h = w * (storedSignature.height / storedSignature.width);
-      const created = addAnnotation(doc, pageId, createAnnotation('signature', {
+      const created = placeSignature(doc, pageId, {
         image: storedSignature.dataUrl,
-        x: Math.max(0, x - w / 2), y: Math.max(0, y - h / 2), width: w, height: h,
-      }));
+        ratio: storedSignature.height / storedSignature.width,
+      }, x, y);
       track('editor_action', { action: 'signature' });
       tel('tool_use', { tool: 'ttd', action: 'signature' });
       selectAnnotation(doc, created.id); // selected → "Semua Hal." is one tap away
@@ -2505,7 +1901,7 @@ const interaction = createInteraction({
       openTextEditor({ pageId: page.id, x: anno.x, y: anno.y, anno });
     }
   },
-  onGantiSteer,
+  onGantiSteer: gantiSteer.onSteer,
 });
 
 // ---- page manager (Halaman sheet) -----------------------------------------------
@@ -2518,14 +1914,8 @@ const pageManager = createPageManager({
   history,
   getRasterizer: () => rasterizer,
   onDocChanged: () => { textRuns.invalidateAll(); ocrIndex.invalidateAll(); rebuildStage(); },
-  onAddFiles: () => document.getElementById('file-input').click(),
-  onExtract: async (pages) => {
-    // The tap, on the rail (2026-10-02). Split/Ekstrak was invisible to it: GA4's
-    // editor_action/split is the only other trace and GA4 is ad-blocked wholesale
-    // for a large share of users. Fired here, not in page-manager.js, which has no
-    // tel import and whose only job is the selection. An intent-side action like
-    // 'arm' — it is deliberately NOT in COMMIT_ACTIONS (nothing was edited).
-    tel('tool_use', { tool: 'halaman', action: 'extract' });
+  onAddFiles: () => pickFiles(),
+  onExtract: singleFlight(async (pages) => {
     const t0 = performance.now(); // extract_export.duration — tap to bytes-in-hand
     // Export ONLY the selected pages: a shallow Doc sharing the same sources.
     try {
@@ -2557,7 +1947,16 @@ const pageManager = createPageManager({
       console.error(err);
       toast(tr('toast.extractFailed'));
     }
-  },
+  }, {
+    // The tap, on the rail (2026-10-02). Split/Ekstrak was invisible to it: GA4's
+    // editor_action/split is the only other trace and GA4 is ad-blocked wholesale
+    // for a large share of users. Fired here, not in page-manager.js, which has no
+    // tel import and whose only job is the selection. An intent-side action like
+    // 'arm' — it is deliberately NOT in COMMIT_ACTIONS (nothing was edited).
+    // onCall = EVERY tap, including one the in-flight guard drops: the field
+    // means "the tap", and a narrower meaning would be EXCLUDE 4.
+    onCall: () => tel('tool_use', { tool: 'halaman', action: 'extract' }),
+  }),
   toast,
 });
 // The per-page control strip above each page in the stage (↑ ↓ putar hapus). It
@@ -2586,7 +1985,29 @@ on('pm-close', 'click', () => pageManager.close());
 // ---- inline text editing ------------------------------------------------------------
 // One code path for "place new text" and "edit existing text": a contenteditable
 // positioned in the page overlay at page coords. Commit on blur / Enter.
+//
+// Closes the open inline editor, if any, through its own commit. A held empty
+// draft goes first through heldDraft.commit, which blurs the format-bar control
+// so a size typed but not yet entered still lands.
+function closeOpenEditor() {
+  heldDraft?.commit();
+  openEditorCommit?.();
+}
+
 function openTextEditor({ pageId, x, y, anno, draft }) {
+  // The open editor closes HERE, before this one claims editingEl and before
+  // the overlay is looked up. Left to its blur, it closed only once this
+  // editor took focus: its commit then cleared the state this editor had
+  // claimed and re-synced the page, which emptied the overlay with this editor
+  // in it, so a second tap with Teks armed left no box at all, and the next
+  // Backspace deleted the text just written. A held empty draft is unfocused
+  // and has no blur coming at all.
+  // The closing commit disarms (setTool('select')); the tap that opens this
+  // editor came from the armed tool, which stays armed for the next blank,
+  // as it does for a tap with no box open.
+  const armed = tool;
+  closeOpenEditor();
+  if (tool !== armed) setTool(armed);
   const slot = slots.find((s) => s.page.id === pageId);
   if (!slot) return;
   const overlay = slot.view.querySelector('.pv-overlay');
@@ -2606,6 +2027,12 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
   // width, alignment, indent; line height comes with the font, above).
   const blockPlan = draft?.block || null;
   if (blockPlan) styleBlockEditor(ed, blockPlan);
+  // A turned text (its page was turned) edits turned, about the same origin
+  // its overlay turns about, so the words do not jump while typing. The
+  // editor has no padding ring, so the origin is its own top-left. A
+  // paragraph edits upright: block-editor.js reads its wraps and baseline
+  // from viewport rects, which a rotate scrambles; the commit keeps the turn.
+  if (!blockPlan) applyTurn(ed, anno || draft || {});
 
   // Hide the original while editing (the editor visually replaces it).
   const origEl = anno ? overlay.querySelector(`[data-anno-id="${anno.id}"]`) : null;
@@ -2630,19 +2057,32 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
   let committed = false; // guard: blur fires after Enter-commit too
   let escaped = false;   // Escape = back out; an empty commit without it = delete the line
   let releaseKeyboardWatch = () => {};
+  let releaseHold = () => {};
+  let releaseBarHold = () => {}; // the format-bar hold of an empty new draft
   const commit = () => {
     if (committed) return;
     committed = true;
     releaseKeyboardWatch(); // before ed.remove(), so the listener never outlives its element
+    releaseHold(); // holdEditor's release (editor-blur.js), with the editor
+    releaseBarHold();
     // RUNG D: read the paragraph's line breaks off the editor BEFORE it leaves
     // the DOM — they are what the file will hold (js/v2/block-editor.js).
-    const blockLines = blockPlan ? readEditorLines(ed) : null;
+    // The text is normalised HERE (a TAB is the one space the file draws), so
+    // the no-op comparisons below see what will actually be stored.
+    const { text, lines: blockLines } = editorCommit(ed.textContent, blockPlan ? readEditorLines(ed) : null);
     const blockTop = blockPlan ? parseFloat(ed.style.top) : null;
-    const text = blockLines ? logicalTextOf(blockLines) : ed.textContent.trim();
     ed.remove();
-    editingAnno = null;
-    editingEl = null;
-    editingIsReplace = false;
+    // Only while the state is still this editor's: a commit that arrives after
+    // a newer editor opened (a late blur) must not close that one.
+    if (editingEl === ed) {
+      editingAnno = null;
+      editingEl = null;
+      editingIsReplace = false;
+    }
+    if (openEditorCommit === commit) openEditorCommit = null;
+    // After the rest of this commit has run: a sync deferred while the editor
+    // was open (see syncPage) catches up now.
+    if (deferredSync.size) Promise.resolve().then(flushDeferredSync);
     // spec-live-surgery.md §5/§8.3 (increment 3): did THIS commit create,
     // re-type, or clear a Ganti edit's cover/text (an annotation carrying
     // replaceCoverId, or the cover it points at)? Gates the re-bake below —
@@ -2827,6 +2267,7 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
         ...styleSourceProps,
         ...fontDecisionProps,
         ...blockProps,
+        ...(d.turn ? { turn: d.turn } : {}),
       }));
       // RUNG D, spec §6 (his ⚖, recommended default): width is law, height is
       // not. A paragraph that grew past its own lines into the text below it
@@ -2864,6 +2305,8 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
       // committed", and it still does — it is now also the count of
       // annotations that take the raster path at export. blocked:false as
       // before: the text below is committed either way.
+      // Since 2026-10-11 it is ALSO sent by js/v2/bake-failure.js (class 'none')
+      // for a bake that threw a classified 'unsupported' — see that file's header.
       // AUTHORED TEXT ONLY. A Ganti Teks replace runs a real coverage check
       // against the document's own font a few lines up and reports through
       // `insert` instead. Caught by tests/font-coverage.spec.js.
@@ -3045,7 +2488,47 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
     }
   };
 
-  ed.addEventListener('blur', commit);
+  // A window switch blurs the editor without moving focus off it, so it
+  // stays open (editor-blur.js); a real blur comes here.
+  const onRealBlur = (e) => {
+    const text = editorCommit(ed.textContent, null).text;
+    if (blurCommitsDraft({ relatedTarget: e.relatedTarget, barEl: formatBarEl, text, hasAnno: !!anno, hasDraft: !!draft })) {
+      commit();
+      return;
+    }
+    // Held open while a format-bar control has focus. Focus moving between
+    // controls keeps it held; coming back to the editor resumes the plain
+    // blur-commits path; going anywhere else is a click-away, so it commits.
+    // A window or app switch (a native colour picker can be one) fires
+    // focusout with relatedTarget null and leaves activeElement on the control:
+    // focus never left the bar, so the hold stands (editor-blur.js's rule).
+    const onBarLeave = (ev) => {
+      if (formatBarEl.contains(ev.relatedTarget) || formatBarEl.contains(document.activeElement)) return;
+      releaseBarHold();
+      if (ev.relatedTarget !== ed) commit();
+    };
+    formatBarEl.addEventListener('focusout', onBarLeave);
+    // resume = the control is done (onControlDone). An editor a rebuild has
+    // detached, or one a newer editor replaced, cannot take focus back: close it.
+    // commit (from openTextEditor) blurs the control first: a size typed but not
+    // yet entered lands on the draft's defaults under the field's own blur rule,
+    // before the close re-syncs the bar to the selected text and overwrites it.
+    const hold = {
+      resume: () => { if (ed.isConnected && editingEl === ed) ed.focus(); else commit(); },
+      commit: () => {
+        if (formatBarEl.contains(document.activeElement)) document.activeElement.blur();
+        commit();
+      },
+    };
+    heldDraft = hold;
+    releaseBarHold = () => {
+      formatBarEl.removeEventListener('focusout', onBarLeave);
+      if (heldDraft === hold) heldDraft = null;
+      releaseBarHold = () => {};
+    };
+  };
+  releaseHold = holdEditor(ed, commit, { onBlur: onRealBlur });
+  openEditorCommit = commit;
   ed.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ed.blur(); }
     // Ctrl/Cmd+B / I = the format bar's buttons, for the WHOLE box. WHY
@@ -3141,6 +2624,18 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
 }
 
 // ---- signature modal (draw / upload) --------------------------------------------
+// The signature the open modal will REPLACE, or null for "make a new one". Set
+// only by Gambar Ulang, read once by onReady. WHY not "whatever is selected at
+// onReady": a pasted image is a signature-type object and stays selected after
+// the paste, so tapping TTD to make a first signature swapped the user's pasted
+// stamp or logo for the drawing. Replacing is an explicit act, never a side effect.
+let redrawTargetId = null;
+// SINGLE SOURCE OF TRUTH for opening the sheet: every open states its target, so
+// a cancelled Gambar Ulang can never leave one behind for the next TTD tap.
+function openSignatureModal(targetId = null) {
+  redrawTargetId = targetId;
+  signatureModal.open();
+}
 const signatureModal = createSignatureModal({
   modal: document.getElementById('sig-modal'),
   toast,
@@ -3149,11 +2644,16 @@ const signatureModal = createSignatureModal({
     // Founder punch list #1: if a placed signature is SELECTED when the user
     // redraws, they're fixing THAT one — swap its image in place instead of
     // making them delete + re-place. Otherwise arm placement as before.
-    const found = selectedSignatureAnno();
+    const targetId = redrawTargetId;
+    redrawTargetId = null;
+    const hit = targetId ? findAnnotation(doc, targetId) : null;
+    const found = hit && hit.annotation.type === 'signature' ? { page: hit.page, anno: hit.annotation } : null;
     if (found) {
       record(history, doc);
-      found.anno.image = sig.dataUrl;
-      found.anno.height = found.anno.width * (sig.height / sig.width);
+      // Through resizeAnnotation: a taller drawing at the same width can run
+      // past the bottom edge, and that holds it inside the page.
+      updateAnnotation(doc, found.anno.id, { image: sig.dataUrl });
+      resizeAnnotation(doc, found.anno.id, { width: found.anno.width, height: found.anno.width * (sig.height / sig.width) });
       rebuildStage();
       toast(tr('toast.signatureReplaced'));
       return;
@@ -3189,21 +2689,16 @@ function syncSigBar() {
     ? tr('sigBar.signatureSelected')
     : (armed ? tr('sigBar.armed') : '');
 }
-on('btn-redraw-sig', 'click', () => signatureModal.open());
+on('btn-redraw-sig', 'click', () => openSignatureModal(selectedSignatureAnno()?.anno.id ?? null));
 
 on('btn-all-pages', 'click', () => {
   const found = selectedSignatureAnno();
   if (!found) return;
-  const { page: home, anno } = found;
-  record(history, doc);
-  for (const page of doc.pages) {
-    if (page.id === home.id) continue;
-    // Same position on every page; each copy is its OWN object (new id) so it
-    // moves/deletes independently afterwards.
-    addAnnotation(doc, page.id, createAnnotation('signature', {
-      image: anno.image,
-      x: anno.x, y: anno.y, width: anno.width, height: anno.height,
-    }));
+  // A re-tap with every page already covered changes nothing, so it records
+  // nothing: no dead undo step, no phantom "unsaved changes".
+  if (pagesMissingSignature(doc, found.anno.id).length) {
+    record(history, doc);
+    copySignatureToAllPages(doc, found.anno.id);
   }
   rebuildStage();
   toast(tr('toast.signatureCopied', { count: doc.pages.length - 1 }));
@@ -3224,13 +2719,25 @@ function deleteSelected() {
 }
 
 // ---- copy / cut / paste / duplicate (Canva/Figma-style) -----------------------------
-// The app's OWN clipboard, in memory only: the system clipboard is never read or
-// written (privacy is the product, and signature-modal.js owns image paste from
-// it). `annoClipboard` is a detached snapshot (core/model.js cloneForPaste), so
+// The app's OWN clipboard, in memory only: the system clipboard is never written,
+// and read only through the `paste` event the user's own Ctrl/Cmd+V raises (see
+// the paste listener below; signature-modal.js owns paste while its sheet is
+// open). `annoClipboard` is a detached snapshot (core/model.js cloneForPaste), so
 // editing the source after Ctrl+C cannot change what Ctrl+V pastes. `pasteCount`
 // steps the paste +10px from the SOURCE position each time, Canva-style.
 let annoClipboard = null;
 let pasteCount = 0;
+// True while the in-app copy is plausibly still the NEWEST thing on the user's
+// clipboard. The app never writes the system clipboard, so it cannot see another
+// app copy over it; what it CAN see is the window losing focus (you have to leave
+// to copy elsewhere) or a native copy/cut inside the page. Either one ends the
+// claim, and a later paste then goes to what the system clipboard carries.
+let annoCopyFresh = false;
+const staleAnnoCopy = () => { annoCopyFresh = false; };
+window.addEventListener('blur', staleAnnoCopy);
+document.addEventListener('visibilitychange', staleAnnoCopy);
+document.addEventListener('copy', staleAnnoCopy);
+document.addEventListener('cut', staleAnnoCopy);
 
 function selectedFound() {
   const id = doc.selection.annotationId;
@@ -3243,6 +2750,7 @@ function copySelected() {
   if (!found || !isCopyable(found.annotation)) return false; // doc-bound kinds: see cloneForPaste
   annoClipboard = cloneForPaste(found.annotation);
   pasteCount = 0;
+  annoCopyFresh = true;
   return true;
 }
 
@@ -3278,6 +2786,118 @@ function placeCopy(pageId, src, n) {
   return clone;
 }
 
+// The paste (a system-clipboard image or text, see the listener below) shares
+// placeCopy's contract: ONE undo step, the new object selected, the pages involved
+// repainted, and the tool back to Pilih ("tools are verbs").
+function placePasted(pageId, type, props) {
+  const prev = selectedFound();
+  record(history, doc);
+  const created = addAnnotation(doc, pageId, createAnnotation(type, props));
+  selectAnnotation(doc, created.id);
+  if (prev && prev.page.id !== pageId) syncPage(prev.page.id);
+  syncPage(pageId);
+  if (tool !== 'select') setTool('select');
+  return created;
+}
+
+// The middle of what the user can see of `pageId`, in that page's own px (what
+// annotations are positioned in). A page scrolled out of view falls back to its
+// own middle.
+function visibleCentreOf(pageId) {
+  const slot = slots.find((sl) => sl.page.id === pageId);
+  const { width, height } = pageDisplaySize(getPage(doc, pageId));
+  if (!slot) return { x: width / 2, y: height / 2 };
+  const r = slot.view.getBoundingClientRect();
+  const vp = scrollEl.getBoundingClientRect();
+  const left = Math.max(r.left, vp.left), right = Math.min(r.right, vp.right);
+  const top = Math.max(r.top, vp.top), bottom = Math.min(r.bottom, vp.bottom);
+  if (right <= left || bottom <= top) return { x: width / 2, y: height / 2 };
+  return { x: ((left + right) / 2 - r.left) / zoom, y: ((top + bottom) / 2 - r.top) / zoom };
+}
+
+const PASTE_IMAGE_MAX_PX = 1200;  // longer side kept in the file; same cap as a drawn/uploaded signature
+const PASTE_IMAGE_PAGE_FRAC = 0.6; // an image never lands bigger than this share of the page's width or height
+
+// A pasted image becomes a signature-type object (movable, aspect-locked resize,
+// Semua Hal.) — the one image object the model and export already have. It is
+// decoded and re-drawn on a canvas, never uploaded: the bytes stay in this tab.
+// PNG unless the source is a JPEG, which export embeds as JPEG (a photo
+// re-encoded as PNG would bloat the file several times over).
+async function pasteImageFile(file) {
+  const img = new Image();
+  const url = URL.createObjectURL(file);
+  try {
+    await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; img.src = url; });
+  } catch { return; } finally { URL.revokeObjectURL(url); }
+  if (doc.pages.length === 0 || !img.naturalWidth || !img.naturalHeight) return;
+  const k = Math.min(1, PASTE_IMAGE_MAX_PX / Math.max(img.naturalWidth, img.naturalHeight));
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(img.naturalWidth * k));
+  c.height = Math.max(1, Math.round(img.naturalHeight * k));
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+  const image = file.type === 'image/jpeg' ? c.toDataURL('image/jpeg', 0.92) : c.toDataURL('image/png');
+  const pageId = pasteTargetPageId();
+  if (!pageId) return;
+  const pg = pageDisplaySize(getPage(doc, pageId));
+  const fit = Math.min(1, (pg.width * PASTE_IMAGE_PAGE_FRAC) / c.width, (pg.height * PASTE_IMAGE_PAGE_FRAC) / c.height);
+  const width = c.width * fit;
+  const height = c.height * fit;
+  const mid = visibleCentreOf(pageId);
+  placePasted(pageId, 'signature', {
+    image, width, height,
+    x: Math.max(0, Math.min(pg.width - width, mid.x - width / 2)),
+    y: Math.max(0, Math.min(pg.height - height, mid.y - height / 2)),
+  });
+}
+
+// Plain text becomes a text object in the bar's current style, exactly what the
+// Teks tool would have made (the same defaults, the same entry path: newlines
+// are lines, a TAB or other layout control is normalised when the text enters
+// the model, by createAnnotation).
+function pasteText(text) {
+  const pageId = pasteTargetPageId();
+  if (!pageId) return;
+  const pg = pageDisplaySize(getPage(doc, pageId));
+  const mid = visibleCentreOf(pageId);
+  placePasted(pageId, 'text', {
+    ...formatBar.getDefaults(), text,
+    x: Math.max(0, Math.min(pg.width - 20, mid.x - 60)),
+    y: Math.max(0, Math.min(pg.height - 20, mid.y - 10)),
+  });
+}
+
+// Ctrl/Cmd+V from the SYSTEM clipboard, read through the paste event only (never
+// the async Clipboard API: no permission prompt, and only what the user just
+// asked to paste). Order, a judgment call and why:
+//   1. the in-app copy while it is fresh (annoCopyFresh): the user pressed
+//      Ctrl+C on an object a moment ago and the system clipboard still holds
+//      whatever was there BEFORE, which is almost always stale (a URL, last
+//      week's screenshot). The keydown handler already took this case; it is
+//      repeated here for pastes that arrive without that keydown (context menu).
+//   2. an image on the system clipboard, then 3. its plain text.
+//   4. otherwise a stale in-app copy, e.g. the system clipboard held a file.
+// Stands down for: an open sheet (the signature dialog has its own paste), any
+// field or the inline editor (native paste into the text), no document, and a
+// paste another listener already took.
+document.addEventListener('paste', (e) => {
+  if (e.defaultPrevented || doc.pages.length === 0 || document.querySelector('dialog[open]')) return;
+  // WHY isContentEditable, not a selector on the target: a paste's target is the
+  // element holding the caret, which after a rich paste into the inline editor
+  // is a <span> INSIDE it. The selector missed, and the next Ctrl+V placed a new
+  // object and tore the open editor out of the DOM, losing what was typed.
+  if (e.target.isContentEditable || e.target.closest?.('input, select, textarea')) return;
+  if (annoClipboard && annoCopyFresh) { if (pasteCopy()) e.preventDefault(); return; }
+  const cd = e.clipboardData;
+  let file = null;
+  for (const item of cd?.items || []) {
+    if (item.kind === 'file' && item.type.startsWith('image/')) { file = item.getAsFile(); if (file) break; }
+  }
+  if (file) { e.preventDefault(); void pasteImageFile(file); return; }
+  const text = (cd?.getData('text/plain') || '').replace(/\r\n?/g, '\n').trim();
+  if (text) { e.preventDefault(); pasteText(text); return; }
+  if (annoClipboard && pasteCopy()) e.preventDefault();
+});
+
 function pasteCopy() {
   if (!annoClipboard) return false;
   pasteCount += 1;
@@ -3297,25 +2917,43 @@ function duplicateSelected() {
 // re-bake only the pages that actually changed.
 function doUndo() {
   const prevPages = doc.pages;
-  if (undo(history, doc)) { pageManager.invalidateThumbs(); rebuildStage(); syncEditedRasters(prevPages); }
+  if (undo(history, doc)) afterHistoryStep(prevPages);
 }
 function doRedo() {
   const prevPages = doc.pages;
-  if (redo(history, doc)) { pageManager.invalidateThumbs(); rebuildStage(); syncEditedRasters(prevPages); }
+  if (redo(history, doc)) afterHistoryStep(prevPages);
+}
+function afterHistoryStep(prevPages) {
+  rebuildStage();
+  syncEditedRasters(prevPages);
+  // Ctrl+Z is allowed inside the Halaman sheet (keydown below), so its grid
+  // must show the restored pages, or the next drag reorders a stale grid.
+  if (document.getElementById('pm-sheet').open) pageManager.render();
 }
 on('btn-undo', 'click', doUndo);
 on('btn-redo', 'click', doRedo);
 
 document.addEventListener('keydown', (e) => {
   // Never hijack typing surfaces (the inline editor stops propagation itself).
-  if (e.target.matches?.('input, select, textarea, [contenteditable="true"]')) return;
+  if (e.target.isContentEditable || e.target.closest?.('input, select, textarea')) return;
   const mod = e.ctrlKey || e.metaKey;
   // WHY lowercased: Shift (or CapsLock) turns e.key into 'Z', so a bare
   // `e.key === 'z'` never matched Ctrl/Cmd+Shift+Z and redo-by-keyboard never fired.
   const key = e.key.toLowerCase();
+  // WHY the open-sheet guard: the editor's keys must not act on the document
+  // behind a sheet. Ctrl+Z behind Unduh changed the doc after the sheet built
+  // its bytes, so the download was the old state and markClean then called the
+  // changed doc saved; Delete on a focused Halaman tile deleted the editor's
+  // selected annotation. Kept: Escape (resets the tool, the dialog closes
+  // itself) and undo/redo in the Halaman sheet, whose page moves it shows live,
+  // but only when it is the ONLY open dialog: in pick mode it sits on top of
+  // Unduh, and querySelector returns the first in DOM order (#pm-sheet), which
+  // let Ctrl+Z through behind Unduh's already-built bytes.
+  const openSheets = document.querySelectorAll('dialog[open]');
+  if (openSheets.length && e.key !== 'Escape'
+    && !(openSheets.length === 1 && openSheets[0].id === 'pm-sheet' && mod && (key === 'z' || key === 'y'))) return;
   if (mod && key === 'z') { e.preventDefault(); e.shiftKey ? doRedo() : doUndo(); }
   else if (mod && key === 'y') { e.preventDefault(); doRedo(); }
-  else if (mod && key === 's') { e.preventDefault(); doDownload(); }
   else if (mod && !e.altKey && !e.shiftKey && 'cxvd'.includes(key) && key.length === 1 && !document.querySelector('dialog[open]')) {
     // WHY the open-dialog guard: preventDefault on Ctrl+V's keydown suppresses the
     // `paste` event, which the signature sheet needs for image paste. WHY no
@@ -3325,7 +2963,11 @@ document.addEventListener('keydown', (e) => {
     const textSelected = !!window.getSelection?.()?.toString();
     if (key === 'c' && !textSelected) { if (copySelected()) e.preventDefault(); }
     else if (key === 'x' && !textSelected) { if (copySelected()) { e.preventDefault(); deleteSelected(); } }
-    else if (key === 'v') { if (annoClipboard && pasteCopy()) e.preventDefault(); }
+    else if (key === 'v') {
+      // Only a FRESH in-app copy is pasted here (and so suppresses the paste event);
+      // anything else falls through to the paste listener, which can read the system clipboard.
+      if (annoClipboard && annoCopyFresh && pasteCopy()) e.preventDefault();
+    }
     else if (key === 'd' && selectedFound()) { e.preventDefault(); duplicateSelected(); } // browsers bookmark on Ctrl+D
   }
   else if (mod && !e.altKey && (key === 'b' || key === 'i') && selectedTextAnno()) {
@@ -3349,7 +2991,7 @@ document.addEventListener('keydown', (e) => {
     else if (k === 'g') setTool('ganti');
     else if (k === 's' || k === 'p') {
       if (storedSignature) setTool('signature');
-      else signatureModal.open();
+      else openSignatureModal();
     }
   }
 });
@@ -3361,6 +3003,11 @@ let nudgeLast = 0;
 document.addEventListener('keydown', (e) => {
   if (!doc.selection.annotationId) return;
   if (e.target.matches?.('input, select, textarea, [contenteditable="true"]')) return;
+  // WHY the open-sheet guard, here and not only in the handler above: this
+  // listener is separate, so that guard never reached it. An arrow behind Unduh
+  // moved the still-selected annotation after the sheet built its bytes; the
+  // download was the old position and markClean called the moved doc saved.
+  if (document.querySelector('dialog[open]')) return;
   const dir = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
   if (!dir) return;
   e.preventDefault();
@@ -3377,10 +3024,22 @@ document.addEventListener('keydown', (e) => {
 });
 
 // ---- file loading (multi-file = merge, by construction) --------------------------------
-// Size guard (carried from the live app): block at 100MB — a 100MB+ file will OOM
-// the weak phones we build for before it ever renders. (The old >20MB heads-up
-// toast was retired when the processing overlay landed — see showProcessing.)
-const SIZE_BLOCK = 100 * 1024 * 1024;
+// The type and size guard (100MB block) lives in core/incoming-files.js: the
+// replace paths must ask it BEFORE they wipe the open document.
+// Says why a selection or a replace was refused.
+function toastRefusal({ refusal, name }) {
+  if (refusal === 'stillLoading') toast(tr('toast.stillLoading'));
+  else toast(refusal === 'tooBig' ? tr('toast.tooBig', { name }) : tr('toast.pickFile'));
+}
+// The one guard of both replace paths (Ganti, Buka Baru). Toasts and returns
+// true when the replace must not wipe the doc: a load is running, or the
+// selection is unusable. Call it BEFORE starting the replace load.
+async function refuseReplace(files) {
+  const verdict = await replaceRefusal({ loading: loadingFiles, files });
+  if (!verdict) return false;
+  toastRefusal(verdict);
+  return true;
+}
 
 // ---- the merge guard: a document that cannot be rebuilt must not be merged ----
 //
@@ -3419,7 +3078,7 @@ async function firstUnrebuildableSource() {
 
 // The landing yields to the editor and the stage is built from `doc`. Shared by a file
 // load (loadFilesInner) and a restored saved document (adoptRestoredDoc).
-function showEditor({ openingZoomFor }) {
+function showEditor({ firstLoad, existingRescaled = false }) {
   if (!rasterizer) rasterizer = createPageRasterizer(doc, { editedPageProvider });
   emptyEl.style.display = 'none';
   // Capture BEFORE clearing: this is the real "editor becomes active" transition,
@@ -3430,41 +3089,73 @@ function showEditor({ openingZoomFor }) {
   // every time someone starts over. See wireDialogHistory below for the other half.
   const wasEmpty = document.body.classList.contains('is-empty');
   document.body.classList.remove('is-empty'); // landing yields, editor chrome returns
-  if (wasEmpty) pushEditorHistoryState();
+  // An append onto an empty editor whose files all fail returns to the landing
+  // while still sitting on the guard entry it pushed earlier; pushing again
+  // would orphan a second one. (A refused replace never leaves the editor.)
+  if (wasEmpty && !window.history.state?.v2doc) pushEditorHistoryState();
 
-  if (openingZoomFor) {
-    zoom = openingZoom(doc.pages[0].width);
-  }
+  // Also on a merge that resized pages already on screen: see zoomAfterLoad.
+  zoom = zoomAfterLoad({
+    firstLoad,
+    existingRescaled,
+    current: zoom,
+    viewport: scrollEl.clientWidth,
+    desktop: deviceClass() === 'desktop',
+    firstPageWidth: firstLoad ? doc.pages[0].width : pageDisplaySize(doc.pages[0]).width,
+    widestPageWidth: widestPageWidth(),
+  });
   rebuildStage(); // applies zoom + sizer at the end
 }
 
 let loadingFiles = false; // re-entry guard: double-taps and rapid picks interleave imports
 
-async function loadFiles(files) {
+// `replace` is Ganti / Buka Baru: the batch is built into a fresh Doc and takes
+// the open document's place only once it has pages (see loadFilesInner).
+async function loadFiles(files, { replace = false } = {}) {
   if (loadingFiles) { toast(tr('toast.stillLoading')); return; }
   // A fresh document (first load / after Buka Baru) is a new editing session —
   // the beta feedback may be asked again. A merge-add into an open doc doesn't reset.
   if (doc.pages.length === 0) resetEditFeedback();
   loadingFiles = true;
   try {
-    await loadFilesInner(files);
+    await loadFilesInner(files, { replace });
   } finally {
     loadingFiles = false;
     hideProcessing();
   }
 }
 
-async function loadFilesInner(files) {
-  const isPdf = (f) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
-  const isImg = (f) => f.type.startsWith('image/');
+async function loadFilesInner(files, { replace = false } = {}) {
   // In picker order: PDFs append their pages, images become one page each.
-  const usable = [...files].filter((f) => isPdf(f) || isImg(f));
-  if (usable.length === 0) { toast(tr('toast.pickFile')); return; }
-  const oversize = usable.find((f) => f.size > SIZE_BLOCK);
-  if (oversize) { toast(tr('toast.tooBig', { name: oversize.name })); return; }
-  const pagesBefore = doc.pages.length;
+  // A PDF whose name lost its extension is told apart by its header
+  // (core/file-kind.js, behind checkIncoming); a file that cannot even be read
+  // for that is skipped there, never thrown here.
+  const verdict = await checkIncoming(files);
+  if (verdict.refusal) { toastRefusal(verdict); return; }
+  // The load empties the stage (rebuildStage, or resetDoc on a replace), and an
+  // editor in it would go without its commit. One held open across a window
+  // switch (the person went to Finder to drag this file in) lost its text, and
+  // its page-hidden listener later committed into whatever document was open
+  // then. It closes here, into the document it was typed on and before the
+  // import's own undo step: on a replace that document is then discarded whole.
+  closeOpenEditor();
+  const { usable, kinds } = verdict;
+  const isPdf = (f) => kinds.get(f) === 'pdf';
+  // WHY a replace imports into a STAGED Doc and not into `doc`: whether a file
+  // opens is only known after it is decoded (a HEIC photo, a password PDF, a
+  // corrupt PDF all pass the type and size check), and wiping first left the
+  // user on an empty landing with the old work and its undo history gone. The
+  // open document stays untouched until the staged one has pages; an append
+  // (`into === doc`) is the unchanged path.
+  const into = replace ? createDoc() : doc;
+  const pagesBefore = into.pages.length;
   const firstLoad = pagesBefore === 0;
-  if (firstLoad) baseName = usable[0].name.replace(/\.[^.]+$/, '');
+  // Pages already on screen, to tell after normalising whether the merge resized
+  // any of them (zoomAfterLoad, core/zoom.js).
+  const idsBefore = new Set(into.pages.map((p) => p.id));
+  // A staged replace names the file at the commit below: now it would rename
+  // the document that is still open.
+  if (firstLoad && !replace) baseName = baseNameOf(usable[0].name);
 
   // Telegraph the parse loop. Note the >20MB heads-up toast is gone: it fired
   // here but sat hidden BEHIND this overlay (z-order), and the overlay itself
@@ -3474,8 +3165,8 @@ async function loadFilesInner(files) {
   // parse (see the merge guard above). Already-open sources first: if one of
   // THEM cannot be rebuilt, adding anything makes the export impossible, and
   // blaming the new file would be wrong. Say which side it is, and stop.
-  const rebuilds = doc.sources.length > 0 || usable.length > 1;
-  if (doc.sources.length > 0) {
+  const rebuilds = into.sources.length > 0 || usable.length > 1;
+  if (into.sources.length > 0) {
     const err = await firstUnrebuildableSource();
     if (err) {
       toast(tr('toast.mergeBlocked'));
@@ -3514,8 +3205,8 @@ async function loadFilesInner(files) {
           const loadErr = await rebuildLoadError(bytes);
           if (loadErr) throw loadErr;
         }
-        const importedPages = await importPdf(doc, { name: f.name, bytes });
-        if (rebuilds) rebuildVerdicts.set(doc.sources.at(-1).id, Promise.resolve(null)); // just proven
+        const importedPages = await importPdf(into, { name: f.name, bytes });
+        if (rebuilds) rebuildVerdicts.set(into.sources.at(-1).id, Promise.resolve(null)); // just proven
         // A protected PDF opens and renders perfectly (PDF.js decrypts) but can
         // NEVER be written back — pdf-lib has no decryption. Say so HERE, at
         // import, rather than letting them edit a 444-page document and meet
@@ -3530,7 +3221,7 @@ async function loadFilesInner(files) {
         // only) — so this must never imply one.
         //
         // COPY IS PLACEHOLDER — client-facing words are Fauzan's, per the seat.
-        if (doc.sources.at(-1)?.encrypted) {
+        if (into.sources.at(-1)?.encrypted) {
           toast(tr('toast.lockedReadOnly')); // TODO(copy): his words
           // blocked:FALSE — this file OPENED and is fully editable. It shares
           // its stage and reason with the genuine decline further down (the
@@ -3549,7 +3240,7 @@ async function loadFilesInner(files) {
         // .then can resolve after the NEXT file in a multi-file merge loop has
         // already been added, and `doc.sources.at(-1)` would then describe the
         // wrong file.
-        const docSigned = !!doc.sources.at(-1)?.signed;
+        const docSigned = !!into.sources.at(-1)?.signed;
         probeTextLayer(bytes)
           .then((hasText) => tel('doc_open', {
             text_layer: hasText, signed: docSigned,
@@ -3558,7 +3249,7 @@ async function loadFilesInner(files) {
           }))
           .catch(() => {});
       } else {
-        await importImage(doc, { name: f.name, bytes, mimeType: f.type });
+        await importImage(into, { name: f.name, bytes, mimeType: f.type });
         // An image page has no text layer at all — that's the scan ladder's
         // own job (spec-edit-dokumen-foto.md), not this rail's.
         // signed:false — an image has no PDF structure to carry a signature.
@@ -3617,7 +3308,14 @@ async function loadFilesInner(files) {
 
   // Every file failed → leave the landing untouched, say it plainly, bail. Also
   // guards the doc.pages[0] read below, which would throw on an empty document.
-  if (doc.pages.length === 0) {
+  // A replace has nothing to put back: its old document was never touched and
+  // is still on screen. Only an append onto an empty editor shows the landing.
+  if (into.pages.length === 0) {
+    if (!replace) {
+      document.body.classList.add('is-empty');
+      emptyEl.style.display = '';
+      refreshChrome();
+    }
     const singleLocked = usable.length === 1 && lastFailureReason === 'encrypted';
     toast(singleLocked
       ? tr('toast.openLocked')
@@ -3625,6 +3323,14 @@ async function loadFilesInner(files) {
         ? tr('toast.openFailedOne')
         : tr('toast.openFailedAll'));
     return;
+  }
+
+  // The commit of a staged replace: the new file opened, so it takes the old
+  // document's place (and its undo history) now. This is the one wipe.
+  if (replace) {
+    await resetDoc(into);
+    resetEditFeedback(); // a new editing session, as an open on the empty editor is
+    baseName = baseNameOf(usable[0].name);
   }
 
   // Every page takes the width of the first page (founder note 6 Aug 2026).
@@ -3637,9 +3343,9 @@ async function loadFilesInner(files) {
   // Placed BEFORE the rasterizer and rebuildStage below: both read page.width,
   // and a raster taken at the pre-normalisation size would have to be thrown
   // away immediately.
-  normalizePageWidths(doc);
+  const rescaled = normalizePageWidths(doc);
 
-  showEditor({ openingZoomFor: firstLoad });
+  showEditor({ firstLoad, existingRescaled: rescaled.some((p) => idsBefore.has(p.id)) });
   if (firstLoad) savedSession?.begin(); // a new document: its autosave slot, and the lock that says it is ours
   // A non-first load that actually grew the doc IS a merge (gabung). Fire at
   // COMPLETION so it counts real merges from EVERY entry point — the [+] tile,
@@ -3647,7 +3353,8 @@ async function loadFilesInner(files) {
   // gabungkan_used fired on page-manager open, which also covers split/reorder/
   // delete; this is the clean, merge-only signal the first-party rail lacked.
   if (!firstLoad && doc.pages.length > pagesBefore) {
-    markChanged(history); // a merge is not undoable, so it never went through record()
+    markChanged(history); // a merge is not undoable: an undo barrier (core/history.js)
+    refreshChrome(); // the barrier just emptied the stacks; grey Undo/Redo now
     tel('tool_use', { tool: 'gabung', action: 'merge' });
   }
   // Honest close-out: skips take priority over the merge tally — the user needs to
@@ -3684,7 +3391,7 @@ function applyIntent(intent) {
   if (intent === 'ttd' || intent === 'paraf') {
     // Same semantics as the toolbar button: no stored signature → the modal
     // opens to make one; otherwise arm placement.
-    if (!storedSignature) { signatureModal.open(); return; }
+    if (!storedSignature) { openSignatureModal(); return; }
     setTool('signature');
     toast(tr('toast.armSignature'));
   } else if (intent === 'teks') {
@@ -3836,14 +3543,34 @@ on(fileBtn, 'click', (e) => { e.stopPropagation(); toggleFileMenu(fileMenu.hidde
 document.addEventListener('pointerdown', (e) => {
   if (!fileMenu.hidden && !e.target.closest('.file-menu-wrap')) toggleFileMenu(false);
 });
+// WHY every in-editor add goes through here with an explicit mode: a Buka Baru
+// whose picker was CANCELLED used to stay armed (only `change` cleared it; a
+// cancelled picker fires `cancel` at best, nothing at all on older Safari), so
+// the next Tambah file wiped the document instead of merging into it. Setting
+// the mode at every open is the fix that needs no event. (Not a `cancel`
+// listener: headless Chromium auto-dismisses the picker the moment it opens,
+// which would disarm every Buka Baru a spec drives with setInputFiles.)
+function pickFiles(replace = false) {
+  pendingReplace = replace; // applied when the picker actually returns files
+  fileInput.click();
+}
 on('fm-add', 'click', () => {
   toggleFileMenu(false);
-  fileInput.click(); // appends → merge, the default loadFiles path
+  pickFiles(); // appends → merge, the default loadFiles path
 });
+// Buka Baru wipes the doc AND its undo history once a picked file OPENS (a file
+// that cannot be decoded changes nothing), so with
+// edits not yet downloaded it asks first. A clean doc (nothing edited, or
+// already downloaded whole) loses nothing, so the picker opens straight away.
 on('fm-new', 'click', () => {
   toggleFileMenu(false);
-  pendingReplace = true; // applied when the picker actually returns files
-  fileInput.click();
+  if (isDirty(history)) document.getElementById('new-confirm').showModal();
+  else pickFiles(true);
+});
+on('nc-cancel', 'click', () => document.getElementById('new-confirm').close());
+on('nc-go', 'click', () => {
+  document.getElementById('new-confirm').close();
+  pickFiles(true);
 });
 on('fm-pages', 'click', () => {
   toggleFileMenu(false);
@@ -3862,19 +3589,14 @@ on('fm-pages', 'click', () => {
 async function adoptRestoredDoc({ doc: restored, name }) {
   showProcessing(1);
   try {
-    if (doc.pages.length > 0) await resetDoc(); // caches, rasterizer and fonts of the OLD doc
+    // The restored Doc takes the old one's place through the one swap (a staged replace
+    // does the same): caches, rasterizer and fonts of the OLD doc go, and a reopened
+    // document starts with a clean undo stack and counts as NOT dirty, so the leave guard
+    // stays down until the first new edit (spec).
+    await resetDoc(restored);
     resetEditFeedback();
-    // IN PLACE: closures hold `doc` by name, and resetDoc may just have replaced it.
-    doc.sources = restored.sources;
-    doc.pages = restored.pages;
-    doc.selection = restored.selection;
     baseName = name || 'dokumen';
-    // A reopened document starts with a clean undo stack and counts as NOT dirty, so the
-    // leave guard stays down until the first new edit (spec).
-    history.undoStack.length = 0;
-    history.redoStack.length = 0;
-    markClean(history);
-    showEditor({ openingZoomFor: true });
+    showEditor({ firstLoad: true });
   } finally {
     hideProcessing();
   }
@@ -3943,7 +3665,7 @@ try {
 
 // Start over: a FRESH doc + history. The signature stays (it's the user's,
 // not the document's). Cancelling the picker leaves everything untouched.
-async function resetDoc() {
+async function resetDoc(next = createDoc()) {
   // The leave guard comes down at once, as it always did: the autosave below takes a moment and
   // is no reason for the browser to still ask about a document being thrown away on purpose
   // (tests/v2-leave-guard.spec.js reloads right after the swap).
@@ -3951,7 +3673,7 @@ async function resetDoc() {
   // The document going away is autosaved FIRST, and the swap waits for the write; then its slot
   // and locks are released. Never throws: Buka Baru must not depend on storage.
   await savedSession?.end();
-  doc = createDoc();
+  doc = next;
   history.undoStack.length = 0;
   history.redoStack.length = 0;
   markClean(history); // a fresh doc has nothing to lose; takes the leave guard down
@@ -3968,11 +3690,9 @@ async function resetDoc() {
   // FontFace we registered on document.fonts belongs to the OLD document. Not
   // clearing them would leak faces forever across repeated Buka Baru, and
   // document.fonts.check() for a stale name would still (wrongly) report true.
-  pdfLibDocCache.clear();
+  editBake.reset();
   rebuildVerdicts.clear();
-  docFontCache.clear();
-  for (const face of addedFontFaces) document.fonts.delete(face);
-  addedFontFaces.clear();
+  docFontLive.reset();
   slots = [];
   stage.innerHTML = '';
   baseName = 'dokumen';
@@ -3980,21 +3700,60 @@ async function resetDoc() {
 }
 on(fileInput, 'change', async (e) => {
   const files = e.target.files;
-  if (files?.length) {
-    if (pendingReplace) await resetDoc();
-    await loadFiles(files).catch((err) => { console.error(err); toast(tr('toast.openFailed')); });
+  const replace = pendingReplace; // read before any await: the mode of THIS pick
+  // Refuse early while the old doc is intact. This is the cheap half (type,
+  // size, a running load); a file that passes it but cannot be decoded is
+  // caught by loadFiles' staging, which wipes nothing until a page exists.
+  if (files?.length && !(replace && await refuseReplace(files))) {
+    await loadFiles(files, { replace }).catch((err) => { console.error(err); toast(tr('toast.openFailed')); });
   }
   pendingReplace = false; // picker cancelled → nothing was destroyed
   fileInput.value = '';
   fileInput.setAttribute('accept', DEFAULT_ACCEPT); // undo any intent narrowing (Foto jadi PDF)
 });
 
-// Drag & drop anywhere (desktop).
+// Drag & drop anywhere (desktop). Onto an empty canvas the file just opens.
+// Onto an open doc it asks: add the pages, or replace the doc (his ask
+// 2026-10-09; before, a drop always appended without saying so). Closing the
+// dialog any other way (Batal, Esc, backdrop, back) drops nothing.
+const dropChoice = document.getElementById('drop-choice');
+let droppedFiles = null;
 document.addEventListener('dragover', (e) => e.preventDefault());
 document.addEventListener('drop', (e) => {
   e.preventDefault();
-  if (e.dataTransfer?.files?.length) loadFiles(e.dataTransfer.files);
+  // Never behind a sheet (the Halaman sheet re-renders itself on a merge, so it
+  // is the one exception). Dropped behind Unduh, the merge missed the bytes the
+  // sheet had already built, and markClean then called the merged doc saved.
+  // This also keeps a second drop from landing while #drop-choice is open.
+  if (document.querySelector('dialog[open]:not(#pm-sheet)')) return;
+  const files = e.dataTransfer?.files;
+  if (!files?.length) return;
+  if (doc.pages.length === 0) {
+    loadFiles(files).catch((err) => { console.error(err); toast(tr('toast.openFailed')); });
+    return;
+  }
+  droppedFiles = [...files]; // the DataTransfer empties once this handler returns
+  dropChoice.showModal();
 });
+on(dropChoice, 'close', () => { droppedFiles = null; });
+function takeDropped() {
+  const files = droppedFiles;
+  dropChoice.close(); // its close handler clears droppedFiles
+  return files;
+}
+on('dc-add', 'click', () => {
+  const files = takeDropped();
+  if (files) loadFiles(files).catch((err) => { console.error(err); toast(tr('toast.openFailed')); });
+});
+on('dc-replace', 'click', async () => {
+  const files = takeDropped();
+  if (!files) return;
+  // Refuse early while the old doc is intact (a running load, a .docx, a
+  // 100MB+ file); one that cannot be decoded is caught by loadFiles' staging.
+  if (await refuseReplace(files)) return;
+  await loadFiles(files, { replace: true }).catch((err) => { console.error(err); toast(tr('toast.openFailed')); });
+});
+on('dc-cancel', 'click', () => dropChoice.close());
 
 // ---- download: the Unduh sheet (output pipeline) ------------------------------------------
 // Opening it starts building the REAL PDF in the background — by the time the
@@ -4015,9 +3774,26 @@ const downloadSheet = createDownloadSheet({
 });
 function doDownload() {
   if (doc.pages.length === 0) return;
+  // Unduh button and Ctrl+S both land here. A load in flight (a staged Ganti /
+  // Buka Baru keeps the OLD doc live under it) would open the sheet on a
+  // document that is about to be swapped: its pre-built bytes would then be
+  // saved under the new file's name. The same loadingFiles flag loadFiles uses.
+  if (loadingFiles) { toast(tr('toast.stillLoading')); return; }
   downloadSheet.open();
 }
 on('btn-download', 'click', doDownload);
+// Ctrl/Cmd+S = the Unduh button. CAPTURE phase on purpose: the inline text editor
+// stops propagation of every keydown it sees (so typing never fires tool verbs),
+// and the main handler above stands down inside any field, so a bubbling listener
+// never saw Ctrl+S where people reach for it most, mid-typing, and the browser's
+// own Save Page opened over the editor. preventDefault runs even with no document
+// open or a sheet already up: "save this page" is never what the key means here.
+document.addEventListener('keydown', (e) => {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey || e.key.toLowerCase() !== 's') return;
+  e.preventDefault();
+  if (document.querySelector('dialog[open]')) return;
+  doDownload();
+}, true);
 
 // ---- wordmark → home (punch list #3) --------------------------------------------
 // On the landing the wordmark is already home; with a doc open it asks first —
@@ -4059,7 +3835,7 @@ function pushEditorHistoryState() {
 (function wireDialogHistory() {
   // NOTE: window.history everywhere — plain `history` is SHADOWED in this
   // module by the undo history (const history = createHistory()).
-  const dialogs = ['pm-sheet', 'sig-modal', 'dl-sheet', 'home-confirm', 'saved-list'].map((id) => document.getElementById(id)).filter(Boolean);
+  const dialogs = ['pm-sheet', 'sig-modal', 'dl-sheet', 'home-confirm', 'drop-choice', 'new-confirm', 'saved-list'].map((id) => document.getElementById(id)).filter(Boolean);
   const stack = []; // open dialogs in STACKING order (array order lies for nesting)
   let expectPop = false;
 
@@ -4190,8 +3966,11 @@ function showScanOffer(pageId) {
     dlg.close();
   };
 
-  dlg.querySelector('#so-tipex').onclick = take('tipex', 'tipex');
-  dlg.querySelector('#so-teks').onclick = take('teks', 'teks');
+  // First arg is the DOM tool id (data-tool), second the rail's word (ARM_TOOL).
+  // They differ on purpose; arming 'tipex'/'teks' armed a tool that does not
+  // exist and left the page unscrollable (touchAction none) on a phone.
+  dlg.querySelector('#so-tipex').onclick = take('whiteout', 'tipex');
+  dlg.querySelector('#so-teks').onclick = take('text', 'teks');
   // RUNG S2. Settles as `accepted` on the CLICK rather than on an armed tool,
   // unlike the two above, and the difference is honest rather than sloppy:
   // recognition takes seconds and can fail, so there is no synchronous "the
@@ -4277,11 +4056,27 @@ if ('serviceWorker' in navigator) {
     // No block comment in this catch: several tests strip block comments with a
     // lazy regex, and the accept string for images earlier in this file opens
     // one as far as that regex can tell, so a closer here swallows the file.
+    const firstVisit = !navigator.serviceWorker.controller;
     try {
       navigator.serviceWorker.controller?.postMessage({ type: 'pdflokal:booted' });
     } catch {
       // enhancement only
     }
     navigator.serviceWorker.register('/sw.js').catch(() => {});
+    // FIRST VISIT: no worker saw this load, so it has no offline generation and an
+    // install made now would launch offline into a dead shell. Once the worker
+    // takes control, hand it the module URLs this page actually ran so it can
+    // adopt them as a generation (sw.js ADOPTION; it keeps nothing if a deploy
+    // landed meanwhile). Same reach as 'booted': only a page that got here.
+    if (firstVisit) {
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        try {
+          const urls = performance.getEntriesByType('resource').map((e) => e.name);
+          navigator.serviceWorker.controller?.postMessage({ type: 'pdflokal:adopt', urls });
+        } catch {
+          // enhancement only
+        }
+      }, { once: true });
+    }
   });
 }

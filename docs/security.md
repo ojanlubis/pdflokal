@@ -15,7 +15,7 @@ libraries. This file holds only the why and the traps. See [CLAUDE.md](../CLAUDE
 ## Server surface
 
 All *file processing* is client-side. `api/` is the only code that runs off-device (each file's
-header says what it is); none of it ever receives a PDF. The two that take user-originated data:
+header says what it is); none of it ever receives a PDF. The ones that take user-originated data:
 
 - **`api/t.js`** — typed, content-blind telemetry. Every event is validated against
   `js/core/telemetry-schema.js` and **dropped if off-schema**. The schema has no free-string field,
@@ -26,6 +26,26 @@ header says what it is); none of it ever receives a PDF. The two that take user-
   Sent only when the user rates 👎, *sees the exact crops*, and taps Kirim. Size-capped client-side,
   re-checked server-side (never trust the client), and constrained again by table CHECK constraints
   (`scripts/turso-feedback-migration.sql`).
+  It also takes the **feature vote's free-text idea** (`kind: 'feature_request'`): the text the
+  person typed, the ids they voted for (`js/core/features.js`: at most 3, from the fixed list),
+  their `visitor_id` and the page language, filed in its **own table** `feature_requests` in the
+  same database, never in `feedback`. No images are read on that path. The table is created by
+  `scripts/turso-feedback-migration.sql` (idempotent) and **must exist before the code that writes
+  it ships**; until then the insert fails, logged content-blind, and the idea is lost.
+- **`api/votes.js`** — the feature vote's ballot box. `POST` takes `{visitor_id, features, has_text,
+  lang}` and writes ONE row to `feature_ballots` in the same database (`pdflokal-feedback`):
+  **one ballot per `visitor_id`, total**, enforced by the table's primary key (the insert is
+  `on conflict do nothing`, so a second ballot writes zero rows and is answered 409). A missing or
+  malformed `visitor_id`, an id not on the list, more than 3, or a ballot with no choice and no idea
+  is a 400 and writes nothing; the 1 to 3 ids are one JSON column of one row, so a ballot lands
+  whole or not at all. The write goes through `_turso.js`, which checks the transport, then every
+  statement's own result (Turso answers HTTP 200 for a refused statement), then the row count: any
+  failure is a 503, never a "recorded". No free text is read (the idea goes to `feature_requests`
+  above, tag-stripped and capped at 500). `GET` returns aggregates only: counts per feature id and
+  the number of voters; no id, no row, no text, and nothing at all under 10 voters. Cached at the CDN
+  for 10 minutes; on any failure it answers `{voters:null,counts:null}`. The `feature_vote` rail
+  event is analytics only; nothing counts it. The table is created by the same idempotent
+  `scripts/turso-feedback-migration.sql` and **must exist before the code that writes it ships**.
 
 Both **fail closed**: if their env vars are absent the endpoint 204s and writes nothing. That
 property is load-bearing and also a trap — it silently swallowed a week of preview telemetry in

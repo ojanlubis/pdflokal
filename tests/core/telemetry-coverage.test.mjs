@@ -57,7 +57,7 @@ function names(fn) {
 // changing this list, which is the whole point.
 // ---------------------------------------------------------------------------
 const GA4_ONLY = [
-  'client_error', 'download', 'editor_action', 'file_failed', 'file_loaded',
+  'client_error', 'donate_tap', 'download', 'editor_action', 'file_failed', 'file_loaded',
   'gabungkan_used', 'ganti_no_text_layer', 'intent_armed', 'pwa_card_open',
   'pwa_install', 'pwa_installed', 'share_card_shown', 'share_sent', 'share_tap',
   'template_card', 'tester_optin', 'tool_opened', 'vote_playstore',
@@ -70,6 +70,15 @@ const GA4_ONLY = [
  * share themselves" — and only GA4 carries source. The first-party rail stores
  * no referrer or UTM by design. Ad-blocking drops the shown/tap/sent funnel and
  * the arrivals by the same factor, so the ratios survive it. */
+
+/* `donate_tap` added 2026-10-06, with a `surface` field ('share-card' | 'vote'). It
+ * is the Traktir kopi tap of the share card AND of the feature vote's last step,
+ * and it sits beside `share_card_shown` (which the vote's coffee step also sends,
+ * tagged surface:'vote') for the same reason they are here: the question is "did a
+ * person who was shown the coffee ask tap it, and from which door", read next to
+ * the visitor's traffic source, which only GA4 carries. A RATIO, so ad-blocking
+ * drops numerator and denominator alike. (`surface`, never `source`: GA4 reads
+ * `source` as the session's traffic source, see lib/analytics.js GA4_RESERVED.) */
 
 /* `template_card` added 2026-09-03, and the test's own question answered rather
  * than waved past: it belongs on THIS rail, not the first-party one, because the
@@ -200,11 +209,59 @@ test('COVERAGE: only the pure classifier may read err.message, and it cannot tra
     + 'with no way to send anything anywhere — that isolation IS the content-blindness guarantee.',
   );
 
-  for (const rel of [['v2', 'app.js'], ['v2', 'download-sheet.js'], ['v2', 'telemetry.js']]) {
-    const src = strip(fs.readFileSync(path.join(JS, ...rel), 'utf8'));
+  // EVERY FILE, NOT A LIST (2026-10-10). This was a hand-kept list of six
+  // modules, and it already missed js/v2/bake-failure.js, which sends
+  // tel('failure', …) AND reads err.message: a function appended there
+  // returning String(err.message) stayed green. A list protects the files
+  // someone remembered; the class is "any module that can reach a rail".
+  // Exemptions are NAMED, each with why and with a check that it is still
+  // needed and still narrow, so an exemption cannot outlive its reason.
+  const READS = /err\?\.message|err\.message/;
+  const sliceFn = (src, signature) => {
+    const at = src.indexOf(signature);
+    if (at < 0) return null;
+    const open = src.indexOf('{', at + signature.length - 1);
+    let depth = 0; let i = open;
+    for (; i < src.length; i++) {
+      if (src[i] === '{') depth++;
+      else if (src[i] === '}' && --depth === 0) break;
+    }
+    return { body: src.slice(open, i + 1), rest: src.slice(0, at) + src.slice(i + 1) };
+  };
+  const EXEMPT = {
+    // The pure classifier itself; its isolation is asserted just above.
+    'core/failure-reason.js': () => {},
+    // A developer lab page (lab-edit.html), never linked from the product. It
+    // prints the message on its OWN screen and has no telemetry door at all.
+    'lab-edit.js': (src) => {
+      assert.match(src, READS, 'js/lab-edit.js no longer reads err.message — delete its exemption');
+      assert.equal(/\b(tel|track|feedback)\s*\(|telemetry|analytics|sentry/i.test(src), false,
+        'js/lab-edit.js reads err.message AND now touches a telemetry door — its exemption no longer holds');
+    },
+    // safeErrorMessage reads the message ONLY to allowlist it (anything that is
+    // not a fixed engine phrasing becomes '[scrubbed]'). Exempt is that ONE
+    // function body; any other read in the file is still banned.
+    'v2/bake-failure.js': (src) => {
+      const fn = sliceFn(src, 'export function safeErrorMessage(err) {');
+      assert.ok(fn, 'js/v2/bake-failure.js lost safeErrorMessage — delete or re-aim its exemption');
+      assert.match(fn.body, READS, 'safeErrorMessage no longer reads err.message — delete its exemption');
+      assert.match(fn.body, /SAFE_MESSAGES\.some\(/, 'safeErrorMessage no longer allowlists the message it reads');
+      assert.equal(READS.test(fn.rest), false,
+        'js/v2/bake-failure.js reads err.message OUTSIDE safeErrorMessage — that read is not allowlisted. '
+        + 'Pass the error to safeErrorMessage() or failureReason().');
+    },
+  };
+  const files = sourceFiles(JS).map((f) => path.relative(JS, f).split(path.sep).join('/'));
+  // Known-positive: the scan reaches the file the old list missed, and more.
+  assert.ok(files.length > 50 && files.includes('v2/bake-failure.js'),
+    `the source scan found ${files.length} files and ${files.includes('v2/bake-failure.js') ? 'did' : 'did NOT'} reach v2/bake-failure.js`);
+  for (const rel of Object.keys(EXEMPT)) assert.ok(files.includes(rel), `exempted js/${rel} no longer exists — delete its exemption`);
+  for (const rel of files) {
+    const src = strip(fs.readFileSync(path.join(JS, rel), 'utf8'));
+    if (EXEMPT[rel]) { EXEMPT[rel](src); continue; }
     assert.equal(
-      /err\?\.message|err\.message/.test(src), false,
-      `err.message appeared in js/${rel.join('/')} — a thrown message can quote the document back to us. `
+      READS.test(src), false,
+      `err.message appeared in js/${rel} — a thrown message can quote the document back to us. `
       + 'Pass the error to failureReason() and send only the bucket it returns.',
     );
   }
@@ -215,11 +272,19 @@ test('COVERAGE: only the pure classifier may read err.message, and it cannot tra
 // constant — the classifier was never asked. A hard-coded enum value in a
 // failure report is indistinguishable from a real classification on the rail,
 // which is what made it survive review and a full gate.
+// EVERY FILE, NOT A LIST (2026-10-10). This scanned app.js and
+// download-sheet.js only, so js/v2/bake-failure.js's tel('failure', …) was
+// never read: `reason: 'unknown'` there stayed green.
+// (The one exemption that stood here, bake-failure.js rewriting a classified
+// 'unsupported' into a literal 'unknown', ended with the founder ruling of
+// 2026-10-11: the classifier's answer is now sent as is.)
 test('COVERAGE: no failure report hard-codes its reason', () => {
-  for (const rel of [['v2', 'app.js'], ['v2', 'download-sheet.js']]) {
+  const seen = new Set();
+  for (const relPath of sourceFiles(JS).map((f) => path.relative(JS, f).split(path.sep).join('/'))) {
+    const rel = relPath.split('/');
     const src = strip(fs.readFileSync(path.join(JS, ...rel), 'utf8'));
     const calls = src.match(/tel\('failure',\s*\{[^}]*\}/g) || [];
-    assert.ok(calls.length > 0, `no failure reports found in js/${rel.join('/')} — the scan broke`);
+    if (calls.length > 0) seen.add(relPath);
     for (const call of calls) {
       // ⚠️ A MISSING `reason` IS A FAILURE, NOT A SKIP. This block was
       // `const m = ...; if (!m) continue;` — so a `tel('failure', {...})` call
@@ -299,5 +364,10 @@ test('COVERAGE: no failure report hard-codes its reason', () => {
         + 'Call failureReason(err).',
       );
     }
+  }
+  // Known-positive: the scan must reach every file that reports failures today,
+  // or "no hard-coded reason found" is a scan that found nothing.
+  for (const rel of ['v2/app.js', 'v2/download-sheet.js', 'v2/bake-failure.js']) {
+    assert.ok(seen.has(rel), `no failure reports found in js/${rel} — the scan broke`);
   }
 });

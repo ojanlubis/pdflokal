@@ -15,9 +15,12 @@ import { createSource, createPage, getSource } from './model.js';
 import { addSource, addPages } from './operations.js';
 import { ensurePdfJs } from './vendor.js';
 import { editSignature } from './page-surgery.js';
+import { totalPageRotation } from './page-rotation.js';
 import { rasterKey } from './raster-key.js';
 import { pageHasVisibleText } from './text-visibility.js';
 import { failureReason } from './failure-reason.js';
+import { sniffImageFormat } from './image-format.js';
+import { stripJpegMetadata } from './jpeg-metadata.js';
 
 // bytes → append a Source + its Pages (metadata only) to `doc`. Returns the pages.
 // SINGLE SOURCE OF TRUTH for "this PDF is password/permissions protected".
@@ -159,35 +162,43 @@ export async function importPdf(doc, { name, bytes }) {
   const pdfjsLib = await ensurePdfJs();
   // Defensive .slice(): PDF.js may detach the ArrayBuffer it's handed.
   const pdf = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
-  const source = addSource(doc, createSource({
-    name,
-    bytes,
-    numPages: pdf.numPages,
-    encrypted: await detectEncrypted(pdf),
-    // The RAW bytes, not the PDF.js document: the signature dictionary is a
-    // file-layout fact, and PDF.js exposes no handle on it. See detectSigned.
-    signed: detectSigned(bytes),
-  }));
-
+  // WHY the Source joins the doc only AFTER every page loaded, and destroy() is
+  // in a finally: a broken page tree (getDocument fine, getPage(k) throws) used
+  // to leak the PDF.js document and leave a page-less Source behind, so the next
+  // single-file open looked like a MERGE and could be refused as one.
+  let source;
   const pages = [];
-  for (let n = 1; n <= pdf.numPages; n += 1) {
-    const pdfPage = await pdf.getPage(n);
-    const vp = pdfPage.getViewport({ scale: 1 }); // honors the PDF's intrinsic /Rotate
-    const page = createPage({
-      source,
-      sourcePageNum: n - 1,
-      width: vp.width,
-      height: vp.height,
-      rotation: 0,
+  try {
+    source = createSource({
+      name,
+      bytes,
+      numPages: pdf.numPages,
+      encrypted: await detectEncrypted(pdf),
+      // The RAW bytes, not the PDF.js document: the signature dictionary is a
+      // file-layout fact, and PDF.js exposes no handle on it. See detectSigned.
+      signed: detectSigned(bytes),
     });
-    // WHY: scanned/landscape PDFs carry an intrinsic /Rotate. PDF.js's explicit
-    // `rotation:` param OVERRIDES it (not additive), so rasterize must pass
-    // intrinsic + user rotation or pre-rotated documents render sideways.
-    page.baseRotation = pdfPage.rotate || 0;
-    pages.push(page);
+    for (let n = 1; n <= pdf.numPages; n += 1) {
+      const pdfPage = await pdf.getPage(n);
+      const vp = pdfPage.getViewport({ scale: 1 }); // honors the PDF's intrinsic /Rotate
+      const page = createPage({
+        source,
+        sourcePageNum: n - 1,
+        width: vp.width,
+        height: vp.height,
+        rotation: 0,
+      });
+      // WHY: scanned/landscape PDFs carry an intrinsic /Rotate. PDF.js's explicit
+      // `rotation:` param OVERRIDES it (not additive), so rasterize must pass
+      // intrinsic + user rotation or pre-rotated documents render sideways.
+      page.baseRotation = pdfPage.rotate || 0;
+      pages.push(page);
+    }
+  } finally {
+    await pdf.destroy().catch(() => { /* already gone */ });
   }
+  addSource(doc, source);
   addPages(doc, pages);
-  await pdf.destroy();
   return pages;
 }
 
@@ -218,8 +229,9 @@ export async function probeTextLayer(bytes) {
 // pdf-lib (the export adapter) can only embed PNG and JPEG. Anything else
 // (WEBP/GIF/BMP/…) is transcoded to PNG HERE, at the browser edge, so the bytes
 // stored on the Source are always export-safe and export never has to sniff for
-// a format it can't handle.
-const EMBEDDABLE_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/jpg']);
+// a format it can't handle. "Anything else" is decided from the BYTES
+// (image-format.js), never the MIME type: File.type comes from the extension,
+// so a WebP saved as foto.jpg claims image/jpeg and used to be stored as-is.
 
 // EXIF Orientation (tag 0x0112) of a JPEG, or 1 when absent/unreadable.
 // WHY THIS EXISTS (2026-09-06, measured with tests/image-orientation.spec.js):
@@ -275,6 +287,48 @@ export function jpegExifOrientation(bytes) {
   return 1;
 }
 
+// iOS Safari gives no 2D context at all past ~16.7 MP (the same ceiling
+// js/render/sharpen.js budgets for); core does not import the render layer.
+const TRANSCODE_MAX_PIXELS = 16_777_216;
+
+// The bytes an image Source stores: the file itself when pdf-lib can embed it
+// as-is, else a transcode. Two reasons land here: a format pdf-lib cannot
+// embed (WEBP/GIF/BMP → PNG), or a JPEG whose EXIF Orientation disagrees with
+// its raw pixels (see jpegExifOrientation) → re-encoded as JPEG from the
+// ORIENTED bitmap, so a portrait phone photo stays portrait in the file and
+// not only in the preview. JPEG, not PNG, for the second case: a 12-megapixel
+// photo as PNG is tens of megabytes, and the source was lossy already.
+// Re-encoding also drops the EXIF block (camera model, timestamps, GPS), which
+// the file never needed to carry. An UPRIGHT JPEG is stored without a
+// re-encode but not untouched: its metadata segments and any Motion Photo
+// video after EOI are cut losslessly (core/jpeg-metadata.js), because export
+// embeds these bytes verbatim into the user's PDF.
+//
+// CAPPED at TRANSCODE_MAX_PIXELS: an iPhone "HEIF Max" photo is 48.8 MP, so
+// the full-size canvas got no context and the import was refused as
+// unreadable (round-3 hunt, 2026-10-10). The stored image is downscaled; the
+// PAGE keeps the photo's size (export draws full-bleed), so nothing moves.
+async function storableImageBytes(bytes, bitmap, width, height) {
+  const format = sniffImageFormat(bytes);
+  const turned = format === 'jpg' && jpegExifOrientation(bytes) !== 1;
+  if (format === 'jpg' && !turned) return stripJpegMetadata(bytes);
+  if (format && !turned) return bytes;
+  const k = Math.min(1, Math.sqrt(TRANSCODE_MAX_PIXELS / (width * height)));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.floor(width * k));
+  canvas.height = Math.max(1, Math.floor(height * k));
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('image transcode: no 2D canvas context');
+  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  const blobOut = await new Promise((resolve) => (turned
+    ? canvas.toBlob(resolve, 'image/jpeg', 0.92)
+    : canvas.toBlob(resolve, 'image/png')));
+  if (!blobOut) throw new Error('image transcode: the canvas could not be encoded');
+  const out = new Uint8Array(await blobOut.arrayBuffer());
+  canvas.width = 0; // release the backing store now, not at GC (iOS counts it)
+  return out;
+}
+
 // bytes (a raw image file) → append a Source + ONE image page to `doc`.
 // Sizing convention: the page's point size EQUALS the image's pixel dimensions,
 // and export draws the image full-bleed edge-to-edge. This matches BOTH the old
@@ -292,30 +346,13 @@ export async function importImage(doc, { name, bytes, mimeType }) {
   const width = bitmap.width;
   const height = bitmap.height;
 
-  let storeBytes = bytes;
-  const isJpeg = type === 'image/jpeg' || type === 'image/jpg';
-  const turned = isJpeg && jpegExifOrientation(bytes) !== 1;
-  if (!EMBEDDABLE_IMAGE_TYPES.has(type) || turned) {
-    // Transcode so export's embed always paints what the user saw. Two reasons
-    // land here: a format pdf-lib cannot embed (WEBP/GIF/BMP → PNG), or a JPEG
-    // whose EXIF Orientation disagrees with its raw pixels (see
-    // jpegExifOrientation) → re-encoded as JPEG from the ORIENTED bitmap, so a
-    // portrait phone photo stays portrait in the file and not only in the
-    // preview. JPEG, not PNG, for the second case: a 12-megapixel photo as PNG
-    // is tens of megabytes, and the source was lossy already. Re-encoding also
-    // drops the EXIF block — camera model, timestamps, GPS — which the file
-    // never needed to carry. We already have the decoded bitmap, so this is one
-    // canvas draw + toBlob.
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    canvas.getContext('2d').drawImage(bitmap, 0, 0);
-    const blobOut = await new Promise((resolve) => (turned
-      ? canvas.toBlob(resolve, 'image/jpeg', 0.92)
-      : canvas.toBlob(resolve, 'image/png')));
-    storeBytes = new Uint8Array(await blobOut.arrayBuffer());
+  let storeBytes;
+  try {
+    storeBytes = await storableImageBytes(bytes, bitmap, width, height);
+  } finally {
+    // In a finally: a transcode that throws must not strand a ~200 MB decode.
+    if (typeof bitmap.close === 'function') bitmap.close();
   }
-  if (typeof bitmap.close === 'function') bitmap.close();
 
   const source = addSource(doc, createSource({ name, bytes: storeBytes, numPages: 1 }));
   const page = createPage({
@@ -364,9 +401,21 @@ export async function rasterizePage(doc, page, opts = {}) {
 // `opts.renderToCanvas`: a test seam, see renderToCanvas below. Not for production.
 export function createPageRasterizer(doc, opts = {}) {
   const docCache = new Map(); // sourceId -> PDF.js document promise
-  const imgCache = new Map(); // sourceId -> ImageBitmap promise (image sources)
+  // sourceId -> { promise: Promise<ImageBitmap>, users, closed } — see withImageBitmap
+  const imgCache = new Map();
   const editedDocCache = new Map(); // page.id -> { signature, docPromise: Promise<PDF.js doc|null> }
   const renderSeq = new Map(); // page.id -> latest ISSUED rasterize seq (stale-guard, see rasterize)
+
+  // WHY a rejection is never cached: both caches hold PROMISES, and a promise
+  // that rejected once (a transient decode failure, pdf.js failing to arrive on
+  // a flaky link) stayed in the map for the whole session, so that page could
+  // never render again until Buka Baru. A failure is forgotten; the next
+  // rasterize tries again. A success is kept exactly as before.
+  function remember(map, key, promise) {
+    map.set(key, promise);
+    promise.catch(() => { if (map.get(key) === promise) map.delete(key); });
+    return promise;
+  }
 
   // Drop (and destroy) any cached edited-page doc for `pageId`. Increment 2
   // wires this method but nothing yet CALLS it on commit/undo/redo (spec
@@ -420,7 +469,8 @@ export function createPageRasterizer(doc, opts = {}) {
       // page you never imported), but rasterizing is the hot path and must not
       // depend on that ordering holding forever. The cached promise makes the
       // already-loaded case free.
-      docCache.set(
+      remember(
+        docCache,
         sourceId,
         ensurePdfJs().then((lib) => lib.getDocument({ data: source.bytes.slice() }).promise),
       );
@@ -428,12 +478,50 @@ export function createPageRasterizer(doc, opts = {}) {
     return docCache.get(sourceId);
   }
 
-  function getImageBitmap(sourceId) {
-    if (!imgCache.has(sourceId)) {
+  // Decoded image bitmaps: the IMG_KEEP most recently used, ref-counted.
+  //
+  // WHY bounded: a 12 MP phone photo decodes to ~46 MB, and the cache used to
+  // keep EVERY image source's bitmap until Buka Baru: scroll through 30
+  // photos and ~1.4 GB stayed resident whatever the viewport released, which
+  // kills a mid-range Android tab (round-3 hunt, 2026-10-10).
+  // WHY ref-counted: closing a bitmap another render is still drawing from
+  // throws InvalidStateError mid-draw. An evicted entry closes only when its
+  // last user is done. Two kept: the page in view and its neighbour, so a
+  // scroll back and forth does not re-decode.
+  const IMG_KEEP = 2;
+  function closeImg(entry) {
+    if (entry.closed) return;
+    entry.closed = true;
+    entry.promise.then((b) => b?.close?.(), () => {});
+  }
+  function evictImg(key, entry) {
+    imgCache.delete(key);
+    entry.evicted = true;
+    if (entry.users === 0) closeImg(entry);
+  }
+  async function withImageBitmap(sourceId, fn) {
+    let entry = imgCache.get(sourceId);
+    if (entry) {
+      imgCache.delete(sourceId); // re-insert: Map order is the LRU order
+      imgCache.set(sourceId, entry);
+    } else {
       const source = getSource(doc, sourceId);
-      imgCache.set(sourceId, window.createImageBitmap(new Blob([source.bytes.slice()])));
+      entry = { promise: window.createImageBitmap(new Blob([source.bytes.slice()])), users: 0, evicted: false, closed: false };
+      imgCache.set(sourceId, entry);
+      // A rejected decode is never cached (same rule as remember() above).
+      entry.promise.catch(() => { if (imgCache.get(sourceId) === entry) imgCache.delete(sourceId); });
+      while (imgCache.size > IMG_KEEP) {
+        const [oldKey, old] = imgCache.entries().next().value;
+        evictImg(oldKey, old);
+      }
     }
-    return imgCache.get(sourceId);
+    entry.users += 1;
+    try {
+      return fn(await entry.promise);
+    } finally {
+      entry.users -= 1;
+      if (entry.evicted && entry.users === 0) closeImg(entry);
+    }
   }
 
   async function renderPdfToCanvas(page, scale) {
@@ -452,17 +540,15 @@ export function createPageRasterizer(doc, opts = {}) {
     // page, so the arithmetic is a no-op there.
     const norm = page.baseWidth > 0 ? page.width / page.baseWidth : 1;
     const px = scale * norm;
-    // Edited docs are a single already-baked page — buildEditedPageBytes sets
-    // its /Rotate exactly the way buildPdfBytes does (see page-surgery.js),
-    // so its OWN metadata is authoritative and pdf.js should just read it —
-    // no explicit override, unlike the plain path below. This is also
-    // exactly what a downloaded PDF would render as, so the editor's live
-    // raster and the final export stay pixel-consistent by construction.
-    // Plain path: intrinsic /Rotate + the user's rotation (PDF.js
-    // `rotation:` is absolute, not additive over the intrinsic value).
-    const vp = editedDoc
-      ? pdfPage.getViewport({ scale: px })
-      : pdfPage.getViewport({ scale: px, rotation: ((page.baseRotation || 0) + (page.rotation || 0)) % 360 });
+    // ONE rotation for both paths: intrinsic /Rotate + the user's rotation
+    // (PDF.js `rotation:` is absolute, not additive over the intrinsic value).
+    // WHY the edited doc gets the override too: it is cached by editSignature,
+    // which deliberately ignores rotation, so after a rotate the cache still
+    // holds bytes baked with the OLD /Rotate. Reading their own metadata showed
+    // an edited page in its old orientation, stretched into the rotated slot,
+    // while the export was right. Surgery works in unrotated page space, so the
+    // baked content is the same at any rotation; only the view turns.
+    const vp = pdfPage.getViewport({ scale: px, rotation: totalPageRotation(page) });
     const canvas = document.createElement('canvas');
     canvas.width = Math.ceil(vp.width);
     canvas.height = Math.ceil(vp.height);
@@ -474,8 +560,10 @@ export function createPageRasterizer(doc, opts = {}) {
   // at `scale` (page point size × scale, matching the PDF path's raster px) and
   // bake in the page rotation. Image pages carry no intrinsic /Rotate, so only
   // page.rotation applies. Rotation is clockwise, matching PDF.js viewports.
-  async function renderImageToCanvas(page, scale) {
-    const bitmap = await getImageBitmap(page.sourceId);
+  function renderImageToCanvas(page, scale) {
+    return withImageBitmap(page.sourceId, (bitmap) => drawImagePage(page, scale, bitmap));
+  }
+  function drawImagePage(page, scale, bitmap) {
     const rotation = (page.rotation || 0) % 360;
     const drawW = page.width * scale;   // unrotated draw size in px
     const drawH = page.height * scale;
@@ -503,6 +591,17 @@ export function createPageRasterizer(doc, opts = {}) {
   // needs width, height and toDataURL().
   const renderToCanvas = opts.renderToCanvas || renderPageToCanvas;
 
+  // Only the data URL outlives a render, so the pixel buffer goes back now, not
+  // at GC: iOS counts every live canvas against one budget, and a long scroll
+  // could otherwise leave later pages as grey placeholders. Same release as
+  // storableImageBytes. NOT applied to renderCanvas: its caller owns the pixels.
+  function releaseCanvas(canvas) { canvas.width = 0; canvas.height = 0; }
+  function encodeAndRelease(canvas) {
+    const out = { width: canvas.width, height: canvas.height };
+    try { out.dataUrl = canvas.toDataURL('image/png'); } finally { releaseCanvas(canvas); }
+    return { dataUrl: out.dataUrl, width: out.width, height: out.height };
+  }
+
   return {
     async rasterize(page, { scale = 2 } = {}) {
       // Stale-guard (founder doubling bug, 2026-07-20): renderToCanvas is async
@@ -522,8 +621,9 @@ export function createPageRasterizer(doc, opts = {}) {
       // restore only if this still equals the restored page's key.
       const key = rasterKey(page);
       const canvas = await renderToCanvas(page, scale);
-      if (renderSeq.get(page.id) !== seq) return page.raster;
-      page.raster = { dataUrl: canvas.toDataURL('image/png'), width: canvas.width, height: canvas.height, scale, key };
+      if (renderSeq.get(page.id) !== seq) { releaseCanvas(canvas); return page.raster; }
+      const { dataUrl, width, height } = encodeAndRelease(canvas);
+      page.raster = { dataUrl, width, height, scale, key };
       return page.raster;
     },
     // Small render for page-manager tiles. Does NOT touch page.raster (the main
@@ -531,8 +631,7 @@ export function createPageRasterizer(doc, opts = {}) {
     async rasterizeThumb(page, { width = 150 } = {}) {
       const rotated = (page.rotation || 0) % 180 !== 0;
       const pageW = rotated ? page.height : page.width;
-      const canvas = await renderToCanvas(page, width / pageW);
-      return { dataUrl: canvas.toDataURL('image/png'), width: canvas.width, height: canvas.height };
+      return encodeAndRelease(await renderToCanvas(page, width / pageW));
     },
     // A raw canvas at an arbitrary scale, for a caller that needs PIXELS
     // rather than a raster to display — today that is only OCR (rung S2,
@@ -557,8 +656,7 @@ export function createPageRasterizer(doc, opts = {}) {
     async destroy() {
       for (const p of docCache.values()) { try { (await p).destroy(); } catch { /* already gone */ } }
       docCache.clear();
-      for (const p of imgCache.values()) { try { (await p).close(); } catch { /* already gone */ } }
-      imgCache.clear();
+      for (const [key, entry] of [...imgCache]) evictImg(key, entry); // in-use ones close when their render ends
       for (const { docPromise } of editedDocCache.values()) {
         try { const pdfDoc = await docPromise; if (pdfDoc) await pdfDoc.destroy(); } catch { /* already gone */ }
       }

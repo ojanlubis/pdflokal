@@ -145,6 +145,19 @@ test('3. the crawler-facing files at the root still exist and are not empty', ()
     urls >= PAGES.length,
     `sitemap.xml lists ${urls} URLs but there are ${PAGES.length} indexed pages. Run \`npm run seo\`.`,
   );
+  // A COUNT is not a verdict: fourteen copies of the landing passed the floor
+  // above. Every indexed page must be listed by its own URL, exactly once, and
+  // nothing may be listed twice.
+  const ORIGIN = 'https://www.pdflokal.id';
+  const locs = [...sitemap.matchAll(/<loc>([^<]*)<\/loc>/g)].map((m) => m[1].trim());
+  const urlOf = (file) => (file === 'index.html' ? `${ORIGIN}/`
+    : file === 'en/index.html' ? `${ORIGIN}/en` : `${ORIGIN}/${file.replace(/\.html$/, '')}`);
+  for (const file of PAGES) {
+    const url = urlOf(file);
+    const n = locs.filter((l) => l === url).length;
+    assert.equal(n, 1, `sitemap.xml lists ${url} ${n} times, expected exactly once. Run \`npm run seo\`.`);
+  }
+  assert.equal(new Set(locs).size, locs.length, `sitemap.xml lists a URL twice: ${JSON.stringify(locs)}`);
 });
 
 test('4. the landing has NOT been stripped relative to a generated page', () => {

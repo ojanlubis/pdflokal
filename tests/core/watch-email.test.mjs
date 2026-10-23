@@ -16,7 +16,8 @@ import { jakartaDay } from '../../api/_watch.js';
 const DAY_MS = 24 * 60 * 60 * 1000;
 const int = (v) => ({ type: 'integer', value: String(v) });
 const text = (v) => ({ type: 'text', value: v });
-const ok = (rows) => ({ ok: true, status: 200, json: async () => ({ results: [
+const ok = (rows, err) => ({ ok: true, status: 200, json: async () => ({ results: err ? [
+  { type: 'error', error: { message: err, code: 'SQLITE_ERROR' } }] : [
   { type: 'ok', response: { type: 'execute', result: { cols: [], rows, affected_row_count: rows.length ? 0 : 1 } } },
   { type: 'ok', response: { type: 'close' } }] }) });
 
@@ -34,6 +35,7 @@ function stubRail(rail = {}) {
   }
   const mail = [];
   const rows = [];
+  const sqls = [];
   const real = globalThis.fetch;
   globalThis.fetch = async (url, init) => {
     const body = JSON.parse(init.body);
@@ -42,6 +44,7 @@ function stubRail(rail = {}) {
       return { ok: true, status: 200, json: async () => ({ status: 'sent' }) };
     }
     const { sql, args } = body.requests[0].stmt;
+    sqls.push(sql);
     if (/insert into routine_runs/.test(sql)) {
       rows.push({ status: args[1].value, findings: JSON.parse(args[3].value), note: args[4].value, raw: JSON.stringify(args) });
       return ok([]);
@@ -54,9 +57,14 @@ function stubRail(rail = {}) {
     if (/hard_fails/.test(sql)) return ok([[int(r.a6)]]);
     if (/note is not null/.test(sql)) return ok(r.notes.map(([ts, rating, note]) => [text(ts), text(rating), text(note)]));
     if (/rating = 'down'/.test(sql)) return ok([[int(r.a5[0]), int(r.a5[1])]]);
+    // The feature vote's ideas live in their own table, counted on their own.
+    if (/from feature_requests/.test(sql)) {
+      if (r.noFeatureTable) return ok(null, 'no such table: feature_requests');
+      return ok([[int(r.featureRequests ?? 0)]]);
+    }
     throw new Error(`unstubbed SQL: ${sql.slice(0, 60)}`);
   };
-  return { mail, rows, restore: () => { globalThis.fetch = real; } };
+  return { mail, rows, sqls, restore: () => { globalThis.fetch = real; } };
 }
 
 const ENV = {
@@ -78,7 +86,7 @@ async function runWatch(rail) {
   }
   assert.equal(stub.rows.length, 1, 'exactly one routine_runs row, every day: the row is the proof it ran');
   assert.equal(res.body.record, 'ok', 'and the write landed');
-  return { mail: stub.mail, row: stub.rows[0], res };
+  return { mail: stub.mail, row: stub.rows[0], res, sqls: stub.sqls };
 }
 
 test('a healthy day: no email, and the row says it stayed quiet', async () => {
@@ -135,3 +143,26 @@ test('the rail cannot be read: that is the alarm, and it emails', async () => {
   assert.equal(row.findings.email, 'ok');
 });
 
+test('FEATURE VOTE IDEAS: counted from their own table, never emailed, and A4/A5 never read that table', async () => {
+  // 40 ideas in a day and nothing else wrong: no email, but the row says how many.
+  const { mail, row, sqls } = await runWatch({ featureRequests: 40 });
+  assert.equal(row.findings.feature_requests, 40, 'counted separately, in the row');
+  assert.equal(row.findings.a4, 0, 'an idea is not "new feedback"');
+  assert.deepEqual(row.findings.fired, []);
+  assert.equal(row.findings.email, 'skipped: quiet');
+  assert.equal(mail.length, 0, 'one email per idea would be the failure this guards');
+  const a4 = sqls.filter((q) => /note is not null/.test(q));
+  const a5 = sqls.filter((q) => /rating = 'down'/.test(q));
+  assert.equal(a4.length, 1, 'vacuity guard: the A4 read ran');
+  assert.equal(a5.length, 1, 'vacuity guard: the A5 read ran');
+  for (const q of [...a4, ...a5]) assert.doesNotMatch(q, /feature_requests/, 'thumbs reads never touch the ideas table');
+  assert.equal(sqls.filter((q) => /from feature_requests/.test(q)).length, 1);
+});
+
+test('FEATURE VOTE IDEAS: before the migration is applied the watch records null, it does NOT cry "rail unreadable"', async () => {
+  const { mail, row, res } = await runWatch({ noFeatureTable: true });
+  assert.equal(res.code, 200, 'a missing ideas table is not a dark rail');
+  assert.equal(row.findings.feature_requests, null);
+  assert.equal(row.findings.email, 'skipped: quiet');
+  assert.equal(mail.length, 0);
+});

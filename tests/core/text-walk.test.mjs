@@ -313,3 +313,47 @@ test('narrow run: the widened tolerance still does not reach an adjacent run tha
   assert.equal(survivors.length, 1, 'the adjacent run is left alone');
   assert.equal(survivors[0].tokens.find((t) => t.t === 'str') !== undefined, true);
 });
+
+// pdf.js splits ONE show op into two text items at a gap over 0.6em, and
+// text-lines.js can then put them on two different Lines (the colon rule).
+// `(Nama        : Budi) Tj` → Lines "Nama" and ": Budi". Matching only by
+// where an op STARTS cut the whole op for a Ganti/Hapus of "Nama", deleting
+// ": Budi" with no cover, reported as a clean cut. The op's END must land
+// inside the span being cleared (any target of it), or the op is a survivor.
+test('overrun: an op that paints past every target is not cut — its neighbour survives under the cover', () => {
+  const widths = new Map([[32, 250], [58, 278], [66, 600], [78, 600], [97, 500], [109, 500]]);
+  const fonts = fontsWith({ F1: widths }, { defaultWidth: 500 });
+  const src = 'BT /F1 10 Tf 72 700 Td (Nama        : Budi) Tj ET';
+  const [rec] = walkShowOps(src, fonts);
+  approx(rec.len, rec.advanceText); // identity Tm/CTM: user length == text advance
+  // "Nama" alone: 6+5+5+5 = 21pt wide.
+  const nama = { x0: 72, y0: 700, ux: 1, uy: 0, len: 21, size: 10 };
+  const { content, removed, results } = planRunRemoval(src, fonts, [nama]);
+  assert.equal(removed, 0, 'the op carrying ": Budi" was cut for a target that only spans "Nama"');
+  assert.equal(content, src);
+  assert.equal(results[0].matched, false);
+  assert.equal(results[0].residual, 1, 'the planner must report the survivor so the cover stays');
+});
+
+test('overrun: the same op is cut when the targets cover both of its runs (editing the whole line)', () => {
+  const widths = new Map([[32, 250], [58, 278], [66, 600], [78, 600], [97, 500], [109, 500]]);
+  const fonts = fontsWith({ F1: widths }, { defaultWidth: 500 });
+  const src = 'BT /F1 10 Tf 72 700 Td (Nama        : Budi) Tj ET';
+  const [rec] = walkShowOps(src, fonts);
+  const valueStart = 72 + 21 + 8 * 2.5; // after "Nama" + 8 spaces
+  const targets = [
+    { x0: 72, y0: 700, ux: 1, uy: 0, len: 21, size: 10 },
+    { x0: valueStart, y0: 700, ux: 1, uy: 0, len: 72 + rec.len - valueStart, size: 10 },
+  ];
+  const { removed, results } = planRunRemoval(src, fonts, targets);
+  assert.equal(removed, 1);
+  assert.equal(results[0].matched, true);
+});
+
+test('overrun: a single trailing space inside the op is not an overrun', () => {
+  const widths = new Map([[32, 250], [65, 500], [66, 500]]);
+  const fonts = fontsWith({ F1: widths });
+  const src = 'BT /F1 12 Tf 72 700 Td (AB ) Tj ET';
+  const { removed } = planRunRemoval(src, fonts, [{ x0: 72, y0: 700, ux: 1, uy: 0, len: 12, size: 12 }]);
+  assert.equal(removed, 1);
+});

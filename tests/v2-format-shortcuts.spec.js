@@ -56,6 +56,30 @@ test.describe('Ctrl/Cmd+B / I — same as the format bar', () => {
     expect(await page.locator('.pv-anno-text u').count()).toBe(0);
   });
 
+  // WHY: authored text stays selected after commit, so a SECOND new text opens
+  // while the first is still selected. The bar and Ctrl+B/I must style the draft
+  // under the caret, never the committed line above it.
+  test('typing a second new text: B and Ctrl+B style the draft, not the selected first text', async ({ page }) => {
+    await openAndType(page, 'Satu');
+    await page.keyboard.press('Enter');
+    await expect(page.locator('.pv-anno-text')).toHaveText('Satu');
+    await page.keyboard.press('t');
+    await page.click('.pv-page >> nth=0', { position: { x: 200, y: 320 } });
+    await page.keyboard.type('Dua');
+    await page.click('.fb-bold');
+    await expect(page.locator('.v2-text-edit')).toHaveCSS('font-weight', '700');
+    await page.keyboard.press(`${MOD}+i`);
+    await expect(page.locator('.v2-text-edit')).toHaveCSS('font-style', 'italic');
+    const annos = () => page.evaluate(() => window.v2.getDoc().pages[0].annotations.map((a) => ({ text: a.text, bold: !!a.bold, italic: !!a.italic })));
+    expect(await annos()).toEqual([{ text: 'Satu', bold: false, italic: false }]);
+    await page.keyboard.press('Enter');
+    await expect(page.locator('.pv-anno-text')).toHaveCount(2);
+    expect(await annos()).toEqual([
+      { text: 'Satu', bold: false, italic: false },
+      { text: 'Dua', bold: true, italic: true },
+    ]);
+  });
+
   test('selected (not editing): toggles the annotation, ONE undo step each', async ({ page }) => {
     await openAndType(page, 'Terpilih');
     await page.keyboard.press('Enter'); // commit; the new text stays selected

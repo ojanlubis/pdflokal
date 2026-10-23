@@ -66,6 +66,7 @@ let noteEl = null;
 let sendEl = null;
 let thumbUp = null;
 let thumbDown = null;
+let closeTimer = 0;     // the post-send auto-close; cleared on every reset
 
 function setRating(next) {
   rating = next;
@@ -84,6 +85,8 @@ function clearShot() {
 }
 
 function reset() {
+  // A reopen within 1.4s of a send must not be closed by the OLD send's timer.
+  clearTimeout(closeTimer);
   rating = null;
   if (noteEl) noteEl.value = '';
   // THE IMAGE IS CLEARED ON EVERY OPEN, not only on send. A screenshot pasted,
@@ -156,7 +159,7 @@ function send() {
   if (done) done.hidden = false;
   // Let them read the thanks, then close. Short enough not to trap anyone, and
   // the dialog stays dismissible throughout.
-  setTimeout(() => { if (dlg && dlg.open) dlg.close(); }, 1400);
+  closeTimer = setTimeout(() => { if (dlg && dlg.open) dlg.close(); }, 1400);
 }
 
 export function initFeedbackForm() {

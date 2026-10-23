@@ -32,7 +32,34 @@ const COLORS = ['#000000', '#d33131', '#1d6fdc', '#1d8a44', '#ffffff'];
 //     from this comment would get no error, just a format bar that silently
 //     stops affecting the draft under the cursor. Documented because the
 //     failure is silence, not a throw.
+//   onControlDone: () => void — a control that took focus (font, size on
+//     Enter, custom colour on close) has finished. app.js hands focus back to
+//     an empty draft that blurCommitsDraft kept open; otherwise a no-op.
 // }
+// The one rule for "which annotation does the bar style". WHY editingEl blocks
+// the selection fallback: a NEW text being typed has an editor but no
+// annotation yet, while the previously committed text stays selected (app.js
+// keeps authored text selected after commit). Falling through to that
+// selection restyled the OLD text and left the draft unchanged.
+export function formatTarget({ editingAnno, editingEl, selected }) {
+  if (editingAnno) return editingAnno;
+  return editingEl ? null : selected;
+}
+
+// The one rule for "does leaving the inline editor commit it". WHY an empty
+// NEW draft blurring into the bar does not: the font select, the size field
+// and the custom colour take focus. For typed text the commit is what creates
+// the annotation the control then styles (commit-and-stay-selected). For an
+// empty draft it commits to NOTHING: the box closed, Teks disarmed, and with no
+// editor left formatTarget fell through to the previously committed text,
+// which took the size meant for the next one. Kept open, editingEl stays set,
+// so the change restyles the draft. A null relatedTarget (a browser that does
+// not say where focus went) commits, as before: never a stranded editor.
+export function blurCommitsDraft({ relatedTarget, barEl, text, hasAnno, hasDraft }) {
+  const intoBar = !!relatedTarget && !!barEl?.contains(relatedTarget);
+  return !(intoBar && !text && !hasAnno && !hasDraft);
+}
+
 export function createFormatBar(deps) {
   const { el } = deps;
   // Sticky defaults for the NEXT new text annotation.
@@ -134,11 +161,13 @@ export function createFormatBar(deps) {
     customColor.value = cur;
   }
 
-  function apply(patch) {
+  // `record: false` = a continuation of a change whose undo step is already taken
+  // (the colour picker's drag, see below).
+  function apply(patch, { record: recordStep = true } = {}) {
     Object.assign(defaults, patch);          // sticky for the next new text
     const anno = deps.getTarget();
     if (anno) {
-      record(deps.history, deps.getDoc());
+      if (recordStep) record(deps.history, deps.getDoc());
       updateAnnotation(deps.getDoc(), anno.id, patch);
       deps.onStyled?.(anno);
     } else {
@@ -147,7 +176,7 @@ export function createFormatBar(deps) {
     reflect(anno || defaults);
   }
 
-  fontSel.addEventListener('change', () => apply({ fontFamily: fontSel.value }));
+  fontSel.addEventListener('change', () => { apply({ fontFamily: fontSel.value }); deps.onControlDone?.(); });
   // Commit on change and on Enter. Both can fire for one edit, so a commit
   // whose text already equals the current size's display is a no-op: no second
   // undo step, and a fractional size from a document line (7.395, shown as
@@ -163,7 +192,9 @@ export function createFormatBar(deps) {
   }
   sizeIn.addEventListener('change', commitSize);
   sizeIn.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); commitSize(); sizeIn.blur(); }
+    // onControlDone before blur: a held draft takes focus back, so this blur
+    // is a no-op and the field's own blur below never sees an empty target.
+    if (e.key === 'Enter') { e.preventDefault(); commitSize(); deps.onControlDone?.(); sizeIn.blur(); }
   });
   // Browsers filter a datalist by the field's current text, so a field showing
   // "18" would offer only "18". Empty it on focus (the size stays visible as
@@ -184,13 +215,31 @@ export function createFormatBar(deps) {
   boldBtn.addEventListener('click', toggleBold);
   italicBtn.addEventListener('click', toggleItalic);
   for (const s of swatches) s.addEventListener('click', () => apply({ color: s.dataset.color }));
-  // 'input' fires while dragging inside the OS picker → live preview on the text.
-  customColor.addEventListener('input', () => apply({ color: customColor.value }));
+  // 'input' fires on every tick while dragging inside the OS picker → live
+  // preview on the text. WHY only the FIRST tick records: one undo step per tick
+  // meant a single drag left a dozen steps, and Ctrl+Z walked back through shades
+  // nobody chose. A whole drag is ONE step, taken before the first tick changes
+  // anything, so undo returns to the colour the text had when the picker opened.
+  // 'change' (picker closed, or a browser that fires only that) ends the drag;
+  // with no tick before it, it is itself the one step. Blur ends it too, so an
+  // abandoned picker cannot swallow the next session's step.
+  let pickerDragging = false;
+  customColor.addEventListener('input', () => {
+    apply({ color: customColor.value }, { record: !pickerDragging });
+    pickerDragging = true;
+  });
+  customColor.addEventListener('change', () => {
+    if (!pickerDragging) apply({ color: customColor.value });
+    pickerDragging = false;
+    deps.onControlDone?.();
+  });
+  customColor.addEventListener('blur', () => { pickerDragging = false; });
 
   // Keep taps inside the bar from bubbling into the stage (deselecting), and
   // keep BUTTON taps from stealing focus (which would blur-commit an open
-  // inline editor). Selects and the size field are exempt — they need focus; the
-  // draft commits-and-stays-selected instead (app.js), so the change still lands.
+  // inline editor). Selects and the size field are exempt — they need focus; a
+  // typed draft commits-and-stays-selected instead (app.js), so the change still
+  // lands, and an empty one stays open (blurCommitsDraft).
   el.addEventListener('pointerdown', (e) => {
     e.stopPropagation();
     if (e.target.closest('button')) e.preventDefault();

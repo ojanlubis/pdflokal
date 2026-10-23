@@ -11,11 +11,20 @@
        1. A click on any language link (.ld-lang-opt with an hreflang) writes
           pdflokal_lang = that link's language. Without it an English-browser user who
           picks "Bahasa Indonesia" on /en would be bounced straight back.
-       2. ONLY on the exact path `/`: a stored choice wins ('en' goes to /en, 'id'
-          stays); with none, a browser whose first language is English goes to /en and
-          anything else stays. `location.replace`, so Back does not return to `/`; the
-          query string and hash travel with it. It never moves /en, a tool page or any
-          other URL, and never an Indonesian browser off `/en`.
+       2. ONLY on the exact path `/`, in this order: a stored choice wins ('en' goes to
+          /en, 'id' stays); else a device whose time zone is Asia/Jakarta, Pontianak,
+          Makassar or Jayapura stays on `/`, whatever the browser language says; else a
+          browser whose first language is English goes to /en and anything else stays.
+          `location.replace`, so Back does not return to `/`; the query string and hash
+          travel with it. It never moves /en, a tool page or any other URL, and never an
+          Indonesian browser off `/en`.
+          WHY THE TIME ZONE (founder, 2026-10-06): 88% of one week's /en visitors were in
+          Indonesia. Indonesians often run an English browser, and the language alone
+          sent them to a page they did not want. The time zone is read from the browser
+          itself (Intl); no IP lookup, no request, nothing leaves the device. It is a
+          hint, not a border: Malaysia, Brunei and every other zone are unchanged (the
+          browser language decides), and a stored choice still beats it. A browser that
+          cannot report a time zone (try/catch) falls through to the language rule.
        NEVER FOR A CRAWLER: Googlebot renders as en-US, and a bot sent to /en would
        never index `/`. So a user agent that says bot, crawler, Lighthouse or headless
        stays put. navigator.webdriver is deliberately NOT tested: it is true under
@@ -42,7 +51,9 @@
     var saved = null;
     try { saved = localStorage.getItem(KEY); } catch (x) {}
     var first = (navigator.languages && navigator.languages[0]) || navigator.language || '';
-    if (saved === 'en' || (saved !== 'id' && /^en/i.test(first))) {
+    var inIndonesia = false;
+    try { inIndonesia = /^Asia\/(Jakarta|Pontianak|Makassar|Jayapura)$/.test(Intl.DateTimeFormat().resolvedOptions().timeZone); } catch (x) {}
+    if (saved === 'en' || (saved !== 'id' && !inIndonesia && /^en/i.test(first))) {
       window.__pdlLeaving = true;
       // Nothing of the Indonesian page may show while /en loads; undone if the move never lands.
       document.documentElement.style.visibility = 'hidden';
@@ -370,7 +381,7 @@
       <h1>Kebijakan Privasi</h1>
       <p class="privacy-lead">
         <strong>File PDF dan gambarmu diolah di browsermu sendiri dan nggak pernah dikirim ke server mana pun.</strong>
-        Yang saya catat adalah cara PDFLokal dipakai, bukan isi dokumenmu. Pengecualiannya ada di bawah.
+        Yang dicatat adalah cara PDFLokal dipakai, bukan isi dokumenmu. Pengecualiannya ada di bawah.
       </p>
 
       <div class="privacy-proof">
@@ -381,7 +392,7 @@
       </div>
 
       <section class="privacy-section">
-        <h2>Yang dikirim ke server saya sendiri</h2>
+        <h2>Yang dikirim ke server PDFLokal sendiri</h2>
         <p>
           Data teknis tentang cara fitur dipakai, untuk tahu alat mana yang perlu diperbaiki: alat
           yang kamu pakai, berapa lama prosesnya, apakah font di dokumen dikenali, jenis perangkat,
@@ -394,13 +405,16 @@
         <p>
           Tiap sesi dapat ID acak sendiri. Satu ID lagi, <code>pdflokal_visitor_id</code>, disimpan di
           browsermu untuk membedakan pengunjung baru dan yang kembali. Isinya angka acak. ID ini cuma
-          sampai ke server saya: Mixpanel, Google Analytics, dan Sentry nggak pernah menerimanya.
+          sampai ke server PDFLokal: Mixpanel, Google Analytics, dan Sentry nggak pernah menerimanya.
+        </p>
+        <p>
+          Kalau kamu ikut voting fitur, pilihanmu dan ide yang kamu tulis (kalau ada) dikirim ke server PDFLokal, bersama <code>pdflokal_visitor_id</code>, supaya tiap pengunjung cuma bisa memilih sekali. Pengunjung lain cuma lihat urutan fitur yang paling banyak dipilih.
         </p>
       </section>
 
       <section class="privacy-section">
         <h2>Yang dikirim ke layanan lain</h2>
-        <p>Untuk menghitung kunjungan dan alat yang dipakai, saya pakai:</p>
+        <p>Untuk menghitung kunjungan dan alat yang dipakai, PDFLokal memakai:</p>
         <ul>
           <li>Vercel Web Analytics, tanpa cookie</li>
           <li>Google Analytics dan Google Ads, dengan cookie (daftarnya di tabel bawah)</li>
@@ -431,11 +445,11 @@
         <p>Dua layanan merekam layar waktu PDFLokal dipakai:</p>
         <ul>
           <li>Sentry, sejak akhir Mei 2026: 1 dari 10 kunjungan, plus setiap kunjungan yang ada error-nya. Tugas utamanya menangkap error</li>
-          <li>Mixpanel: semua sesi, untuk melihat di langkah mana orang kesulitan. Kalau perekamannya saya hentikan, halaman ini saya update</li>
+          <li>Mixpanel: semua sesi, untuk melihat di langkah mana orang kesulitan. Kalau perekamannya dihentikan, halaman ini diupdate</li>
         </ul>
         <p>
           Yang terekam: di mana kamu tap, ke mana kamu scroll, tombol yang kamu buka, dan berapa lama
-          kamu berhenti. Saya sudah membuka data yang dikirim kedua layanan itu, dan ini yang nggak ikut:
+          kamu berhenti. Data yang dikirim kedua layanan itu sudah dibuka, dan ini yang nggak ikut:
         </p>
         <ul>
           <li>Isi dokumenmu. Halaman PDF muncul sebagai kotak kosong</li>
@@ -453,7 +467,7 @@
         <h2>Yang kamu kirim sendiri</h2>
         <ul>
           <li>Screenshot di form masukan. Kamu yang paste, dan kamu lihat dulu sebelum terkirim. Kalau screenshot itu menampilkan isi dokumen, isi itu ikut terkirim</li>
-          <li>Potongan di Edit (beta). Kalau kamu kasih 👎, saya minta izin untuk satu baris yang barusan kamu edit, sebelum dan sesudah, sebagai dua gambar kecil. Kamu lihat keduanya dulu, dan baru terkirim kalau kamu tap Kirim</li>
+          <li>Potongan di Edit (beta). Kalau kamu kasih 👎, PDFLokal minta izin untuk satu baris yang barusan kamu edit, sebelum dan sesudah, sebagai dua gambar kecil. Kamu lihat keduanya dulu, dan baru terkirim kalau kamu tap Kirim</li>
         </ul>
       </section>
 
@@ -468,7 +482,7 @@
         <h2>Yang tersimpan di browsermu</h2>
         <p>
           Preferensi kecil untuk kamu sendiri, di Local Storage (satu di Session Storage, hilang saat
-          tab ditutup). Semuanya tetap di browsermu, kecuali satu baris yang saya tandai.
+          tab ditutup). Semuanya tetap di browsermu, kecuali satu baris yang ditandai.
         </p>
         <table class="storage-table" id="storage-ours">
           <thead>
@@ -512,7 +526,7 @@
             </tr>
             <tr>
               <td><code>pdflokal_maker_seen</code></td>
-              <td>Mengingat kabar terbaru dari saya yang sudah kamu lihat</td>
+              <td>Mengingat kabar terbaru yang sudah kamu lihat</td>
             </tr>
             <tr>
               <td><code>pdflokal_bugreport_last</code></td>
@@ -527,6 +541,26 @@
               <td>Mengingat bahwa ajakan berbagi atau traktir sudah dimatikan</td>
             </tr>
             <tr>
+              <td><code>pdflokal_vote_done</code></td>
+              <td>Mengingat bahwa kamu sudah memilih fitur baru, supaya ajakannya nggak muncul lagi</td>
+            </tr>
+            <tr>
+              <td><code>pdflokal_vote_nanti</code></td>
+              <td>Tanggal terakhir kamu menekan "Nanti aja" di ajakan pilih fitur, supaya ajakannya muncul paling sering sehari sekali</td>
+            </tr>
+            <tr>
+              <td><code>pdflokal_vote_ids</code></td>
+              <td>Fitur yang kamu pilih, supaya PDFLokal bisa kasih tahu kamu di sini kalau salah satunya sudah jadi</td>
+            </tr>
+            <tr>
+              <td><code>pdflokal_vote_told</code></td>
+              <td>Fitur pilihanmu yang sudah dikabari, supaya kabarnya muncul sekali saja</td>
+            </tr>
+            <tr>
+              <td><code>pdflokal_visit_days</code></td>
+              <td>Menghitung berapa hari kamu sudah berkunjung dan judul halaman depan yang terakhir tampil, untuk memilih judul berikutnya</td>
+            </tr>
+            <tr>
               <td><code>pdflokal_boot_healed</code></td>
               <td>Session Storage, cuma kalau halaman gagal dimuat. Mencegah halaman memuat ulang dirinya lebih dari sekali</td>
             </tr>
@@ -534,7 +568,7 @@
               <td><code>pdflokal_visitor_id</code></td>
               <td>ID acak, dibikin sekali di perangkatmu dan dipakai lagi tiap kamu balik.
                 <strong>Satu-satunya baris di tabel ini yang ikut keluar dari browsermu</strong>,
-                ke server saya sendiri, lihat bagian "Yang dikirim ke server saya sendiri" di atas</td>
+                ke server PDFLokal sendiri, lihat bagian "Yang dikirim ke server PDFLokal sendiri" di atas</td>
             </tr>
           </tbody>
         </table>
@@ -575,7 +609,7 @@
         <h2>Pertanyaan?</h2>
         <p>
           Kode PDFLokal terbuka di <a href="https://github.com/ojanlubis/pdflokal" target="_blank" rel="noopener">GitHub</a>,
-          dan kamu bisa buka issue di sana. Atau <a href="https://forms.gle/KPDWVAuc91pVjuWq6" target="_blank">hubungi saya</a> langsung.
+          dan kamu bisa buka issue di sana. Atau <a href="https://forms.gle/KPDWVAuc91pVjuWq6" target="_blank">hubungi Ojan</a> langsung.
         </p>
       </section>
 
@@ -595,14 +629,14 @@
           </p>
         </div>
       </div>
-      <p class="privacy-updated">Terakhir diupdate: 2 Oktober 2026</p>
+      <p class="privacy-updated">Terakhir diupdate: 6 Oktober 2026</p>
     </div>
   </main>
 
   <!-- Footer — ported from index.html's .ld-foot; see css/chrome.css. -->
   <div class="pg-wrap">
     <footer class="ld-foot">
-      <a href="/dukung">Dukung Saya</a>
+      <a href="/dukung">Dukung PDFLokal</a>
       <a href="/privasi">Privasi</a>
       <a href="https://github.com/ojanlubis/pdflokal" rel="noopener">GitHub</a>
       <span>Dibuat di Indonesia</span>

@@ -19,6 +19,7 @@ import { getSource } from '../core/model.js';
 import { ensurePdfJs } from '../core/vendor.js';
 import { groupRunsIntoLines, resolveTap, runsNotOwned } from '../core/text-lines.js';
 import { pageHasVisibleText } from '../core/text-visibility.js';
+import { displayFrameKey } from '../core/page-rotation.js';
 
 // Finger-sized minimum hit box (page-space px at zoom 1). Small print is a
 // <10px-tall run — the ≥44px touch-target law is met by inflating the HIT box,
@@ -40,11 +41,14 @@ function normalize(x, y) {
 
 export function createTextRunIndex({ getDoc }) {
   const docCache = new Map(); // sourceId -> Promise<pdf.js document>
-  const runCache = new Map(); // page.id  -> Promise<Run[]>
+  // Both caches hold { frame, promise }: an entry measured in another display
+  // frame (core/page-rotation.js displayFrameKey) is stale and re-extracted.
+  const runCache = new Map(); // page.id  -> { frame, promise: Promise<Run[]> }
   // Lines are runs grouped by geometry (core/text-lines.js) — same lifecycle
   // as runCache (invalidated together), computed lazily from the cached runs
   // rather than re-extracting, so hit-testing/hints never re-touch pdf.js.
-  const lineCache = new Map(); // page.id  -> Promise<Line[]>
+  const lineCache = new Map(); // page.id  -> { frame, promise: Promise<Line[]> }
+  const pageOf = (pageId) => getDoc().pages.find((p) => p.id === pageId) || null;
 
   function getPdf(sourceId) {
     if (!docCache.has(sourceId)) {
@@ -154,18 +158,20 @@ export function createTextRunIndex({ getDoc }) {
   return {
     // Runs for a page, extracted once and cached. Safe to call repeatedly.
     getRuns(pageId) {
-      if (!runCache.has(pageId)) {
-        const page = getDoc().pages.find((p) => p.id === pageId);
-        if (!page) return Promise.resolve([]);
-        runCache.set(pageId, extract(page).catch((err) => {
+      const page = pageOf(pageId);
+      if (!page) return Promise.resolve([]);
+      const frame = displayFrameKey(page);
+      if (runCache.get(pageId)?.frame !== frame) {
+        lineCache.delete(pageId);
+        runCache.set(pageId, { frame, promise: extract(page).catch((err) => {
           // A page whose text layer fails to parse behaves like a scan: the
           // overlay tools still work, only smart replace declines. Never throw
           // into the tap path.
           console.warn('Ekstraksi teks gagal:', err);
           return [];
-        }));
+        }) });
       }
-      return runCache.get(pageId);
+      return runCache.get(pageId).promise;
     },
 
     // Lines for a page — runs clustered by geometry (founder ruling
@@ -173,8 +179,11 @@ export function createTextRunIndex({ getDoc }) {
     // from the same cached runs, so a single-fragment-per-line document (every
     // pre-line fixture) yields one Line per Run, byte-identical in shape.
     async getLines(pageId) {
-      if (!lineCache.has(pageId)) {
-        lineCache.set(pageId, this.getRuns(pageId).then((runs) => {
+      const page = pageOf(pageId);
+      if (!page) return [];
+      const frame = displayFrameKey(page);
+      if (lineCache.get(pageId)?.frame !== frame) {
+        lineCache.set(pageId, { frame, promise: this.getRuns(pageId).then((runs) => {
           const lines = groupRunsIntoLines(runs);
           // core/text-lines.js is DELIBERATELY paint-order-independent (its own
           // docstring: "paint-order scrambling doesn't change the result") —
@@ -188,9 +197,9 @@ export function createTextRunIndex({ getDoc }) {
           lines.sort((a, b) => Math.min(...a.runs.map((r) => indexOf.get(r)))
             - Math.min(...b.runs.map((r) => indexOf.get(r))));
           return lines;
-        }));
+        }) });
       }
-      return lineCache.get(pageId);
+      return lineCache.get(pageId).promise;
     },
 
     // Lines as the page SHOWS them: the same grouping, over the runs no committed

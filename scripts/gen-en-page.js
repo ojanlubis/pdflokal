@@ -100,7 +100,7 @@ export function mapMarkup(html, fn) {
 // key is the default. Used sparingly; the header comment of the map is JSON, so
 // it is documented here.
 export const CTX = ' @ ';
-function pick(map, key, ctx) {
+export function pick(map, key, ctx) {
   for (const k of Object.keys(map)) {
     if (k.startsWith(key + CTX) && ctx.includes(k.slice(key.length + CTX.length))) return k;
   }

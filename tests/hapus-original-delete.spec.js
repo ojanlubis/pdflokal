@@ -108,6 +108,33 @@ test.describe('Hapus armed: what a tap must NOT do', () => {
     expect(countIn(await unduh(page), LINE)).toBe(2);
   });
 
+  // A mouse has no implicit pointer capture: a press released OUTSIDE the stage
+  // (dragged into the gutter or the toolbar) never sent its pointerup to
+  // interaction.js, so the stale tap candidate swallowed the next press, and
+  // that press's release fired the OLD tap instead.
+  test('a press released outside the stage does not swallow the next tap', async ({ page }) => {
+    test.setTimeout(60000);
+    await openDoc(page);
+    await armHapus(page);
+    // Press on the margin paper of the line's row, then leave the stage.
+    const paper = await paperPoint(page);
+    await page.mouse.move(paper.x, paper.y);
+    await page.mouse.down();
+    await page.mouse.move(2, 2, { steps: 4 }); // the header: not the stage
+    await page.mouse.up();
+    await page.waitForTimeout(200);
+    expect(await annos(page), 'a press that left the stage must delete nothing').toEqual([]);
+
+    // Measured AFTER the release: the drag toward the header can autoscroll.
+    const target = centerOf(await lineBox(page, { str: LINE, nth: 1 }));
+    // Guard: the click must land beyond the 12px tap slop of the abandoned
+    // press, or a stale candidate would fire AT it and this test passes broken.
+    expect(Math.hypot(target.x - paper.x, target.y - paper.y)).toBeGreaterThan(40);
+    await page.mouse.click(target.x, target.y);
+    await expect.poll(async () => (await annos(page)).length, { timeout: 15000 }).toBe(1);
+    await expect.poll(async () => inkOf(page, (await crop(page, { str: LINE, nth: 1 })).buf), { timeout: 15000 }).toBe(0);
+  });
+
   test('a drag is the camera: nothing deleted, nothing reported', async ({ page }) => {
     await openDoc(page);
     await armHapus(page);
@@ -127,7 +154,21 @@ test.describe('Hapus armed: what a tap must NOT do', () => {
     await page.mouse.click(c.x, c.y);
     await page.waitForTimeout(400);
     expect(await annos(page)).toEqual([]);
-    expect(await page.evaluate(() => window.__beacons.length)).toBe(0);
+    // FLUSH, then read. The old `__beacons.length === 0` never flushed the queue,
+    // so it could not be non-zero whatever the tap did. Known-positive: the
+    // flushed rail carries this open's doc_open, so a hapus row would be there too.
+    // Catches: a Pilih tap that deletes/reports as Hapus (original_delete/_miss).
+    let evs = [];
+    await expect.poll(async () => {
+      await page.evaluate(() => {
+        Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+      evs = (await page.evaluate(() => window.__beacons.slice())).flatMap((b) => b.events || []);
+      return evs.some((e) => e.event === 'doc_open');
+    }, { message: 'doc_open never reached the rail, so the absence below proves nothing' }).toBe(true);
+    expect(hapusActions(evs)).toEqual([]);
+    expect(evs.filter((e) => e.event === 'tool_use' && /^original_/.test(e.props.action))).toEqual([]);
   });
 
   test('a tap on an object the person ADDED still deletes it, reports delete not original_delete, and disarms', async ({ page }) => {

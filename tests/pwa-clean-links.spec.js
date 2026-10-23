@@ -23,7 +23,7 @@ for (const path of PAGES) {
   });
 }
 
-test('"Dukung Saya" points at the clean URL', async ({ page }) => {
+test('the footer "Dukung PDFLokal" link points at the clean URL', async ({ page }) => {
   await page.goto('/');
   const href = await page.locator('.ld-foot a', { hasText: 'Dukung' }).first().getAttribute('href');
   expect(href).toBe('/dukung');

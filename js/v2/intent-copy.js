@@ -111,8 +111,11 @@ function say(sel, text) {
 // Re-word the editor around a known job. Safe to call more than once (a tool-card
 // click re-arms a different intent), and safe to call with an unknown/null intent.
 export function applyIntentCopy(intent) {
-  const build = INTENT_COPY[intent];
-  if (!build) return;
+  // WHY Object.hasOwn: `intent` arrives from ?buat= at app.js top level. A plain
+  // lookup answers for inherited keys (`__proto__`, `valueOf`…), and calling one
+  // threw out of app.js before boot finished: a shared link killed the editor.
+  const build = intent && Object.hasOwn(INTENT_COPY, intent) ? INTENT_COPY[intent] : null;
+  if (typeof build !== 'function') return;
   const c = build();
 
   say('.dz-title', c.dzTitle);

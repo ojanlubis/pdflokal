@@ -46,6 +46,13 @@ jobs:
               - 'tests/**'
               - 'images/**'
               - 'fonts/**'
+              # /en is generated from i18n; core tests read both and the
+              # sitemap. Without these a PR touching only them skipped every
+              # test and stayed green until the nightly run after merge.
+              - 'en/**'
+              - 'i18n/**'
+              - 'sitemap.xml'
+              - 'robots.txt'
               - 'playwright.config.js'
               - 'eslint.config.js'
               - 'package.json'
@@ -61,7 +68,7 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
       # Keep this order identical to scripts/qa-gate.mjs. A local green must

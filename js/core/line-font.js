@@ -76,8 +76,14 @@ export function glyphPaints(font, cp) {
 // Does `parsedFont` (a fontkit-parsed program) cover EVERY char of `text`?
 // Same NFC normalize as always (a user typing e + combining-acute means é —
 // judge coverage on the composed form, one char at a time).
+//
+// WHY drawnForm, not the raw text: the stamp DRAWS toStandardFontSafe(text)
+// (a minus sign or non-breaking hyphen becomes '-'), so coverage must be judged
+// on the string pdf-lib will actually encode. Judged on the raw text, a subset
+// holding U+2212 but no '-' passed and then painted .notdef. decideLineFont
+// already judged the drawn form; this keeps the stamp's fallback path honest too.
 export function textCoveredBy(parsedFont, text) {
-  for (const ch of text.normalize('NFC')) {
+  for (const ch of drawnForm(text)) {
     if (!glyphPaints(parsedFont, ch.codePointAt(0))) return false;
   }
   return true;
@@ -88,7 +94,7 @@ export function textCoveredBy(parsedFont, text) {
 // so the common, fully-covered case never pays for a count.
 export function countMissingGlyphs(parsedFont, text) {
   let n = 0;
-  for (const ch of text.normalize('NFC')) {
+  for (const ch of drawnForm(text)) {
     if (!glyphPaints(parsedFont, ch.codePointAt(0))) n += 1;
   }
   return n;

@@ -69,7 +69,7 @@ curl -s -H "Authorization: Bearer $ROUTINE_KEY" \
   "https://www.pdflokal.id/api/routine?since=<ISO timestamp, milliseconds, Z>"
 ```
 
-Call it **once**, keep the JSON, and answer §2-§5 from it. The fields are named below where each
+Call it **once** (after the `?last=1` probe of §1.1), keep the JSON, and answer §2-§5 from it. The fields are named below where each
 section uses them. `since` defaults to 72 hours ago and is capped at 14 days.
 
 - **`$ROUTINE_KEY` missing** → you cannot read or record anything, and setting it is his hand: email
@@ -115,8 +115,11 @@ right — the run is root, so `--with-deps` works here even though it needs apt.
 ### 1.1 Read your last run first
 
 Your last run is `last_run` in the digest (`id`, `ts`, `status`, `window_hours`, `findings`). The
-chicken-and-egg is fine: call once with no `since` to read `last_run.ts`, then call again with
-`since=<that ts>` for the real window.
+chicken-and-egg is fine: call `GET /api/routine?last=1` (same key; it answers `last_run` and `watch`
+from the `routine_runs` table only, a few dozen rows) to read `last_run.ts`, then call the digest once
+with `since=<that ts>` for the real window. **Do not fetch the digest twice**: a digest scans every
+event in its window, Turso's free plan counts rows scanned, and the first call used to cost a whole
+digest to learn one timestamp.
 
 That row's `ts` gives you the real interval. **Compute your window from it; never assume 72 hours.**
 A run can land late, and reporting a nine-day window as "three days" corrupts every delta after it.
@@ -189,6 +192,13 @@ crops are never in it (§0.3).
 Record the count by rating (`feedback_up`, `feedback_down`). **Do not email the notes.** The daily
 watch (§6.1) already emails him every note verbatim the day it arrives; sending them again is the
 noise he stopped reading. The one exception is a note the watch failed to deliver (§8, trigger 3).
+
+The digest also carries **`feature_requests`**, the count of free-text ideas from the feature vote in
+your window (its own table, `feature_requests`; never part of `feedback`, so never in `feedback_up`,
+`feedback_down` or the notes above). Record the number as `feature_requests` in your row. **`null`
+means the table is not there yet** (the migration is not applied), not zero: say "not counted", do
+not report no ideas. Never email the ideas and never quote them; they are read from the database
+by him.
 
 **Notes never enter your row, a commit message, or any file in this repo.**
 
@@ -452,7 +462,7 @@ curl -s -X POST -H "Authorization: Bearer $ROUTINE_KEY" -H "Content-Type: applic
 
 `findings` carries the numbers so the next run has something to diff:
 `sessions`, `sessions_prev`, `events`, `opened`, `exported`, `top_tools`, `devices`,
-`feedback_up`, `feedback_down`, `failures` (stage/reason → `{n, blocked}`), `last_event`, `n_window`,
+`feedback_up`, `feedback_down`, `feature_requests`, `failures` (stage/reason → `{n, blocked}`), `last_event`, `n_window`,
 `browsers`, `watch_days`, `watch_fired`, `rev_live`, `rev_main`, `audit_high`,
 `gate_env`, `fix_pushed` (§5.4), `blocked_on` (§8, trigger 2), `email` (§8).
 

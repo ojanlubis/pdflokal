@@ -88,10 +88,22 @@ test.describe('ganti steer — hover preview + release-commit (desktop mouse)', 
 
   test('no glow when Ganti is not armed, even while hovering a line', async ({ page }) => {
     await openDoc(page, FIXTURE);
-    // Deliberately never arm the tool.
-    await page.mouse.move(300, 300);
-    await page.mouse.move(320, 260);
+    // Deliberately never arm the tool — and hover the CENTRES of real line boxes
+    // (the same points the armed test proves light up). The old (300,300) ->
+    // (320,260) hover could sit on bare paper, so "no glow" passed for free.
+    // Catches: a glow that lights on hover regardless of the armed tool.
+    const boxA = await lineBox(page, { index: LINE.A });
+    await page.mouse.move(boxA.x + boxA.width / 2, boxA.y + boxA.height / 2);
     await expect(page.locator('.pv-ganti-glow')).toHaveCount(0);
+    const boxB = await lineBox(page, { index: LINE.B });
+    await page.mouse.move(boxB.x + boxB.width / 2, boxB.y + boxB.height / 2, { steps: 4 });
+    await expect(page.locator('.pv-ganti-glow')).toHaveCount(0);
+
+    // Known-positive on the SAME point: armed, the hover there does light up.
+    await armGanti(page);
+    const boxB2 = await lineBox(page, { index: LINE.B });
+    await page.mouse.move(boxB2.x + boxB2.width / 2, boxB2.y + boxB2.height / 2, { steps: 4 });
+    await expect(page.locator('.pv-ganti-glow'), 'the hovered point is not a line the glow can light').toBeVisible();
   });
 
   test('a click still commits — quick press+release in place opens the editor prefilled with that line (unchanged outcome)', async ({ page }) => {

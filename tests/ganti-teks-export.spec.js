@@ -123,8 +123,21 @@ test.describe('ganti teks export — the honest-replacement proof (real UI + rea
 
       const origCount = await countFillOps(new Uint8Array(origArr));
       const outCount = await countFillOps(new Uint8Array(outArr));
-      return { origCount, outCount };
+      // The SAME bytes must carry the edit — otherwise "no fill added" is also
+      // what an export that silently dropped the whole edit looks like.
+      const tc = await (await (await window.pdfjsLib.getDocument({ data: new Uint8Array(outArr) }).promise).getPage(1)).getTextContent();
+      return {
+        origCount,
+        outCount,
+        repeatedCount: tc.items.filter((i) => i.str === 'Rapat Anggota Tahunan 2026').length,
+        replacementFound: tc.items.some((i) => i.str.includes('Rapat Luar Biasa')),
+      };
     }, { origArr: Array.from(origBuf), outArr: Array.from(outBuf) });
+
+    // Catches: an export that drops the edit entirely (no cover, no cut, no
+    // replacement) — identical fill count to the original, so the old check passed.
+    expect(r.repeatedCount, 'the tapped line was not cut from these bytes').toBe(2);
+    expect(r.replacementFound, 'the replacement text is not in these bytes').toBe(true);
 
     // Computed from the ORIGINAL fixture itself (not hardcoded) — the export
     // added zero fill ops, proving the whiteout cover was skipped, not just

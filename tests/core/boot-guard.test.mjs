@@ -115,18 +115,23 @@ test('5. it does NOT heal on an unrelated error — that would reload users thro
 });
 
 test('6. OFFLINE never heals, and does not burn the one-shot either', async () => {
-  const off = runGuard({ online: false });
+  // ONE session store across both runs. The old version ran the online half on
+  // a FRESH store, so a guard that set pdflokal_boot_healed on the offline path
+  // stayed green.
+  const store = new Map();
+  const off = runGuard({ online: false, store });
   await off.error(SKEW_MESSAGES[0]);
   assert.equal(off.calls.reloads, 0,
     'the guard healed while offline. Emptying the cache offline replaces a dead editor with a '
     + 'browser error page — the stale cache is the only copy that user has.');
   assert.deepEqual(off.calls.cachesDeleted, [], 'the guard deleted caches while offline');
+  assert.equal(store.has(MARKER), false, 'the offline path wrote pdflokal_boot_healed: the one heal is burnt');
 
-  // And the flag must be untouched, or the user who came back online would find
-  // the one heal already spent on a decision that was never made.
-  const on = runGuard();
+  // Back online in the same session: the one heal must still be available.
+  const on = runGuard({ store });
   await on.error(SKEW_MESSAGES[0]);
-  assert.equal(on.calls.reloads, 1, 'the online case regressed — the offline check is now unconditional');
+  assert.equal(on.calls.reloads, 1, 'back online in the same session, the one heal must still be available');
+  assert.equal(store.has(MARKER), true, 'KNOWN-POSITIVE: the online heal does write the marker');
 });
 
 test('7. a sessionStorage that throws fails CLOSED — no once-guarantee, no heal', async () => {
