@@ -36,6 +36,13 @@ export const UPDATES = [
     approved: true, // his handover, decisions 2026-10-23 13:20
   },
   {
+    id: '2026-10-23-bikin-qr',
+    date: '2026-10-23',
+    text: 'Baru: Bikin QR Code dari link, gratis. Tempel link-nya, unduh QR-nya.', // his ok 2026-10-23
+    en: 'New: make a QR Code from a link, free. Paste the link, download the QR.',
+    approved: true,
+  },
+  {
     id: '2026-10-11-unduh-sama-layar',
     date: '2026-10-11',
     text: 'Hasil Unduh sekarang sama kayak di layar, tulisan dan Tip-Ex nggak turun lagi.',

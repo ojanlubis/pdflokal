@@ -938,6 +938,17 @@ export const SCHEMA = {
     has_text: 'bool',
   },
 
+  // THE QR PAGE (/qr, js/qr.js): the person took the code away. 'download' is the
+  // PNG, 'copy' the image to the clipboard; each fires on the tap, before the
+  // browser says whether it worked (the source site counted taps the same way).
+  // Content-blind by the only possible construction: an enum of two verbs. The
+  // link that was typed, and the code made from it, never ride this rail, and the
+  // page's own last paragraph promises exactly that. ADDITIVE: no existing event
+  // or prop changes, and a cached client simply never sends it.
+  qr_use: {
+    action: ['download', 'copy'],
+  },
+
   // core/visual-oracle.js's compareRegions() on the edited line's own region,
   // pristine (the rebake's PREVIOUS raster) vs stamped (the raster it just
   // produced). A separate event from commit_paint (not new fields riding on

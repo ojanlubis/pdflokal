@@ -89,6 +89,8 @@ const VALID_PROPS = {
   merge_blocked: { reason: 'open_unrebuildable', pages: '2-5' },
   // 2026-10-02, the feature vote (js/core/features.js): ids only, never labels.
   feature_vote: { features: ['pdf-word', 'watermark'], has_text: true },
+  // 2026-10-23, the /qr page (js/qr.js): which verb took the code away, never the link.
+  qr_use: { action: 'download' },
 };
 
 test('every SCHEMA event has a VALID_PROPS fixture (test coverage stays complete as events are added)', () => {
@@ -556,4 +558,18 @@ test('savedCountBucket: an EMPTY list is its own bucket, and garbage collapses t
   assert.equal(savedCountBucket(10), '10+');
   for (const bad of [NaN, -1, undefined, null, 'x']) assert.equal(savedCountBucket(bad), '0');
   for (const n of [0, 1, 5, 20]) assert.equal(validateEvent('saved_list_open', { entries: savedCountBucket(n) }).ok, true);
+});
+
+// qr_use (2026-10-23, the /qr page): the privacy claim on that page is that the link
+// typed there goes nowhere. The rail's half of that claim is that the only values
+// the event can carry are the two verbs: a link, a bare URL or a free word is
+// refused outright, and so is a prop the schema never named.
+test('qr_use: both verbs pass; a typed link, an unknown verb, a missing or extra prop all fail', () => {
+  const ok = (p) => validateEvent('qr_use', p).ok;
+  assert.equal(ok({ action: 'download' }), true);
+  assert.equal(ok({ action: 'copy' }), true);
+  assert.equal(ok({ action: 'https://pdflokal.id' }), false);
+  assert.equal(ok({ action: 'share' }), false);
+  assert.equal(ok({}), false);
+  assert.equal(ok({ action: 'copy', link: 'https://pdflokal.id' }), false);
 });

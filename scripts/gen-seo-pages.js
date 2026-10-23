@@ -461,6 +461,9 @@ const urls = [
   { loc: `${origin}/`, priority: '1.0', changefreq: 'weekly' },
   { loc: `${origin}${EN_PATH}`, priority: '0.8', changefreq: 'monthly' },
   ...data.pages.map((p) => ({ loc: `${origin}/${p.slug}`, priority: '0.9', changefreq: 'monthly' })),
+  // /qr is a hand-written standalone tool page (like /privasi), not a pages.json entry: it
+  // changes no behaviour of the editor, so it is not an "intent" page (see pages.json's rule).
+  { loc: `${origin}/qr`, priority: '0.5', changefreq: 'monthly' },
   { loc: `${origin}/privasi`, priority: '0.3', changefreq: 'yearly' },
   // Clean URLs only: `/dukung.html` answers 308 -> `/dukung` (vercel.json cleanUrls), and a
   // sitemap entry that redirects is a defect. /en/support is its English twin.
