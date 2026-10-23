@@ -31,8 +31,8 @@ export const UPDATES = [
   {
     id: '2026-10-23-gambar',
     date: '2026-10-23',
-    text: 'Sekarang bisa tempel gambar di halaman, pilih file atau Ctrl+V.',
-    en: 'You can now put an image on the page: pick a file or press Ctrl+V.',
+    text: 'Di laptop/PC sekarang bisa tempel gambar di halaman (file atau Ctrl+V). Di HP menyusul.',
+    en: 'On a computer you can now put an image on the page (file or Ctrl+V). Phones next.',
     approved: true, // his handover, decisions 2026-10-23 13:20
   },
   {
