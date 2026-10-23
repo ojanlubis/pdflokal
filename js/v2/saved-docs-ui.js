@@ -235,5 +235,12 @@ export function createSavedUi({ store, presence, session, tel, isLanding, isInte
     });
   }
 
-  return { openList, maybeAskReopen, listDialog: list.dlg, askDialog: ask.dlg };
+  // WHY: the ask is a modal over the homepage, and a visitor can open a file underneath it
+  // (the picker, a drop). The landing then yields to the editor, and a modal left standing
+  // would blind every click on the page. Counts as "declined": they chose another file.
+  function dismissAsk() {
+    if (ask.dlg.open) ask.dlg.close();
+  }
+
+  return { openList, maybeAskReopen, dismissAsk, listDialog: list.dlg, askDialog: ask.dlg };
 }

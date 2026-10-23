@@ -21,6 +21,9 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { createDoc, createSource, createPage, createAnnotation, nextId, _resetIds } from '../../js/core/model.js';
 import {
@@ -475,4 +478,17 @@ test('storage failure kinds: quota, blocked/private, other', () => {
   assert.equal(storageFailureKind({ name: 'InvalidStateError' }), 'blocked');
   assert.equal(storageFailureKind({ name: 'UnknownError' }), 'other');
   assert.equal(storageFailureKind(null), 'other');
+});
+
+// ---- the reopen ask must not outlive the landing (found merging main's reload-after-edit specs) --
+// A file opened under the modal ask leaves the ask standing over the editor: every click then
+// lands on the backdrop. app.js dismisses it when the first document loads. app.js is not loadable
+// headless, so this reads its source: break the wiring and it goes red.
+const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '../..');
+test('a first load dismisses the reopen ask before the autosave slot begins', () => {
+  const APP = fs.readFileSync(path.join(ROOT, 'js/v2/app.js'), 'utf8');
+  const UI = fs.readFileSync(path.join(ROOT, 'js/v2/saved-docs-ui.js'), 'utf8');
+  assert.match(UI, /function dismissAsk\(\)[\s\S]*?ask\.dlg\.close\(\)/);
+  assert.match(UI, /return \{[^}]*dismissAsk/);
+  assert.match(APP, /if \(firstLoad\) \{\s*savedUi\?\.dismissAsk\(\);[\s\S]*?savedSession\?\.begin\(\);/);
 });

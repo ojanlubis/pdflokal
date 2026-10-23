@@ -286,6 +286,20 @@ test.describe('autosave and the reopen ask', () => {
     expect((await storeList(page)).filter((e) => e.kind === 'auto')).toHaveLength(1);
   });
 
+  test('a file opened under the ask closes it: the editor is clickable, not behind the backdrop', async ({ page }) => {
+    await openAndEdit(page);
+    await autosaveCaughtUp(page);
+    await page.reload();
+    await expect(page.locator('#saved-ask')).toBeVisible();
+    await page.setInputFiles('#file-input', FIXTURE);
+    await expectFirstPage(page);
+    await expect(page.locator('#saved-ask')).not.toBeVisible();
+    // A modal left standing would swallow this click (v2-leave-guard.spec.js does exactly this after a reload).
+    await page.keyboard.press('t');
+    await page.click('.pv-page >> nth=0', { position: { x: 200, y: 200 }, timeout: 5000 });
+    await expect(page.locator('.v2-text-edit')).toBeFocused();
+  });
+
   test('"Nanti aja" closes it and leaves the entry in place', async ({ page }) => {
     await openAndEdit(page);
     await autosaveCaughtUp(page);

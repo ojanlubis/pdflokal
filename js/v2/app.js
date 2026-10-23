@@ -140,6 +140,7 @@ let doc = createDoc(); // replaced wholesale by "Buka Baru" (File menu)
 // "Simpan editan" (js/v2/saved-session.js), assigned further down. Declared HERE because the
 // history below calls it on every change, and `let` keeps that call safe before it exists.
 let savedSession = null;
+let savedUi = null; // same reason: loadFilesInner reaches for it
 const history = createHistory(undefined, {
   carryRaster: rasterFitsShape,
   onDirtyChange: setLeaveGuard,
@@ -3346,7 +3347,10 @@ async function loadFilesInner(files, { replace = false } = {}) {
   const rescaled = normalizePageWidths(doc);
 
   showEditor({ firstLoad, existingRescaled: rescaled.some((p) => idsBefore.has(p.id)) });
-  if (firstLoad) savedSession?.begin(); // a new document: its autosave slot, and the lock that says it is ours
+  if (firstLoad) {
+    savedUi?.dismissAsk(); // a file opened under the reopen ask: the ask must not stay over the editor
+    savedSession?.begin(); // a new document: its autosave slot, and the lock that says it is ours
+  }
   // A non-first load that actually grew the doc IS a merge (gabung). Fire at
   // COMPLETION so it counts real merges from EVERY entry point — the [+] tile,
   // the File menu, dropping more files onto an open doc — not sheet-opens. GA4's
@@ -3621,7 +3625,7 @@ savedSession = createSavedSession({
   })[key],
   tel,
 });
-const savedUi = createSavedUi({
+savedUi = createSavedUi({
   store: savedStore,
   presence: savedPresence,
   session: savedSession,
