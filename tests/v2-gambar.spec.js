@@ -47,7 +47,10 @@ async function armWith(page, file) {
 async function tapPage(page, fx, fy) {
   const box = await page.locator('.pv-page').first().boundingBox();
   const size = await page.evaluate(() => { const p = window.v2.getDoc().pages[0]; const r = (p.rotation || 0) % 180 !== 0; return { w: r ? p.height : p.width, h: r ? p.width : p.height }; });
-  await page.mouse.click(box.x + box.width * fx, box.y + box.height * fy);
+  // locator.click scrolls the point into view; a raw mouse.click at a point below
+  // the 720px viewport lands on nothing (the page opens fitted to the width, so
+  // it is taller than the window) and no pointerdown ever reaches the page.
+  await page.locator('.pv-page').first().click({ position: { x: box.width * fx, y: box.height * fy } });
   return { x: size.w * fx, y: size.h * fy };
 }
 
