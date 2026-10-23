@@ -31,9 +31,13 @@ test.use({ serviceWorkers: 'block' });
 // 1x1 transparent PNG: a signature that is real enough to be a data URL.
 const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
 
+// Each box gets its own spot: since #183 a press on your own typed text (Teks armed) grabs it
+// instead of placing a new box, so stacking them at one point would edit the first one.
+let textSlot = 0;
+test.beforeEach(() => { textSlot = 0; });
 async function addText(page, text) {
   await page.click('[data-tool="text"]'); // the button, not the 't' key: after a file pick the focus sits on the file input, which swallows shortcuts
-  await page.click('.pv-page >> nth=0', { position: { x: 200, y: 260 } });
+  await page.click('.pv-page >> nth=0', { position: { x: 200, y: 260 + (textSlot++ % 6) * 45 } });
   await page.keyboard.type(text);
   await page.keyboard.press('Enter');
   await expect(page.locator('.pv-anno-text', { hasText: text })).toHaveCount(1);
@@ -135,7 +139,7 @@ test.describe('manual save', () => {
 
     // Saving again on the same open document UPDATES that entry, never adds one.
     await menuSave(page);
-    await expect(page.locator('#toast')).toContainText('diperbarui');
+    await expect(page.locator('#toast')).toContainText('Perubahan tersimpan');
     expect((await storeList(page)).filter((e) => e.kind === 'manual')).toHaveLength(1);
 
     await autosaveCaughtUp(page);
@@ -168,7 +172,7 @@ test.describe('manual save', () => {
     await expectFirstPage(page);
     await addText(page, 'Tambahan');
     await menuSave(page);
-    await expect(page.locator('#toast')).toContainText('diperbarui');
+    await expect(page.locator('#toast')).toContainText('Perubahan tersimpan');
     const manual = (await storeList(page)).filter((e) => e.kind === 'manual');
     expect(manual).toHaveLength(1);
     const state = await page.evaluate((id) => window.v2.saved.store.load(id).then((l) => JSON.stringify(l.state)), manual[0].id);
@@ -183,7 +187,7 @@ test.describe('manual save', () => {
     const list = page.locator('#saved-list');
     await expect(list).toBeVisible();
     await expect(list.locator('.sv-storage')).toContainText(/(KB|MB|GB)/);
-    await expect(list.locator('.sv-note').first()).toContainText('penyimpanan browser');
+    await expect(list.locator('.sv-note').first()).toContainText('Nggak ada yang diupload');
     // Safari's 7-day note is for Safari only; this is Chromium.
     await expect(list.locator('.sv-safari')).toHaveCount(0);
     const del = list.locator('.sv-row', { hasText: 'sample-2pages' }).locator('.sv-del');
@@ -677,11 +681,11 @@ test.describe('storage that fails never breaks editing', () => {
     await page.setInputFiles('#file-input', FIXTURE);
     await expectFirstPage(page);
     await addText(page, 'Satu');
-    await expect.poll(() => page.evaluate(() => window.__toasts.filter((t) => t.includes('nggak mengizinkan')).length), { timeout: 8000 }).toBe(1);
+    await expect.poll(() => page.evaluate(() => window.__toasts.filter((t) => t.includes('menolak penyimpanan')).length), { timeout: 8000 }).toBe(1);
     await addText(page, 'Dua');
     await addText(page, 'Tiga');
     await page.waitForTimeout(2500);
-    expect(await page.evaluate(() => window.__toasts.filter((t) => t.includes('nggak mengizinkan')).length), 'told once, not per edit').toBe(1);
+    expect(await page.evaluate(() => window.__toasts.filter((t) => t.includes('menolak penyimpanan')).length), 'told once, not per edit').toBe(1);
     expect(await page.evaluate(() => window.v2.saved.session.disabled)).toBe(true);
     expect(await page.evaluate(() => window.v2.getDoc().pages[0].annotations.filter((a) => a.type === 'text').length), 'editing was never touched').toBe(3);
   });
@@ -729,9 +733,9 @@ test.describe('storage that fails never breaks editing', () => {
     await page.reload();
     await page.locator('#saved-ask').getByRole('button', { name: 'Buka lagi' }).click();
     await expect(page.locator('#toast')).toContainText('nggak bisa dibuka');
-    // The ask stays so they can try the other route; the page is still the landing.
+    // The ask closes so the toast is not painted over it; the page is still the landing.
+    await expect(page.locator('#saved-ask')).not.toBeVisible();
     expect(await page.evaluate(() => document.body.classList.contains('is-empty'))).toBe(true);
-    await page.locator('#saved-ask').getByRole('button', { name: 'Nanti aja' }).click();
     await page.setInputFiles('#file-input', FIXTURE);
     await expectFirstPage(page);
   });
