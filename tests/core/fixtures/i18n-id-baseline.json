@@ -1193,5 +1193,17 @@
     "src": [
       "js/v2/feature-vote.js"
     ]
+  },
+  "tools.gambar": {
+    "text": "Gambar",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
+  "tools.gambarTip": {
+    "text": "Tambah gambar ke halaman",
+    "src": [
+      "js/v2/app.js"
+    ]
   }
 }

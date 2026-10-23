@@ -25,6 +25,14 @@ export default {
   page: { short: 'Hal {n}' },
   loading: { count: '{n} dari {total} file' },
 
+  // Gambar (insert a picture) toolbar button. PLACEHOLDER copy and a provisional
+  // toolbar spot: the founder is redesigning the toolbar and has not named this
+  // tool. Both strings are DRAFT, nothing else in the feature is new copy.
+  tools: {
+    gambar: 'Gambar', // DRAFT
+    gambarTip: 'Tambah gambar ke halaman', // DRAFT
+  },
+
   // Signature bar above the page
   sigBar: {
     signatureSelected: 'Tanda tangan terpilih',

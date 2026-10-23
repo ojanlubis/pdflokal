@@ -18,6 +18,14 @@ export default {
   page: { short: 'Page {n}' },
   loading: { count: '{n} of {total} files' },
 
+  // Gambar (insert a picture) toolbar button. PLACEHOLDER copy and a provisional
+  // toolbar spot: the founder is redesigning the toolbar and has not named this
+  // tool. Both strings are DRAFT, nothing else in the feature is new copy.
+  tools: {
+    gambar: 'Image', // DRAFT
+    gambarTip: 'Add an image to the page', // DRAFT
+  },
+
   sigBar: {
     signatureSelected: 'Signature selected',
     armed: 'Pick a spot to place',

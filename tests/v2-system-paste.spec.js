@@ -71,8 +71,9 @@ test.describe('system clipboard paste', () => {
     const px = await page.evaluate((src) => new Promise((r) => {
       const im = new Image(); im.onload = () => r({ w: im.naturalWidth, h: im.naturalHeight }); im.src = src;
     }), a.image);
-    expect(px.w).toBe(1200);
-    expect(px.h).toBe(600);
+    // The cap is Gambar's (js/v2/image-decode.js MAX_IMAGE_PX): 2000px on the long side.
+    expect(px.w).toBe(2000);
+    expect(px.h).toBe(1000);
     expect(await page.evaluate(() => window.v2.getDoc().selection.annotationId)).toBe(a.id);
     await expect(page.locator('.pv-anno')).toHaveCount(1);
     // One paste = one undo step.
