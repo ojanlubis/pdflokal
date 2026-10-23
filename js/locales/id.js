@@ -349,7 +349,8 @@ export default {
     close: 'Tutup', // DRAFT
     // DRAFT-APPROVED-BY-HIM (round 2, 2026-10-23: the founder's own words, final)
     badgeWip: 'Lagi dikerjakan',
-    badgeShipped: 'Sudah ada', // DRAFT: the badge on an option that has shipped (FEATURE_STATUS in js/core/features.js)
+    // DRAFT-APPROVED-BY-HIM (round 2, 2026-10-23: his word, for an option that is done; FEATURE_STATUS in js/core/features.js)
+    badgeShipped: 'Done',
     // DRAFT: the maker card's one line when a feature this person voted for has shipped (js/core/features.js SHIPPED); the wording is the one he gave the seat on 2026-10-06, not yet read as a card
     shipped: '{feature} udah jadi nih. Kamu salah satu yang milih ini, makasii',
     // DRAFT: one label per feature, IN THE ORDER of FEATURES (js/core/features.js)

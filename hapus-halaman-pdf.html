@@ -721,12 +721,15 @@
     .fv-opt:has(input:checked) { font-weight: 600; }
     .fv-opt:has(input:disabled:not(:checked)) { opacity: .45; cursor: not-allowed; }
     .fv-opt:has(input:focus-visible) { outline: 3px solid var(--accent); outline-offset: -3px; border-radius: var(--r-control); }
-    /* Round 2: an option that is not up for a vote (being built, or already shipped). No
-       checkbox, no tap target, listed FIRST; the ground tint and the pill make it read as
-       a status, not as a choice. Not red: red is touchable only. */
-    .fv-opt.fv-badged { cursor: default; justify-content: space-between; background: var(--dzfill); border-radius: var(--r-control); }
-    .fv-opt-name { flex: 1; min-width: 0; font-weight: 600; }
-    .fv-badge { flex: none; padding: var(--sp-4) var(--sp-8); border: 1px solid var(--ink); border-radius: var(--r-pill); font-size: var(--fs-n1); font-weight: 600; line-height: 1.2; color: var(--ink); white-space: nowrap; }
+    /* Round 2: a status row (being built, or done): small and quiet, after the options. A
+       disabled checkbox (ticked when done), the name, the status word at the end. No tint,
+       no pill, no tap target. */
+    .fv-opt.fv-static { min-height: 0; padding: var(--sp-4); gap: var(--sp-8); cursor: default; font-size: var(--fs-n1); color: var(--muted); }
+    .fv-opt.fv-static input { width: 16px; height: 16px; }
+    .fv-opt.fv-static:has(input:disabled:not(:checked)) { opacity: 1; cursor: default; }
+    .fv-opt.fv-static:has(input:checked) { font-weight: 400; }
+    .fv-opt-name { flex: 1; min-width: 0; }
+    .fv-badge { flex: none; font-size: var(--fs-n1); line-height: 1.2; color: var(--muted); white-space: nowrap; }
     @media (hover: hover) {
       .fv-opt:has(input:not(:disabled)):hover { background: var(--dzfill); }
     }

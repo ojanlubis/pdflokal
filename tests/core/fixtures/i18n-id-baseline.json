@@ -1202,7 +1202,7 @@
     ]
   },
   "featureVote.badgeShipped": {
-    "text": "Sudah ada",
+    "text": "Done",
     "src": [
       "js/v2/feature-vote.js"
     ]

@@ -38,13 +38,15 @@ export const CURRENT_ROUND = 2;
 // What the card says about an option that is not (or no longer) up for a vote, by id.
 // 'wip'     being built now: badge `featureVote.badgeWip`
 // 'shipped' it exists: badge `featureVote.badgeShipped`. FLIP THE ENTRY when a feature ships.
-// An id with an entry here is shown with its badge, FIRST, and cannot be picked: the card
-// has no checkbox for it and cleanVote() refuses it (a ballot naming one is invalid).
+// An id with an entry here is shown AFTER the selectable options, as a quiet small row with
+// a DISABLED checkbox (ticked when shipped) and its status word at the end of the row. It
+// cannot be picked: cleanVote() refuses it (a ballot naming one is invalid).
+// (Separate from SHIPPED below, which drives the "kabari" notice to people who voted.)
 // An id with no entry is a normal, selectable option.
 export const FEATURE_STATUS = Object.freeze({
   'pdf-word': 'wip',
-  'canvas-image': 'wip',
-  'save-edits': 'wip',
+  'canvas-image': 'shipped',
+  'save-edits': 'shipped',
 });
 export const BADGE_STATUSES = Object.freeze(['wip', 'shipped']);
 
@@ -89,11 +91,11 @@ export const SHIPPED = Object.freeze([]);
 
 export const FEATURE_IDS = Object.freeze(FEATURES.map((f) => f.id));
 
-// The order the card SHOWS: options with a status badge first, then the selectable ones,
-// each group in list order (a stable sort of FEATURES). Pure, so a test can drive it.
+// The order the card SHOWS: the selectable options first, then the status rows (wip or
+// shipped), each group in list order (a stable sort of FEATURES). Pure, so a test can drive it.
 export function orderForCard(features = FEATURES, status = FEATURE_STATUS) {
   const badged = (f) => Object.hasOwn(status, f.id);
-  return [...features.filter(badged), ...features.filter((f) => !badged(f))];
+  return [...features.filter((f) => !badged(f)), ...features.filter(badged)];
 }
 
 // The ONE validator. `ids` is whatever arrived (a client, a request body, a

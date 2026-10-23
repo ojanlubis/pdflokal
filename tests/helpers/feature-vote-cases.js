@@ -27,10 +27,10 @@ const FIXTURE = path.join(__dirname, '..', 'fixtures', 'sample-2pages.pdf');
 const SHOWS_WITHIN = 1_500;
 const NOT_BY = 5_000;
 
-// ROUND 2 (2026-10-23): pdf-word, save-edits and canvas-image are badged "Lagi dikerjakan" and cannot be
-// picked; the card lists them FIRST. The rest are real checkboxes.
+// ROUND 2 (2026-10-23): pdf-word ("Lagi dikerjakan"), save-edits and canvas-image ("Done") are status
+// rows: small, a DISABLED checkbox (ticked when done), listed AFTER the six real options.
 const TOP = { voters: 40, counts: { batch: 22, watermark: 14, 'form-fill': 9, 'lock-unlock': 4 } };
-const IDS = ['pdf-word', 'save-edits', 'canvas-image', 'pdf-excel', 'lock-unlock', 'form-fill', 'camera-scan', 'watermark', 'batch']; // card order
+const IDS = ['pdf-excel', 'lock-unlock', 'form-fill', 'camera-scan', 'watermark', 'batch', 'pdf-word', 'save-edits', 'canvas-image']; // card order
 const BADGED = ['pdf-word', 'save-edits', 'canvas-image'];
 const DONE_R2 = 'voted:2'; // js/v2/vote-memory.js doneValue(2); round 1 wrote 'voted'
 const dayOf = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -132,7 +132,7 @@ export function defineFeatureVoteSuite({ door }) {
       await expect(step(page, 'invite').locator('[data-fv-later]')).toHaveText('Nanti aja');
       expect(await page.locator('#fv-form .fv-face').evaluate((el) => el.complete && el.naturalWidth > 0), 'the photo really loaded').toBe(true);
 
-      // step 2: no photo, a heading, "Pilih maksimal 3" prominent, 9 rows (3 badged, 6 with a real checkbox)
+      // step 2: no photo, a heading, "Pilih maksimal 3" prominent, 9 rows (6 options, then 3 status rows)
       await toStep2(page);
       await expect(step(page, 'invite')).toBeHidden();
       await expect(page.locator('#fv-form .fv-face')).toBeHidden();
@@ -145,29 +145,30 @@ export function defineFeatureVoteSuite({ door }) {
       expect(title).toBeGreaterThan(15.5); // larger than v1's
       expect(hint.weight).toBeGreaterThanOrEqual(600); // prominent, not a grey subtitle
       expect(hint.size).toBeGreaterThanOrEqual(16);
-      // the badged three come FIRST, each with the founder's badge, and have no checkbox;
-      // then the selectable six in list order
-      await expect(page.locator('#fv-form .fv-badged .fv-opt-name')).toHaveText(['PDF ke Word', 'Simpan editan buat dilanjut nanti', 'Tempel gambar atau logo']);
-      await expect(page.locator('#fv-form .fv-badged .fv-badge')).toHaveText(['Lagi dikerjakan', 'Lagi dikerjakan', 'Lagi dikerjakan']);
+      // six real options first, in list order; then the three status rows, quiet, with their word at the end
       await expect(page.locator('#fv-form label.fv-opt')).toHaveText([
         'PDF ke Excel', 'Kunci dan buka PDF yang pakai password', 'Isi formulir PDF', 'Scan dokumen pakai kamera HP',
         'Tambah watermark', 'Proses banyak file sekaligus',
       ]);
-      expect((await page.locator('#fv-form .fv-list li').first().locator('.fv-badged').count()), 'badged options sort first').toBe(1);
-      expect(await page.locator('#fv-form .fv-list li:nth-child(3) .fv-badged').count()).toBe(1);
-      expect(await page.locator('#fv-form .fv-list li:nth-child(4) .fv-badged').count()).toBe(0);
-      await expect(step(page, 'choose').getByRole('checkbox')).toHaveCount(6);
-      for (const id of BADGED) await expect(box(page, id)).toHaveCount(0); // not tickable: there is nothing to tick
-      // the badge is VISIBLY highlighted: a tinted row, unlike a selectable one
-      const tint = (sel) => page.locator(sel).first().evaluate((el) => getComputedStyle(el).backgroundColor);
-      expect(await tint('#fv-form .fv-badged')).not.toBe(await tint('#fv-form label.fv-opt'));
-      await expect(page.locator('#fv-count')).toHaveText('0 dari 3 dipilih');
-      await expect(page.locator('#fv-send')).toHaveText('Kirim pilihan');
-      await expect(page.locator('#fv-send')).toBeDisabled();
-      await expect(page.locator('label[for="fv-idea"]')).toHaveText('Belum ada di sini? Tulis aja');
-
-      // a tap on a badged row does nothing: still nothing picked
-      await page.locator('#fv-form .fv-badged').first().click();
+      await expect(page.locator('#fv-form .fv-static .fv-opt-name')).toHaveText(['PDF ke Word', 'Simpan editan buat dilanjut nanti', 'Tempel gambar atau logo']);
+      await expect(page.locator('#fv-form .fv-static .fv-badge')).toHaveText(['Lagi dikerjakan', 'Done', 'Done']);
+      const order = await page.locator('#fv-form .fv-opt').evaluateAll((els) => els.map((el) => el.classList.contains('fv-static')));
+      expect(order, 'status rows come after every selectable option').toEqual([false, false, false, false, false, false, true, true, true]);
+      await expect(step(page, 'choose').getByRole('checkbox')).toHaveCount(9);
+      // the status rows' boxes are shown but DISABLED, ticked only for the done ones; they are not the voting boxes
+      const statics = page.locator('#fv-form .fv-static input[type="checkbox"]');
+      await expect(statics).toHaveCount(3);
+      for (const b of await statics.all()) await expect(b).toBeDisabled();
+      expect(await statics.evaluateAll((els) => els.map((el) => el.checked))).toEqual([false, true, true]);
+      for (const id of BADGED) await expect(box(page, id)).toHaveCount(0); // no voting box exists for them
+      // quiet: no tint, and a status row is smaller than a tap-target row
+      const bg = (sel) => page.locator(sel).first().evaluate((el) => getComputedStyle(el).backgroundColor);
+      expect(await bg('#fv-form .fv-static')).toBe(await bg('#fv-form label.fv-opt'));
+      const [hStatic, hOpt] = await Promise.all([page.locator('#fv-form .fv-static').first().boundingBox(), page.locator('#fv-form label.fv-opt').first().boundingBox()]);
+      expect(hStatic.height).toBeLessThan(hOpt.height);
+      expect(hStatic.height).toBeLessThan(36);
+      // a tap on a status row does nothing: still nothing picked
+      await page.locator('#fv-form .fv-static').first().click();
       await expect(page.locator('#fv-count')).toHaveText('0 dari 3 dipilih');
       await expect(page.locator('#fv-send')).toBeDisabled();
       await pick(page, 'pdf-excel');
@@ -228,11 +229,13 @@ export function defineFeatureVoteSuite({ door }) {
       await toStep2(page);
       // Count guard: a loop over an empty .all() passes for free. Catches a renamed row class.
       await expect(page.locator('#fv-form .fv-opt')).toHaveCount(IDS.length);
-      for (const row of await page.locator('#fv-form .fv-opt').all()) {
+      // the six real options are tap targets; the status rows are deliberately small and not
+      await expect(page.locator('#fv-form label.fv-opt')).toHaveCount(6);
+      for (const row of await page.locator('#fv-form label.fv-opt').all()) {
         expect((await row.boundingBox()).height).toBeGreaterThanOrEqual(44);
       }
       // a long label next to a badge still fits the row: nothing spills sideways
-      for (const row of await page.locator('#fv-form .fv-badged').all()) {
+      for (const row of await page.locator('#fv-form .fv-static').all()) {
         const [r, name, badge] = await Promise.all([row.boundingBox(), row.locator('.fv-opt-name').boundingBox(), row.locator('.fv-badge').boundingBox()]);
         expect(badge.x + badge.width).toBeLessThanOrEqual(r.x + r.width + 0.5);
         expect(name.x + name.width).toBeLessThanOrEqual(badge.x + 0.5);
@@ -603,7 +606,8 @@ export function defineFeatureVoteSuite({ door }) {
       await expect(page.getByRole('dialog', { name: 'Voting Fitur PDFLokal' })).toBeVisible();
       await toStep2(page);
       await expect(page.getByRole('dialog', { name: 'Fitur apa yang kamu butuh?' })).toBeVisible();
-      await expect(dlg.getByRole('checkbox')).toHaveCount(6);
+      await expect(dlg.getByRole('checkbox')).toHaveCount(9); // six real ones + three disabled status boxes
+      await expect(dlg.getByRole('checkbox', { name: 'Simpan editan buat dilanjut nanti' })).toBeDisabled();
       await expect(page.getByLabel('Belum ada di sini? Tulis aja')).toBeVisible();
       await expect(page.locator('#fv-count')).toHaveAttribute('aria-live', 'polite');
       await page.getByRole('checkbox', { name: 'PDF ke Excel' }).focus();
@@ -646,8 +650,8 @@ export function defineFeatureVoteSuite({ door }) {
       await toStep2(page);
       await expect(page.locator('#fv-title')).toHaveText('Which features do you need?');
       await expect(page.locator('#fv-form .fv-hint')).toHaveText('Pick up to 3');
-      await expect(page.locator('#fv-form .fv-badged .fv-opt-name')).toHaveText(['PDF to Word', 'Save your edits to continue later', 'Add an image or logo']);
-      await expect(page.locator('#fv-form .fv-badged .fv-badge')).toHaveText(['In the works', 'In the works', 'In the works']);
+      await expect(page.locator('#fv-form .fv-static .fv-opt-name')).toHaveText(['PDF to Word', 'Save your edits to continue later', 'Add an image or logo']);
+      await expect(page.locator('#fv-form .fv-static .fv-badge')).toHaveText(['In the works', 'Done', 'Done']);
       await expect(page.locator('#fv-form label.fv-opt')).toHaveText([
         'PDF to Excel', 'Lock and unlock password-protected PDFs', 'Fill in PDF forms', 'Scan documents with your phone camera',
         'Add a watermark', 'Process many files at once',

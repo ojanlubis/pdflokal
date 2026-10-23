@@ -121,23 +121,32 @@ export function createFeatureVote() {
     if (el.matches('.fv-x')) el.setAttribute('aria-label', tr('featureVote.close'));
     else el.textContent = tr('featureVote.close');
   }
-  // Badged options (FEATURE_STATUS: being built, or already shipped) come first, each
-  // with its badge, and have NO checkbox: they are not up for a vote, so picked(),
-  // refresh() and the 3-pick limit never see them. The rest are the real checkboxes.
+  // Status rows (FEATURE_STATUS: being built, or done) come AFTER the selectable options,
+  // small and quiet: a DISABLED checkbox (ticked when done), the name, and the status word
+  // at the end. They are not up for a vote, so boxes(), picked(), refresh() and the 3-pick
+  // limit never see them (the `fv-static` class is what excludes them).
+  let statusN = 0;
   list.replaceChildren(...orderForCard().map((f) => {
     const li = document.createElement('li');
     if (!isSelectable(f.id)) {
       const row = document.createElement('div');
-      row.className = 'fv-opt fv-badged';
+      row.className = 'fv-opt fv-static';
+      const box = document.createElement('input');
+      box.type = 'checkbox';
+      box.className = 'fv-static-box';
+      box.disabled = true;
+      box.checked = FEATURE_STATUS[f.id] === 'shipped';
       const name = document.createElement('span');
       name.className = 'fv-opt-name';
+      name.id = `fv-static-${statusN += 1}`;
       name.textContent = labelOf(f.id);
+      box.setAttribute('aria-labelledby', name.id);
       const badge = document.createElement('span');
       badge.className = 'fv-badge';
       badge.dataset.status = FEATURE_STATUS[f.id];
       // Two literal call sites: the i18n law forbids building a key from the status.
       badge.textContent = FEATURE_STATUS[f.id] === 'shipped' ? tr('featureVote.badgeShipped') : tr('featureVote.badgeWip');
-      row.append(name, badge);
+      row.append(box, name, badge);
       li.append(row);
       return li;
     }
@@ -154,7 +163,7 @@ export function createFeatureVote() {
     return li;
   }));
 
-  const boxes = () => [...list.querySelectorAll('input[type="checkbox"]')];
+  const boxes = () => [...list.querySelectorAll('input[type="checkbox"]:not(.fv-static-box)')];
   const picked = () => boxes().filter((b) => b.checked).map((b) => b.value);
   let source = 'menu';           // who opened it: 'auto' (the download moment) or 'menu'
   let sent = false;

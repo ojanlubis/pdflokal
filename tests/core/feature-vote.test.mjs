@@ -89,11 +89,10 @@ test('his own words are verbatim (spelling and line breaks are his: do not fix t
   assert.match(src, /start: 'Pilih fitur', \/\/ DRAFT/);
   assert.match(src, /later: 'Nanti aja', \/\/ DRAFT/);
   // round 2's new strings are DRAFT-marked at their own line (the seat lists them for him)
-  assert.match(src, /badgeShipped: 'Sudah ada', \/\/ DRAFT/);
+  assert.match(src, /DRAFT-APPROVED-BY-HIM[^\n]*done[^\n]*\n\s*badgeShipped: 'Done',/, 'his word, marked approved, not DRAFT');
   assert.match(src, /'Proses banyak file sekaligus', \/\/ DRAFT/);
-  assert.equal(ID.featureVote.badgeShipped, 'Sudah ada');
-  assert.equal(EN.featureVote.badgeShipped, 'Available now');
-  assert.match(read('js/locales/en.js'), /badgeShipped: 'Available now', \/\/ DRAFT/);
+  assert.equal(ID.featureVote.badgeShipped, 'Done');
+  assert.equal(EN.featureVote.badgeShipped, 'Done');
   assert.match(read('js/locales/en.js'), /badgeWip: '[^']+', \/\/ DRAFT/);
 });
 
@@ -130,9 +129,9 @@ test('cleanVote: a valid vote passes; empty is allowed (a text-only idea)', () =
 
 // ---- round 2 (2026-10-23): badged options, the per-option status map ---------------
 
-test('ROUND 2: the current round is 2, and exactly pdf-word, canvas-image and save-edits are badged "wip"', () => {
+test('ROUND 2: the current round is 2; pdf-word is "wip", save-edits and canvas-image are "shipped" (his call 2026-10-23)', () => {
   assert.equal(CURRENT_ROUND, 2);
-  assert.deepEqual({ ...FEATURE_STATUS }, { 'pdf-word': 'wip', 'canvas-image': 'wip', 'save-edits': 'wip' });
+  assert.deepEqual({ ...FEATURE_STATUS }, { 'pdf-word': 'wip', 'canvas-image': 'shipped', 'save-edits': 'shipped' });
   assert.ok(Object.isFrozen(FEATURE_STATUS), 'the status map cannot be bent at runtime');
   for (const id of ['pdf-word', 'canvas-image', 'save-edits']) assert.equal(isSelectable(id), false, `${id} is not pickable`);
   for (const id of ['form-fill', 'pdf-excel', 'camera-scan', 'lock-unlock', 'watermark', 'batch']) assert.equal(isSelectable(id), true, `${id} is pickable`);
@@ -149,14 +148,14 @@ test('ROUND 2: a badged option is refused by the ONE validator, alone or inside 
   assert.equal(isSelectable('pdf-word', {}), true, 'vacuity guard: with no entry it is an ordinary option')
 });
 
-test('ROUND 2: the card order puts badged options first, each group in list order; selectable ones keep list order', () => {
+test('ROUND 2: the card order puts the selectable options first and the status rows AFTER them, each group in list order', () => {
   assert.deepEqual(orderForCard().map((f) => f.id), [
-    'pdf-word', 'save-edits', 'canvas-image', // badged, list order
-    'pdf-excel', 'lock-unlock', 'form-fill', 'camera-scan', 'watermark', 'batch',
+    'pdf-excel', 'lock-unlock', 'form-fill', 'camera-scan', 'watermark', 'batch', // selectable, list order
+    'pdf-word', 'save-edits', 'canvas-image', // status rows, list order
   ]);
-  // driven by the map, not by a hard-coded list: flip one more and it moves up
+  // driven by the map, not by a hard-coded list: flip one more and it moves down
   const more = orderForCard(FEATURES, { ...FEATURE_STATUS, watermark: 'shipped' }).map((f) => f.id);
-  assert.deepEqual(more.slice(0, 4), ['pdf-word', 'save-edits', 'canvas-image', 'watermark']);
+  assert.deepEqual(more.slice(-4), ['pdf-word', 'save-edits', 'canvas-image', 'watermark']);
   assert.equal(more.length, FEATURES.length, 'a sort never loses or doubles an option');
   // vacuity guard: with no statuses the order is the list's own
   assert.deepEqual(orderForCard(FEATURES, {}).map((f) => f.id), FEATURE_IDS);

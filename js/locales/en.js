@@ -337,7 +337,7 @@ export default {
     top: 'Most picked so far:',
     close: 'Close',
     badgeWip: 'In the works', // DRAFT: the founder's id words are 'Lagi dikerjakan'; this English line is the seat's
-    badgeShipped: 'Available now', // DRAFT
+    badgeShipped: 'Done', // his word, 2026-10-23 (same in both languages)
     shipped: "{feature} is done. You're one of the people who picked it, thankss",
     labels: [
       'PDF to Word',
