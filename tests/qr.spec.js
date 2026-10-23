@@ -104,6 +104,17 @@ test.describe('/qr', () => {
   });
 
   test('the typed link appears in no request; telemetry carries only the verb', async ({ page }) => {
+    // sendBeacon's Blob body is invisible to page.on('request') (postData() is null for
+    // it), so the beacon is read where it is made: wrap sendBeacon, record the text,
+    // still send it. The request log below covers everything else the page does.
+    await page.addInitScript(() => {
+      window.__beacons = [];
+      const real = navigator.sendBeacon.bind(navigator);
+      navigator.sendBeacon = (url, data) => {
+        if (data && typeof data.text === 'function') data.text().then((t) => window.__beacons.push({ url, body: t }));
+        return real(url, data);
+      };
+    });
     const seen = [];
     page.on('request', (r) => seen.push({ url: r.url(), body: r.postData() || '' }));
     await page.goto('/qr');
@@ -115,16 +126,17 @@ test.describe('/qr', () => {
       Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
       document.dispatchEvent(new Event('visibilitychange'));
     });
-    await expect.poll(() => seen.some((r) => r.url.endsWith('/api/t'))).toBe(true);
+    await expect.poll(() => page.evaluate(() => window.__beacons.length)).toBeGreaterThan(0);
+    const beacons = await page.evaluate(() => window.__beacons);
 
-    // CONTROL: the telemetry request exists and names the verb. Without this the
-    // assertion below could pass over an empty log.
-    const t = seen.find((r) => r.url.endsWith('/api/t'));
-    expect(t.body).toContain('qr_use');
-    expect(t.body).toContain('download');
+    // CONTROL: the telemetry batch exists and names the verb. Without this the
+    // assertions below could pass over an empty log.
+    expect(beacons[0].url).toBe('/api/t');
+    expect(beacons[0].body).toContain('"event":"qr_use"');
+    expect(beacons[0].body).toContain('"action":"download"');
 
     expect(seen.length).toBeGreaterThan(3);
-    for (const r of seen) {
+    for (const r of [...seen, ...beacons]) {
       expect(r.url, `request URL ${r.url}`).not.toContain(MARKER);
       expect(r.body, `request body of ${r.url}`).not.toContain(MARKER);
     }
