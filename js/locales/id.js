@@ -25,9 +25,16 @@ export default {
   page: { short: 'Hal {n}' },
   loading: { count: '{n} dari {total} file' },
 
+  // Gambar (insert a picture) toolbar button. Final 2026-10-23, the seat's call under his handover (decisions 2026-10-23 13:20).
+  tools: {
+    gambar: 'Gambar',
+    gambarTip: 'Tambah gambar ke halaman',
+  },
+
   // Signature bar above the page
   sigBar: {
     signatureSelected: 'Tanda tangan terpilih',
+    pictureSelected: 'Gambar terpilih',
     armed: 'Pilih tempat untuk menempatkan',
   },
 

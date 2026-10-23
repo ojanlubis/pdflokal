@@ -18,8 +18,15 @@ export default {
   page: { short: 'Page {n}' },
   loading: { count: '{n} of {total} files' },
 
+  // Gambar (insert a picture) toolbar button. Final 2026-10-23, the seat's call under his handover (decisions 2026-10-23 13:20).
+  tools: {
+    gambar: 'Image',
+    gambarTip: 'Add an image to the page',
+  },
+
   sigBar: {
     signatureSelected: 'Signature selected',
+    pictureSelected: 'Image selected',
     armed: 'Pick a spot to place',
   },
 

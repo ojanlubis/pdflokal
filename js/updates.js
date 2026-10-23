@@ -29,6 +29,13 @@ import { getLocale } from './lib/i18n.js';
 
 export const UPDATES = [
   {
+    id: '2026-10-23-gambar',
+    date: '2026-10-23',
+    text: 'Di laptop/PC sekarang bisa tempel gambar di halaman (file atau Ctrl+V). Di HP menyusul.',
+    en: 'On a computer you can now put an image on the page (file or Ctrl+V). Phones next.',
+    approved: true, // his handover, decisions 2026-10-23 13:20
+  },
+  {
     id: '2026-10-23-simpan-editan',
     date: '2026-10-23',
     text: 'Editan sekarang tersimpan otomatis di browser ini. Tab ketutup? Buka lagi, lanjut.',
