@@ -1,9 +1,9 @@
 /*
- * THE LANGUAGE SCRIPT IS ONE SCRIPT, IN THREE HEADS, AND IT DECIDES CORRECTLY.
+ * THE LANGUAGE SCRIPT IS ONE SCRIPT, IN FOUR HEADS, AND IT DECIDES CORRECTLY.
  * ============================================================================
  * The inline script first in <head> sends an English browser on `/` to /en, and
  * remembers a language picked in the menu (pdflokal_lang). It is byte-copied
- * into index.html, dukung.html and privasi.html (the generators copy
+ * into index.html, dukung.html, privasi.html and qr.html (the generators copy
  * index.html's head into /en and the 12 tool pages). Properties:
  *
  *   1. ONE COPY EACH, BYTE-IDENTICAL (same shape as theme-boot-parity): a
@@ -30,7 +30,7 @@ import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const PAGES = ['index.html', 'privasi.html', 'dukung.html'];
+const PAGES = ['index.html', 'privasi.html', 'dukung.html', 'qr.html'];
 const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
 const SNIPPET = /<script>\s*\(function \(\) \{\s*var KEY = 'pdflokal_lang';[\s\S]*?<\/script>/g;
 

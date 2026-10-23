@@ -82,11 +82,23 @@ function restore(history, doc, snap) {
 // state it holds, so undo/redo move `current` back and forth along the same
 // ids and "undo back to exactly the downloaded state" is clean again for free.
 // A flag could not do that: it would stay dirty after the undo.
-export function createHistory(limit = DEFAULT_LIMIT, { carryRaster = null, onDirtyChange = null } = {}) {
+//
+// `onChange()` (optional): called after every change to the document — record,
+// undo, redo, markChanged — and for nothing else (markClean is a download, settle
+// a backed-out gesture: neither changes the document). The autosave hangs here
+// (v2/saved-docs wiring in app.js). NOTE record() runs BEFORE its mutation, so a
+// listener must not read the doc synchronously; the autosave debounces and reads
+// the doc when its timer fires. A throwing listener never breaks an edit.
+export function createHistory(limit = DEFAULT_LIMIT, { carryRaster = null, onDirtyChange = null, onChange = null } = {}) {
   return {
     undoStack: [], redoStack: [], limit, carryRaster,
-    current: 0, cleanId: 0, nextId: 1, wasDirty: false, onDirtyChange,
+    current: 0, cleanId: 0, nextId: 1, wasDirty: false, onDirtyChange, onChange,
   };
+}
+
+function changed(history) {
+  if (!history.onChange) return;
+  try { history.onChange(); } catch { /* a listener may never break an edit */ }
 }
 
 function syncDirty(history) {
@@ -103,6 +115,7 @@ export function record(history, doc) {
   history.redoStack.length = 0;
   history.current = history.nextId++;
   syncDirty(history);
+  changed(history);
 }
 
 export function undo(history, doc) {
@@ -112,6 +125,7 @@ export function undo(history, doc) {
   restore(history, doc, snap);
   history.current = snap.id;
   syncDirty(history);
+  changed(history);
   return true;
 }
 
@@ -122,6 +136,7 @@ export function redo(history, doc) {
   restore(history, doc, snap);
   history.current = snap.id;
   syncDirty(history);
+  changed(history);
   return true;
 }
 
@@ -145,6 +160,7 @@ export function markChanged(history) {
   history.redoStack.length = 0;
   history.current = history.nextId++;
   syncDirty(history);
+  changed(history);
 }
 
 // A gesture that record()ed and then backed out leaving the doc exactly as it
