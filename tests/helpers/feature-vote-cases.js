@@ -181,7 +181,8 @@ export function defineFeatureVoteSuite({ door }) {
       // vacuity guard: the 4th really is refused, not just styled
       await box(page, 'form-fill').evaluate((el) => el.click()); // a script/assistive click on a disabled box
       await expect(box(page, 'form-fill')).not.toBeChecked();
-      expect(await page.locator('#fv-form input:checked').count()).toBe(3);
+      // the voting boxes only: a status row's display box is ticked when its feature is done
+      expect(await page.locator('#fv-form input:checked:not(.fv-static-box)').count()).toBe(3);
 
       await page.click('#fv-send');
       // Polled: the ballot is a fetch the route answers asynchronously. Catches a read
