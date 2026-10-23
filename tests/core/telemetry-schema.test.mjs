@@ -476,6 +476,20 @@ test("tool_use accepts 'extract' on halaman, and old clients' actions still vali
   assert.equal(validateEvent('tool_use', { tool: 'halaman', action: 'extracted' }).ok, false);
 });
 
+test("tool_use accepts the Gambar tool: 'gambar' with arm / image / image_paste, content-blind", () => {
+  for (const action of ['arm', 'image', 'image_paste']) {
+    assert.equal(validateEvent('tool_use', { tool: 'gambar', action }).ok, true, action);
+  }
+  // Additive: every tool a cached client sends still validates.
+  for (const tool of ['select', 'teks', 'tipex', 'ganti', 'ttd', 'hapus', 'halaman', 'gabung']) {
+    assert.equal(validateEvent('tool_use', { tool, action: 'arm' }).ok, true, tool);
+  }
+  assert.equal(validateEvent('tool_use', { tool: 'gambar', action: 'placed' }).ok, false);
+  // Content-blind: nothing about the picture can ride along (off-schema props are refused).
+  assert.equal(validateEvent('tool_use', { tool: 'gambar', action: 'image', filename: 'ktp.jpg' }).ok, false);
+  assert.equal(validateEvent('tool_use', { tool: 'gambar', action: 'image', bytes: 123456 }).ok, false);
+});
+
 test('extract_export is export-shaped but NOT export: it cannot be read as one', () => {
   assert.equal(validateEvent('extract_export', VALID_PROPS.extract_export).ok, true);
   // pages_scope uses the same two values as export's, so the rail can join them.

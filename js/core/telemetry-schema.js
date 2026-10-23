@@ -421,9 +421,17 @@ export const SCHEMA = {
   // nothing printed to delete (paper, an image, a drawing, a scan nobody
   // recognised): the count of what people reach for that Hapus still cannot
   // remove. Additive: a cached client never sends either.
+  //
+  // 'gambar' (tool) with 'arm' and 'image' / 'image_paste' (2026-10-23): the
+  // insert-a-picture tool. 'arm' is the toolbar press; 'image' is a picture
+  // placed by the tap that follows the picker; 'image_paste' is one placed by
+  // Ctrl/Cmd+V. Two outcomes, not one, so the rail can tell the tool from the
+  // keyboard path; arm-minus-image is the picker/tap drop-off. CONTENT-BLIND:
+  // no file name, size, type or pixels travel. Enum ADDITIONS only: a cached
+  // client never sends them and every old value still validates.
   tool_use: {
-    tool: ['select', 'teks', 'tipex', 'ganti', 'ttd', 'hapus', 'halaman', 'gabung'],
-    action: ['select', 'whiteout', 'text', 'text_inline', 'signature', 'paraf', 'delete', 'pages_open', 'merge', 'arm', 'sig_modal_open', 'extract', 'original_delete', 'original_miss'],
+    tool: ['select', 'teks', 'tipex', 'ganti', 'ttd', 'hapus', 'halaman', 'gabung', 'gambar'],
+    action: ['select', 'whiteout', 'text', 'text_inline', 'signature', 'paraf', 'delete', 'pages_open', 'merge', 'arm', 'sig_modal_open', 'extract', 'original_delete', 'original_miss', 'image', 'image_paste'],
   },
   // THE OTHER HALF OF THE SAME BLIND SPOT (2026-09-10). `export` fires when a
   // file is actually produced, and `failure`/stage:export fires when the build
