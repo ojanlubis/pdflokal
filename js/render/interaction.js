@@ -25,6 +25,10 @@ import { annotationZIndex } from '../core/annotation-order.js';
 import { ownDelta } from '../core/annotation-geometry.js';
 
 const TAP_SLOP = 12; // px of finger movement beyond which a press is not a tap
+// The ring render/page-view.js pads a text overlay with (padding 10px, margin
+// -10px) to make it a bigger tap target. A press in the ring is aimed at the
+// space around the words, not at them.
+const TEXT_HIT_RING = 10;
 
 // ctx = {
 //   stage:      container holding .pv-page views
@@ -109,6 +113,14 @@ export function createInteraction(ctx) {
   }
 
   // ---- gestures --------------------------------------------------------------
+
+  function onTextContent(e, annoEl) {
+    const r = annoEl.getBoundingClientRect?.();
+    if (!r) return true;
+    const ring = TEXT_HIT_RING * ctx.getZoom();
+    return e.clientX > r.left + ring && e.clientX < r.right - ring
+      && e.clientY > r.top + ring && e.clientY < r.bottom - ring;
+  }
 
   function startDrag(e, annoEl, page, anno, wasSelected = false) {
     const zoom = ctx.getZoom();
@@ -219,7 +231,10 @@ export function createInteraction(ctx) {
     // object we own, not a Ganti replacement (those carry replaceCoverId and
     // are the page's own words), is picked up.
     const hitAnno = annoEl ? page.annotations.find((a) => a.id === annoEl.dataset.annoId) : null;
-    const grabsOwnText = tool === 'text' && hitAnno?.type === 'text' && !hitAnno.replaceCoverId;
+    // Only a press ON the words: a tap just below or beside a line (the ring
+    // above) is the next line or the next blank, and still places a box.
+    const grabsOwnText = tool === 'text' && hitAnno?.type === 'text' && !hitAnno.replaceCoverId
+      && onTextContent(e, annoEl);
     if (grabsOwnText && ctx.onGrabText) {
       ctx.onGrabText();
       // Closing the open box re-syncs the overlay, which replaces this element.

@@ -58,7 +58,9 @@ const model = await import('../../js/core/model.js');
 const ops = await import('../../js/core/operations.js');
 
 // Teks armed, one annotation on the page, a mouse press then a 40px drag on it.
-function pressAndDrag(type, props, { tool = 'text', withGrab = true } = {}) {
+// `at` is where the press lands, relative to the element's top-left; the stub
+// element is 100x40 with the 10px ring, so its words are x 10..90, y 10..30.
+function pressAndDrag(type, props, { tool = 'text', withGrab = true, at = { x: 50, y: 20 } } = {}) {
   model._resetIds();
   const doc = model.createDoc();
   const src = ops.addSource(doc, model.createSource({ name: 'a.pdf', bytes: new Uint8Array([1]), numPages: 1 }));
@@ -72,6 +74,7 @@ function pressAndDrag(type, props, { tool = 'text', withGrab = true } = {}) {
   const view = node('div'); view.className = 'pv-page'; view.dataset.pageId = page.id;
   view.getBoundingClientRect = () => ({ left: 0, top: 0 });
   const el = renderAnnotationEl(anno); el.className = `pv-anno pv-anno-${type}`;
+  el.getBoundingClientRect = () => ({ left: 0, top: 0, right: 100, bottom: 40 });
   view.appendChild(el);
   stage.appendChild(view);
   const log = { placed: 0, grabbed: 0 };
@@ -82,9 +85,9 @@ function pressAndDrag(type, props, { tool = 'text', withGrab = true } = {}) {
     ...(withGrab ? { onGrabText: () => { log.grabbed += 1; current = 'select'; } } : {}),
   });
   const ev = (type_, x, y) => ({ pointerId: 1, pointerType: 'mouse', button: 0, clientX: x, clientY: y, target: el, type: type_, preventDefault() {} });
-  handlers.pointerdown(ev('pointerdown', 10, 10));
-  handlers.pointermove(ev('pointermove', 50, 10));
-  handlers.pointerup(ev('pointerup', 50, 10));
+  handlers.pointerdown(ev('pointerdown', at.x, at.y));
+  handlers.pointermove(ev('pointermove', at.x + 40, at.y));
+  handlers.pointerup(ev('pointerup', at.x + 40, at.y));
   ix.destroy();
   return { anno, log, page };
 }
@@ -101,6 +104,15 @@ test('2. Teks armed: a press on typed text drags it and places no box', () => {
   assert.equal(log.placed, 0, 'a new empty box was placed on top of the text');
   assert.equal(log.grabbed, 1, 'the app was told to close the open box and leave Teks');
   assert.equal(anno.x, 140, 'the text moved with the drag');
+});
+
+test('2b. a press in the 10px ring below or beside the words is the next blank: it places a box', () => {
+  for (const at of [{ x: 50, y: 35 }, { x: 5, y: 20 }, { x: 95, y: 20 }, { x: 50, y: 3 }]) {
+    const { anno, log } = pressAndDrag('text', TEXT, { at });
+    assert.equal(log.placed, 1, `a press at ${JSON.stringify(at)} (ring) should place a box`);
+    assert.equal(log.grabbed, 0);
+    assert.equal(anno.x, 100, 'and must not move the text');
+  }
 });
 
 test('3. known-negative: a Tip-Ex cover and a signature still lose to an armed Teks', () => {
