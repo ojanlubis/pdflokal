@@ -771,6 +771,15 @@
     .fv-opt:has(input:checked) { font-weight: 600; }
     .fv-opt:has(input:disabled:not(:checked)) { opacity: .45; cursor: not-allowed; }
     .fv-opt:has(input:focus-visible) { outline: 3px solid var(--accent); outline-offset: -3px; border-radius: var(--r-control); }
+    /* Round 2: a status row (being built, or done): small and quiet, after the options. A
+       disabled checkbox (ticked when done), the name, the status word at the end. No tint,
+       no pill, no tap target. */
+    .fv-opt.fv-static { min-height: 0; padding: var(--sp-4); gap: var(--sp-8); cursor: default; font-size: var(--fs-n1); color: var(--muted); }
+    .fv-opt.fv-static input { width: 16px; height: 16px; }
+    .fv-opt.fv-static:has(input:disabled:not(:checked)) { opacity: 1; cursor: default; }
+    .fv-opt.fv-static:has(input:checked) { font-weight: 400; }
+    .fv-opt-name { flex: 1; min-width: 0; }
+    .fv-badge { flex: none; font-size: var(--fs-n1); line-height: 1.2; color: var(--muted); white-space: nowrap; }
     @media (hover: hover) {
       .fv-opt:has(input:not(:disabled)):hover { background: var(--dzfill); }
     }

@@ -27,6 +27,33 @@
 
 export const MAX_VOTES = 3;
 
+// ROUND 2 (founder's call 2026-10-23). The vote runs in ROUNDS: round 1 (2026-10-06) is
+// closed and its table (feature_ballots) is never touched again; round 2 writes to
+// feature_ballots_r2 (scripts/turso-feedback-vote-r2.sql). The client sends this number
+// with every ballot and api/votes.js accepts ONLY this one, so a stale tab still running
+// round 1 is refused instead of being counted in round 2. The next round: bump this, add
+// its table, point api/votes.js at it. vote-memory.js remembers "voted" per round.
+export const CURRENT_ROUND = 2;
+
+// What the card says about an option that is not (or no longer) up for a vote, by id.
+// 'wip'     being built now: badge `featureVote.badgeWip`
+// 'shipped' it exists: badge `featureVote.badgeShipped`. FLIP THE ENTRY when a feature ships.
+// An id with an entry here is shown AFTER the selectable options, as a quiet small row with
+// a DISABLED checkbox (ticked when shipped) and its status word at the end of the row. It
+// cannot be picked: cleanVote() refuses it (a ballot naming one is invalid).
+// (Separate from SHIPPED below, which drives the "kabari" notice to people who voted.)
+// An id with no entry is a normal, selectable option.
+export const FEATURE_STATUS = Object.freeze({
+  'pdf-word': 'wip',
+  // Seat call 2026-10-23: Gambar is desktop-only until the toolbar overflow exists, and most
+  // voters are on phones, so 'Done' would be false for them. Flip when it lands on phones.
+  'canvas-image': 'wip',
+  'save-edits': 'shipped',
+});
+export const BADGE_STATUSES = Object.freeze(['wip', 'shipped']);
+
+export const isSelectable = (id, status = FEATURE_STATUS) => !Object.hasOwn(status, id);
+
 export const IDEA_MAX = 500;
 
 // The free-text idea, cleaned: tags and stray angle brackets removed (it is a plain
@@ -44,8 +71,9 @@ export function cleanIdea(text) {
     .slice(0, IDEA_MAX);
 }
 
-// His order (2026-10-06). The card shows them in this order and api/votes.js
-// breaks ties by it.
+// His order (2026-10-06), batch appended in round 2. This is the LABEL order (the
+// featureVote.labels arrays line up with it) and api/votes.js breaks ties by it. The
+// card shows it through orderForCard() below: badged options first.
 export const FEATURES = Object.freeze([
   { id: 'pdf-word' },
   { id: 'pdf-excel' },
@@ -55,26 +83,36 @@ export const FEATURES = Object.freeze([
   { id: 'camera-scan' },
   { id: 'canvas-image' },
   { id: 'watermark' },
+  { id: 'batch' }, // round 2 (2026-10-23): appended, so every label above keeps its index
 ].map((f) => Object.freeze(f)));
 
-// Features that are BUILT AND RELEASED, by id. Empty today. When one ships, add its
+// Features that are BUILT AND RELEASED, by id. When one ships, add its
 // id here: anyone whose stored vote holds it is told once, by the maker card
 // ("<feature> sudah jadi. Kamu salah satu yang milih ini."), and never again.
-export const SHIPPED = Object.freeze([]);
+// save-edits: live 2026-10-23 (#185). canvas-image waits until phones have Gambar.
+export const SHIPPED = Object.freeze(['save-edits']);
 
 export const FEATURE_IDS = Object.freeze(FEATURES.map((f) => f.id));
+
+// The order the card SHOWS: the selectable options first, then the status rows (wip or
+// shipped), each group in list order (a stable sort of FEATURES). Pure, so a test can drive it.
+export function orderForCard(features = FEATURES, status = FEATURE_STATUS) {
+  const badged = (f) => Object.hasOwn(status, f.id);
+  return [...features.filter((f) => !badged(f)), ...features.filter(badged)];
+}
 
 // The ONE validator. `ids` is whatever arrived (a client, a request body, a
 // beacon): returns { ok: true, ids } with the ids de-duplicated in the order
 // given, or { ok: false }. Never repairs: more than MAX_VOTES, an id that is not
-// on the list, a non-string, or a non-array all fail the WHOLE vote, because a
+// on the list, an id that cannot be picked (it carries a FEATURE_STATUS badge:
+// round 2), a non-string, or a non-array all fail the WHOLE vote, because a
 // vote that quietly dropped one of its choices is not the vote the person cast.
 export function cleanVote(ids) {
   if (!Array.isArray(ids)) return { ok: false };
   if (ids.length > MAX_VOTES) return { ok: false };
   const seen = new Set();
   for (const id of ids) {
-    if (typeof id !== 'string' || !FEATURE_IDS.includes(id)) return { ok: false };
+    if (typeof id !== 'string' || !FEATURE_IDS.includes(id) || !isSelectable(id)) return { ok: false };
     if (seen.has(id)) return { ok: false };
     seen.add(id);
   }

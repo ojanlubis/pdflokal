@@ -43,7 +43,7 @@ test.describe('unduh sheet — mobile', () => {
   // and, being modal, would block a test that downloads twice. Marked answered here:
   // this file is about the sheet. The vote's own timing is tests/feature-vote.spec.js.
   test.beforeEach(async ({ page }) => {
-    await page.addInitScript(() => localStorage.setItem('pdflokal_vote_done', 'voted'));
+    await page.addInitScript(() => localStorage.setItem('pdflokal_vote_done', 'voted:2'));
   });
 
   test('opens with correct defaults and a REAL size lands on the button', async ({ page }) => {

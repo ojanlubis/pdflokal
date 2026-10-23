@@ -27,8 +27,12 @@ const FIXTURE = path.join(__dirname, '..', 'fixtures', 'sample-2pages.pdf');
 const SHOWS_WITHIN = 1_500;
 const NOT_BY = 5_000;
 
-const TOP = { voters: 40, counts: { 'pdf-word': 22, watermark: 14, 'save-edits': 9, 'lock-unlock': 4 } };
-const IDS = ['pdf-word', 'pdf-excel', 'save-edits', 'lock-unlock', 'form-fill', 'camera-scan', 'canvas-image', 'watermark'];
+// ROUND 2 (2026-10-23): pdf-word and canvas-image ("Lagi dikerjakan"; Gambar is desktop-only for now), save-edits ("Done") are status
+// rows: small, a DISABLED checkbox (ticked when done), listed AFTER the six real options.
+const TOP = { voters: 40, counts: { batch: 22, watermark: 14, 'form-fill': 9, 'lock-unlock': 4 } };
+const IDS = ['pdf-excel', 'lock-unlock', 'form-fill', 'camera-scan', 'watermark', 'batch', 'pdf-word', 'save-edits', 'canvas-image']; // card order
+const BADGED = ['pdf-word', 'save-edits', 'canvas-image'];
+const DONE_R2 = 'voted:2'; // js/v2/vote-memory.js doneValue(2); round 1 wrote 'voted'
 const dayOf = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 // `ballot`: how the server answers a POST: 'ok' | 'already' | 'fail' | an array consumed in order.
@@ -128,7 +132,7 @@ export function defineFeatureVoteSuite({ door }) {
       await expect(step(page, 'invite').locator('[data-fv-later]')).toHaveText('Nanti aja');
       expect(await page.locator('#fv-form .fv-face').evaluate((el) => el.complete && el.naturalWidth > 0), 'the photo really loaded').toBe(true);
 
-      // step 2: no photo, a heading, "Pilih maksimal 3" prominent, 8 rows, a real checkbox each
+      // step 2: no photo, a heading, "Pilih maksimal 3" prominent, 9 rows (6 options, then 3 status rows)
       await toStep2(page);
       await expect(step(page, 'invite')).toBeHidden();
       await expect(page.locator('#fv-form .fv-face')).toBeHidden();
@@ -141,49 +145,66 @@ export function defineFeatureVoteSuite({ door }) {
       expect(title).toBeGreaterThan(15.5); // larger than v1's
       expect(hint.weight).toBeGreaterThanOrEqual(600); // prominent, not a grey subtitle
       expect(hint.size).toBeGreaterThanOrEqual(16);
-      await expect(page.locator('#fv-form .fv-opt')).toHaveText([
-        'PDF ke Word', 'PDF ke Excel', 'Simpan editan buat dilanjut nanti', 'Kunci dan buka PDF yang pakai password',
-        'Isi formulir PDF', 'Scan dokumen pakai kamera HP', 'Tempel gambar atau logo', 'Tambah watermark',
+      // six real options first, in list order; then the three status rows, quiet, with their word at the end
+      await expect(page.locator('#fv-form label.fv-opt')).toHaveText([
+        'PDF ke Excel', 'Kunci dan buka PDF yang pakai password', 'Isi formulir PDF', 'Scan dokumen pakai kamera HP',
+        'Tambah watermark', 'Proses banyak file sekaligus',
       ]);
-      await expect(step(page, 'choose').getByRole('checkbox')).toHaveCount(8);
+      await expect(page.locator('#fv-form .fv-static .fv-opt-name')).toHaveText(['PDF ke Word', 'Simpan editan buat dilanjut nanti', 'Tempel gambar atau logo']);
+      await expect(page.locator('#fv-form .fv-static .fv-badge')).toHaveText(['Lagi dikerjakan', 'Done', 'Lagi dikerjakan']);
+      const order = await page.locator('#fv-form .fv-opt').evaluateAll((els) => els.map((el) => el.classList.contains('fv-static')));
+      expect(order, 'status rows come after every selectable option').toEqual([false, false, false, false, false, false, true, true, true]);
+      await expect(step(page, 'choose').getByRole('checkbox')).toHaveCount(9);
+      // the status rows' boxes are shown but DISABLED, ticked only for the done ones; they are not the voting boxes
+      const statics = page.locator('#fv-form .fv-static input[type="checkbox"]');
+      await expect(statics).toHaveCount(3);
+      for (const b of await statics.all()) await expect(b).toBeDisabled();
+      expect(await statics.evaluateAll((els) => els.map((el) => el.checked))).toEqual([false, true, false]);
+      for (const id of BADGED) await expect(box(page, id)).toHaveCount(0); // no voting box exists for them
+      // quiet: no tint, and a status row is smaller than a tap-target row
+      const bg = (sel) => page.locator(sel).first().evaluate((el) => getComputedStyle(el).backgroundColor);
+      expect(await bg('#fv-form .fv-static')).toBe(await bg('#fv-form label.fv-opt'));
+      const [hStatic, hOpt] = await Promise.all([page.locator('#fv-form .fv-static').first().boundingBox(), page.locator('#fv-form label.fv-opt').first().boundingBox()]);
+      expect(hStatic.height).toBeLessThan(hOpt.height);
+      expect(hStatic.height).toBeLessThan(36);
+      // a tap on a status row does nothing: still nothing picked
+      await page.locator('#fv-form .fv-static').first().click();
       await expect(page.locator('#fv-count')).toHaveText('0 dari 3 dipilih');
-      await expect(page.locator('#fv-send')).toHaveText('Kirim pilihan');
       await expect(page.locator('#fv-send')).toBeDisabled();
-      await expect(page.locator('label[for="fv-idea"]')).toHaveText('Belum ada di sini? Tulis aja');
-
-      await pick(page, 'pdf-word');
+      await pick(page, 'pdf-excel');
       await expect(page.locator('#fv-send')).toBeEnabled();
-      await pick(page, 'save-edits');
+      await pick(page, 'batch');
       await pick(page, 'watermark');
       await expect(page.locator('#fv-count')).toHaveText('3 dari 3 dipilih');
-      for (const id of IDS.filter((i) => !['pdf-word', 'save-edits', 'watermark'].includes(i))) await expect(box(page, id)).toBeDisabled();
+      for (const id of IDS.filter((i) => !BADGED.includes(i) && !['pdf-excel', 'batch', 'watermark'].includes(i))) await expect(box(page, id)).toBeDisabled();
       await expect(box(page, 'watermark')).toBeEnabled(); // a chosen one can always be un-chosen
       // vacuity guard: the 4th really is refused, not just styled
       await box(page, 'form-fill').evaluate((el) => el.click()); // a script/assistive click on a disabled box
       await expect(box(page, 'form-fill')).not.toBeChecked();
-      expect(await page.locator('#fv-form input:checked').count()).toBe(3);
+      // the voting boxes only: a status row's display box is ticked when its feature is done
+      expect(await page.locator('#fv-form input:checked:not(.fv-static-box)').count()).toBe(3);
 
       await page.click('#fv-send');
       // Polled: the ballot is a fetch the route answers asynchronously. Catches a read
       // that raced the POST (flaky red) — and, with toHaveLength(1), a double send.
       await expect.poll(() => ballots.length).toBe(1);
       expect(ballots).toHaveLength(1);
-      expect(ballots[0]).toMatchObject({ features: ['pdf-word', 'save-edits', 'watermark'], has_text: false, lang: 'id' });
+      expect(ballots[0]).toMatchObject({ round: 2, features: ['pdf-excel', 'watermark', 'batch'], has_text: false, lang: 'id' });
       expect(ballots[0].visitor_id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
 
       // step 3: his one line, the top 3 (names only, no counts), the coffee ask, Tutup
       await expect(step(page, 'done')).toBeVisible();
       await expect(page.locator('#fv-done-head')).toHaveText('Makasi votingnyaa. Kalo udah jadi nnti dikabarin di sini yaa');
       await expect(page.locator('#fv-form .fv-top-label')).toHaveText('Paling banyak dipilih:');
-      await expect(page.locator('#fv-form .fv-top li')).toHaveText(['PDF ke Word', 'Tambah watermark', 'Simpan editan buat dilanjut nanti']);
+      await expect(page.locator('#fv-form .fv-top li')).toHaveText(['Proses banyak file sekaligus', 'Tambah watermark', 'Isi formulir PDF']);
       expect(await page.locator('#fv-form .fv-top').innerText()).not.toMatch(/\d/); // names only
       await expect(page.locator('#fv-form .fv-coffee .sc-sub')).toHaveText('PDFLokal gratis dan bakal terus gratis. Kalo kepakai, bantuin dikit yaa:');
       await expect(page.locator('#fv-form .fv-coffee .sc-qr')).toBeHidden();
       await page.locator('#fv-form .fv-coffee button').click(); // "Traktir kopi"
       await expect(page.locator('#fv-form .fv-coffee .sc-qr img[alt="QRIS untuk traktir kopi"]')).toBeVisible();
       await expect(step(page, 'done').locator('[data-fv-close]')).toHaveText('Tutup');
-      expect(await ls(page, 'pdflokal_vote_done')).toBe('voted');
-      expect(JSON.parse(await ls(page, 'pdflokal_vote_ids'))).toEqual(['pdf-word', 'save-edits', 'watermark']);
+      expect(await ls(page, 'pdflokal_vote_done')).toBe(DONE_R2);
+      expect(JSON.parse(await ls(page, 'pdflokal_vote_ids'))).toEqual(['pdf-excel', 'watermark', 'batch']);
       await step(page, 'done').locator('[data-fv-close]').click();
       await expect(page.locator('#fv-form')).toBeHidden();
     });
@@ -209,8 +230,16 @@ export function defineFeatureVoteSuite({ door }) {
       await toStep2(page);
       // Count guard: a loop over an empty .all() passes for free. Catches a renamed row class.
       await expect(page.locator('#fv-form .fv-opt')).toHaveCount(IDS.length);
-      for (const row of await page.locator('#fv-form .fv-opt').all()) {
+      // the six real options are tap targets; the status rows are deliberately small and not
+      await expect(page.locator('#fv-form label.fv-opt')).toHaveCount(6);
+      for (const row of await page.locator('#fv-form label.fv-opt').all()) {
         expect((await row.boundingBox()).height).toBeGreaterThanOrEqual(44);
+      }
+      // a long label next to a badge still fits the row: nothing spills sideways
+      for (const row of await page.locator('#fv-form .fv-static').all()) {
+        const [r, name, badge] = await Promise.all([row.boundingBox(), row.locator('.fv-opt-name').boundingBox(), row.locator('.fv-badge').boundingBox()]);
+        expect(badge.x + badge.width).toBeLessThanOrEqual(r.x + r.width + 0.5);
+        expect(name.x + name.width).toBeLessThanOrEqual(badge.x + 0.5);
       }
       await page.getByText('Isi formulir PDF', { exact: true }).click();
       await expect(box(page, 'form-fill')).toBeChecked();
@@ -260,7 +289,7 @@ export function defineFeatureVoteSuite({ door }) {
     });
 
     test('TRIGGER: never again after voting; the menu link then opens the after-vote state, not the form', async ({ page }) => {
-      await wire(page, { pre: { pdflokal_vote_done: 'voted', pdflokal_vote_ids: '["pdf-word"]' } });
+      await wire(page, { pre: { pdflokal_vote_done: DONE_R2, pdflokal_vote_ids: '["pdf-word"]' } });
       await openDoc(page);
       await downloadOnce(page);
       await page.waitForTimeout(NOT_BY);
@@ -271,6 +300,28 @@ export function defineFeatureVoteSuite({ door }) {
       await expect(step(page, 'invite')).toBeHidden();
       await expect(step(page, 'choose')).toBeHidden();
       await expect(page.locator('#fv-form .fv-top li')).toHaveCount(3);
+    });
+
+    test('ROUND 2: a round-1 voter (stored "voted") is asked again after a download, and the menu link opens the form, not the after-vote state', async ({ page }) => {
+      const { ballots } = await wire(page, { pre: { pdflokal_vote_done: 'voted', pdflokal_vote_ids: '["pdf-word"]' } });
+      await openDoc(page);
+      await downloadOnce(page);
+      await expect(page.locator('#fv-form')).toBeVisible({ timeout: SHOWS_WITHIN });
+      await expect(step(page, 'invite')).toBeVisible();
+      await page.keyboard.press('Escape');
+      await page.goto('/');
+      await openFromMenu(page, door);
+      await expect(step(page, 'invite')).toBeVisible();
+      await expect(step(page, 'done')).toBeHidden();
+      await toStep2(page);
+      await pick(page, 'form-fill');
+      await page.click('#fv-send');
+      await expect(step(page, 'done')).toBeVisible();
+      expect(ballots).toHaveLength(1);
+      expect(ballots[0]).toMatchObject({ round: 2, features: ['form-fill'] });
+      expect(await ls(page, 'pdflokal_vote_done')).toBe(DONE_R2);
+      // the round-1 pick is still remembered (a shipped feature is still announced to the person who chose it)
+      expect(JSON.parse(await ls(page, 'pdflokal_vote_ids'))).toEqual(['pdf-word', 'form-fill']);
     });
 
     test('TIMING: the dialog is open within ~1s of the download event, and the share/coffee card is ABSENT for that download', async ({ page }) => {
@@ -326,7 +377,7 @@ export function defineFeatureVoteSuite({ door }) {
     });
 
     test('WHEN THE VOTE IS NOT OFFERED: already voted, or a partial (Ekstrak/picked) download, the share card runs as before', async ({ page }) => {
-      await wire(page, { pre: { pdflokal_vote_done: 'voted', pdflokal_vote_ids: '["pdf-word"]' } });
+      await wire(page, { pre: { pdflokal_vote_done: DONE_R2, pdflokal_vote_ids: '["pdf-word"]' } });
       await openDoc(page);
       await downloadOnce(page);
       await expect(page.locator('#support-card')).toBeVisible({ timeout: 4000 });
@@ -412,7 +463,7 @@ export function defineFeatureVoteSuite({ door }) {
       await page.click('#fv-send');
       await expect(step(page, 'done')).toBeVisible();
       expect(ballots).toHaveLength(2);
-      expect(await ls(page, 'pdflokal_vote_done')).toBe('voted');
+      expect(await ls(page, 'pdflokal_vote_done')).toBe(DONE_R2);
     });
 
     test('BALLOT: the server says this visitor already voted (cleared storage): the card shows the after-vote state and claims no ids', async ({ page }) => {
@@ -423,7 +474,7 @@ export function defineFeatureVoteSuite({ door }) {
       await pick(page, 'pdf-excel');
       await page.click('#fv-send');
       await expect(step(page, 'done')).toBeVisible();
-      expect(await ls(page, 'pdflokal_vote_done')).toBe('voted');
+      expect(await ls(page, 'pdflokal_vote_done')).toBe(DONE_R2);
       expect(await ls(page, 'pdflokal_vote_ids')).toBe('[]'); // we do not know what they picked before
     });
 
@@ -444,7 +495,7 @@ export function defineFeatureVoteSuite({ door }) {
       await openFromMenu(page, door);
       await expect(step(page, 'invite')).toBeVisible();
       await toStep2(page);
-      await pick(page, 'pdf-word');
+      await pick(page, 'pdf-excel');
       await page.fill('#fv-idea', 'format baru dong');
       await page.click('#fv-send');
       await expect(step(page, 'done')).toBeVisible();
@@ -494,22 +545,22 @@ export function defineFeatureVoteSuite({ door }) {
       await page.goto('/');
       await openFromMenu(page, door);
       await toStep2(page);
-      await pick(page, 'pdf-word');
+      await pick(page, 'pdf-excel');
       await pick(page, 'lock-unlock');
       await page.fill('#fv-idea', 'tolong ada OCR bahasa Jawa');
       await page.click('#fv-send');
       await expect(step(page, 'done')).toBeVisible();
       await flush(page);
-      expect(ballots[0]).toMatchObject({ features: ['pdf-word', 'lock-unlock'], has_text: true });
+      expect(ballots[0]).toMatchObject({ round: 2, features: ['pdf-excel', 'lock-unlock'], has_text: true });
       expect(JSON.stringify(ballots)).not.toContain('OCR'); // the ballot has no text, ever
 
       await expect.poll(async () => (await beacons(page)).filter((b) => b.url.endsWith('/api/t')).length).toBeGreaterThan(0);
       const events = (await beacons(page)).filter((b) => b.url.endsWith('/api/t')).flatMap((b) => b.json.events);
-      expect(events.find((e) => e.event === 'feature_vote')?.props).toEqual({ features: ['pdf-word', 'lock-unlock'], has_text: true });
+      expect(events.find((e) => e.event === 'feature_vote')?.props).toEqual({ features: ['pdf-excel', 'lock-unlock'], has_text: true, round: 2 });
       expect(JSON.stringify(events)).not.toContain('OCR'); // CONTENT-BLIND: ids and a bool, never the sentence
       await expect.poll(async () => (await beacons(page)).filter((b) => b.url.endsWith('/api/feedback')).length).toBe(1);
       const fb = (await beacons(page)).find((b) => b.url.endsWith('/api/feedback')).json;
-      expect(fb).toMatchObject({ kind: 'feature_request', features: ['pdf-word', 'lock-unlock'], note: 'tolong ada OCR bahasa Jawa', lang: 'id' });
+      expect(fb).toMatchObject({ kind: 'feature_request', features: ['pdf-excel', 'lock-unlock'], note: 'tolong ada OCR bahasa Jawa', lang: 'id' });
       expect(fb.rating).toBeUndefined();
     });
 
@@ -556,12 +607,13 @@ export function defineFeatureVoteSuite({ door }) {
       await expect(page.getByRole('dialog', { name: 'Voting Fitur PDFLokal' })).toBeVisible();
       await toStep2(page);
       await expect(page.getByRole('dialog', { name: 'Fitur apa yang kamu butuh?' })).toBeVisible();
-      await expect(dlg.getByRole('checkbox')).toHaveCount(8);
+      await expect(dlg.getByRole('checkbox')).toHaveCount(9); // six real ones + three disabled status boxes
+      await expect(dlg.getByRole('checkbox', { name: 'Simpan editan buat dilanjut nanti' })).toBeDisabled();
       await expect(page.getByLabel('Belum ada di sini? Tulis aja')).toBeVisible();
       await expect(page.locator('#fv-count')).toHaveAttribute('aria-live', 'polite');
-      await page.getByRole('checkbox', { name: 'PDF ke Word' }).focus();
+      await page.getByRole('checkbox', { name: 'PDF ke Excel' }).focus();
       await page.keyboard.press('Space');
-      await expect(box(page, 'pdf-word')).toBeChecked();
+      await expect(box(page, 'pdf-excel')).toBeChecked();
       await expect(page.locator('#fv-count')).toHaveText('1 dari 3 dipilih');
       await page.keyboard.press('Escape');
       await expect(dlg).toBeHidden();
@@ -599,9 +651,11 @@ export function defineFeatureVoteSuite({ door }) {
       await toStep2(page);
       await expect(page.locator('#fv-title')).toHaveText('Which features do you need?');
       await expect(page.locator('#fv-form .fv-hint')).toHaveText('Pick up to 3');
-      await expect(page.locator('#fv-form .fv-opt')).toHaveText([
-        'PDF to Word', 'PDF to Excel', 'Save your edits to continue later', 'Lock and unlock password-protected PDFs',
-        'Fill in PDF forms', 'Scan documents with your phone camera', 'Add an image or logo', 'Add a watermark',
+      await expect(page.locator('#fv-form .fv-static .fv-opt-name')).toHaveText(['PDF to Word', 'Save your edits to continue later', 'Add an image or logo']);
+      await expect(page.locator('#fv-form .fv-static .fv-badge')).toHaveText(['In the works', 'Done', 'In the works']);
+      await expect(page.locator('#fv-form label.fv-opt')).toHaveText([
+        'PDF to Excel', 'Lock and unlock password-protected PDFs', 'Fill in PDF forms', 'Scan documents with your phone camera',
+        'Add a watermark', 'Process many files at once',
       ]);
       await expect(page.getByLabel('Not here yet? Just write it')).toBeVisible();
       await expect(page.locator('#fv-send')).toHaveText('Send my picks');
@@ -610,7 +664,7 @@ export function defineFeatureVoteSuite({ door }) {
       await expect(page.locator('#fv-count')).toHaveText('1 of 3 picked');
       await page.click('#fv-send');
       await expect(page.locator('#fv-done-head')).toHaveText("Thanks for votingg. When it's done I'll tell you here ok");
-      await expect(page.locator('#fv-form .fv-top li')).toHaveText(['PDF to Word', 'Add a watermark', 'Save your edits to continue later']);
+      await expect(page.locator('#fv-form .fv-top li')).toHaveText(['Process many files at once', 'Add a watermark', 'Fill in PDF forms']);
       await expect(page.locator('#fv-form .fv-coffee .sc-sub')).toHaveText("PDFLokal is free and will stay free. If it's useful to you, help me out a little:");
       // the stored id is the same one /: labels differ, data does not
       await flush(page);
@@ -630,8 +684,8 @@ export function defineFeatureVoteSuite({ door }) {
       await page.waitForTimeout(300);
       await page.screenshot({ path: `${dir}/vote2-step1-${tag}.png` });
       await toStep2(page);
-      await pick(page, 'pdf-word');
-      await pick(page, 'save-edits');
+      await pick(page, 'pdf-excel');
+      await pick(page, 'batch');
       await pick(page, 'watermark');
       await page.screenshot({ path: `${dir}/vote2-step2-${tag}.png` });
       await page.click('#fv-send');

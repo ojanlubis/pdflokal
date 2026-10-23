@@ -1187,7 +1187,8 @@
       "Isi formulir PDF",
       "Scan dokumen pakai kamera HP",
       "Tempel gambar atau logo",
-      "Tambah watermark"
+      "Tambah watermark",
+      "Proses banyak file sekaligus"
     ],
     "src": [
       "js/v2/feature-vote.js",
@@ -1196,6 +1197,18 @@
   },
   "featureVote.inviteTitle": {
     "text": "Voting Fitur PDFLokal",
+    "src": [
+      "js/v2/feature-vote.js"
+    ]
+  },
+  "featureVote.badgeWip": {
+    "text": "Lagi dikerjakan",
+    "src": [
+      "js/v2/feature-vote.js"
+    ]
+  },
+  "featureVote.badgeShipped": {
+    "text": "Done",
     "src": [
       "js/v2/feature-vote.js"
     ]

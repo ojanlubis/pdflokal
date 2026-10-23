@@ -9,7 +9,7 @@
  * Serves this folder as static files (the way `vercel dev` would: clean URLs, `/en`
  * is en/index.html) AND answers the vote's own endpoints with the REAL handlers
  * (api/votes.js, api/feedback.js) running on an IN-MEMORY SQLite that has the real
- * migration applied (scripts/turso-feedback-migration.sql). So the one-ballot-per-
+ * migrations applied (scripts/turso-feedback-migration.sql, scripts/turso-feedback-vote-r2.sql). So the one-ballot-per-
  * visitor rule you see here is the production rule, not a mock of it. Everything
  * else under /api answers 204 (telemetry, rev, visitors: nothing is stored).
  *
@@ -35,16 +35,18 @@ const EMPTY = process.argv.includes('--empty');
 
 const db = new DatabaseSync(':memory:');
 db.exec(fs.readFileSync(path.join(ROOT, 'scripts', 'turso-feedback-migration.sql'), 'utf8'));
+// Round 2's ballot box (the one api/votes.js reads and writes).
+db.exec(fs.readFileSync(path.join(ROOT, 'scripts', 'turso-feedback-vote-r2.sql'), 'utf8'));
 
 function seed() {
   if (EMPTY) return;
   // 14 made-up ballots (api/votes.js shows a ranking only from 10 voters up).
-  const ins = db.prepare('insert into feature_ballots (visitor_id, lang, has_text, features) values (?, ?, ?, ?)');
+  const ins = db.prepare('insert into feature_ballots_r2 (visitor_id, lang, has_text, features) values (?, ?, ?, ?)');
   const picks = [
-    ['pdf-word', 'save-edits'], ['pdf-word', 'watermark'], ['pdf-word', 'lock-unlock', 'save-edits'], ['save-edits'],
-    ['pdf-word', 'pdf-excel'], ['save-edits', 'form-fill'], ['pdf-word'], ['watermark', 'save-edits'],
-    ['pdf-word', 'camera-scan'], ['lock-unlock'], ['pdf-word', 'save-edits', 'canvas-image'], ['pdf-excel', 'pdf-word'],
-    ['save-edits'], ['pdf-word', 'watermark'],
+    ['batch', 'form-fill'], ['batch', 'watermark'], ['batch', 'lock-unlock', 'pdf-excel'], ['pdf-excel'],
+    ['batch', 'pdf-excel'], ['form-fill', 'camera-scan'], ['batch'], ['watermark', 'pdf-excel'],
+    ['batch', 'camera-scan'], ['lock-unlock'], ['batch', 'pdf-excel', 'form-fill'], ['pdf-excel', 'batch'],
+    ['pdf-excel'], ['batch', 'watermark'],
   ];
   picks.forEach((p, i) => ins.run(`00000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`, 'id', 0, JSON.stringify(p)));
 }
@@ -100,7 +102,7 @@ const server = http.createServer(async (req, res) => {
   const pathname = (req.url || '/').split('?')[0];
   try {
     if (pathname === '/__reset') {
-      db.exec('delete from feature_ballots; delete from feature_requests;');
+      db.exec('delete from feature_ballots_r2; delete from feature_requests;');
       seed();
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
       res.end('<!doctype html><meta charset="utf-8"><script>'

@@ -4,12 +4,20 @@
  * The feature vote's server side (founder rulings 2026-10-02 and 2026-10-06; the
  * list and the rules are js/core/features.js).
  *
- *   POST /api/votes  {visitor_id, features:[ids], has_text, lang}   cast THE ballot
- *   GET  /api/votes                                                 the counts
+ *   POST /api/votes  {visitor_id, round, features:[ids], has_text, lang}   cast THE ballot
+ *   GET  /api/votes                                                        the counts
  *
- * ONE BALLOT PER visitor_id, TOTAL (his ruling 2026-10-06). It is enforced where it
- * cannot be walked around, in the DATABASE: `feature_ballots.visitor_id` is the
- * table's PRIMARY KEY (scripts/turso-feedback-migration.sql), and the insert is
+ * ROUND 2 (founder's call 2026-10-23). The vote runs in rounds, each with its own table:
+ * round 1 lives in `feature_ballots` and is CLOSED and never written or altered again;
+ * round 2 lives in `feature_ballots_r2` (scripts/turso-feedback-vote-r2.sql). The client
+ * sends `round`; only CURRENT_ROUND (js/core/features.js) is accepted, so a stale tab
+ * still running round 1 is refused (400) rather than counted in round 2. Everyone is
+ * asked again: a round-1 voter has no row in the r2 table, so their first r2 ballot
+ * lands. GET reads the r2 table only, so a round-1 row is never counted in round 2.
+ *
+ * ONE BALLOT PER visitor_id, PER ROUND (his ruling 2026-10-06). It is enforced where it
+ * cannot be walked around, in the DATABASE: `feature_ballots_r2.visitor_id` is the
+ * table's PRIMARY KEY (scripts/turso-feedback-vote-r2.sql), and the insert is
  * `on conflict do nothing`, so a second ballot from the same visitor writes ZERO
  * rows and is answered 409 "already_voted". The client's own memory
  * (js/v2/vote-memory.js) only hides the offer; it is a convenience a cleared
@@ -20,8 +28,9 @@
  * of ONE row, so a partial ballot cannot land: the row is there whole or not at all.
  *
  * VALIDATED HERE, never trusted from the client: visitor_id must be a real UUID (a
- * missing or malformed one is rejected, 400); `features` goes through the one
- * validator cleanVote() (ids from the list only, at most MAX_VOTES, no duplicates);
+ * missing or malformed one is rejected, 400); `round` must be
+ * CURRENT_ROUND; `features` goes through the one validator cleanVote() (ids from the
+ * list only, none of them badged as not-pickable, at most MAX_VOTES, no duplicates);
  * a ballot with no features must say it carries an idea (has_text), because a
  * ballot is a choice or an idea, never nothing; nothing else from the body is read,
  * and nothing in it is free text (the idea itself goes to api/feedback.js, capped
@@ -46,7 +55,7 @@
 export const config = { runtime: 'nodejs', api: { bodyParser: false } };
 
 import { tursoQuery, tursoInsert } from './_turso.js';
-import { FEATURE_IDS, cleanVote } from '../js/core/features.js';
+import { FEATURE_IDS, CURRENT_ROUND, cleanVote } from '../js/core/features.js';
 
 export const MIN_VOTERS = 10;
 const MAX_BODY_BYTES = 2048;
@@ -60,16 +69,17 @@ export function __setDbForTests(fn) { dbOverride = fn; }
 
 // The statement a ballot is written with. `on conflict do nothing` is the ONE-BALLOT
 // rule: the second ballot from a visitor changes nothing and says so (0 rows).
-export const BALLOT_SQL = 'insert into feature_ballots (visitor_id, lang, has_text, features) values (?, ?, ?, ?) '
+export const BALLOT_SQL = 'insert into feature_ballots_r2 (visitor_id, lang, has_text, features) values (?, ?, ?, ?) '
   + 'on conflict (visitor_id) do nothing';
 
+// ROUND 2's box only; round 1's table is never read here (no double count).
 // ONE statement, one round trip: the first arm counts ballots that picked something
 // (a text-only ballot has no features), the second counts each feature.
 // 'voters' cannot collide with a feature id.
 export const VOTES_SQL = `
-  select 'voters' as k, count(*) as n from feature_ballots where json_array_length(features) > 0
+  select 'voters' as k, count(*) as n from feature_ballots_r2 where json_array_length(features) > 0
   union all
-  select j.value as k, count(*) as n from feature_ballots, json_each(feature_ballots.features) j group by j.value`;
+  select j.value as k, count(*) as n from feature_ballots_r2, json_each(feature_ballots_r2.features) j group by j.value`;
 
 // rows -> { voters, counts } | null. Pure, so the test drives the real decision.
 export function shapeVotes(rows) {
@@ -85,9 +95,11 @@ export function shapeVotes(rows) {
 }
 
 // Pure: the request body -> the ballot to write, or null when it is not one.
-// Reads exactly four fields and nothing else.
+// Reads exactly five fields and nothing else.
 export function cleanBallot(body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return null;
+  // Absent (a stale round-1 client) or any other round: not a ballot for this box.
+  if (body.round !== CURRENT_ROUND) return null;
   const visitor = body.visitor_id;
   if (typeof visitor !== 'string' || !UUID_RE.test(visitor)) return null;
   const vote = cleanVote(body.features);

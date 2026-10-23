@@ -54,7 +54,8 @@ import * as telemetry from './telemetry.js';
 import { track } from '../lib/analytics.js';
 import { t as tr } from '../lib/i18n.js';
 import {
-  FEATURES, MAX_VOTES, IDEA_MAX, cleanVote, cleanIdea, shouldOfferVote, dayKey,
+  FEATURES, FEATURE_STATUS, CURRENT_ROUND, MAX_VOTES, IDEA_MAX, cleanVote, cleanIdea, shouldOfferVote, dayKey,
+  isSelectable, orderForCard,
 } from '../core/features.js';
 import { isVoted, nantiDay, rememberNanti, rememberVote } from './vote-memory.js';
 
@@ -120,8 +121,35 @@ export function createFeatureVote() {
     if (el.matches('.fv-x')) el.setAttribute('aria-label', tr('featureVote.close'));
     else el.textContent = tr('featureVote.close');
   }
-  list.replaceChildren(...FEATURES.map((f) => {
+  // Status rows (FEATURE_STATUS: being built, or done) come AFTER the selectable options,
+  // small and quiet: a DISABLED checkbox (ticked when done), the name, and the status word
+  // at the end. They are not up for a vote, so boxes(), picked(), refresh() and the 3-pick
+  // limit never see them (the `fv-static` class is what excludes them).
+  let statusN = 0;
+  list.replaceChildren(...orderForCard().map((f) => {
     const li = document.createElement('li');
+    if (!isSelectable(f.id)) {
+      const row = document.createElement('div');
+      row.className = 'fv-opt fv-static';
+      const box = document.createElement('input');
+      box.type = 'checkbox';
+      box.className = 'fv-static-box';
+      box.disabled = true;
+      box.checked = FEATURE_STATUS[f.id] === 'shipped';
+      const name = document.createElement('span');
+      name.className = 'fv-opt-name';
+      name.id = `fv-static-${statusN += 1}`;
+      name.textContent = labelOf(f.id);
+      box.setAttribute('aria-labelledby', name.id);
+      const badge = document.createElement('span');
+      badge.className = 'fv-badge';
+      badge.dataset.status = FEATURE_STATUS[f.id];
+      // Two literal call sites: the i18n law forbids building a key from the status.
+      badge.textContent = FEATURE_STATUS[f.id] === 'shipped' ? tr('featureVote.badgeShipped') : tr('featureVote.badgeWip');
+      row.append(box, name, badge);
+      li.append(row);
+      return li;
+    }
     const label = document.createElement('label');
     label.className = 'fv-opt';
     const box = document.createElement('input');
@@ -135,7 +163,7 @@ export function createFeatureVote() {
     return li;
   }));
 
-  const boxes = () => [...list.querySelectorAll('input[type="checkbox"]')];
+  const boxes = () => [...list.querySelectorAll('input[type="checkbox"]:not(.fv-static-box)')];
   const picked = () => boxes().filter((b) => b.checked).map((b) => b.value);
   let source = 'menu';           // who opened it: 'auto' (the download moment) or 'menu'
   let sent = false;
@@ -243,7 +271,7 @@ export function createFeatureVote() {
     // The idea goes either way: it is its own note (feature_requests), not the ballot.
     if (text) telemetry.featureRequest?.(ids, text);
     if (result === 'recorded') {
-      tel('feature_vote', { features: ids, has_text: text !== '' });
+      tel('feature_vote', { features: ids, has_text: text !== '', round: CURRENT_ROUND });
       rememberVote(ids);
     } else if (result === 'already') {
       rememberVote([]); // voted before: we do not know what they picked then, so we never claim to

@@ -78,7 +78,7 @@ async function downloadAll(page) {
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     const today = new Date().toDateString();
-    localStorage.setItem('pdflokal_vote_done', 'voted');
+    localStorage.setItem('pdflokal_vote_done', 'voted:2');
     localStorage.setItem('pdflokal_bugreport_last', today);
     localStorage.setItem('pdflokal-support-last', today);
   });

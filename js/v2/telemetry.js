@@ -30,7 +30,7 @@
 import { validateEvent } from '../core/telemetry-schema.js';
 import { validateSample } from '../core/feedback-sample.js';
 import { validateShot } from '../core/feedback-shot.js';
-import { cleanVote, cleanIdea } from '../core/features.js';
+import { cleanVote, cleanIdea, CURRENT_ROUND } from '../core/features.js';
 
 const ENDPOINT = '/api/t';
 const FLUSH_AT = 10;
@@ -397,7 +397,8 @@ export function featureRequest(features, text) {
 
 /**
  * THE BALLOT (js/v2/feature-vote.js; api/votes.js is the box). One per visitor_id,
- * ever: the server answers 409 when this browser's visitor_id has already voted.
+ * per round: the server answers 409 when this browser's visitor_id has already voted
+ * in CURRENT_ROUND (round 2 since 2026-10-23, sent as `round`).
  * Unlike every other function in this file this one is AWAITED and its answer
  * matters: the card must not say "makasih" for a ballot that did not land.
  *   'recorded'  the server wrote it
@@ -417,7 +418,7 @@ export async function submitBallot(features, hasText) {
       headers: { 'Content-Type': 'application/json' },
       credentials: 'omit',
       body: JSON.stringify({
-        visitor_id: visitorId, features: vote.ids, has_text: hasText === true,
+        visitor_id: visitorId, round: CURRENT_ROUND, features: vote.ids, has_text: hasText === true,
         lang: document.documentElement.lang === 'en' ? 'en' : 'id',
       }),
     });
