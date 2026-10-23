@@ -27,6 +27,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   FEATURES, FEATURE_IDS, MAX_VOTES, IDEA_MAX, SHIPPED, cleanVote, cleanIdea, shouldOfferVote, dayKey, parseIds, untoldShipped,
+  CURRENT_ROUND, FEATURE_STATUS, isSelectable, orderForCard,
 } from '../../js/core/features.js';
 import { validateEvent } from '../../js/core/telemetry-schema.js';
 import tHandler, { __setQueryForTests as setTQuery } from '../../api/t.js';
@@ -36,6 +37,7 @@ import votesHandler, {
 } from '../../api/votes.js';
 import { topThree } from '../../js/v2/feature-vote.js';
 import { shouldShowCard, noticeText } from '../../js/v2/maker-card.js';
+import * as mem from '../../js/v2/vote-memory.js';
 import ID from '../../js/locales/id.js';
 import EN from '../../js/locales/en.js';
 
@@ -48,11 +50,11 @@ const sqliteTest = (name, fn) => test(name, { skip: sqlite ? false : 'node:sqlit
 
 // ---- the list ---------------------------------------------------------------
 
-test('the list: exactly his 8, in his order, unique stable ids, no groups, frozen', () => {
+test('the list: his 8 in his order plus round 2\'s batch appended, unique stable ids, no groups, frozen', () => {
   assert.deepEqual(FEATURE_IDS, [
-    'pdf-word', 'pdf-excel', 'save-edits', 'lock-unlock', 'form-fill', 'camera-scan', 'canvas-image', 'watermark',
+    'pdf-word', 'pdf-excel', 'save-edits', 'lock-unlock', 'form-fill', 'camera-scan', 'canvas-image', 'watermark', 'batch',
   ]);
-  assert.equal(new Set(FEATURE_IDS).size, 8, 'ids are unique');
+  assert.equal(new Set(FEATURE_IDS).size, 9, 'ids are unique');
   for (const id of FEATURE_IDS) assert.match(id, /^[a-z]+(-[a-z]+)*$/, `${id}: ids are lowercase-kebab, never labels`);
   for (const f of FEATURES) assert.deepEqual(Object.keys(f), ['id'], 'a feature is its id and nothing else: no group headings');
   assert.equal(MAX_VOTES, 3);
@@ -69,7 +71,9 @@ test('the labels line up with the list in BOTH languages, are his draft words, a
   assert.deepEqual(ID.featureVote.labels, [
     'PDF ke Word', 'PDF ke Excel', 'Simpan editan buat dilanjut nanti', 'Kunci dan buka PDF yang pakai password',
     'Isi formulir PDF', 'Scan dokumen pakai kamera HP', 'Tempel gambar atau logo', 'Tambah watermark',
-  ], 'the draft copy, verbatim (reference/vote-v2-copy-draft-2026-10-06.md)');
+    'Proses banyak file sekaligus',
+  ], 'the draft copy, verbatim (reference/vote-v2-copy-draft-2026-10-06.md; the last is round 2\'s batch)');
+  assert.equal(EN.featureVote.labels.at(-1), 'Process many files at once');
   const all = JSON.stringify(ID.featureVote) + JSON.stringify(EN.featureVote);
   assert.ok(!/[—–]/.test(all), 'no em or en dash in anything a visitor reads');
 });
@@ -79,10 +83,18 @@ test('his own words are verbatim (spelling and line breaks are his: do not fix t
   assert.equal(ID.featureVote.invite, 'Halo guyss. Mau bikin fitur baru tp bingung apaan. Bantu voting doong. terimakasii');
   assert.equal(ID.featureVote.thanks, 'Makasi votingnyaa. Kalo udah jadi nnti dikabarin di sini yaa');
   assert.equal(ID.featureVote.shipped, '{feature} udah jadi nih. Kamu salah satu yang milih ini, makasii');
+  assert.equal(ID.featureVote.badgeWip, 'Lagi dikerjakan', 'round 2: the founder\'s own words, final');
   const src = read('js/locales/id.js');
   assert.match(src, /DRAFT-APPROVED-BY-HIM/, 'the approved strings are marked');
   assert.match(src, /start: 'Pilih fitur', \/\/ DRAFT/);
   assert.match(src, /later: 'Nanti aja', \/\/ DRAFT/);
+  // round 2's new strings are DRAFT-marked at their own line (the seat lists them for him)
+  assert.match(src, /badgeShipped: 'Sudah ada', \/\/ DRAFT/);
+  assert.match(src, /'Proses banyak file sekaligus', \/\/ DRAFT/);
+  assert.equal(ID.featureVote.badgeShipped, 'Sudah ada');
+  assert.equal(EN.featureVote.badgeShipped, 'Available now');
+  assert.match(read('js/locales/en.js'), /badgeShipped: 'Available now', \/\/ DRAFT/);
+  assert.match(read('js/locales/en.js'), /badgeWip: '[^']+', \/\/ DRAFT/);
 });
 
 test('the card is a skeleton in index.html (no hard-coded option labels) and the menu link is in the nav and the drawer, / and /en', () => {
@@ -111,23 +123,57 @@ test('the card is a skeleton in index.html (no hard-coded option labels) and the
 // ---- the rules --------------------------------------------------------------
 
 test('cleanVote: a valid vote passes; empty is allowed (a text-only idea)', () => {
-  assert.deepEqual(cleanVote(['pdf-word']), { ok: true, ids: ['pdf-word'] });
-  assert.deepEqual(cleanVote(['pdf-word', 'watermark', 'save-edits']), { ok: true, ids: ['pdf-word', 'watermark', 'save-edits'] });
+  assert.deepEqual(cleanVote(['form-fill']), { ok: true, ids: ['form-fill'] });
+  assert.deepEqual(cleanVote(['pdf-excel', 'watermark', 'batch']), { ok: true, ids: ['pdf-excel', 'watermark', 'batch'] });
   assert.deepEqual(cleanVote([]), { ok: true, ids: [] });
 });
 
+// ---- round 2 (2026-10-23): badged options, the per-option status map ---------------
+
+test('ROUND 2: the current round is 2, and exactly pdf-word, canvas-image and save-edits are badged "wip"', () => {
+  assert.equal(CURRENT_ROUND, 2);
+  assert.deepEqual({ ...FEATURE_STATUS }, { 'pdf-word': 'wip', 'canvas-image': 'wip', 'save-edits': 'wip' });
+  assert.ok(Object.isFrozen(FEATURE_STATUS), 'the status map cannot be bent at runtime');
+  for (const id of ['pdf-word', 'canvas-image', 'save-edits']) assert.equal(isSelectable(id), false, `${id} is not pickable`);
+  for (const id of ['form-fill', 'pdf-excel', 'camera-scan', 'lock-unlock', 'watermark', 'batch']) assert.equal(isSelectable(id), true, `${id} is pickable`);
+  for (const status of Object.values(FEATURE_STATUS)) assert.ok(['wip', 'shipped'].includes(status), 'only wip or shipped have a badge');
+});
+
+test('ROUND 2: a badged option is refused by the ONE validator, alone or inside an otherwise good vote, and a shipped one stays unpickable', () => {
+  for (const id of ['pdf-word', 'canvas-image', 'save-edits']) {
+    assert.equal(cleanVote([id]).ok, false, `${id}: badged`);
+    assert.equal(cleanVote(['form-fill', id]).ok, false, `${id}: one badged id fails the WHOLE vote, never dropped quietly`);
+  }
+  // the seat flips an entry to 'shipped': still badged, still not pickable (the map is the rule)
+  assert.equal(isSelectable('pdf-word', { ...FEATURE_STATUS, 'pdf-word': 'shipped' }), false);
+  assert.equal(isSelectable('pdf-word', {}), true, 'vacuity guard: with no entry it is an ordinary option')
+});
+
+test('ROUND 2: the card order puts badged options first, each group in list order; selectable ones keep list order', () => {
+  assert.deepEqual(orderForCard().map((f) => f.id), [
+    'pdf-word', 'save-edits', 'canvas-image', // badged, list order
+    'pdf-excel', 'lock-unlock', 'form-fill', 'camera-scan', 'watermark', 'batch',
+  ]);
+  // driven by the map, not by a hard-coded list: flip one more and it moves up
+  const more = orderForCard(FEATURES, { ...FEATURE_STATUS, watermark: 'shipped' }).map((f) => f.id);
+  assert.deepEqual(more.slice(0, 4), ['pdf-word', 'save-edits', 'canvas-image', 'watermark']);
+  assert.equal(more.length, FEATURES.length, 'a sort never loses or doubles an option');
+  // vacuity guard: with no statuses the order is the list's own
+  assert.deepEqual(orderForCard(FEATURES, {}).map((f) => f.id), FEATURE_IDS);
+});
+
 test('cleanVote: a bad id, a retired v1 id, more than 3, a duplicate, or a non-array fails the WHOLE vote', () => {
-  assert.equal(cleanVote(['pdf-word', 'nope']).ok, false, 'unknown id');
-  for (const gone of ['crop', 'lock', 'pdf-ppt', 'word-pdf', 'redact', 'page-numbers', 'batch', 'grayscale']) {
+  assert.equal(cleanVote(['form-fill', 'nope']).ok, false, 'unknown id');
+  for (const gone of ['crop', 'lock', 'pdf-ppt', 'word-pdf', 'redact', 'page-numbers', 'grayscale']) {
     assert.equal(cleanVote([gone]).ok, false, `${gone} was on v1's list, not on v2's`);
   }
   assert.equal(cleanVote(['PDF-WORD']).ok, false, 'ids are exact');
-  assert.equal(cleanVote(['pdf-word', 'watermark', 'save-edits', 'lock-unlock']).ok, false, 'four');
-  assert.equal(cleanVote(['pdf-word', 'pdf-word']).ok, false, 'duplicate');
-  assert.equal(cleanVote('pdf-word').ok, false);
+  assert.equal(cleanVote(['pdf-excel', 'watermark', 'camera-scan', 'lock-unlock']).ok, false, 'four');
+  assert.equal(cleanVote(['pdf-excel', 'pdf-excel']).ok, false, 'duplicate');
+  assert.equal(cleanVote('pdf-excel').ok, false);
   assert.equal(cleanVote(null).ok, false);
   assert.equal(cleanVote([1]).ok, false);
-  assert.equal(cleanVote([{ id: 'pdf-word' }]).ok, false);
+  assert.equal(cleanVote([{ id: 'pdf-excel' }]).ok, false);
   assert.equal(cleanVote(['__proto__']).ok, false);
 });
 
@@ -247,6 +293,55 @@ test('feature_vote schema: valid shapes pass, bad id / >3 / duplicate / wrong ty
   assert.equal(ok({ features: [{ id: 'watermark' }], has_text: false }), false);
 });
 
+test('feature_vote schema: `round` is an OPTIONAL int (a cached pre-round-2 client still lands its event), type-checked when present', () => {
+  const ok = (p) => validateEvent('feature_vote', p).ok;
+  assert.equal(ok({ features: ['batch'], has_text: false }), true, 'no round: an old client');
+  assert.equal(ok({ features: ['batch'], has_text: false, round: 2 }), true);
+  assert.deepEqual(validateEvent('feature_vote', { features: ['batch'], has_text: false, round: 2 }).clean, { features: ['batch'], has_text: false, round: 2 });
+  assert.equal(ok({ features: ['batch'], has_text: false, round: '2' }), false, 'a string is not a round');
+  assert.equal(ok({ features: ['batch'], has_text: false, round: -1 }), false);
+  assert.equal(ok({ features: ['batch'], has_text: false, round: 2, extra: 1 }), false, 'still no unknown prop');
+  assert.equal(ok({ features: ['pdf-word'], has_text: false, round: 1 }), true, 'round 1 ids stay valid on the rail (history)');
+  assert.match(read('js/v2/feature-vote.js'), /tel\('feature_vote', \{ features: ids, has_text: text !== '', round: CURRENT_ROUND \}\);/, 'the client sends the round');
+  assert.match(read('js/v2/telemetry.js'), /round: CURRENT_ROUND, features: vote\.ids/, 'and the ballot carries it');
+});
+
+// ---- the client's memory, per round (js/v2/vote-memory.js) -----------------------------
+function withStorage(seed, fn) {
+  const store = new Map(Object.entries(seed));
+  const had = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: {
+    getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => { store.set(k, String(v)); }, removeItem: (k) => { store.delete(k); },
+  } });
+  try { return fn(store); } finally { if (had) Object.defineProperty(globalThis, 'localStorage', had); else delete globalThis.localStorage; }
+}
+
+test('ROUND 2 memory: a round-1 voter ("voted") is NOT counted as voted in round 2, so they are asked again; a round-2 vote is remembered', () => {
+  withStorage({ pdflokal_vote_done: 'voted', pdflokal_vote_ids: '["pdf-word","watermark"]' }, (store) => {
+    assert.equal(mem.isVoted(), false, 'round 1\'s "voted" does not silence round 2');
+    assert.equal(shouldOfferVote({ ...base, voted: mem.isVoted() }), true, 'and so the schedule offers the card');
+    mem.rememberVote(['form-fill']);
+    assert.equal(store.get('pdflokal_vote_done'), 'voted:2');
+    assert.equal(mem.isVoted(), true, 'now it is');
+    assert.deepEqual(mem.votedIds(), ['pdf-word', 'form-fill', 'watermark'], 'earlier rounds\' ids are kept (a shipped one is still announced), in list order');
+  });
+  withStorage({ pdflokal_vote_done: 'voted:2' }, () => assert.equal(mem.isVoted(), true));
+  withStorage({}, () => assert.equal(mem.isVoted(), false, 'nobody: not voted'));
+  withStorage({ pdflokal_vote_done: 'voted:3' }, () => assert.equal(mem.isVoted(), false, 'a later round is a different round'));
+  assert.equal(mem.doneValue(1), 'voted', 'round 1 wrote the bare word');
+  assert.equal(mem.doneValue(2), 'voted:2');
+});
+
+test('ROUND 2 memory: "already voted" (the server knew them) claims no ids but still counts as voted this round, and a round-1 "Nanti aja" does not hide the round', () => {
+  withStorage({ pdflokal_vote_done: 'voted', pdflokal_vote_ids: '["watermark"]' }, () => {
+    mem.rememberVote([]);
+    assert.deepEqual(mem.votedIds(), ['watermark'], 'nothing added, nothing lost');
+    assert.equal(mem.isVoted(), true);
+  });
+  // round 1's nanti is a DAY: it quiets that day only, exactly as the schedule always did
+  assert.equal(shouldOfferVote({ ...base, nantiDay: '2026-10-22', today: '2026-10-23' }), true);
+});
+
 function mkReq(bodyObj, { method = 'POST' } = {}) {
   const chunks = [Buffer.from(typeof bodyObj === 'string' ? bodyObj : JSON.stringify(bodyObj), 'utf8')];
   return { method, headers: {}, on(evt, cb) { if (evt === 'data') chunks.forEach((c) => cb(c)); if (evt === 'end') cb(); return this; } };
@@ -285,17 +380,17 @@ async function postVote(props) {
 }
 
 test('api/t.js: a valid vote event is written with its ids and the visitor; bad ones are never written', async () => {
-  const good = await postVote({ features: ['pdf-word', 'watermark'], has_text: true });
+  const good = await postVote({ features: ['pdf-excel', 'watermark'], has_text: true });
   assert.equal(good.res.code, 204);
   assert.equal(good.calls.length, 1, 'a valid vote reaches the insert');
   const [ts, session, , event, props, visitor] = good.calls[0].params;
   assert.ok(ts && session === SESSION && event === 'feature_vote');
-  assert.deepEqual(JSON.parse(props), { features: ['pdf-word', 'watermark'], has_text: true });
+  assert.deepEqual(JSON.parse(props), { features: ['pdf-excel', 'watermark'], has_text: true });
   assert.equal(visitor, VISITOR);
 
   for (const bad of [
     { features: ['not-a-feature'], has_text: false },
-    { features: ['pdf-word', 'watermark', 'save-edits', 'lock-unlock'], has_text: false },
+    { features: ['pdf-excel', 'watermark', 'camera-scan', 'lock-unlock'], has_text: false },
     { features: ['watermark', 'watermark'], has_text: false },
   ]) {
     const r = await postVote(bad);
@@ -320,7 +415,7 @@ const intoTable = (call) => /insert into (\w+)/i.exec(call.text)[1];
 
 test('feedback kind feature_request: filed in feature_requests with ids, visitor, lang, and writes ZERO rows to feedback', async () => {
   const { calls, res } = await postFeedback({
-    kind: 'feature_request', features: ['pdf-word', 'watermark'], note: '  tolong tambah OCR  ', visitor_id: VISITOR, lang: 'en',
+    kind: 'feature_request', features: ['pdf-excel', 'watermark'], note: '  tolong tambah OCR  ', visitor_id: VISITOR, lang: 'en',
   });
   assert.equal(res.code, 204);
   assert.equal(calls.length, 1, 'exactly one statement');
@@ -331,7 +426,7 @@ test('feedback kind feature_request: filed in feature_requests with ids, visitor
   assert.equal(p[FR.visitor], VISITOR);
   assert.equal(p[FR.version], 'abc1234');
   assert.equal(p[FR.lang], 'en');
-  assert.deepEqual(JSON.parse(p[FR.features]), ['pdf-word', 'watermark']);
+  assert.deepEqual(JSON.parse(p[FR.features]), ['pdf-excel', 'watermark']);
   assert.equal(p[FR.note], 'tolong tambah OCR', 'trimmed, and untagged: no prefix trick any more');
 });
 
@@ -367,10 +462,10 @@ test('feedback kind feature_request: a text-only idea files with no ids; the tex
 
 test('feedback kind feature_request: no text, a bad id, more than 3, a duplicate: dropped whole, never repaired', async () => {
   for (const body of [
-    { kind: 'feature_request', features: ['pdf-word'] },
-    { kind: 'feature_request', features: ['pdf-word'], note: '   ' },
+    { kind: 'feature_request', features: ['pdf-excel'] },
+    { kind: 'feature_request', features: ['pdf-excel'], note: '   ' },
     { kind: 'feature_request', features: ['nope'], note: 'x' },
-    { kind: 'feature_request', features: ['pdf-word', 'watermark', 'save-edits', 'lock-unlock'], note: 'x' },
+    { kind: 'feature_request', features: ['pdf-excel', 'watermark', 'camera-scan', 'lock-unlock'], note: 'x' },
     { kind: 'feature_request', features: ['watermark', 'watermark'], note: 'x' },
     { kind: 'feature_request', features: 'watermark', note: 'x' },
   ]) {
@@ -396,9 +491,12 @@ test('a normal thumbs note is untouched (rating still required, still the feedba
 // ---- the migration, on a real SQLite -------------------------------------------------
 
 const MIGRATION = read('scripts/turso-feedback-migration.sql');
+const MIGRATION_R2 = read('scripts/turso-feedback-vote-r2.sql');
+// Production at round 2: the round-1 migration is already applied, the r2 one is applied before merge.
 function freshDb() {
   const db = new sqlite.DatabaseSync(':memory:');
   db.exec(MIGRATION);
+  db.exec(MIGRATION_R2);
   return db;
 }
 // api/votes.js's test seam backed by a REAL database: the endpoint's own SQL runs on it.
@@ -410,7 +508,7 @@ function dbSeam(db, log = []) {
     return { rowCount: Number(stmt.run(...values).changes) };
   };
 }
-const ballotOf = (over = {}) => ({ visitor_id: VISITOR, features: ['pdf-word', 'watermark'], has_text: false, lang: 'id', ...over });
+const ballotOf = (over = {}) => ({ visitor_id: VISITOR, round: CURRENT_ROUND, features: ['pdf-excel', 'watermark'], has_text: false, lang: 'id', ...over });
 async function castBallot(body) {
   const res = mkRes();
   await votesHandler(mkReq(body), res);
@@ -422,7 +520,7 @@ sqliteTest('the migration: idempotent, ADDITIVE ONLY (creates, never alters or d
   const db = new sqlite.DatabaseSync(':memory:');
   db.exec(MIGRATION);
   db.exec(MIGRATION); // CREATE ... IF NOT EXISTS: running it twice is a no-op, not an error
-  const { calls } = await postFeedback({ kind: 'feature_request', features: ['pdf-word', 'watermark'], note: 'tolong tambah OCR', visitor_id: VISITOR, lang: 'id' });
+  const { calls } = await postFeedback({ kind: 'feature_request', features: ['pdf-excel', 'watermark'], note: 'tolong tambah OCR', visitor_id: VISITOR, lang: 'id' });
   assert.equal(calls.length, 1);
   db.prepare(calls[0].text).run(...calls[0].params); // the very statement the endpoint sends
   assert.equal(db.prepare('select count(*) n from feature_requests').get().n, 1);
@@ -444,21 +542,68 @@ sqliteTest('the migration adds exactly feature_ballots (+ its index) for the vot
   db.close();
 });
 
+sqliteTest('ROUND 2 migration: its own file, idempotent, ADDITIVE ONLY, same shape and constraints as round 1, and it leaves round 1 byte-for-byte alone', () => {
+  const exec = MIGRATION_R2.replace(/^\s*--.*$/gm, '');
+  assert.ok(!/\b(drop\s|alter\s|delete\s|update\s|insert\s)/i.test(exec), 'no DROP, ALTER, DELETE, UPDATE or INSERT: it only creates');
+  assert.ok(!/feature_ballots\b(?!_r2)|feature_requests|\bfeedback\b/.test(exec), 'it names no round-1 table at all, not even to read it');
+  const db = new sqlite.DatabaseSync(':memory:');
+  db.exec(MIGRATION);
+  // round 1 has real rows before round 2 arrives, exactly like production
+  const r1 = db.prepare('insert into feature_ballots (visitor_id, lang, has_text, features) values (?,?,?,?)');
+  r1.run(VISITOR, 'id', 0, '["pdf-word","watermark"]');
+  r1.run(VISITOR2, 'en', 1, '[]');
+  const before = JSON.stringify(db.prepare('select * from feature_ballots order by visitor_id').all());
+  const schemaBefore = JSON.stringify(db.prepare("select name, sql from sqlite_master where name not like '%feature_ballots_r2%' order by name").all());
+  db.exec(MIGRATION_R2);
+  db.exec(MIGRATION_R2); // twice is a no-op, not an error
+  assert.equal(JSON.stringify(db.prepare('select * from feature_ballots order by visitor_id').all()), before, 'round 1 rows unchanged');
+  assert.equal(JSON.stringify(db.prepare("select name, sql from sqlite_master where name not like '%feature_ballots_r2%' order by name").all()), schemaBefore, 'no other table, view or index changed');
+  const shape = (t) => db.prepare(`select name, type, "notnull", dflt_value, pk from pragma_table_info('${t}') order by cid`).all();
+  assert.deepEqual(shape('feature_ballots_r2'), shape('feature_ballots'), 'same columns, types, defaults and primary key as round 1');
+  assert.ok(db.prepare("select 1 from sqlite_master where type='index' and name='feature_ballots_r2_ts_idx'").get());
+  assert.equal(db.prepare('select count(*) n from feature_ballots_r2').get().n, 0, 'it starts empty');
+  // the same CHECKs bite (a copy that lost one would take this row)
+  const ins = (v, f, h = 0, l = 'id') => () => db.prepare('insert into feature_ballots_r2 (visitor_id, lang, has_text, features) values (?,?,?,?)').run(v, l, h, f);
+  assert.throws(ins('not-a-uuid', '["batch"]'), /CHECK|constraint/i);
+  assert.throws(ins(VISITOR.toUpperCase(), '["batch"]'), /CHECK|constraint/i);
+  assert.throws(ins(VISITOR, '["a","b","c","d"]'), /CHECK|constraint/i);
+  assert.throws(ins(VISITOR, '[]', 0), /CHECK|constraint/i);
+  assert.throws(ins(VISITOR, '["batch"]', 2), /CHECK|constraint/i);
+  assert.throws(ins(VISITOR, '["batch"]', 0, 'fr'), /CHECK|constraint/i);
+  ins(VISITOR, '["batch"]')();
+  assert.throws(ins(VISITOR, '["batch"]'), /UNIQUE|PRIMARY|constraint/i, 'one ballot per visitor in round 2 as well');
+  db.close();
+});
+
 // ---- the ballot box: api/votes.js POST ----------------------------------------------
 
-test('cleanBallot (pure): reads four fields; a missing or bad visitor_id, a bad id set, or a ballot that is nothing is refused', () => {
+test('cleanBallot (pure): reads five fields; a missing or bad visitor_id, a wrong round, a bad id set, or a ballot that is nothing is refused', () => {
   const good = cleanBallot(ballotOf());
-  assert.deepEqual(good, { visitor: VISITOR, features: ['pdf-word', 'watermark'], hasText: false, lang: 'id' });
+  assert.deepEqual(good, { visitor: VISITOR, features: ['pdf-excel', 'watermark'], hasText: false, lang: 'id' });
   assert.equal(cleanBallot(ballotOf({ visitor_id: VISITOR.toUpperCase() })).visitor, VISITOR, 'lowercased: one voter, one spelling');
   assert.equal(cleanBallot(ballotOf({ visitor_id: undefined })), null, 'no visitor_id');
   assert.equal(cleanBallot(ballotOf({ visitor_id: null })), null);
   assert.equal(cleanBallot(ballotOf({ visitor_id: 'not-a-uuid' })), null);
-  assert.equal(cleanBallot(ballotOf({ visitor_id: `${VISITOR}'; drop table feature_ballots;--` })), null);
+  assert.equal(cleanBallot(ballotOf({ visitor_id: `${VISITOR}'; drop table feature_ballots_r2;--` })), null);
   assert.equal(cleanBallot(ballotOf({ features: ['nope'] })), null);
   assert.equal(cleanBallot(ballotOf({ features: ['crop'] })), null, 'a retired id');
-  assert.equal(cleanBallot(ballotOf({ features: ['pdf-word', 'watermark', 'save-edits', 'lock-unlock'] })), null, 'four');
-  assert.equal(cleanBallot(ballotOf({ features: ['pdf-word', 'pdf-word'] })), null, 'a duplicate');
-  assert.equal(cleanBallot(ballotOf({ features: 'pdf-word' })), null);
+  // ROUND 2: only the current round; a stale round-1 client (which sends no round) is not a ballot
+  assert.equal(cleanBallot(ballotOf({ round: undefined })), null, 'no round: a round-1 client');
+  assert.equal(cleanBallot(ballotOf({ round: 1 })), null, 'round 1 is closed');
+  assert.equal(cleanBallot(ballotOf({ round: 3 })), null, 'a round that is not open');
+  assert.equal(cleanBallot(ballotOf({ round: '2' })), null, 'a number, not a string');
+  assert.equal(cleanBallot(ballotOf({ round: 2.5 })), null);
+  assert.ok(cleanBallot(ballotOf({ round: 2 })), 'vacuity guard: round 2 itself is accepted');
+  // ROUND 2: an option that is not up for a vote cannot be on a ballot, whatever the client says
+  for (const id of ['pdf-word', 'canvas-image', 'save-edits']) {
+    assert.equal(cleanBallot(ballotOf({ features: [id] })), null, `${id} is badged`);
+    assert.equal(cleanBallot(ballotOf({ features: ['batch', id] })), null, `${id} in an otherwise good ballot`);
+    assert.equal(cleanBallot(ballotOf({ features: [id], has_text: true })), null, `${id} with an idea attached`);
+  }
+  assert.deepEqual(cleanBallot(ballotOf({ features: ['batch'] })).features, ['batch'], 'the new option is pickable');
+  assert.equal(cleanBallot(ballotOf({ features: ['pdf-excel', 'watermark', 'camera-scan', 'lock-unlock'] })), null, 'four');
+  assert.equal(cleanBallot(ballotOf({ features: ['pdf-excel', 'pdf-excel'] })), null, 'a duplicate');
+  assert.equal(cleanBallot(ballotOf({ features: 'pdf-excel' })), null);
   assert.equal(cleanBallot(ballotOf({ has_text: 'yes' })), null, 'has_text is a boolean');
   assert.equal(cleanBallot(ballotOf({ features: [], has_text: false })), null, 'a ballot is a choice or an idea, never nothing');
   assert.deepEqual(cleanBallot(ballotOf({ features: [], has_text: true })).features, [], 'an idea alone is a ballot');
@@ -477,14 +622,14 @@ sqliteTest('BALLOT: the first lands (200) as ONE row; the second from the same v
     assert.equal(first.code, 200);
     assert.deepEqual(first.body, { ok: true });
     assert.equal(first.headers['cache-control'], 'no-store');
-    const row = db.prepare('select * from feature_ballots').get();
+    const row = db.prepare('select * from feature_ballots_r2').get();
     assert.equal(row.visitor_id, VISITOR);
-    assert.deepEqual(JSON.parse(row.features), ['pdf-word', 'watermark']);
+    assert.deepEqual(JSON.parse(row.features), ['pdf-excel', 'watermark']);
     assert.equal(row.has_text, 0);
     assert.equal(row.lang, 'id');
     assert.match(row.ts, /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/);
 
-    const before = db.prepare('select * from feature_ballots').all();
+    const before = db.prepare('select * from feature_ballots_r2').all();
     for (const again of [
       ballotOf(),                                             // the same ballot twice
       ballotOf({ features: ['form-fill'] }),                  // a changed mind
@@ -495,12 +640,12 @@ sqliteTest('BALLOT: the first lands (200) as ONE row; the second from the same v
       assert.equal(r.code, 409, JSON.stringify(again));
       assert.deepEqual(r.body, { ok: false, error: 'already_voted' });
     }
-    assert.deepEqual(db.prepare('select * from feature_ballots').all(), before, 'the table is byte-for-byte unchanged');
+    assert.deepEqual(db.prepare('select * from feature_ballots_r2').all(), before, 'the table is byte-for-byte unchanged');
 
     // a DIFFERENT visitor is a different ballot (vacuity guard: the 409 is the key, not a global lock)
     const other = await castBallot(ballotOf({ visitor_id: VISITOR2, features: ['form-fill'] }));
     assert.equal(other.code, 200);
-    assert.equal(db.prepare('select count(*) n from feature_ballots').get().n, 2);
+    assert.equal(db.prepare('select count(*) n from feature_ballots_r2').get().n, 2);
 
     // every statement was the ONE parameterised insert; no input ever became SQL
     assert.ok(log.every((c) => c.sql === BALLOT_SQL), 'only the ballot statement ran');
@@ -508,21 +653,62 @@ sqliteTest('BALLOT: the first lands (200) as ONE row; the second from the same v
   } finally { setDb(null); db.close(); }
 });
 
+sqliteTest('ROUND 2: a visitor who voted in round 1 is asked again and their first round-2 ballot LANDS; round 1 is never written or changed', async () => {
+  const db = freshDb();
+  // VISITOR cast a round-1 ballot (the table the old endpoint wrote)
+  db.prepare('insert into feature_ballots (visitor_id, lang, has_text, features) values (?,?,?,?)').run(VISITOR, 'id', 0, '["pdf-word","watermark"]');
+  const r1Before = JSON.stringify(db.prepare('select * from feature_ballots').all());
+  const log = [];
+  setDb(dbSeam(db, log));
+  try {
+    const r = await castBallot(ballotOf({ features: ['form-fill', 'batch'] }));
+    assert.equal(r.code, 200, 'not 409: the round-1 vote does not count against round 2');
+    assert.deepEqual(JSON.parse(db.prepare('select features from feature_ballots_r2 where visitor_id = ?').get(VISITOR).features), ['form-fill', 'batch']);
+    assert.equal(JSON.stringify(db.prepare('select * from feature_ballots').all()), r1Before, 'round 1 untouched');
+    assert.equal((await castBallot(ballotOf({ features: ['watermark'] }))).code, 409, 'but round 2 is still one ballot per visitor');
+    // the only statements that ran touched the r2 table
+    assert.ok(log.every((c) => /feature_ballots_r2/.test(c.sql) && !/feature_ballots\b(?!_r2)/.test(c.sql)), 'no statement named the round-1 table');
+  } finally { setDb(null); db.close(); }
+});
+
+sqliteTest('ROUND 2: a ballot without the round, with round 1, or naming a badged option is 400 and writes NOTHING to either table', async () => {
+  const db = freshDb();
+  setDb(dbSeam(db));
+  try {
+    for (const body of [
+      ballotOf({ round: undefined }),                     // a stale round-1 tab
+      ballotOf({ round: 1 }),
+      ballotOf({ round: 3 }),
+      ballotOf({ features: ['pdf-word'] }),               // being built: not pickable
+      ballotOf({ features: ['batch', 'save-edits'] }),
+      ballotOf({ features: ['canvas-image'], has_text: true }),
+    ]) {
+      const r = await castBallot(body);
+      assert.equal(r.code, 400, JSON.stringify(body));
+      assert.deepEqual(r.body, { ok: false, error: 'invalid' });
+    }
+    assert.equal(db.prepare('select count(*) n from feature_ballots_r2').get().n, 0);
+    assert.equal(db.prepare('select count(*) n from feature_ballots').get().n, 0);
+    // vacuity guard: the same body with a good round and a pickable option lands
+    assert.equal((await castBallot(ballotOf({ features: ['batch'] }))).code, 200);
+  } finally { setDb(null); db.close(); }
+});
+
 sqliteTest('BALLOT: the DATABASE itself refuses a second ballot and a malformed row, with no help from the endpoint (the table is the lock)', () => {
   const db = freshDb();
   const ins = (visitor, features, has_text = 0, lang = 'id') => db.prepare(
-    'insert into feature_ballots (visitor_id, lang, has_text, features) values (?,?,?,?)').run(visitor, lang, has_text, features);
-  ins(VISITOR, '["pdf-word"]');
+    'insert into feature_ballots_r2 (visitor_id, lang, has_text, features) values (?,?,?,?)').run(visitor, lang, has_text, features);
+  ins(VISITOR, '["pdf-excel"]');
   assert.throws(() => ins(VISITOR, '["watermark"]'), /UNIQUE|PRIMARY|constraint/i, 'a plain second insert is refused by the primary key');
-  assert.throws(() => ins('not-a-uuid', '["pdf-word"]'), /CHECK|constraint/i, 'visitor_id shape');
-  assert.throws(() => ins(VISITOR.toUpperCase(), '["pdf-word"]'), /CHECK|constraint/i, 'lowercase only: no second spelling of one voter');
+  assert.throws(() => ins('not-a-uuid', '["pdf-excel"]'), /CHECK|constraint/i, 'visitor_id shape');
+  assert.throws(() => ins(VISITOR.toUpperCase(), '["pdf-excel"]'), /CHECK|constraint/i, 'lowercase only: no second spelling of one voter');
   assert.throws(() => ins(VISITOR2, '["a","b","c","d"]'), /CHECK|constraint/i, 'more than 3');
   assert.throws(() => ins(VISITOR2, '{}'), /CHECK|constraint/i, 'not an array');
   assert.throws(() => ins(VISITOR2, '[]', 0), /CHECK|constraint/i, 'a ballot is a choice or an idea');
-  assert.throws(() => ins(VISITOR2, '["pdf-word"]', 2), /CHECK|constraint/i, 'has_text is 0 or 1');
-  assert.throws(() => ins(VISITOR2, '["pdf-word"]', 0, 'fr'), /CHECK|constraint/i, 'lang');
+  assert.throws(() => ins(VISITOR2, '["pdf-excel"]', 2), /CHECK|constraint/i, 'has_text is 0 or 1');
+  assert.throws(() => ins(VISITOR2, '["pdf-excel"]', 0, 'fr'), /CHECK|constraint/i, 'lang');
   ins(VISITOR2, '[]', 1); // an idea alone is allowed
-  assert.equal(db.prepare('select count(*) n from feature_ballots').get().n, 2);
+  assert.equal(db.prepare('select count(*) n from feature_ballots_r2').get().n, 2);
   db.close();
 });
 
@@ -534,7 +720,7 @@ sqliteTest('BALLOT: invalid requests are 400 and write nothing; no visitor_id me
       ballotOf({ visitor_id: undefined }),
       ballotOf({ visitor_id: 'x' }),
       ballotOf({ features: ['nope'] }),
-      ballotOf({ features: ['pdf-word', 'watermark', 'save-edits', 'lock-unlock'] }),
+      ballotOf({ features: ['pdf-excel', 'watermark', 'camera-scan', 'lock-unlock'] }),
       ballotOf({ features: [], has_text: false }),
       'not json at all',
       '{"visitor_id":',
@@ -545,7 +731,7 @@ sqliteTest('BALLOT: invalid requests are 400 and write nothing; no visitor_id me
       assert.equal(r.code, 400, typeof body === 'string' ? body.slice(0, 20) : JSON.stringify(body));
       assert.deepEqual(r.body, { ok: false, error: 'invalid' });
     }
-    assert.equal(db.prepare('select count(*) n from feature_ballots').get().n, 0);
+    assert.equal(db.prepare('select count(*) n from feature_ballots_r2').get().n, 0);
     const put = mkRes();
     await votesHandler({ method: 'PUT', on() { return this; } }, put);
     assert.equal(put.code, 405);
@@ -618,15 +804,36 @@ test('BALLOT: with no database configured at all it is 503, never a silent succe
 
 sqliteTest('votes SQL on the real table: one ballot per visitor, each feature counted once per ballot, text-only ballots are not voters', () => {
   const db = freshDb();
-  const ins = db.prepare('insert into feature_ballots (visitor_id, has_text, features) values (?,?,?)');
+  const ins = db.prepare('insert into feature_ballots_r2 (visitor_id, has_text, features) values (?,?,?)');
   const uid = (n) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
-  ins.run(uid(1), 0, JSON.stringify(['pdf-word', 'watermark', 'save-edits']));
-  ins.run(uid(2), 0, JSON.stringify(['pdf-word', 'lock-unlock']));
-  ins.run(uid(3), 0, JSON.stringify(['pdf-word']));
+  ins.run(uid(1), 0, JSON.stringify(['pdf-excel', 'watermark', 'camera-scan']));
+  ins.run(uid(2), 0, JSON.stringify(['pdf-excel', 'lock-unlock']));
+  ins.run(uid(3), 0, JSON.stringify(['pdf-excel']));
   ins.run(uid(4), 1, '[]'); // text-only
   const got = Object.fromEntries(db.prepare(VOTES_SQL).all().map((r) => [r.k, r.n]));
-  assert.deepEqual(got, { voters: 3, 'pdf-word': 3, watermark: 1, 'save-edits': 1, 'lock-unlock': 1 });
+  assert.deepEqual(got, { voters: 3, 'pdf-excel': 3, watermark: 1, 'camera-scan': 1, 'lock-unlock': 1 });
   db.close();
+});
+
+sqliteTest('ROUND 2 counts: round-1 rows in feature_ballots are NEVER counted (no double count), only the r2 box is read', async () => {
+  const db = freshDb();
+  const uid = (n) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+  const r1 = db.prepare('insert into feature_ballots (visitor_id, has_text, features) values (?,?,?)');
+  const r2 = db.prepare('insert into feature_ballots_r2 (visitor_id, has_text, features) values (?,?,?)');
+  for (let i = 1; i <= 30; i += 1) r1.run(uid(i), 0, JSON.stringify(['pdf-word', 'watermark'])); // round 1: 30 voters
+  for (let i = 1; i <= 12; i += 1) r2.run(uid(i), 0, JSON.stringify(i <= 8 ? ['batch'] : ['form-fill', 'watermark'])); // the SAME visitors, round 2
+  const got = Object.fromEntries(db.prepare(VOTES_SQL).all().map((r) => [r.k, r.n]));
+  assert.deepEqual(got, { voters: 12, batch: 8, 'form-fill': 4, watermark: 4 }, 'round 2 only: 12 voters, round 1\'s 30 and its pdf-word are absent');
+  setDb(dbSeam(db));
+  try {
+    const res = mkRes();
+    await votesHandler({ method: 'GET' }, res);
+    const body = JSON.parse(res.body);
+    assert.equal(body.voters, 12);
+    assert.equal(body.counts.batch, 8);
+    assert.equal(body.counts['pdf-word'], 0, 'a badged option has no round-2 votes, whatever round 1 said');
+    assert.equal(body.counts.watermark, 4);
+  } finally { setDb(null); db.close(); }
 });
 
 sqliteTest('votes SQL is not vacuous: zero voters on an empty box, and the shaper then withholds', () => {
@@ -652,8 +859,8 @@ test('shapeVotes: under MIN_VOTERS nothing is shown; above it the counts, with r
 
 sqliteTest('GET /api/votes: aggregates only (never a visitor_id, a row or idea text), cached; a failure is {voters:null} with a short cache', async () => {
   const db = freshDb();
-  const ins = db.prepare('insert into feature_ballots (visitor_id, has_text, features) values (?,?,?)');
-  for (let i = 1; i <= 12; i += 1) ins.run(`00000000-0000-4000-8000-${String(i).padStart(12, '0')}`, 0, JSON.stringify(i % 3 ? ['pdf-word'] : ['watermark', 'form-fill']));
+  const ins = db.prepare('insert into feature_ballots_r2 (visitor_id, has_text, features) values (?,?,?)');
+  for (let i = 1; i <= 12; i += 1) ins.run(`00000000-0000-4000-8000-${String(i).padStart(12, '0')}`, 0, JSON.stringify(i % 3 ? ['pdf-excel'] : ['watermark', 'form-fill']));
   const fr = db.prepare('insert into feature_requests (session_id, app_version, features, note) values (?,?,?,?)');
   fr.run(SESSION, 'abc1234', '[]', 'RAHASIA catatan pribadi');
   setDb(dbSeam(db));
@@ -664,7 +871,7 @@ sqliteTest('GET /api/votes: aggregates only (never a visitor_id, a row or idea t
     assert.match(good.headers['cache-control'], /s-maxage=600/);
     const body = JSON.parse(good.body);
     assert.equal(body.voters, 12);
-    assert.equal(body.counts['pdf-word'], 8);
+    assert.equal(body.counts['pdf-excel'], 8);
     assert.equal(body.counts.watermark, 4);
     assert.deepEqual(Object.keys(body).sort(), ['counts', 'voters']);
     assert.doesNotMatch(good.body, /visitor|session|RAHASIA|[0-9a-f]{8}-[0-9a-f]{4}/);

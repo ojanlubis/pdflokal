@@ -336,6 +336,8 @@ export default {
     thanks: "Thanks for votingg. When it's done I'll tell you here ok",
     top: 'Most picked so far:',
     close: 'Close',
+    badgeWip: 'In the works', // DRAFT: the founder's id words are 'Lagi dikerjakan'; this English line is the seat's
+    badgeShipped: 'Available now', // DRAFT
     shipped: "{feature} is done. You're one of the people who picked it, thankss",
     labels: [
       'PDF to Word',
@@ -346,6 +348,7 @@ export default {
       'Scan documents with your phone camera',
       'Add an image or logo',
       'Add a watermark',
+      'Process many files at once', // DRAFT (round 2)
     ],
   },
 

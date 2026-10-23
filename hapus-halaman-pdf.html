@@ -721,6 +721,12 @@
     .fv-opt:has(input:checked) { font-weight: 600; }
     .fv-opt:has(input:disabled:not(:checked)) { opacity: .45; cursor: not-allowed; }
     .fv-opt:has(input:focus-visible) { outline: 3px solid var(--accent); outline-offset: -3px; border-radius: var(--r-control); }
+    /* Round 2: an option that is not up for a vote (being built, or already shipped). No
+       checkbox, no tap target, listed FIRST; the ground tint and the pill make it read as
+       a status, not as a choice. Not red: red is touchable only. */
+    .fv-opt.fv-badged { cursor: default; justify-content: space-between; background: var(--dzfill); border-radius: var(--r-control); }
+    .fv-opt-name { flex: 1; min-width: 0; font-weight: 600; }
+    .fv-badge { flex: none; padding: var(--sp-4) var(--sp-8); border: 1px solid var(--ink); border-radius: var(--r-pill); font-size: var(--fs-n1); font-weight: 600; line-height: 1.2; color: var(--ink); white-space: nowrap; }
     @media (hover: hover) {
       .fv-opt:has(input:not(:disabled)):hover { background: var(--dzfill); }
     }

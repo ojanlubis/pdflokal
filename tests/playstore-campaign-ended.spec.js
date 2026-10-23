@@ -38,7 +38,7 @@ test.describe('Play Store vote card — campaign ended', () => {
   // moment exactly as it did before. The feature vote's own gating is
   // tests/feature-vote.spec.js.
   test.beforeEach(async ({ page }) => {
-    await page.addInitScript(() => localStorage.setItem('pdflokal_vote_done', 'voted'));
+    await page.addInitScript(() => localStorage.setItem('pdflokal_vote_done', 'voted:2'));
   });
 
   test('a download never shows the vote card; share/tip takes the moment as normal', async ({ page }) => {

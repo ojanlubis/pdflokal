@@ -921,9 +921,14 @@ export const SCHEMA = {
   // person also wrote an idea; the idea itself goes through api/feedback.js,
   // never this rail. api/votes.js counts these rows, one vote per feature per
   // visitor (the latest vote of each visitor wins), so a re-send is harmless.
+  //
+  // `round` (2026-10-23, round 2 of the vote): which round the ballot was cast in.
+  // OPTIONAL (OPTIONAL_PROPS below), so a cached client from before it existed still
+  // lands its event; only the new client sends it. An int, never a label.
   feature_vote: {
     features: { set: FEATURE_IDS, max: MAX_VOTES },
     has_text: 'bool',
+    round: 'int',
   },
 
   // core/visual-oracle.js's compareRegions() on the edited line's own region,
@@ -983,6 +988,7 @@ function validateProp(descriptor, value) {
 export const OPTIONAL_PROPS = {
   insert: new Set(['decision', 'decided_live', 'flips', 'block_lines', 'reflowed']),
   block_edit: new Set(['decline_reason']),
+  feature_vote: new Set(['round']),
 };
 
 // Pure, no I/O. {ok:true, clean} | {ok:false, reason, prop?}. Strict on every
