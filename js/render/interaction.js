@@ -25,6 +25,10 @@ import { annotationZIndex } from '../core/annotation-order.js';
 import { ownDelta } from '../core/annotation-geometry.js';
 
 const TAP_SLOP = 12; // px of finger movement beyond which a press is not a tap
+// The ring render/page-view.js pads a text overlay with (padding 10px, margin
+// -10px) to make it a bigger tap target. A press in the ring is aimed at the
+// space around the words, not at them.
+const TEXT_HIT_RING = 10;
 
 // ctx = {
 //   stage:      container holding .pv-page views
@@ -36,6 +40,9 @@ const TAP_SLOP = 12; // px of finger movement beyond which a press is not a tap
 //   onPlace:    (tool, {pageId, x, y}) => void — tap-to-place for text/signature/gambar;
 //               for 'ganti' this now fires at RELEASE (see startGanti below)
 //   onEditText: (annotationId) => void — click/tap on an already-selected text
+//   onGrabText: () => void — Teks armed, a press landed on text the person typed:
+//               the app closes the open box (its commit disarms Teks) so the
+//               press can pick the text up instead of placing a box on top
 //   onGantiSteer: ({pageId, x, y} | null) => void — live line-highlight while
 //               a Ganti Teks press/drag/hover is in flight; null clears it
 //   onDeleteTap:  (annotationId, pageId) => void — Hapus armed, tapped an object of ours
@@ -106,6 +113,14 @@ export function createInteraction(ctx) {
   }
 
   // ---- gestures --------------------------------------------------------------
+
+  function onTextContent(e, annoEl) {
+    const r = annoEl.getBoundingClientRect?.();
+    if (!r) return true;
+    const ring = TEXT_HIT_RING * ctx.getZoom();
+    return e.clientX > r.left + ring && e.clientX < r.right - ring
+      && e.clientY > r.top + ring && e.clientY < r.bottom - ring;
+  }
 
   function startDrag(e, annoEl, page, anno, wasSelected = false) {
     const zoom = ctx.getZoom();
@@ -191,7 +206,7 @@ export function createInteraction(ctx) {
     const isTouch = e.pointerType !== 'mouse';
 
     const handleEl = e.target.closest?.('.pv-handle');
-    const annoEl = e.target.closest?.('.pv-anno');
+    let annoEl = e.target.closest?.('.pv-anno');
     const pageView = e.target.closest?.('.pv-page');
     if (!pageView) return;
     const pageId = pageView.dataset.pageId;
@@ -206,6 +221,24 @@ export function createInteraction(ctx) {
         startResize(e, selectedEl, found.page, found.anno);
         return;
       }
+    }
+
+    // WHY Teks does not beat text the person typed: with Teks armed (it stays
+    // armed while a box is open, and after a tap-away opens the next one) a
+    // press on the text just written placed a NEW empty box on top of it, so
+    // the text could not be moved (feedback 100369, 100463). Tip-Ex covers and
+    // signatures still lose to an armed Teks (rule 2 below); only a text
+    // object we own, not a Ganti replacement (those carry replaceCoverId and
+    // are the page's own words), is picked up.
+    const hitAnno = annoEl ? page.annotations.find((a) => a.id === annoEl.dataset.annoId) : null;
+    // Only a press ON the words: a tap just below or beside a line (the ring
+    // above) is the next line or the next blank, and still places a box.
+    const grabsOwnText = tool === 'text' && hitAnno?.type === 'text' && !hitAnno.replaceCoverId
+      && onTextContent(e, annoEl);
+    if (grabsOwnText && ctx.onGrabText) {
+      ctx.onGrabText();
+      // Closing the open box re-syncs the overlay, which replaces this element.
+      annoEl = pageView.querySelector?.(`[data-anno-id="${hitAnno.id}"]`) || annoEl;
     }
 
     // 2) An ARMED tool beats annotation hits — so Tip-Ex can cover a spot and
@@ -224,7 +257,7 @@ export function createInteraction(ctx) {
       startGanti(e, pageView, page);
       return;
     }
-    if (tool === 'text' || tool === 'signature' || tool === 'paraf' || tool === 'gambar') {
+    if (((tool === 'text' && !grabsOwnText) || tool === 'signature' || tool === 'paraf' || tool === 'gambar')) {
       // WHY preventDefault: onPlace may create + focus an inline editor NOW.
       // Canceling pointerdown suppresses the compatibility mousedown that
       // would otherwise fire right after and BLUR it (mouse only — touch

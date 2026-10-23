@@ -107,7 +107,7 @@ import { planBlockEdit, blockOfLine, blockAnnotation, editorCommit } from '../co
 import { totalPageRotation } from '../core/page-rotation.js';
 import { styleBlockEditor, placeBlockEditor, readEditorLines } from './block-editor.js';
 import { pageEdits } from '../core/page-surgery.js';
-import { whiteoutRingPoints, whiteoutColorFrom, paperPoints, inkPoints, coverColorFrom, inkColorFrom } from '../core/color-sample.js';
+import { whiteoutRingPoints, whiteoutColorFrom, paperPoints, inkBoxRect, rgbaSamples, coverColorFrom, inkColorFrom } from '../core/color-sample.js';
 import { hitTestEditedLine, hitTestOcrEdit, editOwningLine } from '../core/edit-hit.js';
 import { createEditBake, runWhenIdle } from './edit-bake.js';
 import { createDocFontLive } from './doc-font-live.js';
@@ -1663,7 +1663,8 @@ async function matchReplaceColors(cover, draft, pageId, line) {
     if (el) el.style.backgroundColor = coverColor;
     // The ink-core rule (and why it is not a quartile median) is
     // core/color-sample.js inkColorFrom's.
-    const ink = inkColorFrom(sampleAt(r, inkPoints(line, r.s)), paper);
+    const box = inkBoxRect(line, r.s, r.w, r.h);
+    const ink = box && inkColorFrom(rgbaSamples(r.cx.getImageData(box.x, box.y, box.w, box.h).data), paper);
     if (ink) {
       draft.color = ink;
       if (editingEl && !editingAnno) editingEl.style.color = draft.color;
@@ -1913,6 +1914,9 @@ const interaction = createInteraction({
     matchWhiteoutColor(anno, pageId, x, y); // async; colors the rect while drawing
     return anno;
   },
+  // The person is moving text, not writing: close the open box and leave Teks
+  // (tools are verbs). See interaction.js onPointerDown.
+  onGrabText: () => { closeOpenEditor(); if (tool === 'text') setTool('select'); },
   onEditText: (annoId) => {
     const found = findAnnotation(doc, annoId);
     if (found) {
