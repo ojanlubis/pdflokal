@@ -41,9 +41,12 @@ async function open(page) {
   await expectFirstPage(page);
 }
 
-async function addText(page, text = 'Halo') {
+// `at` matters when a second text goes on the same page: with Teks armed, a press
+// on the words of the first one picks it up (interaction.js), so the next text
+// goes on a clear spot, as a person adding another line would put it.
+async function addText(page, text = 'Halo', at = { x: 200, y: 200 }) {
   await page.keyboard.press('t');
-  await page.click('.pv-page >> nth=0', { position: { x: 200, y: 200 } });
+  await page.click('.pv-page >> nth=0', { position: at });
   await page.keyboard.type(text);
   await page.keyboard.press('Enter');
   await expect(page.locator('.pv-anno-text').last()).toHaveText(text);
@@ -109,7 +112,7 @@ test.describe('leave guard', () => {
     await open(page);
     await addText(page, 'Tiga');
     await downloadAll(page);
-    await addText(page, 'Empat');
+    await addText(page, 'Empat', { x: 200, y: 330 });
     expect(await d.reload(), 'edited again after the download').toEqual(['beforeunload']);
   });
 
@@ -118,7 +121,7 @@ test.describe('leave guard', () => {
     await open(page);
     await addText(page, 'Satu');
     await downloadAll(page);
-    await addText(page, 'Dua');
+    await addText(page, 'Dua', { x: 200, y: 330 });
     await page.keyboard.press('Escape');
     const armed = () => page.evaluate(() => window.v2.history.current !== window.v2.history.cleanId);
     expect(await armed()).toBe(true);

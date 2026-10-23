@@ -142,7 +142,9 @@ test.describe('annotation layering', () => {
     await expectFirstPage(page);
     await placeText(page, 'SATU');
     await drawWhiteout(page);
-    await placeText(page, 'DUA');
+    // Clear of SATU: a press on the words of typed text with Teks armed picks
+    // that text up (interaction.js) instead of placing a second one.
+    await placeText(page, 'DUA', { x: 120, y: 260 });
 
     const agree = await page.evaluate(async () => {
       const { orderedForPaint } = await import('/js/core/annotation-order.js');
