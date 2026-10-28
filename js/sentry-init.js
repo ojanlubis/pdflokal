@@ -82,7 +82,9 @@ if (window.Sentry) Sentry.init({
       // v2 pages are <img>, not <canvas> — the block list must cover .pv-bg
       // (page images) and signature images, or replays would record user
       // documents. Privacy first, always.
-      block: ['canvas', '.pv-bg', '.pv-anno img', '.pm-thumb', '#sig-preview'],
+      // .pv-anno-whiteout: on a scan its cover is painted with a crop of the
+      // page (render/page-view.js paperImage), a CSS background media rules miss.
+      block: ['canvas', '.pv-bg', '.pv-anno img', '.pm-thumb', '#sig-preview', '.pv-anno-whiteout'],
       // A commit-time bake failure (js/v2/bake-failure.js, 2026-10-01) is
       // captured so the next one brings a stack — NOT so it ships a replay.
       // Those events did not exist before, and an on-error replay upload for
