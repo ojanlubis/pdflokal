@@ -297,7 +297,11 @@
       record_mask_all_text: true,
       record_mask_all_inputs: true,
       record_canvas: false,
-      record_block_selector: 'img, video, canvas, input[type="file"], #toast, #fb-form, #fv-form, #edit-feedback',
+      // .pm-thumb + .pv-anno-whiteout: document pixels painted as an inline CSS
+      // background, which `img` never matches. Kelola halaman's thumbnails
+      // reached Mixpanel's player this way (seen by Fauzan 2026-10-28); the
+      // whiteout carries a scan's paper crop (render/page-view.js paperImage).
+      record_block_selector: 'img, video, canvas, input[type="file"], #toast, #fb-form, #fv-form, #edit-feedback, .pm-thumb, .pv-anno-whiteout',
       // THE ALLOWLIST. Masking stays deny-by-default above; these are the only
       // nodes carved out of it, and each one's WHOLE SUBTREE is static markup
       // shipped identically to every visitor. See the head comment for why a

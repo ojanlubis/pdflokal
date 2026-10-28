@@ -132,6 +132,19 @@ test.describe('mixpanel session replay — privacy of the wire', () => {
       'the sheet never painted the filename, so the leak check below is vacuous',
     ).toContainText(SECRET_FILENAME);
 
+    // OPEN KELOLA HALAMAN, AND THIS IS THE LEAK HE SAW (2026-10-28): its
+    // thumbnails are NOT img elements, they are .pm-thumb divs painted with an
+    // inline `background-image: url(data:image/png…)`, so `img` in the block
+    // selector missed them and real documents showed up in Mixpanel's player.
+    // Without this step check 3 below never saw a thumbnail and passed for free.
+    await page.keyboard.press('Escape');
+    await page.click('#btn-pages');
+    await expect.poll(
+      () => page.evaluate(() => [...document.querySelectorAll('#pm-grid .pm-thumb')]
+        .some((t) => t.style.backgroundImage.includes('data:image/png'))),
+      { message: 'no thumbnail painted, so the pixel check below is vacuous for the page manager' },
+    ).toBe(true);
+
     // Force a flush rather than waiting out the recorder's own batch interval.
     await page.waitForTimeout(3000);
     await page.evaluate(() => {
@@ -280,6 +293,10 @@ test.describe('mixpanel session replay — privacy of the wire', () => {
     expect(cfg.block).toContain('img');
     expect(cfg.block).toContain('input[type="file"]');
     expect(cfg.block).toContain('#toast');
+    // Document pixels painted as CSS backgrounds, not img: the page manager's
+    // thumbnails and a scan's paper-matched Tip-Ex cover (page-view.js paperImage).
+    expect(cfg.block).toContain('.pm-thumb');
+    expect(cfg.block).toContain('.pv-anno-whiteout');
     expect(cfg.persistence).toBe(true);
     expect(cfg.crossSub).toBe(false);
     expect(cfg.autocapture).toBe(false);
