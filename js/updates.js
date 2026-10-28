@@ -29,6 +29,13 @@ import { getLocale } from './lib/i18n.js';
 
 export const UPDATES = [
   {
+    id: '2026-10-28-scan-offer',
+    date: '2026-10-28',
+    text: 'Edit di halaman hasil scan nggak nanya terus tiap kamu tap. Sekali "Nanti aja", cukup.',
+    en: 'Edit on a scanned page stops asking on every tap. One "Not now" is enough.',
+    approved: false, // the seat's draft 2026-10-28, his to approve
+  },
+  {
     id: '2026-10-23-gambar',
     date: '2026-10-23',
     text: 'Di laptop/PC sekarang bisa tempel gambar di halaman (file atau Ctrl+V). Di HP menyusul.',

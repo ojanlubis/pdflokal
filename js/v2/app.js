@@ -1069,6 +1069,7 @@ for (const btn of document.querySelectorAll('#toolbar .tool[data-tool]')) {
     // on purpose: pressing TTD with no saved signature never reaches setTool,
     // and that is precisely the path that was invisible.
     if (ARM_TOOL[t]) tel('tool_use', { tool: ARM_TOOL[t], action: 'arm' });
+    if (t === 'ganti') scanOfferDeclined.clear(); // a deliberate re-arm asks again (showScanOffer)
     if (t === 'signature' && !storedSignature) { openSignatureModal(); return; }
     // Gambar is armed by the PICTURE, not by the press: the picker opens now (it
     // needs this very user gesture) and the tool lights when a picture comes
@@ -1257,7 +1258,8 @@ async function smartReplace(pageId, x, y) {
       // The router (two-ladder ruling, seat decisions.md 2026-07-18): no text
       // layer = a scan/photo — that's the dokumen-foto ladder, not this one.
       track('ganti_no_text_layer');
-      showScanOffer(pageId);
+      if (scanOfferDeclined.has(pageId)) toast(tr('toast.scanNotEditable'));
+      else showScanOffer(pageId);
     } else {
       // The page has text but none under the finger: say what it IS, not just
       // that it missed (a picture of words cannot be edited, only covered). The
@@ -4011,6 +4013,13 @@ window.v2 = {
 // normal use (whiting out a signature line, filling a scanned form) and counting
 // it would import a population that never wanted OCR. The organic case is a rail
 // QUERY over the sequence, which per-event timestamps now make answerable.
+// WHY: pages whose offer was dismissed since Edit was last armed from the
+// toolbar. Without it the sheet reopened on EVERY tap of the page: Mixpanel
+// replays 2026-10-28 showed "Nanti aja" pressed 5 times in 30 s, then the
+// visitor left. A tap on a declined page gets the one-line toast instead; a
+// deliberate re-arm (toolbar click handler) clears it and the offer returns.
+const scanOfferDeclined = new Set();
+
 function showScanOffer(pageId) {
   const dlg = document.getElementById('scan-offer');
   if (!dlg) { toast(tr('toast.scanNotEditable')); return; }
@@ -4027,6 +4036,7 @@ function showScanOffer(pageId) {
   const settle = (props) => {
     if (resolved) return;
     resolved = true;
+    if (props.action === 'dismissed') scanOfferDeclined.add(pageId);
     tel('scan_offer', props);
   };
 

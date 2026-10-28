@@ -137,6 +137,37 @@ test.describe('scan dead end', () => {
     expect(outcomes[0].props).toEqual({ action: 'dismissed', tool: 'none' });
   });
 
+  // Mixpanel replays 2026-10-28: after "Nanti aja" the sheet came back on EVERY
+  // tap of the page (5 times in 30 s in one session) and people left. A
+  // dismissal now holds for that page until the user re-arms Edit from the
+  // toolbar; a tap in between gets the one-line toast instead.
+  test('after a dismissal, tapping the same page again shows a toast, not the sheet', async ({ page }) => {
+    await hitTheWall(page);
+    await page.click('#so-dismiss');
+    await expect(page.locator('#scan-offer')).toBeHidden();
+    await outcomesAfter(page, 1);
+
+    const pt = await visiblePagePoint(page);
+    await page.mouse.click(pt.x, pt.y);
+    // Known-positive: the second tap reached the router (its toast is the router's answer).
+    await expect(page.locator('#toast')).toContainText(/scan/i);
+    await expect(page.locator('#scan-offer')).toBeHidden();
+    expect((await scanOffers(page)).filter((e) => e.props.action === 'shown')).toHaveLength(1);
+  });
+
+  test('re-arming Edit from the toolbar brings the offer back once', async ({ page }) => {
+    await hitTheWall(page);
+    await page.click('#so-dismiss');
+    await expect(page.locator('#scan-offer')).toBeHidden();
+
+    await page.click('[data-tool="ganti"]'); // lit, so this disarms (on-off law)
+    await page.waitForFunction(() => window.v2?.getTool() === 'select');
+    await armGanti(page);
+    const pt = await visiblePagePoint(page);
+    await page.mouse.click(pt.x, pt.y);
+    await expect(page.locator('#scan-offer')).toBeVisible();
+  });
+
   test('Escape counts as a dismissal — closing without choosing is a rejection', async ({ page }) => {
     await hitTheWall(page);
     await page.keyboard.press('Escape');
