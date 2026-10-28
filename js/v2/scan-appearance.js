@@ -101,13 +101,33 @@ async function matchLettering(r, line, plane) {
       y: line.y + source.top / scale + ascent - fontSize * 0.9 };
   })))).filter(Boolean).sort((a, b) => a.score - b.score);
   const best = candidates[0];
-  if (!best || best.score > 0.22 || (candidates[1] && candidates[1].score - best.score < 0.015)
-    || best.fontSize < 6 || best.fontSize > 120) return null;
+  const confident = best && best.score <= 0.22 && !(candidates[1] && candidates[1].score - best.score < 0.015);
+  const chosen = confident ? best : familyOnly(candidates);
+  if (!chosen || chosen.fontSize < 6 || chosen.fontSize > 120) return null;
   if (ink.length) {
     const med = (ch) => ink.map((p) => p[ch]).sort((a, b) => a - b)[Math.floor(ink.length / 2)];
-    best.color = `#${[0, 1, 2].map((ch) => med(ch).toString(16).padStart(2, '0')).join('')}`;
+    chosen.color = `#${[0, 1, 2].map((ch) => med(ch).toString(16).padStart(2, '0')).join('')}`;
   }
-  return best;
+  return chosen;
+}
+
+// WHY: the full family+style test above rejected the RIGHT family most of the
+// time. Measured 2026-10-28 (seat reference/scan-edit-2026-10-28): on the scan
+// fixtures Tinos ranked first on ~90% of lines but at 0.23-0.30, so 8 of 10
+// lines on scan-bersih fell back to Helvetica on a Times letter. Here the
+// FAMILY is kept when it wins clearly, and the style is dropped to upright
+// regular ("un-bold rather than all-bold", the same ruling as born-digital
+// mixed-weight lines). Across ~70 fixture lines and 36 degraded synthetic
+// Arimo/Carlito/Tinos lines, 0.32 / 0.03 picked no wrong family; a closer race
+// stays on the default. Changing either number: re-run that measurement.
+const FAMILY_MAX = 0.32;
+const FAMILY_GAP = 0.03;
+function familyOnly(candidates) {
+  const byFamily = new Map();
+  for (const c of candidates) if (!byFamily.has(c.fontFamily)) byFamily.set(c.fontFamily, c.score);
+  const [first, second] = [...byFamily.entries()];
+  if (!first || first[1] > FAMILY_MAX || (second && second[1] - first[1] < FAMILY_GAP)) return null;
+  return candidates.find((c) => c.fontFamily === first[0] && !c.bold && !c.italic) || null;
 }
 
 export async function scanAppearance(r, line) {
