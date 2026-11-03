@@ -1969,6 +1969,7 @@ const evenWidths = createEvenWidths({
   toast,
   tel,
   dialog: document.getElementById('even-offer'),
+  isSheetOpen: () => !!document.getElementById('pm-sheet')?.open,
 });
 
 // ---- page manager (Halaman sheet) -----------------------------------------------

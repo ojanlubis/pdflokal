@@ -149,6 +149,11 @@ test.describe('Kelola Halaman', () => {
     await expect(row.locator('.pm-widths-act')).toHaveText('Samakan');
     await row.locator('.pm-widths-act').click();
     expect(await widths(page)).toEqual([420, 420, 420]);
+    // The row is the one voice in the sheet: no toast over its footer
+    // (Putar/Ekstrak), which it covered on a 375px phone.
+    await page.waitForTimeout(300);
+    await expect(page.locator('#toast')).not.toHaveClass(/show/);
+    await expect(page.locator('#toast')).not.toContainText('disamakan');
     await expect(row.locator('.pm-widths-note')).toHaveText('Lebar halaman sudah disamakan');
     await expect(row.locator('.pm-widths-act')).toHaveText('Kembalikan');
     const even = await tileWidths();

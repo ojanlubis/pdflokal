@@ -25,17 +25,17 @@
  *   toast(msg, { action }),  app's toast (toast-layer.js), one action allowed
  *   tel(event, props),       the app's own tel wrapper
  *   dialog,                  the #even-offer <dialog> (null on a page without it)
+ *   isSheetOpen(),           is Kelola Halaman open (its row speaks instead)
  * }
  */
 import { evenPageWidths, restorePageWidths, pageWidthsState } from '../core/operations.js';
 import { record } from '../core/history.js';
 import { t as tr } from '../lib/i18n.js';
 
-export function createEvenWidths({ getDoc, history, onResized, toast, tel, dialog }) {
+export function createEvenWidths({ getDoc, history, onResized, toast, tel, dialog, isSheetOpen = () => false }) {
   // "Once per opened document": keyed by the Doc object, which Buka Baru and a
   // restore replace wholesale (resetDoc), so a new document is asked afresh.
   const offered = new WeakSet();
-
 
   // Even every page to page 1's width. Returns true when anything moved.
   function even() {
@@ -68,7 +68,19 @@ export function createEvenWidths({ getDoc, history, onResized, toast, tel, dialo
   // empty editor, which never had a merge tally. The toast is one slot
   // (toast-layer.js), so the two travel as one message rather than one
   // replacing the other.
+  //
+  // WHY NOTHING about widths while Kelola Halaman is open (seat review
+  // 2026-11-03, phone-light-3): the toast sat over the sheet's footer
+  // (Putar/Ekstrak), and the sheet's own row already says exactly "Lebar
+  // halaman sudah disamakan" with the same Kembalikan, right where the tap
+  // was. Lifting the toast would only move it over the grid. So the row is
+  // the one voice there; a merge's page count, which the row does not say,
+  // still toasts, plain.
   function afterMerge(merged) {
+    if (isSheetOpen()) {
+      if (merged) toast(merged);
+      return;
+    }
     const msg = merged ? `${merged}. ${tr('even.done')}` : tr('even.done');
     toast(msg, { action: { label: tr('even.restore'), onClick: () => restore() } });
   }
