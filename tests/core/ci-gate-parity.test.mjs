@@ -61,15 +61,32 @@ test('the gate\'s stages and CI\'s run steps are the same commands, in the same 
 });
 
 test('CI wakes for every source family that can affect a gate result', () => {
-  // en/**, i18n/** and sitemap.xml: core tests read the generated /en pages,
-  // their i18n sources and the sitemap; a PR touching only them once skipped
-  // every test and stayed green until the nightly run after merge.
-  for (const pattern of ['*.html', 'css/**', 'js/**', 'api/**', 'seo/**', 'scripts/**', 'tests/**', 'en/**', 'i18n/**', 'sitemap.xml']) {
-    assert.match(WORKFLOW, new RegExp(`['\"]${pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}['\"]`),
-      `paths filter must include ${pattern}`);
-  }
+  // Since 2026-11-03 the filter is a DENY-list (his branch + CI rules, seat decisions): with
+  // predicate-quantifier 'every', a changed file triggers e2e unless it matches one of the '!' patterns.
+  // So the guard is: the quantifier and the catch-all are there, every code family stays OUTSIDE the
+  // exclusions, and the one data path the exclusions exist for (js/updates.js) is inside them.
+  // History kept: en/**, i18n/** and sitemap.xml once fell outside an allow-list and a PR touching only
+  // them skipped every test until the nightly run after merge.
+  const filter = WORKFLOW.match(/runnable:\n((?:\s+- '[^']+'\n)+)/)?.[1] ?? '';
+  const patterns = [...filter.matchAll(/- '([^']+)'/g)].map((m) => m[1]);
+  assert.match(WORKFLOW, /predicate-quantifier:\s*'every'/, 'the paths filter must use predicate-quantifier every');
+  assert.ok(patterns.includes('**'), `the deny-list needs its catch-all '**': ${JSON.stringify(patterns)}`);
 
-  assert.doesNotMatch(WORKFLOW, /['\"]editor-v2\.html['\"]/,
+  const toRe = (glob) => new RegExp('^' + glob.replace(/[.+^${}()|[\]\\]/g, '\\$&')
+    // Placeholders first: converting '**' to '.*' and THEN '*' would rewrite that '.*' into '.[^/]*'.
+    .replace(/\*\*\//g, '\u0001').replace(/\*\*/g, '\u0002').replace(/\*/g, '[^/]*')
+    .replace(/\u0001/g, '(?:.*/)?').replace(/\u0002/g, '.*') + '$');
+  const excluded = patterns.filter((x) => x.startsWith('!')).map((x) => toRe(x.slice(1)));
+  const skips = (file) => excluded.some((re) => re.test(file));
+
+  for (const file of ['index.html', 'dukung.html', 'css/tokens.css', 'js/v2/app.js', 'js/core/export.js', 'api/t.js',
+    'seo/pages.json', 'scripts/gen-seo-pages.js', 'tests/core/zoom.test.mjs', 'en/index.html', 'i18n/markup.en.json',
+    'sitemap.xml', 'vercel.json', 'sw.js', 'package.json', '.github/workflows/e2e.yml']) {
+    assert.ok(!skips(file), `${file} is code, but the paths filter excludes it from e2e`);
+  }
+  assert.ok(skips('js/updates.js'), 'js/updates.js is data only and must skip e2e (lint.yml runs its core check)');
+
+  assert.doesNotMatch(WORKFLOW, /['"]editor-v2\.html['"]/,
     'the deleted editor-v2.html entry must not masquerade as CI coverage');
 });
 
