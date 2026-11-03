@@ -116,13 +116,19 @@ function parseSimpleFont(fontObj, context, PDFLib) {
 // leading '/', matching what the content-stream tokenizer yields for Tf's name
 // operand (see content-stream.js's decodeName).
 export function extractFontMetrics(page, PDFLib) {
+  return fontMetricsOfResources(page.node.Resources(), page.doc.context, PDFLib);
+}
+
+// The same read over any /Resources dict: a page's, or a Form XObject's or an
+// appearance stream's own (core/page-surgery.js walks those to find text the
+// cut cannot reach).
+export function fontMetricsOfResources(resourcesRaw, context, PDFLib) {
   const { PDFName, PDFDict, PDFRef } = PDFLib;
-  const context = page.doc.context;
   const res = (v) => resolve(context, PDFRef, v);
 
   const metrics = new Map();
-  const resources = page.node.Resources();
-  if (!resources) return metrics;
+  const resources = res(resourcesRaw);
+  if (!(resources instanceof PDFDict)) return metrics;
 
   const fontDictRaw = resources.get(PDFName.of('Font'));
   if (!fontDictRaw) return metrics;
@@ -172,16 +178,19 @@ export function extractFontMetrics(page, PDFLib) {
 // runs planRunRemoval read-only against the SOURCE page to learn a tapped
 // line's resource font name, and must not duplicate this decode inline.
 export function readPageContents(page, PDFLib) {
-  const { PDFArray, PDFRawStream, decodePDFRawStream } = PDFLib;
+  const { PDFArray } = PDFLib;
   const context = page.doc.context;
   const contents = page.node.Contents();
   const refs = contents instanceof PDFArray ? contents.asArray() : [contents];
-  const latin1 = (u8) => Array.from(u8, (b) => String.fromCharCode(b)).join('');
-  const parts = refs.map((r) => {
-    const s = context.lookup(r);
-    return latin1(s instanceof PDFRawStream ? decodePDFRawStream(s).decode() : s.getContents());
-  });
-  return parts.join('\n');
+  return refs.map((r) => readStreamText(context.lookup(r), PDFLib)).join('\n');
+}
+
+// One stream's decoded content as a latin1 string (one char per byte), the
+// shape text-walk.js's tokenizer reads.
+export function readStreamText(stream, PDFLib) {
+  const { PDFRawStream, decodePDFRawStream } = PDFLib;
+  const u8 = stream instanceof PDFRawStream ? decodePDFRawStream(stream).decode() : stream.getContents();
+  return Array.from(u8, (b) => String.fromCharCode(b)).join('');
 }
 
 // Remove show-text ops matching `targets` (user-space run geometries) from a

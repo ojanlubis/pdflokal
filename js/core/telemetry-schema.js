@@ -658,9 +658,15 @@ export const SCHEMA = {
   // an existing bucket — burying a new signal inside one is exactly how
   // weight_ratio 1.28999 got quantized into 'near-parity' the same morning. A bucket that can't
   // express the finding is how the finding gets lost.
+  //
+  // 'unreached' (added 2026-11-03, field reports 100500/100504): something the
+  // cut cannot reach (a Form XObject, an annotation's appearance stream) paints
+  // text inside the line, so the edit declined before cutting (matched:false,
+  // cover kept). Before it, those edits were cut, stamped and reported 'clean'
+  // while the other painter's copy of the old words stayed under the new ones.
   surgery: {
     matched: 'bool',
-    reason: ['clean', 'residual', 'no-match'],
+    reason: ['clean', 'residual', 'no-match', 'unreached'],
   },
   // path/reason describe the Rung C STAMP step (core/stamp.js, rebuilt
   // 2026-07-22 per spec-edit-rebuild-composite.md — Path B, founder-ruled):

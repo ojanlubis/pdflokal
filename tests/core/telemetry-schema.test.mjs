@@ -186,12 +186,20 @@ test("surgery.reason carries 'residual' — the rail can now see an incomplete c
   // Every declared value still validates, so adding one didn't narrow the rest.
   // 'untrustworthy-run' left this list 2026-08-09 — runSurgery could never emit
   // it, so looping over it proved only that the schema agreed with itself.
-  for (const reason of ['clean', 'residual', 'no-match']) {
+  for (const reason of ['clean', 'residual', 'no-match', 'unreached']) {
     assert.equal(validateEvent('surgery', { matched: true, reason }).ok, true, `${reason} should validate`);
   }
   // And the gate still closes: an invented reason is refused, so this test is
   // capable of failing rather than just agreeing with whatever the code emits.
   assert.equal(validateEvent('surgery', { matched: true, reason: 'probably-fine' }).ok, false);
+});
+
+// 'unreached' (2026-11-03): the line is also painted by something the cut
+// cannot reach (a Form XObject, an annotation's appearance), so the edit kept
+// its cover. Its emitter is core/page-surgery.js's runSurgery
+// (tests/core/page-surgery-unreached.test.mjs).
+test("surgery.reason carries 'unreached', the decline that used to report 'clean'", () => {
+  assert.equal(validateEvent('surgery', { matched: false, reason: 'unreached' }).ok, true);
 });
 
 // ---- the "what did they come to do?" additions (intent + export choices) ------

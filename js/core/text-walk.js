@@ -86,13 +86,20 @@ function computeAdvance(showTokens, font, fontSize, Tc, Tw, Th) {
 
 // Walk a content stream's interpreter state and return one record per
 // show-text op: where it paints (x,y), its baseline direction (ux,uy), its
-// rendered size, and whether that position is currently trustworthy (exact).
-export function walkShowOps(src, fonts) {
+// rendered size, its render mode (tr), and whether that position is currently
+// trustworthy (exact).
+//
+// `opts` is for walking a Form XObject or an appearance stream rather than a
+// page: `ctm` is the matrix in force where it is painted, and `onDo(name, ctm)`
+// is told about every Do with the matrix in force there, so a caller can
+// follow the forms a stream paints (core/page-surgery.js's painter census).
+// The page walk passes neither and its records are unchanged.
+export function walkShowOps(src, fonts, { ctm = [1, 0, 0, 1, 0, 0], onDo = null } = {}) {
   const ops = tokenizeOps(src);
   const records = [];
 
-  let CTM = [1, 0, 0, 1, 0, 0];
-  let Tc = 0; let Tw = 0; let Th = 1; let TL = 0; let Ts = 0;
+  let CTM = ctm.slice();
+  let Tc = 0; let Tw = 0; let Th = 1; let TL = 0; let Ts = 0; let Tr = 0;
   let fontName = null; let fontSize = 0;
   let Tm = [1, 0, 0, 1, 0, 0];
   let Tlm = [1, 0, 0, 1, 0, 0];
@@ -112,11 +119,11 @@ export function walkShowOps(src, fonts) {
   for (const rec of ops) {
     switch (rec.op) {
       case 'q':
-        stack.push({ CTM: CTM.slice(), Tc, Tw, Th, TL, Ts, fontName, fontSize });
+        stack.push({ CTM: CTM.slice(), Tc, Tw, Th, TL, Ts, Tr, fontName, fontSize });
         break;
       case 'Q': {
         const saved = stack.pop(); // ignore underflow — malformed stream, not our job to fix
-        if (saved) ({ CTM, Tc, Tw, Th, TL, Ts, fontName, fontSize } = saved);
+        if (saved) ({ CTM, Tc, Tw, Th, TL, Ts, Tr, fontName, fontSize } = saved);
         break;
       }
       case 'cm': {
@@ -165,6 +172,12 @@ export function walkShowOps(src, fonts) {
       case 'Tw': [Tw] = nums(rec); break;
       case 'Tz': { const [v] = nums(rec); Th = v / 100; break; }
       case 'Ts': [Ts] = nums(rec); break;
+      case 'Tr': [Tr] = nums(rec); break;
+      case 'Do': {
+        const nameTok = rec.tokens.find((t) => t.t === 'name');
+        if (onDo && nameTok) onDo(nameTok.v, CTM.slice());
+        break;
+      }
       case 'Tj':
       case "'":
       case '"':
@@ -200,7 +213,7 @@ export function walkShowOps(src, fonts) {
         records.push({
           op: rec.op, start: rec.start, end: rec.end, tokens: rec.tokens,
           x: full[4], y: full[5], ux, uy, size,
-          exact, advanceText, len, th: Th, fontSize, btIndex,
+          exact, advanceText, len, th: Th, fontSize, btIndex, tr: Tr,
           // The RESOURCE font name (the Tf operand) — Rung C's re-insert needs
           // it to write replacement text with the document's OWN font; pdf.js
           // only ever exposes its internal id, so the walk is the one place
@@ -213,7 +226,7 @@ export function walkShowOps(src, fonts) {
         break;
       }
       default:
-        break; // Do, BI, and unknown ops: no state change (BI...EI already raw-skipped)
+        break; // BI and unknown ops: no state change (BI...EI already raw-skipped)
     }
   }
   return records;
