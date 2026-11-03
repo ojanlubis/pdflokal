@@ -945,6 +945,20 @@ export const SCHEMA = {
     // the forewarning shape the encrypted-import notice already uses. Enum
     // ADDITION only: old cached clients never send it, so nothing blanks
     // (removals are the two-release hazard, not additions).
+    //
+    // ⚠️ 'corrupt' WIDENS from the release that carries the page-tree fix
+    // (branch claude/untyped-page-tree, founder's call 2026-11-03: keep the fix,
+    // say so here). It now also counts a PDF whose page count pdf-lib and PDF.js
+    // DISAGREE on (core/pdflib-load.js pageCountError, "Invalid PDF page tree"):
+    //   - failure{import, corrupt, blocked:true}: a file joining a merge is
+    //     declined at load (importPdf's rebuildCheck), where before it joined
+    //     and its download carried a neighbour page;
+    //   - failure{export, corrupt}: Unduh (and the edit preview) refuse such a
+    //     file instead of shipping the wrong page.
+    // The same release NARROWS it the other way: a page tree that only lacks
+    // /Type, or inlines a page in /Kids, is repaired in memory and no longer
+    // fails. So a corrupt count read across that date is not like for like:
+    // compare windows on one side of it, or split by app_version.
     reason: ['encrypted', 'corrupt', 'out-of-memory', 'unsupported', 'timeout', 'font-fallback', 'unknown'],
     class: UNSUPPORTED_CLASS,
     blocked: 'bool',
