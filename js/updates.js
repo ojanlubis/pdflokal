@@ -29,6 +29,27 @@ import { getLocale } from './lib/i18n.js';
 
 export const UPDATES = [
   {
+    id: '2026-11-03-download-where',
+    date: '2026-11-03',
+    text: 'Habis Unduh, sekarang dikasih tahu filenya ada di mana.',
+    en: 'After Download, you now see where the file was saved.',
+    approved: true, // his "Yes, the update lines", 2026-11-03
+  },
+  {
+    id: '2026-11-03-edit-leftover',
+    date: '2026-11-03',
+    text: 'Edit nggak ninggalin tulisan lama di bawah tulisan baru lagi.',
+    en: 'Edit no longer leaves the old words showing under the new ones.',
+    approved: true, // his "Yes, the update lines", 2026-11-03
+  },
+  {
+    id: '2026-11-03-mixed-width',
+    date: '2026-11-03',
+    text: 'PDF yang lebar halamannya beda-beda sekarang kebuka pas di layar, nggak kepotong lagi.',
+    en: 'A PDF whose pages have different widths now opens fitted to the screen, nothing cut off.',
+    approved: true, // his "Yes, the update lines", 2026-11-03
+  },
+  {
     id: '2026-10-28-scan-font',
     date: '2026-10-28',
     text: 'Edit di PDF hasil scan sekarang ikut jenis huruf suratnya, kolom formulir tetap rapi.',
