@@ -31,7 +31,9 @@
  * imports.
  */
 
-import { removeRunsFromPdfPage } from './redact.js';
+import { removeRunsFromPdfPage, readPageContents, readStreamText, extractFontMetrics, fontMetricsOfResources } from './redact.js';
+import { walkShowOps } from './text-walk.js';
+import { INVISIBLE_RENDER_MODES } from './text-visibility.js';
 import { resolveStampFont, stampText, stampBlock, blockText } from './stamp.js';
 import { glyphShortfallBucket } from './telemetry-schema.js';
 import { totalPageRotation } from './page-rotation.js';
@@ -57,6 +59,173 @@ function overlapsBirthBox(anno) {
   const iw = Math.max(0, ix1 - ix0);
   const ih = Math.max(0, iy1 - iy0);
   return (iw * ih) >= REPLACE_OVERLAP_MIN * boxArea;
+}
+
+// ---- painters the cut cannot reach ----------------------------------------
+//
+// WHY (field reports 100500 and 100504, 2026-10-24/25: "Jatimpark Group" and
+// "Mr Saturnino Antonio Morais" shown with the new words drawn over the old,
+// both reported surgery {matched:true, reason:'clean'}): the cut edits ONE
+// thing, the page's own content stream. Two other things paint on a page and
+// the cut never sees them:
+//   - a Form XObject (`/Fm0 Do`): its text is painted where the page's CTM
+//     puts it, but its ops live in another stream;
+//   - an annotation's appearance stream (FreeText, a filled form field, a
+//     stamp): pdf.js paints it into the raster (core/import.js, default
+//     annotationMode) and every reader paints it ABOVE the page content.
+// pdf.js's text layer (which is what the user taps, js/v2/text-runs.js)
+// includes the first and excludes the second, so a copy of the line drawn by
+// either one survives the cut. Reproduced with constructed fixtures in
+// tests/core/page-surgery-unreached.test.mjs: a FreeText or a text field
+// repeating the line, and a shadow copy in a Form XObject offset far enough
+// (5pt at 14pt) that pdf.js groups it into a line of its own. The cut found
+// and removed its ops, so 'clean' was true of the content stream and false of
+// the page.
+//
+// So before cutting, each edit asks: does anything the cut cannot reach paint
+// visible text inside this line? If so the edit declines, exactly as a no-match
+// does: no cut, no stamp, the cover stays (on screen the DOM cover hides the
+// raster; export.js flattens a painted annotation under that cover, see
+// flattenPaintedAnnotations). It reports reason 'unreached'. A cut cannot fix
+// a copy it cannot reach, and removing the other painter would delete more
+// than the user asked to change (a stamp, a signature field).
+
+const MAX_FORM_DEPTH = 4; // forms painting forms; a cycle or a deep tree stops here
+
+const mulM = (A, B) => [
+  A[0] * B[0] + A[1] * B[2], A[0] * B[1] + A[1] * B[3],
+  A[2] * B[0] + A[3] * B[2], A[2] * B[1] + A[3] * B[3],
+  A[4] * B[0] + A[5] * B[2] + B[4], A[4] * B[1] + A[5] * B[3] + B[5],
+];
+
+// A record that puts ink on the page: a non-empty string in a render mode that
+// paints (Tr 3 / 7 are an OCR layer or a clip, not marks).
+function paintsText(rec) {
+  if (INVISIBLE_RENDER_MODES.has(rec.tr)) return false;
+  return rec.tokens.some((t) => t.t === 'str' && /[^\s\0]/.test(t.v));
+}
+
+function numbersOf(arr, PDFLib, n) {
+  const { PDFArray, PDFNumber } = PDFLib;
+  if (!(arr instanceof PDFArray) || arr.size() !== n) return null;
+  const out = arr.asArray().map((v) => arr.context?.lookup?.(v) ?? v)
+    .map((v) => (v instanceof PDFNumber ? v.asNumber() : NaN));
+  return out.every(Number.isFinite) ? out : null;
+}
+
+// Every text record painted by the Form XObjects that `src` invokes, in page
+// space, recursively. `resources` is the dict `src`'s names resolve against.
+function formTextRecords(src, fonts, resources, ctm, PDFLib, context, depth, seen, out) {
+  const { PDFName, PDFDict, PDFStream } = PDFLib;
+  const xobjects = resources instanceof PDFDict ? resources.lookup(PDFName.of('XObject')) : null;
+  const records = walkShowOps(src, fonts, {
+    ctm,
+    onDo: (name, doCtm) => {
+      if (depth >= MAX_FORM_DEPTH || !(xobjects instanceof PDFDict)) return;
+      const ref = xobjects.get(PDFName.of(name));
+      const form = context.lookup(ref);
+      if (!(form instanceof PDFStream) || seen.has(form)) return;
+      if (form.dict.lookup(PDFName.of('Subtype')) !== PDFName.of('Form')) return;
+      seen.add(form);
+      const matrix = numbersOf(form.dict.lookup(PDFName.of('Matrix')), PDFLib, 6) || [1, 0, 0, 1, 0, 0];
+      // A form without its own /Resources uses the ones it is painted with
+      // (PDF 1.1 files; the spec still allows it).
+      const own = form.dict.lookup(PDFName.of('Resources'));
+      const formRes = own instanceof PDFDict ? own : resources;
+      const formFonts = own instanceof PDFDict ? fontMetricsOfResources(own, context, PDFLib) : fonts;
+      let formSrc;
+      try { formSrc = readStreamText(form, PDFLib); } catch { return; } // undecodable: nothing provable
+      out.push(...formTextRecords(formSrc, formFonts, formRes, mulM(matrix, doCtm), PDFLib, context, depth + 1, seen, []));
+    },
+  });
+  if (depth > 0) out.push(...records); // depth 0 is the page itself: the cut's own business
+  return out;
+}
+
+// Is the record's origin inside the target's span? The same band
+// text-walk.js's planRunRemoval uses to call a record "inside" a target
+// (0.4em across the baseline, from 0.35em before the start to the end).
+function insideSpan(rec, t) {
+  const vx = rec.x - t.x0;
+  const vy = rec.y - t.y0;
+  const along = vx * t.ux + vy * t.uy;
+  const perp = Math.abs(vx * t.uy - vy * t.ux);
+  return perp <= 0.4 * t.size && along >= -0.35 * t.size && along <= t.len;
+}
+
+// The target's painted box, axis-aligned in page space: descender (-0.25em)
+// to ascent (1em) across the baseline, start to end along it.
+function spanBox(t) {
+  const [vx, vy] = [-t.uy, t.ux];
+  const pts = [];
+  for (const a of [0, t.len]) {
+    for (const b of [-0.25 * t.size, t.size]) pts.push([t.x0 + t.ux * a + vx * b, t.y0 + t.uy * a + vy * b]);
+  }
+  const xs = pts.map((p) => p[0]);
+  const ys = pts.map((p) => p[1]);
+  return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+}
+
+const ANNOT_HIDDEN = 1 << 1;
+const ANNOT_NO_VIEW = 1 << 5;
+
+// The page's annotations whose appearance paints visible text: [{ rect }].
+// The test is on the appearance a reader paints (/AP /N, chosen by /AS when it
+// is a dict of states), never on /Contents or /V, which say what an
+// annotation means, not what it draws.
+function textPaintingAnnotations(pdfPage, PDFLib) {
+  const { PDFName, PDFArray, PDFDict, PDFStream, PDFNumber } = PDFLib;
+  const context = pdfPage.doc.context;
+  const annots = pdfPage.node.lookup(PDFName.of('Annots'));
+  if (!(annots instanceof PDFArray)) return [];
+  const found = [];
+  for (const entry of annots.asArray()) {
+    const annot = context.lookup(entry);
+    if (!(annot instanceof PDFDict)) continue;
+    const flags = annot.lookup(PDFName.of('F'));
+    if ((flags instanceof PDFNumber ? flags.asNumber() : 0) & (ANNOT_HIDDEN | ANNOT_NO_VIEW)) continue;
+    const r = numbersOf(annot.lookup(PDFName.of('Rect')), PDFLib, 4);
+    const ap = annot.lookup(PDFName.of('AP'));
+    if (!r || !(ap instanceof PDFDict)) continue;
+    let n = ap.lookup(PDFName.of('N'));
+    if (n instanceof PDFDict && !(n instanceof PDFStream)) {
+      const state = annot.lookup(PDFName.of('AS'));
+      n = state instanceof PDFName ? n.lookup(state) : null;
+    }
+    if (!(n instanceof PDFStream)) continue;
+    const own = n.dict.lookup(PDFName.of('Resources'));
+    let src;
+    try { src = readStreamText(n, PDFLib); } catch { continue; }
+    const fonts = fontMetricsOfResources(own, context, PDFLib);
+    const direct = walkShowOps(src, fonts);
+    const nested = formTextRecords(src, fonts, own, [1, 0, 0, 1, 0, 0], PDFLib, context, 0, new Set([n]), []);
+    if (!direct.concat(nested).some(paintsText)) continue;
+    found.push({ rect: [Math.min(r[0], r[2]), Math.min(r[1], r[3]), Math.max(r[0], r[2]), Math.max(r[1], r[3])] });
+  }
+  return found;
+}
+
+// For each candidate, true when something the cut cannot reach paints visible
+// text inside one of its targets. Never throws: a page whose forms or
+// annotations cannot be read answers false for all, i.e. exactly today.
+function unreachedByCandidate(pdfPage, PDFLib, candidates) {
+  try {
+    const context = pdfPage.doc.context;
+    const formText = formTextRecords(
+      readPageContents(pdfPage, PDFLib), extractFontMetrics(pdfPage, PDFLib),
+      pdfPage.node.Resources(), [1, 0, 0, 1, 0, 0], PDFLib, context, 0, new Set(), [],
+    ).filter(paintsText);
+    const annots = textPaintingAnnotations(pdfPage, PDFLib);
+    if (formText.length === 0 && annots.length === 0) return candidates.map(() => false);
+    return candidates.map((a) => a.replaceTargets.some((t) => {
+      if (formText.some((rec) => insideSpan(rec, t))) return true;
+      const [x0, y0, x1, y1] = spanBox(t);
+      return annots.some(({ rect }) => rect[0] < x1 && x0 < rect[2] && rect[1] < y1 && y0 < rect[3]);
+    }));
+  } catch (err) {
+    console.warn('[core/page-surgery] painter census failed, edits unchanged:', err);
+    return candidates.map(() => false);
+  }
 }
 
 // Cut the original show-text ops for every whiteout cover that still carries
@@ -87,6 +256,10 @@ export function runSurgery(pdfPage, PDFLib, annotations) {
   //                sits inside a span we were asked to clear. We cut, but we
   //                CANNOT claim the target is clear.
   //   'clean'    — everything matched and nothing was left inside.
+  //   'unreached' — something the cut cannot reach (a Form XObject, an
+  //                annotation's appearance) paints text inside the line, so
+  //                the edit declined BEFORE cutting (matched:false). See the
+  //                painter census above.
   //
   // WHY 'residual' exists (founder field report 2026-07-28): before it, the
   // only outcomes were 'clean' and 'no-match', so a cut that removed a dash
@@ -108,9 +281,15 @@ export function runSurgery(pdfPage, PDFLib, annotations) {
   // 2026-08-09. If that decline is worth telling apart from a plain no-match,
   // this is the function that has to start saying so first.
   const surgeryByCover = new Map();
-  const candidates = annotations.filter(
+  const eligible = annotations.filter(
     (a) => a.type === 'whiteout' && a.replaceTargets?.length && a.replaceBox && overlapsBirthBox(a),
   );
+  if (eligible.length === 0) return { skipCovers, insertByCover, surgeryByCover };
+  const unreached = unreachedByCandidate(pdfPage, PDFLib, eligible);
+  eligible.forEach((a, i) => { if (unreached[i]) surgeryByCover.set(a.id, { matched: false, reason: 'unreached' }); });
+  // Only the reachable ones are cut: an unreached edit keeps every op of its
+  // line, so its cover hides an intact original rather than a half-cut one.
+  const candidates = eligible.filter((_, i) => !unreached[i]);
   if (candidates.length === 0) return { skipCovers, insertByCover, surgeryByCover };
   try {
     const flatTargets = [];
