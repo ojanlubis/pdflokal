@@ -87,7 +87,7 @@ test.describe('/en', () => {
     const card = page.locator('#maker-card');
     await expect(card).toBeVisible({ timeout: 6000 });
     await expect(card.locator('.mk-label')).toHaveText('Latest updates');
-    await expect(card.locator('.mk-real')).toHaveText('Fauzan Ahladzikri');
+    await expect(card.locator('.oj-real')).toHaveText('Fauzan Lubis');
     const times = await card.locator('.mk-list time').allTextContents();
     expect(times.length).toBe(3);
     for (const t of times) expect(t).toMatch(/^\d{1,2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)$/);
@@ -114,7 +114,7 @@ test.describe('/en', () => {
     const qr = page.locator('.sc-qr');
     await expect(qr).toBeVisible();
     await expect(qr.locator('img[src="/images/qris.png"]')).toHaveAttribute('alt', 'QRIS to buy me a coffee');
-    await expect(qr.locator('.sc-performer b')).toHaveText('Ojan');
+    await expect(qr.locator('.sc-performer .oj-name')).toHaveText('okeojan');
     expect(await page.locator('#support-card').innerText()).not.toMatch(STOP);
   });
 

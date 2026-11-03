@@ -29,6 +29,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // The hosts he ships as himself, from the wiki. Present here ONLY so their
 // ABSENCE can be asserted — this list must never become a list of links again
 // without him saying so.
+//
+// HE SAID SO FOR ONE LINK, 2026-11-03: every photo of him and his name is one
+// link to his Instagram (css/ojan-id.css, guarded by tests/core/ojan-id.test.mjs).
+// That exact URL, inside that block, is the one exception; any other handle on
+// the editor surface is still a regression.
+const IG = 'https://www.instagram.com/okeojan.lubis/';
 const SOCIAL_HOSTS = ['tiktok.com', 'instagram.com', 'threads.com', 'x.com', 'ojanlubis.id'];
 
 async function openEditor(page) {
@@ -65,7 +71,10 @@ test.describe('the feedback tab', () => {
     // Guard the instrument before believing its verdict: a page with no links
     // at all would pass this for free. [[assertions-over-empty-sets]]
     expect(hrefs.length).toBeGreaterThan(0);
-    const found = hrefs.filter((h) => SOCIAL_HOSTS.some((host) => h.includes(host)));
+    const identity = await page.locator('a.oj[href]').evaluateAll((els) => els.map((e) => e.href));
+    expect(identity.length, 'the identity block is on the page, so the exception below is real').toBeGreaterThan(0);
+    expect(new Set(identity)).toEqual(new Set([IG]));
+    const found = hrefs.filter((h) => h !== IG && SOCIAL_HOSTS.some((host) => h.includes(host)));
     expect(found, 'a social handle came back onto the editor surface').toEqual([]);
     expect(await page.locator('#contact-tab-panel').count()).toBe(0);
   });
@@ -75,14 +84,15 @@ test.describe('the feedback tab', () => {
     await page.click('#contact-tab-btn');
     await expect(page.locator('#fb-form')).toBeVisible();
 
-    // The byline that replaced the panel's owner row. mesindev.com is the only
-    // link, and it must open away from the editor with rel=noopener — a
-    // target=_blank without it hands the opened tab a live handle on this one.
-    const link = page.locator('.fb-owner a');
-    await expect(link).toHaveAttribute('href', 'https://mesindev.com');
+    // The byline: his shared block (2026-11-03, mesindev.com left it). It must
+    // open away from the editor with rel=noopener — a target=_blank without it
+    // hands the opened tab a live handle on this one.
+    const link = page.locator('.fb-owner a.oj');
+    await expect(link).toHaveAttribute('href', IG);
     await expect(link).toHaveAttribute('target', '_blank');
     expect(await link.getAttribute('rel')).toContain('noopener');
-    await expect(page.locator('.fb-owner b')).toHaveText('Ojan');
+    await expect(page.locator('.fb-owner .oj-name')).toHaveText('okeojan');
+    await expect(page.locator('.fb-owner .oj-real')).toHaveText('Fauzan Lubis');
   });
 
   test('CONTROL: the footer link still opens the SAME dialog — two doors, one form', async ({ page }) => {
@@ -92,6 +102,6 @@ test.describe('the feedback tab', () => {
     await page.goto('/');
     await page.click('#fb-open');
     await expect(page.locator('#fb-form')).toBeVisible();
-    await expect(page.locator('.fb-owner b')).toHaveText('Ojan');
+    await expect(page.locator('.fb-owner .oj-name')).toHaveText('okeojan');
   });
 });

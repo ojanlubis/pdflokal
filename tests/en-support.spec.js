@@ -52,7 +52,7 @@ test.describe('/en/support', () => {
       if (r.status() >= 400) bad.push(`${r.status()} ${u.pathname}`);
     });
     await page.goto('/en/support');
-    for (const sel of ['.qr-image', '.qris-logo', '.performer-face']) {
+    for (const sel of ['.qr-image', '.qris-logo', '.performer .oj-face']) {
       const ok = await page.locator(sel).evaluate((img) => img.complete && img.naturalWidth > 0);
       expect(ok, `${sel} did not load`).toBe(true);
     }

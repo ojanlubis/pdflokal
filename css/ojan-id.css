@@ -1,0 +1,79 @@
+/* ============================================================================
+ * OJAN-ID — his photo and name, the one way they appear anywhere on the site.
+ * SINGLE SOURCE OF TRUTH for how the block looks; tests/core/ojan-id.test.mjs
+ * is the single source of truth for its markup, and fails on any page where his
+ * photo sits outside it.
+ *
+ * His ask, 2026-11-03: every place with his photo and name behaves the same:
+ * the photo, "okeojan" beside it, "Fauzan Lubis" smaller underneath, photo and
+ * name one link to instagram.com/okeojan.lubis in a new tab. His defaults the
+ * same day: the hat stays where it already was, a small Instagram glyph after
+ * the name says "this is a link" without a cursor.
+ *
+ * Markup (copy it from any existing place, never retype it):
+ *   a.oj.oj-{s|m|l|xl}[.oj-stack]  href = the Instagram URL, target _blank, rel noopener
+ *     span.oj-kepala > [img.oj-topi] + img.oj-face (alt "", the link text names him)
+ *     span.oj-teks > span.oj-name (okeojan + svg.oj-ig) + span.oj-real
+ *
+ * Size is the only thing a place chooses: s 32 (feedback form), m 48 (maker
+ * card, support card, privasi), l 72 (dukung), xl 96 (vote invite). .oj-stack
+ * centres the name under the photo (vote, support card).
+ *
+ * ⚠️ Every selector here is TWO classes on purpose. Hosts style bare tags inside
+ * themselves (`.sc-qr img` blew the old hat up to the QR's width): 0,2,0 beats
+ * 0,1,1, so a host's img/a rule cannot reach in.
+ * ==========================================================================*/
+
+.oj.oj {
+  --oj: 48px;
+  display: inline-flex; align-items: center; gap: calc(var(--oj) / 4);
+  color: var(--ink); text-decoration: none; text-align: left;
+  border-radius: 8px; cursor: pointer;
+}
+.oj.oj-s  { --oj: 32px; }
+.oj.oj-m  { --oj: 48px; }
+.oj.oj-l  { --oj: 72px; gap: var(--sp-16); }
+.oj.oj-xl { --oj: 96px; }
+
+.oj.oj-stack { flex-direction: column; gap: var(--sp-4); text-align: center; }
+.oj-stack .oj-teks { align-items: center; }
+
+/* The hat sits ON his head: the photo is its positioning context, and the
+   padding is room for the brim INSIDE the box (the maker card and the vote
+   sheet clip overflow). Hat width and lift scale with the photo. */
+.oj .oj-kepala { position: relative; flex: none; display: block; }
+.oj .oj-kepala:has(.oj-topi) { padding-top: calc(var(--oj) * .3); }
+.oj .oj-face {
+  width: var(--oj); height: var(--oj); display: block;
+  border-radius: 50%; object-fit: cover;
+  /* A ring, not a shadow: on two different grounds a shadow reads as a smudge in dark mode. */
+  border: 2px solid var(--line);
+}
+.oj.oj-s .oj-face { border-width: 1px; }
+.oj .oj-topi {
+  position: absolute; top: 0; left: 50%;
+  width: calc(var(--oj) * .55); height: auto;
+  transform: translateX(-50%) rotate(-12deg);
+  border: 0; border-radius: 0; pointer-events: none;
+}
+
+.oj .oj-teks { display: flex; flex-direction: column; min-width: 0; }
+.oj .oj-name {
+  display: inline-flex; align-items: center; gap: .3em;
+  font-weight: 700; line-height: 1.2; font-size: var(--fs-0);
+}
+.oj .oj-real { color: var(--muted); font-size: var(--fs-n1); line-height: 1.3; }
+.oj.oj-s .oj-name { font-size: var(--fs-n1); }
+.oj.oj-s .oj-real { font-size: var(--fs-n2); }
+.oj.oj-l .oj-name { font-size: var(--fs-2); }
+.oj.oj-l .oj-real { font-size: var(--fs-0); margin-top: 2px; }
+
+/* The "this is a link" cue, readable standing still (touch has no hover). Muted,
+   so the name stays the thing read. */
+.oj .oj-ig { width: .85em; height: .85em; flex: none; color: var(--muted); }
+
+.oj.oj:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+@media (hover: hover) {
+  .oj.oj:hover .oj-name { text-decoration: underline; text-underline-offset: 2px; }
+  .oj.oj:hover .oj-ig { color: var(--ink); }
+}

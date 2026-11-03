@@ -122,20 +122,20 @@ export function defineFeatureVoteSuite({ door }) {
       await expect(page.locator('#fv-invite-text')).toHaveText('Halo guyss. Mau bikin fitur baru tp bingung apaan. Bantu voting doong. terimakasii');
       expect(await page.locator('#fv-invite-title').evaluate((el) => parseFloat(getComputedStyle(el).fontSize))).toBeGreaterThan(15.5); // styled as the dialog's heading
       const text = await page.locator('.fv-invite-text').boundingBox();
-      const face = await page.locator('#fv-form .fv-face').boundingBox();
-      const hat = await page.locator('#fv-form .fv-topi').boundingBox();
+      const face = await page.locator('#fv-form .oj-face').boundingBox();
+      const hat = await page.locator('#fv-form .oj-topi').boundingBox();
       expect(face.y).toBeGreaterThan(text.y + text.height - 1);
       expect(hat.y).toBeLessThan(face.y + face.height / 2); // the hat sits on the head, the maker card's way
-      await expect(page.locator('#fv-form .fv-face')).toHaveAttribute('src', '/images/ojan.jpg');
-      await expect(page.locator('#fv-form .fv-topi')).toHaveAttribute('src', '/images/topi.svg');
+      await expect(page.locator('#fv-form .oj-face')).toHaveAttribute('src', '/images/ojan.jpg');
+      await expect(page.locator('#fv-form .oj-topi')).toHaveAttribute('src', '/images/topi.svg');
       await expect(page.locator('#fv-form .fv-start')).toHaveText('Pilih fitur');
       await expect(step(page, 'invite').locator('[data-fv-later]')).toHaveText('Nanti aja');
-      expect(await page.locator('#fv-form .fv-face').evaluate((el) => el.complete && el.naturalWidth > 0), 'the photo really loaded').toBe(true);
+      expect(await page.locator('#fv-form .oj-face').evaluate((el) => el.complete && el.naturalWidth > 0), 'the photo really loaded').toBe(true);
 
       // step 2: no photo, a heading, "Pilih maksimal 3" prominent, 9 rows (6 options, then 3 status rows)
       await toStep2(page);
       await expect(step(page, 'invite')).toBeHidden();
-      await expect(page.locator('#fv-form .fv-face')).toBeHidden();
+      await expect(page.locator('#fv-form .oj-face')).toBeHidden();
       await expect(page.locator('#fv-title')).toHaveText('Fitur apa yang kamu butuh?');
       await expect(page.locator('#fv-form .fv-hint')).toHaveText('Pilih maksimal 3');
       const [title, hint] = await Promise.all([

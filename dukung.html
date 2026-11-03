@@ -82,7 +82,7 @@
   </script>
 
   <title>Dukung PDFLokal - Biar Tetap Gratis</title>
-  <meta name="description" content="PDFLokal dibuat sendirian oleh Ojan (Fauzan Ahladzikri). Gratis, tanpa iklan. Kalau kepakai, boleh traktir kopi lewat QRIS.">
+  <meta name="description" content="PDFLokal dibuat sendirian oleh Ojan (Fauzan Lubis). Gratis, tanpa iklan. Kalau kepakai, boleh traktir kopi lewat QRIS.">
   <link rel="canonical" href="https://www.pdflokal.id/dukung">
   <!-- hreflang: this page and its English twin (/en/support, generated from this
        file by scripts/gen-en-support.js), reciprocal by being the same three links
@@ -106,6 +106,7 @@
        is and isn't ported, and why it lives here rather than in style.css or
        css/page-base.css. -->
   <link rel="stylesheet" href="/css/chrome.css">
+  <link rel="stylesheet" href="/css/ojan-id.css">
   <!-- THEME BOOT. Applies an EXPLICIT choice before first paint, so a user who
        picked the theme opposite to their OS does not see a flash of the other
        one. It deliberately does NOT resolve the system preference: that is
@@ -182,59 +183,9 @@
     .performer { text-align: center; }
 
     /* SIDE BY SIDE, not stacked (his ruling 2026-08-28: "ini jangan atas
-       bawah, mending sebelahan"). Inline-flex so it centres on a phone and
-       sits on the left edge on desktop. */
-    .performer-id {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--sp-16);
-      text-align: left;
-    }
-
-    /* The hat sits ON his head (his ruling 2026-08-28), so the photo needs a
-       positioning context and room above it for the brim. */
-    .performer-kepala {
-      position: relative;
-      flex: none;
-      padding-top: 14px;
-    }
-
-    .performer-face {
-      width: 72px;
-      height: 72px;
-      border-radius: 50%;
-      object-fit: cover;
-      /* A ring, not a shadow: on two different grounds a shadow reads as a
-         smudge in dark mode. */
-      border: 2px solid var(--line);
-      display: block;
-    }
-
-    .performer-topi {
-      position: absolute;
-      top: -6px;
-      left: 50%;
-      transform: translateX(-50%) rotate(-12deg);
-      width: 40px;
-      height: auto;
-      pointer-events: none;
-    }
-
-    .performer-name {
-      font-size: var(--fs-2);
-      font-weight: 700;
-      color: var(--ink);
-      line-height: 1.2;
-    }
-
-    /* The full legal name is the falsifiable half — it is the name on the
-       LICENSE and on GitHub, so a stranger can check it. "Ojan" alone is
-       warmth with nothing to check. */
-    .performer-real {
-      font-size: var(--fs-0);
-      color: var(--muted);
-      margin-top: 2px;
-    }
+       bawah, mending sebelahan"), hat on his head. The block is css/ojan-id.css
+       (size l): inline-flex, so it centres on a phone and sits on the left edge
+       on desktop. */
 
     .performer-line {
       max-width: 30rem;
@@ -617,16 +568,13 @@
           <!-- The performer. See .performer / .hat in the style block for why
                the person stands OUTSIDE the hat. -->
           <div class="performer">
-            <div class="performer-id">
-              <div class="performer-kepala">
-                <img class="performer-topi" src="/images/topi.svg" alt="" aria-hidden="true" width="40" height="35">
-                <img src="/images/ojan.jpg" alt="Foto Fauzan Ahladzikri (Ojan)" class="performer-face" width="72" height="72">
-              </div>
-              <div>
-                <div class="performer-name">Ojan</div>
-                <div class="performer-real">Fauzan Ahladzikri</div>
-              </div>
-            </div>
+            <a class="oj oj-l" href="https://www.instagram.com/okeojan.lubis/" target="_blank" rel="noopener">
+              <span class="oj-kepala">
+                <img class="oj-topi" src="/images/topi.svg" alt="" aria-hidden="true" width="26" height="23">
+                <img class="oj-face" src="/images/ojan.jpg" alt="" width="72" height="72">
+              </span>
+              <span class="oj-teks"><span class="oj-name">okeojan <svg class="oj-ig" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="Instagram"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg></span><span class="oj-real">Fauzan Lubis</span></span>
+            </a>
             <p class="performer-line">
               Makasih udah mampir. Kalau tadi PDFLokal beneran ngebantu kamu,
               seikhlasnya aja.
