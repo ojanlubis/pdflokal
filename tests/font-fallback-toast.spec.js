@@ -80,7 +80,9 @@ test.describe('font-fallback toast — his ratified string, both call sites', ()
     // FIXTURE has 2 pages; Unduh's default scope is "Semua".
     await expectRealPdf(page, buf, { pages: 2 });
 
-    await expect(page.locator('#toast')).toHaveText(RATIFIED);
+    // His string verbatim, then where the file went (the Unduh sheet's one
+    // toast carries both since 2026-11-03: tests/unduh-file-location.spec.js).
+    await expect(page.locator('#toast')).toHaveText(`${RATIFIED}. File-nya ada di folder Download.`);
   });
 
   test('Kelola Halaman "Ekstrak" (app.js onExtract): toast is exactly his string', async ({ page }) => {

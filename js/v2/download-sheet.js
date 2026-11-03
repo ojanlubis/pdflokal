@@ -24,6 +24,7 @@ import { showStamp } from './celebrate.js';
 import { buildPdfArtifact } from './pdf-builder.js';
 import { passThroughSource } from '../core/export.js';
 import { coveredNoteShows } from './edit-expectations.js';
+import { isIOS } from '../core/ios.js';
 
 // WHAT TO SAY WHEN IT FAILS, AND WHEN NOT TO SAY "TRY AGAIN".
 // Founder ruling via PM, 2026-07-29: advice that cannot work is worse than no
@@ -615,6 +616,7 @@ export function createDownloadSheet(deps) {
       if (seq !== state.seq) return;
       const baseName = deps.getBaseName();
       const n = state.picked ? state.picked.length : deps.getDoc().pages.length;
+      let doneNote = null; // a success note the toast below carries with the file's location
 
       if (state.format === 'pdf') {
         const src = state.size === 'kompres' ? state.compressed : state.base;
@@ -623,7 +625,8 @@ export function createDownloadSheet(deps) {
         // what the rail needs. Without this the catch below can only ever
         // classify our own placeholder, which names nothing.
         if (!src) throw state.buildError || new Error('build missing');
-        // No success toast: the BERES stamp (download chokepoint) is the one voice.
+        // No success note of its own: the BERES stamp (download chokepoint) is
+        // the celebration; the toast after the branches only says where it went.
         deps.download(new Blob([src.bytes], { type: 'application/pdf' }), `${baseName}-pdflokal.pdf`, { whole: !state.picked });
       } else {
         // The built PDF when we have it (it carries the annotations); the raw
@@ -670,7 +673,7 @@ export function createDownloadSheet(deps) {
           await new Promise((r) => setTimeout(r, 30)); // let the label paint before the sync zip
           const zip = zipFiles(files);
           deps.download(new Blob([zip], { type: 'application/zip' }), `${baseName}-gambar.zip`, { whole: !state.picked });
-          deps.toast(tr('sheet.toast.zipDone', { count: n }));
+          doneNote = tr('sheet.toast.zipDone', { count: n });
         }
       }
       // The leave-site guard's "downloaded" mark. Only a whole-document export
@@ -685,9 +688,19 @@ export function createDownloadSheet(deps) {
       // bytes, so the substitution rides along.
       // Ratified by Fauzan 2026-08-14 (PM STATE.md "RATIFIED 2026-08-14").
       if (state.base?.fontFallback) {
-        deps.toast(tr('toast.fontSubstituteResult'));
+        doneNote = tr('toast.fontSubstituteResult');
         tel('failure', { stage: 'export', reason: 'font-fallback', class: 'none', blocked: false });
       }
+      // WHERE THE FILE WENT (founder-approved 2026-11-03): an <a download> saves
+      // silently on most phones, and a first-time user does not know to look in
+      // Download, or on iOS in the Files app. Every successful download says so,
+      // PDF, image and ZIP alike; a failure never reaches here (catch below).
+      // ONE toast, because the toast is a single slot (toast-layer.js): a second
+      // show() replaces the first. So the location is APPENDED to a success note
+      // that fires on the same download. The font heads-up wins over the ZIP
+      // note, as it always did: it was shown second and replaced it.
+      const savedTo = isIOS(globalThis.navigator || {}) ? tr('sheet.toast.savedToIos') : tr('sheet.toast.savedTo');
+      deps.toast(doneNote ? `${doneNote}. ${savedTo}` : savedTo);
       // Richer than the old event: the CHOICES are the product signal now.
       track('download', {
         tool: 'editor-v2',

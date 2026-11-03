@@ -137,7 +137,13 @@ export default {
       alreadySmallest: 'udah paling kecil, nggak bisa dikompres lagi tanpa merusak',
       originalSize: 'ukuran asli',
     },
-    toast: { zipDone: 'Selesai! {count} gambar dibungkus jadi satu ZIP' },
+    toast: {
+      zipDone: 'Selesai! {count} gambar dibungkus jadi satu ZIP',
+      // Where the downloaded file went (founder-approved 2026-11-03). iOS saves
+      // an <a download> into the Files app, everywhere else into Downloads.
+      savedTo: 'File-nya ada di folder Download.',
+      savedToIos: 'File-nya ada di app File, folder Unduhan.',
+    },
   },
 
   // Dropzone + Kelola Halaman wording by the user's job (js/v2/intent-copy.js)

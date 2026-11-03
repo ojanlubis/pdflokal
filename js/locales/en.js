@@ -143,6 +143,8 @@ export default {
         one: 'Done. {count} image packed into one ZIP',
         other: 'Done. {count} images packed into one ZIP',
       },
+      savedTo: 'Saved to your Downloads folder.',
+      savedToIos: 'Saved to the Files app, in Downloads.',
     },
   },
 

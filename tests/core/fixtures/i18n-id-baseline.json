@@ -464,6 +464,18 @@
       "js/v2/download-sheet.js"
     ]
   },
+  "sheet.toast.savedTo": {
+    "text": "File-nya ada di folder Download.",
+    "src": [
+      "js/v2/download-sheet.js"
+    ]
+  },
+  "sheet.toast.savedToIos": {
+    "text": "File-nya ada di app File, folder Unduhan.",
+    "src": [
+      "js/v2/download-sheet.js"
+    ]
+  },
   "intent.gabung.dzTitle": {
     "text": "Seret semua PDF yang mau digabung",
     "src": [
