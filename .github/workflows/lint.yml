@@ -28,3 +28,7 @@ jobs:
       # this, editing index.html and forgetting `npm run seo` silently leaves the
       # 12 tool pages on a stale copy of the app shell — and nothing would fail.
       - run: npm run seo:check
+      # The core suite (headless, ~1 min) runs on EVERY PR, not only inside the e2e job: a text- or data-only
+      # PR (js/updates.js, docs/, Markdown) skips e2e (e2e.yml, its deny-list filter), and its one real check, the
+      # maker-card test (90-char cap, an `en` line), lives here. Branch + CI rules: seat decisions 2026-11-03.
+      - run: npm run test:core
