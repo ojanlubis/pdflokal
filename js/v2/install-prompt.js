@@ -12,6 +12,7 @@
  */
 import { track } from '../lib/analytics.js';
 import { t as tr } from '../lib/i18n.js';
+import { isIOS as coreIsIOS } from '../core/ios.js';
 
 const DISMISS_KEY = 'pdflokal-install-dismissed';
 
@@ -35,10 +36,8 @@ export function isStandalone() {
   return window.matchMedia?.('(display-mode: standalone)').matches
     || window.navigator.standalone === true;
 }
-function isIOS() {
-  return /iphone|ipad|ipod/i.test(navigator.userAgent)
-    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); // iPadOS masquerades as Mac
-}
+// The rule lives in core/ios.js (the Unduh sheet asks it too).
+function isIOS() { return coreIsIOS(navigator); }
 function isMobile() {
   // Not `maxTouchPoints > 1`: a Windows/ChromeOS touchscreen laptop reports 10
   // touch points and would be told "install on your phone". The PRIMARY pointer
