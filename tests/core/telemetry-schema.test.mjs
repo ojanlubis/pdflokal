@@ -595,3 +595,10 @@ test('qr_use: both verbs pass; a typed link, an unknown verb, a missing or extra
   assert.equal(ok({}), false);
   assert.equal(ok({ action: 'copy', link: 'https://pdflokal.id' }), false);
 });
+
+// style_source 'drawn' (2026-11-03, feedback 100536): the weight read off how the
+// run is drawn (a synthetic bold). Emitted by core/font-fingerprint.js lineFontFacts.
+test("font_seen and insert accept style_source 'drawn'", () => {
+  assert.equal(validateEvent('font_seen', { ...VALID_PROPS.font_seen, style_source: 'drawn' }).ok, true);
+  assert.equal(validateEvent('insert', { ...VALID_PROPS.insert, style_source: 'drawn' }).ok, true);
+});

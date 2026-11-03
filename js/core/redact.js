@@ -284,9 +284,29 @@ export function dominantLineFont(pdfPage, PDFLib, line) {
   for (let i = 1; i < targets.length; i += 1) {
     if ((targets[i]?.len ?? 0) > (targets[domIdx]?.len ?? 0)) domIdx = i;
   }
+  const dom = results[domIdx]?.insert || results.find((r) => r.insert)?.insert || null;
   return {
     fontName: names[domIdx] || names.find(Boolean) || null,
     mixedFonts: new Set(names.filter(Boolean)).size > 1,
+    syntheticBold: drawnBold(dom),
   };
+}
+
+// SYNTHETIC BOLD (feedback 100536, 2026-10-27: a bold serif heading came back
+// regular): a word processor asked to bold a face that has no bold cut keeps
+// the REGULAR font, so its name honestly says regular, and draws the glyphs
+// filled AND stroked (render mode 2, or 6 with clipping) with a line width
+// that thickens every stem. The name describes the program; this describes
+// the drawing. Both are the document's own instructions, read, not guessed.
+//
+// Threshold: a stroke at least 1% of the em. Word's own emulation strokes at
+// about 3%; a hairline (`0 w`, a 1-device-pixel stroke) or a stroke under 1%
+// does not visibly thicken anything and is how some generators paint
+// outlined or "crisp" text.
+const FILL_AND_STROKE = new Set([2, 6]);
+const SYNTH_BOLD_MIN = 0.01;
+function drawnBold(insert) {
+  if (!insert || !FILL_AND_STROKE.has(insert.tr)) return false;
+  return insert.strokeWidth > 0 && insert.size > 0 && insert.strokeWidth >= SYNTH_BOLD_MIN * insert.size;
 }
 

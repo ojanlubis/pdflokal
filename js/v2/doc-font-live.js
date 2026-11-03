@@ -19,7 +19,7 @@
 import { getPage, getSource } from '../core/model.js';
 import { ensurePdfLib } from '../core/vendor.js';
 import { extractFontProgram, lookupFontObject } from '../core/doc-fonts.js';
-import { resolveFontFingerprint, docFontFaceDescriptors, FAMILY_BUCKET_TO_CLONE, isInformativeBaseFont } from '../core/font-fingerprint.js';
+import { resolveFontFingerprint, lineFontFacts, docFontFaceDescriptors, FAMILY_BUCKET_TO_CLONE, isInformativeBaseFont } from '../core/font-fingerprint.js';
 import { cloneFamilyFor } from '../core/font-decide.js';
 import { faceLadder } from '../core/line-font.js';
 import { nativeCandidate } from '../core/stamp.js';
@@ -132,6 +132,7 @@ export function createDocFontLive({ getDoc, getDryRunDoc, tel, toast }) {
       if (!pdfPage) return;
       let fontName = null;
       let mixedFonts = false;
+      let syntheticBold = false;
       if (seed) {
         // RE-EDIT, seeded from the stored decision. Before 2026-10-01 a re-edit
         // re-ran the dry run below on cover.replaceTargets[0] alone — on a
@@ -139,13 +140,16 @@ export function createDocFontLive({ getDoc, getDryRunDoc, tel, toast }) {
         // so a re-edit could load a different font than the edit was made in.
         fontName = seed.lineKey ?? seed.ladder?.find((c) => c.path === 'native')?.key ?? null;
       } else {
-        ({ fontName, mixedFonts } = dominantLineFont(pdfPage, PDFLib, line));
+        ({ fontName, mixedFonts, syntheticBold } = dominantLineFont(pdfPage, PDFLib, line));
       }
       // An unmatched line has no font of its own to learn — it still gets a
       // decision (the default substitute below), never the twin's stack.
-      const fp = fontName
-        ? resolveFontFingerprint(pdfPage, PDFLib, fontkit, fontName)
-        : { ok: false };
+      // The font's facts plus how the line is DRAWN (core/font-fingerprint.js
+      // lineFontFacts: a synthetic bold, feedback 100536).
+      const fp = lineFontFacts(
+        fontName ? resolveFontFingerprint(pdfPage, PDFLib, fontkit, fontName) : { ok: false },
+        { syntheticBold, mixedFonts },
+      );
 
       // BUG FIX (founder field test, 2026-07-19, bold Arial headings): pdf.js's
       // OWN getTextContent() never exposes the real font name to the main

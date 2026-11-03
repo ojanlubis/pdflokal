@@ -158,6 +158,18 @@ export function fingerprintProgramBytes(fontkit, bytes) {
   }
 }
 
+// One line's font facts: the font resource's fingerprint (resolveFontFingerprint)
+// plus how the line's dominant run is DRAWN (core/redact.js dominantLineFont).
+// A run the document draws bold, fill+stroke with a real line width, is bold
+// whatever its regular font's name says: the name describes the program, the
+// render mode describes the page (feedback 100536, a word processor's synthetic
+// bold of a face without a bold cut). Only on a single-font line, the same
+// rule as every weight read for a line (dominantLineFont's own WHY).
+export function lineFontFacts(fp, { syntheticBold = false, mixedFonts = false } = {}) {
+  if (!fp || !fp.ok || !syntheticBold || mixedFonts || fp.bold) return fp;
+  return { ...fp, bold: true, styleSource: 'drawn' };
+}
+
 // The measured-family -> clone-family bucket (spec Increment A's "twin
 // selection" bullet): used ONLY when font-decide.js's exact-name routing
 // (cloneFamilyFor) has already declined on BOTH the wrapper's /BaseFont and
@@ -182,11 +194,45 @@ export function resolveFontFingerprint(page, PDFLib, fontkit, fontName) {
   if (!info.ok) return base;
 
   if (info.styleSource !== 'none') {
-    return {
-      ok: true, bold: info.bold, italic: info.italic, mono: false, family: null,
+    // The descriptor's Serif/FixedPitch flag is the family until the program
+    // has spoken (below): weaker than the program's PANOSE, better than none.
+    const named = {
+      ok: true, bold: info.bold, italic: info.italic, mono: info.familyFlag === 'mono', family: info.familyFlag || null,
       styleSource: info.styleSource, embedded: info.embedded, subtype: info.subtype,
       baseFont: info.baseFont, programName: '',
     };
+    // WHY THE PROGRAM IS READ EVEN WHEN THE NAME SPOKE (feedback 100536,
+    // 2026-10-27: a bold SERIF heading "MATA PELAJARAN WAJIB" was replaced in
+    // a regular SANS): a name outside the clone table ("BookAntiqua",
+    // "Georgia", …) says nothing about FAMILY, so `family` stayed null and
+    // core/line-font.js faceLadder fell to its default, Arimo, while the
+    // embedded program's PANOSE would have said serif. The program answers
+    // two things here, in this order of authority:
+    //   - family and mono, always: rung 1 never has them;
+    //   - bold/italic ONLY when the name said nothing (no style word, no
+    //     Flags/FontWeight: styleSaid false). A silent name is not a
+    //     statement of "regular" when the program it wraps declares itself
+    //     bold (OS/2 weight, its own name table): read the artifact, not its
+    //     label. A name that DOES say a style is never overridden.
+    if (!info.embedded || !fontkit) return named;
+    try {
+      const extracted = extractFontProgram(page, PDFLib, fontName);
+      const fp = extracted.ok ? fingerprintProgramBytes(fontkit, extracted.bytes) : { ok: false };
+      if (!fp.ok) return named;
+      // programName stays '' under an informative name: core/line-font.js
+      // faceLadder routes an EXACT clone by the program's name too, and that
+      // routing is the name's business, not this read's (an informative name
+      // outside the clone table keeps routing exactly as before).
+      // A program that declines to name a family (PANOSE 0/1, as Tinos Regular
+      // ships) leaves the descriptor's word standing.
+      const out = { ...named, mono: fp.mono || named.mono, family: fp.family || named.family };
+      if (!info.styleSaid && (fp.bold || fp.italic)) {
+        Object.assign(out, { bold: fp.bold, italic: fp.italic, styleSource: fp.styleSource });
+      }
+      return out;
+    } catch {
+      return named; // decline, never throw: the name's answer stands as before
+    }
   }
 
   // Rung 1 declined (uninformative /BaseFont, no Flags/FontWeight signal) —

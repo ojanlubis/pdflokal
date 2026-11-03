@@ -65,7 +65,10 @@ const DEVICE = ['phone', 'tablet', 'desktop'];
 // measurement the honesty contract forbids. 'geometry' is omitted from the
 // enum per the schema's own law ("anything not emitted by code does not
 // enter an enum") — add it back the day a rung 3 actually ships.
-const STYLE_SOURCE = ['pdf-name', 'pdf-flags', 'program-name', 'os2', 'panose', 'none'];
+// 'drawn' (2026-11-03, feedback 100536): the weight was read off how the run is
+// DRAWN, fill+stroke with a real line width (a word processor's synthetic bold
+// of a face with no bold cut; core/redact.js dominantLineFont). ADDITIVE.
+const STYLE_SOURCE = ['pdf-name', 'pdf-flags', 'program-name', 'os2', 'panose', 'drawn', 'none'];
 
 // spec-edit-fidelity-instrumentation.md Increment C: shared 5-bucket vocab
 // for a stamped-region ÷ pristine-region ratio (core/visual-oracle.js emits

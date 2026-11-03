@@ -99,7 +99,7 @@ export function walkShowOps(src, fonts, { ctm = [1, 0, 0, 1, 0, 0], onDo = null 
   const records = [];
 
   let CTM = ctm.slice();
-  let Tc = 0; let Tw = 0; let Th = 1; let TL = 0; let Ts = 0; let Tr = 0;
+  let Tc = 0; let Tw = 0; let Th = 1; let TL = 0; let Ts = 0; let Tr = 0; let LW = 1;
   let fontName = null; let fontSize = 0;
   let Tm = [1, 0, 0, 1, 0, 0];
   let Tlm = [1, 0, 0, 1, 0, 0];
@@ -119,11 +119,11 @@ export function walkShowOps(src, fonts, { ctm = [1, 0, 0, 1, 0, 0], onDo = null 
   for (const rec of ops) {
     switch (rec.op) {
       case 'q':
-        stack.push({ CTM: CTM.slice(), Tc, Tw, Th, TL, Ts, Tr, fontName, fontSize });
+        stack.push({ CTM: CTM.slice(), Tc, Tw, Th, TL, Ts, Tr, LW, fontName, fontSize });
         break;
       case 'Q': {
         const saved = stack.pop(); // ignore underflow — malformed stream, not our job to fix
-        if (saved) ({ CTM, Tc, Tw, Th, TL, Ts, Tr, fontName, fontSize } = saved);
+        if (saved) ({ CTM, Tc, Tw, Th, TL, Ts, Tr, LW, fontName, fontSize } = saved);
         break;
       }
       case 'cm': {
@@ -173,6 +173,9 @@ export function walkShowOps(src, fonts, { ctm = [1, 0, 0, 1, 0, 0], onDo = null 
       case 'Tz': { const [v] = nums(rec); Th = v / 100; break; }
       case 'Ts': [Ts] = nums(rec); break;
       case 'Tr': [Tr] = nums(rec); break;
+      // Line width (graphics state, default 1): what a stroke render mode
+      // strokes the glyph outlines with, in user space before the CTM.
+      case 'w': [LW] = nums(rec); break;
       case 'Do': {
         const nameTok = rec.tokens.find((t) => t.t === 'name');
         if (onDo && nameTok) onDo(nameTok.v, CTM.slice());
@@ -214,6 +217,9 @@ export function walkShowOps(src, fonts, { ctm = [1, 0, 0, 1, 0, 0], onDo = null 
           op: rec.op, start: rec.start, end: rec.end, tokens: rec.tokens,
           x: full[4], y: full[5], ux, uy, size,
           exact, advanceText, len, th: Th, fontSize, btIndex, tr: Tr,
+          // The stroke width in the same user space as `size` (the CTM scales
+          // a line width; the text matrix does not), so the two compare.
+          strokeWidth: LW * Math.sqrt(Math.abs(CTM[0] * CTM[3] - CTM[1] * CTM[2])),
           // The RESOURCE font name (the Tf operand) — Rung C's re-insert needs
           // it to write replacement text with the document's OWN font; pdf.js
           // only ever exposes its internal id, so the walk is the one place
@@ -368,6 +374,9 @@ export function planRunRemoval(src, fonts, targets) {
       insert: {
         fontName: first.fontName, fontSize: first.fontSize,
         x: first.x, y: first.y, ux: first.ux, uy: first.uy, size: first.size,
+        // How the run was DRAWN, beside which font: render mode and stroke
+        // width (core/redact.js dominantLineFont reads a synthetic bold off them).
+        tr: first.tr, strokeWidth: first.strokeWidth,
         mixedFonts: matches.some((r) => r.fontName !== first.fontName),
       },
     };

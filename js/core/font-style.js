@@ -118,6 +118,7 @@ export function getFontStyleInfo(page, PDFLib, fontName) {
 
     let italicFlag = false;
     let boldFlag = false;
+    let familyFlag = null;
     // embedded: does this font carry ANY program (FontFile/2/3)? A name-only
     // font (no FontDescriptor at all, or one without a program — the
     // standard-14 server-generator shape) has NO glyphs of its own: every
@@ -137,6 +138,11 @@ export function getFontStyleInfo(page, PDFLib, fontName) {
         const flags = res(flagsRaw).asNumber();
         italicFlag = !!(flags & 0x40);    // bit 7 (1-indexed) = Italic
         boldFlag = !!(flags & 0x40000);   // bit 19 = ForceBold
+        // bit 1 = FixedPitch, bit 2 = Serif. Read only when SET: many
+        // generators write 32 (Nonsymbolic) for every font, so an unset Serif
+        // bit says nothing, never "sans" (core/font-fingerprint.js, 100536).
+        if (flags & 0x1) familyFlag = 'mono';
+        else if (flags & 0x2) familyFlag = 'serif';
       }
       const weightRaw = fd.get(PDFName.of('FontWeight'));
       if (weightRaw) {
@@ -178,6 +184,12 @@ export function getFontStyleInfo(page, PDFLib, fontName) {
       baseFont,
       embedded,
       informative,
+      // Did the name or the descriptor actually SAY a style, rather than an
+      // informative name simply not mentioning one? core/font-fingerprint.js
+      // lets the embedded program speak to weight only when nothing was said.
+      styleSaid: fromName.bold || fromName.italic || boldFlag || italicFlag,
+      // The descriptor's own family word, when it says one ('serif'/'mono').
+      familyFlag,
       subtype: subtypeBucket,
       styleSource,
       bold: fromName.bold || boldFlag,
