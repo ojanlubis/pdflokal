@@ -196,3 +196,35 @@ test('12 · ocrScaleFor caps the canvas PIXELS on a tall page; A4 is unchanged',
   assert.ok(Math.abs(ocrScaleFor(842, 595) - 1800 / 842) < 1e-9, 'A4 landscape unchanged');
   assert.equal(ocrScaleFor(595), 3, 'callers that pass no height keep the old answer');
 });
+
+// COLUMN GAPS (2026-10-28, reference/scan-edit-2026-10-28 in the seat). Tesseract
+// reads a form row "Jabatan        : Staf Administrasi" as ONE line. Editing it
+// redrew the label too, collapsed the gap to one space (the colon left its
+// column) and fed the font matcher a shape with no gap, so it picked a
+// monospace face at nearly twice the size. A blank run wider than twice the
+// word height is a column break: each side becomes its own tap target.
+test('13 · a column gap splits one OCR line into separate tap targets', () => {
+  const row = {
+    text: 'Jabatan : Staf Administrasi', confidence: 90, bbox: { x0: 211, y0: 709, x1: 665, y1: 733 },
+    words: [
+      word('Jabatan', 211, 709, 309, 733),
+      word(':', 419, 717, 423, 733),
+      word('Staf', 435, 709, 490, 733),
+      word('Administrasi', 495, 709, 665, 733),
+    ],
+  };
+  const out = ocrLinesToPageLines({ lines: [row] }, 3);
+  assert.deepEqual(out.map((l) => l.str), ['Jabatan', ': Staf Administrasi']);
+  // The value keeps its own column: it starts where the colon is, not at the label.
+  assert.ok(Math.abs(out[1].x - 419 / 3) < 2, `value box starts at ${out[1].x}, the colon is at ${419 / 3}`);
+  assert.ok(out[0].x + out[0].w < out[1].x, 'the label box must end before the value box begins');
+});
+
+test('14 · ordinary word spacing, even generous, does not split a line', () => {
+  const prose = {
+    text: 'adalah benar karyawan', confidence: 90, bbox: { x0: 0, y0: 0, x1: 300, y1: 24 },
+    words: [word('adalah', 0, 0, 80, 24), word('benar', 110, 0, 180, 24), word('karyawan', 215, 0, 300, 24)],
+  };
+  const out = ocrLinesToPageLines({ lines: [prose] }, 1);
+  assert.deepEqual(out.map((l) => l.str), ['adalah benar karyawan']);
+});

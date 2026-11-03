@@ -29,6 +29,13 @@ import { getLocale } from './lib/i18n.js';
 
 export const UPDATES = [
   {
+    id: '2026-10-28-scan-font',
+    date: '2026-10-28',
+    text: 'Edit di PDF hasil scan sekarang ikut jenis huruf suratnya, kolom formulir tetap rapi.',
+    en: 'Edit on a scanned PDF now keeps the letter\'s typeface, and form columns stay aligned.',
+    approved: false, // the seat's draft 2026-10-28, his to approve
+  },
+  {
     id: '2026-10-28-scan-offer',
     date: '2026-10-28',
     text: 'Edit di halaman hasil scan nggak nanya terus tiap kamu tap. Sekali "Nanti aja", cukup.',

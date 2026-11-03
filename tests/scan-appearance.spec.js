@@ -131,3 +131,41 @@ test('short or unrecognisable lettering is not assigned a confident font', async
   });
   expect(result.every((r) => r.paperImage && !r.lettering)).toBe(true);
 });
+
+// THE FORM ROW ON A REAL SCAN (2026-10-28, seat reference/scan-edit-2026-10-28).
+// "Jabatan        : Staf Administrasi" used to be ONE tap target: the label was
+// redrawn with the value, the column gap collapsed and the matcher, fed a shape
+// without its gap, chose nothing, so the letter's Times became Helvetica. Now the
+// row splits at the gap and the value is matched on its own: Tinos, upright, and
+// not bold (a style the matcher is unsure of is dropped, the family is kept).
+test('real scan form row: the value is its own target and keeps the letter\'s serif', async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.goto('/');
+  await page.setInputFiles('#file-input', 'tests/fixtures/nasty/scan-bersih.pdf');
+  await page.waitForFunction(() => window.v2?.getDoc()?.pages?.[0]?.raster);
+  const pageId = await page.evaluate(() => window.v2.getDoc().pages[0].id);
+  await page.evaluate((id) => window.v2.runOcrOnPage(id), pageId);
+  await page.waitForFunction((id) => window.v2.ocrIndex.hasLines(id), pageId, { timeout: 90_000 });
+  const strs = await page.evaluate((id) => window.v2.ocrIndex.getLines(id).map((l) => l.str), pageId);
+  expect(strs).toContain('Jabatan');
+  expect(strs).toContain(': Staf Administrasi');
+
+  if (await page.evaluate(() => window.v2.getTool() !== 'ganti')) await page.click('[data-tool="ganti"]');
+  // Centre the LINE (not the page) in the viewport, then measure it there.
+  const box = await page.evaluate(async (id) => {
+    const line = window.v2.ocrIndex.getLines(id).find((l) => l.str === ': Staf Administrasi');
+    const view = document.querySelector(`.pv-page[data-page-id="${id}"]`);
+    const at = () => {
+      const r = view.getBoundingClientRect(); const k = r.width / view.offsetWidth;
+      return { x: r.left + (line.x + line.w / 2) * k, y: r.top + (line.y + line.h / 2) * k };
+    };
+    document.getElementById('v2-scroll').scrollBy(0, at().y - innerHeight / 2);
+    await new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res)));
+    return at();
+  }, pageId);
+  await page.mouse.click(box.x, box.y);
+  const editor = page.locator('.v2-text-edit');
+  await expect(editor).toHaveText(': Staf Administrasi');
+  await expect(editor).toHaveCSS('font-family', /Tinos/);
+  await expect(editor).toHaveCSS('font-weight', '400');
+});

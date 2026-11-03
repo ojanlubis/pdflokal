@@ -179,6 +179,44 @@ function bandWords(words) {
   }));
 }
 
+// A blank run wider than this many word-heights is a COLUMN break, not a word
+// space. Tesseract reads a form row "Jabatan        : Staf Administrasi" as one
+// line; edited whole, the label was redrawn too, the gap collapsed to a single
+// space (the colon left its column) and scan-appearance.js matched a shape with
+// no gap, picking a monospace face at nearly twice the size (seat
+// reference/scan-edit-2026-10-28, measured 2026-10-28: that gap was 4.6x the
+// word height; word spaces on the same page 0.2-0.5x). Justified prose stays
+// well under 2.
+const COLUMN_GAP = 2;
+
+// One line → one or more segments, cut at column gaps. Needs the engine's
+// per-word boxes; a line without them is returned whole, exactly as before.
+function splitAtColumns(item) {
+  const words = Array.isArray(item?.words) ? item.words.filter((w) => boxOf(w) && textOf(w)) : [];
+  if (words.length < 2) return [item];
+  const sorted = words.slice().sort((a, b) => boxOf(a).x - boxOf(b).x);
+  const heights = sorted.map((w) => boxOf(w).h).sort((a, b) => a - b);
+  const gapMax = COLUMN_GAP * heights[Math.floor(heights.length / 2)];
+  const groups = [[sorted[0]]];
+  for (let i = 1; i < sorted.length; i += 1) {
+    const prev = boxOf(sorted[i - 1]); const next = boxOf(sorted[i]);
+    if (next.x - (prev.x + prev.w) > gapMax) groups.push([]);
+    groups[groups.length - 1].push(sorted[i]);
+  }
+  if (groups.length === 1) return [item];
+  return groups.map((g) => {
+    const boxes = g.map(boxOf);
+    const x0 = Math.min(...boxes.map((b) => b.x)); const y0 = Math.min(...boxes.map((b) => b.y));
+    const x1 = Math.max(...boxes.map((b) => b.x + b.w)); const y1 = Math.max(...boxes.map((b) => b.y + b.h));
+    const confs = g.map((w) => w.confidence).filter(Number.isFinite);
+    return {
+      text: g.map(textOf).join(' '),
+      confidence: confs.length ? confs.reduce((s, c) => s + c, 0) / confs.length : item.confidence,
+      bbox: { x0, y0, x1, y1 },
+    };
+  });
+}
+
 /**
  * One Tesseract recognize() result → tap-able Lines in page-space px.
  *
@@ -197,9 +235,9 @@ function bandWords(words) {
 export function ocrLinesToPageLines(data, scale) {
   if (!data || !Number.isFinite(scale) || scale <= 0) return [];
 
-  const raw = Array.isArray(data.lines) && data.lines.length
+  const raw = (Array.isArray(data.lines) && data.lines.length
     ? data.lines
-    : bandWords(Array.isArray(data.words) ? data.words : []);
+    : bandWords(Array.isArray(data.words) ? data.words : [])).flatMap(splitAtColumns);
 
   const out = [];
   for (const item of raw) {
