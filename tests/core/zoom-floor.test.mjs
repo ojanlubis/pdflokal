@@ -24,7 +24,7 @@ const APP = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url
 const PHONE = { viewport: 412, desktop: false };
 
 test('a 3024pt phone photo opens inside the phone screen', () => {
-  const z = openingZoom({ ...PHONE, pageWidth: 3024 });
+  const z = openingZoom({ ...PHONE, pageWidths: [3024] });
   assert.ok(z * 3024 <= 412 - 16 + 1e-6, `page renders ${Math.round(z * 3024)}px on a 412px screen`);
 });
 
@@ -39,17 +39,19 @@ test('zoom-out from the opening view of a photo is not a dead tap, and reaches t
 
 test('an A4 page keeps the usual floor and opening zoom', () => {
   assert.equal(zoomFloor({ ...PHONE, widestPageWidth: 595 }), ZOOM_MIN);
-  assert.ok(Math.abs(openingZoom({ ...PHONE, pageWidth: 595 }) - (412 - 16) / 595) < 1e-9);
+  assert.ok(Math.abs(openingZoom({ ...PHONE, pageWidths: [595] }) - (412 - 16) / 595) < 1e-9);
   let z = 1;
   for (let i = 0; i < 12; i++) z = clampZoom(z - ZOOM_STEP, { floor: ZOOM_MIN, current: z });
   assert.equal(z, ZOOM_MIN);
 });
 
-test('the floor is the widest page, not the opening page', () => {
-  // Page 1 is an A4; a later page is a 3024pt photo. Open on page 1 as before,
-  // but let the user zoom out far enough to see the photo whole.
-  assert.ok(Math.abs(openingZoom({ ...PHONE, pageWidth: 595, widestPageWidth: 3024 }) - (412 - 16) / 595) < 1e-9);
-  assert.ok(zoomFloor({ ...PHONE, widestPageWidth: 3024 }) < 0.14);
+test('the floor is the widest page, not page 1', () => {
+  // Page 1 is an A4; a later page is a 3024pt photo. The view opens fitted to
+  // the photo (the widest page, founder ruling 2026-11-03; it opened on page 1
+  // before) and the floor lets zoom-out reach that same whole-photo view.
+  const z = openingZoom({ ...PHONE, pageWidths: [595, 3024] });
+  assert.ok(Math.abs(z - (412 - 16) / 3024) < 1e-9);
+  assert.ok(zoomFloor({ ...PHONE, widestPageWidth: 3024 }) <= z + 1e-12);
 });
 
 test('the floor never exceeds the usual 0.3, and never goes to zero or NaN', () => {
@@ -66,7 +68,7 @@ test('a view already below the floor is never lifted by zoom-out, and zoom-in is
 test('desktop is unchanged: a wide photo on a laptop still floors at 0.3', () => {
   const d = { viewport: 1512, desktop: true };
   assert.equal(zoomFloor({ ...d, widestPageWidth: 3024 }), ZOOM_MIN);
-  assert.ok(Math.abs(openingZoom({ ...d, pageWidth: 595 }) - (1512 - 96) / 595) < 1e-9);
+  assert.ok(Math.abs(openingZoom({ ...d, pageWidths: [595] }) - (1512 - 96) / 595) < 1e-9);
 });
 
 test('app.js asks core/zoom.js for the range instead of carrying its own', () => {
@@ -90,7 +92,7 @@ function photoThenPdf() {
   const photoSrc = ops.addSource(doc, model.createSource({ name: 'ktp.jpg', bytes: new Uint8Array([1]), numPages: 1 }));
   ops.addPages(doc, [model.createPage({ source: photoSrc, sourcePageNum: 0, width: 3024, height: 4032, isFromImage: true })]);
   const before = new Set(doc.pages.map((p) => p.id));
-  const zoomBefore = openingZoom({ ...PHONE, pageWidth: 3024 });
+  const zoomBefore = openingZoom({ ...PHONE, pageWidths: [3024] });
   const pdfSrc = ops.addSource(doc, model.createSource({ name: 'a.pdf', bytes: new Uint8Array([2]), numPages: 1 }));
   ops.addPages(doc, [model.createPage({ source: pdfSrc, sourcePageNum: 0, width: 595, height: 842 })]);
   const changed = ops.normalizePageWidths(doc);
@@ -105,7 +107,7 @@ test('photo first, PDF added: the pages are refitted, not left at the photo\'s 0
   assert.equal(typeof zoomMod.zoomAfterLoad, 'function', 'core/zoom.js owns the refit decision');
   const z = zoomMod.zoomAfterLoad({
     ...PHONE, firstLoad: false, existingRescaled, current: zoomBefore,
-    firstPageWidth: doc.pages[0].width, widestPageWidth: 595,
+    pageWidths: doc.pages.map((p) => p.width),
   });
   assert.ok(z * 595 >= 300, `a page renders ${Math.round(z * 595)}px on a 412px phone`);
 });
@@ -113,14 +115,14 @@ test('photo first, PDF added: the pages are refitted, not left at the photo\'s 0
 test('a PDF first and a photo added keeps the zoom the user chose', () => {
   const z = zoomMod.zoomAfterLoad({
     ...PHONE, firstLoad: false, existingRescaled: false, current: 1.4,
-    firstPageWidth: 595, widestPageWidth: 595,
+    pageWidths: [595],
   });
   assert.equal(z, 1.4);
 });
 
 test('the first load still lands on the opening zoom', () => {
-  const z = zoomMod.zoomAfterLoad({ ...PHONE, firstLoad: true, existingRescaled: false, current: 1, firstPageWidth: 595, widestPageWidth: 595 });
-  assert.equal(z, openingZoom({ ...PHONE, pageWidth: 595 }));
+  const z = zoomMod.zoomAfterLoad({ ...PHONE, firstLoad: true, existingRescaled: false, current: 1, pageWidths: [595] });
+  assert.equal(z, openingZoom({ ...PHONE, pageWidths: [595] }));
 });
 
 test('app.js refits through zoomAfterLoad using the normalisation result', () => {

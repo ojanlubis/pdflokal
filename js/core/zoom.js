@@ -35,11 +35,24 @@ export function zoomFloor({ viewport, widestPageWidth, desktop }) {
   return fit > 0 ? Math.min(ZOOM_MIN, fit) : ZOOM_MIN;
 }
 
-// The zoom a freshly opened document lands on.
-export function openingZoom({ viewport, pageWidth, desktop, widestPageWidth = pageWidth }) {
-  if (!(pageWidth > 0)) return 1;
-  const fit = fitZoom({ viewport, pageWidth, desktop });
-  const floor = zoomFloor({ viewport, widestPageWidth, desktop });
+// The zoom a freshly opened document lands on, and the one Ctrl/Cmd+0 returns
+// to. `pageWidths` is every page's displayed width (page-space px, rotation
+// already applied).
+//
+// WHY THE WIDEST PAGE AND NOT PAGE 1 (founder ruling 2026-11-03): a PDF whose
+// page 1 is an A5 and whose later pages are A4 opened fitted to the A5, so on a
+// 375px phone the A4 pages were 509px wide and page 1 sat off-centre; a single
+// file is never width-normalised (operations.js normalizePageWidths is for
+// merges), so nothing else evened it out. Fitting the widest page puts every
+// page on screen, centred, with the narrower ones simply narrower. View only:
+// the document's page sizes are untouched. A uniform document has one width,
+// so it opens exactly where it did when this fitted page 1.
+export function openingZoom({ viewport, pageWidths, desktop }) {
+  let widest = 0;
+  for (const w of pageWidths || []) if (w > widest) widest = w;
+  if (!(widest > 0)) return 1;
+  const fit = fitZoom({ viewport, pageWidth: widest, desktop });
+  const floor = zoomFloor({ viewport, widestPageWidth: widest, desktop });
   return Math.max(floor, Math.min(fit, desktop ? ZOOM_MAX : 1));
 }
 
@@ -62,7 +75,7 @@ export function clampZoom(next, { floor, current }) {
 // pages scaled to the document leave the user's chosen zoom alone (a PDF first,
 // then a photo added). The refit lives here and not in clampZoom, whose
 // never-raise rule is deliberate.
-export function zoomAfterLoad({ firstLoad, existingRescaled, current, viewport, desktop, firstPageWidth, widestPageWidth }) {
+export function zoomAfterLoad({ firstLoad, existingRescaled, current, viewport, desktop, pageWidths }) {
   if (!firstLoad && !existingRescaled) return current;
-  return openingZoom({ viewport, pageWidth: firstPageWidth, desktop, widestPageWidth });
+  return openingZoom({ viewport, pageWidths, desktop });
 }

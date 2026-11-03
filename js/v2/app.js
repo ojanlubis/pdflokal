@@ -390,12 +390,15 @@ function currentZoomFloor() {
     desktop: deviceClass() === 'desktop',
   });
 }
-function openingZoom(pageWidth) {
+// Every page's displayed width: the opening fit is the widest of them (core/zoom.js).
+function pageWidths() {
+  return doc.pages.map((pg) => pageDisplaySize(pg).width);
+}
+function openingZoom() {
   return coreOpeningZoom({
     viewport: scrollEl.clientWidth,
-    pageWidth,
+    pageWidths: pageWidths(),
     desktop: deviceClass() === 'desktop',
-    widestPageWidth: widestPageWidth(),
   });
 }
 // zoom_tap reports the zoom BEFORE the press (core/telemetry-schema.js says why).
@@ -591,23 +594,21 @@ on(scrollEl, 'wheel', (e) => {
 // Keyboard zoom: Ctrl/Cmd + = / + / - / 0, the keys every editor and browser taught.
 // Without this they zoomed the BROWSER's UI (toolbar, sheets and all) while the
 // page stayed the same size relative to it. Same step and clamps as the +/-
-// buttons; 0 = fit the focused page to the width, the same fit a document opens
-// at (openingZoom). CAPTURE phase so it also works inside the inline text editor,
-// which stops propagation of every keydown. Anchored on the viewport centre, so
+// buttons; 0 = the same fit a document opens at (openingZoom: the widest page,
+// so every page is on screen; it fitted the FOCUSED page before 2026-11-03,
+// which put a mixed-width document's wider pages off screen). CAPTURE phase so
+// it also works inside the inline text editor, which stops propagation of
+// every keydown. Anchored on the viewport centre, so
 // the paper under your eyes stays put. NOT telemetered: `zoom_tap` means a press
 // of the on-screen pill (core/telemetry-schema.js) and a keypress would change
 // what that field counts. No document, or a sheet open: the browser keeps its keys.
-function fitWidthZoom() {
-  const pg = getPage(doc, focusedPageId) || doc.pages[0];
-  return openingZoom(pageDisplaySize(pg).width);
-}
 document.addEventListener('keydown', (e) => {
   if (!(e.ctrlKey || e.metaKey) || e.altKey || doc.pages.length === 0) return;
   if (document.querySelector('dialog[open]')) return;
   let next;
   if (e.key === '=' || e.key === '+' || e.code === 'NumpadAdd') next = zoom + ZOOM_STEP;
   else if (e.key === '-' || e.key === '_' || e.code === 'NumpadSubtract') next = zoom - ZOOM_STEP;
-  else if (e.key === '0' || e.code === 'Numpad0') next = fitWidthZoom();
+  else if (e.key === '0' || e.code === 'Numpad0') next = openingZoom();
   else return;
   e.preventDefault();
   const r = scrollEl.getBoundingClientRect();
@@ -3174,8 +3175,7 @@ function showEditor({ firstLoad, existingRescaled = false }) {
     current: zoom,
     viewport: scrollEl.clientWidth,
     desktop: deviceClass() === 'desktop',
-    firstPageWidth: firstLoad ? doc.pages[0].width : pageDisplaySize(doc.pages[0]).width,
-    widestPageWidth: widestPageWidth(),
+    pageWidths: pageWidths(),
   });
   rebuildStage(); // applies zoom + sizer at the end
 }
