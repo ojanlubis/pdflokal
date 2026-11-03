@@ -70,7 +70,11 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      # --ignore-scripts: no dependency here needs a lifecycle script (the only
+      # one with an install script is fsevents, macOS-only, never installed on
+      # Linux; Playwright's browsers come from the explicit step below, not a
+      # postinstall). tests/core/ci-workflow-pins.test.mjs re-checks the lockfile.
+      - run: npm ci --ignore-scripts
       # Keep this order identical to scripts/qa-gate.mjs. A local green must
       # make the same claim as CI, including the headless domain suite.
       - run: npm run lint
@@ -86,11 +90,15 @@ jobs:
 
       - name: Install Playwright browser
         if: steps.pw-cache.outputs.cache-hit != 'true'
-        run: npx playwright install chromium --with-deps
+        # The version is the lockfile's @playwright/test, pinned so npx can never
+        # fetch a different CLI than the runner that drives it (a browser build
+        # from another release fails every launch). Kept in step by
+        # tests/core/ci-workflow-pins.test.mjs.
+        run: npx playwright@1.60.0 install chromium --with-deps
 
       - name: Install system deps for cached browser
         if: steps.pw-cache.outputs.cache-hit == 'true'
-        run: npx playwright install-deps chromium
+        run: npx playwright@1.60.0 install-deps chromium
 
       - run: npx playwright test
 

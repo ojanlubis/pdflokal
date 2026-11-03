@@ -22,7 +22,8 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      # --ignore-scripts: same reasoning as e2e.yml's install step.
+      - run: npm ci --ignore-scripts
       - run: npm run lint
       # The SEO tool pages are GENERATED from seo/pages.json + index.html. Without
       # this, editing index.html and forgetting `npm run seo` silently leaves the

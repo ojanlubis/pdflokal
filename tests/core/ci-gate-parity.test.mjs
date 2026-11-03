@@ -23,8 +23,10 @@ const identity = (words) => {
   return out.join(' ');
 };
 
-// CI steps that install the runner, not stages that judge the tree.
-const isSetup = (command) => /^npm ci$|^npx playwright install(-deps)?\b/.test(command);
+// CI steps that install the runner, not stages that judge the tree. The
+// browser install pins its CLI version (npx playwright@1.60.0 install, see
+// tests/core/ci-workflow-pins.test.mjs); a pinned install is still setup.
+const isSetup = (command) => /^npm ci$|^npx playwright(@[\w.-]+)? install(-deps)?\b/.test(command);
 
 test('CI runs every stage in the authoritative local gate, in order', () => {
   const commands = [...WORKFLOW.matchAll(/^\s*-\s+run:\s+(.+)$/gm)].map((match) => match[1].trim());
