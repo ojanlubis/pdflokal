@@ -1678,15 +1678,18 @@ async function matchReplaceColors(cover, draft, pageId, line) {
     if (cover.ocrBox && (findAnnotation(doc, cover.id)?.annotation !== cover
       || draft.appearanceLocked || editingEl !== draft.editorEl)) return;
     const paper = sampleAt(r, paperPoints(line, r.s));
-    const coverColor = coverColorFrom(paper);
+    // The box's own pixels settle both colours: its ground is the paper the
+    // words sit on (core/color-sample.js, "the line box's own ground").
+    const box = inkBoxRect(line, r.s, r.w, r.h);
+    const inside = box ? rgbaSamples(r.cx.getImageData(box.x, box.y, box.w, box.h).data) : [];
+    const coverColor = coverColorFrom(paper, inside);
     if (!coverColor) return;
     updateAnnotation(doc, cover.id, { color: coverColor });
     const el = stage.querySelector(`[data-anno-id="${cover.id}"]`);
     if (el) el.style.backgroundColor = coverColor;
     // The ink-core rule (and why it is not a quartile median) is
     // core/color-sample.js inkColorFrom's.
-    const box = inkBoxRect(line, r.s, r.w, r.h);
-    const ink = box && inkColorFrom(rgbaSamples(r.cx.getImageData(box.x, box.y, box.w, box.h).data), paper);
+    const ink = inkColorFrom(inside);
     if (ink) {
       draft.color = ink;
       if (editingEl && !editingAnno) editingEl.style.color = draft.color;
