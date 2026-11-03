@@ -40,6 +40,8 @@ const VALID_PROPS = {
   },
   // scan_offer — the scan dead end's affordance (2026-07-28).
   scan_offer: { action: 'shown', tool: 'none' },
+  // even_offer — the Samakan lebar ask (2026-11-03).
+  even_offer: { action: 'shown' },
   // ocr_run — one recognition pass over one page (2026-08-23, rung S2).
   // `lines` uses OCR_LINES_BUCKET, which has a '0' the page bucket does not:
   // "recognised nothing" is the outcome this event exists to be able to see.
@@ -231,6 +233,14 @@ test('doc_open.display_mode: both values validate, and it is REQUIRED', () => {
 // a rail query over the SEQUENCE (ganti_no_text_layer -> tool_use), not a second
 // meaning bolted onto this enum. Overloading one value with two meanings is how
 // `matched:true` came to mean both "found" and "removed".
+test('even_offer and the halaman width actions validate, and invented ones are refused', () => {
+  for (const action of ['shown', 'accepted', 'dismissed']) assert.equal(validateEvent('even_offer', { action }).ok, true, action);
+  assert.equal(validateEvent('even_offer', { action: 'ignored' }).ok, false);
+  for (const action of ['even_widths', 'restore_widths']) {
+    assert.equal(validateEvent('tool_use', { tool: 'halaman', action }).ok, true, action);
+  }
+});
+
 test('scan_offer: every action/tool pair validates, and invented ones are refused', () => {
   for (const action of ['shown', 'accepted', 'dismissed']) {
     assert.equal(validateEvent('scan_offer', { action, tool: 'none' }).ok, true, action);

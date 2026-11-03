@@ -48,6 +48,7 @@ import { createFormatBar, formatTarget, blurCommitsDraft } from './format-bar.js
 import { createTextRunIndex, mapRunFont, MIN_HIT } from './text-runs.js';
 import { createGantiSteer } from './ganti-steer.js';
 import { resolveTap, draftFontSize } from '../core/text-lines.js';
+import { createEvenWidths } from './even-widths.js';
 import { createPageManager } from './page-manager.js';
 import { createPageStrips } from './page-strip.js';
 import { createSignatureModal } from './signature-modal.js';
@@ -231,10 +232,11 @@ function displayMode() {
 const toastCtl = createToast({
   el: toastEl, durationMs: toastDurationMs, raise: raiseToTopLayer, drop: dropFromTopLayer,
 });
-function toast(msg) {
+function toast(msg, opts) {
   // Scales with length (edit-expectations.js): a sentence of a dozen words is
-  // not readable in 2.6 s. Short text keeps the old 2.6 s.
-  toastCtl.show(msg);
+  // not readable in 2.6 s. Short text keeps the old 2.6 s. `opts.action`: one
+  // button after the words (toast-layer.js), e.g. "Kembalikan".
+  toastCtl.show(msg, opts);
 }
 
 // Pull a toast down early. Needed when a dialog opens on top of one: a toast
@@ -1949,6 +1951,27 @@ const interaction = createInteraction({
   onGantiSteer: gantiSteer.onSteer,
 });
 
+// ---- Samakan lebar (js/v2/even-widths.js) ---------------------------------------
+// A resize changes the page sizes the view was fitted to, so it refits (the
+// same fit a document opens at) on top of what any page op does.
+function afterWidthsChanged() {
+  textRuns.invalidateAll();
+  ocrIndex.invalidateAll();
+  zoom = openingZoom();
+  rebuildStage(); // applies zoom + sizer at the end
+  refreshChrome(); // the step just recorded: Undo lights up
+  if (document.getElementById('pm-sheet').open) pageManager.render();
+}
+const evenWidths = createEvenWidths({
+  getDoc: () => doc,
+  history,
+  onResized: afterWidthsChanged,
+  toast,
+  tel,
+  dialog: document.getElementById('even-offer'),
+  isSheetOpen: () => !!document.getElementById('pm-sheet')?.open,
+});
+
 // ---- page manager (Halaman sheet) -----------------------------------------------
 const pageManager = createPageManager({
   sheet: document.getElementById('pm-sheet'),
@@ -1959,6 +1982,7 @@ const pageManager = createPageManager({
   history,
   getRasterizer: () => rasterizer,
   onDocChanged: () => { textRuns.invalidateAll(); ocrIndex.invalidateAll(); rebuildStage(); },
+  evenWidths,
   onAddFiles: () => pickFiles(),
   onExtract: singleFlight(async (pages) => {
     const t0 = performance.now(); // extract_export.duration — tap to bytes-in-hand
@@ -3435,8 +3459,13 @@ async function loadFilesInner(files, { replace = false } = {}) {
   }
   // Honest close-out: skips take priority over the merge tally — the user needs to
   // know something was left out more than they need the count.
+  // A merge that resized pages says so and offers the way back (Samakan lebar,
+  // ruling 4, js/v2/even-widths.js); its count rides in the same toast.
   if (failed > 0) {
     toast(tr('toast.skipped', { count: failed }));
+  } else if (rescaled.length > 0) {
+    if (firstLoad) evenWidths.afterMerge(null);
+    else evenWidths.afterMerge(tr('toast.merged', { count: doc.pages.length }));
   } else if (!firstLoad) {
     toast(tr('toast.merged', { count: doc.pages.length }));
   }
@@ -3450,6 +3479,9 @@ async function loadFilesInner(files, { replace = false } = {}) {
     pendingIntent = null;
     applyIntent(intent);
   }
+  // A single file whose pages differ in width: ask once (ruling 2). After the
+  // intent hook, so a sheet it opened is already up and the offer stands down.
+  if (firstLoad && rescaled.length === 0 && failed === 0) evenWidths.offerOnOpen();
 }
 
 // ---- the landing: dropzone, tool cards, intent hook -------------------------------

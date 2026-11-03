@@ -323,6 +323,18 @@ export default {
     },
   },
 
+  even: {
+    title: 'Pages have different widths',
+    body: "The pages have different widths. Even them out? Every page will follow the first page's width, and its content adjusts with it.",
+    go: 'Even widths',
+    later: 'Not now',
+    done: 'Page widths evened.',
+    restore: 'Restore',
+    rowMixed: 'Pages have different widths',
+    rowEvenOut: 'Even out',
+    rowEvened: 'Page widths evened',
+  },
+
   bugPrompt: {
     small: 'Hello, PDFLokal user',
     big: 'Please let me know about any bugs, here',

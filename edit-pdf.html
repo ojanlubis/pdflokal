@@ -769,6 +769,9 @@
     /* The primary action needs air above the row of alternatives under it. */
     #scan-offer .hc-row + .hc-row { margin-top: 2px; }
     #hc-go:active, #dc-add:active, #nc-go:active { transform: translateY(1px); box-shadow: 0 1px 0 var(--accent-down); }
+    /* ---- Samakan lebar: the offer (js/v2/even-widths.js), the scan offer's
+       own pattern. The drawing is the muted ink; its arrow the one accent. */
+    #even-offer .eo-art { color: var(--muted); display: block; }
     /* ---- Simpan editan: the reopen ask + the saved list (js/v2/saved-docs-ui.js) ----
        DRAFT 2026-10-06, BUILT NOT RELEASED (specs/spec-simpan-editan.md). Both are
        plain dialogs on the standard .sheet system; nothing here is positioned in
@@ -1793,6 +1796,18 @@
     .pm-head { display: flex; align-items: center; gap: 10px; }
     .pm-head h2 { flex: 0 0 auto; }
     .pm-hint { flex: 1; font-size: 10.5px; color: var(--muted); line-height: 1.3; }
+    /* The widths row (page-manager.js): one slim line under the title, only
+       while the widths differ or were evened. */
+    .pm-widths {
+      display: flex; align-items: center; gap: 10px; padding: 6px 10px;
+      border: 1px solid var(--line); border-radius: 8px; background: var(--bg);
+    }
+    .pm-widths[hidden] { display: none; }
+    .pm-widths-note { flex: 1; font-size: 12.5px; color: var(--muted); }
+    .pm-widths-act {
+      min-height: 36px; padding: 0 12px; border-radius: 8px; font: inherit; font-size: 13px; font-weight: 600;
+      border: 1px solid var(--line); background: var(--bg); color: var(--ink);
+    }
     .pm-grid {
       position: relative; /* tiles' offsetParent — the drag math depends on it */
       flex: 1; min-height: 0; /* flex children never shrink below content without this */
@@ -2133,6 +2148,13 @@
       pointer-events: none; max-width: 88vw; text-align: center;
     }
     #toast.show { opacity: 1; }
+    /* The toast's one action (toast-layer.js): the only part of it that takes a
+       tap, and only while it shows (a faded toast must not catch a stray one). */
+    #toast .toast-action {
+      margin-left: 12px; padding: 0 4px; min-height: 32px; font: inherit; font-weight: 700;
+      color: #fff; background: none; border: 0; text-decoration: underline; text-underline-offset: 3px;
+    }
+    #toast.show .toast-action { pointer-events: auto; cursor: pointer; }
 
     /* ---- MAKER CARD + VISITOR COUNT (js/v2/maker-card.js, 2026-09-23) ----
        The person behind PDFLokal, inherited from /dukung's performer: face,
@@ -2951,6 +2973,23 @@
     </div>
   </dialog>
 
+  <!-- "Samakan lebar" (founder rulings 2026-11-03): offered ONCE when a single
+       file opens with pages of different widths (js/v2/even-widths.js). Its
+       words come from the locale files (t() keys), so the shell carries none. -->
+  <dialog id="even-offer" aria-labelledby="eo-title">
+    <div class="sheet hc-sheet">
+      <h2 id="eo-title"></h2>
+      <!-- His drawing (2026-11-03): pages read the way the editor stacks them,
+           top to bottom. Left, page 1 wide over a narrower page 2, dashed guides
+           off page 1's edges showing the gap; the accent arrow; right, both at
+           PAGE 1's width (the anchor, never "the widest"). -->
+      <svg class="eo-art" viewBox="0 0 240 100" width="100%" height="100" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><rect x="38" y="8" width="64" height="38" rx="2"/><rect x="50" y="54" width="40" height="38" rx="2"/><path d="M38 54v42M102 54v42" stroke-dasharray="3 3" opacity=".7"/><path d="M112 50h22m-6-6 6 6-6 6" style="stroke:var(--accent)"/><rect x="146" y="8" width="64" height="38" rx="2"/><rect x="146" y="54" width="64" height="38" rx="2"/><path d="M44 18h34M56 64h20M152 18h34M152 64h34" opacity=".6"/></svg>
+      <p id="eo-body"></p>
+      <div class="hc-row"><button id="eo-go" class="sv-primary"></button></div>
+      <div class="hc-row"><button id="eo-later"></button></div>
+    </div>
+  </dialog>
+
   <div id="support-card" role="dialog" aria-label="Dukung PDFLokal">
     <button id="sc-close" aria-label="Tutup">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -3045,6 +3084,7 @@
         <span class="pm-hint">Pilih halaman yang mau diambil</span>
         <button class="btn-ghost" id="pm-close" aria-label="Tutup"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:14px;height:14px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
       </div>
+      <div id="pm-widths" class="pm-widths" hidden><span class="pm-widths-note"></span><button type="button" class="pm-widths-act"></button></div>
       <div id="pm-grid" class="pm-grid"></div>
       <div id="pm-bulk" class="pm-bulk">
         <span class="pm-count" id="pm-count" aria-live="polite"></span>

@@ -332,6 +332,20 @@ export default {
     deleted: '{count} halaman dihapus. Salah? Tinggal Undo',
   },
 
+  // "Samakan lebar" (js/v2/even-widths.js, page-manager.js), the seat's copy
+  // for the founder's rulings of 2026-11-03; the dialog body is his own words.
+  even: {
+    title: 'Lebar halamannya beda-beda',
+    body: 'Ukuran lebar halaman beda-beda. Mau disamakan? Lebarnya akan mengikuti halaman pertama semua. Isi halaman ikut menyesuaikan.',
+    go: 'Samakan lebar',
+    later: 'Nanti aja',
+    done: 'Lebar halaman sudah disamakan.',
+    restore: 'Kembalikan',
+    rowMixed: 'Lebar halaman beda-beda',
+    rowEvenOut: 'Samakan',
+    rowEvened: 'Lebar halaman sudah disamakan',
+  },
+
   // The bug-report card (js/v2/bug-report-prompt.js): the founder's own words
   bugPrompt: {
     small: 'Halo user PDFLokal',
