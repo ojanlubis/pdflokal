@@ -97,6 +97,7 @@
        is and isn't ported, and why it lives here rather than in style.css or
        css/page-base.css. -->
   <link rel="stylesheet" href="/css/chrome.css">
+  <link rel="stylesheet" href="/css/ojan-id.css">
   <!-- THEME BOOT. Applies an EXPLICIT choice before first paint, so a user who
        picked the theme opposite to their OS does not see a flash of the other
        one. It deliberately does NOT resolve the system preference: that is
@@ -253,34 +254,22 @@
     }
 
     /* THE SIGNATURE — see the markup for why this page has a face on it. */
+    /* His block is css/ojan-id.css (size m); the channel row stays under it,
+       lined up with the name (his default, 2026-11-03). */
     .privacy-signature {
       display: flex;
-      align-items: center;
-      gap: var(--sp-16);
+      flex-direction: column;
+      align-items: flex-start;
+      gap: var(--sp-8);
       margin-top: var(--sp-48);
       padding-top: var(--sp-24);
       border-top: 1px solid var(--line);
     }
 
-    .privacy-signature img {
-      width: 56px;
-      height: 56px;
-      border-radius: 50%;
-      object-fit: cover;
-      border: 1px solid var(--line);
-      flex: none;
-    }
-
-    .privacy-signature .ps-name {
-      font-size: 1rem;
-      color: var(--ink);
-      line-height: 1.4;
-    }
-
     .privacy-signature .ps-links {
       font-size: var(--fs-n1);
       color: var(--muted);
-      margin-top: var(--sp-8);
+      margin-left: 60px; /* photo 48 + the block's gap 12 */
     }
 
     .privacy-updated {
@@ -624,15 +613,17 @@
            "terlalu eksplisit... dengan naro muka sama nama sama kontak gue udah
            cukup sebenernya." The face, the name and the channels ARE the statement. -->
       <div class="privacy-signature">
-        <img src="images/ojan.jpg" alt="Foto Fauzan Ahladzikri (Ojan)" width="56" height="56" loading="lazy">
-        <div>
-          <p class="ps-name"><strong>Fauzan Ahladzikri</strong> (Ojan)</p>
-          <p class="ps-links">
-            <a href="https://tiktok.com/@okeojan" target="_blank" rel="noopener">@okeojan</a> ·
-            <a href="https://github.com/ojanlubis" target="_blank" rel="noopener">github.com/ojanlubis</a> ·
-            <a href="https://ojanlubis.id" target="_blank" rel="noopener">ojanlubis.id</a>
-          </p>
-        </div>
+        <a class="oj oj-m" href="https://www.instagram.com/okeojan.lubis/" target="_blank" rel="noopener">
+          <span class="oj-kepala">
+            <img class="oj-face" src="/images/ojan.jpg" alt="" width="48" height="48" loading="lazy">
+          </span>
+          <span class="oj-teks"><span class="oj-name">okeojan <svg class="oj-ig" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="Instagram"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg></span><span class="oj-real">Fauzan Lubis</span></span>
+        </a>
+        <p class="ps-links">
+          <a href="https://tiktok.com/@okeojan" target="_blank" rel="noopener">@okeojan</a> ·
+          <a href="https://github.com/ojanlubis" target="_blank" rel="noopener">github.com/ojanlubis</a> ·
+          <a href="https://ojanlubis.id" target="_blank" rel="noopener">ojanlubis.id</a>
+        </p>
       </div>
       <p class="privacy-updated">Terakhir diupdate: 6 Oktober 2026</p>
     </div>

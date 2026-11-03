@@ -27,6 +27,6 @@ The tool pages at the root are written in Indonesian. The main page is also avai
 
 ## Optional
 
-- [Dukung PDFLokal](https://www.pdflokal.id/dukung): about the maker, Fauzan Ahladzikri (Ojan), and how to support the project, in Indonesian
+- [Dukung PDFLokal](https://www.pdflokal.id/dukung): about the maker, Fauzan Lubis (okeojan), and how to support the project, in Indonesian
 - [Support PDFLokal](https://www.pdflokal.id/en/support): the same page in English
 - [Source code](https://github.com/ojanlubis/pdflokal)

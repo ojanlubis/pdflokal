@@ -99,8 +99,6 @@
   "Perkecil": "Zoom out",
   "Kirim masukan": "Send feedback",
   "Gimana PDFLokal?": "How's PDFLokal?",
-  "Ojan": "Ojan",
-  "mesindev.com": "mesindev.com",
   "Penilaian": "Rating",
   "Suka": "Like",
   "Kurang": "Not great",
@@ -183,8 +181,9 @@
   "Hapus Latar Belakang Gambar": "Remove Image Background",
   "Dukung": "Support",
   "Dari Ojan": "From Ojan",
-  "Foto Fauzan Ahladzikri (Ojan)": "Photo of Fauzan Ahladzikri (Ojan)",
-  "Fauzan Ahladzikri": "Fauzan Ahladzikri",
+  "okeojan": "okeojan",
+  "Fauzan Lubis": "Fauzan Lubis",
+  "Instagram": "Instagram",
   "Update terakhir": "Latest updates",
   "Lihat selengkapnya": "See more",
   "Slip Gaji": "Payslip",
@@ -198,6 +197,5 @@
   "QRIS": "QRIS",
   "QRIS untuk traktir kopi": "QRIS to buy me a coffee",
   "Scan pakai e-wallet atau m-banking kamu.": "Scan with your e-wallet or mobile banking app.",
-  "Foto Ojan": "Photo of Ojan",
   "Usulkan fitur": "Suggest a feature"
 }

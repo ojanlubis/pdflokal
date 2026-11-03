@@ -396,6 +396,7 @@
     the old wing (alat-gambar.html) and dies with it at demolition.
   -->
   <link rel="stylesheet" href="/css/tokens.css">
+  <link rel="stylesheet" href="/css/ojan-id.css">
   <!-- THEME BOOT. Applies an EXPLICIT choice before first paint, so a user who
        picked the theme opposite to their OS does not see a flash of the other
        one. It deliberately does NOT resolve the system preference: that is
@@ -636,19 +637,10 @@
      * renders as a success. This system has one meaning for red and a second
      * colour meaning "good" is not being introduced here. */
     .fb-sheet { max-width: 380px; }
-    /* The byline under the question. Muted and small on purpose: it answers
-       "who am I writing to", it is not a place to go. The domain is the only
-       link, because it is the only one that leads anywhere useful. */
-    .fb-owner {
-      display: flex; align-items: center; gap: 9px;
-      margin: -2px 0 14px;
-    }
-    .fb-owner img { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex: none; }
-    .fb-owner b { display: block; font-size: 13px; font-weight: 700; color: var(--ink); line-height: 1.25; }
-    .fb-owner a { display: block; font-size: 11.5px; color: var(--muted); font-weight: 500; text-decoration: none; }
-    @media (hover: hover) {
-      .fb-owner a:hover { color: var(--ink); text-decoration: underline; }
-    }
+    /* The byline under the question. Small on purpose: it answers "who am I
+       writing to", it is not the dialog's act. The block itself is css/ojan-id.css
+       (size s); mesindev.com left it on his ruling 2026-11-03. */
+    .fb-owner { margin: -2px 0 14px; }
 
     /* The pasted screenshot, shown back at a size you can actually check. */
     #fb-shot { position: relative; margin: 10px 0 0; }
@@ -735,12 +727,9 @@
     /* step 1: the invitation */
     .fv-invite-text { display: flex; flex-direction: column; gap: var(--sp-12); }
     .fv-invite-text p { margin: 0; font-size: var(--fs-1); line-height: 1.4; color: var(--ink); }
-    /* His photo, with the engraved top hat (images/topi.svg, images/ojan.jpg) exactly
-       as the maker card wears it, only larger. The padding is room for the hat INSIDE
-       the box: the sheet clips overflow, so a hat above this box would be cut off. */
-    .fv-kepala { position: relative; align-self: center; padding-top: 32px; margin-top: var(--sp-8); }
-    .fv-face { width: 96px; height: 96px; border-radius: 50%; object-fit: cover; border: 2px solid var(--line); display: block; }
-    .fv-topi { position: absolute; top: 0; left: 50%; transform: translateX(-50%) rotate(-12deg); width: 52px; height: auto; pointer-events: none; }
+    /* His photo with the hat, exactly as the maker card wears it, only larger
+       (css/ojan-id.css, size xl, stacked; the hat's room is inside that box). */
+    .fv-kepala { align-self: center; margin-top: var(--sp-8); }
     .fv-actions { display: flex; flex-direction: column; gap: var(--sp-8); }
     .fv-primary, .fv-quiet, #fv-send {
       min-height: 48px; padding: 0 var(--sp-16); border-radius: var(--r-control);
@@ -2114,18 +2103,8 @@
        2026-08-28. It was a left-aligned row above the QR with the hat floating
        off to the right, which read as two unrelated things sharing a line. */
     .sc-performer { text-align: center; padding-top: 12px; }
-    .sc-performer .sc-kepala { position: relative; display: inline-block; padding-top: 12px; }
-    .sc-performer img.sc-face { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; border: 1px solid var(--line); display: block; }
-    .sc-hat {
-      /* At 44px the brim has to overlap the crown or it reads as floating. */
-      position: absolute; top: -3px; left: 50%;
-      transform: translateX(-50%) rotate(-12deg);
-      width: 26px; height: auto; pointer-events: none;
-    }
-    /* `.sc-qr img` (0,1,1) outranks `.sc-hat` (0,1,0) and blew the hat up to the QR's width, in the share card as much as in the vote's coffee step. */
-    .sc-qr .sc-hat { width: 26px; border: 0; border-radius: 0; }
-    .sc-performer b { display: block; font-size: 13px; color: var(--ink); line-height: 1.25; margin-top: 6px; }
-    .sc-performer span { display: block; font-size: 11.5px; color: var(--muted); }
+    /* The block is css/ojan-id.css (m, stacked). Its selectors are two classes
+       deep because `.sc-qr img` (0,1,1) once blew the hat up to the QR's width. */
     /* The QRIS mark, above every QR code in the product. Self-hosted. */
     .sc-qr .sc-qris-logo { display: block; width: 150px; height: auto; margin: 0 auto 10px; }
     #sc-never, #ic-never {
@@ -2234,11 +2213,7 @@
       .mk-close { width: 44px; height: 44px; min-height: 44px; top: calc(var(--sp-8) - 6px); right: calc(var(--sp-8) - 6px); }
     }
     .mk-id { display: flex; align-items: center; gap: var(--sp-12); padding-right: 36px; }
-    .mk-kepala { position: relative; flex: none; padding-top: 17px; } /* room for the hat INSIDE the card: its body scrolls (overflow:auto), so a hat above this box is cut off */
-    .mk-face { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid var(--line); display: block; }
-    .mk-topi { position: absolute; top: 0; left: 50%; transform: translateX(-50%) rotate(-12deg); width: 26px; height: auto; pointer-events: none; } /* the engraved cut-out, images/topi.svg (his pick "S", 2026-10-03) */
-    .mk-name { font-weight: 700; font-size: var(--fs-0); line-height: 1.2; }
-    .mk-real { font-size: var(--fs-n1); color: var(--muted); }
+    /* Photo, hat and names: css/ojan-id.css (size m). The hat is images/topi.svg, his pick "S", 2026-10-03. */
     .mk-notice { margin-top: var(--sp-12); display: grid; gap: var(--sp-4); font-size: var(--fs-0); line-height: 1.35; font-weight: 600; }
     .mk-notice p { margin: 0; }
     .mk-label { margin: var(--sp-16) 0 var(--sp-8); font-size: var(--fs-n1); color: var(--muted); }
@@ -2552,14 +2527,13 @@
       <aside id="maker-card" hidden aria-label="Dari Ojan">
         <button type="button" class="mk-close" aria-label="Tutup">×</button>
         <div class="mk-id">
-          <div class="mk-kepala">
-            <img class="mk-topi" src="/images/topi.svg" alt="" aria-hidden="true" width="26" height="23">
-            <img src="/images/ojan.jpg" alt="Foto Fauzan Ahladzikri (Ojan)" class="mk-face" width="48" height="48" loading="lazy">
-          </div>
-          <div>
-            <div class="mk-name">Ojan</div>
-            <div class="mk-real">Fauzan Ahladzikri</div>
-          </div>
+          <a class="oj oj-m" href="https://www.instagram.com/okeojan.lubis/" target="_blank" rel="noopener">
+            <span class="oj-kepala">
+              <img class="oj-topi" src="/images/topi.svg" alt="" aria-hidden="true" width="26" height="23">
+              <img class="oj-face" src="/images/ojan.jpg" alt="" width="48" height="48" loading="lazy">
+            </span>
+            <span class="oj-teks"><span class="oj-name">okeojan <svg class="oj-ig" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="Instagram"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg></span><span class="oj-real">Fauzan Lubis</span></span>
+          </a>
         </div>
         <p class="mk-label">Update terakhir</p>
         <ul class="mk-list"></ul>
@@ -2789,8 +2763,12 @@
              muted, directly under the question so it answers "who am I writing
              to" exactly when that occurs to someone. -->
         <div class="fb-owner">
-          <img src="/images/ojan.jpg" alt="" width="28" height="28" loading="lazy">
-          <div><b>Ojan</b><a href="https://mesindev.com" target="_blank" rel="noopener">mesindev.com</a></div>
+          <a class="oj oj-s" href="https://www.instagram.com/okeojan.lubis/" target="_blank" rel="noopener">
+            <span class="oj-kepala">
+              <img class="oj-face" src="/images/ojan.jpg" alt="" width="32" height="32" loading="lazy">
+            </span>
+            <span class="oj-teks"><span class="oj-name">okeojan <svg class="oj-ig" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="Instagram"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg></span><span class="oj-real">Fauzan Lubis</span></span>
+          </a>
         </div>
         <div class="fb-thumbs" role="group" aria-label="Penilaian">
           <button type="button" id="fb-up" aria-pressed="false">
@@ -2851,8 +2829,13 @@
           <p id="fv-invite-text"></p>
         </div>
         <div class="fv-kepala">
-          <img class="fv-topi" src="/images/topi.svg" alt="" aria-hidden="true" width="26" height="23">
-          <img src="/images/ojan.jpg" alt="Foto Fauzan Ahladzikri (Ojan)" class="fv-face" width="96" height="96">
+          <a class="oj oj-xl oj-stack" href="https://www.instagram.com/okeojan.lubis/" target="_blank" rel="noopener">
+            <span class="oj-kepala">
+              <img class="oj-topi" src="/images/topi.svg" alt="" aria-hidden="true" width="26" height="23">
+              <img class="oj-face" src="/images/ojan.jpg" alt="" width="96" height="96">
+            </span>
+            <span class="oj-teks"><span class="oj-name">okeojan <svg class="oj-ig" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="Instagram"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg></span><span class="oj-real">Fauzan Lubis</span></span>
+          </a>
         </div>
         <div class="fv-actions">
           <button type="button" class="fv-primary fv-start"></button>
@@ -2995,12 +2978,13 @@
       <img src="/images/qris.png" alt="QRIS untuk traktir kopi" loading="lazy">
       <p>Scan pakai e-wallet atau m-banking kamu.</p>
       <div class="sc-performer">
-        <div class="sc-kepala">
-          <img class="sc-hat" src="/images/topi.svg" alt="" aria-hidden="true" width="26" height="23">
-          <img src="/images/ojan.jpg" alt="Foto Ojan" class="sc-face" width="44" height="44" loading="lazy">
-        </div>
-        <b>Ojan</b>
-        <span>Fauzan Ahladzikri</span>
+        <a class="oj oj-m oj-stack" href="https://www.instagram.com/okeojan.lubis/" target="_blank" rel="noopener">
+          <span class="oj-kepala">
+            <img class="oj-topi" src="/images/topi.svg" alt="" aria-hidden="true" width="26" height="23">
+            <img class="oj-face" src="/images/ojan.jpg" alt="" width="48" height="48" loading="lazy">
+          </span>
+          <span class="oj-teks"><span class="oj-name">okeojan <svg class="oj-ig" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="Instagram"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg></span><span class="oj-real">Fauzan Lubis</span></span>
+        </a>
       </div>
     </div>
     <button id="sc-never">jangan tampilkan lagi</button>
