@@ -25,9 +25,22 @@
 // path) it is undefined — and because this line runs at module top level, the
 // throw killed the ENTIRE app.js import graph: page rendered, every button
 // dead. A session id needs uniqueness, not cryptography.
+// The fallback's middle rung (2026-11-03, Sonar javascript:S2245):
+// getRandomValues is NOT secure-context-only, so LAN http has it even where
+// randomUUID is missing; Math.random is left only for a runtime with no
+// `crypto` at all. Same `s-<time36>-<8 base36 chars>` shape either way.
+function fallbackSessionId() {
+  let rnd;
+  try {
+    rnd = Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => (b % 36).toString(36)).join('');
+  } catch {
+    rnd = Math.random().toString(36).slice(2, 10);
+  }
+  return `s-${Date.now().toString(36)}-${rnd}`;
+}
 const sessionId = typeof crypto?.randomUUID === 'function'
   ? crypto.randomUUID()
-  : `s-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  : fallbackSessionId();
 
 // GA4 reads these event-parameter names as the session's TRAFFIC SOURCE, not
 // as custom data. intent_armed sent `source: 'card'`, and GA4 recorded ~35
