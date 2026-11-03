@@ -29,13 +29,6 @@ import { getLocale } from './lib/i18n.js';
 
 export const UPDATES = [
   {
-    id: '2026-11-03-samakan-lebar',
-    date: '2026-11-03',
-    text: 'Halaman yang lebarnya beda-beda sekarang bisa disamakan.',
-    en: 'Pages of different widths can now be evened out.',
-    approved: false, // the seat's draft 2026-11-03, his to approve
-  },
-  {
     id: '2026-10-28-scan-font',
     date: '2026-10-28',
     text: 'Edit di PDF hasil scan sekarang ikut jenis huruf suratnya, kolom formulir tetap rapi.',
