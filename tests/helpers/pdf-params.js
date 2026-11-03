@@ -167,3 +167,41 @@ export async function buildTextPdf(page, c) {
     return Array.from(await d.save());
   }, { c, subject: TEXT_SUBJECT, bystander: TEXT_BYSTANDER }));
 }
+
+// ---- Slice 3: mixed page widths (Samakan lebar, founder rulings 2026-11-03) ---
+// first   page 1's size [w, h] in points: the anchor every page evens to.
+// second  page 2's size. Always a different width from every `first` value
+//         (A4 vs US Letter is 2.8% apart, above core/operations.js's tolerance),
+//         so the open offer always appears.
+// state   what the user did: dismissed the offer ('untouched'), evened, or
+//         evened and then pressed Kembalikan ('restored').
+export const WIDTH_AXES = {
+  first: [[420, 595], [595, 842], [792, 612]],   // A5, A4, US Letter landscape
+  second: [[842, 1191], [612, 792], [298, 420]], // A3, US Letter, A6
+  state: ['untouched', 'evened', 'restored'],
+};
+export function widthCaseName(c) {
+  return `p1 ${c.first.join('x')} p2 ${c.second.join('x')} ${c.state}`;
+}
+export const WIDTH_LABELS = ['Halaman satu', 'Halaman dua'];
+/**
+ * Two pages of the given sizes, each with its label printed at a known
+ * fraction of the page (20% in, 30% down) and a thin frame along its edge, so
+ * a reader can tell where the content landed relative to the page.
+ */
+export async function buildMixedWidthPdf(page, c) {
+  if (!(await page.evaluate(() => Boolean(window.PDFLib)))) {
+    await page.addScriptTag({ url: '/js/vendor/pdf-lib.min.js' });
+  }
+  return Buffer.from(await page.evaluate(async ({ sizes, labels }) => {
+    const L = window.PDFLib;
+    const d = await L.PDFDocument.create();
+    const font = await d.embedFont(L.StandardFonts.Helvetica);
+    sizes.forEach(([w, h], i) => {
+      const p = d.addPage([w, h]);
+      p.drawRectangle({ x: 4, y: 4, width: w - 8, height: h - 8, borderColor: L.rgb(0.6, 0.6, 0.6), borderWidth: 2 });
+      p.drawText(labels[i], { x: w * 0.2, y: h * 0.7, size: 14, font });
+    });
+    return Array.from(await d.save());
+  }, { sizes: [c.first, c.second], labels: WIDTH_LABELS }));
+}

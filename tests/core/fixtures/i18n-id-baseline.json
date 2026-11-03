@@ -1045,6 +1045,61 @@
       "js/v2/page-manager.js"
     ]
   },
+  "even.title": {
+    "text": "Lebar halamannya beda-beda",
+    "src": [
+      "js/v2/even-widths.js"
+    ]
+  },
+  "even.body": {
+    "text": "Ukuran lebar halaman beda-beda. Mau disamakan? Lebarnya akan mengikuti halaman pertama semua. Isi halaman ikut menyesuaikan.",
+    "src": [
+      "js/v2/even-widths.js"
+    ]
+  },
+  "even.go": {
+    "text": "Samakan lebar",
+    "src": [
+      "js/v2/even-widths.js"
+    ]
+  },
+  "even.later": {
+    "text": "Nanti aja",
+    "src": [
+      "js/v2/even-widths.js"
+    ]
+  },
+  "even.done": {
+    "text": "Lebar halaman sudah disamakan.",
+    "src": [
+      "js/v2/even-widths.js"
+    ]
+  },
+  "even.restore": {
+    "text": "Kembalikan",
+    "src": [
+      "js/v2/even-widths.js",
+      "js/v2/page-manager.js"
+    ]
+  },
+  "even.rowMixed": {
+    "text": "Lebar halaman beda-beda",
+    "src": [
+      "js/v2/page-manager.js"
+    ]
+  },
+  "even.rowEvenOut": {
+    "text": "Samakan",
+    "src": [
+      "js/v2/page-manager.js"
+    ]
+  },
+  "even.rowEvened": {
+    "text": "Lebar halaman sudah disamakan",
+    "src": [
+      "js/v2/page-manager.js"
+    ]
+  },
   "bugPrompt.small": {
     "text": "Halo user PDFLokal",
     "src": [

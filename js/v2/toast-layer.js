@@ -13,6 +13,10 @@
 // popover must outlive the fade-out or the fade is cut to nothing.
 export const TOAST_FADE_MS = 260;
 
+// A toast that carries an action stays up long enough to reach for it: the
+// reading time for its words is not the time it takes to decide and tap.
+export const ACTION_TOAST_MS = 6000;
+
 export function createToast({
   el, durationMs, raise, drop,
   schedule = setTimeout, cancel = clearTimeout, fadeMs = TOAST_FADE_MS,
@@ -27,14 +31,30 @@ export function createToast({
   }
 
   return {
-    show(msg) {
+    // `action` ({ label, onClick }): ONE button after the words ("Kembalikan").
+    // Built as an element, never innerHTML (a toast can quote a filename). The
+    // next show() replaces the text and with it the button, so a stale action
+    // can never outlive the message it belonged to.
+    show(msg, { action = null } = {}) {
       el.textContent = msg;
+      if (action) {
+        const btn = el.ownerDocument.createElement('button');
+        btn.type = 'button';
+        btn.className = 'toast-action';
+        btn.textContent = action.label;
+        btn.addEventListener('click', () => {
+          cancel(hideTimer);
+          startFade();
+          action.onClick();
+        });
+        el.append(btn);
+      }
       el.classList.add('show');
       // Every call, not once: a sheet opened since the last toast sits above it.
       raise(el);
       cancel(hideTimer);
       cancel(dropTimer);
-      hideTimer = schedule(startFade, durationMs(msg));
+      hideTimer = schedule(startFade, action ? Math.max(ACTION_TOAST_MS, durationMs(msg)) : durationMs(msg));
     },
     hide() {
       cancel(hideTimer);

@@ -443,7 +443,10 @@ export const SCHEMA = {
   // client never sends them and every old value still validates.
   tool_use: {
     tool: ['select', 'teks', 'tipex', 'ganti', 'ttd', 'hapus', 'halaman', 'gabung', 'gambar'],
-    action: ['select', 'whiteout', 'text', 'text_inline', 'signature', 'paraf', 'delete', 'pages_open', 'merge', 'arm', 'sig_modal_open', 'extract', 'original_delete', 'original_miss', 'image', 'image_paste'],
+    // 'even_widths' / 'restore_widths' (2026-11-03, tool 'halaman'): Samakan lebar
+    // and its Kembalikan (js/v2/even-widths.js), from the open offer, Kelola
+    // Halaman or the toast. ENUM ADDITION ONLY.
+    action: ['select', 'whiteout', 'text', 'text_inline', 'signature', 'paraf', 'delete', 'pages_open', 'merge', 'arm', 'sig_modal_open', 'extract', 'original_delete', 'original_miss', 'image', 'image_paste', 'even_widths', 'restore_widths'],
   },
   // THE OTHER HALF OF THE SAME BLIND SPOT (2026-09-10). `export` fires when a
   // file is actually produced, and `failure`/stage:export fires when the build
@@ -598,6 +601,13 @@ export const SCHEMA = {
   // -> tool_use), which per-event timestamps now make answerable. Events record
   // what happened; joins answer why. Overloading one enum value with two
   // meanings is how `matched:true` came to mean two things.
+  // even_offer (2026-11-03): the once-per-document "Samakan lebar" ask when a
+  // single file opens with mixed page widths (js/v2/even-widths.js). Exactly one
+  // outcome per showing, the scan offer's own rule; Esc and the backdrop are
+  // dismissals.
+  even_offer: {
+    action: ['shown', 'accepted', 'dismissed'],
+  },
   scan_offer: {
     action: ['shown', 'accepted', 'dismissed'],
     // 'ocr' (added 2026-08-23, rung S2): the offer's fourth option — recognise
