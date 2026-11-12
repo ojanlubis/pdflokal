@@ -33,14 +33,14 @@ export const UPDATES = [
     date: '2026-11-12',
     text: 'Gambar yang di-drop sekarang bisa ditaruh di atas halaman, atau jadi halaman baru.',
     en: 'A picture dropped onto a document can now go on top of the page, or become a new page.',
-    approved: false,
+    approved: true, // his "Oke, merge pas CI hijau", 2026-11-12
   },
   {
     id: '2026-11-12-align',
     date: '2026-11-12',
     text: 'Teks dan Edit paragraf sekarang bisa rata kiri, tengah, atau kanan.',
     en: 'Text and Edit paragraphs can now be aligned left, center or right.',
-    approved: false,
+    approved: true, // his "Oke, merge pas CI hijau", 2026-11-12
   },
   {
     id: '2026-11-03-download-where',
