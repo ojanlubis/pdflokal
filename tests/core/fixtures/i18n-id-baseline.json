@@ -1483,5 +1483,35 @@
     "src": [
       "js/v2/saved-docs-ui.js"
     ]
+  },
+  "format.align": {
+    "text": "Rata paragraf",
+    "src": [
+      "js/v2/format-bar.js"
+    ]
+  },
+  "format.alignLeft": {
+    "text": "Rata kiri",
+    "src": [
+      "js/v2/format-bar.js"
+    ]
+  },
+  "format.alignCenter": {
+    "text": "Rata tengah",
+    "src": [
+      "js/v2/format-bar.js"
+    ]
+  },
+  "format.alignRight": {
+    "text": "Rata kanan",
+    "src": [
+      "js/v2/format-bar.js"
+    ]
+  },
+  "format.alignJustify": {
+    "text": "Rata kiri-kanan",
+    "src": [
+      "js/v2/format-bar.js"
+    ]
   }
 }

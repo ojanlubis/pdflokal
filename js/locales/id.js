@@ -314,6 +314,11 @@ export default {
     italic: 'Miring',
     color: 'Warna {color}',
     moreColors: 'Warna lainnya',
+    align: 'Rata paragraf',
+    alignLeft: 'Rata kiri',
+    alignCenter: 'Rata tengah',
+    alignRight: 'Rata kanan',
+    alignJustify: 'Rata kiri-kanan',
   },
 
   // Kelola Halaman sheet (js/v2/page-manager.js)

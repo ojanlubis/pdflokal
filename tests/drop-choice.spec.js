@@ -161,8 +161,25 @@ test.describe('a replace with a file that cannot be decoded', () => {
     await expect(page.locator('body')).not.toHaveClass(/is-empty/);
   }
 
+  // A dropped PICTURE no longer offers Ganti: it asks on-the-page or new page
+  // (his ask 2026-11-12, tests/drop-image-and-align.spec.js). A replace by a
+  // picture still goes through Buka Baru, below; the drop replace is a PDF's.
+  test('a dropped foto.heic asks where the picture goes; one we cannot read keeps the doc and its edits', async ({ page }) => {
+    await open(page);
+    await addText(page);
+    await page.evaluate(async ({ name, type, text }) => {
+      const dt = new DataTransfer();
+      dt.items.add(new File([text], name, { type }));
+      document.getElementById('v2-stage').dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
+    }, { name: HEIC.name, type: HEIC.mimeType, text: HEIC.buffer.toString() });
+    await expect(page.locator('#drop-image-choice')).toBeVisible();
+    await page.click('#dic-onpage');
+    await expectDocKept(page);
+    await expect(page.locator('.pv-anno-signature')).toHaveCount(0);
+  });
+
   for (const bad of [HEIC, RUSAK]) {
-    test(`Ganti with ${bad.name} keeps the doc and its edits`, async ({ page }) => {
+    if (bad === RUSAK) test(`Ganti with ${bad.name} keeps the doc and its edits`, async ({ page }) => {
       await open(page);
       await addText(page);
       await page.evaluate(async ({ name, type, text }) => {

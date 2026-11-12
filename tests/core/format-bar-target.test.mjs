@@ -32,7 +32,7 @@ class StubEl {
   blur() {}
   fire(type, extra = {}) { for (const fn of this.listeners[type] || []) fn({ target: this, preventDefault() {}, stopPropagation() {}, ...extra }); }
 }
-globalThis.document = { createElement: (tag) => new StubEl(tag) };
+globalThis.document = { createElement: (tag) => new StubEl(tag), createElementNS: (_ns, tag) => new StubEl(tag) };
 const find = (root, cls) => {
   const all = [];
   const walk = (e) => { all.push(e); e.children.forEach(walk); };
@@ -164,4 +164,72 @@ test('custom colour: a drag tick does not hand focus back, closing the picker do
   assert.equal(done.length, 1);
   assert.equal(satu.color, '#000000');
   assert.equal(draftRestyles.at(-1)?.color, '#123456');
+});
+
+// ---- paragraph alignment (his ask 2026-11-12) ---------------------------------------
+// THE PROPERTY: rata kiri/tengah/kanan styles the same target every other
+// control does (the draft while typing, else the selected text), with one undo
+// step; while an Edit PARAGRAPH draft is open it changes that draft's plan and
+// nothing in the model (the commit carries it), and only then is justify offered.
+const alignBtn = (el, v) => find(el, 'fb-align-btn').find((b) => b.dataset.align === v);
+
+test('rata tengah while typing a new text sets the draft, not the selected committed text', () => {
+  const { satu, el, draftRestyles, bar } = scene();
+  alignBtn(el, 'center').fire('click');
+  assert.equal(satu.align, undefined, 'the committed text must not change');
+  assert.equal(draftRestyles.at(-1)?.align, 'center', 'the draft is restyled');
+  assert.equal(bar.getDefaults().align, 'center', 'and the next commit inherits it');
+  assert.equal(alignBtn(el, 'justify').hidden, true, 'no justify for typed text: it has no fixed width');
+});
+
+test('rata kanan on a selected committed text changes it, one undo step', () => {
+  const { doc, satu } = scene();
+  const history = createHistory();
+  const el = new StubEl('div');
+  createFormatBar({
+    el, getDoc: () => doc, history,
+    getTarget: () => formatTarget({ editingAnno: null, editingEl: null, selected: findAnnotation(doc, doc.selection.annotationId).annotation }),
+    onStyled: () => {},
+  });
+  alignBtn(el, 'right').fire('click');
+  assert.equal(findAnnotation(doc, satu.id).annotation.align, 'right');
+  assert.equal(history.undoStack.length, 1, 'one undo step');
+  alignBtn(el, 'right').fire('click');
+  assert.equal(history.undoStack.length, 1, 'a second tap on the same alignment is no step');
+});
+
+test('an Edit paragraph draft: alignment changes its plan only, justify offered, the rest of the bar hidden', () => {
+  const { doc, satu } = scene();
+  const plan = { align: 'justify' };
+  const restyled = [];
+  const el = new StubEl('div');
+  const bar = createFormatBar({
+    el, getDoc: () => doc, history: createHistory(),
+    getTarget: () => formatTarget({ editingAnno: null, editingEl: { draft: true }, selected: satu }),
+    getBlockPlan: () => plan,
+    onBlockAlign: (a) => restyled.push(a),
+    onStyled: () => { throw new Error('the model must not change while the paragraph is a draft'); },
+    onDefaults: () => {},
+  });
+  bar.sync(true);
+  assert.equal(el.classList.has('fb-align-only'), true, 'only alignment shows on an edit');
+  assert.equal(alignBtn(el, 'justify').hidden, false, 'justify is offered for a paragraph');
+  assert.equal(alignBtn(el, 'justify').attrs['aria-pressed'], 'true', 'the paragraph\'s own alignment is shown');
+  alignBtn(el, 'center').fire('click');
+  assert.equal(plan.align, 'center');
+  assert.deepEqual(restyled, ['center']);
+  assert.equal(satu.align, undefined, 'the selected text behind the draft is untouched');
+  assert.equal(bar.getDefaults().align, 'left', 'a paragraph choice is not sticky for the next Teks');
+});
+
+test('a committed paragraph selected afterwards offers no alignment (its lines are baked)', () => {
+  const { doc } = scene();
+  const para = addAnnotation(doc, doc.pages[0].id, createAnnotation('text', { x: 1, y: 1, text: 'p', block: { align: 'left', lines: [] } }));
+  const el = new StubEl('div');
+  const bar = createFormatBar({
+    el, getDoc: () => doc, history: createHistory(),
+    getTarget: () => para, getBlockPlan: () => null, onStyled: () => {},
+  });
+  bar.sync(true);
+  assert.equal(find(el, 'fb-align')[0].hidden, true);
 });

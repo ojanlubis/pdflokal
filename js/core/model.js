@@ -91,7 +91,7 @@ export function createAnnotation(type, props = {}) {
 //                the way its source does on screen.
 //   - anything else (watermark/pageNumber are unreachable from v2): not copyable.
 const COPY_FIELDS = {
-  text: ['text', 'x', 'y', 'turn', 'fontSize', 'fontFamily', 'bold', 'italic', 'color'],
+  text: ['text', 'x', 'y', 'turn', 'fontSize', 'fontFamily', 'bold', 'italic', 'color', 'align'],
   whiteout: ['x', 'y', 'width', 'height', 'color'],
   signature: ['image', 'kind', 'x', 'y', 'turn', 'width', 'height'],
 };

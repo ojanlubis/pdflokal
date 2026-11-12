@@ -44,7 +44,7 @@ test('the Gambar blocks of app.js make no network call', () => {
 
 test("every tel('tool_use', {tool: 'gambar', action}) in app.js validates against the shared schema", () => {
   const calls = [...APP.matchAll(/tel\('tool_use', \{ tool: 'gambar', action: '(\w+)' \}\)/g)].map((m) => m[1]);
-  assert.deepEqual([...new Set(calls)].sort(), ['image', 'image_paste'], 'the two placement paths, once each');
+  assert.deepEqual([...new Set(calls)].sort(), ['image', 'image_drop', 'image_paste'], 'the three placement paths, once each');
   for (const action of calls) assert.equal(validateEvent('tool_use', { tool: 'gambar', action }).ok, true, action);
   // 'arm' goes through ARM_TOOL, the one place data-tool maps to the rail's word.
   assert.match(APP, /const ARM_TOOL = \{[^}]*gambar: 'gambar'[^}]*\}/);
