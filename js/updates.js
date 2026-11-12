@@ -29,6 +29,20 @@ import { getLocale } from './lib/i18n.js';
 
 export const UPDATES = [
   {
+    id: '2026-11-12-drop-picture',
+    date: '2026-11-12',
+    text: 'Gambar yang di-drop sekarang bisa ditaruh di atas halaman, atau jadi halaman baru.',
+    en: 'A picture dropped onto a document can now go on top of the page, or become a new page.',
+    approved: false,
+  },
+  {
+    id: '2026-11-12-align',
+    date: '2026-11-12',
+    text: 'Teks dan Edit paragraf sekarang bisa rata kiri, tengah, atau kanan.',
+    en: 'Text and Edit paragraphs can now be aligned left, center or right.',
+    approved: false,
+  },
+  {
     id: '2026-11-03-download-where',
     date: '2026-11-03',
     text: 'Habis Unduh, sekarang dikasih tahu filenya ada di mana.',
