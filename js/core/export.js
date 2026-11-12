@@ -26,6 +26,7 @@ import { fenceUnkeptPages, landPageRefs, pagePlaceholder } from './page-fence.js
 import { applyPageSurgery } from './page-surgery.js';
 import { resolveDecidedFont, blockText } from './stamp.js';
 import { placeBlockLines } from './block-edit.js';
+import { alignOffset } from './reflow.js';
 import { CLONE_FONT_VARIANTS, CLONE_FONT_URLS, isSfntFontProgram } from './clone-fonts.js';
 import { toStandardFontSafe, drawTextSafe, unencodableInStandardFont } from './text-encode.js';
 import { totalPageRotation } from './page-rotation.js';
@@ -419,8 +420,14 @@ async function drawText(pdfPage, anno, frame, env) {
     if (await drawTextAsImage(pdfPage, { ...anno, fontSize: size }, frame, env, safeText)) return;
   }
   const lines = safeText.split('\n');
+  // Rata tengah / kanan (2026-11-12): each line inside the box its widest line
+  // makes, as the overlay's text-align lays it out. Left needs no measuring.
+  const align = anno.align === 'center' || anno.align === 'right' ? anno.align : null;
+  const widths = align ? lines.map((l) => font.widthOfTextAtSize(l, size)) : null;
+  const room = widths ? Math.max(0, ...widths) : 0;
   for (let i = 0; i < lines.length; i += 1) {
-    const { x, y } = objectPoint(anno, 0, size * TEXT_BASELINE_RATIO + i * size * TEXT_LINE_HEIGHT, frame);
+    const dx = widths ? alignOffset(align, room, widths[i]) : 0;
+    const { x, y } = objectPoint(anno, dx, size * TEXT_BASELINE_RATIO + i * size * TEXT_LINE_HEIGHT, frame);
     drawTextSafe(pdfPage, lines[i], { x, y, size, font, color, rotate });
   }
 }

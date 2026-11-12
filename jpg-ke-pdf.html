@@ -977,6 +977,13 @@
     .fb-color-custom { padding: 0; cursor: pointer; background: conic-gradient(red, yellow, lime, cyan, blue, magenta, red); }
     .fb-color-custom::-webkit-color-swatch-wrapper { padding: 3px; }
     .fb-color-custom::-webkit-color-swatch { border: 1px solid rgba(0,0,0,.15); border-radius: 50%; }
+    /* paragraph alignment: one joined group, set apart from the colours */
+    .fb-align { display: flex; gap: 2px; flex: 0 0 auto; margin-left: 4px; padding-left: 8px; border-left: 1px solid var(--line); }
+    .fb-align[hidden], .fb-align-btn[hidden] { display: none; }
+    .fb-align-btn { display: inline-flex; align-items: center; justify-content: center; padding: 0; }
+    /* an Edit paragraph keeps its own face, size and colour: only alignment shows */
+    #format-bar.fb-align-only > :not(.fb-align) { display: none; }
+    #format-bar.fb-align-only .fb-align { margin-left: 0; padding-left: 0; border-left: 0; }
 
     /* ---- document area: CONTAINER scroll (kills edge-overscroll flicker) ---- */
     #v2-scroll {
@@ -2922,6 +2929,19 @@
         <button id="dc-add">Tambah</button>
         <button id="dc-replace">Ganti</button>
         <button id="dc-cancel">Batal</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Only pictures dropped onto an open doc (his ask 2026-11-12): on top of
+       the page under the drop, as a Gambar object, or a page of its own. -->
+  <dialog id="drop-image-choice" aria-label="Taruh gambar">
+    <div class="sheet hc-sheet">
+      <h2>Gambarnya mau ditaruh di mana?</h2>
+      <div class="hc-row">
+        <button id="dic-onpage">Di atas halaman</button>
+        <button id="dic-newpage">Halaman baru</button>
+        <button id="dic-cancel">Batal</button>
       </div>
     </div>
   </dialog>

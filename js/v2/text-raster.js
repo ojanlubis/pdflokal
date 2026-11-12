@@ -27,6 +27,7 @@
  * before when it did not.
  */
 import { textFontCss } from '../render/page-view.js';
+import { alignOffset } from '../core/reflow.js';
 
 // Oversample so the raster stays crisp when a viewer zooms. Capped so a huge
 // annotation cannot ask for a canvas the GPU refuses (mobile Safari caps a
@@ -52,7 +53,8 @@ export async function rasterizeTextAnno(anno) {
   const measure = document.createElement('canvas').getContext('2d');
   if (!measure) return null;
   measure.font = font;
-  const widest = Math.max(...lines.map((l) => measure.measureText(l).width), 0);
+  const lineWidths = lines.map((l) => measure.measureText(l).width);
+  const widest = Math.max(...lineWidths, 0);
   // Some colour-emoji glyphs report an advance narrower than their bitmap;
   // pad a quarter-em so the last glyph's right edge is never clipped.
   const width = Math.ceil(widest + size * 0.25);
@@ -70,7 +72,8 @@ export async function rasterizeTextAnno(anno) {
   ctx.fillStyle = anno?.color || '#000000';
   ctx.textBaseline = 'alphabetic';
   lines.forEach((line, i) => {
-    ctx.fillText(line, 0, size * BASELINE_RATIO + i * size * LINE_HEIGHT);
+    const dx = alignOffset(anno?.align, widest, lineWidths[i]);
+    ctx.fillText(line, dx, size * BASELINE_RATIO + i * size * LINE_HEIGHT);
   });
 
   const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));

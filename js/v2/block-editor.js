@@ -33,7 +33,9 @@ export function styleBlockEditor(ed, plan) {
   ed.style.padding = '0';
   ed.style.width = `${k * plan.width}px`;
   ed.style.textAlign = plan.align;
-  ed.style.textIndent = `${plan.align === 'right' ? 0 : k * (plan.indent || 0)}px`;
+  // Indent for left and justify only, as core/reflow.js layoutLines lays it out.
+  const indented = plan.align === 'left' || plan.align === 'justify';
+  ed.style.textIndent = `${indented ? k * (plan.indent || 0) : 0}px`;
   ed.style.left = `${plan.disp.x}px`;
   ed.dataset.block = plan.align;
 }

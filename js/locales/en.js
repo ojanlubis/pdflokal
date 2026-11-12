@@ -306,6 +306,11 @@ export default {
     italic: 'Italic',
     color: 'Color {color}',
     moreColors: 'More colors',
+    align: 'Paragraph alignment',
+    alignLeft: 'Align left',
+    alignCenter: 'Center',
+    alignRight: 'Align right',
+    alignJustify: 'Justify',
   },
 
   pm: {
