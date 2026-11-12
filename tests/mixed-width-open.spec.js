@@ -84,6 +84,12 @@ for (const vp of [{ width: 375, height: 812 }, { width: 1280, height: 800 }]) {
 test('Ctrl/Cmd + 0 on a mixed-width document lands on the opening fit, every page inside', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await openMixedWidth(page);
+  // A mixed-width open offers Samakan lebar (#198) in a dialog, and zoom keys
+  // stand down while any dialog is open. Decline it first, or the keys below
+  // never reach the zoom (red every night 2026-11-04..11-12, read 11-12).
+  await expect(page.locator('#even-offer')).toBeVisible();
+  await page.click('#eo-later');
+  await expect(page.locator('#even-offer')).toBeHidden();
   const z0 = await zoomOf(page);
   const mod = process.platform === 'darwin' ? 'Meta' : 'Control';
   await page.keyboard.press(`${mod}+Equal`);
