@@ -31,33 +31,20 @@ jobs:
       - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
         id: filter
         with:
+          # A DENY-list, not an allow-list (seat decisions 2026-11-03). With `every`, a changed file counts
+          # when it matches every pattern, i.e. it is none of the excluded text/data paths. So a PR touching
+          # only js/updates.js, docs/ or Markdown skips the 40-minute browser suite, and anything else, new
+          # kinds of files included, runs it: an unknown path errs toward testing. lint.yml runs the core
+          # suite (the maker-card 90-char + `en` check among it) on every PR either way.
+          predicate-quantifier: 'every'
           filters: |
             runnable:
-              - '*.html'
-              - '*.js'
-              - '*.css'
-              - '*.webmanifest'
-              - 'vercel.json'
-              - 'css/**'
-              - 'js/**'
-              - 'api/**'
-              - 'seo/**'
-              - 'scripts/**'
-              - 'tests/**'
-              - 'images/**'
-              - 'fonts/**'
-              # /en is generated from i18n; core tests read both and the
-              # sitemap. Without these a PR touching only them skipped every
-              # test and stayed green until the nightly run after merge.
-              - 'en/**'
-              - 'i18n/**'
-              - 'sitemap.xml'
-              - 'robots.txt'
-              - 'playwright.config.js'
-              - 'eslint.config.js'
-              - 'package.json'
-              - 'package-lock.json'
-              - '.github/workflows/e2e.yml'
+              - '**'
+              - '!js/updates.js'
+              - '!docs/**'
+              - '!**/*.md'
+              - '!LICENSE'
+              - '!review-shots/**'
 
   e2e:
     needs: changes

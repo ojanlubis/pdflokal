@@ -136,6 +136,11 @@ Permanent refusals: never attach GA4 to Ads tag `AW-17538923405` · no fabricate
 
 ## Git
 
+- **Branch + CI rules (his, 2026-11-03; seat decisions):** one branch per PR, named `feat/` `fix/` `copy/` (text or
+  data only) or `claude/` (cloud sessions). GitHub deletes the branch on merge. Work with no PR for 7 days becomes an
+  `archive/*` tag and its branch is deleted. Text/data-only PRs (`js/updates.js`, `docs/`, Markdown) skip e2e
+  (`e2e.yml` deny-list filter); `lint.yml` runs lint, `seo:check` and core on every PR. Delete remote branches with
+  `gh api -X DELETE repos/ojanlubis/pdflokal/git/refs/heads/<b>` if a plain `git push --delete` is refused by the ruleset.
 - **Branches open on his word, gated by CI.** `e2e.yml` runs the full gate on a PR (a newer push
   cancels the PR's superseded run) and once a night on `main` (01:00 WIB), NOT after every merge:
   his ruling 2026-10-01, CI "secukupnya". A bare branch push triggers nothing, and retargeting a
