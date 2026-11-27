@@ -61,21 +61,53 @@ test.describe('ganti teks — happy path (tame fixture)', () => {
     expect(await page.evaluate(() => window.v2.getDoc().pages[0].annotations.length)).toBe(2);
   });
 
-  test('editing is not redefining: NO format bar during the draft NOR at commit (founder ruling)', async ({ page }) => {
+  // His call 2026-11-27 (superseding "editing is not redefining", 2026-07-18):
+  // Edit does everything Teks does. The whole bar shows over the draft; a face
+  // the user picks FREES the edit (core/operations.js freesEdit): it is drawn
+  // as Teks in that face, and the original's words stay cut.
+  test('Edit does what Teks does: the whole bar over the draft, a picked face frees the edit', async ({ page }) => {
     await openDoc(page, FX('sample-2pages.pdf'));
     await armGanti(page);
     await tapLine(page, { str: 'Test Page 1' });
-    await expect(page.locator('#format-bar')).not.toHaveClass(/show/);
-    // A genuine edit (not a no-op — an unmodified commit is now a CANCEL and
-    // creates nothing, see tests/ganti-teks-fidelity.spec.js's bug 1 suite).
-    await page.keyboard.type('Test Page 1 Ubah');
-    // Commit does NOT auto-select (taste-judge, night 2026-07-19): the flow
-    // ends bar-free. A later DELIBERATE tap selects it like any text object —
-    // one grammar — and only then may the bar return.
-    await page.keyboard.press('Enter');
-    await expect(page.locator('#format-bar')).not.toHaveClass(/show/);
-    await page.locator('.pv-anno-text').click();
     await expect(page.locator('#format-bar')).toHaveClass(/show/);
+    await expect(page.locator('#format-bar .fb-font')).toBeVisible();
+    await page.locator('#format-bar .fb-font').selectOption('Montserrat');
+    await expect(page.locator('.v2-text-edit')).toHaveCSS('font-family', /Montserrat/);
+    await page.locator('.v2-text-edit').click();
+    await page.keyboard.press('Enter');
+    const edit = await page.evaluate(() => window.v2.getDoc().pages[0].annotations.find((a) => a.type === 'text'));
+    expect(edit, 'a face change with the words untouched is a change, not the no-op').toBeTruthy();
+    expect(edit).toMatchObject({ fontFamily: 'Montserrat', detached: true });
+    expect(edit.replaceCoverId, 'still the original line\'s edit: its cover keeps the cut').toBeTruthy();
+  });
+
+  test('a finished Edit can be picked up and moved like Teks; moving frees it', async ({ page }) => {
+    await openDoc(page, FX('sample-2pages.pdf'));
+    await armGanti(page);
+    await tapLine(page, { str: 'Test Page 1' });
+    await page.keyboard.type(' Ubah');
+    await page.keyboard.press('Enter');
+    // Commit does NOT auto-select (taste-judge, night 2026-07-19). A later
+    // tap selects it like any text object, baked or not.
+    const el = page.locator('.pv-anno-text');
+    await expect(el).toHaveCount(1);
+    // The known-positive: it IS baked (in the page image, its handle invisible),
+    // so the pick-up below exercises the baked path, not a declined overlay.
+    await expect(el).toHaveAttribute('data-baked', '1');
+    await el.click();
+    await expect(page.locator('#format-bar')).toHaveClass(/show/);
+    const box = await el.boundingBox();
+    const before = await page.evaluate(() => window.v2.getDoc().pages[0].annotations.find((a) => a.type === 'text'));
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + 60, box.y + box.height / 2 + 80, { steps: 6 });
+    await page.mouse.up();
+    const after = await page.evaluate(() => window.v2.getDoc().pages[0].annotations.find((a) => a.type === 'text'));
+    expect(after.y).toBeGreaterThan(before.y + 20);
+    expect(after.detached).toBe(true);
+    // Freed, it is no longer in the page image: its own words paint.
+    await expect(el).not.toHaveAttribute('data-baked', '1');
+    await expect(el).not.toHaveCSS('color', 'rgba(0, 0, 0, 0)');
   });
 
   test('Escape backs out and takes the cover with it', async ({ page }) => {

@@ -40,7 +40,7 @@ import {
 } from '../core/telemetry-schema.js';
 import { createOcrIndex, ocrEngineLoaded } from './ocr-runs.js';
 import { scanAppearance, scanPaper } from './scan-appearance.js';
-import { createPageSlot, pageDisplaySize, syncOverlay, textFontCss, applyTextFont, measureTextAnnoWidth, applyTurn } from '../render/page-view.js';
+import { createPageSlot, pageDisplaySize, syncOverlay, textFontCss, applyTextFont, measureTextAnnoWidth, applyTurn, revealBakedEdit } from '../render/page-view.js';
 import { createViewportStream } from '../render/viewport.js';
 import { RASTER_BASE, sharpenScale, maxPixelsFor, imageScaleCap } from '../render/sharpen.js';
 import { createInteraction } from '../render/interaction.js';
@@ -162,8 +162,9 @@ let pendingGambar = null;
 let baseName = 'dokumen';
 let editingAnno = null;       // text annotation currently in the inline editor
 let editingEl = null;         // its contenteditable (format bar restyles it live)
-let editingIsReplace = false; // Ganti Teks draft open → NO format bar (see below)
-let editingBlockPlan = null;  // ...except an Edit PARAGRAPH draft: alignment only (format-bar.js)
+let editingIsReplace = false; // an Edit draft is open
+let editingBlockPlan = null;  // an Edit PARAGRAPH draft's plan: its alignment (format-bar.js)
+let editingDraft = null;      // the open Edit draft, which the format bar styles (getEditDraft)
 let heldDraft = null;         // { resume, commit } while an empty draft waits on a format-bar control (blurCommitsDraft)
 let openEditorCommit = null;  // the open inline editor's commit, while one is open (closeOpenEditor)
 
@@ -997,6 +998,13 @@ const formatBar = createFormatBar({
   history,
   getTarget: () => formatTarget({ editingAnno, editingEl, selected: selectedTextAnno() }),
   getBlockPlan: () => (editingEl ? editingBlockPlan : null),
+  getEditDraft: () => (editingEl && editingIsReplace ? editingDraft : null),
+  onEditDraftStyled: (d) => {
+    if (!editingEl || editingDraft !== d) return;
+    applyTextFont(editingEl, d);
+    editingEl.style.color = d.color || '#000';
+    if (editingBlockPlan) placeBlockEditor(editingEl, editingBlockPlan);
+  },
   onBlockAlign: () => {
     if (!editingEl || !editingBlockPlan) return;
     styleBlockEditor(editingEl, editingBlockPlan);
@@ -1010,7 +1018,9 @@ const formatBar = createFormatBar({
       editingEl.style.textAlign = editorAlign(anno);
     }
     for (const page of doc.pages) {
-      if (page.annotations.some((a) => a.id === anno.id)) { syncPage(page.id); break; }
+      if (!page.annotations.some((a) => a.id === anno.id)) continue;
+      if (anno.replaceCoverId) bakeAfterEditChange(page.id, null); else syncPage(page.id);
+      break;
     }
   },
   onDefaults: (d) => {
@@ -1036,11 +1046,11 @@ function syncFormatBar() {
   // not redefine the text"). Fidelity is the machine's job (sampling, Rung C
   // font matching), never a decision pushed to the user. The bar returns for
   // authoring flows and for a committed text object selected afterwards.
-  const editing = (editingAnno || editingEl) && !editingIsReplace;
-  // An Edit PARAGRAPH draft is the one replace that shows the bar, and only
-  // its alignment (his ask 2026-11-12; format-bar.js getBlockPlan).
-  const blockDraft = !!(editingEl && editingBlockPlan);
-  formatBar.sync(!!(editing || blockDraft || (!editingIsReplace && selectedTextAnno()) || tool === 'text'));
+  // SUPERSEDED 2026-11-27 by his call "Edit does everything Teks does": the
+  // whole bar shows over an Edit draft too, and a change lands on that draft
+  // (format-bar.js getEditDraft). An untouched edit still keeps the
+  // original's face; only the user's own choice replaces it.
+  formatBar.sync(!!(editingAnno || editingEl || selectedTextAnno() || tool === 'text'));
 }
 
 // ---- tools ----------------------------------------------------------------------
@@ -1194,6 +1204,9 @@ function reEditLine(pageId, cover, replacement) {
     italic: !!replacement?.italic,
     color: replacement?.color,
     docFontFamily: replacement?.docFontFamily,
+    // A freed edit (core/operations.js freesEdit) reopens as the user left it:
+    // their face, at their place, and the commit keeps it freed.
+    ...(replacement?.detached ? { detached: true } : {}),
     // The committed edit's font decision: the editor opens IN that face (its
     // FontFace is still registered), and prepareDocFont re-loads the same
     // candidates from it rather than re-deriving them.
@@ -1217,7 +1230,7 @@ function reEditLine(pageId, cover, replacement) {
       coverColor: cover.color,
     },
   };
-  const at = draft.turn ? { x: replacement.x, y: replacement.y } : { x: box.x, y: box.y };
+  const at = draft.turn || draft.detached ? { x: replacement.x, y: replacement.y } : { x: box.x, y: box.y };
   openTextEditor({ pageId, x: draft.block ? draft.block.disp.x : at.x, y: at.y, anno: null, draft });
   setTool('select');
   hideToast();
@@ -1872,7 +1885,12 @@ const interaction = createInteraction({
   getZoom: () => zoom,
   getTool: () => tool,
   history,
-  onChange: (kind) => {
+  onChange: (kind, payload) => {
+    const moved = payload?.annotation;
+    if ((kind === 'move' || kind === 'resize') && moved?.replaceCoverId) {
+      const pid = doc.pages.find((p) => p.annotations.includes(moved))?.id;
+      if (pid) bakeAfterEditChange(pid, null);
+    }
     // Tip-Ex stroke finished (color was already matched at stroke START):
     // return home to Pilih (founder: whiteout should NOT stay sticky).
     if (kind === 'draw') {
@@ -1962,6 +1980,10 @@ const interaction = createInteraction({
     const found = findAnnotation(doc, annoId);
     if (found) {
       const { page, annotation: anno } = found;
+      // A selected Edit retypes through Edit's own editor (its cover, its
+      // font ladder, one edit per original line), never the Teks one.
+      const cover = anno.replaceCoverId ? findAnnotation(doc, anno.replaceCoverId)?.annotation : null;
+      if (cover?.replaceBox) { reEditLine(page.id, cover, anno); return; }
       openTextEditor({ pageId: page.id, x: anno.x, y: anno.y, anno });
     }
   },
@@ -2131,6 +2153,7 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
   editingAnno = anno || null;
   editingEl = ed;
   editingIsReplace = !!draft;
+  editingDraft = draft || null;
   editingBlockPlan = blockPlan;
   // Rung C live-font-preview: prepareDocFont (fired from smartReplace, still
   // in flight) needs to reach THIS specific editor element once the doc font
@@ -2169,6 +2192,7 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
       editingAnno = null;
       editingEl = null;
       editingIsReplace = false;
+      editingDraft = null;
       editingBlockPlan = null;
     }
     if (openEditorCommit === commit) openEditorCommit = null;
@@ -2216,7 +2240,7 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
         touchedEdit = !!anno.replaceCoverId;
         if (anno.replaceCoverId) { gantiOutcome = 'commit'; gantiCoverId = anno.replaceCoverId; }
       }
-    } else if (draft && text === String(draft.text || '').trim() && !(blockPlan && blockPlan.align !== blockAlignAtOpen)) {
+    } else if (draft && text === String(draft.text || '').trim() && !draft.styled && !(blockPlan && blockPlan.align !== blockAlignAtOpen)) {
       // BUG FIX (founder field test, 2026-07-19): tap a line, change NOTHING,
       // blur — must behave EXACTLY like the empty/Escape backout below, not
       // create a cover + a same-text replacement annotation (the founder
@@ -2335,7 +2359,7 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
         // program + an exact metric clone routed = nothing real was
         // substituted — silent. See prepareDocFont for the fields' WHY.
         const nameOnlyClone = d.fontUnembedded && d.cloneRouted;
-        if (!covered && !nameOnlyClone) toast(tr('toast.fontSubstituteChar'));
+        if (!covered && !nameOnlyClone && !d.detached) toast(tr('toast.fontSubstituteChar'));
         // font_path is 'doc-font' only when the document's OWN font paints
         // this — a name-only clone is still a substitute, so it reads as
         // 'twin' (the schema's font_path enum has no separate 'clone' value).
@@ -2360,6 +2384,8 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
         ...fontDecisionProps,
         ...blockProps,
         ...(d.turn ? { turn: d.turn } : {}),
+        // Freed by the format bar while typing (core/operations.js freesEdit).
+        ...(d.replaceCoverId && d.detached ? { detached: true } : {}),
         // Typed Teks only: an edit's line keeps the original's place.
         ...(!draft && (d.align === 'center' || d.align === 'right') ? { align: d.align } : {}),
       }));
@@ -3143,6 +3169,11 @@ document.addEventListener('keydown', (e) => {
   if (a) {
     const el = stage.querySelector(`[data-anno-id="${a.id}"]`);
     if (el) { el.style.left = a.x + 'px'; el.style.top = a.y + 'px'; }
+    if (a.replaceCoverId) {
+      revealBakedEdit(el);
+      const pid = doc.pages.find((p) => p.annotations.includes(a))?.id;
+      if (pid) bakeAfterEditChange(pid, null);
+    }
   }
 });
 

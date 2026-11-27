@@ -198,7 +198,7 @@ test('rata kanan on a selected committed text changes it, one undo step', () => 
   assert.equal(history.undoStack.length, 1, 'a second tap on the same alignment is no step');
 });
 
-test('an Edit paragraph draft: alignment changes its plan only, justify offered, the rest of the bar hidden', () => {
+test('an Edit paragraph draft: alignment changes its plan only, justify offered, the whole bar shows (his call 2026-11-27)', () => {
   const { doc, satu } = scene();
   const plan = { align: 'justify' };
   const restyled = [];
@@ -212,7 +212,7 @@ test('an Edit paragraph draft: alignment changes its plan only, justify offered,
     onDefaults: () => {},
   });
   bar.sync(true);
-  assert.equal(el.classList.has('fb-align-only'), true, 'only alignment shows on an edit');
+  assert.equal(el.classList.has('fb-align-only'), false, 'an edit gets the whole bar, like Teks');
   assert.equal(alignBtn(el, 'justify').hidden, false, 'justify is offered for a paragraph');
   assert.equal(alignBtn(el, 'justify').attrs['aria-pressed'], 'true', 'the paragraph\'s own alignment is shown');
   alignBtn(el, 'center').fire('click');

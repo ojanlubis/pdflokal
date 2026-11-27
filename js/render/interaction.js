@@ -18,6 +18,7 @@
  * in place; structural re-syncs happen on gesture end via onChange.
  */
 
+import { revealBakedEdit } from './page-view.js';
 import { selectAnnotation, clearSelection, moveAnnotation, resizeAnnotation, updateAnnotation } from '../core/operations.js';
 import { record } from '../core/history.js';
 import { decorateSelected, undecorateSelected } from './page-view.js';
@@ -366,6 +367,10 @@ export function createInteraction(ctx) {
       if (!gesture.moved && (dx || dy)) {
         gesture.moved = true;
         if (ctx.history) record(ctx.history, doc);   // one undo step per gesture
+        // A baked Edit's grab handle is invisible (render/page-view.js
+        // bakedEditHandle): the words are in the page image. The moment it
+        // moves it is freed, so its words travel with the finger from here.
+        revealBakedEdit(gesture.annoEl);
       }
       if (!gesture.moved) return;
       // Through the single mutation path (clamps to page), then surgical DOM.

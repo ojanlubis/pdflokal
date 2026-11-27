@@ -708,6 +708,9 @@ export const SCHEMA = {
     reason: [
       'clean', 'unsupported-font', 'mixed-fonts', 'multiline', 'empty',
       'missing-glyph', 'clone-unavailable',
+      // 'detached' (2026-11-27, additive): the user moved or restyled the edit,
+      // so it is drawn as Teks by choice (core/operations.js freeEdit).
+      'detached',
     ],
     // style_source/glyph_shortfall (Increment B, core/stamp.js's
     // resolveStampFont): style_source names which ladder rung decided the

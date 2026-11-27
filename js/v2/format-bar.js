@@ -11,7 +11,7 @@
  * undo step per discrete change and goes through updateAnnotation (invariant #5).
  */
 
-import { updateAnnotation } from '../core/operations.js';
+import { updateAnnotation, freesEdit } from '../core/operations.js';
 import { record } from '../core/history.js';
 import { FONT_CSS } from '../render/page-view.js';
 import { FONT_SIZE_PRESETS, parseFontSize, formatFontSize } from '../core/font-size.js';
@@ -70,6 +70,12 @@ function alignIcon(lines) {
 //     (2026-11-12).
 //   onBlockAlign: (align) => void — restyle that draft's editor after its
 //     plan's align changed.
+//   getEditDraft: () => the open Edit draft (a replace being typed, js/v2/app.js
+//     openTextEditor's `draft`), or null. His call 2026-11-27: Edit does what
+//     Teks does, so the WHOLE bar shows over an Edit and a change lands on
+//     that draft (never on the sticky defaults, which are the next Teks's).
+//     A face, size or weight frees the edit (core/operations.js freesEdit).
+//   onEditDraftStyled: (draft) => void — restyle that draft's editor.
 //   onControlDone: () => void — a control that took focus (font, size on
 //     Enter, custom colour on close) has finished. app.js hands focus back to
 //     an empty draft that blurCommitsDraft kept open; otherwise a no-op.
@@ -224,6 +230,8 @@ export function createFormatBar(deps) {
   function alignTarget() {
     const plan = deps.getBlockPlan?.() || null;
     if (plan) return { kind: 'block', align: plan.align || 'left' };
+    // A one-line Edit has no box for its line to sit in.
+    if (deps.getEditDraft?.()) return null;
     const anno = deps.getTarget();
     if (anno && anno.block) return null;
     return { kind: 'text', align: (anno || defaults).align || 'left' };
@@ -231,7 +239,6 @@ export function createFormatBar(deps) {
   function reflectAlign() {
     const at = alignTarget();
     alignGroup.hidden = !at;
-    el.classList.toggle('fb-align-only', at?.kind === 'block');
     for (const b of alignBtns) {
       const isJustify = b.dataset.align === 'justify';
       b.hidden = isJustify && at?.kind !== 'block';
@@ -257,6 +264,17 @@ export function createFormatBar(deps) {
   // `record: false` = a continuation of a change whose undo step is already taken
   // (the colour picker's drag, see below).
   function apply(patch, { record: recordStep = true } = {}) {
+    const draft = deps.getEditDraft?.() || null;
+    if (draft) {
+      // Not a model change yet: the draft rides the commit, which takes the
+      // undo step (js/v2/app.js). Same freeing rule as a committed edit.
+      if (freesEdit({ ...draft, type: 'text', replaceCoverId: draft.replaceCoverId || draft.reEdit?.coverId || 'draft' }, patch)) draft.detached = true;
+      Object.assign(draft, patch);
+      draft.styled = true;
+      deps.onEditDraftStyled?.(draft);
+      reflect(draft);
+      return;
+    }
     Object.assign(defaults, patch);          // sticky for the next new text
     const anno = deps.getTarget();
     if (anno) {
@@ -275,13 +293,13 @@ export function createFormatBar(deps) {
   // undo step, and a fractional size from a document line (7.395, shown as
   // "7.4") is never rewritten unless the user actually changes it.
   function commitSize() {
-    const cur = (deps.getTarget() || defaults).fontSize || 18;
+    const cur = (deps.getEditDraft?.() || deps.getTarget() || defaults).fontSize || 18;
     const raw = sizeIn.value.trim();
     if (raw !== '' && raw !== formatFontSize(cur)) {
       const n = parseFontSize(raw, cur);
       if (n !== cur) { apply({ fontSize: n }); return; }
     }
-    reflect(deps.getTarget() || defaults);   // garbage / empty / unchanged: show the real value
+    reflect(deps.getEditDraft?.() || deps.getTarget() || defaults);   // garbage / empty / unchanged: show the real value
   }
   sizeIn.addEventListener('change', commitSize);
   sizeIn.addEventListener('keydown', (e) => {
@@ -303,8 +321,8 @@ export function createFormatBar(deps) {
   // SINGLE SOURCE OF TRUTH for bold/italic: the buttons AND the Ctrl/Cmd+B/I
   // shortcuts (app.js) both come through here, so a shortcut can never differ
   // from the button in scope (whole box), undo step, or aria-pressed state.
-  function toggleBold() { apply({ bold: !(deps.getTarget() || defaults).bold }); }
-  function toggleItalic() { apply({ italic: !(deps.getTarget() || defaults).italic }); }
+  function toggleBold() { apply({ bold: !(deps.getEditDraft?.() || deps.getTarget() || defaults).bold }); }
+  function toggleItalic() { apply({ italic: !(deps.getEditDraft?.() || deps.getTarget() || defaults).italic }); }
   boldBtn.addEventListener('click', toggleBold);
   italicBtn.addEventListener('click', toggleItalic);
   for (const s of swatches) s.addEventListener('click', () => apply({ color: s.dataset.color }));
@@ -342,7 +360,7 @@ export function createFormatBar(deps) {
   return {
     // Show when text is in play; reflect the target's style (or the defaults).
     sync(visible) {
-      const anno = deps.getTarget();
+      const anno = deps.getEditDraft?.() || deps.getTarget();
       el.classList.toggle('show', !!visible);
       reflect(anno || defaults);
     },

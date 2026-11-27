@@ -340,7 +340,7 @@ async function drawTextAsImage(pdfPage, anno, frame, env, text) {
 // the twin's family, which for most edits was whole-line Helvetica: a face the
 // user never saw. null = no decision, or it did not verify → the twin as before.
 async function decidedFontFor(pdfPage, anno, env, text) {
-  if (!anno.replaceCoverId || !anno.fontDecision || !env.fontkit) return null;
+  if (!anno.replaceCoverId || anno.detached || !anno.fontDecision || !env.fontkit) return null;
   const r = await resolveDecidedFont(pdfPage, env.PDFLib, env.fontkit, anno.fontDecision, text);
   return r.ok ? r.font : null;
 }
