@@ -1527,13 +1527,13 @@
     ]
   },
   "toast.fontNoEmbed": {
-    "text": "Lisensi font ini nggak ngizinin dipakai di PDF",
+    "text": "Lisensi font ini melarang dipakai di PDF",
     "src": [
       "js/v2/app.js"
     ]
   },
   "toast.fontCollection": {
-    "text": "Ini kumpulan font (.ttc). Pilih satu file .ttf atau .otf",
+    "text": "File .ttc berisi beberapa font. Pilih satu file .ttf atau .otf",
     "src": [
       "js/v2/app.js"
     ]
