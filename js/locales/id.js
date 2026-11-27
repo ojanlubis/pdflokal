@@ -50,6 +50,10 @@ export default {
     armWhiteout: 'Seret di halaman untuk menutup teks',
     armSignature: 'Pilih tempat untuk menempatkan tanda tangan',
     armEdit: 'Edit teks asli. Tap tulisan yang mau kamu ubah',
+    fontNotFont: 'File ini bukan font. Pilih file .ttf atau .otf',
+    fontNoEmbed: 'Lisensi font ini nggak ngizinin dipakai di PDF',
+    fontCollection: 'Ini kumpulan font (.ttc). Pilih satu file .ttf atau .otf',
+    fontTooBig: 'Font ini terlalu besar, maksimal 15 MB',
     armEditShort: 'Tap tulisan yang mau diubah',
     missedText: 'Nggak kena tulisan, tap tepat di teksnya ya',
     // The Edit tool's limits, said at the moment the person hits them. His
@@ -319,6 +323,7 @@ export default {
     alignCenter: 'Rata tengah',
     alignRight: 'Rata kanan',
     alignJustify: 'Rata kiri-kanan',
+    addFont: '+ Font sendiri…',
   },
 
   // Kelola Halaman sheet (js/v2/page-manager.js)

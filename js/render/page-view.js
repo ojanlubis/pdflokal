@@ -29,6 +29,7 @@
 import { orderedForPaint, annotationZIndex } from '../core/annotation-order.js';
 import { turnOf } from '../core/annotation-geometry.js';
 import { t as tr } from '../lib/i18n.js';
+import { isUserFont, userFontCss } from '../core/user-fonts.js';
 
 // SINGLE SOURCE OF TRUTH for a page's displayed size, in page-space px. It
 // swaps for 90/270 — the raster is rendered pre-rotated, so the view (and every
@@ -216,6 +217,12 @@ export function textFontCss(anno) {
   if (decided) {
     const d = anno.fontDecision;
     return `${d.italic ? 'italic ' : ''}${d.bold ? '700 ' : '400 '}${anno.fontSize || 24}px "${decided}"`;
+  }
+  // A font the user brought (core/user-fonts.js) paints in its one registered
+  // face: weight and style stay 400/normal, because the file has one face and
+  // the PDF embeds exactly that one (core/export.js embedUserFont).
+  if (isUserFont(anno.fontFamily)) {
+    return `400 ${anno.fontSize || 24}px "${userFontCss(anno.fontFamily)}", ${FONT_CSS['Helvetica']}`;
   }
   const family = FONT_CSS[anno.fontFamily] || FONT_CSS['Helvetica'];
   // Rung C live-font-preview (2026-07-19): a committed Ganti replacement whose

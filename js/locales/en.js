@@ -40,6 +40,10 @@ export default {
     armWhiteout: 'Drag on the page to cover text',
     armSignature: 'Pick a spot to place the signature',
     armEdit: 'Edit original text. Tap the text you want to change',
+    fontNotFont: 'This file is not a font. Pick a .ttf or .otf file',
+    fontNoEmbed: "This font's licence does not allow using it in a PDF",
+    fontCollection: 'This is a font collection (.ttc). Pick a single .ttf or .otf file',
+    fontTooBig: 'This font is too big, 15 MB at most',
     armEditShort: 'Tap the text you want to change',
     missedText: 'Missed the text. Tap right on it',
     notText: "No text there. If it's a picture, use Whiteout.",
@@ -311,6 +315,7 @@ export default {
     alignCenter: 'Center',
     alignRight: 'Align right',
     alignJustify: 'Justify',
+    addFont: '+ Your own font…',
   },
 
   pm: {

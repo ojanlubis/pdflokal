@@ -1513,5 +1513,35 @@
     "src": [
       "js/v2/format-bar.js"
     ]
+  },
+  "format.addFont": {
+    "text": "+ Font sendiri…",
+    "src": [
+      "js/v2/format-bar.js"
+    ]
+  },
+  "toast.fontNotFont": {
+    "text": "File ini bukan font. Pilih file .ttf atau .otf",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
+  "toast.fontNoEmbed": {
+    "text": "Lisensi font ini nggak ngizinin dipakai di PDF",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
+  "toast.fontCollection": {
+    "text": "Ini kumpulan font (.ttc). Pilih satu file .ttf atau .otf",
+    "src": [
+      "js/v2/app.js"
+    ]
+  },
+  "toast.fontTooBig": {
+    "text": "Font ini terlalu besar, maksimal 15 MB",
+    "src": [
+      "js/v2/app.js"
+    ]
   }
 }

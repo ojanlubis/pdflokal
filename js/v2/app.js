@@ -121,6 +121,7 @@ import { createDocFontLive } from './doc-font-live.js';
 import { raiseToTopLayer, dropFromTopLayer, openModalDialogs, shouldRaiseOverlay } from './top-layer.js';
 import { createToast } from './toast-layer.js';
 import { singleFlight } from './single-flight.js';
+import { loadUserFonts, listUserFonts, addUserFont, pickFontFile } from './user-fonts.js';
 
 // WHY there is no `window.pdfjsLib.…workerSrc = …` line here any more: pdf.js is
 // loaded on demand now (core/vendor.js), so touching it at module top-level
@@ -1032,7 +1033,21 @@ const formatBar = createFormatBar({
     }
   },
   onControlDone: () => heldDraft?.resume(),
+  // Fonts the user brings (core/user-fonts.js, his call 2026-11-27).
+  userFonts: listUserFonts,
+  addUserFont: async () => {
+    const file = await pickFontFile();
+    if (!file) return null;
+    const r = await addUserFont(file);
+    if (r.ok) tel('tool_use', { tool: 'teks', action: 'user_font' });
+    else if (r.reason === 'no-embed') toast(tr('toast.fontNoEmbed'));
+    else if (r.reason === 'collection') toast(tr('toast.fontCollection'));
+    else if (r.reason === 'too-big') toast(tr('toast.fontTooBig'));
+    else toast(tr('toast.fontNotFont'));
+    return r;
+  },
 });
+loadUserFonts().then(() => formatBar.refreshFonts()).catch(() => {});
 
 // The inline editor's text-align for a typed Teks object (left = the default '').
 function editorAlign(style) {
