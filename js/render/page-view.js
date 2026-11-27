@@ -357,14 +357,18 @@ export function applyTurn(el, anno, origin = '0 0') {
 function isBakedEditText(anno) {
   return anno.type === 'text' && !!anno.replaceCoverId;
 }
+// Its own class, not pv-anno-text: nothing about it is painted text, and the
+// suites that guard against double paint count pv-anno-text over a baked edit.
 function bakedEditHandle(el) {
   el.dataset.baked = '1';
   el.dataset.inkColor = el.style.color;
   el.style.color = 'transparent';
+  el.classList.replace('pv-anno-text', 'pv-anno-baked');
 }
 export function revealBakedEdit(el) {
   if (!el || el.dataset.baked !== '1') return;
   el.style.color = el.dataset.inkColor || '';
+  el.classList.replace('pv-anno-baked', 'pv-anno-text');
   delete el.dataset.baked;
 }
 

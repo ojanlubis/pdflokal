@@ -2378,7 +2378,7 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
         // 'twin' (the schema's font_path enum has no separate 'clone' value).
         gantiOutcome = 'commit';
         gantiCoverId = d.replaceCoverId;
-        gantiDocFont = covered;
+        gantiDocFont = covered && !d.detached;
       }
       // RUNG D: the painted lines + the paragraph's geometry ride the
       // replacement (core/block-edit.js blockAnnotation); it sits where the
@@ -2667,18 +2667,15 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
     // Ctrl/Cmd+B / I = the format bar's buttons, for the WHOLE box. WHY
     // preventDefault always: the browser's native contenteditable bold styles
     // only the selection and is read back with textContent on commit, so it was
-    // silently lost. WHY toggle only when !editingIsReplace: a Ganti draft hides
-    // the format bar (founder ruling: editing != redefining), and with no
-    // annotation yet the toggle would rewrite the sticky defaults behind it.
+    // silently lost. An Edit draft takes them too since 2026-11-27 (the
+    // bar routes them to the draft, format-bar.js getEditDraft).
     // Ctrl/Cmd+U: no underline feature, so swallow the native one.
     if ((e.ctrlKey || e.metaKey) && !e.altKey) {
       const mk = e.key.toLowerCase();
       if (mk === 'b' || mk === 'i' || mk === 'u') {
         e.preventDefault();
-        if (!editingIsReplace) {
-          if (mk === 'b') formatBar.toggleBold();
-          else if (mk === 'i') formatBar.toggleItalic();
-        }
+        if (mk === 'b') formatBar.toggleBold();
+        else if (mk === 'i') formatBar.toggleItalic();
       }
     }
     // Escape = back out. Restore what the editor OPENED with, so commit()'s

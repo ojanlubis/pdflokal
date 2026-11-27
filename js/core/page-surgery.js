@@ -536,6 +536,9 @@ export function editSignature(page) {
     // RUNG D: a paragraph's painted line breaks are what the stamp draws; the
     // same words broken differently must re-bake.
     block: replacement?.block ?? null,
+    // A freed edit (core/operations.js freesEdit) is not stamped at all: a move
+    // changes only its place and this flag, and must still re-bake.
+    detached: !!replacement?.detached,
   }));
   return JSON.stringify(parts);
 }

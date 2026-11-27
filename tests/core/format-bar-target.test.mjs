@@ -119,7 +119,7 @@ test('blurring an EMPTY new draft into the bar keeps it open (no commit)', () =>
   assert.equal(blurCommitsDraft({ relatedTarget: font, barEl: el, text: '', hasAnno: false, hasDraft: false }), false);
 });
 
-test('every other blur still commits: no target, outside the bar, typed text, an annotation, a Ganti draft', () => {
+test('every other blur still commits: no target, outside the bar, typed text, an annotation', () => {
   const { el } = scene();
   const size = find(el, 'fb-size')[0];
   const base = { relatedTarget: size, barEl: el, text: '', hasAnno: false, hasDraft: false };
@@ -129,7 +129,17 @@ test('every other blur still commits: no target, outside the bar, typed text, an
   // Typed text commits and stays selected, so the control styles the new annotation (the designed contract).
   assert.equal(blurCommitsDraft({ ...base, text: 'Dua' }), true);
   assert.equal(blurCommitsDraft({ ...base, hasAnno: true }), true);
-  assert.equal(blurCommitsDraft({ ...base, hasDraft: true }), true);
+  // An Edit draft leaving for anywhere but the bar still commits.
+  assert.equal(blurCommitsDraft({ ...base, hasDraft: true, relatedTarget: new StubEl('div') }), true);
+  assert.equal(blurCommitsDraft({ ...base, hasDraft: true, relatedTarget: null }), true);
+});
+
+test('an Edit draft blurring INTO the bar is held, typed or not (his call 2026-11-27)', () => {
+  const { el } = scene();
+  const font = find(el, 'fb-font')[0];
+  const base = { relatedTarget: font, barEl: el, text: '', hasAnno: false, hasDraft: true };
+  assert.equal(blurCommitsDraft(base), false);
+  assert.equal(blurCommitsDraft({ ...base, text: 'Rp 1.500.000' }), false);
 });
 
 test('size typed + Enter while the empty draft is held styles the draft, not the selected text, and hands focus back', () => {

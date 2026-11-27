@@ -17,7 +17,7 @@ function scene() {
   addPages(doc, [createPage({ source: src, sourcePageNum: 0, width: 595, height: 842 })]);
   const pageId = doc.pages[0].id;
   const cover = addAnnotation(doc, pageId, createAnnotation('whiteout', {
-    x: 50, y: 100, width: 120, height: 14, replaceBox: { x: 50, y: 100, w: 120, h: 14 }, replaceTargets: [],
+    x: 50, y: 100, width: 120, height: 14, replaceBox: { x: 50, y: 100, w: 120, h: 14 }, replaceTargets: [{ str: 'Rp 1.000.000' }],
   }));
   const edit = addAnnotation(doc, pageId, createAnnotation('text', {
     x: 50, y: 100, text: 'Rp 1.500.000', fontFamily: 'Helvetica', fontSize: 11, bold: false, italic: false,
@@ -63,4 +63,13 @@ test('a freed edit is not stamped at the original: it is drawn as Teks, the cut 
   const { skipDraw, insertOutcomes } = await planNativeInserts(null, {}, {}, [edit], new Set([cover.id]), new Map());
   assert.equal(skipDraw.has(edit.id), false, 'left for the text drawer, where the user put it');
   assert.equal(insertOutcomes.get(edit.id)?.reason, 'detached');
+});
+
+test('freeing an edit changes the bake signature, so a move alone re-bakes', async () => {
+  const { editSignature } = await import('../../js/core/page-surgery.js');
+  const { doc, edit } = scene();
+  const page = doc.pages[0];
+  const before = editSignature(page);
+  edit.detached = true;
+  assert.notEqual(editSignature(page), before);
 });

@@ -100,8 +100,13 @@ export function formatTarget({ editingAnno, editingEl, selected }) {
 // which took the size meant for the next one. Kept open, editingEl stays set,
 // so the change restyles the draft. A null relatedTarget (a browser that does
 // not say where focus went) commits, as before: never a stranded editor.
+// An EDIT draft (hasDraft) is held the same way, typed or not (his call
+// 2026-11-27, the whole bar over an Edit): committing it on the way into the
+// bar would close the Edit (an untouched one cancels) and the pick would land
+// on the next Teks's defaults instead (format-bar.js getEditDraft).
 export function blurCommitsDraft({ relatedTarget, barEl, text, hasAnno, hasDraft }) {
   const intoBar = !!relatedTarget && !!barEl?.contains(relatedTarget);
+  if (intoBar && hasDraft && !hasAnno) return false;
   return !(intoBar && !text && !hasAnno && !hasDraft);
 }
 
