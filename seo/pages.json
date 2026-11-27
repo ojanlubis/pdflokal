@@ -576,7 +576,7 @@
       "howto": "Cara mengedit PDF",
       "steps": [
         "Seret PDF-mu ke kotak di atas.",
-        "Ada kata yang salah di teks yang sudah tercetak? Ketuk <strong>Edit</strong> (masih beta), lalu ketuk barisnya dan ketik penggantinya.",
+        "Ada kata yang salah di teks yang sudah tercetak? Ketuk <strong>Edit</strong>, lalu ketuk barisnya dan ketik penggantinya.",
         "Mau menambahkan tulisan baru? Ketuk <strong>Teks</strong>, lalu ketuk tempat di halaman untuk mulai menulis. Ukuran, tebal, dan warna huruf bisa diatur.",
         "Perlu menutup tulisan tanpa menggantinya? Ketuk <strong>Tipe-X</strong>, lalu seret di atas bagian yang mau ditutup. Setelah beres, ketuk Unduh."
       ],
@@ -597,7 +597,7 @@
         {
           "h2": "Yang tidak bisa (dan PDFLokal akan bilang terus terang)",
           "p": [
-            "Edit Teks Asli masih beta. Paragraf biasa bisa diubah utuh dan tulisannya turun sendiri, tapi tabel, daftar, dan judul masih per baris. Sesekali font penggantinya tidak persis sama, dan itu ditandai waktu terjadi."
+            "Paragraf biasa bisa diubah utuh dan tulisannya turun sendiri, tapi tabel, daftar, dan judul masih per baris. Sesekali font penggantinya tidak persis sama, dan itu ditandai waktu terjadi."
           ]
         },
         {
@@ -625,7 +625,7 @@
       "faq": [
         {
           "q": "Bisa mengubah tulisan yang sudah ada di PDF?",
-          "a": "Bisa, lewat tombol Edit (masih beta). Ketuk barisnya, ketik penggantinya, dan PDFLokal mencari font yang paling mendekati aslinya. Paragraf biasa bisa diubah utuh. Tabel, daftar, dan judul masih per baris."
+          "a": "Bisa, lewat tombol Edit. Ketuk barisnya, ketik penggantinya, dan PDFLokal mencari font yang paling mendekati aslinya. Paragraf biasa bisa diubah utuh. Tabel, daftar, dan judul masih per baris."
         },
         {
           "q": "Jenis hurufnya bisa dipilih?",

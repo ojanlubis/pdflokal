@@ -39,7 +39,7 @@ export default {
     armText: 'Pick a spot to write',
     armWhiteout: 'Drag on the page to cover text',
     armSignature: 'Pick a spot to place the signature',
-    armEdit: 'Edit original text, a beta feature. Tap the text you want to change',
+    armEdit: 'Edit original text. Tap the text you want to change',
     armEditShort: 'Tap the text you want to change',
     missedText: 'Missed the text. Tap right on it',
     notText: "No text there. If it's a picture, use Whiteout.",

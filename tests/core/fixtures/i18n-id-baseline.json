@@ -67,7 +67,7 @@
     ]
   },
   "toast.armEdit": {
-    "text": "Edit teks asli, fitur beta. Tap tulisan yang mau kamu ubah",
+    "text": "Edit teks asli. Tap tulisan yang mau kamu ubah",
     "src": [
       "js/v2/app.js"
     ]

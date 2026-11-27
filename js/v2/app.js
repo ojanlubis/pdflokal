@@ -1110,13 +1110,11 @@ for (const btn of document.querySelectorAll('#toolbar .tool[data-tool]')) {
     if (t === 'text') toast(tr('toast.armText'));
     if (t === 'whiteout') toast(tr('toast.armWhiteout'));
     if (t === 'signature') toast(tr('toast.armSignature'));
-    // Beta note lives HERE (not just the button's title=) because a title tip
-    // is desktop-hover only — ~half of pdflokal's traffic is mobile and would
-    // never see "beta". The arm-toast announces it on every device, once per
-    // arming, right as the user starts. Verb shifted ganti→edit to match the
-    // renamed button (taste: the verb matches the interaction model everywhere).
+    // The arm-toast says what to do next, on every device (a title tip is
+    // desktop-hover only). Edit is out of beta (his call 2026-11-27, "we have
+    // users"); the 👍/👎 on the first commit stays, it is how edits are judged.
     if (t === 'ganti') {
-      // A locked or signed file gets its own sentence INSTEAD of the beta line,
+      // A locked or signed file gets its own sentence INSTEAD of the usual line,
       // once per document (edit-expectations.js armEditNoticeKey). Literal keys
       // here so tests/core/i18n.test.mjs can see every one being read.
       const notice = armEditNoticeKey(doc);
@@ -1576,7 +1574,7 @@ async function runOcrOnPage(pageId) {
 }
 
 // setTool('ganti') fires its own arm toast for the BORN-DIGITAL ladder
-// ("Edit teks asli, fitur beta…"), which names the wrong ladder for a scan.
+// ("Edit teks asli. Tap tulisan…"), which names the wrong ladder for a scan.
 // Ours is raised after it, deliberately, so the message left standing is the
 // true one — one message at a time, the same rule showScanOffer's hideToast()
 // exists to keep.

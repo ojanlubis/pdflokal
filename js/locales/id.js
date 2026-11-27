@@ -49,7 +49,7 @@ export default {
     armText: 'Pilih tempat untuk menulis',
     armWhiteout: 'Seret di halaman untuk menutup teks',
     armSignature: 'Pilih tempat untuk menempatkan tanda tangan',
-    armEdit: 'Edit teks asli, fitur beta. Tap tulisan yang mau kamu ubah',
+    armEdit: 'Edit teks asli. Tap tulisan yang mau kamu ubah',
     armEditShort: 'Tap tulisan yang mau diubah',
     missedText: 'Nggak kena tulisan, tap tepat di teksnya ya',
     // The Edit tool's limits, said at the moment the person hits them. His

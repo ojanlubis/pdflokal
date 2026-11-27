@@ -114,7 +114,7 @@ test.describe('arming Edit on a locked or signed document', () => {
     await expect(toast(page)).toHaveText('Ada meterai/TTD digital. Kalau diedit, jadi nggak sah.');
     await page.click('[data-tool="ganti"]'); // disarm
     await page.click('[data-tool="ganti"]');
-    await expect(toast(page)).toContainText('fitur beta');
+    await expect(toast(page)).toHaveText('Edit teks asli. Tap tulisan yang mau kamu ubah');
   });
 
   test('locked: the first arm says edits cannot be downloaded, the second is normal', async ({ page }) => {
@@ -125,15 +125,15 @@ test.describe('arming Edit on a locked or signed document', () => {
     await expect(toast(page)).toHaveText('PDF ini dikunci, hasil edit nggak bisa diunduh.');
     await page.click('[data-tool="ganti"]');
     await page.click('[data-tool="ganti"]');
-    await expect(toast(page)).toContainText('fitur beta');
+    await expect(toast(page)).toHaveText('Edit teks asli. Tap tulisan yang mau kamu ubah');
   });
 
-  test('CONTROL: an ordinary PDF gets the beta line the first time', async ({ page }) => {
+  test('CONTROL: an ordinary PDF gets the usual line the first time', async ({ page }) => {
     await page.goto('/');
     await page.setInputFiles('#file-input', NASTY('surat-resmi.pdf'));
     await expectFirstPage(page);
     await page.click('[data-tool="ganti"]');
-    await expect(toast(page)).toContainText('fitur beta');
+    await expect(toast(page)).toHaveText('Edit teks asli. Tap tulisan yang mau kamu ubah');
   });
 });
 
