@@ -23,12 +23,13 @@ export async function armGanti(page) {
 }
 
 // Viewport-space box of a printed line, addressed by { str, nth } (nth match
-// of a substring, paint order) or { index } (paint-order line index). Scrolls
-// the line toward mid-viewport first so the returned center is clickable.
+// of a substring, paint order) or { index } (paint-order line index), on page
+// `pageIndex` (0-based, default the first). Scrolls the line toward
+// mid-viewport first so the returned center is clickable.
 export async function lineBox(page, target) {
-  const t = { nth: 0, ...target };
+  const t = { nth: 0, pageIndex: 0, ...target };
   const box = await page.evaluate(async (q) => {
-    const pg = window.v2.getDoc().pages[0];
+    const pg = window.v2.getDoc().pages[q.pageIndex];
     const lines = await window.v2.textRuns.getLines(pg.id);
     const line = q.str !== undefined
       ? lines.filter((l) => l.str.includes(q.str))[q.nth]

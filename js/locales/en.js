@@ -306,6 +306,11 @@ export default {
     italic: 'Italic',
     color: 'Color {color}',
     moreColors: 'More colors',
+    align: 'Paragraph alignment',
+    alignLeft: 'Align left',
+    alignCenter: 'Center',
+    alignRight: 'Align right',
+    alignJustify: 'Justify',
   },
 
   pm: {
@@ -321,6 +326,18 @@ export default {
       one: '{count} page deleted. Wrong one? Just Undo',
       other: '{count} pages deleted. Wrong ones? Just Undo',
     },
+  },
+
+  even: {
+    title: 'Pages have different widths',
+    body: "The pages have different widths. Even them out? Every page will follow the first page's width, and its content adjusts with it.",
+    go: 'Even widths',
+    later: 'Not now',
+    done: 'Page widths evened.',
+    restore: 'Restore',
+    rowMixed: 'Pages have different widths',
+    rowEvenOut: 'Even out',
+    rowEvened: 'Page widths evened',
   },
 
   bugPrompt: {

@@ -150,6 +150,17 @@ function gapCount(text) {
 // `firstIndent` right of the box's left edge and has that much less room, the
 // way CSS `text-indent` lays it out in the editor. Ignored for right/center
 // (an indented right-flush paragraph is not a layout this engine claims).
+// SINGLE SOURCE OF TRUTH for how far a line of `width` sits from its box's
+// left edge in a box `room` wide: 0 for left (and justify, which starts there),
+// half the slack for center, all of it for right. Also used for a typed Teks
+// object (core/export.js drawText, js/v2/text-raster.js), whose box is as wide
+// as its widest line, the way the screen's text-align lays it out.
+export function alignOffset(align, room, width) {
+  if (align === 'right') return room - width;
+  if (align === 'center') return (room - width) / 2;
+  return 0;
+}
+
 export function layoutLines(wrapped, { align, maxWidth, spaceWidthOf: _spaceWidthOf, firstIndent = 0 }) {
   const lastIndex = wrapped.length - 1;
   const indentable = align === 'left' || align === 'justify' || align === undefined;
@@ -159,10 +170,8 @@ export function layoutLines(wrapped, { align, maxWidth, spaceWidthOf: _spaceWidt
     const indent = index === 0 && indentable ? firstIndent : 0;
     const room = maxWidth - indent;
 
-    let dx;
-    if (align === 'right') dx = maxWidth - width;
-    else if (align === 'center') dx = (maxWidth - width) / 2;
-    else dx = indent; // left and justify both start at the box's left edge (plus a first-line indent)
+    // left and justify both start at the box's left edge (plus a first-line indent)
+    const dx = align === 'right' || align === 'center' ? alignOffset(align, maxWidth, width) : indent;
 
     let wordGapExtra = 0;
     if (align === 'justify') {

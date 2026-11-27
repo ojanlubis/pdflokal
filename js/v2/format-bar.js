@@ -19,6 +19,37 @@ import { t as tr } from '../lib/i18n.js';
 
 const COLORS = ['#000000', '#d33131', '#1d6fdc', '#1d8a44', '#ffffff'];
 
+// Paragraph alignment (his ask 2026-11-12, "rata kiri, tengah atau kanan").
+// Justify only means something inside a box of fixed width, so it is offered
+// for an Edit paragraph (Rung D, which has one) and not for typed Teks text
+// (which is as wide as its widest line). Icons: four lines, the text editors'
+// usual picture of each alignment.
+const ALIGNS = [
+  { value: 'left', label: () => tr('format.alignLeft'), lines: [[3, 17], [3, 13], [3, 17], [3, 11]] },
+  { value: 'center', label: () => tr('format.alignCenter'), lines: [[3, 17], [5, 15], [3, 17], [6, 14]] },
+  { value: 'right', label: () => tr('format.alignRight'), lines: [[3, 17], [7, 17], [3, 17], [9, 17]] },
+  { value: 'justify', label: () => tr('format.alignJustify'), lines: [[3, 17], [3, 17], [3, 17], [3, 11]] },
+];
+const SVG_NS = 'http://www.w3.org/2000/svg';
+function alignIcon(lines) {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 20 20');
+  svg.setAttribute('width', '18');
+  svg.setAttribute('height', '18');
+  svg.setAttribute('aria-hidden', 'true');
+  lines.forEach(([x1, x2], i) => {
+    const l = document.createElementNS(SVG_NS, 'line');
+    const y = String(4 + i * 4);
+    l.setAttribute('x1', String(x1)); l.setAttribute('x2', String(x2));
+    l.setAttribute('y1', y); l.setAttribute('y2', y);
+    l.setAttribute('stroke', 'currentColor');
+    l.setAttribute('stroke-width', '2');
+    l.setAttribute('stroke-linecap', 'round');
+    svg.appendChild(l);
+  });
+  return svg;
+}
+
 // deps = {
 //   el:        the bar container (in editor-v2.html)
 //   getDoc, history
@@ -32,6 +63,13 @@ const COLORS = ['#000000', '#d33131', '#1d6fdc', '#1d8a44', '#ffffff'];
 //     from this comment would get no error, just a format bar that silently
 //     stops affecting the draft under the cursor. Documented because the
 //     failure is silence, not a throw.
+//   getBlockPlan: () => the plan of an Edit PARAGRAPH draft being typed (Rung D,
+//     its `block`), or null. While one is open the bar shows ONLY alignment:
+//     an edit keeps the original's face, size and colour (founder ruling
+//     2026-07-18), but where the lines sit in the box is his to choose
+//     (2026-11-12).
+//   onBlockAlign: (align) => void — restyle that draft's editor after its
+//     plan's align changed.
 //   onControlDone: () => void — a control that took focus (font, size on
 //     Enter, custom colour on close) has finished. app.js hands focus back to
 //     an empty draft that blurCommitsDraft kept open; otherwise a no-op.
@@ -63,7 +101,7 @@ export function blurCommitsDraft({ relatedTarget, barEl, text, hasAnno, hasDraft
 export function createFormatBar(deps) {
   const { el } = deps;
   // Sticky defaults for the NEXT new text annotation.
-  const defaults = { fontFamily: 'Helvetica', fontSize: 18, bold: false, italic: false, color: '#000000' };
+  const defaults = { fontFamily: 'Helvetica', fontSize: 18, bold: false, italic: false, color: '#000000', align: 'left' };
 
   // ---- build the controls once ------------------------------------------------
   el.innerHTML = '';
@@ -146,6 +184,23 @@ export function createFormatBar(deps) {
   customColor.title = tr('format.moreColors');
   el.appendChild(customColor);
 
+  const alignGroup = document.createElement('div');
+  alignGroup.className = 'fb-align';
+  alignGroup.setAttribute('role', 'group');
+  alignGroup.setAttribute('aria-label', tr('format.align'));
+  const alignBtns = ALIGNS.map((a) => {
+    const b = document.createElement('button');
+    b.className = 'fb-toggle fb-align-btn';
+    b.dataset.align = a.value;
+    b.setAttribute('aria-label', a.label());
+    b.title = a.label();
+    b.setAttribute('aria-pressed', 'false');
+    b.appendChild(alignIcon(a.lines));
+    alignGroup.appendChild(b);
+    return b;
+  });
+  el.appendChild(alignGroup);
+
   // ---- state sync ---------------------------------------------------------------
   function reflect(style) {
     fontSel.value = style.fontFamily || 'Helvetica';
@@ -159,6 +214,44 @@ export function createFormatBar(deps) {
     for (const s of swatches) s.classList.toggle('on', s.dataset.color === cur);
     customColor.classList.toggle('on', !isPreset);
     customColor.value = cur;
+    reflectAlign();
+  }
+
+  // The bar's three states: hidden, Teks (every control; no justify), and an
+  // Edit paragraph draft (alignment only, justify included). A committed
+  // paragraph selected afterwards gets no alignment: its lines are already
+  // baked into the page, and changing them is a re-edit.
+  function alignTarget() {
+    const plan = deps.getBlockPlan?.() || null;
+    if (plan) return { kind: 'block', align: plan.align || 'left' };
+    const anno = deps.getTarget();
+    if (anno && anno.block) return null;
+    return { kind: 'text', align: (anno || defaults).align || 'left' };
+  }
+  function reflectAlign() {
+    const at = alignTarget();
+    alignGroup.hidden = !at;
+    el.classList.toggle('fb-align-only', at?.kind === 'block');
+    for (const b of alignBtns) {
+      const isJustify = b.dataset.align === 'justify';
+      b.hidden = isJustify && at?.kind !== 'block';
+      const on = !!at && at.align === b.dataset.align;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-pressed', String(on));
+    }
+  }
+  function setAlign(value) {
+    const at = alignTarget();
+    if (!at || at.align === value) return;
+    if (at.kind === 'block') {
+      // Not a model change yet: the draft's plan rides the commit
+      // (core/block-edit.js blockAnnotation), which takes the undo step.
+      deps.getBlockPlan().align = value;
+      deps.onBlockAlign?.(value);
+      reflectAlign();
+      return;
+    }
+    apply({ align: value });
   }
 
   // `record: false` = a continuation of a change whose undo step is already taken
@@ -215,6 +308,7 @@ export function createFormatBar(deps) {
   boldBtn.addEventListener('click', toggleBold);
   italicBtn.addEventListener('click', toggleItalic);
   for (const s of swatches) s.addEventListener('click', () => apply({ color: s.dataset.color }));
+  for (const b of alignBtns) b.addEventListener('click', () => setAlign(b.dataset.align));
   // 'input' fires on every tick while dragging inside the OS picker → live
   // preview on the text. WHY only the FIRST tick records: one undo step per tick
   // meant a single drag left a dozen steps, and Ctrl+Z walked back through shades

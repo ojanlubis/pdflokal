@@ -271,7 +271,9 @@ function renderBlockRows(el, anno) {
   const last = b.lines.length - 1;
   b.lines.forEach((line, i) => {
     const row = document.createElement('div');
-    const indent = i === 0 && b.align !== 'right' ? b.k * (b.indent || 0) : 0;
+    // A first-line indent belongs to left and justify only (core/reflow.js
+    // layoutLines): a centred or right-flush paragraph has none.
+    const indent = i === 0 && (b.align === 'left' || b.align === 'justify') ? b.k * (b.indent || 0) : 0;
     applyTextFont(row, anno);
     const stretch = b.align === 'justify' && i !== last && !line.hard && line.text.includes(' ');
     const align = b.align === 'justify' ? 'left' : b.align;
@@ -356,6 +358,9 @@ export function renderAnnotationEl(anno) {
     el.style.color = anno.color || '#000';
     el.style.whiteSpace = 'pre';
     el.style.lineHeight = '1.2';
+    // Rata tengah / kanan: lines inside the box the widest one makes (export.js
+    // drawText lays the file out the same way).
+    if (anno.align === 'center' || anno.align === 'right') el.style.textAlign = anno.align;
     // Finger-sized hit area without moving the visual position: small text at
     // page zoom ~0.6 is a <20px target — padding grows the hit box, the
     // negative margin cancels the layout shift. (≥44px rule, product def §6.5.)

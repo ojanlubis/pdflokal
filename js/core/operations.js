@@ -84,34 +84,97 @@ export function normalizePageWidths(doc) {
   // that must not make a single-file document look like a merge.
   const contributing = new Set(doc.pages.map((p) => p.sourceId));
   if (contributing.size < 2) return [];
+  return scalePagesToAnchor(doc.pages);
+}
 
-  const displayedWidth = (p) => ((p.rotation || 0) % 180 !== 0 ? p.height : p.width);
-  const anchor = displayedWidth(anchorPage(doc.pages));
+// The page's width as the user sees it: a quarter-turned page shows its height.
+const displayedWidth = (p) => ((p.rotation || 0) % 180 !== 0 ? p.height : p.width);
+
+// Scale every page uniformly to the anchor's displayed width. Returns the pages
+// that moved. Shared by the merge's automatic path above and the user's own
+// "Samakan lebar" below, so the two can never scale differently.
+function scalePagesToAnchor(pages) {
+  const anchor = displayedWidth(anchorPage(pages));
   if (!(anchor > 0)) return []; // a degenerate anchor must not zero the document
-
   const changed = [];
-  for (const page of doc.pages) {
+  for (const page of pages) {
     const dw = displayedWidth(page);
     if (!(dw > 0)) continue;
     const factor = anchor / dw;
     if (factor === 1) continue;
-    page.width *= factor;
-    page.height *= factor;
-    // Annotations live in this same display frame, so they move with it, or a
-    // signature at x=800 stays at 800 on a page now 595 wide. New objects, not
-    // in-place edits: history snapshots share nested fields (block) by reference.
-    page.annotations = page.annotations.map((a) => scaleAnnotationGeometry(a, factor));
-    // Drop the cached raster: it was rendered at the OLD point size. The view
-    // stretches a raster to fit, so a stale one is geometrically right and
-    // merely soft — but on a page scaled up several times over (a photo
-    // anchoring a PDF) "merely soft" is unreadable, and the streaming layer
-    // has no other signal that this page needs re-rendering. null is exactly
-    // what a not-yet-rasterized page carries, so every reader already handles
-    // it. Only pages that actually MOVED lose their raster.
-    page.raster = null;
+    scalePage(page, factor);
     changed.push(page);
   }
   return changed;
+}
+
+// SINGLE SOURCE OF TRUTH for resizing a page: both dimensions by one factor,
+// its annotations with it, its raster dropped.
+function scalePage(page, factor) {
+  page.width *= factor;
+  page.height *= factor;
+  // Annotations live in this same display frame, so they move with it, or a
+  // signature at x=800 stays at 800 on a page now 595 wide. New objects, not
+  // in-place edits: history snapshots share nested fields (block) by reference.
+  page.annotations = page.annotations.map((a) => scaleAnnotationGeometry(a, factor));
+  // Drop the cached raster: it was rendered at the OLD point size. The view
+  // stretches a raster to fit, so a stale one is geometrically right and
+  // merely soft — but on a page scaled up several times over (a photo
+  // anchoring a PDF) "merely soft" is unreadable, and the streaming layer
+  // has no other signal that this page needs re-rendering. null is exactly
+  // what a not-yet-rasterized page carries, so every reader already handles
+  // it. Only pages that actually MOVED lose their raster.
+  page.raster = null;
+}
+
+// ---- "Samakan lebar": the user's own choice (founder rulings 2026-11-03) ----
+//
+// normalizePageWidths above stays MERGE ONLY: a single file is never changed
+// unasked. These two are the asked-for half: the app offers them once when a
+// single file opens with mixed widths, in Kelola Halaman, and as "Kembalikan"
+// after a merge. Same anchor (anchorPage: page 1 unless page 1 is a photo in a
+// document that has a PDF page, the 2026-08-09 ruling), same uniform scaling.
+
+// Widths closer than this (relative) count as one width: 595 vs 595.28 is the
+// same A4 written by two programs, not a page anyone would call different.
+const WIDTH_TOLERANCE = 0.005;
+const sameWidth = (a, b) => Math.abs(a - b) <= WIDTH_TOLERANCE * Math.max(a, b);
+
+// Scale every page to the anchor's width, whatever the source count. Returns
+// the pages that moved ([] when they already match).
+export function evenPageWidths(doc) {
+  if (doc.pages.length < 2) return [];
+  return scalePagesToAnchor(doc.pages);
+}
+
+// Every page back to the size its source measured (baseWidth/baseHeight,
+// core/model.js), undoing evenPageWidths and the merge's normalisation alike.
+// Returns the pages that moved.
+export function restorePageWidths(doc) {
+  const changed = [];
+  for (const page of doc.pages) {
+    if (!(page.baseWidth > 0) || !(page.width > 0)) continue;
+    const factor = page.baseWidth / page.width;
+    if (factor === 1) continue;
+    scalePage(page, factor);
+    // Land exactly on the recorded size, not on float drift from the product.
+    page.width = page.baseWidth;
+    page.height = page.baseHeight;
+    changed.push(page);
+  }
+  return changed;
+}
+
+// What the width controls should offer:
+//   'mixed'  — displayed widths differ: offer "Samakan"
+//   'evened' — one width, reached by resizing a page: offer "Kembalikan"
+//   'even'   — one width, every page at its own size: offer nothing
+export function pageWidthsState(doc) {
+  const pages = doc.pages;
+  if (pages.length < 2) return 'even';
+  const first = displayedWidth(pages[0]);
+  if (pages.some((p) => !sameWidth(displayedWidth(p), first))) return 'mixed';
+  return pages.some((p) => p.baseWidth > 0 && !sameWidth(p.width, p.baseWidth)) ? 'evened' : 'even';
 }
 
 export function removePage(doc, pageId) {

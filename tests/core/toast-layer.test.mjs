@@ -21,7 +21,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
 
-const { createToast, TOAST_FADE_MS } = await import('../../js/v2/toast-layer.js');
+const { createToast, TOAST_FADE_MS, ACTION_TOAST_MS } = await import('../../js/v2/toast-layer.js');
 const { raiseToTopLayer, dropFromTopLayer } = await import('../../js/v2/top-layer.js');
 
 function fakeEl() {
@@ -143,10 +143,49 @@ test('the fade window covers the CSS opacity transition on #toast', () => {
 test('app.js builds toast()/hideToast() on createToast and no longer pokes .show by hand', () => {
   const src = read('js/v2/app.js');
   assert.match(src, /import \{[^}]*createToast[^}]*\} from '\.\/toast-layer\.js'/);
-  const toastFn = src.match(/function toast\(msg\) \{[\s\S]*?\n\}/)[0];
-  assert.match(toastFn, /toastCtl\.show\(msg\)/);
+  const toastFn = src.match(/function toast\(msg, opts\) \{[\s\S]*?\n\}/)[0];
+  assert.match(toastFn, /toastCtl\.show\(msg, opts\)/);
   const hideFn = src.match(/function hideToast\(\) \{[\s\S]*?\n\}/)[0];
   assert.match(hideFn, /toastCtl\.hide\(\)/);
   assert.doesNotMatch(src, /toastEl\.classList\.remove\('show'\)/,
     'removing .show by hand leaves the popover open in the top layer; use hideToast()');
+});
+
+// ---- one action ("Kembalikan", js/v2/even-widths.js) ---------------------------
+
+function fakeElWithDom() {
+  const el = fakeEl();
+  el.children = [];
+  el.append = (c) => el.children.push(c);
+  Object.defineProperty(el, 'textContent', {
+    get() { return el._text; }, set(v) { el._text = v; el.children = []; },
+  });
+  el.ownerDocument = {
+    createElement: () => {
+      const handlers = {};
+      return { addEventListener: (ev, fn) => { handlers[ev] = fn; }, click: () => handlers.click?.() };
+    },
+  };
+  return el;
+}
+
+test('a toast with an action carries ONE button, which runs the action and fades the toast', () => {
+  const el = fakeElWithDom();
+  const timers = [];
+  const ctl = createToast({
+    el, durationMs: () => 2600, raise: () => {}, drop: () => {},
+    schedule: (fn, ms) => { timers.push({ fn, ms }); return timers.length; }, cancel: () => {},
+  });
+  let ran = 0;
+  ctl.show('Lebar halaman sudah disamakan.', { action: { label: 'Kembalikan', onClick: () => { ran += 1; } } });
+  assert.equal(el.children.length, 1);
+  assert.equal(el.children[0].textContent, 'Kembalikan');
+  assert.equal(timers.at(-1).ms, ACTION_TOAST_MS, 'an action toast stays long enough to reach for');
+  el.children[0].click();
+  assert.equal(ran, 1);
+  assert.equal(el.classList.contains('show'), false, 'tapping the action fades the toast');
+  // The next plain toast replaces the words AND the button.
+  ctl.show('Disimpan');
+  assert.equal(el.children.length, 0);
+  assert.equal(timers.at(-1).ms, 2600, 'a plain toast keeps its own reading time');
 });

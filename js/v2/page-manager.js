@@ -31,6 +31,9 @@ export function setUnavailable(btn, off) {
   else btn.removeAttribute('aria-disabled');
 }
 
+// The page's width as the user sees it: a quarter-turned page shows its height.
+const displayedWidth = (p) => ((p.rotation || 0) % 180 !== 0 ? p.height : p.width);
+
 const LONG_PRESS_MS = 280;
 const DRAG_SLOP = 8; // px of movement that cancels a pending long-press
 
@@ -41,6 +44,7 @@ const DRAG_SLOP = 8; // px of movement that cancels a pending long-press
 //   getDoc, history,
 //   getRasterizer: () => rasterizer (has rasterizeThumb)
 //   onDocChanged: () => void       — app rebuilds the main stage
+//   evenWidths:   js/v2/even-widths.js — state(), even(), restore() (the widths row)
 //   onAddFiles:   () => void       — opens the file input (append/merge)
 //   onExtract:    (pages) => void  — download selected pages as a new PDF
 //   toast:        (msg) => void
@@ -107,7 +111,11 @@ export function createPageManager(deps) {
     if (dragActive) return;
     const doc = deps.getDoc();
     grid.innerHTML = '';
-    doc.pages.forEach((page, i) => grid.appendChild(renderTile(page, i)));
+    // TRUE relative widths (Samakan lebar, ruling 5): every tile is sized
+    // against the widest page, so an A5 next to an A4 looks like one. Before,
+    // every tile filled its column and the two looked identical.
+    const widest = Math.max(...doc.pages.map(displayedWidth), 0);
+    doc.pages.forEach((page, i) => grid.appendChild(renderTile(page, i, widest)));
 
     // [+] add tile — merge more files without leaving the sheet. (Not while
     // picking pages for a download — that's a selection moment, not editing.)
@@ -122,9 +130,27 @@ export function createPageManager(deps) {
     }
 
     renderBulkBar();
+    renderWidthsRow();
   }
 
-  function renderTile(page, index) {
+  // The slim row under the title: "Lebar halaman beda-beda [Samakan]" while the
+  // widths differ, "Lebar halaman sudah disamakan [Kembalikan]" once evened,
+  // nothing otherwise. Hidden while picking pages for a download, which is a
+  // selection moment, not editing (same rule as the [+] tile).
+  function renderWidthsRow() {
+    const row = sheet.querySelector('#pm-widths');
+    if (!row) return;
+    const state = pickResolve || !deps.evenWidths ? 'even' : deps.evenWidths.state();
+    row.hidden = state === 'even';
+    if (state === 'even') return;
+    const mixed = state === 'mixed';
+    row.querySelector('.pm-widths-note').textContent = mixed ? tr('even.rowMixed') : tr('even.rowEvened');
+    const act = row.querySelector('.pm-widths-act');
+    act.textContent = mixed ? tr('even.rowEvenOut') : tr('even.restore');
+    act.onclick = () => (mixed ? deps.evenWidths.even() : deps.evenWidths.restore());
+  }
+
+  function renderTile(page, index, widest) {
     const tile = document.createElement('div');
     tile.className = 'pm-tile';
     tile.dataset.pageId = page.id;
@@ -153,6 +179,14 @@ export function createPageManager(deps) {
     // thumb) hit a grid auto-row cyclic-sizing quirk: rows collapsed under
     // multi-row layouts while single rows measured fine.
     tile.style.aspectRatio = String(1 / ratio);
+    // WIDTH, not the aspect ratio, carries the difference: an A5 and an A4 share
+    // one ratio, so ratio alone draws them identical. Bottom-aligned in the row,
+    // the way pages sit on a desk.
+    if (widest > 0) {
+      tile.style.width = `${(100 * displayedWidth(page)) / widest}%`;
+      tile.style.justifySelf = 'center';
+      tile.style.alignSelf = 'end';
+    }
 
     const im = document.createElement('div');
     im.className = 'pm-thumb';

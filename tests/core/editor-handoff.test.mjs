@@ -85,7 +85,7 @@ test('the handoff keeps the armed tool: Teks stays on for the next blank', () =>
 
 test('commit() clears the shared editing state only while it is still its own', () => {
   const { commit } = openTextEditorParts();
-  assert.match(commit, /if \(editingEl === ed\) \{\s*editingAnno = null;\s*editingEl = null;\s*editingIsReplace = false;\s*\}/,
+  assert.match(commit, /if \(editingEl === ed\) \{\s*editingAnno = null;\s*editingEl = null;\s*editingIsReplace = false;\s*editingBlockPlan = null;\s*\}/,
     'commit() clears editingEl unconditionally: a late commit of an old editor wipes the open one');
   assert.doesNotMatch(commit.replace(/if \(editingEl === ed\) \{[^}]*\}/, ''), /editingEl = null/,
     'commit() still clears editingEl outside the ownership check');

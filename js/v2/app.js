@@ -48,6 +48,7 @@ import { createFormatBar, formatTarget, blurCommitsDraft } from './format-bar.js
 import { createTextRunIndex, mapRunFont, MIN_HIT } from './text-runs.js';
 import { createGantiSteer } from './ganti-steer.js';
 import { resolveTap, draftFontSize } from '../core/text-lines.js';
+import { createEvenWidths } from './even-widths.js';
 import { createPageManager } from './page-manager.js';
 import { createPageStrips } from './page-strip.js';
 import { createSignatureModal } from './signature-modal.js';
@@ -162,6 +163,7 @@ let baseName = 'dokumen';
 let editingAnno = null;       // text annotation currently in the inline editor
 let editingEl = null;         // its contenteditable (format bar restyles it live)
 let editingIsReplace = false; // Ganti Teks draft open → NO format bar (see below)
+let editingBlockPlan = null;  // ...except an Edit PARAGRAPH draft: alignment only (format-bar.js)
 let heldDraft = null;         // { resume, commit } while an empty draft waits on a format-bar control (blurCommitsDraft)
 let openEditorCommit = null;  // the open inline editor's commit, while one is open (closeOpenEditor)
 
@@ -231,10 +233,11 @@ function displayMode() {
 const toastCtl = createToast({
   el: toastEl, durationMs: toastDurationMs, raise: raiseToTopLayer, drop: dropFromTopLayer,
 });
-function toast(msg) {
+function toast(msg, opts) {
   // Scales with length (edit-expectations.js): a sentence of a dozen words is
-  // not readable in 2.6 s. Short text keeps the old 2.6 s.
-  toastCtl.show(msg);
+  // not readable in 2.6 s. Short text keeps the old 2.6 s. `opts.action`: one
+  // button after the words (toast-layer.js), e.g. "Kembalikan".
+  toastCtl.show(msg, opts);
 }
 
 // Pull a toast down early. Needed when a dialog opens on top of one: a toast
@@ -993,11 +996,18 @@ const formatBar = createFormatBar({
   getDoc: () => doc,
   history,
   getTarget: () => formatTarget({ editingAnno, editingEl, selected: selectedTextAnno() }),
+  getBlockPlan: () => (editingEl ? editingBlockPlan : null),
+  onBlockAlign: () => {
+    if (!editingEl || !editingBlockPlan) return;
+    styleBlockEditor(editingEl, editingBlockPlan);
+    placeBlockEditor(editingEl, editingBlockPlan);
+  },
   onStyled: (anno) => {
     // Restyle the open inline editor live; re-render the committed element.
     if (editingEl && editingAnno && anno.id === editingAnno.id) {
       editingEl.style.font = textFontCss(anno);
       editingEl.style.color = anno.color || '#000';
+      editingEl.style.textAlign = editorAlign(anno);
     }
     for (const page of doc.pages) {
       if (page.annotations.some((a) => a.id === anno.id)) { syncPage(page.id); break; }
@@ -1008,10 +1018,16 @@ const formatBar = createFormatBar({
     if (editingEl && !editingAnno) {
       editingEl.style.font = textFontCss(d);
       editingEl.style.color = d.color || '#000';
+      editingEl.style.textAlign = editorAlign(d);
     }
   },
   onControlDone: () => heldDraft?.resume(),
 });
+
+// The inline editor's text-align for a typed Teks object (left = the default '').
+function editorAlign(style) {
+  return style && (style.align === 'center' || style.align === 'right') ? style.align : '';
+}
 
 function syncFormatBar() {
   // FOUNDER RULING (2026-07-18, banked in ojan-ui-taste): editing ≠ redefining.
@@ -1021,7 +1037,10 @@ function syncFormatBar() {
   // font matching), never a decision pushed to the user. The bar returns for
   // authoring flows and for a committed text object selected afterwards.
   const editing = (editingAnno || editingEl) && !editingIsReplace;
-  formatBar.sync(!!(editing || (!editingIsReplace && selectedTextAnno()) || tool === 'text'));
+  // An Edit PARAGRAPH draft is the one replace that shows the bar, and only
+  // its alignment (his ask 2026-11-12; format-bar.js getBlockPlan).
+  const blockDraft = !!(editingEl && editingBlockPlan);
+  formatBar.sync(!!(editing || blockDraft || (!editingIsReplace && selectedTextAnno()) || tool === 'text'));
 }
 
 // ---- tools ----------------------------------------------------------------------
@@ -1949,6 +1968,27 @@ const interaction = createInteraction({
   onGantiSteer: gantiSteer.onSteer,
 });
 
+// ---- Samakan lebar (js/v2/even-widths.js) ---------------------------------------
+// A resize changes the page sizes the view was fitted to, so it refits (the
+// same fit a document opens at) on top of what any page op does.
+function afterWidthsChanged() {
+  textRuns.invalidateAll();
+  ocrIndex.invalidateAll();
+  zoom = openingZoom();
+  rebuildStage(); // applies zoom + sizer at the end
+  refreshChrome(); // the step just recorded: Undo lights up
+  if (document.getElementById('pm-sheet').open) pageManager.render();
+}
+const evenWidths = createEvenWidths({
+  getDoc: () => doc,
+  history,
+  onResized: afterWidthsChanged,
+  toast,
+  tel,
+  dialog: document.getElementById('even-offer'),
+  isSheetOpen: () => !!document.getElementById('pm-sheet')?.open,
+});
+
 // ---- page manager (Halaman sheet) -----------------------------------------------
 const pageManager = createPageManager({
   sheet: document.getElementById('pm-sheet'),
@@ -1959,6 +1999,7 @@ const pageManager = createPageManager({
   history,
   getRasterizer: () => rasterizer,
   onDocChanged: () => { textRuns.invalidateAll(); ocrIndex.invalidateAll(); rebuildStage(); },
+  evenWidths,
   onAddFiles: () => pickFiles(),
   onExtract: singleFlight(async (pages) => {
     const t0 = performance.now(); // extract_export.duration — tap to bytes-in-hand
@@ -2072,6 +2113,10 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
   // width, alignment, indent; line height comes with the font, above).
   const blockPlan = draft?.block || null;
   if (blockPlan) styleBlockEditor(ed, blockPlan);
+  else if (!draft) ed.style.textAlign = editorAlign(style);
+  // What the paragraph was aligned to when it opened: an alignment change with
+  // the words untouched is still a change, not a no-op (below).
+  const blockAlignAtOpen = blockPlan ? blockPlan.align : null;
   // A turned text (its page was turned) edits turned, about the same origin
   // its overlay turns about, so the words do not jump while typing. The
   // editor has no padding ring, so the origin is its own top-left. A
@@ -2086,6 +2131,7 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
   editingAnno = anno || null;
   editingEl = ed;
   editingIsReplace = !!draft;
+  editingBlockPlan = blockPlan;
   // Rung C live-font-preview: prepareDocFont (fired from smartReplace, still
   // in flight) needs to reach THIS specific editor element once the doc font
   // lands — the draft is its only handle, since a newer tap can open another
@@ -2123,6 +2169,7 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
       editingAnno = null;
       editingEl = null;
       editingIsReplace = false;
+      editingBlockPlan = null;
     }
     if (openEditorCommit === commit) openEditorCommit = null;
     // After the rest of this commit has run: a sync deferred while the editor
@@ -2169,7 +2216,7 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
         touchedEdit = !!anno.replaceCoverId;
         if (anno.replaceCoverId) { gantiOutcome = 'commit'; gantiCoverId = anno.replaceCoverId; }
       }
-    } else if (draft && text === String(draft.text || '').trim()) {
+    } else if (draft && text === String(draft.text || '').trim() && !(blockPlan && blockPlan.align !== blockAlignAtOpen)) {
       // BUG FIX (founder field test, 2026-07-19): tap a line, change NOTHING,
       // blur — must behave EXACTLY like the empty/Escape backout below, not
       // create a cover + a same-text replacement annotation (the founder
@@ -2313,6 +2360,8 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
         ...fontDecisionProps,
         ...blockProps,
         ...(d.turn ? { turn: d.turn } : {}),
+        // Typed Teks only: an edit's line keeps the original's place.
+        ...(!draft && (d.align === 'center' || d.align === 'right') ? { align: d.align } : {}),
       }));
       // RUNG D, spec §6 (his ⚖, recommended default): width is law, height is
       // not. A paragraph that grew past its own lines into the text below it
@@ -3435,8 +3484,13 @@ async function loadFilesInner(files, { replace = false } = {}) {
   }
   // Honest close-out: skips take priority over the merge tally — the user needs to
   // know something was left out more than they need the count.
+  // A merge that resized pages says so and offers the way back (Samakan lebar,
+  // ruling 4, js/v2/even-widths.js); its count rides in the same toast.
   if (failed > 0) {
     toast(tr('toast.skipped', { count: failed }));
+  } else if (rescaled.length > 0) {
+    if (firstLoad) evenWidths.afterMerge(null);
+    else evenWidths.afterMerge(tr('toast.merged', { count: doc.pages.length }));
   } else if (!firstLoad) {
     toast(tr('toast.merged', { count: doc.pages.length }));
   }
@@ -3450,6 +3504,9 @@ async function loadFilesInner(files, { replace = false } = {}) {
     pendingIntent = null;
     applyIntent(intent);
   }
+  // A single file whose pages differ in width: ask once (ruling 2). After the
+  // intent hook, so a sheet it opened is already up and the offer stands down.
+  if (firstLoad && rescaled.length === 0 && failed === 0) evenWidths.offerOnOpen();
 }
 
 // ---- the landing: dropzone, tool cards, intent hook -------------------------------
@@ -3809,9 +3866,69 @@ document.addEventListener('drop', (e) => {
     return;
   }
   droppedFiles = [...files]; // the DataTransfer empties once this handler returns
+  // Only pictures: the question is where the picture goes, on top of a page
+  // (a Gambar object at the drop point) or as a page of its own (his ask
+  // 2026-11-12). A PDF in the drop keeps the add-or-replace question, and so
+  // does a drop onto the open Halaman sheet, where the pages are the subject.
+  if (droppedFiles.every(isImageFile) && !document.getElementById('pm-sheet')?.open) {
+    droppedAt = dropPoint(e.clientX, e.clientY);
+    dropImageChoice.showModal();
+    return;
+  }
   dropChoice.showModal();
 });
 on(dropChoice, 'close', () => { droppedFiles = null; });
+
+// ---- a dropped picture: on top of the page, or a new page ----------------------
+const dropImageChoice = document.getElementById('drop-image-choice');
+let droppedAt = null;
+const IMAGE_NAME = /\.(jpe?g|jpe|jfif|png|webp|heic|heif|gif|bmp|avif)$/i;
+function isImageFile(f) {
+  return (f.type || '').startsWith('image/') || IMAGE_NAME.test(f.name || '');
+}
+// The page under the drop and the point on it, in that page's own px (what
+// annotations are positioned in). A drop in the gap between pages goes to the
+// nearest page, at its visible middle.
+function dropPoint(clientX, clientY) {
+  let best = null;
+  for (const sl of slots) {
+    const r = sl.view.getBoundingClientRect();
+    const inside = clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom;
+    if (inside) return { pageId: sl.page.id, x: (clientX - r.left) / zoom, y: (clientY - r.top) / zoom };
+    const dist = clientY < r.top ? r.top - clientY : clientY > r.bottom ? clientY - r.bottom : 0;
+    if (!best || dist < best.dist) best = { pageId: sl.page.id, dist };
+  }
+  return best ? { pageId: best.pageId, ...visibleCentreOf(best.pageId) } : null;
+}
+on(dropImageChoice, 'close', () => { droppedFiles = null; droppedAt = null; });
+on('dic-onpage', 'click', async () => {
+  const files = droppedFiles;
+  const at = droppedAt;
+  dropImageChoice.close();
+  if (!files || !at) return;
+  // Several pictures land one under another's corner, so none hides the rest.
+  const STEP = 24;
+  let placed = 0;
+  for (const file of files) {
+    let picked;
+    try { picked = await decodeImageFile(file); } catch (err) {
+      console.warn('Gambar yang di-drop gagal dibaca', err);
+      toast(tr('toast.openFailedOne'));
+      continue;
+    }
+    if (!getPage(doc, at.pageId)) return; // the page went away while decoding
+    const off = placed * STEP;
+    placePastedWith(at.pageId, () => placeImage(doc, at.pageId, picked, at.x + off, at.y + off));
+    placed += 1;
+  }
+  if (placed) tel('tool_use', { tool: 'gambar', action: 'image_drop' });
+});
+on('dic-newpage', 'click', () => {
+  const files = droppedFiles;
+  dropImageChoice.close();
+  if (files) loadFiles(files).catch((err) => { console.error(err); toast(tr('toast.openFailed')); });
+});
+on('dic-cancel', 'click', () => dropImageChoice.close());
 function takeDropped() {
   const files = droppedFiles;
   dropChoice.close(); // its close handler clears droppedFiles
@@ -3911,7 +4028,7 @@ function pushEditorHistoryState() {
 (function wireDialogHistory() {
   // NOTE: window.history everywhere — plain `history` is SHADOWED in this
   // module by the undo history (const history = createHistory()).
-  const dialogs = ['pm-sheet', 'sig-modal', 'dl-sheet', 'home-confirm', 'drop-choice', 'new-confirm', 'saved-list'].map((id) => document.getElementById(id)).filter(Boolean);
+  const dialogs = ['pm-sheet', 'sig-modal', 'dl-sheet', 'home-confirm', 'drop-choice', 'drop-image-choice', 'new-confirm', 'saved-list'].map((id) => document.getElementById(id)).filter(Boolean);
   const stack = []; // open dialogs in STACKING order (array order lies for nesting)
   let expectPop = false;
 
