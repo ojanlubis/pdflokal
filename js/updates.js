@@ -33,14 +33,14 @@ export const UPDATES = [
     date: '2026-11-27',
     text: 'Bisa pakai font sendiri: pilih + Font sendiri di daftar font. Filenya nggak diunggah.',
     en: 'Use your own font: pick + Your own font in the font list. The file is never uploaded.',
-    approved: false,
+    approved: true, // his "Yes, approve", 2026-11-27
   },
   {
     id: '2026-11-27-edit-like-teks',
     date: '2026-11-27',
     text: 'Hasil Edit sekarang bisa dipindah dan diganti font, ukuran, dan warnanya.',
     en: 'Edited text can now be moved, and its font, size and colour changed.',
-    approved: false,
+    approved: true, // his "Yes, approve", 2026-11-27
   },
   {
     id: '2026-11-12-drop-picture',
