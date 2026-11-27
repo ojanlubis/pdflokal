@@ -11,7 +11,8 @@
  * undo step per discrete change and goes through updateAnnotation (invariant #5).
  */
 
-import { updateAnnotation } from '../core/operations.js';
+import { updateAnnotation, freesEdit } from '../core/operations.js';
+import { isUserFont, userFontCss } from '../core/user-fonts.js';
 import { record } from '../core/history.js';
 import { FONT_CSS } from '../render/page-view.js';
 import { FONT_SIZE_PRESETS, parseFontSize, formatFontSize } from '../core/font-size.js';
@@ -70,6 +71,12 @@ function alignIcon(lines) {
 //     (2026-11-12).
 //   onBlockAlign: (align) => void — restyle that draft's editor after its
 //     plan's align changed.
+//   getEditDraft: () => the open Edit draft (a replace being typed, js/v2/app.js
+//     openTextEditor's `draft`), or null. His call 2026-11-27: Edit does what
+//     Teks does, so the WHOLE bar shows over an Edit and a change lands on
+//     that draft (never on the sticky defaults, which are the next Teks's).
+//     A face, size or weight frees the edit (core/operations.js freesEdit).
+//   onEditDraftStyled: (draft) => void — restyle that draft's editor.
 //   onControlDone: () => void — a control that took focus (font, size on
 //     Enter, custom colour on close) has finished. app.js hands focus back to
 //     an empty draft that blurCommitsDraft kept open; otherwise a no-op.
@@ -93,8 +100,13 @@ export function formatTarget({ editingAnno, editingEl, selected }) {
 // which took the size meant for the next one. Kept open, editingEl stays set,
 // so the change restyles the draft. A null relatedTarget (a browser that does
 // not say where focus went) commits, as before: never a stranded editor.
+// An EDIT draft (hasDraft) is held the same way, typed or not (his call
+// 2026-11-27, the whole bar over an Edit): committing it on the way into the
+// bar would close the Edit (an untouched one cancels) and the pick would land
+// on the next Teks's defaults instead (format-bar.js getEditDraft).
 export function blurCommitsDraft({ relatedTarget, barEl, text, hasAnno, hasDraft }) {
   const intoBar = !!relatedTarget && !!barEl?.contains(relatedTarget);
+  if (intoBar && hasDraft && !hasAnno) return false;
   return !(intoBar && !text && !hasAnno && !hasDraft);
 }
 
@@ -121,13 +133,35 @@ export function createFormatBar(deps) {
     'Cousine': 'Cousine (Courier New)',
     'Caladea': 'Caladea (Cambria)',
   };
-  for (const name of Object.keys(FONT_CSS)) {
-    const opt = document.createElement('option');
-    opt.value = name;
-    opt.textContent = FONT_LABELS[name] || name;
-    opt.style.fontFamily = FONT_CSS[name];
-    fontSel.appendChild(opt);
+  // The list: the bundled faces, then the fonts this user brought
+  // (core/user-fonts.js, his call 2026-11-27), then the row that adds one.
+  // Rebuilt whenever a font is added, so the new one is in the list it was
+  // picked from.
+  const ADD_FONT = '__add-font__';
+  function fillFonts() {
+    fontSel.textContent = '';
+    for (const name of Object.keys(FONT_CSS)) {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = FONT_LABELS[name] || name;
+      opt.style.fontFamily = FONT_CSS[name];
+      fontSel.appendChild(opt);
+    }
+    for (const f of deps.userFonts?.() || []) {
+      const opt = document.createElement('option');
+      opt.value = f.key;
+      opt.textContent = f.name;
+      opt.style.fontFamily = `"${userFontCss(f.key)}"`;
+      fontSel.appendChild(opt);
+    }
+    if (deps.addUserFont) {
+      const opt = document.createElement('option');
+      opt.value = ADD_FONT;
+      opt.textContent = tr('format.addFont');
+      fontSel.appendChild(opt);
+    }
   }
+  fillFonts();
   el.appendChild(fontSel);
 
   // Size = a typed number plus presets (founder 2026-10-01: the old <select>
@@ -204,6 +238,14 @@ export function createFormatBar(deps) {
   // ---- state sync ---------------------------------------------------------------
   function reflect(style) {
     fontSel.value = style.fontFamily || 'Helvetica';
+    // A user font the list does not hold (a saved document whose font this
+    // browser no longer keeps) shows as the face it falls back to.
+    if (fontSel.value !== (style.fontFamily || 'Helvetica')) fontSel.value = 'Helvetica';
+    // One face per brought font: bold/italic would be faked on screen and
+    // ignored in the file (core/export.js embedUserFont), so they rest.
+    const oneFace = isUserFont(style.fontFamily);
+    boldBtn.disabled = oneFace;
+    italicBtn.disabled = oneFace;
     sizeIn.value = formatFontSize(style.fontSize || 18);
     boldBtn.classList.toggle('on', !!style.bold);
     boldBtn.setAttribute('aria-pressed', String(!!style.bold));
@@ -224,6 +266,8 @@ export function createFormatBar(deps) {
   function alignTarget() {
     const plan = deps.getBlockPlan?.() || null;
     if (plan) return { kind: 'block', align: plan.align || 'left' };
+    // A one-line Edit has no box for its line to sit in.
+    if (deps.getEditDraft?.()) return null;
     const anno = deps.getTarget();
     if (anno && anno.block) return null;
     return { kind: 'text', align: (anno || defaults).align || 'left' };
@@ -231,7 +275,6 @@ export function createFormatBar(deps) {
   function reflectAlign() {
     const at = alignTarget();
     alignGroup.hidden = !at;
-    el.classList.toggle('fb-align-only', at?.kind === 'block');
     for (const b of alignBtns) {
       const isJustify = b.dataset.align === 'justify';
       b.hidden = isJustify && at?.kind !== 'block';
@@ -257,6 +300,17 @@ export function createFormatBar(deps) {
   // `record: false` = a continuation of a change whose undo step is already taken
   // (the colour picker's drag, see below).
   function apply(patch, { record: recordStep = true } = {}) {
+    const draft = deps.getEditDraft?.() || null;
+    if (draft) {
+      // Not a model change yet: the draft rides the commit, which takes the
+      // undo step (js/v2/app.js). Same freeing rule as a committed edit.
+      if (freesEdit({ ...draft, type: 'text', replaceCoverId: draft.replaceCoverId || draft.reEdit?.coverId || 'draft' }, patch)) draft.detached = true;
+      Object.assign(draft, patch);
+      draft.styled = true;
+      deps.onEditDraftStyled?.(draft);
+      reflect(draft);
+      return;
+    }
     Object.assign(defaults, patch);          // sticky for the next new text
     const anno = deps.getTarget();
     if (anno) {
@@ -269,19 +323,30 @@ export function createFormatBar(deps) {
     reflect(anno || defaults);
   }
 
-  fontSel.addEventListener('change', () => { apply({ fontFamily: fontSel.value }); deps.onControlDone?.(); });
+  fontSel.addEventListener('change', async () => {
+    if (fontSel.value !== ADD_FONT) { apply({ fontFamily: fontSel.value }); deps.onControlDone?.(); return; }
+    // Back to the current face while the picker is open: cancelling it must
+    // leave the select showing the truth.
+    reflect(deps.getEditDraft?.() || deps.getTarget() || defaults);
+    const added = await deps.addUserFont();
+    if (added?.ok) {
+      fillFonts();
+      apply({ fontFamily: added.key, bold: false, italic: false });
+    }
+    deps.onControlDone?.();
+  });
   // Commit on change and on Enter. Both can fire for one edit, so a commit
   // whose text already equals the current size's display is a no-op: no second
   // undo step, and a fractional size from a document line (7.395, shown as
   // "7.4") is never rewritten unless the user actually changes it.
   function commitSize() {
-    const cur = (deps.getTarget() || defaults).fontSize || 18;
+    const cur = (deps.getEditDraft?.() || deps.getTarget() || defaults).fontSize || 18;
     const raw = sizeIn.value.trim();
     if (raw !== '' && raw !== formatFontSize(cur)) {
       const n = parseFontSize(raw, cur);
       if (n !== cur) { apply({ fontSize: n }); return; }
     }
-    reflect(deps.getTarget() || defaults);   // garbage / empty / unchanged: show the real value
+    reflect(deps.getEditDraft?.() || deps.getTarget() || defaults);   // garbage / empty / unchanged: show the real value
   }
   sizeIn.addEventListener('change', commitSize);
   sizeIn.addEventListener('keydown', (e) => {
@@ -303,8 +368,11 @@ export function createFormatBar(deps) {
   // SINGLE SOURCE OF TRUTH for bold/italic: the buttons AND the Ctrl/Cmd+B/I
   // shortcuts (app.js) both come through here, so a shortcut can never differ
   // from the button in scope (whole box), undo step, or aria-pressed state.
-  function toggleBold() { apply({ bold: !(deps.getTarget() || defaults).bold }); }
-  function toggleItalic() { apply({ italic: !(deps.getTarget() || defaults).italic }); }
+  const styleNow = () => deps.getEditDraft?.() || deps.getTarget() || defaults;
+  // A brought font has one face (reflect disables the buttons); the
+  // Ctrl/Cmd+B/I shortcuts come through here too, so they rest with them.
+  function toggleBold() { if (!isUserFont(styleNow().fontFamily)) apply({ bold: !styleNow().bold }); }
+  function toggleItalic() { if (!isUserFont(styleNow().fontFamily)) apply({ italic: !styleNow().italic }); }
   boldBtn.addEventListener('click', toggleBold);
   italicBtn.addEventListener('click', toggleItalic);
   for (const s of swatches) s.addEventListener('click', () => apply({ color: s.dataset.color }));
@@ -342,11 +410,13 @@ export function createFormatBar(deps) {
   return {
     // Show when text is in play; reflect the target's style (or the defaults).
     sync(visible) {
-      const anno = deps.getTarget();
+      const anno = deps.getEditDraft?.() || deps.getTarget();
       el.classList.toggle('show', !!visible);
       reflect(anno || defaults);
     },
     getDefaults: () => ({ ...defaults }),
+    // Fonts this browser kept load after the bar is built (js/v2/user-fonts.js).
+    refreshFonts() { fillFonts(); reflect(styleNow()); },
     toggleBold,
     toggleItalic,
   };

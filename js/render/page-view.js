@@ -29,6 +29,7 @@
 import { orderedForPaint, annotationZIndex } from '../core/annotation-order.js';
 import { turnOf } from '../core/annotation-geometry.js';
 import { t as tr } from '../lib/i18n.js';
+import { isUserFont, userFontCss } from '../core/user-fonts.js';
 
 // SINGLE SOURCE OF TRUTH for a page's displayed size, in page-space px. It
 // swaps for 90/270 — the raster is rendered pre-rotated, so the view (and every
@@ -75,8 +76,9 @@ export function renderPageView(page, opts = {}) {
     // them ALSO as a DOM overlay would double-paint. A DECLINED edit's cover
     // (and its twin text, when native-insert alone declined) still renders —
     // see the editApplied skip below.
-    if (page.editApplied?.has(anno.id)) continue;
+    if (page.editApplied?.has(anno.id) && !isBakedEditText(anno)) continue;
     const el = renderAnnotationEl(anno);
+    if (page.editApplied?.has(anno.id)) bakedEditHandle(el);
     // Top of its OWN band, never top of everything — a held Tip-Ex used to get
     // z-index 1000 and so appeared above the text it belongs under, then
     // dropped behind on deselect. The screen lied while you were editing.
@@ -195,6 +197,7 @@ export const FONT_CSS = {
 // decision names the CSS family the editor registered from the very bytes the
 // stamp embeds; 'none' is never stored, so any stored decision has one.
 export function decidedFontFamily(anno) {
+  if (anno && anno.detached) return null; // core/operations.js freeEdit: the user's face, not the line's
   const d = anno && anno.fontDecision;
   return d && d.path && d.path !== 'none' && d.css ? d.css : null;
 }
@@ -215,6 +218,12 @@ export function textFontCss(anno) {
     const d = anno.fontDecision;
     return `${d.italic ? 'italic ' : ''}${d.bold ? '700 ' : '400 '}${anno.fontSize || 24}px "${decided}"`;
   }
+  // A font the user brought (core/user-fonts.js) paints in its one registered
+  // face: weight and style stay 400/normal, because the file has one face and
+  // the PDF embeds exactly that one (core/export.js embedUserFont).
+  if (isUserFont(anno.fontFamily)) {
+    return `400 ${anno.fontSize || 24}px "${userFontCss(anno.fontFamily)}", ${FONT_CSS['Helvetica']}`;
+  }
   const family = FONT_CSS[anno.fontFamily] || FONT_CSS['Helvetica'];
   // Rung C live-font-preview (2026-07-19): a committed Ganti replacement whose
   // draft successfully loaded the document's OWN embedded font (js/v2/app.js's
@@ -224,7 +233,7 @@ export function textFontCss(anno) {
   // stack stays right behind it as the per-glyph fallback (a char the doc font
   // doesn't cover silently falls through to the twin — the same honest
   // preview export's own coverage check performs).
-  const stack = anno.docFontFamily ? `"${anno.docFontFamily}", ${family}` : family;
+  const stack = anno.docFontFamily && !anno.detached ? `"${anno.docFontFamily}", ${family}` : family;
   return `${anno.italic ? 'italic ' : ''}${anno.bold ? '700 ' : '400 '}${anno.fontSize || 24}px ${stack}`;
 }
 
@@ -338,6 +347,31 @@ export function applyTurn(el, anno, origin = '0 0') {
 }
 
 // One annotation as a positioned DOM element (page-space px).
+// A baked Edit (its words are in the page image, page.editApplied) still gets
+// an element, invisible, so it can be picked up like any Teks: selected,
+// restyled, dragged (his call 2026-11-27, Edit does what Teks does). Only the
+// text: its cover is the cut itself and has nothing to grab. Drawing the
+// words would double-paint them over the raster, so they are transparent
+// until the drag frees the edit (render/interaction.js), and the re-bake that
+// follows takes the edit out of editApplied and paints it for real.
+function isBakedEditText(anno) {
+  return anno.type === 'text' && !!anno.replaceCoverId;
+}
+// Its own class, not pv-anno-text: nothing about it is painted text, and the
+// suites that guard against double paint count pv-anno-text over a baked edit.
+function bakedEditHandle(el) {
+  el.dataset.baked = '1';
+  el.dataset.inkColor = el.style.color;
+  el.style.color = 'transparent';
+  el.classList.replace('pv-anno-text', 'pv-anno-baked');
+}
+export function revealBakedEdit(el) {
+  if (!el || el.dataset.baked !== '1') return;
+  el.style.color = el.dataset.inkColor || '';
+  el.classList.replace('pv-anno-baked', 'pv-anno-text');
+  delete el.dataset.baked;
+}
+
 export function renderAnnotationEl(anno) {
   const el = document.createElement('div');
   el.className = 'pv-anno pv-anno-' + anno.type;
@@ -417,8 +451,9 @@ export function syncOverlay(page, view, opts = {}) {
     // See renderPageView's identical skip — same suppression signal, kept in
     // lockstep so a resync (undo/redo, format bar, drag) never re-draws a
     // baked edit's overlay back into existence.
-    if (page.editApplied?.has(anno.id)) continue;
+    if (page.editApplied?.has(anno.id) && !isBakedEditText(anno)) continue;
     const el = renderAnnotationEl(anno);
+    if (page.editApplied?.has(anno.id)) bakedEditHandle(el);
     const active = anno.id === activeId;
     el.style.zIndex = String(annotationZIndex(anno, { selected: active }));
     if (active) decorateSelected(el, anno);

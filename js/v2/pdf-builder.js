@@ -8,6 +8,7 @@
 import { buildPdfBytes } from '../core/export.js';
 import { ensurePdfLib } from '../core/vendor.js';
 import { rasterizeTextAnno } from './text-raster.js';
+import { userFontBytes } from './user-fonts.js';
 
 export async function buildPdfArtifact(doc, deps = {}) {
   const loadPdfLib = deps.loadPdfLib || ensurePdfLib;
@@ -25,6 +26,8 @@ export async function buildPdfArtifact(doc, deps = {}) {
     // instead of aborting the whole export. Injected HERE, the one browser
     // edge every UI route goes through, so no route can forget it.
     rasterizeText: rasterizeTextAnno,
+    // A font the user brought lives in this browser only (js/v2/user-fonts.js).
+    userFontBytes,
   });
   return { bytes, fontFallback, covered };
 }

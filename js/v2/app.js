@@ -40,7 +40,7 @@ import {
 } from '../core/telemetry-schema.js';
 import { createOcrIndex, ocrEngineLoaded } from './ocr-runs.js';
 import { scanAppearance, scanPaper } from './scan-appearance.js';
-import { createPageSlot, pageDisplaySize, syncOverlay, textFontCss, applyTextFont, measureTextAnnoWidth, applyTurn } from '../render/page-view.js';
+import { createPageSlot, pageDisplaySize, syncOverlay, textFontCss, applyTextFont, measureTextAnnoWidth, applyTurn, revealBakedEdit } from '../render/page-view.js';
 import { createViewportStream } from '../render/viewport.js';
 import { RASTER_BASE, sharpenScale, maxPixelsFor, imageScaleCap } from '../render/sharpen.js';
 import { createInteraction } from '../render/interaction.js';
@@ -121,6 +121,7 @@ import { createDocFontLive } from './doc-font-live.js';
 import { raiseToTopLayer, dropFromTopLayer, openModalDialogs, shouldRaiseOverlay } from './top-layer.js';
 import { createToast } from './toast-layer.js';
 import { singleFlight } from './single-flight.js';
+import { loadUserFonts, listUserFonts, addUserFont, pickFontFile } from './user-fonts.js';
 
 // WHY there is no `window.pdfjsLib.…workerSrc = …` line here any more: pdf.js is
 // loaded on demand now (core/vendor.js), so touching it at module top-level
@@ -162,8 +163,9 @@ let pendingGambar = null;
 let baseName = 'dokumen';
 let editingAnno = null;       // text annotation currently in the inline editor
 let editingEl = null;         // its contenteditable (format bar restyles it live)
-let editingIsReplace = false; // Ganti Teks draft open → NO format bar (see below)
-let editingBlockPlan = null;  // ...except an Edit PARAGRAPH draft: alignment only (format-bar.js)
+let editingIsReplace = false; // an Edit draft is open
+let editingBlockPlan = null;  // an Edit PARAGRAPH draft's plan: its alignment (format-bar.js)
+let editingDraft = null;      // the open Edit draft, which the format bar styles (getEditDraft)
 let heldDraft = null;         // { resume, commit } while an empty draft waits on a format-bar control (blurCommitsDraft)
 let openEditorCommit = null;  // the open inline editor's commit, while one is open (closeOpenEditor)
 
@@ -997,6 +999,13 @@ const formatBar = createFormatBar({
   history,
   getTarget: () => formatTarget({ editingAnno, editingEl, selected: selectedTextAnno() }),
   getBlockPlan: () => (editingEl ? editingBlockPlan : null),
+  getEditDraft: () => (editingEl && editingIsReplace ? editingDraft : null),
+  onEditDraftStyled: (d) => {
+    if (!editingEl || editingDraft !== d) return;
+    applyTextFont(editingEl, d);
+    editingEl.style.color = d.color || '#000';
+    if (editingBlockPlan) placeBlockEditor(editingEl, editingBlockPlan);
+  },
   onBlockAlign: () => {
     if (!editingEl || !editingBlockPlan) return;
     styleBlockEditor(editingEl, editingBlockPlan);
@@ -1010,7 +1019,9 @@ const formatBar = createFormatBar({
       editingEl.style.textAlign = editorAlign(anno);
     }
     for (const page of doc.pages) {
-      if (page.annotations.some((a) => a.id === anno.id)) { syncPage(page.id); break; }
+      if (!page.annotations.some((a) => a.id === anno.id)) continue;
+      if (anno.replaceCoverId) bakeAfterEditChange(page.id, null); else syncPage(page.id);
+      break;
     }
   },
   onDefaults: (d) => {
@@ -1022,7 +1033,21 @@ const formatBar = createFormatBar({
     }
   },
   onControlDone: () => heldDraft?.resume(),
+  // Fonts the user brings (core/user-fonts.js, his call 2026-11-27).
+  userFonts: listUserFonts,
+  addUserFont: async () => {
+    const file = await pickFontFile();
+    if (!file) return null;
+    const r = await addUserFont(file);
+    if (r.ok) tel('tool_use', { tool: 'teks', action: 'user_font' });
+    else if (r.reason === 'no-embed') toast(tr('toast.fontNoEmbed'));
+    else if (r.reason === 'collection') toast(tr('toast.fontCollection'));
+    else if (r.reason === 'too-big') toast(tr('toast.fontTooBig'));
+    else toast(tr('toast.fontNotFont'));
+    return r;
+  },
 });
+loadUserFonts().then(() => formatBar.refreshFonts()).catch(() => {});
 
 // The inline editor's text-align for a typed Teks object (left = the default '').
 function editorAlign(style) {
@@ -1036,11 +1061,11 @@ function syncFormatBar() {
   // not redefine the text"). Fidelity is the machine's job (sampling, Rung C
   // font matching), never a decision pushed to the user. The bar returns for
   // authoring flows and for a committed text object selected afterwards.
-  const editing = (editingAnno || editingEl) && !editingIsReplace;
-  // An Edit PARAGRAPH draft is the one replace that shows the bar, and only
-  // its alignment (his ask 2026-11-12; format-bar.js getBlockPlan).
-  const blockDraft = !!(editingEl && editingBlockPlan);
-  formatBar.sync(!!(editing || blockDraft || (!editingIsReplace && selectedTextAnno()) || tool === 'text'));
+  // SUPERSEDED 2026-11-27 by his call "Edit does everything Teks does": the
+  // whole bar shows over an Edit draft too, and a change lands on that draft
+  // (format-bar.js getEditDraft). An untouched edit still keeps the
+  // original's face; only the user's own choice replaces it.
+  formatBar.sync(!!(editingAnno || editingEl || selectedTextAnno() || tool === 'text'));
 }
 
 // ---- tools ----------------------------------------------------------------------
@@ -1100,13 +1125,11 @@ for (const btn of document.querySelectorAll('#toolbar .tool[data-tool]')) {
     if (t === 'text') toast(tr('toast.armText'));
     if (t === 'whiteout') toast(tr('toast.armWhiteout'));
     if (t === 'signature') toast(tr('toast.armSignature'));
-    // Beta note lives HERE (not just the button's title=) because a title tip
-    // is desktop-hover only — ~half of pdflokal's traffic is mobile and would
-    // never see "beta". The arm-toast announces it on every device, once per
-    // arming, right as the user starts. Verb shifted ganti→edit to match the
-    // renamed button (taste: the verb matches the interaction model everywhere).
+    // The arm-toast says what to do next, on every device (a title tip is
+    // desktop-hover only). Edit is out of beta (his call 2026-11-27, "we have
+    // users"); the 👍/👎 on the first commit stays, it is how edits are judged.
     if (t === 'ganti') {
-      // A locked or signed file gets its own sentence INSTEAD of the beta line,
+      // A locked or signed file gets its own sentence INSTEAD of the usual line,
       // once per document (edit-expectations.js armEditNoticeKey). Literal keys
       // here so tests/core/i18n.test.mjs can see every one being read.
       const notice = armEditNoticeKey(doc);
@@ -1194,6 +1217,9 @@ function reEditLine(pageId, cover, replacement) {
     italic: !!replacement?.italic,
     color: replacement?.color,
     docFontFamily: replacement?.docFontFamily,
+    // A freed edit (core/operations.js freesEdit) reopens as the user left it:
+    // their face, at their place, and the commit keeps it freed.
+    ...(replacement?.detached ? { detached: true } : {}),
     // The committed edit's font decision: the editor opens IN that face (its
     // FontFace is still registered), and prepareDocFont re-loads the same
     // candidates from it rather than re-deriving them.
@@ -1217,7 +1243,7 @@ function reEditLine(pageId, cover, replacement) {
       coverColor: cover.color,
     },
   };
-  const at = draft.turn ? { x: replacement.x, y: replacement.y } : { x: box.x, y: box.y };
+  const at = draft.turn || draft.detached ? { x: replacement.x, y: replacement.y } : { x: box.x, y: box.y };
   openTextEditor({ pageId, x: draft.block ? draft.block.disp.x : at.x, y: at.y, anno: null, draft });
   setTool('select');
   hideToast();
@@ -1563,7 +1589,7 @@ async function runOcrOnPage(pageId) {
 }
 
 // setTool('ganti') fires its own arm toast for the BORN-DIGITAL ladder
-// ("Edit teks asli, fitur beta…"), which names the wrong ladder for a scan.
+// ("Edit teks asli. Tap tulisan…"), which names the wrong ladder for a scan.
 // Ours is raised after it, deliberately, so the message left standing is the
 // true one — one message at a time, the same rule showScanOffer's hideToast()
 // exists to keep.
@@ -1872,7 +1898,12 @@ const interaction = createInteraction({
   getZoom: () => zoom,
   getTool: () => tool,
   history,
-  onChange: (kind) => {
+  onChange: (kind, payload) => {
+    const moved = payload?.annotation;
+    if ((kind === 'move' || kind === 'resize') && moved?.replaceCoverId) {
+      const pid = doc.pages.find((p) => p.annotations.includes(moved))?.id;
+      if (pid) bakeAfterEditChange(pid, null);
+    }
     // Tip-Ex stroke finished (color was already matched at stroke START):
     // return home to Pilih (founder: whiteout should NOT stay sticky).
     if (kind === 'draw') {
@@ -1962,6 +1993,10 @@ const interaction = createInteraction({
     const found = findAnnotation(doc, annoId);
     if (found) {
       const { page, annotation: anno } = found;
+      // A selected Edit retypes through Edit's own editor (its cover, its
+      // font ladder, one edit per original line), never the Teks one.
+      const cover = anno.replaceCoverId ? findAnnotation(doc, anno.replaceCoverId)?.annotation : null;
+      if (cover?.replaceBox) { reEditLine(page.id, cover, anno); return; }
       openTextEditor({ pageId: page.id, x: anno.x, y: anno.y, anno });
     }
   },
@@ -2131,6 +2166,7 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
   editingAnno = anno || null;
   editingEl = ed;
   editingIsReplace = !!draft;
+  editingDraft = draft || null;
   editingBlockPlan = blockPlan;
   // Rung C live-font-preview: prepareDocFont (fired from smartReplace, still
   // in flight) needs to reach THIS specific editor element once the doc font
@@ -2169,6 +2205,7 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
       editingAnno = null;
       editingEl = null;
       editingIsReplace = false;
+      editingDraft = null;
       editingBlockPlan = null;
     }
     if (openEditorCommit === commit) openEditorCommit = null;
@@ -2216,7 +2253,7 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
         touchedEdit = !!anno.replaceCoverId;
         if (anno.replaceCoverId) { gantiOutcome = 'commit'; gantiCoverId = anno.replaceCoverId; }
       }
-    } else if (draft && text === String(draft.text || '').trim() && !(blockPlan && blockPlan.align !== blockAlignAtOpen)) {
+    } else if (draft && text === String(draft.text || '').trim() && !draft.styled && !(blockPlan && blockPlan.align !== blockAlignAtOpen)) {
       // BUG FIX (founder field test, 2026-07-19): tap a line, change NOTHING,
       // blur — must behave EXACTLY like the empty/Escape backout below, not
       // create a cover + a same-text replacement annotation (the founder
@@ -2335,13 +2372,13 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
         // program + an exact metric clone routed = nothing real was
         // substituted — silent. See prepareDocFont for the fields' WHY.
         const nameOnlyClone = d.fontUnembedded && d.cloneRouted;
-        if (!covered && !nameOnlyClone) toast(tr('toast.fontSubstituteChar'));
+        if (!covered && !nameOnlyClone && !d.detached) toast(tr('toast.fontSubstituteChar'));
         // font_path is 'doc-font' only when the document's OWN font paints
         // this — a name-only clone is still a substitute, so it reads as
         // 'twin' (the schema's font_path enum has no separate 'clone' value).
         gantiOutcome = 'commit';
         gantiCoverId = d.replaceCoverId;
-        gantiDocFont = covered;
+        gantiDocFont = covered && !d.detached;
       }
       // RUNG D: the painted lines + the paragraph's geometry ride the
       // replacement (core/block-edit.js blockAnnotation); it sits where the
@@ -2360,6 +2397,8 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
         ...fontDecisionProps,
         ...blockProps,
         ...(d.turn ? { turn: d.turn } : {}),
+        // Freed by the format bar while typing (core/operations.js freesEdit).
+        ...(d.replaceCoverId && d.detached ? { detached: true } : {}),
         // Typed Teks only: an edit's line keeps the original's place.
         ...(!draft && (d.align === 'center' || d.align === 'right') ? { align: d.align } : {}),
       }));
@@ -2628,18 +2667,15 @@ function openTextEditor({ pageId, x, y, anno, draft }) {
     // Ctrl/Cmd+B / I = the format bar's buttons, for the WHOLE box. WHY
     // preventDefault always: the browser's native contenteditable bold styles
     // only the selection and is read back with textContent on commit, so it was
-    // silently lost. WHY toggle only when !editingIsReplace: a Ganti draft hides
-    // the format bar (founder ruling: editing != redefining), and with no
-    // annotation yet the toggle would rewrite the sticky defaults behind it.
+    // silently lost. An Edit draft takes them too since 2026-11-27 (the
+    // bar routes them to the draft, format-bar.js getEditDraft).
     // Ctrl/Cmd+U: no underline feature, so swallow the native one.
     if ((e.ctrlKey || e.metaKey) && !e.altKey) {
       const mk = e.key.toLowerCase();
       if (mk === 'b' || mk === 'i' || mk === 'u') {
         e.preventDefault();
-        if (!editingIsReplace) {
-          if (mk === 'b') formatBar.toggleBold();
-          else if (mk === 'i') formatBar.toggleItalic();
-        }
+        if (mk === 'b') formatBar.toggleBold();
+        else if (mk === 'i') formatBar.toggleItalic();
       }
     }
     // Escape = back out. Restore what the editor OPENED with, so commit()'s
@@ -3143,6 +3179,11 @@ document.addEventListener('keydown', (e) => {
   if (a) {
     const el = stage.querySelector(`[data-anno-id="${a.id}"]`);
     if (el) { el.style.left = a.x + 'px'; el.style.top = a.y + 'px'; }
+    if (a.replaceCoverId) {
+      revealBakedEdit(el);
+      const pid = doc.pages.find((p) => p.annotations.includes(a))?.id;
+      if (pid) bakeAfterEditChange(pid, null);
+    }
   }
 });
 

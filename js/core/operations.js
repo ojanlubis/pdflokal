@@ -372,11 +372,28 @@ export function copySignatureToAllPages(doc, annotationId) {
   return added;
 }
 
+// SINGLE SOURCE OF TRUTH for "when does an Edit stop being the original's line".
+// His call 2026-11-27: Edit does everything Teks does (move, font, size, bold,
+// italic, colour, alignment), overriding the 2026-07-18 "editing is not
+// redefining" ruling. An edit the user MOVES, or gives a face, size or weight
+// of their own, is FREED (`detached: true`): the original's words stay cut,
+// and the new text is drawn as plain Teks where and how the user put it
+// (core/page-surgery.js skips the stamp, core/export.js and render/page-view.js
+// stop using the line's decided face). Colour and alignment do NOT free it:
+// the stamp already paints the annotation's colour in the document's own font,
+// and a paragraph's alignment rides its block.
+export const EDIT_FREEING_KEYS = ['fontFamily', 'fontSize', 'bold', 'italic'];
+export function freesEdit(annotation, patch) {
+  if (!annotation || annotation.type !== 'text' || !annotation.replaceCoverId || annotation.detached) return false;
+  return EDIT_FREEING_KEYS.some((k) => k in patch && patch[k] !== annotation[k]);
+}
+
 export function updateAnnotation(doc, annotationId, patch) {
   const found = findAnnotation(doc, annotationId);
   if (!found) return null;
   // WHY: the editor commit lands here; see createAnnotation (core/model.js).
   if (found.annotation.type === 'text' && typeof patch.text === 'string') patch = { ...patch, text: normaliseEnteredText(patch.text) };
+  if (freesEdit(found.annotation, patch)) patch = { ...patch, detached: true };
   Object.assign(found.annotation, patch);
   return found.annotation;
 }
@@ -428,6 +445,9 @@ export function moveAnnotation(doc, annotationId, dx, dy) {
   const to = originInside(page, annotation, (annotation.x || 0) + dx, (annotation.y || 0) + dy);
   const moved = withBlockFollowing({ ...annotation, x: to.x, y: to.y }, annotation);
   // In place: the drag holds this object and reads its x/y back.
+  // A moved Edit is freed (freesEdit above): the stamp would bake it back at
+  // the original's place.
+  if (annotation.type === 'text' && annotation.replaceCoverId && (moved.x !== annotation.x || moved.y !== annotation.y)) annotation.detached = true;
   annotation.x = moved.x;
   annotation.y = moved.y;
   if (moved.block !== annotation.block) annotation.block = moved.block;

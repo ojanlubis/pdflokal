@@ -28,6 +28,7 @@ import { resolveDecidedFont, blockText } from './stamp.js';
 import { placeBlockLines } from './block-edit.js';
 import { alignOffset } from './reflow.js';
 import { CLONE_FONT_VARIANTS, CLONE_FONT_URLS, isSfntFontProgram } from './clone-fonts.js';
+import { isUserFont } from './user-fonts.js';
 import { toStandardFontSafe, drawTextSafe, unencodableInStandardFont } from './text-encode.js';
 import { totalPageRotation } from './page-rotation.js';
 import { orderedForPaint } from './annotation-order.js';
@@ -138,7 +139,28 @@ async function embedStandardFont(env, fontName, bold) {
   return env.fontCache[fontName];
 }
 
+// A font the user brought (core/user-fonts.js). Its bytes come from the
+// browser edge (deps.userFontBytes, js/v2/pdf-builder.js): core stays
+// headless and never opens storage. One face per file, so bold/italic do not
+// pick a variant (the format bar disables them for a user font). Missing
+// bytes (a saved document reopened in a browser that lost the font) take the
+// SAME honest fallback as a bundled font that failed to load, witness and all.
+async function embedUserFont(env, key) {
+  if (env.fontCache[key]) return env.fontCache[key];
+  let bytes = null;
+  try { bytes = env.userFontBytes ? await env.userFontBytes(key) : null; } catch { bytes = null; }
+  if (!bytes || !env.fontkit || !isSfntFontProgram(bytes)) return cacheFallbackFont(env, key, false);
+  try {
+    env.fontCache[key] = await env.newDoc.embedFont(bytes, { subset: true });
+    return env.fontCache[key];
+  } catch (err) {
+    console.error('[core/export] Failed to embed a user font', err);
+    return cacheFallbackFont(env, key, false);
+  }
+}
+
 async function getFont(env, fontFamily, bold, italic) {
+  if (isUserFont(fontFamily)) return embedUserFont(env, fontFamily);
   const { name, isCustom } = resolveFontName(fontFamily || 'Helvetica', bold, italic);
   if (env.fontCache[name]) return env.fontCache[name];
   return isCustom ? embedCustomFont(env, name, bold) : embedStandardFont(env, name, bold);
@@ -340,7 +362,7 @@ async function drawTextAsImage(pdfPage, anno, frame, env, text) {
 // the twin's family, which for most edits was whole-line Helvetica: a face the
 // user never saw. null = no decision, or it did not verify → the twin as before.
 async function decidedFontFor(pdfPage, anno, env, text) {
-  if (!anno.replaceCoverId || !anno.fontDecision || !env.fontkit) return null;
+  if (!anno.replaceCoverId || anno.detached || !anno.fontDecision || !env.fontkit) return null;
   const r = await resolveDecidedFont(pdfPage, env.PDFLib, env.fontkit, anno.fontDecision, text);
   return r.ok ? r.font : null;
 }
@@ -838,6 +860,7 @@ export async function buildPdfBytes(doc, deps = {}) {
     PDFLib, fontkit, newDoc, fontCache: {}, imageCache: new Map(),
     onFontFallback: deps.onFontFallback || null, // see cacheFallbackFont
     rasterizeText: deps.rasterizeText || null,   // see drawTextAsImage
+    userFontBytes: deps.userFontBytes || null,   // see embedUserFont
   };
   env.getFont = (family, bold, italic) => getFont(env, family, bold, italic);
 

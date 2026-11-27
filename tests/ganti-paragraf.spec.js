@@ -112,7 +112,9 @@ test('a tapped paragraph is edited whole, re-wraps in its own box, and the file 
   // The page re-renders from the edited FILE bytes (the commit-time bake); once
   // it has, the replacement's overlay is suppressed and the raster is the file.
   await page.waitForFunction((id) => window.v2.getDoc().pages[0].editApplied?.has(id), anno.id, { timeout: 10_000 });
-  await expect(page.locator(`[data-anno-id="${anno.id}"]`)).toHaveCount(0);
+  // Its only element is the invisible grab handle (render/page-view.js
+  // bakedEditHandle, 2026-11-27): nothing painted over the raster.
+  await expect(page.locator(`[data-anno-id="${anno.id}"]:not([data-baked])`)).toHaveCount(0);
   const baked = await page.screenshot({ clip });
   // Same lines at the same heights: the rows of ink in the editor and in the
   // rendered file line up (a shift would be the editor sitting off the

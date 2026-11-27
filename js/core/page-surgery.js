@@ -380,6 +380,15 @@ export async function planNativeInserts(pdfPage, PDFLib, fontkit, annotations, s
   if (!fontkit) return { skipDraw, insertOutcomes }; // same deps guard as the custom-font embed path
   for (const anno of annotations) {
     if (anno.type !== 'text' || !anno.replaceCoverId || !skipCovers.has(anno.replaceCoverId)) continue;
+    // A FREED edit (core/operations.js freeEdit: moved, or given a face, size
+    // or weight by the user) is not the original's line any more. The cut
+    // still holds, so the old words are gone, but the stamp would draw at the
+    // original's place in the original's font. Left out of skipDraw, it is
+    // drawn like any Teks, where and how the user put it.
+    if (anno.detached) {
+      insertOutcomes.set(anno.id, { path: 'twin', reason: 'detached', style_source: anno.styleSource || 'none', glyph_shortfall: 0, decision: 'none', decided_live: false });
+      continue;
+    }
     const insert = insertByCover.get(anno.replaceCoverId);
     if (!insert) continue;
     try {
@@ -527,6 +536,9 @@ export function editSignature(page) {
     // RUNG D: a paragraph's painted line breaks are what the stamp draws; the
     // same words broken differently must re-bake.
     block: replacement?.block ?? null,
+    // A freed edit (core/operations.js freesEdit) is not stamped at all: a move
+    // changes only its place and this flag, and must still re-bake.
+    detached: !!replacement?.detached,
   }));
   return JSON.stringify(parts);
 }

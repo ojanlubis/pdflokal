@@ -88,16 +88,14 @@ async function editMiddleLine(page, newText) {
 }
 
 test.describe('edit beta: rename + first-commit feedback', () => {
-  test('the tool is renamed Edit with a VISIBLE beta badge + beta arm-toast', async ({ page }) => {
+  // Out of beta (his call 2026-11-27): no badge, no beta in the arm-toast.
+  test('the tool is Edit, with no beta badge and no beta in the arm-toast', async ({ page }) => {
     await openDoc(page, NASTY('undangan-cid.pdf'));
     const btn = page.locator('[data-tool="ganti"]');
-    await expect(btn).toContainText('Edit');
-    await expect(btn).not.toContainText('Ganti');
-    const badge = btn.locator('.beta-tag');
-    await expect(badge).toBeVisible();
-    await expect(badge).toHaveText(/beta/i);
+    await expect(btn).toHaveText('Edit');
+    await expect(btn).not.toHaveAttribute('title', /beta/i);
     await armGanti(page);
-    await expect(page.locator('#toast')).toContainText(/beta/i);
+    await expect(page.locator('#toast')).toHaveText('Edit teks asli. Tap tulisan yang mau kamu ubah');
   });
 
   test('the pill appears on the first commit; 👍 sends rating:up (no note)', async ({ page }) => {

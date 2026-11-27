@@ -84,14 +84,14 @@ test('Teks: rata tengah from the bar lands on the committed text and stays for t
   await expect(page.locator(`[data-anno-id="${anno.id}"]`)).toHaveCSS('text-align', 'center');
 });
 
-test('Edit paragraph: the bar shows alignment only; centring with the words untouched commits', async ({ page }) => {
+test('Edit paragraph: the whole bar shows, justify included; centring with the words untouched commits', async ({ page }) => {
   await openPdf(page, 'paragraf-badan.pdf');
   await armGanti(page);
   await tapLine(page, { str: 'lingkungan kantor' });
   const ed = page.locator('.v2-text-edit');
   await expect(ed).toHaveAttribute('data-block', 'justify');
-  await expect(page.locator('#format-bar')).toHaveClass(/fb-align-only/);
-  await expect(page.locator('#format-bar .fb-font')).toBeHidden();
+  // His call 2026-11-27: Edit does what Teks does.
+  await expect(page.locator('#format-bar .fb-font')).toBeVisible();
   await expect(page.locator('#format-bar .fb-align-btn[data-align="justify"]')).toHaveAttribute('aria-pressed', 'true');
   await page.locator('#format-bar .fb-align-btn[data-align="center"]').click();
   await expect(ed).toHaveCSS('text-align', 'center');

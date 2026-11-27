@@ -148,6 +148,7 @@ export function startLineFont({ draft, candidates, lineKey = null, onRefuse, onS
   const state = { accepted: ed.textContent, decision: null, flips: 0, composing: false };
 
   const show = (decision) => {
+    if (draft.detached) return; // the user picked the face (core/operations.js freeEdit)
     if (!decision || decision.path === 'none') return; // keep the face already shown
     if (state.decision && faceId(state.decision) !== faceId(decision)) state.flips += 1;
     state.decision = decision;
@@ -174,6 +175,7 @@ export function startLineFont({ draft, candidates, lineKey = null, onRefuse, onS
 
   const onInput = () => {
     if (state.composing) return; // IME: judge the composed text, not its pieces
+    if (draft.detached) return;  // a freed edit types like Teks: nothing is refused
     const next = ed.textContent;
     const r = acceptLineInput(state.accepted, next, live);
     if (r.text !== next) replaceText(ed, next, r.text);
@@ -187,7 +189,7 @@ export function startLineFont({ draft, candidates, lineKey = null, onRefuse, onS
   // plain insertions — composition (most phone keyboards) is not cancelable
   // and falls to the input handler above, which strips it after the fact.
   ed.addEventListener('beforeinput', (e) => {
-    if (e.inputType !== 'insertText' || !e.data || !e.cancelable) return;
+    if (e.inputType !== 'insertText' || !e.data || !e.cancelable || draft.detached) return;
     const blocked = [...e.data].filter((ch) => decideLineFont(ch, live).path === 'none');
     if (blocked.length === 0 || blocked.length !== [...e.data].length) return;
     e.preventDefault();
@@ -201,6 +203,7 @@ export function startLineFont({ draft, candidates, lineKey = null, onRefuse, onS
     // The decision for the text being committed, decided NOW (not from the
     // last input event) so a commit can never carry a stale face.
     decideNow(text) {
+      if (draft.detached) return null;
       return stored(decideLineFont(text, live));
     },
     get flips() { return state.flips; },

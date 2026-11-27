@@ -447,7 +447,7 @@ export const SCHEMA = {
     // 'even_widths' / 'restore_widths' (2026-11-03, tool 'halaman'): Samakan lebar
     // and its Kembalikan (js/v2/even-widths.js), from the open offer, Kelola
     // Halaman or the toast. ENUM ADDITION ONLY.
-    action: ['select', 'whiteout', 'text', 'text_inline', 'signature', 'paraf', 'delete', 'pages_open', 'merge', 'arm', 'sig_modal_open', 'extract', 'original_delete', 'original_miss', 'image', 'image_paste', 'image_drop', 'even_widths', 'restore_widths'],
+    action: ['select', 'whiteout', 'text', 'text_inline', 'signature', 'paraf', 'delete', 'pages_open', 'merge', 'arm', 'sig_modal_open', 'extract', 'original_delete', 'original_miss', 'image', 'image_paste', 'image_drop', 'even_widths', 'restore_widths', 'user_font'],
   },
   // THE OTHER HALF OF THE SAME BLIND SPOT (2026-09-10). `export` fires when a
   // file is actually produced, and `failure`/stage:export fires when the build
@@ -708,6 +708,9 @@ export const SCHEMA = {
     reason: [
       'clean', 'unsupported-font', 'mixed-fonts', 'multiline', 'empty',
       'missing-glyph', 'clone-unavailable',
+      // 'detached' (2026-11-27, additive): the user moved or restyled the edit,
+      // so it is drawn as Teks by choice (core/operations.js freeEdit).
+      'detached',
     ],
     // style_source/glyph_shortfall (Increment B, core/stamp.js's
     // resolveStampFont): style_source names which ladder rung decided the
