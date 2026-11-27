@@ -9,6 +9,7 @@ import { expect } from '@playwright/test';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { lineBox, centerOf } from './lines.js';
+import { DONE_KEY, doneValue } from '../../js/v2/vote-memory.js';
 import { expectFirstPage } from './render.js';
 import { downloadBytes, inspectPdf } from './download-bytes.js';
 
@@ -18,6 +19,11 @@ export const UNDANGAN = NASTY('undangan-cid.pdf');
 export const LINE = 'Rapat Anggota Tahunan 2026';
 
 export async function openDoc(page, fixture = UNDANGAN) {
+  // These specs download twice, and the feature-vote card opens after a second
+  // download and covers the toolbar (its own suite is feature-vote-cases.js).
+  // Already voted in the CURRENT round, from the app's own rule, so a new
+  // round cannot silently bring the card back.
+  await page.addInitScript(([k, v]) => { try { localStorage.setItem(k, v); } catch { /* private mode */ } }, [DONE_KEY, doneValue()]);
   await page.addInitScript(() => {
     window.__beacons = [];
     navigator.sendBeacon = (url, blob) => {
