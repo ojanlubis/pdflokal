@@ -29,6 +29,20 @@ import { getLocale } from './lib/i18n.js';
 
 export const UPDATES = [
   {
+    id: '2026-11-27-font-sendiri',
+    date: '2026-11-27',
+    text: 'Bisa pakai font sendiri: pilih + Font sendiri di daftar font. Filenya tetap di HP-mu.',
+    en: 'Use your own font: pick + Your own font in the font list. The file stays on your device.',
+    approved: false,
+  },
+  {
+    id: '2026-11-27-edit-like-teks',
+    date: '2026-11-27',
+    text: 'Hasil Edit sekarang bisa dipindah, ganti font, ukuran, warna, dan rata, kayak Teks.',
+    en: 'Edited text can now be moved and restyled (font, size, colour, alignment), like Teks.',
+    approved: false,
+  },
+  {
     id: '2026-11-12-drop-picture',
     date: '2026-11-12',
     text: 'Gambar yang di-drop sekarang bisa ditaruh di atas halaman, atau jadi halaman baru.',
